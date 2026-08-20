@@ -326,9 +326,11 @@ class MyCustomMissAV(InfoExtractor):
 
         final_formats.sort(key=lambda x: x.get('quality', 0) or x.get('height', 0) or 0, reverse=True)
 
+        thumbnail_url = self._og_search_thumbnail(webpage, default=None)
         return {
             'id': video_id,
             'title': self._og_search_title(webpage, default=video_id),
+            'thumbnail': thumbnail_url,
             'formats': final_formats,
             'age_limit': 18,
         }
