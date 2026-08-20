@@ -36,7 +36,6 @@ def _interruptible_sleep(task_id, seconds):
 
 
 def _fetch_segment(task_id, seg_url, headers):
-    """Retry only the failed segment before escalating to task-level retry."""
     last = None
     for attempt in range(SEGMENT_RETRY_ATTEMPTS):
         _check_task_state(task_id)
@@ -55,7 +54,6 @@ def _fetch_segment(task_id, seg_url, headers):
             raise
         except Exception as exc:
             last = str(exc)
-
         if attempt + 1 < SEGMENT_RETRY_ATTEMPTS:
             delay = SEGMENT_RETRY_BACKOFF[attempt + 1]
             print(
@@ -64,7 +62,6 @@ def _fetch_segment(task_id, seg_url, headers):
                 flush=True,
             )
             _interruptible_sleep(task_id, delay)
-
     raise ValueError(f'세그먼트 반복 실패({last}): {seg_url}')
 
 
@@ -87,7 +84,6 @@ def _fetch_variant_playlist(task_id, variant_url, headers):
             raise
         except Exception as exc:
             last = str(exc)
-
         if attempt + 1 < PLAYLIST_RETRY_ATTEMPTS:
             delay = PLAYLIST_RETRY_BACKOFF[attempt + 1]
             print(
@@ -96,15 +92,12 @@ def _fetch_variant_playlist(task_id, variant_url, headers):
                 flush=True,
             )
             _interruptible_sleep(task_id, delay)
-
     raise ValueError(f'변형 m3u8 반복 실패: {last}')
 
 
 def _download_hls_resumable(task_id, variant_url, headers, out_path):
-    """Resumable HLS downloader with per-segment retries and pause support."""
     parts_dir = os.path.join(core.DOWNLOAD_DIR, f'.{task_id}.parts')
     os.makedirs(parts_dir, exist_ok=True)
-
     playlist_text = _fetch_variant_playlist(task_id, variant_url, headers)
     base = variant_url.rsplit('/', 1)[0] + '/'
     seg_urls = [
@@ -131,7 +124,6 @@ def _download_hls_resumable(task_id, variant_url, headers, out_path):
         if os.path.exists(seg_path(index)) and os.path.getsize(seg_path(index)) > 0
     )
     total_bytes_estimate = int(downloaded_bytes * total / done) if done else 0
-
     print(f'[다운로드] 세그먼트 {total}개 (완료 {done} / 남음 {len(pending)})', flush=True)
     if task_id in core.tasks:
         core.tasks[task_id]['progress'] = f'{int(done * 100 / total)}%'
@@ -163,7 +155,6 @@ def _download_hls_resumable(task_id, variant_url, headers, out_path):
             speed_samples.append(batch_speed)
             speed_samples = speed_samples[-4:]
             smoothed_speed = sum(speed_samples) / len(speed_samples)
-
             done += len(batch)
             downloaded_bytes += batch_bytes
             total_bytes_estimate = int(downloaded_bytes * total / done) if done else 0
@@ -184,20 +175,16 @@ def _download_hls_resumable(task_id, variant_url, headers, out_path):
     with open(list_path, 'w', encoding='utf-8') as list_file:
         for index in range(total):
             list_file.write(f"file '{seg_path(index)}'\n")
-
     print('[ffmpeg] mp4 리먹스 중...', flush=True)
     proc = subprocess.run(
-        [
-            'ffmpeg', '-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0',
-            '-i', list_path, '-c', 'copy', out_path,
-        ],
+        ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0',
+         '-i', list_path, '-c', 'copy', out_path],
         capture_output=True,
         text=True,
     )
     if proc.returncode == 0 and os.path.exists(out_path):
         shutil.rmtree(parts_dir, ignore_errors=True)
         return out_path
-
     print(
         f'[ffmpeg] concat 실패(코드 {proc.returncode}) → ts로 저장: '
         f'{(proc.stderr or "")[:300]}',
@@ -212,6 +199,15 @@ def _download_hls_resumable(task_id, variant_url, headers, out_path):
     return ts_out
 
 
+def _store_info(task_id, info):
+    if task_id not in core.tasks:
+        return
+    task = core.tasks[task_id]
+    task['display_title'] = info.get('title') or task.get('url')
+    task['thumbnail_url'] = info.get('thumbnail') or ''
+    core.save_tasks()
+
+
 def _download_video(task_id, url):
     try:
         _check_task_state(task_id)
@@ -222,7 +218,7 @@ def _download_video(task_id, url):
             ydl.add_info_extractor(core.MyCustomMissAV())
             print(f'[Download] 시작: {url}', flush=True)
             info = ydl.extract_info(url, download=False)
-
+        _store_info(task_id, info)
         _check_task_state(task_id)
         fmt = core._pick_format(info.get('formats', []), core.settings.get('video_quality', 'best'))
         if not fmt:
@@ -232,13 +228,11 @@ def _download_video(task_id, url):
         for key, value in core.CROSS_SITE_HEADERS.items():
             headers.setdefault(key, value)
         print(f"[선택] {fmt.get('height')}p -> {variant_url}", flush=True)
-
         out_name = core._safe_filename(info)
         out_path = os.path.join(core.DOWNLOAD_DIR, out_name)
         final_path = _download_hls_resumable(task_id, variant_url, headers, out_path)
         if task_id not in core.tasks:
             return
-
         out_name = os.path.basename(final_path)
         core.tasks[task_id]['status'] = '완료'
         core.tasks[task_id]['progress'] = '100%'
@@ -299,6 +293,25 @@ def _install_routes():
         core.download_queue.put(task_id)
         print(f"[Resume] 재개 큐 추가: {task.get('url')}", flush=True)
         return core.jsonify({'status': 'success', 'message': '재개 대기 중'})
+
+    @core.app.route('/api/tasks/<task_id>/thumbnail', methods=['GET'])
+    def teddy_task_thumbnail(task_id):
+        task = core.tasks.get(task_id)
+        if not task or not task.get('thumbnail_url'):
+            return core.Response(status=404)
+        url = task['thumbnail_url']
+        try:
+            parsed = core.urlparse(url)
+            if parsed.scheme not in ('http', 'https'):
+                return core.Response(status=400)
+            response = core.cffi_requests.get(url, impersonate='chrome110', timeout=15)
+            if response.status_code != 200:
+                return core.Response(status=502)
+            content_type = response.headers.get('content-type', 'image/jpeg')
+            return core.Response(response.content, mimetype=content_type.split(';')[0])
+        except Exception as exc:
+            print(f'[Thumbnail] 실패: {exc}', flush=True)
+            return core.Response(status=502)
 
     original_delete = core.app.view_functions.get('delete_task')
     if original_delete:
