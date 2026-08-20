@@ -1,3 +1,5 @@
+import os
+
 import teddy_logging
 
 # Install the stdout/stderr tee before importing the application so startup,
@@ -9,11 +11,13 @@ import time
 import teddy_entrypoint as reliability
 import teddy_generic
 import teddy_network
+import teddy_storage
 
 
 core = reliability.core
 teddy_network.install(core)
 teddy_logging.install_routes(core)
+teddy_storage.install_file_routes(core)
 
 
 # Keep the proven segment retry implementation intact and add one recovery layer
@@ -60,17 +64,47 @@ core._fetch_segment = _fetch_segment_with_network_recovery
 _custom_download_video = reliability._download_video
 
 
+def _move_custom_result_to_site_folder(task_id, url):
+    task = core.tasks.get(task_id)
+    if not task or task.get('status') != '완료' or not task.get('filename'):
+        return
+
+    current_name = str(task.get('filename') or '').replace('\\', '/')
+    # Old/root-style custom completion gives only a basename. If it is already
+    # nested, leave it alone so retries and future storage implementations remain compatible.
+    if '/' in current_name:
+        task['storage_folder'] = current_name.split('/', 1)[0]
+        core.save_tasks()
+        return
+
+    source = os.path.join(core.DOWNLOAD_DIR, current_name)
+    if not os.path.isfile(source):
+        return
+
+    site_key, site_dir = teddy_storage.ensure_site_dir(core, url, custom=True)
+    destination = os.path.join(site_dir, os.path.basename(source))
+    os.replace(source, destination)
+    task['filename'] = teddy_storage.relative_public_path(core, destination)
+    task['storage_folder'] = site_key
+    core.save_tasks()
+    print(f"[Storage] custom-hls 완료 파일 이동: {task['filename']}", flush=True)
+
+
 def _dispatch_download(task_id, url):
     task = core.tasks.get(task_id)
     if teddy_generic.is_custom_site(core, url):
         if task:
             task['engine'] = 'custom-hls'
+            task['storage_folder'] = 'missav'
             core.save_tasks()
         print(f'[Engine] custom-hls: {url}', flush=True)
-        return _custom_download_video(task_id, url)
+        result = _custom_download_video(task_id, url)
+        _move_custom_result_to_site_folder(task_id, url)
+        return result
 
     if task:
         task['engine'] = 'yt-dlp'
+        task['storage_folder'] = teddy_storage.site_key_for_url(url)
         core.save_tasks()
     print(f'[Engine] yt-dlp: {url}', flush=True)
     return teddy_generic.download_generic(core, reliability, task_id, url)
