@@ -25,12 +25,13 @@ COPY . .
 
 # Source + patch scripts must all parse before any build-time mutation.
 RUN python -m py_compile \
-    teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py \
+    app.py teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py \
     teddy_routing.py teddy_duplicates.py teddy_logging.py teddy_storage.py \
     teddy_generic.py teddy_bootstrap.py teddy_verify_build.py \
     teddy_patch_vpn_health.py teddy_patch_proxy_pool.py teddy_patch_proxy_speed.py \
     teddy_patch_proxy_learning.py teddy_patch_proxy_task_sync.py \
     teddy_patch_task_claim_remux.py teddy_patch_proxy_singleflight.py \
+    teddy_patch_proxy_engine_recovery.py teddy_patch_extraction_pause.py \
     teddy_patch_index.py teddy_patch_logs.py teddy_patch_storage.py teddy_patch_routing.py
 
 # Existing deterministic boundary smoke tests.
@@ -51,10 +52,12 @@ RUN sed -i 's/ensure_ready(core, wait_seconds=15)/ensure_ready(core, wait_second
 RUN python teddy_patch_task_claim_remux.py
 RUN python teddy_patch_proxy_learning.py
 RUN python teddy_patch_proxy_task_sync.py
+RUN python teddy_patch_proxy_engine_recovery.py
+RUN python teddy_patch_extraction_pause.py
 
 # Patched runtime must compile and satisfy explicit semantic markers.
 RUN python -m py_compile \
-    teddy_entrypoint.py teddy_bootstrap.py teddy_vpn_health.py teddy_network.py \
+    app.py teddy_entrypoint.py teddy_bootstrap.py teddy_vpn_health.py teddy_network.py \
     teddy_proxy_pool.py teddy_routing.py teddy_generic.py teddy_patch_routing.py
 RUN python teddy_verify_build.py runtime
 
