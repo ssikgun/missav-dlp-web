@@ -20,12 +20,12 @@ RUN uv pip install --system --no-cache -r requirements.txt
 # 5. 애플리케이션 복사
 COPY . .
 
-# Teddy custom: 원본 index.html은 건드리지 않고 속도 표시 스크립트만 빌드 시 삽입
-RUN sed -i 's#</body>#<script src="/static/teddy-speed.js"></script></body>#' templates/index.html
+# Teddy custom: 원본 index.html은 건드리지 않고 커스텀 UI 레이어만 빌드 시 삽입
+RUN sed -i 's#</body>#<script src="/static/teddy-speed.js"></script><script src="/static/teddy-reliability.js"></script></body>#' templates/index.html
 
 # 6. 폴더 생성 및 포트 노출
 RUN mkdir -p /downloads
 EXPOSE 5000
 
-# 7. 파이썬 바로 실행 (SpoofDPI는 app.py가 알아서 켭니다)
-CMD ["python", "app.py"]
+# 7. Teddy 안정성 레이어를 적용한 엔트리포인트 실행
+CMD ["python", "teddy_entrypoint.py"]
