@@ -114,8 +114,8 @@
             rotateButton.title = 'Gluetun control API 설정이 필요합니다.';
         } else if (rotationInProgress) {
             rotateButton.title = 'VPN을 재연결하는 중입니다.';
-        } else if (data && data.active_tasks > 0) {
-            rotateButton.title = '먼저 진행 중인 다운로드를 일시정지하세요.';
+        } else if (data && data.active_vpn_tasks > 0) {
+            rotateButton.title = '먼저 진행 중인 VPN 다운로드를 일시정지하세요.';
         } else {
             rotateButton.title = 'VPN을 재연결해 새 출구 IP를 요청합니다.';
         }
