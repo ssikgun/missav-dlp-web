@@ -6,12 +6,12 @@ from collections import deque
 FAILURE_WINDOW_SECONDS = 60
 FAILURE_COUNT_THRESHOLD = 10
 FAILURE_SEGMENT_THRESHOLD = 5
-TRIGGER_THROTTLE_SECONDS = 10
+TRIGGER_THROTTLE_SECONDS = 60
 
 _lock = threading.Lock()
 _events = {}
 _last_trigger = {}
-_recovery_threads = set()
+_recovering_tasks = set()
 
 
 def _prune_locked(now):
@@ -22,7 +22,8 @@ def _prune_locked(now):
             queue.popleft()
         if not queue:
             _events.pop(task_id, None)
-            _last_trigger.pop(task_id, None)
+            if task_id not in _recovering_tasks:
+                _last_trigger.pop(task_id, None)
 
 
 def _clear_locked():
@@ -35,6 +36,12 @@ def clear():
         _clear_locked()
 
 
+def clear_task(task_id):
+    with _lock:
+        _events.pop(task_id, None)
+        _last_trigger.pop(task_id, None)
+
+
 def snapshot():
     now = time.monotonic()
     with _lock:
@@ -44,17 +51,19 @@ def snapshot():
             for task_id, queue in _events.items()
             for ts, segment, _reason in queue
         ]
+        recovering = len(_recovering_tasks)
     return {
         'auto_failure_count': len(rows),
         'auto_failure_segments': len({(task_id, segment) for task_id, _ts, segment in rows}),
         'auto_failure_threshold': FAILURE_COUNT_THRESHOLD,
         'auto_failure_segment_threshold': FAILURE_SEGMENT_THRESHOLD,
         'auto_failure_window_seconds': FAILURE_WINDOW_SECONDS,
+        'auto_recovery_workers': recovering,
     }
 
 
 def _recover_in_background(core, network_module, task_id, summary, failed_since):
-    current = threading.current_thread()
+    recovered = False
     try:
         recovered = network_module.auto_recover(
             core,
@@ -63,14 +72,18 @@ def _recover_in_background(core, network_module, task_id, summary, failed_since)
             failed_since=failed_since,
         )
         if recovered:
-            clear()
+            clear_task(task_id)
     finally:
         with _lock:
-            _recovery_threads.discard(current)
+            _recovering_tasks.discard(task_id)
+            if not recovered:
+                # A failed recovery must not immediately launch another 55-second
+                # reconnect loop from the same accumulated failure burst.
+                _last_trigger[task_id] = time.monotonic()
 
 
 def note_failure(core, network_module, task_id, segment, reason):
-    """Observe a recoverable VPN segment failure and rotate on sustained degradation."""
+    """Observe recoverable VPN segment failures and rotate on sustained degradation."""
     if not core.settings.get('network_auto_recover', True):
         return False
     task = core.tasks.get(task_id)
@@ -92,11 +105,16 @@ def note_failure(core, network_module, task_id, segment, reason):
         distinct = len({item[1] for item in queue})
         oldest = queue[0][0]
         last_trigger = _last_trigger.get(task_id, 0.0)
+
+        if task_id in _recovering_tasks:
+            return False
         if count < FAILURE_COUNT_THRESHOLD or distinct < FAILURE_SEGMENT_THRESHOLD:
             return False
         if now - last_trigger < TRIGGER_THROTTLE_SECONDS:
             return False
+
         _last_trigger[task_id] = now
+        _recovering_tasks.add(task_id)
 
     summary = (
         f'{FAILURE_WINDOW_SECONDS}s 내 recoverable 오류 {count}회 / '
@@ -110,8 +128,6 @@ def note_failure(core, network_module, task_id, segment, reason):
         name=f'vpn-auto-recover-{task_id[:8]}',
         daemon=True,
     )
-    with _lock:
-        _recovery_threads.add(worker)
     worker.start()
     return True
 
