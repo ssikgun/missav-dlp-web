@@ -21,7 +21,7 @@ class DownloadPaused(Exception):
 def _check_task_state(task_id):
     if task_id not in core.tasks:
         raise core.DownloadCancelled()
-    if core.tasks[task_id].get('status') == '일시정지':
+    if core.tasks[task_id].get('status') in ('일시정지 요청 중', '일시정지'):
         raise DownloadPaused()
 
 
@@ -142,6 +142,7 @@ def _download_hls_resumable(task_id, variant_url, headers, out_path):
     def fetch_to_file(item):
         index, url = item
         data = _fetch_segment(task_id, url, headers)
+        _check_task_state(task_id)
         tmp = seg_path(index) + '.tmp'
         with open(tmp, 'wb') as file_obj:
             file_obj.write(data)
@@ -257,7 +258,7 @@ def _download_video(task_id, url):
             core.tasks[task_id]['status'] = '일시정지'
             core.tasks[task_id]['speed_bps'] = 0
             core.save_tasks()
-        print(f'[Pause] 일시정지: {url}', flush=True)
+        print(f'[Pause] 일시정지 완료: {url}', flush=True)
     except core.DownloadCancelled:
         if task_id in core.tasks:
             core.tasks[task_id]['status'] = '취소됨'
@@ -279,11 +280,11 @@ def _install_routes():
             return core.jsonify({'status': 'error', 'message': '작업 없음'}), 404
         if task.get('status') != '다운로드 중':
             return core.jsonify({'status': 'error', 'message': '다운로드 중인 작업만 일시정지할 수 있습니다.'}), 400
-        task['status'] = '일시정지'
+        task['status'] = '일시정지 요청 중'
         task['speed_bps'] = 0
         core.save_tasks()
         print(f"[Pause] 요청: {task.get('url')}", flush=True)
-        return core.jsonify({'status': 'success', 'message': '일시정지 요청됨'})
+        return core.jsonify({'status': 'success', 'message': '안전하게 일시정지하는 중입니다.'})
 
     @core.app.route('/api/tasks/<task_id>/resume', methods=['POST'])
     def teddy_resume_task(task_id):
@@ -303,10 +304,10 @@ def _install_routes():
     if original_delete:
         def safe_delete_task(task_id):
             task = core.tasks.get(task_id)
-            if task and task.get('status') == '다운로드 중':
+            if task and task.get('status') in ('다운로드 중', '일시정지 요청 중'):
                 return core.jsonify({
                     'status': 'error',
-                    'message': '다운로드 중에는 삭제할 수 없습니다. 먼저 일시정지하세요.',
+                    'message': '다운로드가 완전히 일시정지된 뒤 삭제하세요.',
                 }), 409
             return original_delete(task_id)
         core.app.view_functions['delete_task'] = safe_delete_task
@@ -316,7 +317,7 @@ def _install_routes():
         if not task:
             return core.jsonify({'status': 'error', 'message': '작업 없음'}), 404
         current = task.get('status', '')
-        if current in ('다운로드 중', '대기 중'):
+        if current in ('다운로드 중', '대기 중', '일시정지 요청 중'):
             return core.jsonify({'status': 'error', 'message': '이미 진행 중인 작업'}), 400
         if current == '일시정지':
             return core.jsonify({'status': 'error', 'message': '일시정지 작업은 재개 버튼을 사용하세요.'}), 400
