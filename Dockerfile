@@ -17,6 +17,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN uv pip install --system --no-cache -r requirements.txt
 
+# Teddy custom: 런타임 핵심 의존성 import를 빌드 단계에서 검증
+RUN python -c "import typing_extensions; import curl_cffi; import yt_dlp; import flask; print('dependency smoke test: OK')"
+
 # 5. 애플리케이션 복사
 COPY . .
 
