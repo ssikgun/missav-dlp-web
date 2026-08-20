@@ -15,8 +15,10 @@ def forbid(path, needle, label=None):
 
 
 def verify_runtime():
+    import teddy_hls_transport as h
     import teddy_proxy_pool as p
 
+    assert h.HLS_WORKERS == 8
     assert p.BANDWIDTH_TEST_BYTES == 512 * 1024
     assert p.BANDWIDTH_TEST_LIMIT <= 8
     assert p.BANDWIDTH_TEST_WORKERS <= 4
@@ -50,6 +52,13 @@ def verify_runtime():
             "task.get('status') in ('일시정지 요청 중', '일시정지')",
             "elif t.get('status') == '일시정지 요청 중'",
             'except ExtractorError',
+        ],
+        'teddy_hls_transport.py': [
+            'HLS_WORKERS = 8',
+            'cffi_requests.Session()',
+            "state.get('proxy_url') == proxy_url",
+            'def invalidate()',
+            "kwargs['proxies']",
         ],
         'teddy_network.py': [
             'Gluetun proxy를 통한 공인 IP 확인',
@@ -92,8 +101,15 @@ def verify_runtime():
             '활성 작업',
         ],
         'teddy_entrypoint.py': [
+            'import teddy_hls_transport',
+            'FIRST_COMPLETED',
+            'teddy_hls_transport.get(',
+            'teddy_hls_transport.invalidate()',
+            'persistent session + continuous',
+            'return_when=FIRST_COMPLETED',
+            'submit_one()',
             '_teddy_proxy_transfer_observer',
-            'observer(task_id, batch_bytes, elapsed)',
+            'observer(task_id, window_bytes, window_elapsed)',
             'remux-output.mp4',
             'os.replace(remux_tmp, out_path)',
             '_teddy_vpn_failure_observer',
@@ -107,6 +123,7 @@ def verify_runtime():
         for needle in needles:
             require(path, needle)
 
+    forbid('teddy_entrypoint.py', 'batch_size = 16', 'legacy HLS batch barrier')
     print('Teddy runtime build verification: OK')
 
 
