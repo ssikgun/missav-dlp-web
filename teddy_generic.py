@@ -4,6 +4,7 @@ import shutil
 import threading
 import time
 
+import teddy_routing
 import teddy_storage
 
 
@@ -100,16 +101,18 @@ def _find_final_path(core, ydl, info, home_dir):
     return ''
 
 
-def download_generic(core, reliability, task_id, url):
+def download_generic(core, reliability, task_id, url, network_mode='direct'):
     temp_dir = _task_temp_dir(core, task_id)
     os.makedirs(temp_dir, exist_ok=True)
     site_key, site_dir = teddy_storage.ensure_site_dir(core, url, custom=False)
     last_filename = {'path': ''}
+    proxy_url = teddy_routing.proxy_for_mode(network_mode)
 
     task = core.tasks.get(task_id)
     if task:
         task['storage_folder'] = site_key
         task['engine'] = 'yt-dlp'
+        task['network_mode'] = network_mode
         _maybe_save(core, task_id, force=True)
 
     def progress_hook(data):
@@ -165,8 +168,11 @@ def download_generic(core, reliability, task_id, url):
         },
         'progress_hooks': [progress_hook],
     }
+    if proxy_url:
+        opts['proxy'] = proxy_url
 
-    print(f'[yt-dlp] generic download 시작: {url} -> {site_key}/', flush=True)
+    route_label = 'VPN' if network_mode == 'vpn' else 'Direct'
+    print(f'[yt-dlp] generic download 시작 ({route_label}): {url} -> {site_key}/', flush=True)
     try:
         with core.yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -181,7 +187,7 @@ def download_generic(core, reliability, task_id, url):
 
         task = core.tasks.get(task_id)
         if not task:
-            return
+            return {'status': 'cancelled'}
         if not final_path:
             candidate = last_filename.get('path') or ''
             if candidate and os.path.isfile(candidate):
@@ -199,9 +205,12 @@ def download_generic(core, reliability, task_id, url):
         task['total_bytes_estimate'] = final_size
         task['engine'] = 'yt-dlp'
         task['storage_folder'] = site_key
+        task['network_mode'] = network_mode
+        task.pop('last_error_detail', None)
         _maybe_save(core, task_id, force=True)
         shutil.rmtree(temp_dir, ignore_errors=True)
-        print(f"[완료][yt-dlp] {task['filename']}", flush=True)
+        print(f"[완료][yt-dlp][{route_label}] {task['filename']}", flush=True)
+        return {'status': 'complete'}
     except reliability.DownloadPaused:
         task = core.tasks.get(task_id)
         if task:
@@ -209,14 +218,17 @@ def download_generic(core, reliability, task_id, url):
             task['speed_bps'] = 0
             task['engine'] = 'yt-dlp'
             task['storage_folder'] = site_key
+            task['network_mode'] = network_mode
             _maybe_save(core, task_id, force=True)
         print(f'[Pause][yt-dlp] 일시정지 완료: {url}', flush=True)
+        return {'status': 'paused'}
     except core.DownloadCancelled:
         task = core.tasks.get(task_id)
         if task:
             task['status'] = '취소됨'
             task['speed_bps'] = 0
             _maybe_save(core, task_id, force=True)
+        return {'status': 'cancelled'}
     except Exception as exc:
         task = core.tasks.get(task_id)
         # yt-dlp may wrap an exception raised from a progress hook. Preserve the
@@ -226,16 +238,21 @@ def download_generic(core, reliability, task_id, url):
             task['speed_bps'] = 0
             task['engine'] = 'yt-dlp'
             task['storage_folder'] = site_key
+            task['network_mode'] = network_mode
             _maybe_save(core, task_id, force=True)
             print(f'[Pause][yt-dlp] 일시정지 완료: {url}', flush=True)
-            return
-        print(f'[Error][yt-dlp] {url}: {exc}', flush=True)
+            return {'status': 'paused'}
+        message = str(exc)
+        print(f'[Error][yt-dlp][{route_label}] {url}: {message}', flush=True)
         if task:
-            task['status'] = f'에러: {str(exc)[:100]}'
+            task['status'] = f'에러: {message[:100]}'
+            task['last_error_detail'] = message[:1000]
             task['speed_bps'] = 0
             task['engine'] = 'yt-dlp'
             task['storage_folder'] = site_key
+            task['network_mode'] = network_mode
             _maybe_save(core, task_id, force=True)
+        return {'status': 'error', 'error': message}
 
 
 def install_delete_cleanup(core):
