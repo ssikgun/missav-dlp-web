@@ -3,3 +3,5 @@ werkzeug>=3.0.6
 # impersonate(브라우저 TLS 위장) 네트워킹이 안정화된 버전 이상 필요
 yt-dlp>=2024.8.6
 curl_cffi>=0.7.0
+# Python 3.10에서 curl_cffi가 typing.Unpack 대신 사용하는 fallback
+typing_extensions>=4.12.0
