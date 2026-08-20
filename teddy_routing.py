@@ -10,10 +10,12 @@ from urllib.parse import urlparse
 VPN_PROXY_URL = os.environ.get('GLUETUN_PROXY_URL', 'http://gluetun:8888').strip()
 _STATE_LOCK = threading.Lock()
 _ROUTE_LOCAL = threading.local()
+_PROXY_PROVIDER = None
 _STATE = {
     'manual_rules': {},
     'learned_rules': {},
 }
+VALID_MODES = ('direct', 'proxy', 'vpn')
 
 _ALIAS_HOSTS = {
     'youtu.be': 'youtube.com',
@@ -29,9 +31,8 @@ _ALIAS_HOSTS = {
 class RouteAwareRequests:
     """Proxy curl_cffi through the task-selected route without global races.
 
-    When a route context is VPN, all explicit/implicit proxy arguments are
-    overridden with Gluetun's HTTP proxy. Outside a route context requests keep
-    their original behavior, which is important for control-server and UI calls.
+    Direct has no implicit proxy, VPN uses Gluetun's HTTP proxy, and Proxy uses
+    the currently selected public proxy supplied by teddy_proxy_pool.
     """
     def __init__(self, wrapped):
         self._wrapped = wrapped
@@ -74,6 +75,19 @@ def request_route(mode):
         _ROUTE_LOCAL.proxy_url = previous
 
 
+def set_proxy_provider(provider):
+    global _PROXY_PROVIDER
+    _PROXY_PROVIDER = provider if callable(provider) else None
+
+
+def mode_label(mode):
+    if mode == 'vpn':
+        return 'VPN'
+    if mode == 'proxy':
+        return 'Proxy'
+    return 'Direct'
+
+
 def _state_path(core):
     return os.path.join(core.DOWNLOAD_DIR, '.network-routing.json')
 
@@ -113,11 +127,11 @@ def _load(core):
         clean_manual = {
             str(key): value
             for key, value in manual.items()
-            if value in ('direct', 'vpn') and str(key)
+            if value in VALID_MODES and str(key)
         }
         clean_learned = {}
         for key, value in learned.items():
-            if not isinstance(value, dict) or value.get('mode') not in ('direct', 'vpn'):
+            if not isinstance(value, dict) or value.get('mode') not in VALID_MODES:
                 continue
             clean_learned[str(key)] = {
                 'mode': value['mode'],
@@ -166,7 +180,7 @@ def snapshot():
 def resolve(url, override='auto'):
     override = str(override or 'auto').lower()
     site = canonical_site(url)
-    if override in ('direct', 'vpn'):
+    if override in VALID_MODES:
         return {
             'site': site,
             'mode': override,
@@ -178,14 +192,14 @@ def resolve(url, override='auto'):
         manual = _STATE['manual_rules'].get(site)
         learned = _STATE['learned_rules'].get(site)
 
-    if manual in ('direct', 'vpn'):
+    if manual in VALID_MODES:
         return {
             'site': site,
             'mode': manual,
             'source': 'manual',
             'fixed': True,
         }
-    if isinstance(learned, dict) and learned.get('mode') in ('direct', 'vpn'):
+    if isinstance(learned, dict) and learned.get('mode') in VALID_MODES:
         return {
             'site': site,
             'mode': learned['mode'],
@@ -200,12 +214,29 @@ def resolve(url, override='auto'):
     }
 
 
+def fallback_modes(mode, proxy_enabled=True):
+    """Return ordered fallbacks without silently reversing a learned VPN route."""
+    if mode == 'direct':
+        return ['proxy', 'vpn'] if proxy_enabled else ['vpn']
+    if mode == 'proxy':
+        return ['vpn']
+    return []
+
+
 def fallback_mode(mode):
-    return 'vpn' if mode == 'direct' else 'direct'
+    modes = fallback_modes(mode, proxy_enabled=True)
+    return modes[0] if modes else ''
 
 
 def proxy_for_mode(mode):
-    return VPN_PROXY_URL if mode == 'vpn' and VPN_PROXY_URL else None
+    if mode == 'vpn':
+        return VPN_PROXY_URL or None
+    if mode == 'proxy' and _PROXY_PROVIDER:
+        try:
+            return _PROXY_PROVIDER() or None
+        except Exception:
+            return None
+    return None
 
 
 def proxy_for_task(core, task_id):
@@ -234,7 +265,7 @@ def prepare_fallback(core, task_id, next_mode):
 
 
 def learn_success(core, url, mode, source):
-    if mode not in ('direct', 'vpn'):
+    if mode not in VALID_MODES:
         return
     # Explicit one-off overrides and manual rules are authoritative and should
     # never mutate the automatic learning table.
@@ -255,6 +286,9 @@ def learn_success(core, url, mode, source):
 
 
 def should_fallback(network_module, error_message):
+    text = str(error_message or '').lower()
+    if 'proxy pool unavailable' in text or 'public proxy unavailable' in text:
+        return True
     return bool(network_module.is_recoverable_failure(error_message))
 
 
@@ -268,7 +302,7 @@ def install(core):
         if not url:
             return core.jsonify({'status': 'error', 'message': 'URL 입력'}), 400
         override = str(core.request.form.get('network_mode', 'auto') or 'auto').lower()
-        if override not in ('auto', 'direct', 'vpn'):
+        if override not in ('auto',) + VALID_MODES:
             return core.jsonify({'status': 'error', 'message': '잘못된 네트워크 모드입니다.'}), 400
 
         task_id = str(core.uuid.uuid4())
@@ -303,7 +337,8 @@ def install(core):
         data = snapshot()
         data.update({
             'default_mode': 'direct',
-            'fallback_mode': 'vpn',
+            'fallback_mode': 'proxy',
+            'fallback_chain': ['proxy', 'vpn'],
             'learning_enabled': True,
         })
         return core.jsonify(data)
@@ -321,8 +356,8 @@ def install(core):
         mode = str(payload.get('mode') or '').lower()
         if not target:
             return core.jsonify({'status': 'error', 'message': '사이트 URL 또는 도메인을 입력하세요.'}), 400
-        if mode not in ('direct', 'vpn'):
-            return core.jsonify({'status': 'error', 'message': 'Direct 또는 VPN을 선택하세요.'}), 400
+        if mode not in VALID_MODES:
+            return core.jsonify({'status': 'error', 'message': 'Direct, Proxy 또는 VPN을 선택하세요.'}), 400
         with _STATE_LOCK:
             _STATE['manual_rules'][target] = mode
         _save(core)
@@ -354,6 +389,6 @@ def install(core):
         return core.jsonify({'status': 'success', 'removed': existed})
 
     print(
-        '[Teddy] adaptive routing enabled: Direct first -> VPN fallback -> learn success',
+        '[Teddy] adaptive routing enabled: Direct -> Proxy -> VPN -> learn success',
         flush=True,
     )
