@@ -22,6 +22,7 @@ RUN python -c "import typing_extensions; import curl_cffi; import yt_dlp; import
 
 # 5. 애플리케이션 복사
 COPY . .
+RUN python -m py_compile teddy_entrypoint.py teddy_network.py teddy_bootstrap.py teddy_patch_index.py
 
 # Teddy custom: 범용 브랜딩 + 안정적인 keyed task UI를 빌드 시 적용
 # 패치 대상이 upstream 변경으로 달라지면 teddy_patch_index.py가 빌드를 실패시킨다.
