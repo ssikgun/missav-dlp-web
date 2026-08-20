@@ -82,6 +82,10 @@ def main():
     text = replace_function(text, '_fetch_segment', '_fetch_variant_playlist', fetch_segment)
 
     download_hls = r'''def _download_hls_resumable(task_id, variant_url, headers, out_path):
+    # Capture the persisted benchmark setting once per task. Changing the UI while
+    # a download is active affects only the next HLS task, so an executor never
+    # changes size underneath an in-flight download.
+    worker_count = teddy_hls_transport.workers_from_settings(core.settings)
     parts_dir = os.path.join(core.DOWNLOAD_DIR, f'.{task_id}.parts')
     os.makedirs(parts_dir, exist_ok=True)
     playlist_text = _fetch_variant_playlist(task_id, variant_url, headers)
@@ -112,7 +116,7 @@ def main():
     total_bytes_estimate = int(downloaded_bytes * total / done) if done else 0
     print(
         f'[다운로드] 세그먼트 {total}개 (완료 {done} / 남음 {len(pending)}) '
-        f'· persistent session + continuous {teddy_hls_transport.HLS_WORKERS} workers',
+        f'· persistent session + continuous {worker_count} workers',
         flush=True,
     )
     if task_id in core.tasks:
@@ -120,6 +124,7 @@ def main():
         core.tasks[task_id]['speed_bps'] = 0
         core.tasks[task_id]['downloaded_bytes'] = downloaded_bytes
         core.tasks[task_id]['total_bytes_estimate'] = total_bytes_estimate
+        core.tasks[task_id]['hls_workers'] = worker_count
         core.save_tasks()
 
     def fetch_to_file(item):
@@ -138,7 +143,7 @@ def main():
     last_speed = 0
     pending_iter = iter(pending)
     in_flight = {}
-    executor = ThreadPoolExecutor(max_workers=teddy_hls_transport.HLS_WORKERS)
+    executor = ThreadPoolExecutor(max_workers=worker_count)
 
     def submit_one():
         try:
@@ -150,7 +155,7 @@ def main():
         return True
 
     try:
-        for _ in range(min(teddy_hls_transport.HLS_WORKERS, len(pending))):
+        for _ in range(min(worker_count, len(pending))):
             submit_one()
 
         while in_flight:
