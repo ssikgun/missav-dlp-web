@@ -2,16 +2,21 @@
     const originalFetch = window.fetch.bind(window);
     let latestTasks = null;
 
-    function formatSpeed(bytesPerSecond) {
-        const bps = Number(bytesPerSecond) || 0;
-        if (bps <= 0) return '';
-        if (bps >= 1e9) return (bps / 1e9).toFixed(1) + ' GB/s';
-        if (bps >= 1e6) return (bps / 1e6).toFixed(1) + ' MB/s';
-        if (bps >= 1e3) return (bps / 1e3).toFixed(1) + ' KB/s';
-        return Math.round(bps) + ' B/s';
+    function formatBytes(bytes) {
+        const value = Number(bytes) || 0;
+        if (value <= 0) return '';
+        if (value >= 1e9) return (value / 1e9).toFixed(1) + ' GB';
+        if (value >= 1e6) return (value / 1e6).toFixed(1) + ' MB';
+        if (value >= 1e3) return (value / 1e3).toFixed(1) + ' KB';
+        return Math.round(value) + ' B';
     }
 
-    function renderSpeeds() {
+    function formatSpeed(bytesPerSecond) {
+        const formatted = formatBytes(bytesPerSecond);
+        return formatted ? formatted + '/s' : '';
+    }
+
+    function renderSpeedsAndSizes() {
         if (!latestTasks) return;
         const entries = Object.entries(latestTasks).reverse();
         const cards = document.querySelectorAll('#taskList .task-card');
@@ -25,7 +30,19 @@
 
             const pct = task.progress || '0%';
             const speed = formatSpeed(task.speed_bps);
-            text.textContent = speed ? `${pct} · ↓ ${speed}` : pct;
+            const downloaded = formatBytes(task.downloaded_bytes);
+            const totalEstimate = formatBytes(task.total_bytes_estimate);
+
+            const parts = [pct];
+            if (downloaded && totalEstimate) {
+                parts.push(`${downloaded} / 약 ${totalEstimate}`);
+            } else if (downloaded) {
+                parts.push(downloaded);
+            }
+            if (speed) {
+                parts.push(`↓ ${speed}`);
+            }
+            text.textContent = parts.join(' · ');
         });
     }
 
@@ -35,14 +52,14 @@
             if (requestUrl.endsWith('/api/tasks') || requestUrl === '/api/tasks') {
                 response.clone().json().then(data => {
                     latestTasks = data;
-                    setTimeout(renderSpeeds, 0);
+                    setTimeout(renderSpeedsAndSizes, 0);
                 }).catch(() => {});
             }
             return response;
         });
     };
 
-    const observer = new MutationObserver(renderSpeeds);
+    const observer = new MutationObserver(renderSpeedsAndSizes);
     const taskList = document.getElementById('taskList');
     if (taskList) {
         observer.observe(taskList, { childList: true, subtree: true });
