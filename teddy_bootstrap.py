@@ -81,13 +81,18 @@ def _move_custom_result_to_site_folder(task_id, url):
     if not os.path.isfile(source):
         return
 
-    site_key, site_dir = teddy_storage.ensure_site_dir(core, url, custom=True)
-    destination = os.path.join(site_dir, os.path.basename(source))
-    os.replace(source, destination)
-    task['filename'] = teddy_storage.relative_public_path(core, destination)
-    task['storage_folder'] = site_key
-    core.save_tasks()
-    print(f"[Storage] custom-hls 완료 파일 이동: {task['filename']}", flush=True)
+    try:
+        site_key, site_dir = teddy_storage.ensure_site_dir(core, url, custom=True)
+        destination = os.path.join(site_dir, os.path.basename(source))
+        os.replace(source, destination)
+        task['filename'] = teddy_storage.relative_public_path(core, destination)
+        task['storage_folder'] = site_key
+        core.save_tasks()
+        print(f"[Storage] custom-hls 완료 파일 이동: {task['filename']}", flush=True)
+    except OSError as exc:
+        # Storage organization must never turn a successful download into a
+        # failed task or kill a worker. Keep the root file as a safe fallback.
+        print(f'[Storage] 사이트 폴더 이동 실패 → 루트 파일 유지: {exc}', flush=True)
 
 
 def _dispatch_download(task_id, url):
