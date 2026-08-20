@@ -59,6 +59,16 @@ def main():
             # VPN reconnects keep the same Gluetun proxy URL. Dropping the worker
             # Session here guarantees the retry opens a fresh CONNECT/TLS path.
             teddy_hls_transport.invalidate()
+
+        # Preserve the cumulative VPN health observer from the reliability layer.
+        # The observer itself ignores Direct/Proxy tasks and non-recoverable errors.
+        observer = getattr(core, '_teddy_vpn_failure_observer', None)
+        if callable(observer):
+            try:
+                observer(task_id, os.path.basename(seg_url), last)
+            except Exception as observer_exc:
+                print(f'[VPN 자동복구] 오류 감지기 예외: {observer_exc}', flush=True)
+
         if attempt + 1 < SEGMENT_RETRY_ATTEMPTS:
             delay = SEGMENT_RETRY_BACKOFF[attempt + 1]
             print(
