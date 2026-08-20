@@ -5,8 +5,8 @@ from curl_cffi import requests as cffi_requests
 
 # Hitomi's recovered M3U8 core uses a much smaller dedicated worker pool than the
 # GUI's general downloader connection setting. Keep 8 as the compatibility
-# default, but allow controlled 2/4/8 A/B tests from the persisted web settings.
-ALLOWED_HLS_WORKERS = (2, 4, 8)
+# default, but allow controlled 2/4/8/12/16 A/B tests from persisted web settings.
+ALLOWED_HLS_WORKERS = (2, 4, 8, 12, 16)
 HLS_WORKERS = 8
 
 _thread_local = threading.local()
