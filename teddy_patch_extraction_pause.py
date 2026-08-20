@@ -16,6 +16,13 @@ def replace_once(path, old, new, label):
 def main():
     replace_once(
         APP,
+        """            if t.get('status') in ('다운로드 중', '대기 중'):\n                t['status'] = '에러: 다운로드 중단됨 (재시작하세요)'\n                t['progress'] = '0%'\n            t['speed_bps'] = 0\n""",
+        """            if t.get('status') in ('다운로드 중', '대기 중'):\n                t['status'] = '에러: 다운로드 중단됨 (재시작하세요)'\n                t['progress'] = '0%'\n            elif t.get('status') == '일시정지 요청 중':\n                # A container restart while extraction/network I/O was still\n                # unwinding should complete the user's requested pause rather\n                # than leave the task permanently stuck in an intermediate state.\n                t['status'] = '일시정지'\n            t['speed_bps'] = 0\n""",
+        'recover pending pause after restart',
+    )
+
+    replace_once(
+        APP,
         "from yt_dlp.extractor.common import InfoExtractor\n",
         "from yt_dlp.extractor.common import InfoExtractor\nfrom yt_dlp.utils import ExtractorError\n",
         'ExtractorError import',
