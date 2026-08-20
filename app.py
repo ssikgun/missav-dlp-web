@@ -153,6 +153,7 @@ def load_tasks():
             if t.get('status') in ('다운로드 중', '대기 중'):
                 t['status'] = '에러: 다운로드 중단됨 (재시작하세요)'
                 t['progress'] = '0%'
+            t['speed_bps'] = 0
             tasks[tid] = t
         save_tasks()
     except Exception as e:
@@ -385,6 +386,7 @@ def _download_hls_resumable(task_id, variant_url, headers, out_path):
     print(f'[다운로드] 세그먼트 {total}개 (완료 {done} / 남음 {len(pending)})', flush=True)
     if task_id in tasks:
         tasks[task_id]['progress'] = f'{int(done * 100 / total)}%'
+        tasks[task_id]['speed_bps'] = 0
 
     def fetch_to_file(item):
         i, u = item
@@ -393,20 +395,32 @@ def _download_hls_resumable(task_id, variant_url, headers, out_path):
         with open(tmp, 'wb') as f:
             f.write(data)
         os.replace(tmp, seg_path(i))  # 원자적 저장 — 중단돼도 반쪽 세그먼트가 안 남는다
+        return len(data)
 
+    speed_samples = []
     with ThreadPoolExecutor(max_workers=8) as ex:
         BATCH = 16
         for start in range(0, len(pending), BATCH):
             if task_id not in tasks:
                 raise DownloadCancelled()
             batch = pending[start:start + BATCH]
-            list(ex.map(fetch_to_file, batch))
+            batch_started = time.monotonic()
+            byte_counts = list(ex.map(fetch_to_file, batch))
+            elapsed = max(time.monotonic() - batch_started, 0.001)
+            batch_speed = sum(byte_counts) / elapsed
+            speed_samples.append(batch_speed)
+            speed_samples = speed_samples[-4:]
+            smoothed_speed = sum(speed_samples) / len(speed_samples)
+
             done += len(batch)
-            tasks[task_id]['progress'] = f'{int(min(done, total) * 100 / total)}%'
+            if task_id in tasks:
+                tasks[task_id]['progress'] = f'{int(min(done, total) * 100 / total)}%'
+                tasks[task_id]['speed_bps'] = int(smoothed_speed)
 
     # 모든 세그먼트 확보 → ffmpeg concat으로 mp4 리먹스
     if task_id in tasks:
         tasks[task_id]['progress'] = '99%'
+        tasks[task_id]['speed_bps'] = 0
     list_path = os.path.join(parts_dir, 'filelist.txt')
     with open(list_path, 'w', encoding='utf-8') as lf:
         for i in range(total):
@@ -501,6 +515,7 @@ def download_video(task_id, url):
         if task_id in tasks:
             tasks[task_id]['status'] = '완료'
             tasks[task_id]['progress'] = '100%'
+            tasks[task_id]['speed_bps'] = 0
             tasks[task_id]['filename'] = out_name
             try:
                 tasks[task_id]['filesize'] = os.path.getsize(final_path)
@@ -511,11 +526,13 @@ def download_video(task_id, url):
     except DownloadCancelled:
         if task_id in tasks:
             tasks[task_id]['status'] = '취소됨'
+            tasks[task_id]['speed_bps'] = 0
             save_tasks()
     except Exception as e:
         print(f"[Error] {url}: {e}", flush=True)
         if task_id in tasks:
             tasks[task_id]['status'] = f'에러: {str(e)[:100]}'
+            tasks[task_id]['speed_bps'] = 0
             save_tasks()
 
 
@@ -527,6 +544,7 @@ def worker():
             break
         if task_id in tasks:
             tasks[task_id]['status'] = '다운로드 중'
+            tasks[task_id]['speed_bps'] = 0
             save_tasks()
             download_video(task_id, tasks[task_id]['url'])
         download_queue.task_done()
@@ -553,6 +571,7 @@ def auto_retry_monitor():
                 t['retries'] = n + 1
                 t['status'] = '대기 중'
                 t['progress'] = '0%'
+                t['speed_bps'] = 0
                 save_tasks()
                 download_queue.put(tid)
                 print(f"[자동재시도] ({t['retries']}/{cap}) {t.get('url')}", flush=True)
@@ -577,7 +596,7 @@ def handle_download():
     if not url:
         return jsonify({"status": "error", "message": "URL 입력"}), 400
     task_id = str(uuid.uuid4())
-    tasks[task_id] = {'url': url, 'status': '대기 중', 'progress': '0%'}
+    tasks[task_id] = {'url': url, 'status': '대기 중', 'progress': '0%', 'speed_bps': 0}
     save_tasks()
     download_queue.put(task_id)
     return jsonify({"status": "success", "task_id": task_id})
@@ -605,6 +624,7 @@ def retry_task(task_id):
         return jsonify({"status": "error", "message": "이미 진행 중인 작업"}), 400
     tasks[task_id]['status'] = '대기 중'
     tasks[task_id]['progress'] = '0%'
+    tasks[task_id]['speed_bps'] = 0
     tasks[task_id]['retries'] = 0   # 수동 재시작은 자동 재시도 예산을 초기화
     save_tasks()
     download_queue.put(task_id)
