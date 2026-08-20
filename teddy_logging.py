@@ -22,7 +22,9 @@ _VIEWER_NOISE = (
     'GET /api/logs',
     'GET /api/tasks',
     'GET /api/network/status',
+    'GET /api/routing/resolve',
     'GET /static/',
+    'GET /favicon.ico',
 )
 
 
