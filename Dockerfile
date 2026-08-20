@@ -22,7 +22,7 @@ RUN python -c "import typing_extensions; import curl_cffi; import yt_dlp; import
 
 # 5. 애플리케이션 복사
 COPY . .
-RUN python -m py_compile teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py teddy_routing.py teddy_duplicates.py teddy_logging.py teddy_storage.py teddy_generic.py teddy_bootstrap.py teddy_patch_vpn_health.py teddy_patch_proxy_pool.py teddy_patch_proxy_speed.py teddy_patch_task_claim_remux.py teddy_patch_index.py teddy_patch_logs.py teddy_patch_storage.py teddy_patch_routing.py && \
+RUN python -m py_compile teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py teddy_routing.py teddy_duplicates.py teddy_logging.py teddy_storage.py teddy_generic.py teddy_bootstrap.py teddy_patch_vpn_health.py teddy_patch_proxy_pool.py teddy_patch_proxy_speed.py teddy_patch_proxy_learning.py teddy_patch_proxy_task_sync.py teddy_patch_task_claim_remux.py teddy_patch_proxy_singleflight.py teddy_patch_index.py teddy_patch_logs.py teddy_patch_storage.py teddy_patch_routing.py && \
     python -c "import teddy_network as n; assert n.is_recoverable_failure('HTTP 403'); assert n.is_recoverable_failure('HTTP Error 403: Forbidden'); assert n.is_recoverable_failure('operation timed out'); assert n.is_recoverable_failure('connection reset by peer'); assert n.is_recoverable_failure('curl: (35) TLS connect error'); assert not n.is_recoverable_failure('HTTP 404'); assert not n.is_recoverable_failure('HTTP 401'); print('adaptive network failure boundary smoke test: OK')" && \
     python -c "import teddy_vpn_health as h; s=h.snapshot(); assert s['auto_failure_threshold'] == 10; assert s['auto_failure_segment_threshold'] == 5; assert s['auto_failure_window_seconds'] == 60; print('cumulative VPN health monitor smoke test: OK')" && \
     python -c "import teddy_proxy_pool as p; assert p._normalize_proxy('8.8.8.8:8080') == 'http://8.8.8.8:8080'; assert not p._normalize_proxy('127.0.0.1:8080'); assert not p._normalize_proxy('192.168.1.10:3128'); assert p.MAX_CANDIDATES <= 64; print('free proxy pool safety smoke test: OK')" && \
@@ -39,18 +39,30 @@ RUN python teddy_patch_vpn_health.py && \
     python teddy_patch_proxy_speed.py && \
     sed -i 's/ensure_ready(core, wait_seconds=15)/ensure_ready(core, wait_seconds=35)/' teddy_bootstrap.py && \
     python teddy_patch_task_claim_remux.py && \
+    python teddy_patch_proxy_learning.py && \
+    python teddy_patch_proxy_task_sync.py && \
     python -m py_compile teddy_entrypoint.py teddy_bootstrap.py teddy_vpn_health.py teddy_network.py teddy_proxy_pool.py teddy_routing.py teddy_generic.py teddy_patch_routing.py && \
     python -c "import teddy_proxy_pool as p; assert p.BANDWIDTH_TEST_BYTES == 512 * 1024; assert p.BANDWIDTH_TEST_LIMIT <= 8; assert p.BANDWIDTH_TEST_WORKERS <= 4; assert 'speed.cloudflare.com/__down' in p.BANDWIDTH_URL; print('proxy real-speed ranking smoke test: OK')" && \
+    python -c "import teddy_proxy_pool as p; proxy='http://8.8.8.8:8080'; p._state['performance'][proxy]={'learned_speed_bps':3000000,'transfer_samples':4,'task_success_count':2,'failure_streak':0}; learned=p._apply_learned_stats({'proxy':proxy,'latency_ms':900,'speed_bps':100000}); unlearned={'proxy':'http://1.1.1.1:8080','latency_ms':100,'speed_bps':200000}; assert learned['learned_speed_bps']==3000000; assert p._selection_key(learned) < p._selection_key(unlearned); print('proxy real-use learning ranking smoke test: OK')" && \
     grep -q 'Gluetun proxy를 통한 공인 IP 확인' teddy_network.py && \
     grep -q '다운로드 큐에 추가했습니다' teddy_routing.py && \
     grep -q 'mode_label(network_mode)' teddy_generic.py && \
     grep -q 'teddy_proxy_pool.install' teddy_bootstrap.py && \
     grep -q 'rotate_after_failure' teddy_bootstrap.py && \
     grep -q 'network_proxy_speed_bps' teddy_bootstrap.py && \
+    grep -q 'network_proxy_learned_speed_bps' teddy_bootstrap.py && \
     grep -q 'ensure_ready(core, wait_seconds=35)' teddy_bootstrap.py && \
     grep -q '_rank_by_real_speed' teddy_proxy_pool.py && \
+    grep -q '_selection_key' teddy_proxy_pool.py && \
     grep -q 'current_speed_bps' teddy_proxy_pool.py && \
+    grep -q 'current_learned_speed_bps' teddy_proxy_pool.py && \
     grep -q 'speed.cloudflare.com/__down' teddy_proxy_pool.py && \
+    grep -q '_teddy_proxy_transfer_observer' teddy_entrypoint.py && \
+    grep -q 'observe_task_success' teddy_bootstrap.py && \
+    grep -q 'note_failure(core' teddy_bootstrap.py && \
+    grep -q '_proxy_recovery_state' teddy_bootstrap.py && \
+    grep -q '다른 작업/세그먼트가 이미 프록시를 변경함' teddy_bootstrap.py && \
+    grep -q '활성 작업' teddy_proxy_pool.py && \
     grep -q '동일 task 중복 실행 차단' teddy_bootstrap.py && \
     grep -q 'remux-output.mp4' teddy_entrypoint.py && \
     grep -q 'os.replace(remux_tmp, out_path)' teddy_entrypoint.py && \
@@ -68,12 +80,13 @@ RUN python teddy_patch_vpn_health.py && \
     grep -q 'teddy-proxy.js' templates/index.html && \
     grep -q 'value="proxy"' templates/index.html && \
     grep -q 'teddyProxyPoolMount' templates/index.html && \
-    grep -q '검사 ' templates/index.html && \
+    grep -q '실사용 ' templates/index.html && \
+    grep -q '누적 자동 IP 변경' templates/teddy-network.js && \
     grep -q '자동 복구' templates/teddy-network.js && \
     grep -q 'auto_failure_count' templates/teddy-network.js && \
     grep -q '무료 Proxy Pool' templates/teddy-proxy.js && \
-    grep -q '속도 측정' templates/teddy-proxy.js && \
-    grep -q 'current_speed_bps' templates/teddy-proxy.js && \
+    grep -q '실사용 학습' templates/teddy-proxy.js && \
+    grep -q 'current_learned_speed_bps' templates/teddy-proxy.js && \
     grep -q "'/api/proxy/status'" templates/teddy-proxy.js && \
     grep -q "'/api/proxy/status'" teddy_proxy_pool.py && \
     grep -q 'auto_recover' teddy_network.py && \
