@@ -127,6 +127,163 @@
     box-sizing: border-box;
 }
 
+/* Free proxy pool */
+.teddy-proxy-panel {
+    margin: 14px 0 18px;
+    padding: 14px;
+    border: 1px solid #d7e0ec;
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+.teddy-proxy-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.teddy-proxy-title {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.teddy-proxy-sub,
+.teddy-proxy-status,
+.teddy-proxy-current,
+.teddy-proxy-note,
+.teddy-proxy-empty {
+    font-size: 11px;
+    line-height: 1.5;
+    color: #64748b;
+}
+
+.teddy-proxy-sub {
+    margin-top: 3px;
+}
+
+.teddy-proxy-status {
+    margin-top: 12px;
+    font-weight: 600;
+}
+
+.teddy-proxy-current {
+    margin-top: 3px;
+    word-break: break-all;
+}
+
+.teddy-proxy-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.teddy-proxy-actions {
+    display: flex;
+    margin-top: 10px;
+}
+
+.teddy-proxy-actions button,
+.teddy-proxy-manual-add button,
+.teddy-proxy-manual-row button {
+    min-height: 32px;
+    padding: 0 11px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: #e8eef8;
+    color: #1d4ed8;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.teddy-proxy-actions button:hover:not(:disabled),
+.teddy-proxy-manual-add button:hover:not(:disabled),
+.teddy-proxy-manual-row button:hover:not(:disabled) {
+    background: #dbe7fb;
+}
+
+.teddy-proxy-actions button:disabled,
+.teddy-proxy-manual-add button:disabled,
+.teddy-proxy-manual-row button:disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+}
+
+.teddy-proxy-manual-title {
+    margin-top: 14px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.teddy-proxy-manual-title span {
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+.teddy-proxy-manual-add {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    margin-top: 7px;
+}
+
+.teddy-proxy-manual-add input {
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #0f172a;
+    font-family: monospace;
+    font-size: 11px;
+    outline: none;
+}
+
+.teddy-proxy-manual-add input:focus {
+    border-color: #60a5fa;
+}
+
+.teddy-proxy-manual-list {
+    margin-top: 8px;
+}
+
+.teddy-proxy-manual-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.teddy-proxy-manual-row code {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+}
+
+.teddy-proxy-manual-row button {
+    color: #dc2626;
+    background: #fef2f2;
+}
+
+.teddy-proxy-manual-row button:hover:not(:disabled) {
+    background: #fee2e2;
+}
+
+.teddy-proxy-note {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #e2e8f0;
+}
+
 html[data-theme="dark"] .teddy-route-select,
 html[data-theme="dark"] .teddy-routing-row select,
 html[data-theme="dark"] .teddy-routing-add select {
@@ -167,6 +324,49 @@ html[data-theme="dark"] .teddy-routing-add button {
     color: #93c5fd;
 }
 
+html[data-theme="dark"] .teddy-proxy-panel {
+    background: #111827;
+    border-color: #334155;
+}
+
+html[data-theme="dark"] .teddy-proxy-sub,
+html[data-theme="dark"] .teddy-proxy-status,
+html[data-theme="dark"] .teddy-proxy-current,
+html[data-theme="dark"] .teddy-proxy-note,
+html[data-theme="dark"] .teddy-proxy-empty {
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] .teddy-proxy-actions button,
+html[data-theme="dark"] .teddy-proxy-manual-add button {
+    background: #172554;
+    color: #ffffff;
+}
+
+html[data-theme="dark"] .teddy-proxy-actions button:hover:not(:disabled),
+html[data-theme="dark"] .teddy-proxy-manual-add button:hover:not(:disabled) {
+    background: #1e3a8a;
+}
+
+html[data-theme="dark"] .teddy-proxy-manual-row button {
+    background: #331416;
+    color: #ffffff;
+}
+
+html[data-theme="dark"] .teddy-proxy-manual-row button:hover:not(:disabled) {
+    background: #4c1d1f;
+}
+
+html[data-theme="dark"] .teddy-proxy-manual-add input {
+    background: #0f172a;
+    color: #e5e7eb;
+    border-color: #334155;
+}
+
+html[data-theme="dark"] .teddy-proxy-note {
+    border-top-color: #334155;
+}
+
 @media (max-width: 720px) {
     .url-bar {
         flex-wrap: wrap;
@@ -175,7 +375,11 @@ html[data-theme="dark"] .teddy-routing-add button {
         min-height: 42px;
     }
     .teddy-routing-row,
-    .teddy-routing-add {
+    .teddy-routing-add,
+    .teddy-proxy-manual-add {
         grid-template-columns: 1fr;
+    }
+    .teddy-proxy-head {
+        flex-direction: column;
     }
 }
