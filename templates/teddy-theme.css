@@ -199,24 +199,24 @@ html[data-theme="dark"] .toast.error {
     --teddy-btn-primary-bg: #3b82f6;
     --teddy-btn-primary-hover: #2563eb;
     --teddy-btn-primary-text: #ffffff;
-    --teddy-btn-secondary-bg: #e8eef8;
-    --teddy-btn-secondary-hover: #dbe7fb;
-    --teddy-btn-secondary-text: #1d4ed8;
-    --teddy-btn-danger-bg: #fef2f2;
-    --teddy-btn-danger-hover: #fee2e2;
-    --teddy-btn-danger-text: #dc2626;
+    --teddy-btn-secondary-bg: #2563eb;
+    --teddy-btn-secondary-hover: #1d4ed8;
+    --teddy-btn-secondary-text: #ffffff;
+    --teddy-btn-danger-bg: #dc2626;
+    --teddy-btn-danger-hover: #b91c1c;
+    --teddy-btn-danger-text: #ffffff;
     --teddy-btn-ghost-bg: #f1f5f9;
     --teddy-btn-ghost-hover: #e2e8f0;
     --teddy-btn-ghost-text: #64748b;
 }
 
 html[data-theme="dark"] {
-    --teddy-btn-secondary-bg: #172554;
-    --teddy-btn-secondary-hover: #1e3a8a;
-    --teddy-btn-secondary-text: #93c5fd;
-    --teddy-btn-danger-bg: #331416;
-    --teddy-btn-danger-hover: #4c1d1f;
-    --teddy-btn-danger-text: #fca5a5;
+    --teddy-btn-secondary-bg: #1e3a8a;
+    --teddy-btn-secondary-hover: #2563eb;
+    --teddy-btn-secondary-text: #ffffff;
+    --teddy-btn-danger-bg: #991b1b;
+    --teddy-btn-danger-hover: #b91c1c;
+    --teddy-btn-danger-text: #ffffff;
     --teddy-btn-ghost-bg: #1f2937;
     --teddy-btn-ghost-hover: #334155;
     --teddy-btn-ghost-text: #cbd5e1;
