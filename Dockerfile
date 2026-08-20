@@ -34,6 +34,7 @@ RUN python -m py_compile teddy_entrypoint.py teddy_network.py teddy_vpn_health.p
 # Teddy custom: 범용 브랜딩 + 안정적인 keyed task UI + 로그 + 사이트별 저장 + 적응형 라우팅 적용
 # 패치 대상이 upstream 변경으로 달라지면 패치 스크립트가 빌드를 실패시킨다.
 RUN python teddy_patch_vpn_health.py && \
+    python -m py_compile teddy_entrypoint.py teddy_bootstrap.py teddy_vpn_health.py && \
     python teddy_patch_index.py && \
     python teddy_patch_logs.py && \
     python teddy_patch_storage.py && \
@@ -46,6 +47,7 @@ RUN python teddy_patch_vpn_health.py && \
     grep -q 'Ⅱ 일시정지' templates/index.html && \
     grep -q 'teddy-network.js' templates/index.html && \
     grep -q '자동 복구' templates/teddy-network.js && \
+    grep -q 'auto_failure_count' templates/teddy-network.js && \
     grep -q 'auto_recover' teddy_network.py && \
     grep -q '_teddy_vpn_failure_observer' teddy_entrypoint.py && \
     grep -q 'teddy_vpn_health.install' teddy_bootstrap.py && \
