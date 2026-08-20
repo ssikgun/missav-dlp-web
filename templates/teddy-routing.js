@@ -3,7 +3,9 @@
     let resolveTimer = null;
 
     function modeLabel(mode) {
-        return mode === 'vpn' ? 'VPN' : 'Direct';
+        if (mode === 'vpn') return 'VPN';
+        if (mode === 'proxy') return 'Proxy';
+        return 'Direct';
     }
 
     function sourceLabel(source) {
@@ -48,7 +50,7 @@
             info.querySelector('.teddy-routing-site').textContent = site;
 
             const select = document.createElement('select');
-            select.innerHTML = '<option value="direct">Direct</option><option value="vpn">VPN</option>';
+            select.innerHTML = '<option value="direct">Direct</option><option value="proxy">Proxy</option><option value="vpn">VPN</option>';
             select.value = mode;
             select.addEventListener('change', async () => {
                 try {
@@ -173,21 +175,25 @@
             hint.textContent = '이번 작업만 Direct로 고정 · 자동 학습값은 변경하지 않음';
             return;
         }
+        if (select.value === 'proxy') {
+            hint.textContent = '이번 작업은 무료 Proxy Pool로 고정 · 실패 시 Pool 안에서 후보를 교체';
+            return;
+        }
         if (select.value === 'vpn') {
             hint.textContent = '이번 작업만 VPN으로 고정 · 자동 학습값은 변경하지 않음';
             return;
         }
         const url = input.value.trim();
         if (!url) {
-            hint.textContent = '자동 · 새 사이트는 Direct 우선 → 네트워크 오류 시 VPN 재시도';
+            hint.textContent = '자동 · 새 사이트는 Direct 우선 → 실패 시 무료 Proxy → 실패 시 VPN';
             return;
         }
         try {
             const result = await apiJson('/api/routing/resolve?mode=auto&url=' + encodeURIComponent(url));
             const label = modeLabel(result.mode);
-            hint.textContent = '자동 선택: ' + label + ' · ' + sourceLabel(result.source) + (result.fixed ? '' : ' · 실패 시 반대 경로 재시도');
+            hint.textContent = '자동 선택: ' + label + ' · ' + sourceLabel(result.source) + (result.fixed ? '' : ' · 실패 시 다음 경로 재시도');
         } catch (_) {
-            hint.textContent = '자동 · 새 사이트는 Direct 우선 → 네트워크 오류 시 VPN 재시도';
+            hint.textContent = '자동 · 새 사이트는 Direct 우선 → 실패 시 무료 Proxy → 실패 시 VPN';
         }
     }
 
