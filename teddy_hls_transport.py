@@ -3,10 +3,29 @@ import threading
 from curl_cffi import requests as cffi_requests
 
 
-# Keep the first performance comparison apples-to-apples with Hitomi's 8-connection test.
+# Hitomi's recovered M3U8 core uses a much smaller dedicated worker pool than the
+# GUI's general downloader connection setting. Keep 8 as the compatibility
+# default, but allow controlled 2/4/8 A/B tests from the persisted web settings.
+ALLOWED_HLS_WORKERS = (2, 4, 8)
 HLS_WORKERS = 8
 
 _thread_local = threading.local()
+
+
+def normalize_workers(value):
+    try:
+        workers = int(value)
+    except (TypeError, ValueError):
+        return HLS_WORKERS
+    if workers not in ALLOWED_HLS_WORKERS:
+        return HLS_WORKERS
+    return workers
+
+
+def workers_from_settings(settings):
+    if not isinstance(settings, dict):
+        return HLS_WORKERS
+    return normalize_workers(settings.get('hls_workers', HLS_WORKERS))
 
 
 def _proxy_for_task(core, task_id):
