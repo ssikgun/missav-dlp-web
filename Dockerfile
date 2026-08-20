@@ -26,12 +26,13 @@ COPY . .
 # Teddy custom: 범용 브랜딩 + 안정적인 keyed task UI를 빌드 시 적용
 # 패치 대상이 upstream 변경으로 달라지면 teddy_patch_index.py가 빌드를 실패시킨다.
 RUN python teddy_patch_index.py && \
-    sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-theme.css"></head>#' templates/index.html && \
-    sed -i 's#</body>#<script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script></body>#' templates/index.html && \
+    sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-theme.css"><link rel="stylesheet" href="/static/teddy-network.css"></head>#' templates/index.html && \
+    sed -i 's#</body>#<script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script><script src="/static/teddy-network.js"></script></body>#' templates/index.html && \
     grep -q '<title>Downloader</title>' templates/index.html && \
     grep -q 'teddyEffectiveSpeed' templates/index.html && \
     grep -q '남은 시간 약' templates/index.html && \
     grep -q 'Ⅱ 일시정지' templates/index.html && \
+    grep -q 'teddy-network.js' templates/index.html && \
     ! grep -q 'MissAV' templates/index.html && \
     ! grep -q 'taskList.innerHTML = entries.map' templates/index.html
 
@@ -39,5 +40,5 @@ RUN python teddy_patch_index.py && \
 RUN mkdir -p /downloads
 EXPOSE 5000
 
-# 7. Teddy 안정성 레이어를 적용한 엔트리포인트 실행
-CMD ["python", "teddy_entrypoint.py"]
+# 7. Teddy 안정성 + VPN 관리 레이어 실행
+CMD ["python", "teddy_bootstrap.py"]
