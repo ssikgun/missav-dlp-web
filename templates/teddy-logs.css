@@ -1,0 +1,95 @@
+.teddy-log-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.teddy-log-subtitle {
+    margin-bottom: 10px;
+}
+
+.teddy-log-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.teddy-log-autoscroll {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.teddy-log-controls button {
+    border: 1px solid #dbe3ef;
+    border-radius: 8px;
+    padding: 8px 11px;
+    background: #f8fafc;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.teddy-log-controls button:hover {
+    background: #eef2f7;
+}
+
+.teddy-log-status {
+    margin: 2px 0 8px;
+    color: #94a3b8;
+    font-size: 11px;
+}
+
+.teddy-log-output {
+    width: 100%;
+    height: calc(100vh - 170px);
+    min-height: 360px;
+    overflow: auto;
+    margin: 0;
+    padding: 14px 16px;
+    border: 1px solid #dbe3ef;
+    border-radius: 10px;
+    background: #0b1020;
+    color: #d8e2f0;
+    font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    tab-size: 4;
+}
+
+html[data-theme="dark"] .teddy-log-autoscroll {
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] .teddy-log-controls button {
+    background: #111827;
+    border-color: #273449;
+    color: #cbd5e1;
+}
+
+html[data-theme="dark"] .teddy-log-controls button:hover {
+    background: #172033;
+}
+
+html[data-theme="dark"] .teddy-log-output {
+    background: #050a14;
+    border-color: #273449;
+    color: #d8e2f0;
+}
+
+@media (max-width: 720px) {
+    .teddy-log-header {
+        flex-direction: column;
+    }
+
+    .teddy-log-output {
+        height: calc(100vh - 240px);
+        min-height: 300px;
+    }
+}
