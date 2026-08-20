@@ -82,7 +82,7 @@ def verify_runtime():
         ],
         'teddy_entrypoint.py': [
             '_teddy_proxy_transfer_observer',
-            'network_proxy_learned_speed_bps',
+            'observer(task_id, batch_bytes, elapsed)',
             'remux-output.mp4',
             'os.replace(remux_tmp, out_path)',
             '_teddy_vpn_failure_observer',
