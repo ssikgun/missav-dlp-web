@@ -6,6 +6,12 @@ on:
       - teddy-custom
   workflow_dispatch:
 
+# Rapid sequential commits used to race: an older, slower build could finish last
+# and overwrite the mutable teddy-custom tag with stale code.
+concurrency:
+  group: teddy-custom-image-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write
@@ -21,6 +27,8 @@ jobs:
     steps:
       - name: Checkout teddy-custom
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -32,11 +40,32 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Teddy image
+      # Always publish the immutable commit image first.
+      - name: Build and push immutable Teddy image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:teddy-custom
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:teddy-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      # Only the actual current teddy-custom branch HEAD may move the mutable tag.
+      # This second guard keeps an obsolete run from winning even if cancellation
+      # arrives too late while a Docker push is already finishing.
+      - name: Promote branch HEAD to teddy-custom
+        shell: bash
+        run: |
+          set -euo pipefail
+          HEAD_SHA="$(git ls-remote origin refs/heads/teddy-custom | cut -f1)"
+          echo "Workflow SHA: ${GITHUB_SHA}"
+          echo "Branch HEAD:  ${HEAD_SHA}"
+          if [ "${HEAD_SHA}" != "${GITHUB_SHA}" ]; then
+            echo "Skipping teddy-custom promotion: this run is no longer branch HEAD."
+            exit 0
+          fi
+          docker buildx imagetools create \
+            --tag "${REGISTRY}/${IMAGE_NAME}:teddy-custom" \
+            "${REGISTRY}/${IMAGE_NAME}:teddy-${GITHUB_SHA}"
+          echo "Promoted ${GITHUB_SHA} to teddy-custom."
