@@ -1,0 +1,194 @@
+html {
+    color-scheme: light;
+}
+
+html[data-theme="dark"] {
+    color-scheme: dark;
+}
+
+body,
+.sidebar,
+.main,
+.task-card,
+.file-card,
+.url-bar input,
+.search-input,
+.sort-select,
+.setting-input,
+.setting-input-wide,
+.setting-select,
+.setting-textarea,
+.sidebar-btn,
+.btn,
+.stat-badge,
+.toast {
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+/* Theme toggle inserted by teddy-theme.js */
+.teddy-theme-toggle {
+    font-size: 18px;
+}
+
+html[data-theme="dark"] body {
+    background: #0b1120;
+    color: #e5e7eb;
+}
+
+html[data-theme="dark"] .sidebar {
+    background: #111827;
+    border-right-color: #253047;
+}
+
+html[data-theme="dark"] .sidebar-btn {
+    background: #1f2937;
+    color: #9ca3af;
+}
+
+html[data-theme="dark"] .sidebar-btn:hover:not(.active) {
+    background: #334155;
+    color: #e5e7eb;
+}
+
+html[data-theme="dark"] .sidebar-btn.active {
+    background: #3b82f6;
+    color: #ffffff;
+}
+
+html[data-theme="dark"] .main {
+    background: #0b1120;
+}
+
+html[data-theme="dark"] .page-title,
+html[data-theme="dark"] .task-title,
+html[data-theme="dark"] .file-name,
+html[data-theme="dark"] .setting-label {
+    color: #f8fafc;
+}
+
+html[data-theme="dark"] .page-subtitle,
+html[data-theme="dark"] .task-meta,
+html[data-theme="dark"] .file-meta,
+html[data-theme="dark"] .setting-desc,
+html[data-theme="dark"] .progress-text,
+html[data-theme="dark"] .toggle-text,
+html[data-theme="dark"] .empty {
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] .url-bar input,
+html[data-theme="dark"] .search-input,
+html[data-theme="dark"] .sort-select,
+html[data-theme="dark"] .setting-input,
+html[data-theme="dark"] .setting-input-wide,
+html[data-theme="dark"] .setting-select,
+html[data-theme="dark"] .setting-textarea {
+    background: #111827;
+    color: #e5e7eb;
+    border-color: #334155;
+}
+
+html[data-theme="dark"] .url-bar input::placeholder,
+html[data-theme="dark"] .search-input::placeholder,
+html[data-theme="dark"] .setting-input-wide::placeholder,
+html[data-theme="dark"] .setting-textarea::placeholder {
+    color: #64748b;
+}
+
+html[data-theme="dark"] .url-bar input:focus,
+html[data-theme="dark"] .search-input:focus,
+html[data-theme="dark"] .setting-input:focus,
+html[data-theme="dark"] .setting-input-wide:focus,
+html[data-theme="dark"] .setting-textarea:focus {
+    border-color: #60a5fa;
+}
+
+html[data-theme="dark"] .task-card,
+html[data-theme="dark"] .file-card {
+    background: #111827;
+    border-color: #273449;
+}
+
+html[data-theme="dark"] .task-card.done {
+    background: #0d2118;
+    border-color: #166534;
+}
+
+html[data-theme="dark"] .task-card.error {
+    background: #281214;
+    border-color: #7f1d1d;
+}
+
+html[data-theme="dark"] .progress-bg {
+    background: #263244;
+}
+
+html[data-theme="dark"] .file-icon {
+    background: #1f2937;
+}
+
+html[data-theme="dark"] .stat-downloading {
+    background: #102348;
+    color: #60a5fa;
+}
+
+html[data-theme="dark"] .stat-done {
+    background: #0d2118;
+    color: #4ade80;
+}
+
+html[data-theme="dark"] .stat-waiting {
+    background: #2b2110;
+    color: #fbbf24;
+}
+
+html[data-theme="dark"] .stat-error {
+    background: #281214;
+    color: #f87171;
+}
+
+html[data-theme="dark"] .btn-primary,
+html[data-theme="dark"] .btn-preview {
+    background: #172554;
+    color: #93c5fd;
+}
+
+html[data-theme="dark"] .btn-danger {
+    background: #331416;
+    color: #fca5a5;
+}
+
+html[data-theme="dark"] .btn-ghost,
+html[data-theme="dark"] .btn-reset {
+    background: #1f2937;
+    color: #94a3b8;
+    border-color: #334155;
+}
+
+html[data-theme="dark"] .btn-reset:hover {
+    background: #334155;
+}
+
+html[data-theme="dark"] .setting-actions {
+    border-top-color: #253047;
+}
+
+html[data-theme="dark"] .toggle-slider {
+    background: #475569;
+}
+
+html[data-theme="dark"] .modal-overlay {
+    background: rgba(0, 0, 0, 0.82);
+}
+
+html[data-theme="dark"] .toast.success {
+    background: #0d2118;
+    color: #4ade80;
+    border-color: #166534;
+}
+
+html[data-theme="dark"] .toast.error {
+    background: #281214;
+    color: #f87171;
+    border-color: #7f1d1d;
+}
