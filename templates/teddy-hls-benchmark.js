@@ -1,6 +1,6 @@
 (function () {
     const SETTING_ID = 'set-hls-workers';
-    const ALLOWED = [2, 4, 8, 12, 16];
+    const ALLOWED = [2, 4, 8, 12, 16, 20, 24];
 
     function normalize(value) {
         const n = Number(value);
@@ -36,13 +36,15 @@
         group.innerHTML =
             '<label class="setting-label">HLS 연결 수 (성능 테스트)</label>' +
             '<div class="setting-desc">MissAV/HLS 전용 worker 수입니다. 새로 시작하거나 재개하는 HLS 실행부터 적용됩니다. ' +
-            '같은 영상·같은 Proxy에서 2 / 4 / 8 / 12 / 16을 비교해 최적값을 찾으세요.</div>' +
+            '같은 영상·같은 Proxy에서 2 / 4 / 8 / 12 / 16 / 20 / 24를 비교해 최적값을 찾으세요.</div>' +
             '<select id="' + SETTING_ID + '" class="setting-select">' +
                 '<option value="2">2 workers</option>' +
                 '<option value="4">4 workers</option>' +
                 '<option value="8">8 workers (기존값)</option>' +
                 '<option value="12">12 workers</option>' +
                 '<option value="16">16 workers</option>' +
+                '<option value="20">20 workers</option>' +
+                '<option value="24">24 workers</option>' +
             '</select>';
         anchor.insertAdjacentElement('afterend', group);
 
