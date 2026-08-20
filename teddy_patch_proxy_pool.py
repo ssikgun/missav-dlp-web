@@ -2,7 +2,6 @@ from pathlib import Path
 
 
 GENERIC = Path('teddy_generic.py')
-BOOTSTRAP = Path('teddy_bootstrap.py')
 PROXY_POOL = Path('teddy_proxy_pool.py')
 
 
@@ -22,23 +21,31 @@ def main():
         'generic proxy route label',
     )
 
-    # Selecting Proxy explicitly fixes the route category, not one volatile IP.
-    # Allow the pool to try another verified candidate while still preventing
-    # fallback to Direct/VPN for a one-off Proxy override.
-    replace_once(
-        BOOTSTRAP,
-        """            mode == 'proxy'\n            and recoverable\n            and not decision['fixed']\n            and proxy_task_retries < 2\n""",
-        """            mode == 'proxy'\n            and recoverable\n            and proxy_task_retries < 2\n""",
-        'fixed proxy candidate rotation',
-    )
-
     # Clear the completion event before spawning a refresh worker and mark the
     # refresh as in-flight immediately. Otherwise ensure_ready() could observe a
     # stale completion event from the previous run and fall through too early.
     replace_once(
         PROXY_POOL,
-        """def start_refresh(core=None, delay=0.0):\n    core = core or _core\n    if core is None:\n        return False\n    with _lock:\n        if _state['refreshing']:\n            return False\n    worker = threading.Thread(\n""",
-        """def start_refresh(core=None, delay=0.0):\n    core = core or _core\n    if core is None:\n        return False\n    with _lock:\n        if _state['refreshing']:\n            return False\n        _state['refreshing'] = True\n        _refresh_done.clear()\n    worker = threading.Thread(\n""",
+        """def start_refresh(core=None, delay=0.0):
+    core = core or _core
+    if core is None:
+        return False
+    with _lock:
+        if _state['refreshing']:
+            return False
+    worker = threading.Thread(
+""",
+        """def start_refresh(core=None, delay=0.0):
+    core = core or _core
+    if core is None:
+        return False
+    with _lock:
+        if _state['refreshing']:
+            return False
+        _state['refreshing'] = True
+        _refresh_done.clear()
+    worker = threading.Thread(
+""",
         'proxy refresh event race',
     )
 
