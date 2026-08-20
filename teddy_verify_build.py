@@ -48,6 +48,7 @@ def verify_runtime():
             'teddy_check_task_state',
             "get('teddy_task_id')",
             "task.get('status') in ('일시정지 요청 중', '일시정지')",
+            "elif t.get('status') == '일시정지 요청 중'",
             'except ExtractorError',
         ],
         'teddy_network.py': [
