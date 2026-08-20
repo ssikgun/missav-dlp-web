@@ -24,7 +24,8 @@ RUN python -c "import typing_extensions; import curl_cffi; import yt_dlp; import
 COPY . .
 
 # Teddy custom: 원본 index.html은 건드리지 않고 커스텀 UI 레이어만 빌드 시 삽입
-RUN sed -i 's#</body>#<script src="/static/teddy-speed.js"></script><script src="/static/teddy-reliability.js"></script></body>#' templates/index.html
+RUN sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-theme.css"></head>#' templates/index.html && \
+    sed -i 's#</body>#<script src="/static/teddy-speed.js"></script><script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script></body>#' templates/index.html
 
 # 6. 폴더 생성 및 포트 노출
 RUN mkdir -p /downloads
