@@ -3,11 +3,13 @@ import os
 import re
 import threading
 import time
+from contextlib import contextmanager
 from urllib.parse import urlparse
 
 
 VPN_PROXY_URL = os.environ.get('GLUETUN_PROXY_URL', 'http://gluetun:8888').strip()
 _STATE_LOCK = threading.Lock()
+_ROUTE_LOCAL = threading.local()
 _STATE = {
     'manual_rules': {},
     'learned_rules': {},
@@ -22,6 +24,54 @@ _ALIAS_HOSTS = {
     'fb.watch': 'facebook.com',
     'facebook.com': 'facebook.com',
 }
+
+
+class RouteAwareRequests:
+    """Proxy curl_cffi through the task-selected route without global races.
+
+    When a route context is VPN, all explicit/implicit proxy arguments are
+    overridden with Gluetun's HTTP proxy. Outside a route context requests keep
+    their original behavior, which is important for control-server and UI calls.
+    """
+    def __init__(self, wrapped):
+        self._wrapped = wrapped
+
+    def _call(self, name, *args, **kwargs):
+        proxy_url = getattr(_ROUTE_LOCAL, 'proxy_url', None)
+        if proxy_url:
+            kwargs['proxies'] = {'http': proxy_url, 'https': proxy_url}
+        return getattr(self._wrapped, name)(*args, **kwargs)
+
+    def get(self, *args, **kwargs):
+        return self._call('get', *args, **kwargs)
+
+    def post(self, *args, **kwargs):
+        return self._call('post', *args, **kwargs)
+
+    def put(self, *args, **kwargs):
+        return self._call('put', *args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        return self._call('delete', *args, **kwargs)
+
+    def patch(self, *args, **kwargs):
+        return self._call('patch', *args, **kwargs)
+
+    def head(self, *args, **kwargs):
+        return self._call('head', *args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._wrapped, name)
+
+
+@contextmanager
+def request_route(mode):
+    previous = getattr(_ROUTE_LOCAL, 'proxy_url', None)
+    _ROUTE_LOCAL.proxy_url = proxy_for_mode(mode)
+    try:
+        yield
+    finally:
+        _ROUTE_LOCAL.proxy_url = previous
 
 
 def _state_path(core):
