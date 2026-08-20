@@ -22,96 +22,53 @@ RUN python -c "import typing_extensions; import curl_cffi; import yt_dlp; import
 
 # 5. 애플리케이션 복사
 COPY . .
-RUN python -m py_compile teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py teddy_routing.py teddy_duplicates.py teddy_logging.py teddy_storage.py teddy_generic.py teddy_bootstrap.py teddy_patch_vpn_health.py teddy_patch_proxy_pool.py teddy_patch_proxy_speed.py teddy_patch_proxy_learning.py teddy_patch_proxy_task_sync.py teddy_patch_task_claim_remux.py teddy_patch_proxy_singleflight.py teddy_patch_index.py teddy_patch_logs.py teddy_patch_storage.py teddy_patch_routing.py && \
-    python -c "import teddy_network as n; assert n.is_recoverable_failure('HTTP 403'); assert n.is_recoverable_failure('HTTP Error 403: Forbidden'); assert n.is_recoverable_failure('operation timed out'); assert n.is_recoverable_failure('connection reset by peer'); assert n.is_recoverable_failure('curl: (35) TLS connect error'); assert not n.is_recoverable_failure('HTTP 404'); assert not n.is_recoverable_failure('HTTP 401'); print('adaptive network failure boundary smoke test: OK')" && \
-    python -c "import teddy_vpn_health as h; s=h.snapshot(); assert s['auto_failure_threshold'] == 10; assert s['auto_failure_segment_threshold'] == 5; assert s['auto_failure_window_seconds'] == 60; print('cumulative VPN health monitor smoke test: OK')" && \
-    python -c "import teddy_proxy_pool as p; assert p._normalize_proxy('8.8.8.8:8080') == 'http://8.8.8.8:8080'; assert not p._normalize_proxy('127.0.0.1:8080'); assert not p._normalize_proxy('192.168.1.10:3128'); assert p.MAX_CANDIDATES <= 64; print('free proxy pool safety smoke test: OK')" && \
-    python -c "import teddy_routing as r; assert r.canonical_site('https://youtu.be/abc') == 'youtube.com'; assert r.canonical_site('https://www.youtube.com/watch?v=abc') == 'youtube.com'; assert r.canonical_site('https://missav123.com/ko/abc') == 'missav'; assert r.proxy_for_mode('direct') is None; r.set_proxy_provider(lambda: 'http://8.8.8.8:8080'); assert r.proxy_for_mode('proxy') == 'http://8.8.8.8:8080'; assert r.fallback_modes('direct') == ['proxy', 'vpn']; assert r.fallback_modes('proxy') == ['vpn']; assert r.fallback_modes('vpn') == []; print('adaptive three-route smoke test: OK')" && \
-    python -c "import teddy_duplicates as d; assert d.duplicate_key('https://youtu.be/abc') == d.duplicate_key('https://www.youtube.com/watch?v=abc'); assert d.duplicate_key('https://missav123.com/ko/ABC') == d.duplicate_key('https://missav01.com/en/ABC'); assert d.duplicate_key('https://example.com/a#one') == d.duplicate_key('https://example.com/a#two'); assert d.duplicate_key('https://example.com/a?x=1') != d.duplicate_key('https://example.com/a?x=2'); print('duplicate queue guard smoke test: OK')" && \
-    python -c "import teddy_logging as l; assert l._clean_for_viewer('\\x1b[31mRED\\x1b[0m') == 'RED'; assert l._clean_for_viewer(b'hello') == 'hello'; print('web log cleanup smoke test: OK')" && \
-    python -c "import teddy_generic as g; C=type('C',(),{'settings':{'video_quality':'1080'}}); s=g._format_selector(C); assert 'height<=1080' in s; assert 'ext=mp4' in s; print('generic yt-dlp engine smoke test: OK')" && \
-    python -c "import teddy_storage as s; assert s.site_key_for_url('https://youtu.be/abc') == 'youtube'; assert s.site_key_for_url('https://www.youtube.com/watch?v=abc') == 'youtube'; assert s.site_key_for_url('https://missav123.com/ko/abc', custom=True) == 'missav'; assert s.site_key_for_url('https://vimeo.com/123') == 'vimeo'; print('site-aware storage smoke test: OK')"
 
-# Teddy custom: 범용 브랜딩 + 안정적인 keyed task UI + 로그 + 사이트별 저장 + 적응형 라우팅 적용
-# 패치 대상이 upstream 변경으로 달라지면 패치 스크립트가 빌드를 실패시킨다.
-RUN python teddy_patch_vpn_health.py && \
-    python teddy_patch_proxy_pool.py && \
-    python teddy_patch_proxy_speed.py && \
-    sed -i 's/ensure_ready(core, wait_seconds=15)/ensure_ready(core, wait_seconds=35)/' teddy_bootstrap.py && \
-    python teddy_patch_task_claim_remux.py && \
-    python teddy_patch_proxy_learning.py && \
-    python teddy_patch_proxy_task_sync.py && \
-    python -m py_compile teddy_entrypoint.py teddy_bootstrap.py teddy_vpn_health.py teddy_network.py teddy_proxy_pool.py teddy_routing.py teddy_generic.py teddy_patch_routing.py && \
-    python -c "import teddy_proxy_pool as p; assert p.BANDWIDTH_TEST_BYTES == 512 * 1024; assert p.BANDWIDTH_TEST_LIMIT <= 8; assert p.BANDWIDTH_TEST_WORKERS <= 4; assert 'speed.cloudflare.com/__down' in p.BANDWIDTH_URL; print('proxy real-speed ranking smoke test: OK')" && \
-    python -c "import teddy_proxy_pool as p; proxy='http://8.8.8.8:8080'; p._state['performance'][proxy]={'learned_speed_bps':3000000,'transfer_samples':4,'task_success_count':2,'failure_streak':0}; learned=p._apply_learned_stats({'proxy':proxy,'latency_ms':900,'speed_bps':100000}); unlearned={'proxy':'http://1.1.1.1:8080','latency_ms':100,'speed_bps':200000}; assert learned['learned_speed_bps']==3000000; assert p._selection_key(learned) < p._selection_key(unlearned); print('proxy real-use learning ranking smoke test: OK')" && \
-    grep -q 'Gluetun proxy를 통한 공인 IP 확인' teddy_network.py && \
-    grep -q '다운로드 큐에 추가했습니다' teddy_routing.py && \
-    grep -q 'mode_label(network_mode)' teddy_generic.py && \
-    grep -q 'teddy_proxy_pool.install' teddy_bootstrap.py && \
-    grep -q 'rotate_after_failure' teddy_bootstrap.py && \
-    grep -q 'network_proxy_speed_bps' teddy_bootstrap.py && \
-    grep -q 'network_proxy_learned_speed_bps' teddy_bootstrap.py && \
-    grep -q 'ensure_ready(core, wait_seconds=35)' teddy_bootstrap.py && \
-    grep -q '_rank_by_real_speed' teddy_proxy_pool.py && \
-    grep -q '_selection_key' teddy_proxy_pool.py && \
-    grep -q 'current_speed_bps' teddy_proxy_pool.py && \
-    grep -q 'current_learned_speed_bps' teddy_proxy_pool.py && \
-    grep -q 'speed.cloudflare.com/__down' teddy_proxy_pool.py && \
-    grep -q '_teddy_proxy_transfer_observer' teddy_entrypoint.py && \
-    grep -q 'observe_task_success' teddy_bootstrap.py && \
-    grep -q 'note_failure(core' teddy_bootstrap.py && \
-    grep -q '_proxy_recovery_state' teddy_bootstrap.py && \
-    grep -q '다른 작업/세그먼트가 이미 프록시를 변경함' teddy_bootstrap.py && \
-    grep -q '활성 작업' teddy_proxy_pool.py && \
-    grep -q '동일 task 중복 실행 차단' teddy_bootstrap.py && \
-    grep -q 'remux-output.mp4' teddy_entrypoint.py && \
-    grep -q 'os.replace(remux_tmp, out_path)' teddy_entrypoint.py && \
-    python teddy_patch_index.py && \
-    python teddy_patch_logs.py && \
-    python teddy_patch_storage.py && \
-    python teddy_patch_routing.py && \
-    sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-theme.css"><link rel="stylesheet" href="/static/teddy-network.css"><link rel="stylesheet" href="/static/teddy-logs.css"><link rel="stylesheet" href="/static/teddy-routing.css"></head>#' templates/index.html && \
-    sed -i 's#</body>#<script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script><script src="/static/teddy-network.js"></script><script src="/static/teddy-logs.js"></script><script src="/static/teddy-routing.js"></script><script src="/static/teddy-proxy.js"></script></body>#' templates/index.html && \
-    grep -q '<title>Downloader</title>' templates/index.html && \
-    grep -q 'teddyEffectiveSpeed' templates/index.html && \
-    grep -q '남은 시간 약' templates/index.html && \
-    grep -q 'Ⅱ 일시정지' templates/index.html && \
-    grep -q 'teddy-network.js' templates/index.html && \
-    grep -q 'teddy-proxy.js' templates/index.html && \
-    grep -q 'value="proxy"' templates/index.html && \
-    grep -q 'teddyProxyPoolMount' templates/index.html && \
-    grep -q '실사용 ' templates/index.html && \
-    grep -q '누적 자동 IP 변경' templates/teddy-network.js && \
-    grep -q '자동 복구' templates/teddy-network.js && \
-    grep -q 'auto_failure_count' templates/teddy-network.js && \
-    grep -q '무료 Proxy Pool' templates/teddy-proxy.js && \
-    grep -q '실사용 학습' templates/teddy-proxy.js && \
-    grep -q 'current_learned_speed_bps' templates/teddy-proxy.js && \
-    grep -q "'/api/proxy/status'" templates/teddy-proxy.js && \
-    grep -q "'/api/proxy/status'" teddy_proxy_pool.py && \
-    grep -q 'auto_recover' teddy_network.py && \
-    grep -q '_teddy_vpn_failure_observer' teddy_entrypoint.py && \
-    grep -q 'teddy_vpn_health.install' teddy_bootstrap.py && \
-    grep -q '_fetch_segment_with_network_recovery' teddy_bootstrap.py && \
-    grep -q '_dispatch_download_guarded' teddy_bootstrap.py && \
-    grep -q 'duplicate queue guard enabled' teddy_duplicates.py && \
-    grep -q 'teddy_duplicates.install' teddy_bootstrap.py && \
-    grep -q 'download_generic' teddy_generic.py && \
-    grep -q 'site_key_for_url' teddy_storage.py && \
-    grep -q 'install_file_routes' teddy_bootstrap.py && \
-    grep -q 'teddyEncodeFilePath' templates/index.html && \
-    grep -q 'downloadNetworkMode' templates/index.html && \
-    grep -q 'teddyRoutingTarget' templates/index.html && \
-    grep -q 'teddy-routing.js' templates/index.html && \
-    grep -q 'adaptive routing enabled' teddy_routing.py && \
-    grep -q 'RouteAwareRequests' teddy_bootstrap.py && \
-    grep -q 'network_mode' teddy_generic.py && \
-    grep -q 'data-page="logs"' templates/index.html && \
-    grep -q 'id="page-logs"' templates/index.html && \
-    grep -q 'teddy-logs.js' templates/index.html && \
-    grep -q "'/api/logs'" teddy_logging.py && \
-    ! grep -q 'MissAV' templates/index.html && \
-    ! grep -q 'taskList.innerHTML = entries.map' templates/index.html
+# Source + patch scripts must all parse before any build-time mutation.
+RUN python -m py_compile \
+    teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py \
+    teddy_routing.py teddy_duplicates.py teddy_logging.py teddy_storage.py \
+    teddy_generic.py teddy_bootstrap.py teddy_verify_build.py \
+    teddy_patch_vpn_health.py teddy_patch_proxy_pool.py teddy_patch_proxy_speed.py \
+    teddy_patch_proxy_learning.py teddy_patch_proxy_task_sync.py \
+    teddy_patch_task_claim_remux.py teddy_patch_proxy_singleflight.py \
+    teddy_patch_index.py teddy_patch_logs.py teddy_patch_storage.py teddy_patch_routing.py
+
+# Existing deterministic boundary smoke tests.
+RUN python -c "import teddy_network as n; assert n.is_recoverable_failure('HTTP 403'); assert n.is_recoverable_failure('HTTP Error 403: Forbidden'); assert n.is_recoverable_failure('operation timed out'); assert n.is_recoverable_failure('connection reset by peer'); assert n.is_recoverable_failure('curl: (35) TLS connect error'); assert not n.is_recoverable_failure('HTTP 404'); assert not n.is_recoverable_failure('HTTP 401'); print('adaptive network failure boundary smoke test: OK')"
+RUN python -c "import teddy_vpn_health as h; s=h.snapshot(); assert s['auto_failure_threshold'] == 10; assert s['auto_failure_segment_threshold'] == 5; assert s['auto_failure_window_seconds'] == 60; print('cumulative VPN health monitor smoke test: OK')"
+RUN python -c "import teddy_proxy_pool as p; assert p._normalize_proxy('8.8.8.8:8080') == 'http://8.8.8.8:8080'; assert not p._normalize_proxy('127.0.0.1:8080'); assert not p._normalize_proxy('192.168.1.10:3128'); assert p.MAX_CANDIDATES <= 64; print('free proxy pool safety smoke test: OK')"
+RUN python -c "import teddy_routing as r; assert r.canonical_site('https://youtu.be/abc') == 'youtube.com'; assert r.canonical_site('https://www.youtube.com/watch?v=abc') == 'youtube.com'; assert r.canonical_site('https://missav123.com/ko/abc') == 'missav'; assert r.proxy_for_mode('direct') is None; r.set_proxy_provider(lambda: 'http://8.8.8.8:8080'); assert r.proxy_for_mode('proxy') == 'http://8.8.8.8:8080'; assert r.fallback_modes('direct') == ['proxy', 'vpn']; assert r.fallback_modes('proxy') == ['vpn']; assert r.fallback_modes('vpn') == []; print('adaptive three-route smoke test: OK')"
+RUN python -c "import teddy_duplicates as d; assert d.duplicate_key('https://youtu.be/abc') == d.duplicate_key('https://www.youtube.com/watch?v=abc'); assert d.duplicate_key('https://missav123.com/ko/ABC') == d.duplicate_key('https://missav01.com/en/ABC'); assert d.duplicate_key('https://example.com/a#one') == d.duplicate_key('https://example.com/a#two'); assert d.duplicate_key('https://example.com/a?x=1') != d.duplicate_key('https://example.com/a?x=2'); print('duplicate queue guard smoke test: OK')"
+RUN python -c "import teddy_logging as l; assert l._clean_for_viewer('\\x1b[31mRED\\x1b[0m') == 'RED'; assert l._clean_for_viewer(b'hello') == 'hello'; print('web log cleanup smoke test: OK')"
+RUN python -c "import teddy_generic as g; C=type('C',(),{'settings':{'video_quality':'1080'}}); s=g._format_selector(C); assert 'height<=1080' in s; assert 'ext=mp4' in s; print('generic yt-dlp engine smoke test: OK')"
+RUN python -c "import teddy_storage as s; assert s.site_key_for_url('https://youtu.be/abc') == 'youtube'; assert s.site_key_for_url('https://www.youtube.com/watch?v=abc') == 'youtube'; assert s.site_key_for_url('https://missav123.com/ko/abc', custom=True) == 'missav'; assert s.site_key_for_url('https://vimeo.com/123') == 'vimeo'; print('site-aware storage smoke test: OK')"
+
+# Teddy runtime patches. Keep each major stage separate so Actions exposes the exact failing patch.
+RUN python teddy_patch_vpn_health.py
+RUN python teddy_patch_proxy_pool.py
+RUN python teddy_patch_proxy_speed.py
+RUN sed -i 's/ensure_ready(core, wait_seconds=15)/ensure_ready(core, wait_seconds=35)/' teddy_bootstrap.py
+RUN python teddy_patch_task_claim_remux.py
+RUN python teddy_patch_proxy_learning.py
+RUN python teddy_patch_proxy_task_sync.py
+
+# Patched runtime must compile and satisfy explicit semantic markers.
+RUN python -m py_compile \
+    teddy_entrypoint.py teddy_bootstrap.py teddy_vpn_health.py teddy_network.py \
+    teddy_proxy_pool.py teddy_routing.py teddy_generic.py teddy_patch_routing.py
+RUN python teddy_verify_build.py runtime
+
+# Teddy UI / file-manager / routing patches.
+RUN python teddy_patch_index.py
+RUN python teddy_patch_logs.py
+RUN python teddy_patch_storage.py
+RUN python teddy_patch_routing.py
+
+# Static asset injection remains deterministic and idempotent inside the image build.
+RUN sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-theme.css"><link rel="stylesheet" href="/static/teddy-network.css"><link rel="stylesheet" href="/static/teddy-logs.css"><link rel="stylesheet" href="/static/teddy-routing.css"></head>#' templates/index.html && \
+    sed -i 's#</body>#<script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script><script src="/static/teddy-network.js"></script><script src="/static/teddy-logs.js"></script><script src="/static/teddy-routing.js"></script><script src="/static/teddy-proxy.js"></script></body>#' templates/index.html
+
+RUN python teddy_verify_build.py final
 
 # 6. 폴더 생성 및 포트 노출
 RUN mkdir -p /downloads
