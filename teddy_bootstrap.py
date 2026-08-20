@@ -1,3 +1,9 @@
+import teddy_logging
+
+# Install the stdout/stderr tee before importing the application so startup,
+# downloader, retry and VPN messages are all available in the web log viewer.
+teddy_logging.install_capture()
+
 import time
 
 import teddy_entrypoint as reliability
@@ -6,6 +12,7 @@ import teddy_network
 
 core = reliability.core
 teddy_network.install(core)
+teddy_logging.install_routes(core)
 
 
 # Keep the proven segment retry implementation intact and add one recovery layer
