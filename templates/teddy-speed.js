@@ -42,7 +42,11 @@
             if (speed) {
                 parts.push(`↓ ${speed}`);
             }
-            text.textContent = parts.join(' · ');
+
+            const nextText = parts.join(' · ');
+            if (text.textContent !== nextText) {
+                text.textContent = nextText;
+            }
         });
     }
 
@@ -52,16 +56,11 @@
             if (requestUrl.endsWith('/api/tasks') || requestUrl === '/api/tasks') {
                 response.clone().json().then(data => {
                     latestTasks = data;
+                    // 원본 fetchTasks()가 DOM을 그린 직후 한 번만 속도/용량을 보정한다.
                     setTimeout(renderSpeedsAndSizes, 0);
                 }).catch(() => {});
             }
             return response;
         });
     };
-
-    const observer = new MutationObserver(renderSpeedsAndSizes);
-    const taskList = document.getElementById('taskList');
-    if (taskList) {
-        observer.observe(taskList, { childList: true, subtree: true });
-    }
 })();
