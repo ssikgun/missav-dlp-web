@@ -13,6 +13,7 @@ import teddy_duplicates
 import teddy_generic
 import teddy_network
 import teddy_routing
+import teddy_proxy_pool
 import teddy_storage
 
 
@@ -27,11 +28,11 @@ teddy_duplicates.install(core)
 teddy_network.install(core)
 teddy_logging.install_routes(core)
 teddy_storage.install_file_routes(core)
+teddy_proxy_pool.install(core, teddy_routing, teddy_network)
 
 
 # Keep the proven segment retry implementation intact and add route context plus
-# the existing VPN rotation layer around it. Direct tasks never rotate Gluetun;
-# a terminal Direct failure is handled later by the task-level VPN fallback.
+# VPN/proxy recovery around it. Direct tasks never rotate another route.
 _original_fetch_segment = reliability._fetch_segment
 _original_fetch_variant_playlist = reliability._fetch_variant_playlist
 
@@ -54,11 +55,32 @@ def _fetch_segment_with_network_recovery(task_id, seg_url, headers):
         raise
     except Exception as exc:
         message = str(exc)
-        if mode != 'vpn' or not teddy_network.is_recoverable_failure(message):
+        if not teddy_network.is_recoverable_failure(message):
+            raise
+
+        if mode == 'proxy':
+            print(
+                f'[Proxy] 세그먼트 재시도 소진 -> 다음 프록시 판단: {message[:180]}',
+                flush=True,
+            )
+            if not teddy_proxy_pool.rotate_after_failure(core, reason=message):
+                raise
+            reliability._check_task_state(task_id)
+            record = teddy_proxy_pool.current_record()
+            current = core.tasks.get(task_id)
+            if current:
+                current['network_proxy'] = record.get('proxy', '')
+                current['network_proxy_latency_ms'] = int(record.get('latency_ms') or 0)
+                core.save_tasks()
+            print('[Proxy] 새 프록시에서 같은 세그먼트 재시도', flush=True)
+            with teddy_routing.request_route('proxy'):
+                return _original_fetch_segment(task_id, seg_url, headers)
+
+        if mode != 'vpn':
             raise
 
         print(
-            f'[VPN 자동복구] 세그먼트 재시도 소진 → 네트워크 복구 판단: {message[:180]}',
+            f'[VPN 자동복구] 세그먼트 재시도 소진 -> 네트워크 복구 판단: {message[:180]}',
             flush=True,
         )
         recovered = teddy_network.auto_recover(
@@ -111,7 +133,7 @@ def _move_custom_result_to_site_folder(task_id, url):
         core.save_tasks()
         print(f"[Storage] custom-hls 완료 파일 이동: {task['filename']}", flush=True)
     except OSError as exc:
-        print(f'[Storage] 사이트 폴더 이동 실패 → 루트 파일 유지: {exc}', flush=True)
+        print(f'[Storage] 사이트 폴더 이동 실패 -> 루트 파일 유지: {exc}', flush=True)
 
 
 def _custom_result(task_id):
@@ -134,6 +156,12 @@ def _custom_result(task_id):
 
 
 def _run_engine_once(task_id, url, custom, mode):
+    if mode == 'proxy' and not teddy_proxy_pool.ensure_ready(core, wait_seconds=15):
+        return {
+            'status': 'error',
+            'error': 'Proxy Pool unavailable: 검증을 통과한 무료 프록시가 없습니다.',
+        }
+
     task = core.tasks.get(task_id)
     if task:
         task['network_mode'] = mode
@@ -141,9 +169,18 @@ def _run_engine_once(task_id, url, custom, mode):
         task['storage_folder'] = (
             'missav' if custom else teddy_storage.site_key_for_url(url)
         )
+        if mode == 'proxy':
+            record = teddy_proxy_pool.current_record()
+            task['network_proxy'] = record.get('proxy', '')
+            task['network_proxy_latency_ms'] = int(record.get('latency_ms') or 0)
+            task['network_proxy_exit_ip'] = record.get('exit_ip', '')
+        else:
+            task.pop('network_proxy', None)
+            task.pop('network_proxy_latency_ms', None)
+            task.pop('network_proxy_exit_ip', None)
         core.save_tasks()
 
-    route_label = 'VPN' if mode == 'vpn' else 'Direct'
+    route_label = teddy_routing.mode_label(mode)
     engine_label = 'custom-hls' if custom else 'yt-dlp'
     print(f'[Engine] {engine_label} · {route_label}: {url}', flush=True)
 
@@ -164,6 +201,14 @@ def _run_engine_once(task_id, url, custom, mode):
     )
 
 
+def _reactivate_task(task_id):
+    current = core.tasks.get(task_id)
+    if current:
+        current['status'] = '다운로드 중'
+        current['speed_bps'] = 0
+        core.save_tasks()
+
+
 def _dispatch_download(task_id, url):
     task = core.tasks.get(task_id)
     if not task:
@@ -174,12 +219,12 @@ def _dispatch_download(task_id, url):
 
     # New tasks already contain a resolved mode. Existing tasks from older images
     # are resolved here once. Paused/error retries keep their persisted last mode.
-    if task.get('network_mode') in ('direct', 'vpn') and task.get('network_route_source'):
+    if task.get('network_mode') in teddy_routing.VALID_MODES and task.get('network_route_source'):
         decision = {
             'site': task.get('network_site') or teddy_routing.canonical_site(url),
             'mode': task['network_mode'],
             'source': task.get('network_route_source') or 'default',
-            'fixed': override in ('direct', 'vpn') or task.get('network_route_source') == 'manual',
+            'fixed': override in teddy_routing.VALID_MODES or task.get('network_route_source') == 'manual',
         }
     else:
         decision = teddy_routing.resolve(url, override=override)
@@ -190,17 +235,24 @@ def _dispatch_download(task_id, url):
 
     primary = decision['mode']
     source = decision['source']
+    proxy_enabled = bool(teddy_proxy_pool.snapshot().get('enabled'))
     modes = [primary]
     if not decision['fixed']:
-        modes.append(teddy_routing.fallback_mode(primary))
+        modes.extend(teddy_routing.fallback_modes(primary, proxy_enabled=proxy_enabled))
 
-    for index, mode in enumerate(modes):
+    # A volatile free proxy may disappear between validation and use. Allow two
+    # additional verified proxy candidates before falling back to VPN.
+    proxy_task_retries = 0
+    index = 0
+    previous_mode = None
+    while index < len(modes):
         if task_id not in core.tasks:
             return
+        mode = modes[index]
         if index:
             teddy_routing.prepare_fallback(core, task_id, mode)
             print(
-                f'[Routing] 네트워크 fallback: {primary} -> {mode} '
+                f'[Routing] 네트워크 fallback: {previous_mode or primary} -> {mode} '
                 f'({decision.get("site") or "unknown"})',
                 flush=True,
             )
@@ -218,22 +270,34 @@ def _dispatch_download(task_id, url):
             return
 
         error_message = result.get('error') or ''
+        recoverable = teddy_routing.should_fallback(teddy_network, error_message)
+
+        if (
+            mode == 'proxy'
+            and recoverable
+            and not decision['fixed']
+            and proxy_task_retries < 2
+            and teddy_proxy_pool.rotate_after_failure(core, reason=error_message)
+        ):
+            proxy_task_retries += 1
+            modes.insert(index + 1, 'proxy')
+            _reactivate_task(task_id)
+            previous_mode = 'proxy'
+            index += 1
+            continue
+
         if decision['fixed'] or index + 1 >= len(modes):
             return
-        if not teddy_routing.should_fallback(teddy_network, error_message):
+        if not recoverable:
             print(
-                f'[Routing] VPN fallback 생략: 네트워크성 오류가 아님 · {error_message[:180]}',
+                f'[Routing] fallback 생략: 네트워크성 오류가 아님 · {error_message[:180]}',
                 flush=True,
             )
             return
 
-        # A failed attempt may have left status=error. Put it back into an active
-        # state before trying the alternate route; partial files remain intact.
-        current = core.tasks.get(task_id)
-        if current:
-            current['status'] = '다운로드 중'
-            current['speed_bps'] = 0
-            core.save_tasks()
+        _reactivate_task(task_id)
+        previous_mode = mode
+        index += 1
 
 
 reliability._download_video = _dispatch_download
