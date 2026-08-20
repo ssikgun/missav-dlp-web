@@ -35,7 +35,8 @@
 .teddy-network-dot.warn { background: #f59e0b; }
 .teddy-network-dot.error { background: #ef4444; }
 
-.teddy-network-meta {
+.teddy-network-meta,
+.teddy-network-recovery-meta {
     margin-top: 4px;
     color: #64748b;
     font-size: 12px;
@@ -43,10 +44,40 @@
     overflow-wrap: anywhere;
 }
 
+.teddy-network-recovery-meta {
+    color: #7c8aa0;
+}
+
 .teddy-network-actions {
     display: flex;
-    gap: 8px;
+    align-items: center;
+    gap: 10px;
     flex-shrink: 0;
+}
+
+.teddy-network-auto {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+}
+
+.teddy-network-auto-input {
+    width: 16px;
+    height: 16px;
+    accent-color: #2563eb;
+    cursor: pointer;
+}
+
+.teddy-network-auto-input:disabled,
+.teddy-network-auto:has(.teddy-network-auto-input:disabled) {
+    opacity: 0.55;
+    cursor: not-allowed;
 }
 
 .teddy-network-button {
@@ -78,8 +109,13 @@ html[data-theme="dark"] .teddy-network-title {
     color: #f8fafc;
 }
 
-html[data-theme="dark"] .teddy-network-meta {
+html[data-theme="dark"] .teddy-network-meta,
+html[data-theme="dark"] .teddy-network-recovery-meta {
     color: #94a3b8;
+}
+
+html[data-theme="dark"] .teddy-network-auto {
+    color: #cbd5e1;
 }
 
 html[data-theme="dark"] .teddy-network-button {
@@ -97,8 +133,12 @@ html[data-theme="dark"] .teddy-network-button:hover:not(:disabled) {
         flex-direction: column;
     }
 
-    .teddy-network-actions,
-    .teddy-network-button {
+    .teddy-network-actions {
         width: 100%;
+        justify-content: space-between;
+    }
+
+    .teddy-network-button {
+        min-width: 96px;
     }
 }
