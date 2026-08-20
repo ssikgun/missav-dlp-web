@@ -154,6 +154,8 @@ def load_tasks():
                 t['status'] = '에러: 다운로드 중단됨 (재시작하세요)'
                 t['progress'] = '0%'
             t['speed_bps'] = 0
+            t.setdefault('downloaded_bytes', 0)
+            t.setdefault('total_bytes_estimate', 0)
             tasks[tid] = t
         save_tasks()
     except Exception as e:
@@ -383,10 +385,19 @@ def _download_hls_resumable(task_id, variant_url, headers, out_path):
     pending = [(i, u) for i, u in enumerate(seg_urls)
                if not (os.path.exists(seg_path(i)) and os.path.getsize(seg_path(i)) > 0)]
     done = total - len(pending)
+    downloaded_bytes = sum(
+        os.path.getsize(seg_path(i))
+        for i in range(total)
+        if os.path.exists(seg_path(i)) and os.path.getsize(seg_path(i)) > 0
+    )
+    total_bytes_estimate = int(downloaded_bytes * total / done) if done else 0
+
     print(f'[다운로드] 세그먼트 {total}개 (완료 {done} / 남음 {len(pending)})', flush=True)
     if task_id in tasks:
         tasks[task_id]['progress'] = f'{int(done * 100 / total)}%'
         tasks[task_id]['speed_bps'] = 0
+        tasks[task_id]['downloaded_bytes'] = downloaded_bytes
+        tasks[task_id]['total_bytes_estimate'] = total_bytes_estimate
 
     def fetch_to_file(item):
         i, u = item
@@ -407,20 +418,27 @@ def _download_hls_resumable(task_id, variant_url, headers, out_path):
             batch_started = time.monotonic()
             byte_counts = list(ex.map(fetch_to_file, batch))
             elapsed = max(time.monotonic() - batch_started, 0.001)
-            batch_speed = sum(byte_counts) / elapsed
+            batch_bytes = sum(byte_counts)
+            batch_speed = batch_bytes / elapsed
             speed_samples.append(batch_speed)
             speed_samples = speed_samples[-4:]
             smoothed_speed = sum(speed_samples) / len(speed_samples)
 
             done += len(batch)
+            downloaded_bytes += batch_bytes
+            total_bytes_estimate = int(downloaded_bytes * total / done) if done else 0
             if task_id in tasks:
                 tasks[task_id]['progress'] = f'{int(min(done, total) * 100 / total)}%'
                 tasks[task_id]['speed_bps'] = int(smoothed_speed)
+                tasks[task_id]['downloaded_bytes'] = downloaded_bytes
+                tasks[task_id]['total_bytes_estimate'] = total_bytes_estimate
 
     # 모든 세그먼트 확보 → ffmpeg concat으로 mp4 리먹스
     if task_id in tasks:
         tasks[task_id]['progress'] = '99%'
         tasks[task_id]['speed_bps'] = 0
+        tasks[task_id]['downloaded_bytes'] = downloaded_bytes
+        tasks[task_id]['total_bytes_estimate'] = downloaded_bytes
     list_path = os.path.join(parts_dir, 'filelist.txt')
     with open(list_path, 'w', encoding='utf-8') as lf:
         for i in range(total):
@@ -518,7 +536,10 @@ def download_video(task_id, url):
             tasks[task_id]['speed_bps'] = 0
             tasks[task_id]['filename'] = out_name
             try:
-                tasks[task_id]['filesize'] = os.path.getsize(final_path)
+                final_size = os.path.getsize(final_path)
+                tasks[task_id]['filesize'] = final_size
+                tasks[task_id]['downloaded_bytes'] = final_size
+                tasks[task_id]['total_bytes_estimate'] = final_size
             except OSError:
                 pass
             save_tasks()
@@ -596,7 +617,14 @@ def handle_download():
     if not url:
         return jsonify({"status": "error", "message": "URL 입력"}), 400
     task_id = str(uuid.uuid4())
-    tasks[task_id] = {'url': url, 'status': '대기 중', 'progress': '0%', 'speed_bps': 0}
+    tasks[task_id] = {
+        'url': url,
+        'status': '대기 중',
+        'progress': '0%',
+        'speed_bps': 0,
+        'downloaded_bytes': 0,
+        'total_bytes_estimate': 0,
+    }
     save_tasks()
     download_queue.put(task_id)
     return jsonify({"status": "success", "task_id": task_id})
