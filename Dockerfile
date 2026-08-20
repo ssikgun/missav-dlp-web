@@ -20,6 +20,9 @@ RUN uv pip install --system --no-cache -r requirements.txt
 # 5. 애플리케이션 복사
 COPY . .
 
+# Teddy custom: 원본 index.html은 건드리지 않고 속도 표시 스크립트만 빌드 시 삽입
+RUN sed -i 's#</body>#<script src="/static/teddy-speed.js"></script></body>#' templates/index.html
+
 # 6. 폴더 생성 및 포트 노출
 RUN mkdir -p /downloads
 EXPOSE 5000
