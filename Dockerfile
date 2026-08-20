@@ -22,7 +22,7 @@ RUN python -c "import typing_extensions; import curl_cffi; import yt_dlp; import
 
 # 5. 애플리케이션 복사
 COPY . .
-RUN python -m py_compile teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py teddy_routing.py teddy_duplicates.py teddy_logging.py teddy_storage.py teddy_generic.py teddy_bootstrap.py teddy_patch_vpn_health.py teddy_patch_proxy_pool.py teddy_patch_index.py teddy_patch_logs.py teddy_patch_storage.py teddy_patch_routing.py && \
+RUN python -m py_compile teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py teddy_routing.py teddy_duplicates.py teddy_logging.py teddy_storage.py teddy_generic.py teddy_bootstrap.py teddy_patch_vpn_health.py teddy_patch_proxy_pool.py teddy_patch_task_claim_remux.py teddy_patch_index.py teddy_patch_logs.py teddy_patch_storage.py teddy_patch_routing.py && \
     python -c "import teddy_network as n; assert n.is_recoverable_failure('HTTP 403'); assert n.is_recoverable_failure('HTTP Error 403: Forbidden'); assert n.is_recoverable_failure('operation timed out'); assert n.is_recoverable_failure('connection reset by peer'); assert n.is_recoverable_failure('curl: (35) TLS connect error'); assert not n.is_recoverable_failure('HTTP 404'); assert not n.is_recoverable_failure('HTTP 401'); print('adaptive network failure boundary smoke test: OK')" && \
     python -c "import teddy_vpn_health as h; s=h.snapshot(); assert s['auto_failure_threshold'] == 10; assert s['auto_failure_segment_threshold'] == 5; assert s['auto_failure_window_seconds'] == 60; print('cumulative VPN health monitor smoke test: OK')" && \
     python -c "import teddy_proxy_pool as p; assert p._normalize_proxy('8.8.8.8:8080') == 'http://8.8.8.8:8080'; assert not p._normalize_proxy('127.0.0.1:8080'); assert not p._normalize_proxy('192.168.1.10:3128'); assert p.MAX_CANDIDATES <= 64; print('free proxy pool safety smoke test: OK')" && \
@@ -36,12 +36,16 @@ RUN python -m py_compile teddy_entrypoint.py teddy_network.py teddy_vpn_health.p
 # 패치 대상이 upstream 변경으로 달라지면 패치 스크립트가 빌드를 실패시킨다.
 RUN python teddy_patch_vpn_health.py && \
     python teddy_patch_proxy_pool.py && \
+    python teddy_patch_task_claim_remux.py && \
     python -m py_compile teddy_entrypoint.py teddy_bootstrap.py teddy_vpn_health.py teddy_network.py teddy_proxy_pool.py teddy_routing.py teddy_generic.py && \
     grep -q 'Gluetun proxy를 통한 공인 IP 확인' teddy_network.py && \
     grep -q '다운로드 큐에 추가했습니다' teddy_routing.py && \
     grep -q 'mode_label(network_mode)' teddy_generic.py && \
     grep -q 'teddy_proxy_pool.install' teddy_bootstrap.py && \
     grep -q 'rotate_after_failure' teddy_bootstrap.py && \
+    grep -q '동일 task 중복 실행 차단' teddy_bootstrap.py && \
+    grep -q 'remux-output.mp4' teddy_entrypoint.py && \
+    grep -q 'os.replace(remux_tmp, out_path)' teddy_entrypoint.py && \
     python teddy_patch_index.py && \
     python teddy_patch_logs.py && \
     python teddy_patch_storage.py && \
@@ -65,7 +69,7 @@ RUN python teddy_patch_vpn_health.py && \
     grep -q '_teddy_vpn_failure_observer' teddy_entrypoint.py && \
     grep -q 'teddy_vpn_health.install' teddy_bootstrap.py && \
     grep -q '_fetch_segment_with_network_recovery' teddy_bootstrap.py && \
-    grep -q '_dispatch_download' teddy_bootstrap.py && \
+    grep -q '_dispatch_download_guarded' teddy_bootstrap.py && \
     grep -q 'duplicate queue guard enabled' teddy_duplicates.py && \
     grep -q 'teddy_duplicates.install' teddy_bootstrap.py && \
     grep -q 'download_generic' teddy_generic.py && \
