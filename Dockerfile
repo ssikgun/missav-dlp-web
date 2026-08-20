@@ -22,7 +22,8 @@ RUN python -c "import typing_extensions; import curl_cffi; import yt_dlp; import
 
 # 5. 애플리케이션 복사
 COPY . .
-RUN python -m py_compile teddy_entrypoint.py teddy_network.py teddy_bootstrap.py teddy_patch_index.py
+RUN python -m py_compile teddy_entrypoint.py teddy_network.py teddy_bootstrap.py teddy_patch_index.py && \
+    python -c "import teddy_network as n; assert n.is_recoverable_failure('HTTP 403'); assert n.is_recoverable_failure('operation timed out'); assert n.is_recoverable_failure('connection reset by peer'); assert not n.is_recoverable_failure('HTTP 404'); assert not n.is_recoverable_failure('HTTP 401'); print('automatic VPN recovery boundary smoke test: OK')"
 
 # Teddy custom: 범용 브랜딩 + 안정적인 keyed task UI를 빌드 시 적용
 # 패치 대상이 upstream 변경으로 달라지면 teddy_patch_index.py가 빌드를 실패시킨다.
@@ -34,6 +35,9 @@ RUN python teddy_patch_index.py && \
     grep -q '남은 시간 약' templates/index.html && \
     grep -q 'Ⅱ 일시정지' templates/index.html && \
     grep -q 'teddy-network.js' templates/index.html && \
+    grep -q '자동 복구' templates/teddy-network.js && \
+    grep -q 'auto_recover' teddy_network.py && \
+    grep -q '_fetch_segment_with_network_recovery' teddy_bootstrap.py && \
     ! grep -q 'MissAV' templates/index.html && \
     ! grep -q 'taskList.innerHTML = entries.map' templates/index.html
 
