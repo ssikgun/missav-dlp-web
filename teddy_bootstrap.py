@@ -9,6 +9,7 @@ teddy_logging.install_capture()
 import time
 
 import teddy_entrypoint as reliability
+import teddy_duplicates
 import teddy_generic
 import teddy_network
 import teddy_routing
@@ -22,6 +23,7 @@ core = reliability.core
 core.cffi_requests = teddy_routing.RouteAwareRequests(core.cffi_requests)
 
 teddy_routing.install(core)
+teddy_duplicates.install(core)
 teddy_network.install(core)
 teddy_logging.install_routes(core)
 teddy_storage.install_file_routes(core)
