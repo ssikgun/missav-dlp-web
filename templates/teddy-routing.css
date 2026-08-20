@@ -1,0 +1,180 @@
+.teddy-route-select {
+    min-width: 112px;
+    padding: 0 12px;
+    border: 2px solid #cbd5e1;
+    border-radius: 9px;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 700;
+    outline: none;
+}
+
+.teddy-route-hint {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.teddy-routing-settings {
+    padding-top: 4px;
+}
+
+.teddy-routing-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 11px 12px;
+    margin: 10px 0 16px;
+    border: 1px solid #dbe3ef;
+    border-radius: 9px;
+    background: #f8fafc;
+    font-size: 12px;
+    color: #475569;
+}
+
+.teddy-routing-summary strong {
+    color: #0f172a;
+}
+
+.teddy-routing-section-title {
+    margin: 16px 0 8px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #334155;
+}
+
+.teddy-routing-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.teddy-routing-empty {
+    padding: 10px 12px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.teddy-routing-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 112px auto;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.teddy-routing-site {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.teddy-routing-meta {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+.teddy-routing-row select,
+.teddy-routing-add select {
+    min-width: 0;
+    width: 100%;
+    padding: 8px 9px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 12px;
+}
+
+.teddy-routing-row button,
+.teddy-routing-add button {
+    border: 0;
+    border-radius: 7px;
+    padding: 8px 11px;
+    background: #e8eef8;
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.teddy-routing-row button:hover,
+.teddy-routing-add button:hover {
+    background: #dbe7fb;
+}
+
+.teddy-routing-add {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 112px auto;
+    gap: 8px;
+    margin-top: 9px;
+}
+
+.teddy-routing-add .setting-input-wide,
+.teddy-routing-add .setting-select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+html[data-theme="dark"] .teddy-route-select,
+html[data-theme="dark"] .teddy-routing-row select,
+html[data-theme="dark"] .teddy-routing-add select {
+    background: #111827;
+    border-color: #334155;
+    color: #e5e7eb;
+}
+
+html[data-theme="dark"] .teddy-route-hint,
+html[data-theme="dark"] .teddy-routing-meta {
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] .teddy-routing-summary {
+    background: #111827;
+    border-color: #273449;
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] .teddy-routing-summary strong,
+html[data-theme="dark"] .teddy-routing-section-title,
+html[data-theme="dark"] .teddy-routing-site {
+    color: #f8fafc;
+}
+
+html[data-theme="dark"] .teddy-routing-row {
+    background: #0f172a;
+    border-color: #273449;
+}
+
+html[data-theme="dark"] .teddy-routing-empty {
+    border-color: #334155;
+}
+
+html[data-theme="dark"] .teddy-routing-row button,
+html[data-theme="dark"] .teddy-routing-add button {
+    background: #172554;
+    color: #93c5fd;
+}
+
+@media (max-width: 720px) {
+    .url-bar {
+        flex-wrap: wrap;
+    }
+    .teddy-route-select {
+        min-height: 42px;
+    }
+    .teddy-routing-row,
+    .teddy-routing-add {
+        grid-template-columns: 1fr;
+    }
+}
