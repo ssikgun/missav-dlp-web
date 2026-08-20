@@ -43,6 +43,13 @@ def verify_runtime():
     assert p._selection_key(learned) < p._selection_key(unlearned)
 
     checks = {
+        'app.py': [
+            'from yt_dlp.utils import ExtractorError',
+            'teddy_check_task_state',
+            "get('teddy_task_id')",
+            "task.get('status') in ('일시정지 요청 중', '일시정지')",
+            'except ExtractorError',
+        ],
         'teddy_network.py': [
             'Gluetun proxy를 통한 공인 IP 확인',
             'auto_recover',
@@ -70,6 +77,9 @@ def verify_runtime():
             '_dispatch_download_guarded',
             'teddy_duplicates.install',
             'RouteAwareRequests',
+            'attempted_proxy',
+            '엔진 단계 실패 -> 다음 Proxy 후보로 재시도',
+            '엔진 단계 실패 -> 다른 작업이 바꾼 새 후보 재사용',
         ],
         'teddy_proxy_pool.py': [
             '_rank_by_real_speed',
@@ -86,6 +96,8 @@ def verify_runtime():
             'remux-output.mp4',
             'os.replace(remux_tmp, out_path)',
             '_teddy_vpn_failure_observer',
+            "'teddy_task_id': task_id",
+            '추출 단계 일시정지 완료',
         ],
         'teddy_duplicates.py': ['duplicate queue guard enabled'],
         'teddy_storage.py': ['site_key_for_url'],
