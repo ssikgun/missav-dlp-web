@@ -192,3 +192,132 @@ html[data-theme="dark"] .toast.error {
     color: #f87171;
     border-color: #7f1d1d;
 }
+
+/* --- Unified button system --- */
+:root {
+    --teddy-btn-radius: 8px;
+    --teddy-btn-primary-bg: #3b82f6;
+    --teddy-btn-primary-hover: #2563eb;
+    --teddy-btn-primary-text: #ffffff;
+    --teddy-btn-secondary-bg: #e8eef8;
+    --teddy-btn-secondary-hover: #dbe7fb;
+    --teddy-btn-secondary-text: #1d4ed8;
+    --teddy-btn-danger-bg: #fef2f2;
+    --teddy-btn-danger-hover: #fee2e2;
+    --teddy-btn-danger-text: #dc2626;
+    --teddy-btn-ghost-bg: #f1f5f9;
+    --teddy-btn-ghost-hover: #e2e8f0;
+    --teddy-btn-ghost-text: #64748b;
+}
+
+html[data-theme="dark"] {
+    --teddy-btn-secondary-bg: #172554;
+    --teddy-btn-secondary-hover: #1e3a8a;
+    --teddy-btn-secondary-text: #93c5fd;
+    --teddy-btn-danger-bg: #331416;
+    --teddy-btn-danger-hover: #4c1d1f;
+    --teddy-btn-danger-text: #fca5a5;
+    --teddy-btn-ghost-bg: #1f2937;
+    --teddy-btn-ghost-hover: #334155;
+    --teddy-btn-ghost-text: #cbd5e1;
+}
+
+.url-bar button,
+.btn,
+.teddy-network-button,
+.btn-save,
+.btn-reset,
+.teddy-routing-row button,
+.teddy-routing-add button {
+    border: 1px solid transparent;
+    border-radius: var(--teddy-btn-radius);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    opacity: 1;
+    transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.url-bar button,
+.btn-save {
+    background: var(--teddy-btn-primary-bg);
+    color: var(--teddy-btn-primary-text);
+}
+
+.url-bar button:hover:not(:disabled),
+.btn-save:hover:not(:disabled) {
+    background: var(--teddy-btn-primary-hover);
+    opacity: 1;
+}
+
+.btn-primary,
+.btn-preview,
+.teddy-network-button,
+.teddy-routing-row button,
+.teddy-routing-add button {
+    background: var(--teddy-btn-secondary-bg);
+    color: var(--teddy-btn-secondary-text);
+}
+
+.btn-primary:hover:not(:disabled),
+.btn-preview:hover:not(:disabled),
+.teddy-network-button:hover:not(:disabled),
+.teddy-routing-row button:hover:not(:disabled),
+.teddy-routing-add button:hover:not(:disabled) {
+    background: var(--teddy-btn-secondary-hover);
+    color: var(--teddy-btn-secondary-text);
+    opacity: 1;
+}
+
+.btn-danger {
+    background: var(--teddy-btn-danger-bg);
+    color: var(--teddy-btn-danger-text);
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: var(--teddy-btn-danger-hover);
+    color: var(--teddy-btn-danger-text);
+    opacity: 1;
+}
+
+.btn-ghost,
+.btn-reset {
+    background: var(--teddy-btn-ghost-bg);
+    color: var(--teddy-btn-ghost-text);
+}
+
+.btn-ghost:hover:not(:disabled),
+.btn-reset:hover:not(:disabled) {
+    background: var(--teddy-btn-ghost-hover);
+    color: var(--teddy-btn-ghost-text);
+    opacity: 1;
+}
+
+.btn,
+.teddy-network-button,
+.teddy-routing-row button,
+.teddy-routing-add button {
+    min-height: 34px;
+    padding: 0 12px;
+    justify-content: center;
+}
+
+.url-bar button {
+    min-height: 44px;
+    padding: 0 22px;
+    font-size: 13px;
+}
+
+.teddy-network-button:disabled,
+.btn:disabled,
+.btn-save:disabled,
+.btn-reset:disabled,
+.teddy-routing-row button:disabled,
+.teddy-routing-add button:disabled,
+.url-bar button:disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+}
