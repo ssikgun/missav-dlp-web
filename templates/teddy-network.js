@@ -22,7 +22,7 @@
                 '<div class="teddy-network-recovery-meta"></div>' +
             '</div>' +
             '<div class="teddy-network-actions">' +
-                '<label class="teddy-network-auto" title="반복적인 네트워크 오류가 발생하면 VPN IP를 자동 변경합니다.">' +
+                '<label class="teddy-network-auto" title="반복적인 네트워크 오류가 누적되면 VPN IP를 자동 변경합니다.">' +
                     '<input class="teddy-network-auto-input" type="checkbox">' +
                     '<span>자동 복구</span>' +
                 '</label>' +
@@ -96,8 +96,18 @@
         const autoCount = Number(data && data.auto_rotate_count) || 0;
         const recent = formatRecent(data && data.last_auto_rotate_at);
         const lastIp = data && data.last_auto_ip ? data.last_auto_ip : '';
+        const failureCount = Number(data && data.auto_failure_count) || 0;
+        const failureThreshold = Number(data && data.auto_failure_threshold) || 10;
+        const failureSegments = Number(data && data.auto_failure_segments) || 0;
+        const failureSegmentThreshold = Number(data && data.auto_failure_segment_threshold) || 5;
+        const failureWindow = Number(data && data.auto_failure_window_seconds) || 60;
         recoveryMeta.textContent =
             '자동 복구 ' + (autoEnabled ? '켜짐' : '꺼짐') +
+            (autoEnabled
+                ? ' · 오류 감지 ' + failureCount + '/' + failureThreshold +
+                  ' · 세그먼트 ' + failureSegments + '/' + failureSegmentThreshold +
+                  ' (' + failureWindow + '초)'
+                : '') +
             ' · 자동 IP 변경 ' + autoCount + '회' +
             ' · 최근 ' + recent +
             (lastIp ? ' · ' + lastIp : '');
