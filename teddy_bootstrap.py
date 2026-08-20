@@ -7,6 +7,7 @@ teddy_logging.install_capture()
 import time
 
 import teddy_entrypoint as reliability
+import teddy_generic
 import teddy_network
 
 
@@ -52,6 +53,32 @@ def _fetch_segment_with_network_recovery(task_id, seg_url, headers):
 
 reliability._fetch_segment = _fetch_segment_with_network_recovery
 core._fetch_segment = _fetch_segment_with_network_recovery
+
+
+# Route only the site that needs the proven custom HLS path to that engine.
+# Everything else goes through yt-dlp's maintained extractor/downloader stack.
+_custom_download_video = reliability._download_video
+
+
+def _dispatch_download(task_id, url):
+    task = core.tasks.get(task_id)
+    if teddy_generic.is_custom_site(core, url):
+        if task:
+            task['engine'] = 'custom-hls'
+            core.save_tasks()
+        print(f'[Engine] custom-hls: {url}', flush=True)
+        return _custom_download_video(task_id, url)
+
+    if task:
+        task['engine'] = 'yt-dlp'
+        core.save_tasks()
+    print(f'[Engine] yt-dlp: {url}', flush=True)
+    return teddy_generic.download_generic(core, reliability, task_id, url)
+
+
+reliability._download_video = _dispatch_download
+core.download_video = _dispatch_download
+teddy_generic.install_delete_cleanup(core)
 
 
 if __name__ == '__main__':
