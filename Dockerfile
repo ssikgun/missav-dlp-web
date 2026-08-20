@@ -37,6 +37,7 @@ RUN python -m py_compile teddy_entrypoint.py teddy_network.py teddy_vpn_health.p
 RUN python teddy_patch_vpn_health.py && \
     python teddy_patch_proxy_pool.py && \
     python teddy_patch_proxy_speed.py && \
+    sed -i 's/ensure_ready(core, wait_seconds=15)/ensure_ready(core, wait_seconds=35)/' teddy_bootstrap.py && \
     python teddy_patch_task_claim_remux.py && \
     python -m py_compile teddy_entrypoint.py teddy_bootstrap.py teddy_vpn_health.py teddy_network.py teddy_proxy_pool.py teddy_routing.py teddy_generic.py teddy_patch_routing.py && \
     python -c "import teddy_proxy_pool as p; assert p.BANDWIDTH_TEST_BYTES == 512 * 1024; assert p.BANDWIDTH_TEST_LIMIT <= 8; assert p.BANDWIDTH_TEST_WORKERS <= 4; assert 'speed.cloudflare.com/__down' in p.BANDWIDTH_URL; print('proxy real-speed ranking smoke test: OK')" && \
@@ -46,6 +47,7 @@ RUN python teddy_patch_vpn_health.py && \
     grep -q 'teddy_proxy_pool.install' teddy_bootstrap.py && \
     grep -q 'rotate_after_failure' teddy_bootstrap.py && \
     grep -q 'network_proxy_speed_bps' teddy_bootstrap.py && \
+    grep -q 'ensure_ready(core, wait_seconds=35)' teddy_bootstrap.py && \
     grep -q '_rank_by_real_speed' teddy_proxy_pool.py && \
     grep -q 'current_speed_bps' teddy_proxy_pool.py && \
     grep -q 'speed.cloudflare.com/__down' teddy_proxy_pool.py && \
