@@ -11,6 +11,7 @@ TRIGGER_THROTTLE_SECONDS = 10
 _lock = threading.Lock()
 _events = {}
 _last_trigger = {}
+_recovery_threads = set()
 
 
 def _prune_locked(now):
@@ -52,6 +53,22 @@ def snapshot():
     }
 
 
+def _recover_in_background(core, network_module, task_id, summary, failed_since):
+    current = threading.current_thread()
+    try:
+        recovered = network_module.auto_recover(
+            core,
+            task_id=task_id,
+            reason=summary,
+            failed_since=failed_since,
+        )
+        if recovered:
+            clear()
+    finally:
+        with _lock:
+            _recovery_threads.discard(current)
+
+
 def note_failure(core, network_module, task_id, segment, reason):
     """Observe a recoverable VPN segment failure and rotate on sustained degradation."""
     if not core.settings.get('network_auto_recover', True):
@@ -86,15 +103,17 @@ def note_failure(core, network_module, task_id, segment, reason):
         f'서로 다른 세그먼트 {distinct}개 · 최근: {reason[:160]}'
     )
     print(f'[VPN 자동복구] 누적 오류 임계치 도달: {summary}', flush=True)
-    recovered = network_module.auto_recover(
-        core,
-        task_id=task_id,
-        reason=summary,
-        failed_since=oldest,
+
+    worker = threading.Thread(
+        target=_recover_in_background,
+        args=(core, network_module, task_id, summary, oldest),
+        name=f'vpn-auto-recover-{task_id[:8]}',
+        daemon=True,
     )
-    if recovered:
-        clear()
-    return recovered
+    with _lock:
+        _recovery_threads.add(worker)
+    worker.start()
+    return True
 
 
 def install(core, network_module):
