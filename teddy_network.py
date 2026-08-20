@@ -3,8 +3,15 @@ import os
 import threading
 import time
 
+import teddy_routing
 
-CONTROL_URL = os.environ.get('GLUETUN_CONTROL_URL', 'http://127.0.0.1:8000').rstrip('/')
+
+_control_override = os.environ.get('GLUETUN_CONTROL_URL', '').strip().rstrip('/')
+CONTROL_URLS = (
+    [_control_override]
+    if _control_override
+    else ['http://gluetun:8000', 'http://127.0.0.1:8000']
+)
 ROTATE_TIMEOUT_SECONDS = 55
 AUTO_ROTATE_COOLDOWN_SECONDS = 90
 
@@ -59,21 +66,28 @@ def _save_auto_state(core):
 
 
 def _control_request(core, method, path, payload=None, timeout=4):
-    url = CONTROL_URL + path
-    kwargs = {'timeout': timeout}
-    if payload is not None:
-        kwargs['json'] = payload
-    response = getattr(core.cffi_requests, method.lower())(url, **kwargs)
-    if response.status_code in (401, 403):
-        raise PermissionError('Gluetun control API 인증 설정이 필요합니다.')
-    if response.status_code < 200 or response.status_code >= 300:
-        raise RuntimeError(f'Gluetun control API HTTP {response.status_code}')
-    if not response.content:
-        return {}
-    try:
-        return response.json()
-    except Exception:
-        return {}
+    last_error = None
+    for base in CONTROL_URLS:
+        url = base + path
+        kwargs = {'timeout': timeout}
+        if payload is not None:
+            kwargs['json'] = payload
+        try:
+            response = getattr(core.cffi_requests, method.lower())(url, **kwargs)
+        except Exception as exc:
+            last_error = exc
+            continue
+        if response.status_code in (401, 403):
+            raise PermissionError('Gluetun control API 인증 설정이 필요합니다.')
+        if response.status_code < 200 or response.status_code >= 300:
+            raise RuntimeError(f'Gluetun control API HTTP {response.status_code}')
+        if not response.content:
+            return {}
+        try:
+            return response.json()
+        except Exception:
+            return {}
+    raise RuntimeError(f'Gluetun control API 연결 실패: {last_error or "unreachable"}')
 
 
 def _external_identity(core, force=False):
@@ -83,11 +97,17 @@ def _external_identity(core, force=False):
             return dict(_identity_cache['data'])
 
     data = {}
+    proxy_url = teddy_routing.proxy_for_mode('vpn')
+    proxy_kwargs = (
+        {'proxies': {'http': proxy_url, 'https': proxy_url}}
+        if proxy_url else {}
+    )
     try:
         response = core.cffi_requests.get(
             'https://ipinfo.io/json',
             impersonate='firefox135',
             timeout=7,
+            **proxy_kwargs,
         )
         if response.status_code == 200:
             raw = response.json()
@@ -106,6 +126,7 @@ def _external_identity(core, force=False):
                 'https://api.ipify.org?format=json',
                 impersonate='firefox135',
                 timeout=7,
+                **proxy_kwargs,
             )
             if response.status_code == 200:
                 data = {'public_ip': (response.json().get('ip') or '')}
@@ -130,13 +151,27 @@ def _active_task_count(core):
     return sum(1 for task in core.tasks.values() if task.get('status') in active_statuses)
 
 
+def _active_vpn_task_count(core):
+    active_statuses = {'다운로드 중', '일시정지 요청 중', '대기 중'}
+    return sum(
+        1 for task in core.tasks.values()
+        if task.get('status') in active_statuses and task.get('network_mode') == 'vpn'
+    )
+
+
 def is_recoverable_failure(message):
-    """Return True only for failures where changing the VPN route can reasonably help."""
+    """Return True only for failures where changing Direct/VPN route can help."""
     text = str(message or '').lower()
 
     recoverable_http = (
-        'http 403', 'http 408', 'http 425', 'http 429',
-        'http 500', 'http 502', 'http 503', 'http 504',
+        'http 403', 'http error 403', '403 forbidden',
+        'http 408', 'http error 408',
+        'http 425', 'http error 425',
+        'http 429', 'http error 429', '429 too many requests',
+        'http 500', 'http error 500',
+        'http 502', 'http error 502',
+        'http 503', 'http error 503',
+        'http 504', 'http error 504',
         'http 520', 'http 521', 'http 522', 'http 523', 'http 524',
     )
     if any(token in text for token in recoverable_http):
@@ -148,7 +183,10 @@ def is_recoverable_failure(message):
         'network is unreachable', 'network error', 'recv failure',
         'empty reply', 'ssl connect', 'tls connect',
         'curl: (7)', 'curl: (28)', 'curl: (35)', 'curl: (52)', 'curl: (56)',
-        'operation too slow', 'connection closed',
+        'operation too slow', 'connection closed', 'cloudflare',
+        'access denied', 'geo restricted', 'geo-restricted', 'georestricted',
+        'not available in your country', 'not available from your location',
+        'blocked in your country', 'region restriction',
     )
     return any(token in text for token in network_tokens)
 
@@ -221,7 +259,6 @@ def _perform_rotation_locked(core, automatic=False, reason=''):
             'country': identity.get('country') or '',
         }
     except Exception:
-        # Best effort: if stop succeeded but start failed, request running again.
         try:
             _control_request(core, 'PUT', '/v1/vpn/status', {'status': 'running'}, timeout=7)
         except Exception:
@@ -232,18 +269,17 @@ def _perform_rotation_locked(core, automatic=False, reason=''):
 
 
 def auto_recover(core, task_id, reason, failed_since):
-    """Rotate once after repeated recoverable segment failures.
-
-    Concurrent segment workers share one rotation: workers whose failure window began
-    before another worker successfully rotated simply reuse that new network path.
-    """
+    """Rotate once after repeated recoverable failures on a VPN-routed task."""
     global _last_rotation_monotonic
 
     if not core.settings.get('network_auto_recover', True):
         return False
     if task_id not in core.tasks:
         return False
-    if core.tasks[task_id].get('status') in ('일시정지 요청 중', '일시정지'):
+    task = core.tasks[task_id]
+    if task.get('network_mode') != 'vpn':
+        return False
+    if task.get('status') in ('일시정지 요청 중', '일시정지'):
         return False
 
     now = time.monotonic()
@@ -255,8 +291,6 @@ def auto_recover(core, task_id, reason, failed_since):
         print(f'[VPN 자동복구] cooldown 중 ({remaining}s 남음) → task 재시도로 넘김', flush=True)
         return False
 
-    # Block here if another worker is rotating. Re-check after acquiring the lock
-    # so a shared outage never causes a burst of multiple reconnects.
     with _rotate_lock:
         if _last_rotation_monotonic > failed_since:
             print('[VPN 자동복구] 대기 중 다른 세그먼트가 복구 완료 → 새 경로 재사용', flush=True)
@@ -303,7 +337,7 @@ def _network_status(core, force_identity=False):
     except PermissionError as exc:
         result['message'] = str(exc)
     except Exception as exc:
-        result['message'] = f'Gluetun control API 연결 실패: {exc}'
+        result['message'] = str(exc)
 
     identity = _external_identity(core, force=force_identity)
     if not result['public_ip']:
@@ -314,9 +348,10 @@ def _network_status(core, force_identity=False):
         result['country'] = identity.get('country') or ''
 
     result['active_tasks'] = _active_task_count(core)
+    result['active_vpn_tasks'] = _active_vpn_task_count(core)
     result['can_rotate'] = bool(
         result['control_ready']
-        and result['active_tasks'] == 0
+        and result['active_vpn_tasks'] == 0
         and not _rotation_in_progress
     )
     with _state_lock:
@@ -347,10 +382,10 @@ def install(core):
 
     @core.app.route('/api/network/rotate', methods=['POST'])
     def teddy_network_rotate():
-        if _active_task_count(core):
+        if _active_vpn_task_count(core):
             return core.jsonify({
                 'status': 'error',
-                'message': '먼저 진행 중인 다운로드를 일시정지하세요.',
+                'message': '먼저 진행 중인 VPN 다운로드를 일시정지하세요.',
             }), 409
 
         if not _rotate_lock.acquire(blocking=False):
@@ -384,6 +419,6 @@ def install(core):
             _rotate_lock.release()
 
     print(
-        '[Teddy] VPN network manager enabled: manual rotate + automatic recovery',
+        '[Teddy] VPN network manager enabled: split-route proxy + manual rotate + automatic recovery',
         flush=True,
     )
