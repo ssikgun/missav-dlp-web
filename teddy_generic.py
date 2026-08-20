@@ -4,6 +4,8 @@ import shutil
 import threading
 import time
 
+import teddy_storage
+
 
 _save_lock = threading.Lock()
 _last_saved = {}
@@ -68,7 +70,7 @@ def _progress_fraction(data):
     return downloaded, total, None
 
 
-def _find_final_path(core, ydl, info):
+def _find_final_path(core, ydl, info, home_dir):
     candidates = []
     if isinstance(info, dict):
         for key in ('filepath', '_filename'):
@@ -91,7 +93,7 @@ def _find_final_path(core, ydl, info):
 
     video_id = str((info or {}).get('id') or '')
     if video_id:
-        pattern = os.path.join(core.DOWNLOAD_DIR, f'*{glob.escape(video_id)}*')
+        pattern = os.path.join(home_dir, f'*{glob.escape(video_id)}*')
         matches = [path for path in glob.glob(pattern) if os.path.isfile(path)]
         if matches:
             return max(matches, key=os.path.getmtime)
@@ -101,7 +103,14 @@ def _find_final_path(core, ydl, info):
 def download_generic(core, reliability, task_id, url):
     temp_dir = _task_temp_dir(core, task_id)
     os.makedirs(temp_dir, exist_ok=True)
+    site_key, site_dir = teddy_storage.ensure_site_dir(core, url, custom=False)
     last_filename = {'path': ''}
+
+    task = core.tasks.get(task_id)
+    if task:
+        task['storage_folder'] = site_key
+        task['engine'] = 'yt-dlp'
+        _maybe_save(core, task_id, force=True)
 
     def progress_hook(data):
         task = core.tasks.get(task_id)
@@ -145,7 +154,7 @@ def download_generic(core, reliability, task_id, url):
         'format': _format_selector(core),
         'merge_output_format': 'mp4',
         'paths': {
-            'home': core.DOWNLOAD_DIR,
+            'home': site_dir,
             'temp': temp_dir,
         },
         'outtmpl': {
@@ -157,7 +166,7 @@ def download_generic(core, reliability, task_id, url):
         'progress_hooks': [progress_hook],
     }
 
-    print(f'[yt-dlp] generic download 시작: {url}', flush=True)
+    print(f'[yt-dlp] generic download 시작: {url} -> {site_key}/', flush=True)
     try:
         with core.yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -168,7 +177,7 @@ def download_generic(core, reliability, task_id, url):
                 if len(entries) == 1:
                     info = entries[0]
             _store_metadata(core, task_id, info)
-            final_path = _find_final_path(core, ydl, info)
+            final_path = _find_final_path(core, ydl, info, site_dir)
 
         task = core.tasks.get(task_id)
         if not task:
@@ -184,11 +193,12 @@ def download_generic(core, reliability, task_id, url):
         task['status'] = '완료'
         task['progress'] = '100%'
         task['speed_bps'] = 0
-        task['filename'] = os.path.basename(final_path)
+        task['filename'] = teddy_storage.relative_public_path(core, final_path)
         task['filesize'] = final_size
         task['downloaded_bytes'] = final_size
         task['total_bytes_estimate'] = final_size
         task['engine'] = 'yt-dlp'
+        task['storage_folder'] = site_key
         _maybe_save(core, task_id, force=True)
         shutil.rmtree(temp_dir, ignore_errors=True)
         print(f"[완료][yt-dlp] {task['filename']}", flush=True)
@@ -198,6 +208,7 @@ def download_generic(core, reliability, task_id, url):
             task['status'] = '일시정지'
             task['speed_bps'] = 0
             task['engine'] = 'yt-dlp'
+            task['storage_folder'] = site_key
             _maybe_save(core, task_id, force=True)
         print(f'[Pause][yt-dlp] 일시정지 완료: {url}', flush=True)
     except core.DownloadCancelled:
@@ -214,6 +225,7 @@ def download_generic(core, reliability, task_id, url):
             task['status'] = '일시정지'
             task['speed_bps'] = 0
             task['engine'] = 'yt-dlp'
+            task['storage_folder'] = site_key
             _maybe_save(core, task_id, force=True)
             print(f'[Pause][yt-dlp] 일시정지 완료: {url}', flush=True)
             return
@@ -222,6 +234,7 @@ def download_generic(core, reliability, task_id, url):
             task['status'] = f'에러: {str(exc)[:100]}'
             task['speed_bps'] = 0
             task['engine'] = 'yt-dlp'
+            task['storage_folder'] = site_key
             _maybe_save(core, task_id, force=True)
 
 
