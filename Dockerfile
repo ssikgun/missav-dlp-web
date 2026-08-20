@@ -22,8 +22,9 @@ RUN python -c "import typing_extensions; import curl_cffi; import yt_dlp; import
 
 # 5. 애플리케이션 복사
 COPY . .
-RUN python -m py_compile teddy_entrypoint.py teddy_network.py teddy_routing.py teddy_duplicates.py teddy_logging.py teddy_storage.py teddy_generic.py teddy_bootstrap.py teddy_patch_index.py teddy_patch_logs.py teddy_patch_storage.py teddy_patch_routing.py && \
-    python -c "import teddy_network as n; assert n.is_recoverable_failure('HTTP 403'); assert n.is_recoverable_failure('HTTP Error 403: Forbidden'); assert n.is_recoverable_failure('operation timed out'); assert n.is_recoverable_failure('connection reset by peer'); assert not n.is_recoverable_failure('HTTP 404'); assert not n.is_recoverable_failure('HTTP 401'); print('adaptive network failure boundary smoke test: OK')" && \
+RUN python -m py_compile teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_routing.py teddy_duplicates.py teddy_logging.py teddy_storage.py teddy_generic.py teddy_bootstrap.py teddy_patch_vpn_health.py teddy_patch_index.py teddy_patch_logs.py teddy_patch_storage.py teddy_patch_routing.py && \
+    python -c "import teddy_network as n; assert n.is_recoverable_failure('HTTP 403'); assert n.is_recoverable_failure('HTTP Error 403: Forbidden'); assert n.is_recoverable_failure('operation timed out'); assert n.is_recoverable_failure('connection reset by peer'); assert n.is_recoverable_failure('curl: (35) TLS connect error'); assert not n.is_recoverable_failure('HTTP 404'); assert not n.is_recoverable_failure('HTTP 401'); print('adaptive network failure boundary smoke test: OK')" && \
+    python -c "import teddy_vpn_health as h; s=h.snapshot(); assert s['auto_failure_threshold'] == 10; assert s['auto_failure_segment_threshold'] == 5; assert s['auto_failure_window_seconds'] == 60; print('cumulative VPN health monitor smoke test: OK')" && \
     python -c "import teddy_routing as r; assert r.canonical_site('https://youtu.be/abc') == 'youtube.com'; assert r.canonical_site('https://www.youtube.com/watch?v=abc') == 'youtube.com'; assert r.canonical_site('https://missav123.com/ko/abc') == 'missav'; assert r.proxy_for_mode('direct') is None; assert r.fallback_mode('direct') == 'vpn'; assert r.fallback_mode('vpn') == 'direct'; print('adaptive routing smoke test: OK')" && \
     python -c "import teddy_duplicates as d; assert d.duplicate_key('https://youtu.be/abc') == d.duplicate_key('https://www.youtube.com/watch?v=abc'); assert d.duplicate_key('https://missav123.com/ko/ABC') == d.duplicate_key('https://missav01.com/en/ABC'); assert d.duplicate_key('https://example.com/a#one') == d.duplicate_key('https://example.com/a#two'); assert d.duplicate_key('https://example.com/a?x=1') != d.duplicate_key('https://example.com/a?x=2'); print('duplicate queue guard smoke test: OK')" && \
     python -c "import teddy_logging as l; assert l._clean_for_viewer('\\x1b[31mRED\\x1b[0m') == 'RED'; assert l._clean_for_viewer(b'hello') == 'hello'; print('web log cleanup smoke test: OK')" && \
@@ -32,7 +33,8 @@ RUN python -m py_compile teddy_entrypoint.py teddy_network.py teddy_routing.py t
 
 # Teddy custom: 범용 브랜딩 + 안정적인 keyed task UI + 로그 + 사이트별 저장 + 적응형 라우팅 적용
 # 패치 대상이 upstream 변경으로 달라지면 패치 스크립트가 빌드를 실패시킨다.
-RUN python teddy_patch_index.py && \
+RUN python teddy_patch_vpn_health.py && \
+    python teddy_patch_index.py && \
     python teddy_patch_logs.py && \
     python teddy_patch_storage.py && \
     python teddy_patch_routing.py && \
@@ -45,6 +47,8 @@ RUN python teddy_patch_index.py && \
     grep -q 'teddy-network.js' templates/index.html && \
     grep -q '자동 복구' templates/teddy-network.js && \
     grep -q 'auto_recover' teddy_network.py && \
+    grep -q '_teddy_vpn_failure_observer' teddy_entrypoint.py && \
+    grep -q 'teddy_vpn_health.install' teddy_bootstrap.py && \
     grep -q '_fetch_segment_with_network_recovery' teddy_bootstrap.py && \
     grep -q '_dispatch_download' teddy_bootstrap.py && \
     grep -q 'duplicate queue guard enabled' teddy_duplicates.py && \
