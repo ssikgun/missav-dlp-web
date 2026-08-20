@@ -23,9 +23,13 @@ RUN python -c "import typing_extensions; import curl_cffi; import yt_dlp; import
 # 5. 애플리케이션 복사
 COPY . .
 
-# Teddy custom: 원본 index.html은 건드리지 않고 커스텀 UI 레이어만 빌드 시 삽입
-RUN sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-theme.css"></head>#' templates/index.html && \
-    sed -i 's#</body>#<script src="/static/teddy-speed.js"></script><script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script></body>#' templates/index.html
+# Teddy custom: task card를 처음부터 Teddy UI로 렌더링하도록 빌드 시 안전 패치
+# 패치 대상이 upstream 변경으로 달라지면 teddy_patch_index.py가 빌드를 실패시킨다.
+RUN python teddy_patch_index.py && \
+    sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-theme.css"></head>#' templates/index.html && \
+    sed -i 's#</body>#<script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script></body>#' templates/index.html && \
+    grep -q 'Ⅱ 일시정지' templates/index.html && \
+    grep -q '남은 시간 약' templates/index.html
 
 # 6. 폴더 생성 및 포트 노출
 RUN mkdir -p /downloads
