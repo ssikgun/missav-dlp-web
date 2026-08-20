@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import teddy_patch_proxy_singleflight
+
+
 ENTRYPOINT = Path('teddy_entrypoint.py')
 BOOTSTRAP = Path('teddy_bootstrap.py')
 
@@ -34,6 +37,7 @@ def main():
         'single execution claim',
     )
 
+    teddy_patch_proxy_singleflight.main()
     print('task claim + atomic remux runtime patch: OK')
 
 
