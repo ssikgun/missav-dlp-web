@@ -44,7 +44,7 @@ RUN python -c "import teddy_duplicates as d; assert d.duplicate_key('https://you
 RUN python -c "import teddy_logging as l; assert l._clean_for_viewer('\\x1b[31mRED\\x1b[0m') == 'RED'; assert l._clean_for_viewer(b'hello') == 'hello'; print('web log cleanup smoke test: OK')"
 RUN python -c "import teddy_generic as g; C=type('C',(),{'settings':{'video_quality':'1080'}}); s=g._format_selector(C); assert 'height<=1080' in s; assert 'ext=mp4' in s; print('generic yt-dlp engine smoke test: OK')"
 RUN python -c "import teddy_storage as s; assert s.site_key_for_url('https://youtu.be/abc') == 'youtube'; assert s.site_key_for_url('https://www.youtube.com/watch?v=abc') == 'youtube'; assert s.site_key_for_url('https://missav123.com/ko/abc', custom=True) == 'missav'; assert s.site_key_for_url('https://vimeo.com/123') == 'vimeo'; print('site-aware storage smoke test: OK')"
-RUN python -c "import teddy_hls_transport as h; assert h.HLS_WORKERS == 8; assert callable(h.get); assert callable(h.invalidate); print('persistent HLS transport smoke test: OK')"
+RUN python -c "import teddy_hls_transport as h; assert h.HLS_WORKERS == 8; assert h.ALLOWED_HLS_WORKERS == (2, 4, 8); assert h.workers_from_settings({}) == 8; assert h.workers_from_settings({'hls_workers': 2}) == 2; assert h.workers_from_settings({'hls_workers': 4}) == 4; assert h.workers_from_settings({'hls_workers': 8}) == 8; assert h.workers_from_settings({'hls_workers': 3}) == 8; assert callable(h.get); assert callable(h.invalidate); print('persistent HLS transport + worker benchmark smoke test: OK')"
 
 # Teddy runtime patches. Keep each major stage separate so Actions exposes the exact failing patch.
 RUN python teddy_patch_vpn_health.py
@@ -74,7 +74,7 @@ RUN python teddy_patch_routing.py
 
 # Static asset injection remains deterministic and idempotent inside the image build.
 RUN sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-theme.css"><link rel="stylesheet" href="/static/teddy-network.css"><link rel="stylesheet" href="/static/teddy-logs.css"><link rel="stylesheet" href="/static/teddy-routing.css"></head>#' templates/index.html && \
-    sed -i 's#</body>#<script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script><script src="/static/teddy-network.js"></script><script src="/static/teddy-logs.js"></script><script src="/static/teddy-routing.js"></script><script src="/static/teddy-proxy.js"></script></body>#' templates/index.html
+    sed -i 's#</body>#<script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script><script src="/static/teddy-network.js"></script><script src="/static/teddy-logs.js"></script><script src="/static/teddy-routing.js"></script><script src="/static/teddy-proxy.js"></script><script src="/static/teddy-hls-benchmark.js"></script></body>#' templates/index.html
 
 RUN python teddy_verify_build.py final
 
