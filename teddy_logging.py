@@ -1,3 +1,4 @@
+import re
 import sys
 import threading
 import time
@@ -11,18 +12,44 @@ _lines = deque(maxlen=MAX_LOG_LINES)
 _next_seq = 1
 _installed = False
 
-# High-frequency browser polling is still written to real stdout/stderr, but
-# omitted from the in-app viewer so useful download/VPN events stay readable.
+# ANSI terminal styling is useful in docker logs but should not be rendered as
+# raw escape sequences in the browser log viewer.
+_ANSI_ESCAPE_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
+# High-frequency browser polling/static traffic is still written to real
+# stdout/stderr, but omitted from the in-app viewer so useful events stay clear.
 _VIEWER_NOISE = (
     'GET /api/logs',
     'GET /api/tasks',
     'GET /api/network/status',
+    'GET /static/',
 )
+
+
+def _to_text(data):
+    if isinstance(data, bytes):
+        return data.decode('utf-8', errors='replace')
+    return str(data)
+
+
+def _clean_for_viewer(text):
+    clean = _ANSI_ESCAPE_RE.sub('', _to_text(text)).rstrip('\r')
+    # Some libraries hand a bytes repr to text streams; unwrap the common
+    # b'...' / b"..." form only when it is obviously a single bytes literal.
+    if len(clean) >= 3 and clean[:2] in ("b'", 'b"') and clean[-1] == clean[1]:
+        try:
+            import ast
+            value = ast.literal_eval(clean)
+            if isinstance(value, bytes):
+                clean = value.decode('utf-8', errors='replace').rstrip('\r\n')
+        except Exception:
+            pass
+    return clean
 
 
 def _append_line(stream_name, text):
     global _next_seq
-    clean = str(text).rstrip('\r')
+    clean = _clean_for_viewer(text)
     if not clean:
         return
     if any(token in clean for token in _VIEWER_NOISE):
@@ -45,11 +72,10 @@ class _TeeStream:
         self._pending_lock = threading.Lock()
 
     def write(self, data):
-        if not isinstance(data, str):
-            data = str(data)
-        written = self._original.write(data)
+        text = _to_text(data)
+        written = self._original.write(text)
         with self._pending_lock:
-            self._pending += data
+            self._pending += text
             while '\n' in self._pending:
                 line, self._pending = self._pending.split('\n', 1)
                 _append_line(self._stream_name, line)
