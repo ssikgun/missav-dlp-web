@@ -194,14 +194,21 @@ def verify_final():
             'teddy-logs.js',
         ],
         'templates/teddy-hls-benchmark.js': [
-            'HLS 연결 방식 (성능 테스트)',
-            'Async shared pool benchmark',
-            'Async pool 연결 수 (성능 테스트)',
-            '24 connections (기존 Async값)',
-            "hls_transport_mode: mode",
-            'hls_pool_clients: clients',
-            "defaultSettings.hls_transport_mode = 'per-worker'",
-            'defaultSettings.hls_pool_clients = 24',
+            'HLS 성능 모드',
+            '🚀 최고속',
+            '⚖️ 균형 (권장)',
+            '🛡️ 보수',
+            '직접 설정됨 (터미널/진단)',
+            'hls_workers: preset.workers',
+            'hls_pool_clients: preset.pool',
+            "hls_transport_mode: 'async-pool'",
+            "hls_http_version: 'v1'",
+            "hls_write_mode: 'parts'",
+            'defaultSettings.hls_workers = 16',
+            'defaultSettings.hls_pool_clients = 16',
+            "defaultSettings.hls_transport_mode = 'async-pool'",
+            "defaultSettings.hls_http_version = 'v1'",
+            "defaultSettings.hls_write_mode = 'parts'",
         ],
         'templates/teddy-network.js': [
             '누적 자동 IP 변경',
@@ -225,6 +232,9 @@ def verify_final():
 
     forbid('templates/index.html', 'MissAV')
     forbid('templates/index.html', 'taskList.innerHTML = entries.map')
+    forbid('templates/teddy-hls-benchmark.js', 'HLS 연결 방식 (성능 테스트)', 'legacy detailed HLS transport selector')
+    forbid('templates/teddy-hls-benchmark.js', 'Async pool 연결 수 (성능 테스트)', 'legacy detailed HLS pool selector')
+    forbid('templates/teddy-hls-benchmark.js', 'HLS 저장 방식 (성능 테스트)', 'legacy detailed HLS write selector')
     print('Teddy final UI build verification: OK')
 
 
