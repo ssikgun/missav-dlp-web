@@ -25,6 +25,12 @@ def main():
     )
     text = replace_once(
         text,
+        "\\u2193 받기</a>' +\n                        '<button class=\"btn btn-ghost\" onclick=\"deleteTask(\\'' + id + '\\')\">\\u2715</button>'",
+        "\\u2193 받기</a>' +\n                        '<button class=\"btn btn-danger\" onclick=\"deleteTask(\\'' + id + '\\')\">목록에서 삭제</button>'",
+        "completed task remove action",
+    )
+    text = replace_once(
+        text,
         "confirm('서버에서 파일을 삭제하시겠습니까?')",
         "confirm('이 파일을 NAS에서 삭제할까요? 삭제 후 되돌릴 수 없습니다.')",
         "NAS delete confirmation",
@@ -49,6 +55,8 @@ def main():
     rendered = INDEX.read_text(encoding="utf-8")
     required = (
         '>\\u25b6 재생</button>',
+        'class="btn btn-danger" onclick="deleteTask(',
+        '>목록에서 삭제</button>',
         "이 파일을 NAS에서 삭제할까요? 삭제 후 되돌릴 수 없습니다.",
         'controls playsinline preload="metadata"',
         MOBILE_STYLESHEET,
