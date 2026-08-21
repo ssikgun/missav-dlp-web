@@ -1,0 +1,25 @@
+# LXC migration canary image.
+#
+# Build on the exact production Teddy image that CT108 is replacing, then apply
+# only the split local-work / NAS-final storage layer.  This keeps the NAS
+# production image/tag untouched while the migration is proven end-to-end.
+FROM ghcr.io/ssikgun/missav-dlp-web:teddy-db25e08af9e31d23dd1eaf353db4e30dc7b48c7c
+
+WORKDIR /app
+
+COPY teddy_storage.py /app/teddy_storage.py
+COPY teddy_patch_split_storage.py /app/teddy_patch_split_storage.py
+
+RUN python -m py_compile teddy_storage.py teddy_patch_split_storage.py && \
+    python teddy_patch_split_storage.py && \
+    python -m py_compile teddy_storage.py teddy_generic.py teddy_entrypoint.py teddy_bootstrap.py
+
+# Migration-specific semantic guards.  The legacy /downloads root remains the
+# local work/state root; only completed public files use TEDDY_FINAL_DIR.
+RUN grep -Fq "TEDDY_FINAL_DIR" teddy_storage.py && \
+    grep -Fq "local_result_path" teddy_generic.py && \
+    grep -Fq "local_result_path" teddy_entrypoint.py && \
+    grep -Fq "error_kind') == 'storage'" teddy_bootstrap.py && \
+    grep -Fq "Final directory:" teddy_bootstrap.py
+
+RUN mkdir -p /downloads /final
