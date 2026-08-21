@@ -13,8 +13,23 @@ def replace_once(path, old, new, label):
     path.write_text(text.replace(old, new, 1), encoding='utf-8')
 
 
+def replace_once_or_already_applied(path, old, new, label):
+    text = path.read_text(encoding='utf-8')
+    old_count = text.count(old)
+    new_count = text.count(new)
+    if old_count == 1 and new_count == 0:
+        path.write_text(text.replace(old, new, 1), encoding='utf-8')
+        return 'applied'
+    if old_count == 0 and new_count == 1:
+        return 'already-applied'
+    raise SystemExit(
+        f'{label}: expected one old anchor or one already-applied marker, '
+        f'found old={old_count} new={new_count}'
+    )
+
+
 def main():
-    replace_once(
+    route_state = replace_once_or_already_applied(
         GENERIC,
         "    route_label = 'VPN' if network_mode == 'vpn' else 'Direct'\n",
         "    route_label = teddy_routing.mode_label(network_mode)\n",
@@ -49,7 +64,7 @@ def main():
         'proxy refresh event race',
     )
 
-    print('proxy pool runtime patch: OK')
+    print(f'proxy pool runtime patch: OK (route-label={route_state})')
 
 
 if __name__ == '__main__':
