@@ -66,6 +66,11 @@ def verify_runtime():
     g._apply_media_options(audio_opts, ytdlp_custom)
     assert audio_opts['postprocessors'][0]['key'] == 'FFmpegExtractAudio'
     assert audio_opts['postprocessors'][0]['preferredcodec'] == 'mp3'
+    video_opts = {'format': 'bv*+ba/b'}
+    g._apply_media_options(video_opts, g.normalize_ytdlp_options({'yt_dlp_video_container': 'mkv'}))
+    assert video_opts['merge_output_format'] == 'mkv'
+    assert video_opts['postprocessors'][0]['key'] == 'FFmpegVideoRemuxer'
+    assert video_opts['postprocessors'][0]['preferedformat'] == 'mkv'
 
     proxy = 'http://8.8.8.8:8080'
     p._state['performance'][proxy] = {
@@ -131,7 +136,8 @@ def verify_runtime():
             'yt_dlp_options_for_task',
             "'noplaylist': True",
             "'FFmpegExtractAudio'",
-            "opts['remuxvideo'] = container",
+            "'FFmpegVideoRemuxer'",
+            "'preferedformat': container",
             "opts['writeautomaticsub'] = True",
             'mode_label(network_mode)',
             'network_mode',
