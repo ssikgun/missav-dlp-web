@@ -24,6 +24,12 @@ HLS_WRITE_MODE = 'parts'
 ALLOWED_HLS_TRANSPORT_MODES = ('per-worker', 'async-pool')
 HLS_TRANSPORT_MODE = 'per-worker'
 
+# Decouple scheduler width from AsyncSession's actual curl-handle pool. The first
+# async benchmark used max_clients == workers (24). Keep 24 as the compatibility
+# default while allowing a controlled Hitomi-like connection-reuse A/B test.
+ALLOWED_HLS_POOL_CLIENTS = (4, 8, 12, 16, 24)
+HLS_POOL_CLIENTS = 24
+
 _thread_local = threading.local()
 
 
@@ -67,6 +73,22 @@ def transport_mode_from_settings(settings):
     if not isinstance(settings, dict):
         return HLS_TRANSPORT_MODE
     return normalize_transport_mode(settings.get('hls_transport_mode', HLS_TRANSPORT_MODE))
+
+
+def normalize_pool_clients(value):
+    try:
+        clients = int(value)
+    except (TypeError, ValueError):
+        return HLS_POOL_CLIENTS
+    if clients not in ALLOWED_HLS_POOL_CLIENTS:
+        return HLS_POOL_CLIENTS
+    return clients
+
+
+def pool_clients_from_settings(settings):
+    if not isinstance(settings, dict):
+        return HLS_POOL_CLIENTS
+    return normalize_pool_clients(settings.get('hls_pool_clients', HLS_POOL_CLIENTS))
 
 
 def transport_mode_for_task(core, task_id, settings):
@@ -237,7 +259,7 @@ def get(core, task_id, url, *, impersonate, headers=None, timeout=45,
         }
 
     if mode == 'async-pool':
-        clients = normalize_workers(max_clients or HLS_WORKERS)
+        clients = normalize_pool_clients(max_clients or HLS_POOL_CLIENTS)
         return _async_pool.get(proxy_url, clients, url, kwargs, timeout)
 
     session = _session_for(proxy_url)
