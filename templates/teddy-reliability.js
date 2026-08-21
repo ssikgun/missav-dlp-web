@@ -211,10 +211,31 @@
 
     window.teddyClearCompletedTasks = teddyClearCompletedTasks;
 
+    function ensureTaskSummaryRow(stats) {
+        let row = document.getElementById('teddy-task-summary-row');
+        if (!row) {
+            row = document.createElement('div');
+            row.id = 'teddy-task-summary-row';
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.justifyContent = 'space-between';
+            row.style.gap = '12px';
+            row.style.flexWrap = 'wrap';
+            row.style.marginBottom = '16px';
+            stats.parentNode.insertBefore(row, stats);
+            row.appendChild(stats);
+        }
+
+        stats.style.marginBottom = '0';
+        stats.style.flex = '1 1 auto';
+        return row;
+    }
+
     function ensureCompletedCleanupButton() {
         const stats = document.getElementById('stats');
         if (!stats) return;
 
+        const row = ensureTaskSummaryRow(stats);
         const hasCompleted = !!stats.querySelector('.stat-done');
         let button = document.getElementById('teddy-clear-completed');
         if (!hasCompleted) {
@@ -229,15 +250,17 @@
             button.className = 'btn btn-ghost';
             button.textContent = '완료 일괄 삭제';
             button.title = '다운로드 파일은 유지하고 완료 작업 기록만 삭제합니다';
-            button.style.display = 'block';
-            button.style.margin = '-10px 0 16px auto';
+            button.style.flex = '0 0 auto';
             button.addEventListener('click', teddyClearCompletedTasks);
-            stats.insertAdjacentElement('afterend', button);
+            row.appendChild(button);
+        } else if (button.parentNode !== row) {
+            row.appendChild(button);
         }
     }
 
     const stats = document.getElementById('stats');
     if (stats && !window.__teddyCompletedCleanupObserver) {
+        ensureTaskSummaryRow(stats);
         const observer = new MutationObserver(ensureCompletedCleanupButton);
         observer.observe(stats, { childList: true });
         window.__teddyCompletedCleanupObserver = observer;
