@@ -1,8 +1,10 @@
 (function () {
     const WORKER_SETTING_ID = 'set-hls-workers';
     const WRITE_SETTING_ID = 'set-hls-write-mode';
+    const TRANSPORT_SETTING_ID = 'set-hls-transport-mode';
     const ALLOWED_WORKERS = [2, 4, 8, 12, 16, 20, 24];
     const ALLOWED_WRITE_MODES = ['parts', 'ram'];
+    const ALLOWED_TRANSPORT_MODES = ['per-worker', 'async-pool'];
 
     function normalizeWorkers(value) {
         const n = Number(value);
@@ -14,16 +16,23 @@
         return ALLOWED_WRITE_MODES.includes(mode) ? mode : 'parts';
     }
 
-    function loadSettings(workerSelect, writeSelect) {
+    function normalizeTransportMode(value) {
+        const mode = String(value || '').toLowerCase();
+        return ALLOWED_TRANSPORT_MODES.includes(mode) ? mode : 'per-worker';
+    }
+
+    function loadSettings(workerSelect, writeSelect, transportSelect) {
         return fetch('/api/settings')
             .then(function (r) { return r.json(); })
             .then(function (settings) {
                 workerSelect.value = String(normalizeWorkers(settings.hls_workers));
                 writeSelect.value = normalizeWriteMode(settings.hls_write_mode);
+                transportSelect.value = normalizeTransportMode(settings.hls_transport_mode);
             })
             .catch(function () {
                 workerSelect.value = '8';
                 writeSelect.value = 'parts';
+                transportSelect.value = 'per-worker';
             });
     }
 
@@ -49,11 +58,12 @@
         const anchor = maxConcurrent.closest('.setting-group');
         if (!anchor || !anchor.parentNode) return;
 
-        // Extend the page's existing reset payload so "기본값 복원" also returns
-        // both HLS benchmark knobs to the production-safe compatibility defaults.
+        // Extend the page's existing reset payload so "기본값 복원" returns all
+        // HLS benchmark knobs to the proven production-safe defaults.
         if (typeof defaultSettings !== 'undefined' && defaultSettings) {
             defaultSettings.hls_workers = 8;
             defaultSettings.hls_write_mode = 'parts';
+            defaultSettings.hls_transport_mode = 'per-worker';
         }
 
         const workerGroup = document.createElement('div');
@@ -73,6 +83,19 @@
             '</select>';
         anchor.insertAdjacentElement('afterend', workerGroup);
 
+        const transportGroup = document.createElement('div');
+        transportGroup.className = 'setting-group';
+        transportGroup.innerHTML =
+            '<label class="setting-label">HLS 연결 방식 (성능 테스트)</label>' +
+            '<div class="setting-desc">Per-worker Session은 현재 검증된 방식입니다. Async shared pool은 하나의 ' +
+            'curl_cffi AsyncSession/AsyncCurl pool에서 연결을 재사용하는 비교 경로입니다. Proxy/Direct 벤치마크용이며, ' +
+            'VPN은 자동 복구 안전성을 위해 실제 실행 시 기존 Per-worker 방식으로 유지됩니다.</div>' +
+            '<select id="' + TRANSPORT_SETTING_ID + '" class="setting-select">' +
+                '<option value="per-worker">Per-worker Session (기존값)</option>' +
+                '<option value="async-pool">Async shared pool benchmark</option>' +
+            '</select>';
+        workerGroup.insertAdjacentElement('afterend', transportGroup);
+
         const writeGroup = document.createElement('div');
         writeGroup.className = 'setting-group';
         writeGroup.innerHTML =
@@ -84,11 +107,12 @@
                 '<option value="parts">Safe parts (기존값)</option>' +
                 '<option value="ram">RAM benchmark</option>' +
             '</select>';
-        workerGroup.insertAdjacentElement('afterend', writeGroup);
+        transportGroup.insertAdjacentElement('afterend', writeGroup);
 
         const workerSelect = workerGroup.querySelector('#' + WORKER_SETTING_ID);
+        const transportSelect = transportGroup.querySelector('#' + TRANSPORT_SETTING_ID);
         const writeSelect = writeGroup.querySelector('#' + WRITE_SETTING_ID);
-        loadSettings(workerSelect, writeSelect);
+        loadSettings(workerSelect, writeSelect, transportSelect);
 
         workerSelect.addEventListener('change', function () {
             const workers = normalizeWorkers(workerSelect.value);
@@ -98,6 +122,18 @@
                 'HLS 연결 수를 ' + workers + '로 저장했습니다. 다음 HLS 실행부터 적용됩니다.'
             ).catch(function (err) {
                 if (typeof showToast === 'function') showToast('HLS 연결 수 저장 실패: ' + err, 'error');
+            });
+        });
+
+        transportSelect.addEventListener('change', function () {
+            const mode = normalizeTransportMode(transportSelect.value);
+            transportSelect.value = mode;
+            const label = mode === 'async-pool' ? 'Async shared pool benchmark' : 'Per-worker Session';
+            saveSetting(
+                { hls_transport_mode: mode },
+                'HLS 연결 방식을 ' + label + '로 저장했습니다. 다음 HLS 실행부터 적용됩니다.'
+            ).catch(function (err) {
+                if (typeof showToast === 'function') showToast('HLS 연결 방식 저장 실패: ' + err, 'error');
             });
         });
 
@@ -121,7 +157,10 @@
                 const result = originalLoadSettingsUI.apply(this, arguments);
                 const currentWorkers = document.getElementById(WORKER_SETTING_ID);
                 const currentWrite = document.getElementById(WRITE_SETTING_ID);
-                if (currentWorkers && currentWrite) loadSettings(currentWorkers, currentWrite);
+                const currentTransport = document.getElementById(TRANSPORT_SETTING_ID);
+                if (currentWorkers && currentWrite && currentTransport) {
+                    loadSettings(currentWorkers, currentWrite, currentTransport);
+                }
                 return result;
             };
             window.__teddyHlsLoadWrapped = true;
