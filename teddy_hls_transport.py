@@ -9,6 +9,13 @@ from curl_cffi import requests as cffi_requests
 ALLOWED_HLS_WORKERS = (2, 4, 8, 12, 16, 20, 24)
 HLS_WORKERS = 8
 
+# Keep the proven per-segment .parts path as the production-safe default. The
+# optional RAM benchmark only moves the segment payload out of worker-thread disk
+# I/O; the coordinator still persists the exact same .parts files, preserving
+# pause/resume and crash recovery semantics for completed segments.
+ALLOWED_HLS_WRITE_MODES = ('parts', 'ram')
+HLS_WRITE_MODE = 'parts'
+
 _thread_local = threading.local()
 
 
@@ -26,6 +33,19 @@ def workers_from_settings(settings):
     if not isinstance(settings, dict):
         return HLS_WORKERS
     return normalize_workers(settings.get('hls_workers', HLS_WORKERS))
+
+
+def normalize_write_mode(value):
+    mode = str(value or '').strip().lower()
+    if mode not in ALLOWED_HLS_WRITE_MODES:
+        return HLS_WRITE_MODE
+    return mode
+
+
+def write_mode_from_settings(settings):
+    if not isinstance(settings, dict):
+        return HLS_WRITE_MODE
+    return normalize_write_mode(settings.get('hls_write_mode', HLS_WRITE_MODE))
 
 
 def _proxy_for_task(core, task_id):
