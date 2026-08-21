@@ -320,17 +320,41 @@
         text-align: center;
     }
 
-    /* Browser iframe fills the viewport above the bottom navigation. */
+    /* Browser gets a true full-bleed viewport above the bottom navigation.
+       Positioning it against the visual viewport avoids inheriting .main padding. */
     #page-browser {
-        margin: calc(-16px - env(safe-area-inset-top)) -14px 0;
-        width: calc(100% + 28px);
-        height: calc(100dvh - 64px - env(safe-area-inset-bottom));
+        position: fixed;
+        z-index: 800;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: calc(64px + env(safe-area-inset-bottom));
+        margin: 0;
+        width: 100vw;
+        max-width: none;
+        height: auto;
+        overflow: hidden;
     }
 
-    .teddy-browser-shell,
-    .teddy-browser-frame {
-        width: 100%;
+    .teddy-browser-shell {
+        position: absolute;
+        inset: 0;
+        width: 100vw;
+        max-width: none;
         height: 100%;
+        margin: 0;
+        overflow: hidden;
+    }
+
+    .teddy-browser-frame {
+        position: absolute;
+        inset: 0;
+        display: block;
+        width: 100vw;
+        max-width: none;
+        height: 100%;
+        margin: 0;
+        border: 0;
     }
 
     /* Video playback modal */
