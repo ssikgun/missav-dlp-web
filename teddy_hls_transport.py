@@ -2,6 +2,7 @@ import asyncio
 import threading
 
 from curl_cffi import requests as cffi_requests
+from curl_cffi.const import CurlHttpVersion
 
 
 # Hitomi's recovered M3U8 core uses a much smaller dedicated worker pool than the
@@ -29,6 +30,12 @@ HLS_TRANSPORT_MODE = 'per-worker'
 # default while allowing a controlled Hitomi-like connection-reuse A/B test.
 ALLOWED_HLS_POOL_CLIENTS = (4, 8, 12, 16, 24)
 HLS_POOL_CLIENTS = 24
+
+# curl_cffi/browser impersonation normally negotiates HTTP automatically (usually
+# HTTP/2 when the route supports it). Hitomi's recovered requests.Session path is
+# HTTP/1.1, so keep auto as the safe default and expose only a controlled v1 A/B.
+ALLOWED_HLS_HTTP_VERSIONS = ('auto', 'v1')
+HLS_HTTP_VERSION = 'auto'
 
 _thread_local = threading.local()
 
@@ -91,6 +98,19 @@ def pool_clients_from_settings(settings):
     return normalize_pool_clients(settings.get('hls_pool_clients', HLS_POOL_CLIENTS))
 
 
+def normalize_http_version(value):
+    mode = str(value or '').strip().lower()
+    if mode not in ALLOWED_HLS_HTTP_VERSIONS:
+        return HLS_HTTP_VERSION
+    return mode
+
+
+def http_version_from_settings(settings):
+    if not isinstance(settings, dict):
+        return HLS_HTTP_VERSION
+    return normalize_http_version(settings.get('hls_http_version', HLS_HTTP_VERSION))
+
+
 def transport_mode_for_task(core, task_id, settings):
     """Resolve the actual transport for one HLS execution.
 
@@ -116,6 +136,45 @@ def _proxy_for_task(core, task_id):
         return ''
 
 
+def _http_version_for_task(core, task_id):
+    task = core.tasks.get(task_id) or {}
+    return normalize_http_version(task.get('hls_http_version', HLS_HTTP_VERSION))
+
+
+def _http_version_arg(mode):
+    mode = normalize_http_version(mode)
+    if mode == 'v1':
+        return CurlHttpVersion.V1_1
+    return None
+
+
+def _actual_http_label(value):
+    try:
+        if value == CurlHttpVersion.V1_0:
+            return '1.0'
+        if value == CurlHttpVersion.V1_1:
+            return '1.1'
+        if value == CurlHttpVersion.V2_0:
+            return '2'
+        if hasattr(CurlHttpVersion, 'V3') and value == CurlHttpVersion.V3:
+            return '3'
+    except Exception:
+        pass
+    try:
+        return str(int(value))
+    except Exception:
+        return str(value or '?')
+
+
+def _record_actual_http(core, task_id, response):
+    try:
+        task = core.tasks.get(task_id)
+        if task is not None:
+            task['hls_http_version_actual'] = _actual_http_label(response.http_version)
+    except Exception:
+        pass
+
+
 def _close_state(state):
     if not state:
         return
@@ -134,15 +193,21 @@ def _invalidate_per_worker():
     _thread_local.state = None
 
 
-def _session_for(proxy_url):
+def _session_for(proxy_url, http_version):
     state = getattr(_thread_local, 'state', None)
-    if state and state.get('proxy_url') == proxy_url and state.get('session') is not None:
+    if (
+        state
+        and state.get('proxy_url') == proxy_url
+        and state.get('http_version') == http_version
+        and state.get('session') is not None
+    ):
         return state['session']
 
     _close_state(state)
     session = cffi_requests.Session()
     _thread_local.state = {
         'proxy_url': proxy_url,
+        'http_version': http_version,
         'session': session,
     }
     return session
@@ -179,7 +244,7 @@ class _AsyncPoolBridge:
             if not ready.wait(5):
                 raise RuntimeError('HLS async pool event loop failed to start')
 
-    async def _ensure_session(self, proxy_url, max_clients):
+    async def _ensure_session(self, proxy_url, max_clients, http_version):
         if self._session_lock is None:
             self._session_lock = asyncio.Lock()
         async with self._session_lock:
@@ -188,6 +253,7 @@ class _AsyncPoolBridge:
                 state
                 and state.get('proxy_url') == proxy_url
                 and state.get('max_clients') == max_clients
+                and state.get('http_version') == http_version
                 and state.get('session') is not None
             ):
                 return state['session']
@@ -204,18 +270,19 @@ class _AsyncPoolBridge:
             self._state = {
                 'proxy_url': proxy_url,
                 'max_clients': max_clients,
+                'http_version': http_version,
                 'session': session,
             }
             return session
 
-    async def _get_async(self, proxy_url, max_clients, url, kwargs):
-        session = await self._ensure_session(proxy_url, max_clients)
+    async def _get_async(self, proxy_url, max_clients, http_version, url, kwargs):
+        session = await self._ensure_session(proxy_url, max_clients, http_version)
         return await session.get(url, **kwargs)
 
-    def get(self, proxy_url, max_clients, url, kwargs, timeout):
+    def get(self, proxy_url, max_clients, http_version, url, kwargs, timeout):
         self._ensure_loop()
         future = asyncio.run_coroutine_threadsafe(
-            self._get_async(proxy_url, max_clients, url, kwargs),
+            self._get_async(proxy_url, max_clients, http_version, url, kwargs),
             self._loop,
         )
         return future.result(timeout=max(float(timeout) + 10.0, 20.0))
@@ -243,15 +310,21 @@ def get(core, task_id, url, *, impersonate, headers=None, timeout=45,
     per-worker keeps one persistent synchronous Session per worker. async-pool uses
     one AsyncSession pool (up to max_clients curl handles) shared by the HLS task's
     worker calls. Public-proxy rotation is keyed by proxy_url; VPN tasks deliberately
-    stay on per-worker transport through transport_mode_for_task().
+    stay on per-worker transport through transport_mode_for_task(). HTTP version is
+    captured per HLS execution in the task and keyed into session reuse so an A/B
+    change starts a fresh connection topology after pause/resume.
     """
     proxy_url = _proxy_for_task(core, task_id)
     mode = normalize_transport_mode(transport_mode)
+    http_version = _http_version_for_task(core, task_id)
     kwargs = {
         'impersonate': impersonate,
         'headers': headers or {},
         'timeout': timeout,
     }
+    version_arg = _http_version_arg(http_version)
+    if version_arg is not None:
+        kwargs['http_version'] = version_arg
     if proxy_url:
         kwargs['proxies'] = {
             'http': proxy_url,
@@ -260,7 +333,11 @@ def get(core, task_id, url, *, impersonate, headers=None, timeout=45,
 
     if mode == 'async-pool':
         clients = normalize_pool_clients(max_clients or HLS_POOL_CLIENTS)
-        return _async_pool.get(proxy_url, clients, url, kwargs, timeout)
+        response = _async_pool.get(proxy_url, clients, http_version, url, kwargs, timeout)
+        _record_actual_http(core, task_id, response)
+        return response
 
-    session = _session_for(proxy_url)
-    return session.get(url, **kwargs)
+    session = _session_for(proxy_url, http_version)
+    response = session.get(url, **kwargs)
+    _record_actual_http(core, task_id, response)
+    return response
