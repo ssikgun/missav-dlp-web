@@ -9,3 +9,9 @@ venv/
 
 # Runtime / local
 *.log
+
+# CT108 production runtime / secrets
+gluetun.env
+gluetun-control-auth.toml
+work/
+vpn-browser-config/
