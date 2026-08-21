@@ -1,0 +1,33 @@
+#page-browser {
+    margin: -32px;
+    width: calc(100% + 64px);
+    height: 100vh;
+    overflow: hidden;
+    background: #111827;
+}
+
+#page-browser.active {
+    display: block;
+}
+
+.teddy-browser-shell {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #111827;
+}
+
+.teddy-browser-frame {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #111827;
+}
+
+@media (max-width: 720px) {
+    #page-browser {
+        margin: -16px;
+        width: calc(100% + 32px);
+    }
+}
