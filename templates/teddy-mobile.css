@@ -320,8 +320,7 @@
         text-align: center;
     }
 
-    /* Browser page remains available as an error/fallback view.
-       On mobile the Browser button opens the configured browser URL directly. */
+    /* Browser iframe fills the viewport above the bottom navigation. */
     #page-browser {
         margin: calc(-16px - env(safe-area-inset-top)) -14px 0;
         width: calc(100% + 28px);
