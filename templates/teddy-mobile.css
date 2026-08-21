@@ -54,6 +54,10 @@
         border-radius: 12px;
     }
 
+    .teddy-theme-toggle {
+        display: none !important;
+    }
+
     .main {
         width: 100%;
         max-width: 100vw;
@@ -99,11 +103,19 @@
     .teddy-route-select {
         width: 100%;
         min-width: 0;
+        height: 48px;
         min-height: 48px;
+        box-sizing: border-box;
     }
 
-    .url-bar input {
+    .url-bar input,
+    .teddy-route-select {
         font-size: 16px; /* Avoid iOS Safari auto-zoom on focus. */
+    }
+
+    .teddy-route-select {
+        padding: 0 14px;
+        border-radius: 10px;
     }
 
     .stats {
@@ -207,12 +219,19 @@
     .search-input,
     .sort-select {
         min-width: 0;
-        min-height: 44px;
+        height: 48px;
+        min-height: 48px;
+        box-sizing: border-box;
     }
 
     .search-input {
         width: 100%;
         font-size: 16px;
+    }
+
+    .sort-select {
+        font-size: 16px;
+        padding: 0 12px;
     }
 
     .file-card {
@@ -301,7 +320,8 @@
         text-align: center;
     }
 
-    /* Browser page fills the viewport above the bottom navigation. */
+    /* Browser page remains available as an error/fallback view.
+       On mobile the Browser button opens the configured browser URL directly. */
     #page-browser {
         margin: calc(-16px - env(safe-area-inset-top)) -14px 0;
         width: calc(100% + 28px);
