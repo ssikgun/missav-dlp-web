@@ -1,7 +1,8 @@
 # Teddy Custom Downloader — Final Handoff
 
 - 작성 시각: 2026-08-21 KST
-- 상태: **PRODUCTION MIGRATION PASS**
+- 종료 검증 시각: 2026-08-21 20:34 KST
+- 상태: **CLOSED — PRODUCTION MIGRATION COMPLETE**
 - 운영 호스트: Proxmox CT108 (`downloader`, `192.168.1.155`)
 - 운영 브랜치: `teddy-custom`
 - 배포 이미지 소스 커밋: `6cb5415322ae420cefa96d8d48540af850b99b67`
@@ -35,8 +36,12 @@ NAS Docker에서 운용하던 Teddy Custom Downloader를 새 Proxmox LXC CT108�
 - NAS final NFS mount RW 정상
 - migration / production-candidate 로컬 테스트 이미지 제거 완료
 - NAS의 구 Docker deployment 제거 완료
+- **실제 PVE reboot 후 NFS automount / CT108 onboot / Docker / 3개 컨테이너 / 외부 서비스 자동복구 PASS**
+- 별도 CT startup delay 없이 boot race 미발생
 
 대규모 기능 E2E를 production cutover 후 다시 반복하지 않았다. 동일 migration image/candidate에서 이미 generic yt-dlp와 MissAV HLS split-storage E2E를 수행했고, production image는 해당 production source를 Dockerfile에 정식 wiring한 immutable GHCR build로 검증했다.
+
+**Migration closure status: CLOSED.**
 
 ---
 
@@ -672,56 +677,74 @@ image: ghcr.io/ssikgun/missav-dlp-web:teddy-6cb5415322ae420cefa96d8d48540af850b9
 
 ---
 
-## 15. Remaining item — 확인필요
+## 15. PVE actual reboot / automatic recovery test — PASS
 
-Only one migration closure test remains deliberately deferred:
+Controlled Proxmox host reboot was completed on 2026-08-21.
 
-### PVE actual reboot / automatic recovery test — **확인필요**
+Actual boot evidence:
 
-A controlled Proxmox host reboot has not yet been performed because another workload was running on the host.
-
-Pre-reboot configuration checks already passed:
-
-- PVE `/etc/fstab` NFS line present
-- `findmnt --verify --verbose` success
-- CT108 `onboot: 1`
-- CT108 `mp0` NAS bind configured
-- CT108 static IP configured
-- CT108 renderD128 device configured
-- Docker enabled/active
-- all three containers `restart: unless-stopped`
-- NFS available inside CT108
-- Gluetun healthy
-
-No explicit CT `startup:` delay was added. Do not add one preemptively; only add boot-order delay if an actual reboot demonstrates a race.
-
-### Reboot test procedure
-
-Run only when the PVE host can safely be rebooted.
-
-On `root@pve`:
-
-```bash
-sync
-reboot
+```text
+BOOT TIME: 2026-08-21 20:27:30 KST
+system boot: 2026-08-21 20:27
+kernel: 6.8.12-19-pve
 ```
 
-After PVE returns, **do not manually start CT108 or containers before checking automatic recovery**.
+No CT, NFS, Docker service, or container was manually started before verification.
 
-Check in this order:
+### PVE-side recovery
 
-1. PVE NFS automount is available
-2. CT108 started automatically via `onboot: 1`
-3. CT108 NAS bind mount is present
-4. Docker started automatically inside CT108
-5. all three containers started automatically
-6. Gluetun becomes `healthy`
-7. `/mnt/nas-downloads` inside CT108 resolves to the NAS NFS path and is RW
-8. `http://192.168.1.155:58000` / API responds
-9. `https://downloader.ssikgun.com` works
-10. embedded `https://browser.ssikgun.com` works
+After approximately two minutes:
 
-If all ten pass, migration can be marked fully **CLOSED**.
+- CT108 `pct status 108` → `status: running`
+- `/mnt/nas-video/video2/downloads` accessible
+- systemd automount active
+- actual NFS mounted automatically:
+  `192.168.1.201:/volume1/video -> /mnt/nas-video`
+- NFS mode remained `rw`, `vers=3`, `hard`
+
+### CT108-side recovery
+
+Inside `downloader` after boot:
+
+- CT uptime approximately two minutes
+- Docker `is-enabled` → `enabled`
+- Docker `is-active` → `active`
+- `gluetun-missav` → automatically running and `healthy`
+- `missav-dlp-web` → automatically running
+- `missav-vpn-browser` → automatically running
+- `/mnt/nas-downloads` → NAS NFS path present, `rw`, NFSv3
+
+The Downloader container showed an older creation time but a two-minute uptime, confirming the existing production container restarted automatically rather than being recreated manually.
+
+### Service recovery
+
+Post-reboot local verification:
+
+```text
+Downloader local HTTP: 200
+/api/browser/config: {"url":"https://browser.ssikgun.com"}
+[Teddy] site-aware storage enabled: work=/downloads final=/final
+Work directory: /downloads
+Final directory: /final
+```
+
+Production image remained:
+
+```text
+ghcr.io/ssikgun/missav-dlp-web:teddy-6cb5415322ae420cefa96d8d48540af850b99b67
+image_id=sha256:6de80934e40c5f6faf469e06464807663a90ab92b1fde5f82220a9428d8d1161
+```
+
+User externally confirmed after reboot:
+
+1. `https://downloader.ssikgun.com` — PASS
+2. embedded `https://browser.ssikgun.com` — PASS
+
+All ten planned automatic recovery checks passed.
+
+**Result: PASS. Migration is fully CLOSED.**
+
+No explicit CT `startup:` delay is required based on this boot. Do not add one without new evidence of a boot-order race.
 
 ---
 
@@ -806,4 +829,4 @@ Do not destroy `/opt/missav-dlp-web/work` during a routine image rollback becaus
 - Never request or expose VPN credentials, GitHub tokens, one-time codes, or Gluetun auth contents.
 - Keep runtime/secrets out of Git.
 - Production deploys should pin immutable GHCR tags.
-- The PVE reboot test is the only currently known migration closure item still marked **확인필요**.
+- **CT108 migration is CLOSED. Future feature work should start from the current `teddy-custom` production baseline and roadmap, not from migration tasks.**
