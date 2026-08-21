@@ -19,6 +19,8 @@ def verify_runtime():
     import teddy_proxy_pool as p
 
     assert h.HLS_WORKERS == 8
+    assert h.ALLOWED_HLS_TRANSPORT_MODES == ('per-worker', 'async-pool')
+    assert h.HLS_TRANSPORT_MODE == 'per-worker'
     assert p.BANDWIDTH_TEST_BYTES == 512 * 1024
     assert p.BANDWIDTH_TEST_LIMIT <= 8
     assert p.BANDWIDTH_TEST_WORKERS <= 4
@@ -55,9 +57,13 @@ def verify_runtime():
         ],
         'teddy_hls_transport.py': [
             'HLS_WORKERS = 8',
+            "ALLOWED_HLS_TRANSPORT_MODES = ('per-worker', 'async-pool')",
             'cffi_requests.Session()',
+            'cffi_requests.AsyncSession(max_clients=max_clients)',
+            'asyncio.run_coroutine_threadsafe',
             "state.get('proxy_url') == proxy_url",
-            'def invalidate()',
+            "task.get('network_mode') == 'vpn'",
+            "def invalidate(mode='per-worker')",
             "kwargs['proxies']",
         ],
         'teddy_network.py': [
@@ -104,8 +110,10 @@ def verify_runtime():
             'import teddy_hls_transport',
             'FIRST_COMPLETED',
             'teddy_hls_transport.get(',
-            'teddy_hls_transport.invalidate()',
-            'persistent session + continuous',
+            'teddy_hls_transport.invalidate(transport_mode)',
+            'transport_mode=transport_mode',
+            "core.tasks[task_id]['hls_transport_mode'] = transport_mode",
+            'continuous',
             'return_when=FIRST_COMPLETED',
             'submit_one()',
             '_teddy_proxy_transfer_observer',
@@ -115,6 +123,11 @@ def verify_runtime():
             '_teddy_vpn_failure_observer',
             "'teddy_task_id': task_id",
             '추출 단계 일시정지 완료',
+        ],
+        'teddy_hls_benchmark.py': [
+            "task.get('hls_transport_mode', '?')",
+            'transport=',
+            'proxy_changed=',
         ],
         'teddy_duplicates.py': ['duplicate queue guard enabled'],
         'teddy_storage.py': ['site_key_for_url'],
@@ -136,6 +149,7 @@ def verify_final():
             'Ⅱ 일시정지',
             'teddy-network.js',
             'teddy-proxy.js',
+            'teddy-hls-benchmark.js',
             'value="proxy"',
             'teddyProxyPoolMount',
             '실사용 ',
@@ -146,6 +160,12 @@ def verify_final():
             'data-page="logs"',
             'id="page-logs"',
             'teddy-logs.js',
+        ],
+        'templates/teddy-hls-benchmark.js': [
+            'HLS 연결 방식 (성능 테스트)',
+            'Async shared pool benchmark',
+            "hls_transport_mode: mode",
+            "defaultSettings.hls_transport_mode = 'per-worker'",
         ],
         'templates/teddy-network.js': [
             '누적 자동 IP 변경',
