@@ -25,8 +25,7 @@ def main():
     text = replace_once(
         text,
         "        f'· continuous {worker_count} workers · transport={transport_mode} · write={write_mode}',\n",
-        "        f'· continuous {worker_count} workers · transport={transport_mode} '
-"
+        "        f'· continuous {worker_count} workers · transport={transport_mode} '\n"
         "        f'· pool={pool_clients} · write={write_mode}',\n",
         'runtime log pool size',
     )
