@@ -1,43 +1,68 @@
 (function () {
-    const SETTING_ID = 'set-hls-workers';
-    const ALLOWED = [2, 4, 8, 12, 16, 20, 24];
+    const WORKER_SETTING_ID = 'set-hls-workers';
+    const WRITE_SETTING_ID = 'set-hls-write-mode';
+    const ALLOWED_WORKERS = [2, 4, 8, 12, 16, 20, 24];
+    const ALLOWED_WRITE_MODES = ['parts', 'ram'];
 
-    function normalize(value) {
+    function normalizeWorkers(value) {
         const n = Number(value);
-        return ALLOWED.includes(n) ? n : 8;
+        return ALLOWED_WORKERS.includes(n) ? n : 8;
     }
 
-    function loadSetting(select) {
+    function normalizeWriteMode(value) {
+        const mode = String(value || '').toLowerCase();
+        return ALLOWED_WRITE_MODES.includes(mode) ? mode : 'parts';
+    }
+
+    function loadSettings(workerSelect, writeSelect) {
         return fetch('/api/settings')
             .then(function (r) { return r.json(); })
             .then(function (settings) {
-                select.value = String(normalize(settings.hls_workers));
+                workerSelect.value = String(normalizeWorkers(settings.hls_workers));
+                writeSelect.value = normalizeWriteMode(settings.hls_write_mode);
             })
             .catch(function () {
-                select.value = '8';
+                workerSelect.value = '8';
+                writeSelect.value = 'parts';
             });
     }
 
+    function saveSetting(payload, successMessage) {
+        return fetch('/api/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            if (typeof showToast === 'function') {
+                showToast(successMessage, res.status === 'success' ? 'success' : 'error');
+            }
+            return res;
+        });
+    }
+
     function mount() {
-        if (document.getElementById(SETTING_ID)) return;
+        if (document.getElementById(WORKER_SETTING_ID)) return;
         const maxConcurrent = document.getElementById('set-max-concurrent');
         if (!maxConcurrent) return;
         const anchor = maxConcurrent.closest('.setting-group');
         if (!anchor || !anchor.parentNode) return;
 
         // Extend the page's existing reset payload so "기본값 복원" also returns
-        // this benchmark knob to the compatibility default.
+        // both HLS benchmark knobs to the production-safe compatibility defaults.
         if (typeof defaultSettings !== 'undefined' && defaultSettings) {
             defaultSettings.hls_workers = 8;
+            defaultSettings.hls_write_mode = 'parts';
         }
 
-        const group = document.createElement('div');
-        group.className = 'setting-group';
-        group.innerHTML =
+        const workerGroup = document.createElement('div');
+        workerGroup.className = 'setting-group';
+        workerGroup.innerHTML =
             '<label class="setting-label">HLS 연결 수 (성능 테스트)</label>' +
             '<div class="setting-desc">MissAV/HLS 전용 worker 수입니다. 새로 시작하거나 재개하는 HLS 실행부터 적용됩니다. ' +
-            '같은 영상·같은 Proxy에서 2 / 4 / 8 / 12 / 16 / 20 / 24를 비교해 최적값을 찾으세요.</div>' +
-            '<select id="' + SETTING_ID + '" class="setting-select">' +
+            '같은 영상·같은 Proxy에서 값을 비교해 최적점을 찾으세요.</div>' +
+            '<select id="' + WORKER_SETTING_ID + '" class="setting-select">' +
                 '<option value="2">2 workers</option>' +
                 '<option value="4">4 workers</option>' +
                 '<option value="8">8 workers (기존값)</option>' +
@@ -46,41 +71,57 @@
                 '<option value="20">20 workers</option>' +
                 '<option value="24">24 workers</option>' +
             '</select>';
-        anchor.insertAdjacentElement('afterend', group);
+        anchor.insertAdjacentElement('afterend', workerGroup);
 
-        const select = group.querySelector('#' + SETTING_ID);
-        loadSetting(select);
+        const writeGroup = document.createElement('div');
+        writeGroup.className = 'setting-group';
+        writeGroup.innerHTML =
+            '<label class="setting-label">HLS 저장 방식 (성능 테스트)</label>' +
+            '<div class="setting-desc">Safe parts는 기존 방식입니다. RAM benchmark는 worker가 네트워크 수신만 하고 ' +
+            '메인 coordinator가 같은 .parts 파일을 한 번에 하나씩 저장해 동시 NAS I/O 영향을 비교합니다. ' +
+            '완료된 세그먼트 이어받기는 두 방식 모두 유지됩니다.</div>' +
+            '<select id="' + WRITE_SETTING_ID + '" class="setting-select">' +
+                '<option value="parts">Safe parts (기존값)</option>' +
+                '<option value="ram">RAM benchmark</option>' +
+            '</select>';
+        workerGroup.insertAdjacentElement('afterend', writeGroup);
 
-        select.addEventListener('change', function () {
-            const workers = normalize(select.value);
-            select.value = String(workers);
-            fetch('/api/settings', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ hls_workers: workers })
-            })
-            .then(function (r) { return r.json(); })
-            .then(function (res) {
-                if (typeof showToast === 'function') {
-                    showToast('HLS 연결 수를 ' + workers + '로 저장했습니다. 다음 HLS 실행부터 적용됩니다.',
-                              res.status === 'success' ? 'success' : 'error');
-                }
-            })
-            .catch(function (err) {
-                if (typeof showToast === 'function') {
-                    showToast('HLS 연결 수 저장 실패: ' + err, 'error');
-                }
+        const workerSelect = workerGroup.querySelector('#' + WORKER_SETTING_ID);
+        const writeSelect = writeGroup.querySelector('#' + WRITE_SETTING_ID);
+        loadSettings(workerSelect, writeSelect);
+
+        workerSelect.addEventListener('change', function () {
+            const workers = normalizeWorkers(workerSelect.value);
+            workerSelect.value = String(workers);
+            saveSetting(
+                { hls_workers: workers },
+                'HLS 연결 수를 ' + workers + '로 저장했습니다. 다음 HLS 실행부터 적용됩니다.'
+            ).catch(function (err) {
+                if (typeof showToast === 'function') showToast('HLS 연결 수 저장 실패: ' + err, 'error');
             });
         });
 
-        // Existing settings navigation/reset calls loadSettingsUI(). Refresh this
-        // separately injected field at the same time without touching upstream UI.
+        writeSelect.addEventListener('change', function () {
+            const mode = normalizeWriteMode(writeSelect.value);
+            writeSelect.value = mode;
+            const label = mode === 'ram' ? 'RAM benchmark' : 'Safe parts';
+            saveSetting(
+                { hls_write_mode: mode },
+                'HLS 저장 방식을 ' + label + '로 저장했습니다. 다음 HLS 실행부터 적용됩니다.'
+            ).catch(function (err) {
+                if (typeof showToast === 'function') showToast('HLS 저장 방식 저장 실패: ' + err, 'error');
+            });
+        });
+
+        // Existing settings navigation/reset calls loadSettingsUI(). Refresh the
+        // separately injected fields at the same time without touching upstream UI.
         if (typeof window.loadSettingsUI === 'function' && !window.__teddyHlsLoadWrapped) {
             const originalLoadSettingsUI = window.loadSettingsUI;
             window.loadSettingsUI = function () {
                 const result = originalLoadSettingsUI.apply(this, arguments);
-                const current = document.getElementById(SETTING_ID);
-                if (current) loadSetting(current);
+                const currentWorkers = document.getElementById(WORKER_SETTING_ID);
+                const currentWrite = document.getElementById(WRITE_SETTING_ID);
+                if (currentWorkers && currentWrite) loadSettings(currentWorkers, currentWrite);
                 return result;
             };
             window.__teddyHlsLoadWrapped = true;
