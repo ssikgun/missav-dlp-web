@@ -1,44 +1,76 @@
-# VPN(gluetun) 경유 구성 — 두 서비스를 한 스택으로 운영
-#   docker compose -f docker-compose.gluetun.yml pull
-#   docker compose -f docker-compose.gluetun.yml up -d
+# Teddy Downloader — CT108 production deployment
 #
-# 주의:
-#  - missav-dlp-web 은 network_mode: container:gluetun-vpn 이므로 자기 ports: 를 가질 수 없음.
-#    웹 UI 포트(58000:5000)는 gluetun 쪽에서 공개하고 FIREWALL_INBOUND_PORTS 에 5000 을 포함해야 함.
-#  - wg0.conf 는 IPv4 전용으로 (Address 의 ::/128, AllowedIPs 의 ::/0 제거).
-#  - surrit.com 이 특정 VPN 출구 IP를 밴하면 세그먼트가 403 → 브라우저에서 재생되는 서버로 교체.
-#  - gluetun 컨테이너를 재생성하면 missav-dlp-web 도 다시 up -d 해야 네트워크가 재부착됨.
+# Architecture:
+#   missav-dlp-web
+#     Direct -> normal host internet
+#     Proxy  -> free proxy pool
+#     VPN    -> Gluetun HTTP proxy (:8888)
+#
+#   vpn-browser -> shares only Gluetun's network namespace
+#
+# Storage:
+#   /downloads -> local CT108 NVMe work/state
+#   /final     -> NAS NFS completed files
+#
+# Security:
+#   - gluetun.env contains VPN credentials and MUST NOT be committed.
+#   - gluetun-control-auth.toml MUST NOT be committed.
+#   - TEDDY_IMAGE should be an immutable GHCR image tag.
 
 services:
-  gluetun-vpn:
+  gluetun:
     image: qmcgaw/gluetun:latest
-    container_name: gluetun-vpn
+    container_name: gluetun-missav
+    restart: unless-stopped
     cap_add:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
+    env_file:
+      - ./gluetun.env
     environment:
-      - VPN_SERVICE_PROVIDER=custom
+      - VPN_SERVICE_PROVIDER=protonvpn
       - VPN_TYPE=wireguard
-      - WIREGUARD_CONFIG_FILE=/gluetun/wireguard/wg0.conf
-      - FIREWALL_OUTBOUND_SUBNETS=192.168.1.0/24
-      - FIREWALL_INBOUND_PORTS=8080,8600,8000,5000
-      - DNS_TYPE=1.1.1.1
+      - HTTPPROXY=on
+      - FREE_ONLY=on
+      - TZ=Asia/Seoul
     ports:
-      - 38000:8000/tcp
-      - 38080:8080/tcp
-      - 38600:8600/tcp
-      - 58000:5000/tcp      # missav-dlp-web 웹 UI
+      - "58001:5800/tcp"
     volumes:
-      - /mnt/App_Pool/gluetun-vpn:/gluetun
-    restart: unless-stopped
+      - ./gluetun-control-auth.toml:/gluetun/auth/config.toml:ro
 
   missav-dlp-web:
-    image: ghcr.io/nerdnam/missav-dlp-web:0.0.19
-    pull_policy: always
+    image: ${TEDDY_IMAGE:?TEDDY_IMAGE must be an immutable GHCR Teddy image}
+    container_name: missav-dlp-web
     restart: unless-stopped
-    network_mode: container:gluetun-vpn
     depends_on:
-      - gluetun-vpn
+      - gluetun
+    environment:
+      - TEDDY_FINAL_DIR=/final
+      - TEDDY_BROWSER_URL=https://browser.ssikgun.com
+      - GLUETUN_PROXY_URL=http://gluetun:8888
+      - GLUETUN_CONTROL_URL=http://gluetun:8000
+    ports:
+      - "58000:5000/tcp"
     volumes:
-      - /mnt/Data3/download:/downloads
+      - ./work:/downloads
+      - /mnt/nas-downloads:/final
+
+  vpn-browser:
+    image: jlesage/chromium:latest
+    container_name: missav-vpn-browser
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    environment:
+      - TZ=Asia/Seoul
+      - ENABLE_CJK_FONT=1
+      - VNC_LISTENING_PORT=-1
+      - KEEP_APP_RUNNING=1
+      - SUP_GROUP_IDS=992
+      - CHROMIUM_CUSTOM_ARGS=--load-extension=/config/teddy-downloader-extension
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+    volumes:
+      - ./vpn-browser-config:/config:rw
