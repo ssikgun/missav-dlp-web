@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import teddy_patch_mobile
+
 
 BOOTSTRAP = Path('teddy_bootstrap.py')
 
@@ -23,6 +25,7 @@ def main():
         'teddy_storage.install_file_routes(core)\nteddy_browser_config.install(core)\n',
         'browser config route install',
     )
+    teddy_patch_mobile.main()
     print('browser runtime config patch: OK')
 
 
