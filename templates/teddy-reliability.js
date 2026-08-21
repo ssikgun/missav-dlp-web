@@ -229,9 +229,10 @@
             button.className = 'btn btn-ghost';
             button.textContent = '완료 일괄 삭제';
             button.title = '다운로드 파일은 유지하고 완료 작업 기록만 삭제합니다';
-            button.style.marginLeft = 'auto';
+            button.style.display = 'block';
+            button.style.margin = '-10px 0 16px auto';
             button.addEventListener('click', teddyClearCompletedTasks);
-            stats.appendChild(button);
+            stats.insertAdjacentElement('afterend', button);
         }
     }
 
