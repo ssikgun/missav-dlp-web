@@ -32,7 +32,7 @@ RUN python -m py_compile \
     teddy_patch_proxy_learning.py teddy_patch_proxy_task_sync.py \
     teddy_patch_task_claim_remux.py teddy_patch_proxy_singleflight.py \
     teddy_patch_proxy_engine_recovery.py teddy_patch_extraction_pause.py \
-    teddy_patch_hls_transport.py teddy_patch_index.py teddy_patch_logs.py \
+    teddy_patch_hls_transport.py teddy_patch_hls_transport_bridge.py teddy_patch_index.py teddy_patch_logs.py \
     teddy_patch_storage.py teddy_patch_routing.py
 
 # Existing deterministic boundary smoke tests.
@@ -59,6 +59,11 @@ RUN python teddy_patch_extraction_pause.py
 # Apply the final HLS implementation after all reliability/network patches so it
 # owns the finished segment transport/scheduler without overlapping patch anchors.
 RUN python teddy_patch_hls_transport.py
+# The bootstrap recovery wrapper replaces reliability._fetch_segment at runtime.
+# Keep its call signature in lockstep with the HLS transport benchmark kwargs.
+RUN python teddy_patch_hls_transport_bridge.py
+RUN grep -Fq "def _fetch_segment_with_network_recovery(task_id, seg_url, headers, transport_mode='per-worker', worker_count=None):" teddy_bootstrap.py && \
+    test "$(grep -Fc 'transport_mode=transport_mode, worker_count=worker_count' teddy_bootstrap.py)" -eq 3
 
 # Patched runtime must compile and satisfy explicit semantic markers.
 RUN python -m py_compile \
