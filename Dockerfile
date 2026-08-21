@@ -27,7 +27,7 @@ COPY . .
 RUN python -m py_compile \
     app.py teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py \
     teddy_routing.py teddy_duplicates.py teddy_logging.py teddy_storage.py \
-    teddy_generic.py teddy_bootstrap.py teddy_verify_build.py teddy_hls_transport.py \
+    teddy_generic.py teddy_bootstrap.py teddy_verify_build.py teddy_hls_transport.py teddy_hls_benchmark.py \
     teddy_patch_vpn_health.py teddy_patch_proxy_pool.py teddy_patch_proxy_speed.py \
     teddy_patch_proxy_learning.py teddy_patch_proxy_task_sync.py \
     teddy_patch_task_claim_remux.py teddy_patch_proxy_singleflight.py \
@@ -44,7 +44,7 @@ RUN python -c "import teddy_duplicates as d; assert d.duplicate_key('https://you
 RUN python -c "import teddy_logging as l; assert l._clean_for_viewer('\\x1b[31mRED\\x1b[0m') == 'RED'; assert l._clean_for_viewer(b'hello') == 'hello'; print('web log cleanup smoke test: OK')"
 RUN python -c "import teddy_generic as g; C=type('C',(),{'settings':{'video_quality':'1080'}}); s=g._format_selector(C); assert 'height<=1080' in s; assert 'ext=mp4' in s; print('generic yt-dlp engine smoke test: OK')"
 RUN python -c "import teddy_storage as s; assert s.site_key_for_url('https://youtu.be/abc') == 'youtube'; assert s.site_key_for_url('https://www.youtube.com/watch?v=abc') == 'youtube'; assert s.site_key_for_url('https://missav123.com/ko/abc', custom=True) == 'missav'; assert s.site_key_for_url('https://vimeo.com/123') == 'vimeo'; print('site-aware storage smoke test: OK')"
-RUN python -c "import teddy_hls_transport as h; assert h.HLS_WORKERS == 8; assert h.ALLOWED_HLS_WORKERS == (2, 4, 8, 12, 16, 20, 24); assert h.workers_from_settings({}) == 8; assert h.workers_from_settings({'hls_workers': 2}) == 2; assert h.workers_from_settings({'hls_workers': 4}) == 4; assert h.workers_from_settings({'hls_workers': 8}) == 8; assert h.workers_from_settings({'hls_workers': 12}) == 12; assert h.workers_from_settings({'hls_workers': 16}) == 16; assert h.workers_from_settings({'hls_workers': 20}) == 20; assert h.workers_from_settings({'hls_workers': 24}) == 24; assert h.workers_from_settings({'hls_workers': 3}) == 8; assert callable(h.get); assert callable(h.invalidate); print('persistent HLS transport + worker benchmark smoke test: OK')"
+RUN python -c "import teddy_hls_transport as h; assert h.HLS_WORKERS == 8; assert h.ALLOWED_HLS_WORKERS == (2, 4, 8, 12, 16, 20, 24); assert h.ALLOWED_HLS_WRITE_MODES == ('parts', 'ram'); assert h.ALLOWED_HLS_TRANSPORT_MODES == ('per-worker', 'async-pool'); assert h.workers_from_settings({'hls_workers': 24}) == 24; assert h.write_mode_from_settings({'hls_write_mode': 'ram'}) == 'ram'; assert h.transport_mode_from_settings({'hls_transport_mode': 'async-pool'}) == 'async-pool'; assert h.transport_mode_from_settings({'hls_transport_mode': 'bad'}) == 'per-worker'; assert callable(h.get); assert callable(h.invalidate); print('persistent/async HLS transport benchmark smoke test: OK')"
 
 # Teddy runtime patches. Keep each major stage separate so Actions exposes the exact failing patch.
 RUN python teddy_patch_vpn_health.py
@@ -63,7 +63,7 @@ RUN python teddy_patch_hls_transport.py
 # Patched runtime must compile and satisfy explicit semantic markers.
 RUN python -m py_compile \
     app.py teddy_entrypoint.py teddy_bootstrap.py teddy_vpn_health.py teddy_network.py \
-    teddy_proxy_pool.py teddy_routing.py teddy_generic.py teddy_hls_transport.py teddy_patch_routing.py
+    teddy_proxy_pool.py teddy_routing.py teddy_generic.py teddy_hls_transport.py teddy_hls_benchmark.py teddy_patch_routing.py
 RUN python teddy_verify_build.py runtime
 
 # Teddy UI / file-manager / routing patches.
