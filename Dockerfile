@@ -32,8 +32,8 @@ RUN python -m py_compile \
     teddy_patch_proxy_learning.py teddy_patch_proxy_task_sync.py \
     teddy_patch_task_claim_remux.py teddy_patch_proxy_singleflight.py \
     teddy_patch_proxy_engine_recovery.py teddy_patch_extraction_pause.py \
-    teddy_patch_hls_transport.py teddy_patch_hls_transport_bridge.py teddy_patch_index.py teddy_patch_logs.py \
-    teddy_patch_storage.py teddy_patch_routing.py
+    teddy_patch_hls_transport.py teddy_patch_hls_pool_clients.py teddy_patch_hls_transport_bridge.py \
+    teddy_patch_index.py teddy_patch_logs.py teddy_patch_storage.py teddy_patch_routing.py
 
 # Existing deterministic boundary smoke tests.
 RUN python -c "import teddy_network as n; assert n.is_recoverable_failure('HTTP 403'); assert n.is_recoverable_failure('HTTP Error 403: Forbidden'); assert n.is_recoverable_failure('operation timed out'); assert n.is_recoverable_failure('connection reset by peer'); assert n.is_recoverable_failure('curl: (35) TLS connect error'); assert not n.is_recoverable_failure('HTTP 404'); assert not n.is_recoverable_failure('HTTP 401'); print('adaptive network failure boundary smoke test: OK')"
@@ -44,7 +44,7 @@ RUN python -c "import teddy_duplicates as d; assert d.duplicate_key('https://you
 RUN python -c "import teddy_logging as l; assert l._clean_for_viewer('\\x1b[31mRED\\x1b[0m') == 'RED'; assert l._clean_for_viewer(b'hello') == 'hello'; print('web log cleanup smoke test: OK')"
 RUN python -c "import teddy_generic as g; C=type('C',(),{'settings':{'video_quality':'1080'}}); s=g._format_selector(C); assert 'height<=1080' in s; assert 'ext=mp4' in s; print('generic yt-dlp engine smoke test: OK')"
 RUN python -c "import teddy_storage as s; assert s.site_key_for_url('https://youtu.be/abc') == 'youtube'; assert s.site_key_for_url('https://www.youtube.com/watch?v=abc') == 'youtube'; assert s.site_key_for_url('https://missav123.com/ko/abc', custom=True) == 'missav'; assert s.site_key_for_url('https://vimeo.com/123') == 'vimeo'; print('site-aware storage smoke test: OK')"
-RUN python -c "import teddy_hls_transport as h; assert h.HLS_WORKERS == 8; assert h.ALLOWED_HLS_WORKERS == (2, 4, 8, 12, 16, 20, 24); assert h.ALLOWED_HLS_WRITE_MODES == ('parts', 'ram'); assert h.ALLOWED_HLS_TRANSPORT_MODES == ('per-worker', 'async-pool'); assert h.workers_from_settings({'hls_workers': 24}) == 24; assert h.write_mode_from_settings({'hls_write_mode': 'ram'}) == 'ram'; assert h.transport_mode_from_settings({'hls_transport_mode': 'async-pool'}) == 'async-pool'; assert h.transport_mode_from_settings({'hls_transport_mode': 'bad'}) == 'per-worker'; assert callable(h.get); assert callable(h.invalidate); print('persistent/async HLS transport benchmark smoke test: OK')"
+RUN python -c "import teddy_hls_transport as h; assert h.HLS_WORKERS == 8; assert h.ALLOWED_HLS_WORKERS == (2, 4, 8, 12, 16, 20, 24); assert h.ALLOWED_HLS_WRITE_MODES == ('parts', 'ram'); assert h.ALLOWED_HLS_TRANSPORT_MODES == ('per-worker', 'async-pool'); assert h.HLS_POOL_CLIENTS == 24; assert h.ALLOWED_HLS_POOL_CLIENTS == (4, 8, 12, 16, 24); assert h.workers_from_settings({'hls_workers': 24}) == 24; assert h.write_mode_from_settings({'hls_write_mode': 'ram'}) == 'ram'; assert h.transport_mode_from_settings({'hls_transport_mode': 'async-pool'}) == 'async-pool'; assert h.transport_mode_from_settings({'hls_transport_mode': 'bad'}) == 'per-worker'; assert h.pool_clients_from_settings({}) == 24; assert h.pool_clients_from_settings({'hls_pool_clients': 4}) == 4; assert h.pool_clients_from_settings({'hls_pool_clients': 8}) == 8; assert h.pool_clients_from_settings({'hls_pool_clients': 12}) == 12; assert h.pool_clients_from_settings({'hls_pool_clients': 16}) == 16; assert h.pool_clients_from_settings({'hls_pool_clients': 24}) == 24; assert h.pool_clients_from_settings({'hls_pool_clients': 20}) == 24; assert callable(h.get); assert callable(h.invalidate); print('persistent/async HLS transport + pool-size benchmark smoke test: OK')"
 
 # Teddy runtime patches. Keep each major stage separate so Actions exposes the exact failing patch.
 RUN python teddy_patch_vpn_health.py
@@ -59,6 +59,11 @@ RUN python teddy_patch_extraction_pause.py
 # Apply the final HLS implementation after all reliability/network patches so it
 # owns the finished segment transport/scheduler without overlapping patch anchors.
 RUN python teddy_patch_hls_transport.py
+# Keep scheduler worker width separate from AsyncSession max_clients for A/B tests.
+RUN python teddy_patch_hls_pool_clients.py
+RUN grep -Fq "pool_clients = teddy_hls_transport.pool_clients_from_settings(core.settings)" teddy_entrypoint.py && \
+    grep -Fq "core.tasks[task_id]['hls_pool_clients'] = pool_clients" teddy_entrypoint.py && \
+    grep -Fq "worker_count=pool_clients" teddy_entrypoint.py
 # The bootstrap recovery wrapper replaces reliability._fetch_segment at runtime.
 # Keep its call signature in lockstep with the HLS transport benchmark kwargs.
 RUN python teddy_patch_hls_transport_bridge.py
