@@ -1,7 +1,14 @@
 (() => {
     const button = document.querySelector('.sidebar-btn[data-page="browser"]');
     const frame = document.getElementById('teddyBrowserFrame');
+    const mobileMedia = window.matchMedia
+        ? window.matchMedia('(max-width: 768px), (max-width: 1024px) and (hover: none) and (pointer: coarse)')
+        : null;
     if (!button || !frame) return;
+
+    function isMobileUI() {
+        return Boolean(mobileMedia && mobileMedia.matches);
+    }
 
     function lanBrowserUrl() {
         const rawHost = window.location.hostname || 'localhost';
@@ -69,13 +76,31 @@
         return { url: lanBrowserUrl(), error: '' };
     }
 
+    function prepareMobileReturnPage() {
+        const downloadButton = document.querySelector('.sidebar-btn[data-page="download"]');
+        const downloadPage = document.getElementById('page-download');
+        const browserPage = document.getElementById('page-browser');
+        document.querySelectorAll('.sidebar-btn').forEach(item => item.classList.remove('active'));
+        document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+        downloadButton?.classList.add('active');
+        downloadPage?.classList.add('active');
+        browserPage?.classList.remove('active');
+    }
+
     async function ensureBrowserLoaded() {
-        if (frame.dataset.loaded === '1') return;
         const resolved = await resolveBrowserUrl();
         if (!resolved.url) {
             showMessage(resolved.error || 'VPN Browser 주소를 확인할 수 없습니다.');
             return;
         }
+
+        if (isMobileUI()) {
+            prepareMobileReturnPage();
+            window.location.assign(resolved.url);
+            return;
+        }
+
+        if (frame.dataset.loaded === '1') return;
         const note = frame.parentElement?.querySelector('.teddy-browser-message');
         if (note) note.remove();
         frame.style.display = 'block';
@@ -85,7 +110,7 @@
 
     button.addEventListener('click', ensureBrowserLoaded);
 
-    if (document.getElementById('page-browser')?.classList.contains('active')) {
+    if (!isMobileUI() && document.getElementById('page-browser')?.classList.contains('active')) {
         ensureBrowserLoaded();
     }
 })();
