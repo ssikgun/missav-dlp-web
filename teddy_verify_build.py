@@ -210,6 +210,15 @@ def verify_final():
             "defaultSettings.hls_http_version = 'v1'",
             "defaultSettings.hls_write_mode = 'parts'",
         ],
+        'templates/teddy-reliability.js': [
+            'isHlsRemuxing',
+            "task.progress === '99%'",
+            "task.hls_transport_mode",
+            "progress: '100%'",
+            '다운로드 완료 · MP4 생성 중',
+            'MP4 생성 중…',
+            '__teddyRemuxUiWrapped',
+        ],
         'templates/teddy-network.js': [
             '누적 자동 IP 변경',
             '자동 복구',
