@@ -10,14 +10,15 @@
         return Boolean(mobileMedia && mobileMedia.matches);
     }
 
-    function lanBrowserUrl() {
+    function lanBrowserUrl(mobile) {
         const rawHost = window.location.hostname || 'localhost';
         const host = rawHost.includes(':') ? `[${rawHost}]` : rawHost;
-        return `http://${host}:58001/`;
+        return `http://${host}:${mobile ? '58003' : '58001'}/`;
     }
 
     function showMessage(message) {
         frame.removeAttribute('src');
+        delete frame.dataset.loadedUrl;
         frame.style.display = 'none';
         const shell = frame.parentElement;
         if (!shell) return;
@@ -42,12 +43,16 @@
     }
 
     async function resolveBrowserUrl() {
+        const mobile = isMobileUI();
+        const envName = mobile ? 'TEDDY_MOBILE_BROWSER_URL' : 'TEDDY_BROWSER_URL';
         let configured = '';
+
         try {
             const response = await fetch('/api/browser/config', { cache: 'no-store' });
             if (response.ok) {
                 const payload = await response.json();
-                configured = String(payload && payload.url ? payload.url : '').trim();
+                const raw = mobile ? payload?.mobile_url : payload?.url;
+                configured = String(raw || '').trim();
             }
         } catch (_) {}
 
@@ -57,34 +62,23 @@
                 if (window.location.protocol === 'https:' && target.protocol !== 'https:') {
                     return {
                         url: '',
-                        error: '외부 HTTPS 접속에서는 VPN Browser URL도 HTTPS여야 합니다. TEDDY_BROWSER_URL을 HTTPS 주소로 설정하세요.',
+                        error: `외부 HTTPS 접속에서는 VPN Browser URL도 HTTPS여야 합니다. ${envName}을 HTTPS 주소로 설정하세요.`,
                     };
                 }
                 return { url: target.toString(), error: '' };
             } catch (_) {
-                return { url: '', error: 'TEDDY_BROWSER_URL 설정값이 올바른 URL이 아닙니다.' };
+                return { url: '', error: `${envName} 설정값이 올바른 URL이 아닙니다.` };
             }
         }
 
         if (window.location.protocol === 'https:') {
             return {
                 url: '',
-                error: '외부 HTTPS 접속용 VPN Browser 주소가 설정되지 않았습니다. TEDDY_BROWSER_URL을 별도 HTTPS 프록시 주소로 설정하세요.',
+                error: `외부 HTTPS 접속용 VPN Browser 주소가 설정되지 않았습니다. ${envName}을 별도 HTTPS 프록시 주소로 설정하세요.`,
             };
         }
 
-        return { url: lanBrowserUrl(), error: '' };
-    }
-
-    function prepareMobileReturnPage() {
-        const downloadButton = document.querySelector('.sidebar-btn[data-page="download"]');
-        const downloadPage = document.getElementById('page-download');
-        const browserPage = document.getElementById('page-browser');
-        document.querySelectorAll('.sidebar-btn').forEach(item => item.classList.remove('active'));
-        document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-        downloadButton?.classList.add('active');
-        downloadPage?.classList.add('active');
-        browserPage?.classList.remove('active');
+        return { url: lanBrowserUrl(mobile), error: '' };
     }
 
     async function ensureBrowserLoaded() {
@@ -94,23 +88,18 @@
             return;
         }
 
-        if (isMobileUI()) {
-            prepareMobileReturnPage();
-            window.location.assign(resolved.url);
-            return;
-        }
+        if (frame.dataset.loadedUrl === resolved.url) return;
 
-        if (frame.dataset.loaded === '1') return;
         const note = frame.parentElement?.querySelector('.teddy-browser-message');
         if (note) note.remove();
         frame.style.display = 'block';
         frame.src = resolved.url;
-        frame.dataset.loaded = '1';
+        frame.dataset.loadedUrl = resolved.url;
     }
 
     button.addEventListener('click', ensureBrowserLoaded);
 
-    if (!isMobileUI() && document.getElementById('page-browser')?.classList.contains('active')) {
+    if (document.getElementById('page-browser')?.classList.contains('active')) {
         ensureBrowserLoaded();
     }
 })();
