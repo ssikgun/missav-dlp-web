@@ -15,6 +15,7 @@ def forbid(path, needle, label=None):
 
 
 def verify_runtime():
+    import teddy_generic as g
     import teddy_hls_transport as h
     import teddy_proxy_pool as p
 
@@ -35,6 +36,36 @@ def verify_runtime():
     assert p.BANDWIDTH_TEST_LIMIT <= 8
     assert p.BANDWIDTH_TEST_WORKERS <= 4
     assert 'speed.cloudflare.com/__down' in p.BANDWIDTH_URL
+
+    ytdlp_defaults = g.normalize_ytdlp_options({})
+    assert ytdlp_defaults == {
+        'media_mode': 'video',
+        'quality': 'best',
+        'video_container': 'mp4',
+        'audio_format': 'm4a',
+        'subtitles': 'off',
+    }
+    ytdlp_custom = g.normalize_ytdlp_options({
+        'yt_dlp_media_mode': 'audio',
+        'yt_dlp_video_quality': '1080',
+        'yt_dlp_video_container': 'mkv',
+        'yt_dlp_audio_format': 'mp3',
+        'yt_dlp_subtitles': 'ko_en',
+    })
+    assert ytdlp_custom['media_mode'] == 'audio'
+    assert ytdlp_custom['quality'] == '1080'
+    assert ytdlp_custom['video_container'] == 'mkv'
+    assert ytdlp_custom['audio_format'] == 'mp3'
+    assert ytdlp_custom['subtitles'] == 'ko_en'
+    assert g.normalize_ytdlp_options({'yt_dlp_audio_format': 'flac'})['audio_format'] == 'm4a'
+    fake_core = type('C', (), {'settings': {'yt_dlp_video_quality': '1080', 'yt_dlp_video_container': 'mp4'}})
+    selector = g._format_selector(fake_core)
+    assert 'height<=1080' in selector
+    assert 'ext=mp4' in selector
+    audio_opts = {'format': 'ba/b'}
+    g._apply_media_options(audio_opts, ytdlp_custom)
+    assert audio_opts['postprocessors'][0]['key'] == 'FFmpegExtractAudio'
+    assert audio_opts['postprocessors'][0]['preferredcodec'] == 'mp3'
 
     proxy = 'http://8.8.8.8:8080'
     p._state['performance'][proxy] = {
@@ -94,6 +125,14 @@ def verify_runtime():
             '다운로드 큐에 추가했습니다',
         ],
         'teddy_generic.py': [
+            'YT_DLP_MEDIA_MODES',
+            'YT_DLP_VIDEO_QUALITIES',
+            'normalize_ytdlp_options',
+            'yt_dlp_options_for_task',
+            "'noplaylist': True",
+            "'FFmpegExtractAudio'",
+            "opts['remuxvideo'] = container",
+            "opts['writeautomaticsub'] = True",
             'mode_label(network_mode)',
             'network_mode',
             'download_generic',
@@ -192,6 +231,20 @@ def verify_final():
             'data-page="logs"',
             'id="page-logs"',
             'teddy-logs.js',
+            'data-page="browser"',
+            'id="page-browser"',
+            'teddy-browser.js',
+            '일반 사이트 yt-dlp 옵션',
+            'id="set-ytdlp-media-mode"',
+            'id="set-ytdlp-video-quality"',
+            'id="set-ytdlp-video-container"',
+            'id="set-ytdlp-audio-format"',
+            'id="set-ytdlp-subtitles"',
+            "yt_dlp_media_mode: 'video'",
+            "yt_dlp_video_container: 'mp4'",
+            "yt_dlp_audio_format: 'm4a'",
+            "yt_dlp_subtitles: 'off'",
+            'teddyUpdateYtDlpVisibility',
         ],
         'templates/teddy-hls-benchmark.js': [
             'HLS 성능 모드',
