@@ -3,6 +3,9 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+    clear: both;
     padding: 12px 14px;
     margin: 0 0 18px;
     border: 1px solid #dbe3ef;
@@ -10,8 +13,17 @@
     background: #f8fafc;
 }
 
+/* Keep the network panel and task counters on stable full-width rows. */
+#page-download > .stats,
+#page-download > #taskList {
+    width: 100%;
+    box-sizing: border-box;
+    clear: both;
+}
+
 .teddy-network-main {
     min-width: 0;
+    flex: 1 1 auto;
 }
 
 .teddy-network-title {
