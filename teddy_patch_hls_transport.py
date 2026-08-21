@@ -82,10 +82,11 @@ def main():
     text = replace_function(text, '_fetch_segment', '_fetch_variant_playlist', fetch_segment)
 
     download_hls = r'''def _download_hls_resumable(task_id, variant_url, headers, out_path):
-    # Capture the persisted benchmark setting once per task. Changing the UI while
-    # a download is active affects only the next HLS task, so an executor never
-    # changes size underneath an in-flight download.
+    # Capture persisted benchmark settings once per task. Changing the UI while a
+    # download is active affects only the next HLS execution, so neither executor
+    # size nor write strategy changes underneath in-flight requests.
     worker_count = teddy_hls_transport.workers_from_settings(core.settings)
+    write_mode = teddy_hls_transport.write_mode_from_settings(core.settings)
     parts_dir = os.path.join(core.DOWNLOAD_DIR, f'.{task_id}.parts')
     os.makedirs(parts_dir, exist_ok=True)
     playlist_text = _fetch_variant_playlist(task_id, variant_url, headers)
@@ -116,7 +117,7 @@ def main():
     total_bytes_estimate = int(downloaded_bytes * total / done) if done else 0
     print(
         f'[다운로드] 세그먼트 {total}개 (완료 {done} / 남음 {len(pending)}) '
-        f'· persistent session + continuous {worker_count} workers',
+        f'· persistent session + continuous {worker_count} workers · write={write_mode}',
         flush=True,
     )
     if task_id in core.tasks:
@@ -125,17 +126,30 @@ def main():
         core.tasks[task_id]['downloaded_bytes'] = downloaded_bytes
         core.tasks[task_id]['total_bytes_estimate'] = total_bytes_estimate
         core.tasks[task_id]['hls_workers'] = worker_count
+        core.tasks[task_id]['hls_write_mode'] = write_mode
         core.save_tasks()
 
-    def fetch_to_file(item):
-        index, url = item
-        data = _fetch_segment(task_id, url, headers)
+    def write_part(index, data):
         _check_task_state(task_id)
         tmp = seg_path(index) + '.tmp'
         with open(tmp, 'wb') as file_obj:
             file_obj.write(data)
         os.replace(tmp, seg_path(index))
-        return len(data)
+
+    def fetch_item(item):
+        index, url = item
+        data = _fetch_segment(task_id, url, headers)
+        _check_task_state(task_id)
+        if write_mode == 'parts':
+            # Production-safe path: preserve the proven behavior exactly, including
+            # worker-thread persistence before a segment is considered complete.
+            write_part(index, data)
+            return len(data)
+        # RAM benchmark: the network worker returns immediately with bytes. The
+        # coordinator refills that freed network slot before serially persisting the
+        # payload to the same .parts layout, isolating concurrent NAS file I/O while
+        # retaining completed-segment resume/crash recovery.
+        return index, data
 
     speed_samples = []
     window_started = time.monotonic()
@@ -150,7 +164,7 @@ def main():
             item = next(pending_iter)
         except StopIteration:
             return False
-        future = executor.submit(fetch_to_file, item)
+        future = executor.submit(fetch_item, item)
         in_flight[future] = item
         return True
 
@@ -163,7 +177,16 @@ def main():
             completed, _ = wait(tuple(in_flight), return_when=FIRST_COMPLETED)
             for future in completed:
                 in_flight.pop(future, None)
-                byte_count = future.result()
+                result = future.result()
+                if write_mode == 'ram':
+                    index, data = result
+                    # Refill the free network slot before touching NAS storage.
+                    submit_one()
+                    write_part(index, data)
+                    byte_count = len(data)
+                else:
+                    byte_count = result
+
                 done += 1
                 downloaded_bytes += byte_count
                 window_bytes += byte_count
@@ -196,9 +219,10 @@ def main():
                     core.tasks[task_id]['downloaded_bytes'] = downloaded_bytes
                     core.tasks[task_id]['total_bytes_estimate'] = total_bytes_estimate
 
-                # Continuous scheduler: immediately refill the slot that just
-                # completed instead of waiting for a fixed 16-segment batch.
-                submit_one()
+                # Existing parts mode refills after persistence; RAM mode already
+                # refilled immediately after the network future completed above.
+                if write_mode != 'ram':
+                    submit_one()
     finally:
         executor.shutdown(wait=True, cancel_futures=True)
 
