@@ -26,6 +26,11 @@ def verify_runtime():
     assert h.pool_clients_from_settings({}) == 24
     assert h.pool_clients_from_settings({'hls_pool_clients': 12}) == 12
     assert h.pool_clients_from_settings({'hls_pool_clients': 20}) == 24
+    assert h.HLS_HTTP_VERSION == 'auto'
+    assert h.ALLOWED_HLS_HTTP_VERSIONS == ('auto', 'v1')
+    assert h.http_version_from_settings({}) == 'auto'
+    assert h.http_version_from_settings({'hls_http_version': 'v1'}) == 'v1'
+    assert h.http_version_from_settings({'hls_http_version': 'bad'}) == 'auto'
     assert p.BANDWIDTH_TEST_BYTES == 512 * 1024
     assert p.BANDWIDTH_TEST_LIMIT <= 8
     assert p.BANDWIDTH_TEST_WORKERS <= 4
@@ -65,11 +70,17 @@ def verify_runtime():
             "ALLOWED_HLS_TRANSPORT_MODES = ('per-worker', 'async-pool')",
             "ALLOWED_HLS_POOL_CLIENTS = (4, 8, 12, 16, 24)",
             'HLS_POOL_CLIENTS = 24',
+            "ALLOWED_HLS_HTTP_VERSIONS = ('auto', 'v1')",
+            "HLS_HTTP_VERSION = 'auto'",
             'def pool_clients_from_settings(settings):',
+            'def http_version_from_settings(settings):',
+            'CurlHttpVersion.V1_1',
+            "task['hls_http_version_actual']",
             'cffi_requests.Session()',
             'cffi_requests.AsyncSession(max_clients=max_clients)',
             'asyncio.run_coroutine_threadsafe',
             "state.get('proxy_url') == proxy_url",
+            "state.get('http_version') == http_version",
             "task.get('network_mode') == 'vpn'",
             "def invalidate(mode='per-worker')",
             'clients = normalize_pool_clients(max_clients or HLS_POOL_CLIENTS)',
@@ -122,10 +133,13 @@ def verify_runtime():
             'teddy_hls_transport.invalidate(transport_mode)',
             'transport_mode=transport_mode',
             'pool_clients = teddy_hls_transport.pool_clients_from_settings(core.settings)',
+            'http_version = teddy_hls_transport.http_version_from_settings(core.settings)',
             "core.tasks[task_id]['hls_transport_mode'] = transport_mode",
             "core.tasks[task_id]['hls_pool_clients'] = pool_clients",
+            "core.tasks[task_id]['hls_http_version'] = http_version",
+            "core.tasks[task_id]['hls_http_version_actual'] = '?'",
             'worker_count=pool_clients',
-            '· pool={pool_clients} · write={write_mode}',
+            '· pool={pool_clients} · http={http_version} · write={write_mode}',
             'continuous',
             'return_when=FIRST_COMPLETED',
             'submit_one()',
@@ -140,8 +154,11 @@ def verify_runtime():
         'teddy_hls_benchmark.py': [
             "task.get('hls_transport_mode', '?')",
             "task.get('hls_pool_clients', '?')",
+            "task.get('hls_http_version', '?')",
+            "task.get('hls_http_version_actual', '?')",
             'transport=',
             'pool=',
+            'actual_http=',
             'proxy_changed=',
         ],
         'teddy_duplicates.py': ['duplicate queue guard enabled'],
