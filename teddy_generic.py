@@ -11,6 +11,20 @@ import teddy_storage
 _save_lock = threading.Lock()
 _last_saved = {}
 
+YT_DLP_MEDIA_MODES = ('video', 'audio')
+YT_DLP_VIDEO_QUALITIES = ('best', '2160', '1440', '1080', '720', '480')
+YT_DLP_VIDEO_CONTAINERS = ('mp4', 'mkv')
+YT_DLP_AUDIO_FORMATS = ('m4a', 'mp3')
+YT_DLP_SUBTITLE_MODES = ('off', 'ko', 'en', 'ko_en')
+
+YT_DLP_DEFAULTS = {
+    'media_mode': 'video',
+    'quality': 'best',
+    'video_container': 'mp4',
+    'audio_format': 'm4a',
+    'subtitles': 'off',
+}
+
 
 def is_custom_site(core, url):
     try:
@@ -23,16 +37,67 @@ def _task_temp_dir(core, task_id):
     return os.path.join(core.DOWNLOAD_DIR, f'.{task_id}.ytdlp')
 
 
-def _format_selector(core):
-    quality = str(core.settings.get('video_quality', 'best') or 'best')
-    if quality.isdigit():
-        height = int(quality)
+def _pick(raw, short_key, setting_key, allowed, default):
+    value = raw.get(short_key, raw.get(setting_key, default))
+    value = str(value or default).lower()
+    return value if value in allowed else default
+
+
+def normalize_ytdlp_options(raw):
+    raw = raw if isinstance(raw, dict) else {}
+    quality_default = str(raw.get('video_quality', YT_DLP_DEFAULTS['quality']) or YT_DLP_DEFAULTS['quality'])
+    if quality_default not in YT_DLP_VIDEO_QUALITIES:
+        quality_default = YT_DLP_DEFAULTS['quality']
+    return {
+        'media_mode': _pick(
+            raw, 'media_mode', 'yt_dlp_media_mode',
+            YT_DLP_MEDIA_MODES, YT_DLP_DEFAULTS['media_mode'],
+        ),
+        'quality': _pick(
+            raw, 'quality', 'yt_dlp_video_quality',
+            YT_DLP_VIDEO_QUALITIES, quality_default,
+        ),
+        'video_container': _pick(
+            raw, 'video_container', 'yt_dlp_video_container',
+            YT_DLP_VIDEO_CONTAINERS, YT_DLP_DEFAULTS['video_container'],
+        ),
+        'audio_format': _pick(
+            raw, 'audio_format', 'yt_dlp_audio_format',
+            YT_DLP_AUDIO_FORMATS, YT_DLP_DEFAULTS['audio_format'],
+        ),
+        'subtitles': _pick(
+            raw, 'subtitles', 'yt_dlp_subtitles',
+            YT_DLP_SUBTITLE_MODES, YT_DLP_DEFAULTS['subtitles'],
+        ),
+    }
+
+
+def _format_selector(core, options=None):
+    options = normalize_ytdlp_options(options if options is not None else core.settings)
+    if options['media_mode'] == 'audio':
+        return 'ba/b'
+
+    quality = options['quality']
+    container = options['video_container']
+    height_filter = '' if quality == 'best' else f'[height<={int(quality)}]'
+
+    if container == 'mp4':
         return (
-            f'bv*[height<={height}][ext=mp4]+ba[ext=m4a]/'
-            f'b[height<={height}][ext=mp4]/'
-            f'bv*[height<={height}]+ba/b[height<={height}]'
+            f'bv*{height_filter}[ext=mp4]+ba[ext=m4a]/'
+            f'b{height_filter}[ext=mp4]/'
+            f'bv*{height_filter}+ba/b{height_filter}'
         )
-    return 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b'
+    return f'bv*{height_filter}+ba/b{height_filter}'
+
+
+def _subtitle_languages(mode):
+    if mode == 'ko':
+        return ['ko']
+    if mode == 'en':
+        return ['en']
+    if mode == 'ko_en':
+        return ['ko', 'en']
+    return []
 
 
 def _maybe_save(core, task_id, force=False):
@@ -43,6 +108,25 @@ def _maybe_save(core, task_id, force=False):
             return
         _last_saved[task_id] = now
     core.save_tasks()
+
+
+def yt_dlp_options_for_task(core, task_id):
+    task = core.tasks.get(task_id)
+    if not task:
+        return normalize_ytdlp_options(core.settings)
+
+    existing = task.get('yt_dlp_options')
+    if isinstance(existing, dict):
+        normalized = normalize_ytdlp_options(existing)
+        if existing != normalized:
+            task['yt_dlp_options'] = normalized
+            _maybe_save(core, task_id, force=True)
+        return normalized
+
+    normalized = normalize_ytdlp_options(core.settings)
+    task['yt_dlp_options'] = normalized
+    _maybe_save(core, task_id, force=True)
+    return normalized
 
 
 def _store_metadata(core, task_id, info):
@@ -101,18 +185,45 @@ def _find_final_path(core, ydl, info, home_dir):
     return ''
 
 
+def _apply_media_options(opts, options):
+    if options['media_mode'] == 'audio':
+        postprocessor = {
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': options['audio_format'],
+        }
+        if options['audio_format'] == 'mp3':
+            postprocessor['preferredquality'] = '192'
+        opts['postprocessors'] = [postprocessor]
+        return
+
+    container = options['video_container']
+    opts['merge_output_format'] = container
+    # Enforce the user's selected final video container even when yt-dlp can
+    # satisfy the selector with a single already-muxed fallback format.
+    opts['remuxvideo'] = container
+
+    subtitle_languages = _subtitle_languages(options['subtitles'])
+    if subtitle_languages:
+        opts['writesubtitles'] = True
+        opts['writeautomaticsub'] = True
+        opts['subtitleslangs'] = subtitle_languages
+        opts['subtitlesformat'] = 'vtt/best'
+
+
 def download_generic(core, reliability, task_id, url, network_mode='direct'):
     temp_dir = _task_temp_dir(core, task_id)
     os.makedirs(temp_dir, exist_ok=True)
     site_key, site_dir = teddy_storage.ensure_site_dir(core, url, custom=False)
     last_filename = {'path': ''}
     proxy_url = teddy_routing.proxy_for_mode(network_mode)
+    ytdlp_options = yt_dlp_options_for_task(core, task_id)
 
     task = core.tasks.get(task_id)
     if task:
         task['storage_folder'] = site_key
         task['engine'] = 'yt-dlp'
         task['network_mode'] = network_mode
+        task['yt_dlp_options'] = ytdlp_options
         _maybe_save(core, task_id, force=True)
 
     def progress_hook(data):
@@ -148,14 +259,14 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
     opts = {
         'quiet': False,
         'no_warnings': False,
+        # Playlist support is intentionally a separate roadmap item.
         'noplaylist': True,
         'continuedl': True,
         'nopart': False,
         'retries': 8,
         'fragment_retries': 8,
         'socket_timeout': 30,
-        'format': _format_selector(core),
-        'merge_output_format': 'mp4',
+        'format': _format_selector(core, ytdlp_options),
         'paths': {
             'home': site_dir,
             'temp': temp_dir,
@@ -168,11 +279,23 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
         },
         'progress_hooks': [progress_hook],
     }
+    _apply_media_options(opts, ytdlp_options)
     if proxy_url:
         opts['proxy'] = proxy_url
 
-    route_label = 'VPN' if network_mode == 'vpn' else 'Direct'
-    print(f'[yt-dlp] generic download 시작 ({route_label}): {url} -> {site_key}/', flush=True)
+    route_label = teddy_routing.mode_label(network_mode)
+    option_label = (
+        f"mode={ytdlp_options['media_mode']} "
+        f"quality={ytdlp_options['quality']} "
+        f"video={ytdlp_options['video_container']} "
+        f"audio={ytdlp_options['audio_format']} "
+        f"subs={ytdlp_options['subtitles']}"
+    )
+    print(
+        f'[yt-dlp] generic download 시작 ({route_label}; {option_label}): '
+        f'{url} -> {site_key}/',
+        flush=True,
+    )
     try:
         with core.yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -206,6 +329,7 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
         task['engine'] = 'yt-dlp'
         task['storage_folder'] = site_key
         task['network_mode'] = network_mode
+        task['yt_dlp_options'] = ytdlp_options
         task.pop('last_error_detail', None)
         _maybe_save(core, task_id, force=True)
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -219,6 +343,7 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
             task['engine'] = 'yt-dlp'
             task['storage_folder'] = site_key
             task['network_mode'] = network_mode
+            task['yt_dlp_options'] = ytdlp_options
             _maybe_save(core, task_id, force=True)
         print(f'[Pause][yt-dlp] 일시정지 완료: {url}', flush=True)
         return {'status': 'paused'}
@@ -239,6 +364,7 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
             task['engine'] = 'yt-dlp'
             task['storage_folder'] = site_key
             task['network_mode'] = network_mode
+            task['yt_dlp_options'] = ytdlp_options
             _maybe_save(core, task_id, force=True)
             print(f'[Pause][yt-dlp] 일시정지 완료: {url}', flush=True)
             return {'status': 'paused'}
@@ -251,6 +377,7 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
             task['engine'] = 'yt-dlp'
             task['storage_folder'] = site_key
             task['network_mode'] = network_mode
+            task['yt_dlp_options'] = ytdlp_options
             _maybe_save(core, task_id, force=True)
         return {'status': 'error', 'error': message}
 
