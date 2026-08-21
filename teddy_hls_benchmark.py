@@ -70,10 +70,13 @@ def main():
     write_mode = task.get('hls_write_mode', '?')
     transport_mode = task.get('hls_transport_mode', '?')
     pool_clients = task.get('hls_pool_clients', '?')
+    http_version = task.get('hls_http_version', '?')
+    actual_http = task.get('hls_http_version_actual', '?')
     proxy_start, latency_start = proxy_snapshot()
     print(
         f'Teddy HLS benchmark: task={task_id} workers={workers} '
-        f'transport={transport_mode} pool={pool_clients} write={write_mode} '
+        f'transport={transport_mode} pool={pool_clients} '
+        f'http={http_version}/{actual_http} write={write_mode} '
         f'proxy={proxy_start or "-"} latency={latency_start or "-"}ms',
         flush=True,
     )
@@ -107,6 +110,8 @@ def main():
     observed_write_modes = {task.get('hls_write_mode', '?')}
     observed_transport_modes = {task.get('hls_transport_mode', '?')}
     observed_pool_clients = {task.get('hls_pool_clients', '?')}
+    observed_http_versions = {task.get('hls_http_version', '?')}
+    observed_actual_http = {task.get('hls_http_version_actual', '?')}
 
     deadline = start_time + args.duration
     while True:
@@ -131,6 +136,8 @@ def main():
         observed_write_modes.add(task.get('hls_write_mode', '?'))
         observed_transport_modes.add(task.get('hls_transport_mode', '?'))
         observed_pool_clients.add(task.get('hls_pool_clients', '?'))
+        observed_http_versions.add(task.get('hls_http_version', '?'))
+        observed_actual_http.add(task.get('hls_http_version_actual', '?'))
 
         proxy_now, latency_now = proxy_snapshot()
         if proxy_start and proxy_now and proxy_now != proxy_start:
@@ -141,6 +148,7 @@ def main():
             f'[{stamp}] workers={task.get("hls_workers", "?")} '
             f'transport={task.get("hls_transport_mode", "?")} '
             f'pool={task.get("hls_pool_clients", "?")} '
+            f'http={task.get("hls_http_version", "?")}/{task.get("hls_http_version_actual", "?")} '
             f'write={task.get("hls_write_mode", "?")} '
             f'progress={task.get("progress", "?")} '
             f'actual={current_speed / MB:6.2f} MB/s '
@@ -160,12 +168,16 @@ def main():
     measured = max(end_time - start_time, 0.001)
     transferred = max(0, end_bytes - start_bytes)
     average = transferred / measured
+    observed_http_versions.add(task.get('hls_http_version', '?'))
+    observed_actual_http.add(task.get('hls_http_version_actual', '?'))
 
-    print('-' * 132, flush=True)
+    print('-' * 152, flush=True)
     print(
         f'RESULT workers={sorted(str(v) for v in observed_workers)} '
         f'transport={sorted(str(v) for v in observed_transport_modes)} '
         f'pool={sorted(str(v) for v in observed_pool_clients)} '
+        f'http={sorted(str(v) for v in observed_http_versions)} '
+        f'actual_http={sorted(str(v) for v in observed_actual_http)} '
         f'write={sorted(str(v) for v in observed_write_modes)} '
         f'avg={average / MB:.2f} MB/s '
         f'transferred={transferred / MB:.1f} MB '
