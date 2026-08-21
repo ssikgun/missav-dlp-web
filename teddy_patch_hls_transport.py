@@ -32,7 +32,7 @@ def main():
         raise SystemExit('HLS transport patch: app core import anchor missing')
     text = text.replace(core_import, core_import + 'import teddy_hls_transport\n', 1)
 
-    fetch_segment = r'''def _fetch_segment(task_id, seg_url, headers):
+    fetch_segment = r'''def _fetch_segment(task_id, seg_url, headers, transport_mode='per-worker', worker_count=None):
     last = None
     for attempt in range(SEGMENT_RETRY_ATTEMPTS):
         _check_task_state(task_id)
@@ -45,23 +45,24 @@ def main():
                 impersonate=target,
                 headers=headers,
                 timeout=SEGMENT_TIMEOUT_SECONDS,
+                transport_mode=transport_mode,
+                max_clients=worker_count,
             )
             if response.status_code == 200:
                 return response.content
             last = f'HTTP {response.status_code}'
-            # A non-200 response should not keep a potentially poisoned CONNECT/TLS
-            # tunnel around for the next browser-fingerprint retry.
-            teddy_hls_transport.invalidate()
+            # Per-worker mode drops only this worker's CONNECT/TLS path. Async-pool
+            # mode intentionally keeps the shared pool alive for unrelated in-flight
+            # requests; public-proxy rotation replaces it by proxy URL on next use.
+            teddy_hls_transport.invalidate(transport_mode)
         except (DownloadPaused, core.DownloadCancelled):
             raise
         except Exception as exc:
             last = str(exc)
-            # VPN reconnects keep the same Gluetun proxy URL. Dropping the worker
-            # Session here guarantees the retry opens a fresh CONNECT/TLS path.
-            teddy_hls_transport.invalidate()
+            teddy_hls_transport.invalidate(transport_mode)
 
         # Preserve the cumulative VPN health observer from the reliability layer.
-        # The observer itself ignores Direct/Proxy tasks and non-recoverable errors.
+        # VPN tasks use per-worker transport even when async-pool is requested.
         observer = getattr(core, '_teddy_vpn_failure_observer', None)
         if callable(observer):
             try:
@@ -82,11 +83,12 @@ def main():
     text = replace_function(text, '_fetch_segment', '_fetch_variant_playlist', fetch_segment)
 
     download_hls = r'''def _download_hls_resumable(task_id, variant_url, headers, out_path):
-    # Capture persisted benchmark settings once per task. Changing the UI while a
-    # download is active affects only the next HLS execution, so neither executor
-    # size nor write strategy changes underneath in-flight requests.
+    # Capture persisted benchmark settings once per execution. Changing the UI while
+    # a download is active affects only the next HLS execution, so executor size,
+    # write strategy, and connection topology stay stable during one benchmark run.
     worker_count = teddy_hls_transport.workers_from_settings(core.settings)
     write_mode = teddy_hls_transport.write_mode_from_settings(core.settings)
+    transport_mode = teddy_hls_transport.transport_mode_for_task(core, task_id, core.settings)
     parts_dir = os.path.join(core.DOWNLOAD_DIR, f'.{task_id}.parts')
     os.makedirs(parts_dir, exist_ok=True)
     playlist_text = _fetch_variant_playlist(task_id, variant_url, headers)
@@ -117,7 +119,7 @@ def main():
     total_bytes_estimate = int(downloaded_bytes * total / done) if done else 0
     print(
         f'[다운로드] 세그먼트 {total}개 (완료 {done} / 남음 {len(pending)}) '
-        f'· persistent session + continuous {worker_count} workers · write={write_mode}',
+        f'· continuous {worker_count} workers · transport={transport_mode} · write={write_mode}',
         flush=True,
     )
     if task_id in core.tasks:
@@ -127,6 +129,7 @@ def main():
         core.tasks[task_id]['total_bytes_estimate'] = total_bytes_estimate
         core.tasks[task_id]['hls_workers'] = worker_count
         core.tasks[task_id]['hls_write_mode'] = write_mode
+        core.tasks[task_id]['hls_transport_mode'] = transport_mode
         core.save_tasks()
 
     def write_part(index, data):
@@ -138,7 +141,13 @@ def main():
 
     def fetch_item(item):
         index, url = item
-        data = _fetch_segment(task_id, url, headers)
+        data = _fetch_segment(
+            task_id,
+            url,
+            headers,
+            transport_mode=transport_mode,
+            worker_count=worker_count,
+        )
         _check_task_state(task_id)
         if write_mode == 'parts':
             # Production-safe path: preserve the proven behavior exactly, including
@@ -291,7 +300,7 @@ def main():
     text = replace_function(text, '_download_hls_resumable', '_store_info', download_hls)
 
     ENTRYPOINT.write_text(text, encoding='utf-8')
-    print('persistent HLS sessions + continuous scheduler runtime patch: OK')
+    print('persistent/async HLS transport + continuous scheduler runtime patch: OK')
 
 
 if __name__ == '__main__':
