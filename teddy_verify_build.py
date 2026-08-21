@@ -21,6 +21,11 @@ def verify_runtime():
     assert h.HLS_WORKERS == 8
     assert h.ALLOWED_HLS_TRANSPORT_MODES == ('per-worker', 'async-pool')
     assert h.HLS_TRANSPORT_MODE == 'per-worker'
+    assert h.HLS_POOL_CLIENTS == 24
+    assert h.ALLOWED_HLS_POOL_CLIENTS == (4, 8, 12, 16, 24)
+    assert h.pool_clients_from_settings({}) == 24
+    assert h.pool_clients_from_settings({'hls_pool_clients': 12}) == 12
+    assert h.pool_clients_from_settings({'hls_pool_clients': 20}) == 24
     assert p.BANDWIDTH_TEST_BYTES == 512 * 1024
     assert p.BANDWIDTH_TEST_LIMIT <= 8
     assert p.BANDWIDTH_TEST_WORKERS <= 4
@@ -58,12 +63,16 @@ def verify_runtime():
         'teddy_hls_transport.py': [
             'HLS_WORKERS = 8',
             "ALLOWED_HLS_TRANSPORT_MODES = ('per-worker', 'async-pool')",
+            "ALLOWED_HLS_POOL_CLIENTS = (4, 8, 12, 16, 24)",
+            'HLS_POOL_CLIENTS = 24',
+            'def pool_clients_from_settings(settings):',
             'cffi_requests.Session()',
             'cffi_requests.AsyncSession(max_clients=max_clients)',
             'asyncio.run_coroutine_threadsafe',
             "state.get('proxy_url') == proxy_url",
             "task.get('network_mode') == 'vpn'",
             "def invalidate(mode='per-worker')",
+            'clients = normalize_pool_clients(max_clients or HLS_POOL_CLIENTS)',
             "kwargs['proxies']",
         ],
         'teddy_network.py': [
@@ -112,7 +121,11 @@ def verify_runtime():
             'teddy_hls_transport.get(',
             'teddy_hls_transport.invalidate(transport_mode)',
             'transport_mode=transport_mode',
+            'pool_clients = teddy_hls_transport.pool_clients_from_settings(core.settings)',
             "core.tasks[task_id]['hls_transport_mode'] = transport_mode",
+            "core.tasks[task_id]['hls_pool_clients'] = pool_clients",
+            'worker_count=pool_clients',
+            '· pool={pool_clients} · write={write_mode}',
             'continuous',
             'return_when=FIRST_COMPLETED',
             'submit_one()',
@@ -126,7 +139,9 @@ def verify_runtime():
         ],
         'teddy_hls_benchmark.py': [
             "task.get('hls_transport_mode', '?')",
+            "task.get('hls_pool_clients', '?')",
             'transport=',
+            'pool=',
             'proxy_changed=',
         ],
         'teddy_duplicates.py': ['duplicate queue guard enabled'],
@@ -164,8 +179,12 @@ def verify_final():
         'templates/teddy-hls-benchmark.js': [
             'HLS 연결 방식 (성능 테스트)',
             'Async shared pool benchmark',
+            'Async pool 연결 수 (성능 테스트)',
+            '24 connections (기존 Async값)',
             "hls_transport_mode: mode",
+            'hls_pool_clients: clients',
             "defaultSettings.hls_transport_mode = 'per-worker'",
+            'defaultSettings.hls_pool_clients = 24',
         ],
         'templates/teddy-network.js': [
             '누적 자동 IP 변경',
