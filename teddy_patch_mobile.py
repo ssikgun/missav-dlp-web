@@ -2,6 +2,7 @@ from pathlib import Path
 
 
 INDEX = Path("templates/index.html")
+MOBILE_STYLESHEET = '<link rel="stylesheet" href="/static/teddy-mobile.css">'
 
 
 def replace_once(text, old, new, label):
@@ -35,7 +36,27 @@ def main():
         "mobile video attributes",
     )
 
+    if MOBILE_STYLESHEET not in text:
+        text = replace_once(
+            text,
+            "</head>",
+            MOBILE_STYLESHEET + "</head>",
+            "mobile stylesheet injection",
+        )
+
     INDEX.write_text(text, encoding="utf-8")
+
+    rendered = INDEX.read_text(encoding="utf-8")
+    required = (
+        '>\\u25b6 재생</button>',
+        "이 파일을 NAS에서 삭제할까요? 삭제 후 되돌릴 수 없습니다.",
+        'controls playsinline preload="metadata"',
+        MOBILE_STYLESHEET,
+    )
+    missing = [marker for marker in required if marker not in rendered]
+    if missing:
+        raise SystemExit(f"mobile patch verification failed: {missing}")
+
     print("mobile UI patch: OK")
 
 
