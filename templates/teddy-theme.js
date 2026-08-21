@@ -1,6 +1,13 @@
 (() => {
     const STORAGE_KEY = 'teddy-theme';
     const root = document.documentElement;
+    const mobileMedia = window.matchMedia
+        ? window.matchMedia('(max-width: 768px), (max-width: 1024px) and (hover: none) and (pointer: coarse)')
+        : null;
+
+    function isMobileUI() {
+        return Boolean(mobileMedia && mobileMedia.matches);
+    }
 
     function systemTheme() {
         return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -28,7 +35,16 @@
         }
     }
 
+    function removeButton() {
+        document.getElementById('teddy-theme-toggle')?.remove();
+    }
+
     function installButton() {
+        if (isMobileUI()) {
+            removeButton();
+            return;
+        }
+
         const sidebar = document.querySelector('.sidebar');
         if (!sidebar || document.getElementById('teddy-theme-toggle')) return;
 
@@ -47,23 +63,41 @@
         } else {
             sidebar.appendChild(button);
         }
-        applyTheme(root.dataset.theme || savedTheme() || systemTheme(), false);
     }
 
-    applyTheme(savedTheme() || systemTheme(), false);
+    function syncTheme() {
+        if (isMobileUI()) {
+            applyTheme(systemTheme(), false);
+            removeButton();
+            return;
+        }
+        applyTheme(savedTheme() || systemTheme(), false);
+    }
+
+    syncTheme();
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', installButton, { once: true });
+        document.addEventListener('DOMContentLoaded', () => {
+            syncTheme();
+            installButton();
+        }, { once: true });
     } else {
         installButton();
     }
 
-    const media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
-    if (media && media.addEventListener) {
-        media.addEventListener('change', event => {
-            if (!savedTheme()) {
+    const colorMedia = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    if (colorMedia && colorMedia.addEventListener) {
+        colorMedia.addEventListener('change', event => {
+            if (isMobileUI() || !savedTheme()) {
                 applyTheme(event.matches ? 'dark' : 'light', false);
             }
+        });
+    }
+
+    if (mobileMedia && mobileMedia.addEventListener) {
+        mobileMedia.addEventListener('change', () => {
+            syncTheme();
+            installButton();
         });
     }
 })();
