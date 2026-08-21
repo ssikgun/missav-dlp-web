@@ -140,4 +140,106 @@
         }
         if (typeof fetchTasks === 'function') fetchTasks();
     };
+
+    async function teddyClearCompletedTasks() {
+        const button = document.getElementById('teddy-clear-completed');
+        try {
+            const tasksResponse = await originalFetch('/api/tasks');
+            if (!tasksResponse.ok) {
+                throw new Error('작업 목록을 불러오지 못했습니다.');
+            }
+            const tasks = await tasksResponse.json();
+            const completedIds = Object.entries(tasks)
+                .filter(([, task]) => String((task && task.status) || '') === '완료')
+                .map(([id]) => id);
+
+            if (!completedIds.length) {
+                if (typeof showToast === 'function') {
+                    showToast('정리할 완료 작업이 없습니다.', 'success');
+                }
+                if (typeof fetchTasks === 'function') fetchTasks();
+                return;
+            }
+
+            if (!window.confirm(
+                `완료된 작업 기록 ${completedIds.length}개를 목록에서 삭제하시겠습니까?\n\n` +
+                '다운로드된 파일은 삭제되지 않습니다.'
+            )) return;
+
+            if (button) {
+                button.disabled = true;
+                button.textContent = '정리 중…';
+            }
+
+            let removed = 0;
+            let failed = 0;
+            for (const id of completedIds) {
+                try {
+                    const response = await originalFetch(`/api/tasks/${encodeURIComponent(id)}`, {
+                        method: 'DELETE',
+                    });
+                    if (response.ok) removed++;
+                    else failed++;
+                } catch (_) {
+                    failed++;
+                }
+            }
+
+            if (typeof showToast === 'function') {
+                if (failed) {
+                    showToast(`완료 작업 ${removed}개 정리 · ${failed}개 실패`, 'error');
+                } else {
+                    showToast(
+                        `완료된 작업 기록 ${removed}개를 정리했습니다. 다운로드 파일은 유지됩니다.`,
+                        'success',
+                    );
+                }
+            }
+            if (typeof fetchTasks === 'function') fetchTasks();
+        } catch (error) {
+            if (typeof showToast === 'function') {
+                showToast(error && error.message ? error.message : '완료 작업 정리에 실패했습니다.', 'error');
+            }
+        } finally {
+            const currentButton = document.getElementById('teddy-clear-completed');
+            if (currentButton) {
+                currentButton.disabled = false;
+                currentButton.textContent = '완료 일괄 삭제';
+            }
+        }
+    }
+
+    window.teddyClearCompletedTasks = teddyClearCompletedTasks;
+
+    function ensureCompletedCleanupButton() {
+        const stats = document.getElementById('stats');
+        if (!stats) return;
+
+        const hasCompleted = !!stats.querySelector('.stat-done');
+        let button = document.getElementById('teddy-clear-completed');
+        if (!hasCompleted) {
+            if (button) button.remove();
+            return;
+        }
+
+        if (!button) {
+            button = document.createElement('button');
+            button.id = 'teddy-clear-completed';
+            button.type = 'button';
+            button.className = 'btn btn-ghost';
+            button.textContent = '완료 일괄 삭제';
+            button.title = '다운로드 파일은 유지하고 완료 작업 기록만 삭제합니다';
+            button.style.marginLeft = 'auto';
+            button.addEventListener('click', teddyClearCompletedTasks);
+            stats.appendChild(button);
+        }
+    }
+
+    const stats = document.getElementById('stats');
+    if (stats && !window.__teddyCompletedCleanupObserver) {
+        const observer = new MutationObserver(ensureCompletedCleanupButton);
+        observer.observe(stats, { childList: true });
+        window.__teddyCompletedCleanupObserver = observer;
+        ensureCompletedCleanupButton();
+    }
 })();
