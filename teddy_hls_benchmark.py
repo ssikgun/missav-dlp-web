@@ -67,9 +67,10 @@ def main():
 
     task_id, task = select_task(args.task_id)
     workers = task.get('hls_workers', '?')
+    write_mode = task.get('hls_write_mode', '?')
     proxy_start, latency_start = proxy_snapshot()
     print(
-        f'Teddy HLS benchmark: task={task_id} workers={workers} '
+        f'Teddy HLS benchmark: task={task_id} workers={workers} write={write_mode} '
         f'proxy={proxy_start or "-"} latency={latency_start or "-"}ms',
         flush=True,
     )
@@ -100,6 +101,7 @@ def main():
     prev_time = start_time
     proxy_changed = False
     observed_workers = {task.get('hls_workers', '?')}
+    observed_write_modes = {task.get('hls_write_mode', '?')}
 
     deadline = start_time + args.duration
     while True:
@@ -121,6 +123,7 @@ def main():
         average_speed = max(0, current_bytes - start_bytes) / elapsed
         api_speed = int(task.get('speed_bps') or 0)
         observed_workers.add(task.get('hls_workers', '?'))
+        observed_write_modes.add(task.get('hls_write_mode', '?'))
 
         proxy_now, latency_now = proxy_snapshot()
         if proxy_start and proxy_now and proxy_now != proxy_start:
@@ -129,6 +132,7 @@ def main():
         stamp = time.strftime('%H:%M:%S')
         print(
             f'[{stamp}] workers={task.get("hls_workers", "?")} '
+            f'write={task.get("hls_write_mode", "?")} '
             f'progress={task.get("progress", "?")} '
             f'actual={current_speed / MB:6.2f} MB/s '
             f'api={api_speed / MB:6.2f} MB/s '
@@ -148,9 +152,10 @@ def main():
     transferred = max(0, end_bytes - start_bytes)
     average = transferred / measured
 
-    print('-' * 88, flush=True)
+    print('-' * 100, flush=True)
     print(
         f'RESULT workers={sorted(str(v) for v in observed_workers)} '
+        f'write={sorted(str(v) for v in observed_write_modes)} '
         f'avg={average / MB:.2f} MB/s '
         f'transferred={transferred / MB:.1f} MB '
         f'elapsed={measured:.1f}s '
