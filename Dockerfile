@@ -34,7 +34,7 @@ RUN python -m py_compile \
     teddy_patch_proxy_engine_recovery.py teddy_patch_extraction_pause.py \
     teddy_patch_hls_transport.py teddy_patch_hls_pool_clients.py teddy_patch_hls_transport_bridge.py \
     teddy_patch_index.py teddy_patch_logs.py teddy_patch_storage.py teddy_patch_routing.py \
-    teddy_patch_ytdlp_options.py teddy_patch_browser.py teddy_patch_split_storage.py teddy_patch_browser_runtime.py
+    teddy_patch_ytdlp_options.py teddy_patch_browser.py teddy_patch_split_storage.py teddy_patch_mobile.py teddy_patch_browser_runtime.py
 
 # Existing deterministic boundary smoke tests.
 RUN python -c "import teddy_network as n; assert n.is_recoverable_failure('HTTP 403'); assert n.is_recoverable_failure('HTTP Error 403: Forbidden'); assert n.is_recoverable_failure('operation timed out'); assert n.is_recoverable_failure('connection reset by peer'); assert n.is_recoverable_failure('curl: (35) TLS connect error'); assert not n.is_recoverable_failure('HTTP 404'); assert not n.is_recoverable_failure('HTTP 401'); print('adaptive network failure boundary smoke test: OK')"
@@ -102,7 +102,10 @@ RUN grep -Fq 'id="set-ytdlp-media-mode"' templates/index.html && \
 
 # Static asset injection remains deterministic and idempotent inside the image build.
 RUN sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-theme.css"><link rel="stylesheet" href="/static/teddy-network.css"><link rel="stylesheet" href="/static/teddy-logs.css"><link rel="stylesheet" href="/static/teddy-routing.css"></head>#' templates/index.html && \
-    sed -i 's#</body>#<script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script><script src="/static/teddy-network.js"></script><script src="/static/teddy-logs.js"></script><script src="/static/teddy-routing.js"></script><script src="/static/teddy-proxy.js"></script><script src="/static/teddy-hls-benchmark.js"></script></body>#' templates/index.html
+    sed -i 's#</body>#<script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script><script src="/static/teddy-network.js"></script><script src="/static/teddy-logs.js"></script><script src="/static/teddy-routing.js"></script><script src="/static/teddy-proxy.js"></script><script src="/static/teddy-hls-benchmark.js"></script></body>#' templates/index.html && \
+    sed -i 's#<link rel="stylesheet" href="/static/teddy-mobile.css">##' templates/index.html && \
+    sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-mobile.css"></head>#' templates/index.html
+RUN python -c "from pathlib import Path; t=Path('templates/index.html').read_text(); assert t.count('/static/teddy-mobile.css') == 1; assert t.rfind('/static/teddy-mobile.css') > t.rfind('/static/teddy-routing.css'); print('mobile stylesheet order: OK')"
 
 # Split-storage production guards. /downloads remains local work/state;
 # TEDDY_FINAL_DIR points completed public files at the final filesystem.
