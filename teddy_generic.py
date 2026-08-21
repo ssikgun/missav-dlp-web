@@ -198,9 +198,12 @@ def _apply_media_options(opts, options):
 
     container = options['video_container']
     opts['merge_output_format'] = container
-    # Enforce the user's selected final video container even when yt-dlp can
-    # satisfy the selector with a single already-muxed fallback format.
-    opts['remuxvideo'] = container
+    # YoutubeDL's Python API does not run the CLI option-conversion layer.
+    # Add the same postprocessor that yt-dlp's --remux-video option generates.
+    opts['postprocessors'] = [{
+        'key': 'FFmpegVideoRemuxer',
+        'preferedformat': container,
+    }]
 
     subtitle_languages = _subtitle_languages(options['subtitles'])
     if subtitle_languages:
