@@ -1,0 +1,373 @@
+/* Teddy responsive mobile layer.
+ * Loaded last so it can adapt the existing desktop UI without redesigning
+ * backend/runtime behavior. Desktop rules remain untouched above the breakpoint.
+ */
+
+@media (max-width: 768px), (max-width: 1024px) and (hover: none) and (pointer: coarse) {
+    html,
+    body {
+        width: 100%;
+        max-width: 100%;
+        min-height: 100dvh;
+        overflow-x: hidden;
+    }
+
+    body {
+        display: block;
+        height: 100dvh;
+    }
+
+    /* Bottom navigation is easier to reach on iPhone and avoids stealing width. */
+    .sidebar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 900;
+        width: 100%;
+        height: auto;
+        min-height: 64px;
+        padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+        border-right: 0;
+        border-top: 1px solid #e2e8f0;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-around;
+        gap: 6px;
+    }
+
+    html[data-theme="dark"] .sidebar {
+        border-top-color: #253047;
+    }
+
+    .sidebar-logo,
+    .sidebar > div[style*="flex:1"] {
+        display: none !important;
+    }
+
+    .sidebar-btn {
+        width: auto;
+        min-width: 48px;
+        max-width: 76px;
+        height: 48px;
+        flex: 1 1 0;
+        border-radius: 12px;
+    }
+
+    .main {
+        width: 100%;
+        max-width: 100vw;
+        height: 100dvh;
+        padding: calc(16px + env(safe-area-inset-top)) 14px calc(82px + env(safe-area-inset-bottom));
+        overflow-x: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .page,
+    .settings-form,
+    .task-card,
+    .file-card,
+    .teddy-network-panel,
+    .teddy-proxy-panel,
+    .teddy-routing-summary {
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .page-title {
+        font-size: 22px;
+        line-height: 1.25;
+    }
+
+    .page-subtitle {
+        margin-bottom: 18px;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+    }
+
+    /* Download page */
+    .url-bar {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .url-bar input,
+    .url-bar button,
+    .teddy-route-select {
+        width: 100%;
+        min-width: 0;
+        min-height: 48px;
+    }
+
+    .url-bar input {
+        font-size: 16px; /* Avoid iOS Safari auto-zoom on focus. */
+    }
+
+    .stats {
+        gap: 7px;
+    }
+
+    .stat-badge {
+        padding: 7px 10px;
+    }
+
+    .task-card {
+        padding: 14px;
+    }
+
+    .task-top {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .task-title,
+    .task-meta,
+    .progress-text {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    .task-actions {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .task-actions .btn {
+        min-height: 44px;
+        flex: 1 1 120px;
+    }
+
+    .progress-bg {
+        width: 100%;
+        height: 7px;
+    }
+
+    /* Network / routing panels */
+    .teddy-network-panel {
+        padding: 12px;
+        gap: 12px;
+    }
+
+    .teddy-network-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .teddy-network-button,
+    .teddy-routing-row button,
+    .teddy-routing-add button,
+    .teddy-proxy-actions button,
+    .teddy-proxy-manual-add button,
+    .teddy-proxy-manual-row button {
+        min-height: 44px;
+    }
+
+    .teddy-routing-row,
+    .teddy-routing-add,
+    .teddy-proxy-manual-add {
+        grid-template-columns: 1fr;
+    }
+
+    .teddy-routing-site,
+    .teddy-proxy-current,
+    .teddy-proxy-manual-row code {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    .teddy-proxy-manual-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    /* File manager */
+    .files-header {
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .files-controls {
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+    }
+
+    .search-input,
+    .sort-select {
+        min-width: 0;
+        min-height: 44px;
+    }
+
+    .search-input {
+        width: 100%;
+        font-size: 16px;
+    }
+
+    .file-card {
+        padding: 14px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .file-info {
+        width: 100%;
+        align-items: flex-start;
+    }
+
+    .file-name {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        line-height: 1.4;
+    }
+
+    .file-meta {
+        line-height: 1.45;
+    }
+
+    .file-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .file-actions .btn {
+        width: 100%;
+        min-height: 46px;
+        justify-content: center;
+    }
+
+    /* Mobile file manager intentionally omits the download action. */
+    .file-card .file-actions > a[href*="/download"] {
+        display: none !important;
+    }
+
+    /* Settings */
+    .setting-input,
+    .setting-input-wide,
+    .setting-select,
+    .setting-textarea {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .setting-input,
+    .setting-input-wide,
+    .setting-select {
+        min-height: 46px;
+    }
+
+    .setting-input-wide,
+    .setting-textarea {
+        overflow-wrap: anywhere;
+    }
+
+    .setting-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .btn-save,
+    .btn-reset {
+        min-height: 46px;
+        width: 100%;
+    }
+
+    /* Toasts must stay clear of the Dynamic Island / safe area. */
+    .toast {
+        top: calc(10px + env(safe-area-inset-top));
+        left: 12px;
+        right: 12px;
+        width: auto;
+        max-width: none;
+        text-align: center;
+    }
+
+    /* Browser page fills the viewport above the bottom navigation. */
+    #page-browser {
+        margin: calc(-16px - env(safe-area-inset-top)) -14px 0;
+        width: calc(100% + 28px);
+        height: calc(100dvh - 64px - env(safe-area-inset-bottom));
+    }
+
+    .teddy-browser-shell,
+    .teddy-browser-frame {
+        width: 100%;
+        height: 100%;
+    }
+
+    /* Video playback modal */
+    .modal-overlay {
+        background: #000;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    .modal-content {
+        width: 100%;
+        max-width: none;
+        max-height: 100%;
+        border-radius: 0;
+        background: #000;
+    }
+
+    .modal-content video {
+        width: 100%;
+        max-width: 100%;
+        max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        object-fit: contain;
+        background: #000;
+    }
+
+    .modal-close {
+        top: max(10px, env(safe-area-inset-top));
+        right: max(10px, env(safe-area-inset-right));
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        font-size: 22px;
+    }
+}
+
+/* iPhone landscape playback: use the whole display while preserving safe areas. */
+@media (max-width: 1024px) and (orientation: landscape) and (hover: none) and (pointer: coarse) {
+    .modal-overlay {
+        padding: 0;
+    }
+
+    .modal-content {
+        width: 100vw;
+        height: 100dvh;
+        max-width: none;
+        max-height: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-content video {
+        width: 100vw;
+        height: 100dvh;
+        max-height: none;
+        object-fit: contain;
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+}
