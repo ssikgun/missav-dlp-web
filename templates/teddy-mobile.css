@@ -389,6 +389,14 @@
     }
 }
 
+/* Standalone PWA: keep the full-bleed browser inside the iPhone safe area. */
+@media (display-mode: standalone) and (max-width: 768px),
+       (display-mode: standalone) and (max-width: 1024px) and (hover: none) and (pointer: coarse) {
+    #page-browser {
+        top: env(safe-area-inset-top);
+    }
+}
+
 /* iPhone landscape playback: use the whole display while preserving safe areas. */
 @media (max-width: 1024px) and (orientation: landscape) and (hover: none) and (pointer: coarse) {
     .modal-overlay {
