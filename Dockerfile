@@ -34,7 +34,8 @@ RUN python -m py_compile \
     teddy_patch_proxy_engine_recovery.py teddy_patch_extraction_pause.py \
     teddy_patch_hls_transport.py teddy_patch_hls_pool_clients.py teddy_patch_hls_transport_bridge.py \
     teddy_patch_index.py teddy_patch_logs.py teddy_patch_storage.py teddy_patch_routing.py \
-    teddy_patch_ytdlp_options.py teddy_patch_browser.py teddy_patch_split_storage.py teddy_patch_mobile.py teddy_patch_browser_runtime.py
+    teddy_patch_ytdlp_options.py teddy_patch_browser.py teddy_patch_split_storage.py teddy_patch_mobile.py teddy_patch_browser_runtime.py \
+    teddy_patch_pwa.py
 
 # Existing deterministic boundary smoke tests.
 RUN python -c "import teddy_network as n; assert n.is_recoverable_failure('HTTP 403'); assert n.is_recoverable_failure('HTTP Error 403: Forbidden'); assert n.is_recoverable_failure('operation timed out'); assert n.is_recoverable_failure('connection reset by peer'); assert n.is_recoverable_failure('curl: (35) TLS connect error'); assert not n.is_recoverable_failure('HTTP 404'); assert not n.is_recoverable_failure('HTTP 401'); print('adaptive network failure boundary smoke test: OK')"
@@ -45,7 +46,7 @@ RUN python -c "import teddy_duplicates as d; assert d.duplicate_key('https://you
 RUN python -c "import teddy_logging as l; assert l._clean_for_viewer('\\x1b[31mRED\\x1b[0m') == 'RED'; assert l._clean_for_viewer(b'hello') == 'hello'; print('web log cleanup smoke test: OK')"
 RUN python -c "import teddy_generic as g; C=type('C',(),{'settings':{'video_quality':'1080'}}); s=g._format_selector(C); assert 'height<=1080' in s; assert 'ext=mp4' in s; print('generic yt-dlp engine smoke test: OK')"
 RUN python -c "import teddy_storage as s; assert s.site_key_for_url('https://youtu.be/abc') == 'youtube'; assert s.site_key_for_url('https://www.youtube.com/watch?v=abc') == 'youtube'; assert s.site_key_for_url('https://missav123.com/ko/abc', custom=True) == 'missav'; assert s.site_key_for_url('https://vimeo.com/123') == 'vimeo'; print('site-aware storage smoke test: OK')"
-RUN python -c "import teddy_hls_transport as h; assert h.HLS_WORKERS == 8; assert h.ALLOWED_HLS_WORKERS == (2, 4, 8, 12, 16, 20, 24); assert h.ALLOWED_HLS_WRITE_MODES == ('parts', 'ram'); assert h.ALLOWED_HLS_TRANSPORT_MODES == ('per-worker', 'async-pool'); assert h.HLS_POOL_CLIENTS == 24; assert h.ALLOWED_HLS_POOL_CLIENTS == (4, 8, 12, 16, 24); assert h.workers_from_settings({'hls_workers': 24}) == 24; assert h.write_mode_from_settings({'hls_write_mode': 'ram'}) == 'ram'; assert h.transport_mode_from_settings({'hls_transport_mode': 'async-pool'}) == 'async-pool'; assert h.transport_mode_from_settings({'hls_transport_mode': 'bad'}) == 'per-worker'; assert h.pool_clients_from_settings({}) == 24; assert h.pool_clients_from_settings({'hls_pool_clients': 4}) == 4; assert h.pool_clients_from_settings({'hls_pool_clients': 8}) == 8; assert h.pool_clients_from_settings({'hls_pool_clients': 12}) == 12; assert h.pool_clients_from_settings({'hls_pool_clients': 16}) == 16; assert h.pool_clients_from_settings({'hls_pool_clients': 24}) == 24; assert h.pool_clients_from_settings({'hls_pool_clients': 20}) == 24; assert callable(h.get); assert callable(h.invalidate); print('persistent/async HLS transport + pool-size benchmark smoke test: OK')"
+RUN python -c "import teddy_hls_transport as h; assert h.HLS_WORKERS == 8; assert h.ALLOWED_HLS_WORKERS == (2, 4, 8, 12, 16, 20, 24); assert h.ALLOWED_HLS_WRITE_MODES == ('parts', 'ram'); assert h.ALLOWED_HLS_TRANSPORT_MODES == ('per-worker', 'async-pool'); assert h.HLS_POOL_CLIENTS == 24; assert h.ALLOWED_HLS_POOL_CLIENTS == (4, 8, 12, 16, 24); assert h.workers_from_settings({'hls_workers': 24}) == 24; assert h.write_mode_from_settings({'hls_write_mode': 'ram'}) == 'ram'; assert h.transport_mode_from_settings({'hls_transport_mode': 'async-pool') == 'async-pool'; assert h.transport_mode_from_settings({'hls_transport_mode': 'bad'}) == 'per-worker'; assert h.pool_clients_from_settings({}) == 24; assert h.pool_clients_from_settings({'hls_pool_clients': 4}) == 4; assert h.pool_clients_from_settings({'hls_pool_clients': 8}) == 8; assert h.pool_clients_from_settings({'hls_pool_clients': 12}) == 12; assert h.pool_clients_from_settings({'hls_pool_clients': 16}) == 16; assert h.pool_clients_from_settings({'hls_pool_clients': 24}) == 24; assert h.pool_clients_from_settings({'hls_pool_clients': 20}) == 24; assert callable(h.get); assert callable(h.invalidate); print('persistent/async HLS transport + pool-size benchmark smoke test: OK')"
 
 # Teddy runtime patches. Keep each major stage separate so Actions exposes the exact failing patch.
 RUN python teddy_patch_vpn_health.py
@@ -107,6 +108,14 @@ RUN sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-theme.css"><lin
     sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-mobile.css"></head>#' templates/index.html
 RUN python -c "from pathlib import Path; t=Path('templates/index.html').read_text(); assert t.count('/static/teddy-mobile.css') == 1; assert t.rfind('/static/teddy-mobile.css') > t.rfind('/static/teddy-routing.css'); print('mobile stylesheet order: OK')"
 
+# PWA phase 1: installable/home-screen metadata only. Deliberately no service worker/offline cache.
+RUN python teddy_patch_pwa.py
+RUN grep -Fq 'rel="manifest" href="/static/teddy-manifest.webmanifest"' templates/index.html && \
+    grep -Fq 'rel="apple-touch-icon" sizes="180x180" href="/static/teddy-icon-180.png"' templates/index.html && \
+    grep -Fq '"display": "standalone"' templates/teddy-manifest.webmanifest && \
+    test -s templates/teddy-icon-180.png && \
+    test -s templates/teddy-icon.svg
+
 # Split-storage production guards. /downloads remains local work/state;
 # TEDDY_FINAL_DIR points completed public files at the final filesystem.
 RUN grep -Fq "TEDDY_FINAL_DIR" teddy_storage.py && \
@@ -117,7 +126,7 @@ RUN grep -Fq "TEDDY_FINAL_DIR" teddy_storage.py && \
 
 RUN python -m py_compile \
     teddy_bootstrap.py teddy_browser_config.py teddy_storage.py \
-    teddy_generic.py teddy_entrypoint.py
+    teddy_generic.py teddy_entrypoint.py teddy_patch_pwa.py
 RUN python teddy_verify_build.py final
 
 # 6. 폴더 생성 및 포트 노출
