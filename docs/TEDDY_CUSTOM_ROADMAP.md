@@ -1,7 +1,7 @@
 # Teddy Custom Downloader — Feature Roadmap
 
 - 작성 시각: 2026-08-21 KST
-- 업데이트 시각: 2026-08-22 15:28 KST
+- 업데이트 시각: 2026-08-22 15:37 KST
 - 기준: CT108 production migration **CLOSED** + Responsive Mobile UI production **CLOSED**
 - 현재 production 브랜치: `teddy-custom`
 - 현재 production 이미지 소스: `54e83d344d0b8a90b81b1570fd30a1376298d91a`
@@ -145,28 +145,117 @@
 - Mobile embedded Browser — **PASS**
 - 기존 Downloader download/VPN/split-storage backend 불필요한 재설계 없음 — **PASS**
 
-### 확인필요 — iPhone Safari 완료파일 `받기`
+### Deferred — iPhone Safari 완료파일 `받기`
 
-Responsive Mobile UI closure와 별개로, 완료 task의 `받기`를 이용해 NAS 완료 파일을 iPhone Safari로 저장할 때 다운로드가 100%까지 진행된 뒤 `!`로 끝나는 사례가 보고되어 별도 확인이 필요하다.
+상태: **DEFERRED — REOPEN ON REPRODUCTION**
 
-현재까지 확인된 기본 download 응답은 `200`, `Content-Length`, `Content-Disposition`, `video/mp4`, `Accept-Ranges: bytes`가 정상으로 보였다. 원인은 아직 확정하지 않는다.
+완료 task의 `받기`를 이용해 NAS 완료 파일을 iPhone Safari로 저장할 때 다운로드가 100%까지 진행된 뒤 `!`로 끝난 사례가 한 차례 관찰되었으나 현재 지속적으로 재현되지 않는다.
 
-후속 진단 시 우선순위:
+기본 download 응답은 `200`, `Content-Length`, `Content-Disposition`, `video/mp4`, `Accept-Ranges: bytes`가 정상으로 보였다. 현 시점에는 backend/split-storage를 선제 변경하지 않는다.
 
-1. external URL에 대한 first/last byte Range GET이 정확한 `206 Content-Range`를 반환하는지 확인
-2. Range가 정상이라면 iOS Safari final-save / filename sanitization / iCloud 다운로드 위치 등 client-side 원인을 분리
-3. 실제 증거 없이 backend나 split-storage를 변경하지 않음
+동일 증상이 다시 재현될 때만 아래 순서로 재오픈한다.
+
+1. external URL first/last byte Range GET의 `206 Content-Range` 확인
+2. Range가 정상이라면 iOS Safari final-save / filename sanitization / iCloud 다운로드 위치 등 client-side 원인 분리
+3. 실제 증거 없이 backend나 split-storage 변경 금지
 
 ---
 
-## Optional follow-up — PWA
+## Feature 2 — PWA / Home Screen App Experience
 
-Responsive Mobile UI가 production에서 안정화되었으므로 선택적으로 검토할 수 있다.
+상태: **PLANNING — NOT YET IMPLEMENTED**
 
-- 홈 화면 추가
-- standalone/app-like 실행
-- 아이콘 / manifest / theme metadata
-- App Store native app 개발과는 별도이며 필수 항목 아님
+목표: 현재 안정화된 Responsive Mobile UI를 그대로 유지하면서, iPhone 홈 화면에서 Teddy Downloader를 앱처럼 실행할 수 있는 얇은 PWA shell을 추가한다. 새 모바일 앱이나 별도 backend를 만들지 않는다.
+
+### 핵심 원칙
+
+- 기존 origin `https://downloader.ssikgun.com` 그대로 사용
+- 기존 Responsive Mobile UI를 PWA의 화면으로 그대로 사용
+- Downloader API / download engine / routing / storage / VPN Browser backend는 변경하지 않음
+- Safari 일반 탭 사용성은 그대로 유지
+- PWA 때문에 PC/Desktop UI가 달라지지 않아야 함
+- 초기 버전에서는 offline-first 앱으로 만들지 않음
+- application/API 응답을 공격적으로 cache하지 않아 stale task state나 stale UI를 만들지 않음
+- 기존 mobile system dark/light 동작 보존
+- mobile embedded VPN Browser iframe 동작 보존
+
+### Phase 1 scope
+
+1. Web App Manifest 추가
+   - app name / short name
+   - `start_url=/`
+   - `scope=/`
+   - `display=standalone`
+   - theme/background metadata
+2. Home Screen icon 세트 추가
+   - iOS `apple-touch-icon`
+   - manifest icons
+   - 아이콘은 Teddy Downloader 식별성이 있고 작은 크기에서도 읽히는 단순 디자인 사용
+3. `templates/index.html` head에 PWA metadata 연결
+   - manifest link
+   - Apple web-app metadata
+   - theme-color metadata
+4. standalone mode에서 기존 safe-area / bottom navigation이 정상인지 검증
+5. iPhone Safari에서 `홈 화면에 추가` 후 실행 검증
+6. PC/Desktop 및 일반 Safari regression 검증
+
+### Service worker policy
+
+초기 PWA의 목적은 “설치/앱처럼 실행”이지 offline 사용이 아니다.
+
+따라서 Phase 1에서는 service worker를 필수 전제로 하지 않고, 실제 installability 또는 플랫폼 호환성 때문에 필요하다는 근거가 있을 때만 최소 범위로 추가한다.
+
+추가하게 되더라도 원칙은 다음과 같다.
+
+- API 응답 cache 금지
+- task/download 상태 cache 금지
+- `/api/*` network-only
+- video/file stream 및 download cache 금지
+- Browser iframe/proxy 관련 응답 cache 금지
+- shell static asset만 필요한 범위에서 제한적으로 cache
+- 새 production image 배포 시 stale cache로 이전 UI가 남지 않도록 versioning/activation 정책 필수
+
+### PWA에서 유지해야 하는 현재 동작
+
+- 완료 task `↓ 받기`
+- `목록에서 삭제`는 task record만 삭제
+- Mobile File Manager는 `재생 / 삭제`
+- NAS 삭제 confirmation
+- HTML5 direct playback/fullscreen
+- mobile full-bleed VPN Browser iframe
+- iOS system dark/light appearance
+- 하단 navigation 및 safe-area
+
+### Acceptance criteria
+
+최소 다음을 실제 iPhone에서 확인한다.
+
+- Safari에서 기존 Downloader 정상 — PASS 필요
+- `홈 화면에 추가` 가능
+- Teddy 전용 아이콘 표시
+- 홈 화면 아이콘에서 실행 시 standalone/app-like 화면
+- 주소창 없는 실행에서도 하단 navigation / safe-area 정상
+- 로그인/세션/기존 app state 동작에 회귀 없음
+- Downloader queue 추가/상태조회 정상
+- 완료파일 재생 정상
+- mobile embedded Browser 정상
+- 홈 화면 앱을 닫고 다시 열어도 정상 시작
+- Desktop layout/기능 회귀 없음
+
+### Out of scope — Phase 1
+
+- App Store native app
+- push notification
+- background download engine 재작성
+- offline download queue
+- offline video storage
+- backend API 변경
+- Jellyfin 연동
+- VPN Browser 재설계
+
+### Implementation approach
+
+PWA 작업은 기존 mobile patch/build ownership을 먼저 확인한 뒤, 최소 파일/patch만 추가한다. 현재 production baseline을 직접 덮어쓰기보다 별도 feature branch/canary에서 검증한 뒤 immutable GHCR image로 승격한다.
 
 ---
 
@@ -193,3 +282,4 @@ Media LXC의 Jellyfin은 NAS media와 GPU를 사용할 수 있지만 Teddy 기�
 - Production 변경은 immutable GHCR image로 배포한다.
 - 위험한 서버/Compose 변경은 작은 단계로 수행한다.
 - Mobile UI feature는 CLOSED 상태다. 이후 작업은 실제 regression 또는 명확한 신규 요구가 있을 때만 다시 연다.
+- PWA는 Feature 2로 분리하며 기존 Mobile UI closure를 다시 열지 않는다.
