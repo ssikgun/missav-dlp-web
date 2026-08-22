@@ -1,10 +1,16 @@
 # Teddy Custom Downloader — Feature Roadmap
 
 - 작성 시각: 2026-08-21 KST
-- 업데이트 시각: 2026-08-21 KST
-- 기준: CT108 production migration **CLOSED** 후 모바일 UI 개발 시작
-- 운영 코드 기준 이미지 소스: `6cb5415322ae420cefa96d8d48540af850b99b67`
-- 현재 개발 브랜치: `teddy-mobile-ui`
+- 업데이트 시각: 2026-08-22 15:28 KST
+- 기준: CT108 production migration **CLOSED** + Responsive Mobile UI production **CLOSED**
+- 현재 production 브랜치: `teddy-custom`
+- 현재 production 이미지 소스: `54e83d344d0b8a90b81b1570fd30a1376298d91a`
+- 현재 production immutable image:
+  `ghcr.io/ssikgun/missav-dlp-web:teddy-54e83d344d0b8a90b81b1570fd30a1376298d91a`
+- 현재 production image/index digest:
+  `sha256:06e49f05791cc9f10e5c60646a6c5007a264798ef863e609c46acff1a932a2e0`
+- Mobile UI closure handoff:
+  `docs/handoffs/TEDDY_CUSTOM_MOBILE_UI_HANDOFF_20260822.md`
 
 ## 완료 — Migration closure
 
@@ -23,128 +29,158 @@
 - 외부 `downloader.ssikgun.com`
 - embedded `browser.ssikgun.com`
 
-별도 CT startup delay 없이 boot race가 발생하지 않았다. 최종 handoff에서 migration 상태를 CLOSED 처리했다.
+별도 CT startup delay 없이 boot race가 발생하지 않았다. Migration 정본은 기존 `TEDDY_CUSTOM_HANDOFF_20260821.md`에 CLOSED 상태로 보존한다.
 
 ---
 
 ## Feature 1 — Responsive PC / Mobile UI
 
-상태: **IN PROGRESS**
+상태: **CLOSED / PASS — PRODUCTION**
 
-목표: PC와 모바일을 별도 제품으로 분리하지 않고, 동일한 Teddy Downloader URL/백엔드에서 화면 너비와 모바일 입력 특성에 따라 적절한 UI를 제공한다.
+목표였던 “PC와 모바일을 별도 제품으로 분리하지 않고 동일한 Teddy Downloader URL/백엔드에서 반응형 UI를 제공”하는 작업을 production에 승격하고 실기 검증까지 완료했다.
 
-기본 방향:
+### Production closure
 
-- 하나의 `https://downloader.ssikgun.com`
-- Desktop 기본 UI 유지
-- CSS media query / responsive layout 중심으로 모바일 UI 제공
-- User-Agent 기반 분기보다 viewport width를 우선하고, 모바일 landscape 보완에는 coarse pointer 조건을 함께 사용 가능
-- 기존 Downloader backend, HLS engine, routing, VPN, split-storage 동작은 변경하지 않는 것을 원칙으로 함
-- 1차 실기 기준: iPhone 17 Pro Max
+- Feature branch `teddy-mobile-ui`의 변경을 `teddy-custom`에 fast-forward 승격 완료
+- 최종 UI polish 이미지 소스:
+  `54e83d344d0b8a90b81b1570fd30a1376298d91a`
+- immutable image:
+  `ghcr.io/ssikgun/missav-dlp-web:teddy-54e83d344d0b8a90b81b1570fd30a1376298d91a`
+- image/index digest:
+  `sha256:06e49f05791cc9f10e5c60646a6c5007a264798ef863e609c46acff1a932a2e0`
+- CT108 `/opt/missav-dlp-web/compose.yaml`에 immutable tag 고정 후 `missav-dlp-web`만 재생성
+- production HTTP 정상
+- PC desktop regression 실사용 확인 PASS
+- Mobile UI canary container / canary images / temporary work directories 제거 완료
+- repository 배포 compose를 실제 production 모바일 브라우저 구조와 동기화 완료
+  - commit: `6542c13dcc6d1f97fe93847c23f7624d19a26d38`
 
 ### Desktop
 
-- 현재 넓은 화면 레이아웃 최대한 유지
+완료 상태:
+
+- 기존 넓은 화면 레이아웃 유지
 - 기존 네트워크 패널 / 작업 목록 / Browser embedded 사용성 보존
-- 파일 관리: `재생 / 다운로드 / 삭제`
-- 모바일 대응 때문에 PC UI가 퇴행하지 않도록 회귀검증
+- 파일 관리 `재생 / 다운로드 / 삭제` 유지
+- 완료 작업의 `받기` 유지
+- 완료 작업 개별 제거 동작은 `목록에서 삭제`로 명확화
+- PC 회귀검증에서 주요 기능 정상 확인
 
 ### Mobile
 
-- 좁은 화면에서 겹침/overflow 제거
-- 주요 영역을 세로 1열 또는 필요한 경우 2열 카드로 재배치
-- 사이드 내비게이션은 모바일에서 하단 내비게이션 형태 우선
-- URL 입력창과 실행 버튼 모바일 친화적 배치
-- 작업 목록 모바일 카드 대응
-- 긴 파일명 / URL / 상태 문자열 안전 줄바꿈
-- 진행률 bar는 가용 폭 100% 사용
-- 터치 버튼 최소 hit area를 충분히 확보
-- Direct / Proxy / VPN 상태/제어 모바일 재배치
-- network panel 모바일 1열화
-- `overflow-wrap: anywhere` 등 긴 문자열 안전 처리
-- iPhone safe area (`safe-area-inset-*`) 대응
-- iOS 입력창 자동 확대 방지를 위해 필요한 텍스트 입력은 16px 기준 검토
-- 불필요한 전체 페이지 가로 스크롤 제거
+완료 상태:
+
+- 동일한 `https://downloader.ssikgun.com` 사용
+- viewport 기반 responsive layout
+- 모바일 하단 내비게이션
+- iPhone safe area 대응
+- 폼/버튼 터치 영역 확대
+- 긴 파일명/URL/상태 문자열 안전 줄바꿈
+- network panel / task cards 모바일 1열 중심 재배치
+- 모바일에서는 별도 theme toggle을 노출하지 않고 iOS system dark/light mode를 따름
+- 완료 작업 카드에서 `↓ 받기` 유지
+- 완료 작업의 큰 회색 `×`를 붉은 계열 `목록에서 삭제` 버튼으로 변경
+- `목록에서 삭제`는 task-list record만 제거하며 NAS 파일 삭제와 분리
 
 ### File Manager / Playback
 
-확정 요구사항:
+완료 상태:
 
 - 사용자 표시 용어 `미리보기` → **`재생`**
 - Desktop 파일 카드: `재생 / 다운로드 / 삭제`
-- Mobile 파일 카드: **`재생 / 삭제`**, 다운로드 버튼 숨김
-- PC와 Mobile 모두 파일 삭제 전 확인 팝업 표시
-- 삭제 확인 문구는 NAS 실제 파일이 삭제되고 되돌릴 수 없음을 명확히 표시
+- Mobile 파일 카드: **`재생 / 삭제`**, 파일-manager 다운로드 버튼 숨김
+- PC와 Mobile 모두 NAS 파일 삭제 전 확인 팝업 표시
+- 확인 문구:
+  `이 파일을 NAS에서 삭제할까요? 삭제 후 되돌릴 수 없습니다.`
 - 삭제 API/backend 자체는 기존 동작 유지
-- 기본 재생은 현재 Teddy HTML5 `<video>` + `/api/files/<file>/stream` Direct Play 유지
-- 모바일 video에 `playsinline`을 사용하여 iPhone inline playback 지원
-- 세로 화면에서 모바일 친화 플레이어
-- 가로 회전 시 영상이 화면을 최대한 사용하도록 landscape layout
-- iOS native video controls / fullscreen 사용성 보존
-
-### Optional playback fallback — Jellyfin
-
-상태: **후순위 / 실제 필요 시 검증**
-
-Media LXC의 Jellyfin은 이미 Synology video mount와 `/dev/dri/renderD128` 장치를 가지고 있다. 다만 Teddy 기본 재생 엔진으로 교체하지 않는다.
-
-원칙:
-
-- iPhone/Safari가 직접 재생 가능한 파일 → Teddy HTML5 Direct Play
-- 직접 재생이 안 되는 코덱/컨테이너가 실제로 발견될 때 → Jellyfin/FFmpeg hardware transcode fallback 검토
-- Jellyfin 연동을 위해 정상 MP4 direct-play 경로를 불필요하게 복잡하게 만들지 않는다
-- 실제 hardware transcoding 활성 여부는 연동 전에 별도 확인
+- 기본 재생은 Teddy HTML5 `<video>` + `/api/files/<file>/stream` Direct Play 유지
+- `<video controls playsinline preload="metadata">`
+- iPhone에서 빠른 direct playback / fullscreen 동작 확인
+- Jellyfin을 기본 재생 경로로 추가하지 않음
 
 ### VPN Browser on Mobile
 
-Desktop에서는 현재 embedded Browser를 유지한다.
+최종 구현은 새 창/direct-navigation 방식이 아니라 **Downloader 내부 iframe 유지**다.
 
-모바일에서는 작은 iframe 내부에서 원격 Chromium을 조작하기 불편할 수 있으므로 다음 UX를 우선 검토한다.
+- Desktop Browser URL:
+  `https://browser.ssikgun.com`
+- Mobile Browser URL:
+  `https://mobile-browser.ssikgun.com`
+- backend `/api/browser/config`가 desktop/mobile URL을 함께 제공
+- 모바일에서 전용 `vpn-browser-mobile` Chromium 사용
+- `DISPLAY_WIDTH=720`
+- `DISPLAY_HEIGHT=1200`
+- host `58003 -> container 5800`
+- Chromium proxy:
+  `http://gluetun:8888`
+- 모바일 iframe full-bleed 적용
+- iPhone에서 우측 검은 여백 없이 화면 폭을 채우는 것 확인
+- 기존 Downloader extension을 그대로 사용하여 production download queue로 전달
 
-- 현재 iframe이 모바일 viewport에서 정상 동작하는지 먼저 확인
-- 필요하면 `VPN Browser 전체 화면으로 열기` 버튼 제공
-- `https://browser.ssikgun.com`을 모바일 전체 화면/새 화면 형태로 사용
-- Downloader로 쉽게 돌아올 수 있는 흐름 유지
+### Implementation stages — final
 
-기존 Browser 기능을 다시 만들거나 backend를 변경하지 않는다.
+1. Responsive base layer / iPhone safe area / bottom navigation — **DONE**
+2. Download task cards / network / routing / settings mobile layout — **DONE**
+3. File manager mobile cards — **DONE**
+4. `미리보기` → `재생`, mobile file-manager download 숨김, NAS delete confirmation — **DONE**
+5. Mobile video portrait / landscape / native fullscreen — **DONE**
+6. Mobile VPN Browser dedicated iframe flow — **DONE**
+7. iPhone 실기 검증 — **DONE**
+8. Desktop regression 검증 — **DONE**
+9. Jellyfin fallback feasibility — **DEFERRED / 필요 시만**
+10. immutable GHCR image production 승격 — **DONE**
+11. canary cleanup / deployment compose sync — **DONE**
 
-### Implementation stages
+### Acceptance criteria — result
 
-1. Responsive base layer / iPhone safe area / bottom navigation
-2. Download task cards / network / routing / settings mobile layout
-3. File manager mobile cards
-4. `미리보기` → `재생`, mobile download action 숨김, 공통 NAS delete confirmation
-5. Mobile video portrait / landscape playback
-6. VPN Browser mobile UX
-7. iPhone 17 Pro Max 실기 검증
-8. Desktop regression 검증
-9. 필요 시 Jellyfin fallback feasibility 검증
-10. immutable GHCR image로 production 승격
+- PC 브라우저 주요 레이아웃 및 기능 회귀 없음 — **PASS**
+- iPhone portrait에서 주요 텍스트/버튼/상태 영역 정상 — **PASS**
+- 모바일 video direct playback / fullscreen — **PASS**
+- 모바일 task cards / progress / controls 조작 가능 — **PASS**
+- Mobile 파일 관리 `재생 / 삭제` — **PASS**
+- PC 파일 관리 `재생 / 다운로드 / 삭제` — **PASS**
+- PC/Mobile NAS 파일 삭제 confirmation — **PASS**
+- external Downloader — **PASS**
+- Desktop embedded Browser — **PASS**
+- Mobile embedded Browser — **PASS**
+- 기존 Downloader download/VPN/split-storage backend 불필요한 재설계 없음 — **PASS**
 
-### Optional follow-up — PWA
+### 확인필요 — iPhone Safari 완료파일 `받기`
 
-Responsive Mobile UI가 안정화된 뒤 선택적으로 검토한다.
+Responsive Mobile UI closure와 별개로, 완료 task의 `받기`를 이용해 NAS 완료 파일을 iPhone Safari로 저장할 때 다운로드가 100%까지 진행된 뒤 `!`로 끝나는 사례가 보고되어 별도 확인이 필요하다.
+
+현재까지 확인된 기본 download 응답은 `200`, `Content-Length`, `Content-Disposition`, `video/mp4`, `Accept-Ranges: bytes`가 정상으로 보였다. 원인은 아직 확정하지 않는다.
+
+후속 진단 시 우선순위:
+
+1. external URL에 대한 first/last byte Range GET이 정확한 `206 Content-Range`를 반환하는지 확인
+2. Range가 정상이라면 iOS Safari final-save / filename sanitization / iCloud 다운로드 위치 등 client-side 원인을 분리
+3. 실제 증거 없이 backend나 split-storage를 변경하지 않음
+
+---
+
+## Optional follow-up — PWA
+
+Responsive Mobile UI가 production에서 안정화되었으므로 선택적으로 검토할 수 있다.
 
 - 홈 화면 추가
 - standalone/app-like 실행
 - 아이콘 / manifest / theme metadata
 - App Store native app 개발과는 별도이며 필수 항목 아님
 
-### Acceptance criteria
+---
 
-최소 다음을 실제 화면에서 확인한다.
+## Optional playback fallback — Jellyfin
 
-- PC 브라우저: 기존 주요 레이아웃 및 기능 회귀 없음
-- iPhone 17 Pro Max portrait: 텍스트/버튼/상태 영역이 서로 겹치지 않음
-- iPhone 17 Pro Max landscape: video playback이 가용 화면을 정상 사용
-- 모바일에서 가로 overflow가 의도하지 않은 영역에 발생하지 않음
-- task cards / progress / controls 조작 가능
-- Mobile 파일 관리에는 `재생 / 삭제`만 표시
-- PC 파일 관리에는 `재생 / 다운로드 / 삭제` 표시
-- PC/Mobile 삭제 모두 confirmation 후에만 실제 DELETE 수행
-- external Downloader 정상
-- embedded 또는 full-screen VPN Browser 정상
-- Downloader의 다운로드/VPN/split-storage backend 동작에는 불필요한 변경 없음
+상태: **후순위 / 실제 필요 시 검증**
+
+Media LXC의 Jellyfin은 NAS media와 GPU를 사용할 수 있지만 Teddy 기본 재생 엔진으로 교체하지 않는다.
+
+원칙:
+
+- iPhone/Safari가 직접 재생 가능한 파일 → Teddy HTML5 Direct Play
+- 실제로 직접 재생 불가능한 코덱/컨테이너가 발견될 때만 Jellyfin/FFmpeg hardware transcode fallback 검토
+- 정상 MP4 direct-play 경로를 불필요하게 복잡하게 만들지 않는다
 
 ---
 
@@ -156,3 +192,4 @@ Responsive Mobile UI가 안정화된 뒤 선택적으로 검토한다.
 - Desktop regression과 Mobile usability를 함께 검증한다.
 - Production 변경은 immutable GHCR image로 배포한다.
 - 위험한 서버/Compose 변경은 작은 단계로 수행한다.
+- Mobile UI feature는 CLOSED 상태다. 이후 작업은 실제 regression 또는 명확한 신규 요구가 있을 때만 다시 연다.
