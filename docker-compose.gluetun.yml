@@ -7,6 +7,7 @@
 #     VPN    -> Gluetun HTTP proxy (:8888)
 #
 #   vpn-browser -> shares only Gluetun's network namespace
+#   vpn-browser-mobile -> normal Compose network + Chromium proxy via Gluetun (:8888)
 #
 # Storage:
 #   /downloads -> local CT108 NVMe work/state
@@ -48,6 +49,7 @@ services:
     environment:
       - TEDDY_FINAL_DIR=/final
       - TEDDY_BROWSER_URL=https://browser.ssikgun.com
+      - TEDDY_MOBILE_BROWSER_URL=https://mobile-browser.ssikgun.com
       - GLUETUN_PROXY_URL=http://gluetun:8888
       - GLUETUN_CONTROL_URL=http://gluetun:8000
     ports:
@@ -74,3 +76,26 @@ services:
       - /dev/dri/renderD128:/dev/dri/renderD128
     volumes:
       - ./vpn-browser-config:/config:rw
+
+  vpn-browser-mobile:
+    image: jlesage/chromium:latest
+    container_name: missav-vpn-browser-mobile
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+      - missav-dlp-web
+    environment:
+      - TZ=Asia/Seoul
+      - ENABLE_CJK_FONT=1
+      - VNC_LISTENING_PORT=-1
+      - KEEP_APP_RUNNING=1
+      - DISPLAY_WIDTH=720
+      - DISPLAY_HEIGHT=1200
+      - SUP_GROUP_IDS=992
+      - CHROMIUM_CUSTOM_ARGS=--load-extension=/config/teddy-downloader-extension --proxy-server=http://gluetun:8888
+    ports:
+      - "58003:5800/tcp"
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+    volumes:
+      - /opt/missav-mobile-browser-config:/config:rw
