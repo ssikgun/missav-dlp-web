@@ -1,14 +1,16 @@
 # Teddy Custom Downloader — Feature Roadmap
 
 - 작성 시각: 2026-08-21 KST
-- 업데이트 시각: 2026-08-22 15:37 KST
+- 업데이트 시각: 2026-08-22 21:06 KST
 - 기준: CT108 production migration **CLOSED** + Responsive Mobile UI production **CLOSED**
 - 현재 production 브랜치: `teddy-custom`
-- 현재 production 이미지 소스: `54e83d344d0b8a90b81b1570fd30a1376298d91a`
+- 현재 production 이미지 소스: `06a9b6ae79e8da47b7c386ec7f2b6c2d115ac14e`
 - 현재 production immutable image:
-  `ghcr.io/ssikgun/missav-dlp-web:teddy-54e83d344d0b8a90b81b1570fd30a1376298d91a`
+  `ghcr.io/ssikgun/missav-dlp-web:teddy-06a9b6ae79e8da47b7c386ec7f2b6c2d115ac14e`
 - 현재 production image/index digest:
-  `sha256:06e49f05791cc9f10e5c60646a6c5007a264798ef863e609c46acff1a932a2e0`
+  `sha256:bb0d26e7ffc5b3e993fe6efcafbf0ad7444c204fb20e9a7ca6bb503479a6ebf9`
+- PWA closure handoff:
+  `docs/handoffs/TEDDY_CUSTOM_PWA_HANDOFF_20260822.md`
 - Mobile UI closure handoff:
   `docs/handoffs/TEDDY_CUSTOM_MOBILE_UI_HANDOFF_20260822.md`
 
@@ -110,6 +112,7 @@
 - 모바일에서 전용 `vpn-browser-mobile` Chromium 사용
 - `DISPLAY_WIDTH=720`
 - `DISPLAY_HEIGHT=1200`
+- 참고: 위 `720x1200`은 Feature 1 closure 당시 baseline이다. Feature 2 PWA production 이후 현재 운영 값은 `720x1300`이다.
 - host `58003 -> container 5800`
 - Chromium proxy:
   `http://gluetun:8888`
@@ -163,7 +166,31 @@
 
 ## Feature 2 — PWA / Home Screen App Experience
 
-상태: **PLANNING — NOT YET IMPLEMENTED**
+상태: **CLOSED / PASS — PRODUCTION**
+
+### Production closure
+
+PWA Phase 1을 production에 승격하고 실제 iPhone Home Screen 설치 및 standalone 실행을 확인했다.
+
+- production source:
+  `06a9b6ae79e8da47b7c386ec7f2b6c2d115ac14e`
+- immutable image:
+  `ghcr.io/ssikgun/missav-dlp-web:teddy-06a9b6ae79e8da47b7c386ec7f2b6c2d115ac14e`
+- image/index digest:
+  `sha256:bb0d26e7ffc5b3e993fe6efcafbf0ad7444c204fb20e9a7ca6bb503479a6ebf9`
+- iPhone Add to Home Screen: **PASS**
+- Teddy icon: **PASS**
+- standalone/no-address-bar launch: **PASS**
+- safe-area/bottom navigation: **PASS**
+- manifest/PWA assets runtime: **PASS**
+- service worker: **NOT USED BY DESIGN**
+- mobile embedded Browser full-height fit: **PASS**
+- production mobile Browser display:
+  `720x1300`
+- canary/test resources cleanup: **PASS**
+- closure handoff:
+  `docs/handoffs/TEDDY_CUSTOM_PWA_HANDOFF_20260822.md`
+
 
 목표: 현재 안정화된 Responsive Mobile UI를 그대로 유지하면서, iPhone 홈 화면에서 Teddy Downloader를 앱처럼 실행할 수 있는 얇은 PWA shell을 추가한다. 새 모바일 앱이나 별도 backend를 만들지 않는다.
 
