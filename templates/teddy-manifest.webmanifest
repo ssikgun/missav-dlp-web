@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "Teddy Downloader",
+  "short_name": "Teddy",
+  "description": "Teddy Custom Downloader",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0b74f1",
+  "categories": ["utilities"],
+  "icons": [
+    {
+      "src": "/static/teddy-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/teddy-icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
