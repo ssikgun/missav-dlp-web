@@ -90,7 +90,7 @@ services:
       - VNC_LISTENING_PORT=-1
       - KEEP_APP_RUNNING=1
       - DISPLAY_WIDTH=720
-      - DISPLAY_HEIGHT=1200
+      - DISPLAY_HEIGHT=1300
       - SUP_GROUP_IDS=992
       - CHROMIUM_CUSTOM_ARGS=--load-extension=/config/teddy-downloader-extension --proxy-server=http://gluetun:8888
     ports:
