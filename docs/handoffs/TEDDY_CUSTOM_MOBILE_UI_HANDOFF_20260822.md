@@ -1,6 +1,7 @@
 # Teddy Custom Downloader — Mobile UI Production Handoff
 
 - 작성 시각: 2026-08-22 15:28 KST
+- 업데이트 시각: 2026-08-22 15:37 KST
 - 상태: **CLOSED — RESPONSIVE MOBILE UI PRODUCTION COMPLETE**
 - 운영 호스트: Proxmox CT108 (`downloader`, `192.168.1.155`)
 - 운영 브랜치: `teddy-custom`
@@ -34,7 +35,7 @@ Responsive PC/Mobile UI 작업을 production에 승격했고 iPhone 실사용 �
 
 **Mobile UI feature status: CLOSED.**
 
-완료 task의 iPhone Safari client download finalization 문제는 Responsive UI closure와 분리된 별도 follow-up으로 남긴다. 원인은 아직 확정하지 않는다.
+완료 task의 iPhone Safari client download finalization `100% -> !` 현상은 일시적 오류로 판단되어 현재 재현되지 않는 상태다. 선제적으로 backend를 변경하지 않고 **DEFERRED — REOPEN ON REPRODUCTION**으로 둔다.
 
 ---
 
@@ -263,14 +264,18 @@ rather than hardcoding the current live SHA. Future deployment should continue t
 
 ---
 
-## 10. Open follow-up — iPhone Safari completed-file `받기`
+## 10. Deferred follow-up — iPhone Safari completed-file `받기`
+
+상태: **DEFERRED — REOPEN ON REPRODUCTION**
 
 This is **not** the server-side YouTube/MissAV download queue. It is the later client download of a completed NAS file from Teddy to iPhone Safari.
 
-Reported symptom:
+Previously reported symptom:
 
 - Safari download progresses to 100%
 - final state may become `!`
+
+The symptom is not currently reproducing consistently and is treated as a likely transient client/download-finalization event unless it occurs again.
 
 Basic response/header diagnostics already observed:
 
@@ -283,13 +288,13 @@ Basic response/header diagnostics already observed:
 
 Therefore a simple server-side wrong `Content-Length` claim is not currently supported by evidence.
 
-Still **확인필요**:
+Do not perform proactive backend/split-storage changes for this item. If the symptom reproduces, reopen this follow-up and start with read-only diagnostics:
 
 1. external first 1KB Range GET → expected `206` and correct `Content-Range`
 2. external last 1KB Range GET → expected `206` and correct total size
 3. if Range is correct, isolate iOS Safari final-save / filename sanitization / iCloud download destination behavior
 
-A Unicode filename edge case is possible but unproven. Do not change server filename or split-storage behavior without a reproducer/evidence.
+A Unicode filename edge case remains possible but unproven. Only investigate it after a new reproducer/evidence exists.
 
 ---
 
@@ -316,20 +321,11 @@ Use live behavior and logs as source of truth before changing any of the above.
 
 ---
 
-## 12. Optional future work
+## 12. Future feature boundary
 
-### PWA
+### PWA — moved to Feature 2
 
-Optional only after the responsive web UI is considered stable enough to benefit from app-like launch behavior.
-
-Potential scope:
-
-- Add to Home Screen
-- manifest / icons
-- standalone display mode
-- theme metadata
-
-PWA is not required for current mobile closure.
+PWA is no longer part of the Responsive Mobile UI closure. It is tracked as a separate new feature in `docs/TEDDY_CUSTOM_ROADMAP.md` so the closed mobile baseline remains stable.
 
 ### Jellyfin fallback
 
