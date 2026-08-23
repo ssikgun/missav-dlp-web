@@ -149,3 +149,45 @@ services:
     mem_limit: "3g"
     memswap_limit: "3g"
     pids_limit: 512
+
+  vpn-browser-mobile-selkies:
+    image: ghcr.io/ssikgun/missav-dlp-web@sha256:ec8872d6635adb33f68f2634ecdcb14484d00e91dffffa4d588e8625cc2e0c49
+    container_name: missav-vpn-browser-mobile-selkies
+    hostname: missav-vpn-browser-mobile-selkies
+    profiles:
+      - selkies-mobile-canary
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+      - missav-dlp-web
+    env_file:
+      - /opt/missav-selkies-browser-config/selkies-auth.env
+    environment:
+      - TZ=Asia/Seoul
+      - LIBVA_DRIVER_NAME=iHD
+      - SELKIES_PORT=8080
+      - SELKIES_MODE=websockets
+      - SELKIES_ENCODER=h264enc
+      - SELKIES_RENDER_DRI=/dev/dri/renderD128
+      - DRI_NODE=/dev/dri/renderD128
+      - SELKIES_WAYLAND=true
+      - SELKIES_WAYLAND_COMPOSITOR=labwc
+      - SELKIES_WAYLAND_OUTPUTS=1
+      - SELKIES_MANUAL_WIDTH=720
+      - SELKIES_MANUAL_HEIGHT=1300
+      - SELKIES_SCALING_DPI=96
+      - SELKIES_UI_SHOW_SIDEBAR=true
+      - TEDDY_PROXY_SERVER=http://gluetun:8888
+      - TEDDY_START_URL=https://api.ipify.org
+    ports:
+      - "192.168.1.155:58011:8080/tcp"
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "992"
+    volumes:
+      - /opt/missav-selkies-mobile-browser-config/chrome-profile:/config/chrome-profile:rw
+    shm_size: "1gb"
+    mem_limit: "2g"
+    memswap_limit: "2g"
+    pids_limit: 512
