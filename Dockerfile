@@ -26,7 +26,7 @@ COPY . .
 # Source + patch scripts must all parse before any build-time mutation.
 RUN python -m py_compile \
     app.py teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py \
-    teddy_routing.py teddy_duplicates.py teddy_logging.py teddy_storage.py teddy_browser_config.py \
+    teddy_routing.py teddy_duplicates.py teddy_logging.py teddy_storage.py teddy_browser_config.py teddy_auth.py \
     teddy_generic.py teddy_bootstrap.py teddy_verify_build.py teddy_hls_transport.py teddy_hls_benchmark.py \
     teddy_patch_vpn_health.py teddy_patch_proxy_pool.py teddy_patch_proxy_speed.py \
     teddy_patch_proxy_learning.py teddy_patch_proxy_task_sync.py \
@@ -35,7 +35,7 @@ RUN python -m py_compile \
     teddy_patch_hls_transport.py teddy_patch_hls_pool_clients.py teddy_patch_hls_transport_bridge.py \
     teddy_patch_index.py teddy_patch_logs.py teddy_patch_storage.py teddy_patch_routing.py \
     teddy_patch_ytdlp_options.py teddy_patch_browser.py teddy_patch_split_storage.py teddy_patch_mobile.py teddy_patch_browser_runtime.py \
-    teddy_patch_pwa.py
+    teddy_patch_auth.py teddy_patch_pwa.py
 
 # Existing deterministic boundary smoke tests.
 RUN python -c "import teddy_network as n; assert n.is_recoverable_failure('HTTP 403'); assert n.is_recoverable_failure('HTTP Error 403: Forbidden'); assert n.is_recoverable_failure('operation timed out'); assert n.is_recoverable_failure('connection reset by peer'); assert n.is_recoverable_failure('curl: (35) TLS connect error'); assert not n.is_recoverable_failure('HTTP 404'); assert not n.is_recoverable_failure('HTTP 401'); print('adaptive network failure boundary smoke test: OK')"
@@ -76,7 +76,7 @@ RUN grep -Fq "def _fetch_segment_with_network_recovery(task_id, seg_url, headers
 RUN python -m py_compile \
     app.py teddy_entrypoint.py teddy_bootstrap.py teddy_vpn_health.py teddy_network.py \
     teddy_proxy_pool.py teddy_routing.py teddy_generic.py teddy_hls_transport.py teddy_hls_benchmark.py \
-    teddy_browser_config.py teddy_patch_routing.py
+    teddy_browser_config.py teddy_auth.py teddy_patch_routing.py
 RUN python teddy_verify_build.py runtime
 
 # Teddy UI / file-manager / routing patches.
@@ -89,12 +89,15 @@ RUN python teddy_patch_browser.py
 # Keep the proven LXC migration order: split-storage first, then browser runtime.
 RUN python teddy_patch_split_storage.py
 RUN python teddy_patch_browser_runtime.py
+RUN python teddy_patch_auth.py
 RUN grep -Fq 'data-page="browser"' templates/index.html && \
     grep -Fq 'id="page-browser"' templates/index.html && \
     grep -Fq '/static/teddy-browser.css' templates/index.html && \
     grep -Fq '/static/teddy-browser.js' templates/index.html && \
     grep -Fq '/api/browser/config' templates/teddy-browser.js && \
-    grep -Fq 'teddy_browser_config.install(core)' teddy_bootstrap.py
+    grep -Fq 'teddy_browser_config.install(core)' teddy_bootstrap.py && \
+    grep -Fq 'import teddy_auth' teddy_bootstrap.py && \
+    grep -Fq 'teddy_auth.install(core)' teddy_bootstrap.py
 RUN grep -Fq 'id="set-ytdlp-media-mode"' templates/index.html && \
     grep -Fq 'id="set-ytdlp-video-quality"' templates/index.html && \
     grep -Fq 'id="set-ytdlp-video-container"' templates/index.html && \
@@ -125,7 +128,7 @@ RUN grep -Fq "TEDDY_FINAL_DIR" teddy_storage.py && \
     grep -Fq "Final directory:" teddy_bootstrap.py
 
 RUN python -m py_compile \
-    teddy_bootstrap.py teddy_browser_config.py teddy_storage.py \
+    teddy_bootstrap.py teddy_browser_config.py teddy_auth.py teddy_storage.py \
     teddy_generic.py teddy_entrypoint.py teddy_patch_pwa.py
 RUN python teddy_verify_build.py final
 
