@@ -57,8 +57,6 @@ cleanup_stale_singleton() {
     "${PROFILE}/SingletonSocket"
 }
 
-cleanup_stale_singleton
-
 ARGS=(
   --no-sandbox
   --ozone-platform=wayland
@@ -75,4 +73,45 @@ if [ -n "${TEDDY_PROXY_SERVER:-}" ]; then
   ARGS+=(--proxy-server="${TEDDY_PROXY_SERVER}")
 fi
 
-exec "${CHROME}" "${ARGS[@]}" "${TEDDY_START_URL:-about:blank}"
+RESTART_DELAY="${TEDDY_BROWSER_RESTART_DELAY:-2}"
+STOP_REQUESTED=0
+CHROME_PID=""
+
+stop_browser_supervisor() {
+  STOP_REQUESTED=1
+
+  if [ -n "${CHROME_PID}" ] && kill -0 "${CHROME_PID}" 2>/dev/null; then
+    kill -TERM "${CHROME_PID}" 2>/dev/null || true
+  fi
+}
+
+trap stop_browser_supervisor TERM INT
+
+while [ "${STOP_REQUESTED}" -eq 0 ]; do
+  cleanup_stale_singleton
+
+  echo "Starting Teddy Chrome..."
+
+  "${CHROME}" \
+    "${ARGS[@]}" \
+    "${TEDDY_START_URL:-about:blank}" &
+
+  CHROME_PID="$!"
+
+  set +e
+  wait "${CHROME_PID}"
+  CHROME_RC="$?"
+  set -e
+
+  CHROME_PID=""
+
+  if [ "${STOP_REQUESTED}" -ne 0 ]; then
+    break
+  fi
+
+  echo "Teddy Chrome exited with status ${CHROME_RC}; restarting in ${RESTART_DELAY}s..."
+
+  sleep "${RESTART_DELAY}"
+done
+
+echo "Teddy Chrome supervisor stopped."
