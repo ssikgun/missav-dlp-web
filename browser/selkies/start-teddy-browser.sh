@@ -71,6 +71,7 @@ ARGS=(
 
 if [ -n "${TEDDY_PROXY_SERVER:-}" ]; then
   ARGS+=(--proxy-server="${TEDDY_PROXY_SERVER}")
+  ARGS+=(--proxy-bypass-list="${TEDDY_PROXY_BYPASS_LIST:-missav-dlp-web}")
 fi
 
 RESTART_DELAY="${TEDDY_BROWSER_RESTART_DELAY:-2}"
