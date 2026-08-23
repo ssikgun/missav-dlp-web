@@ -105,7 +105,8 @@ services:
       - /opt/missav-mobile-browser-config:/config:rw
 
   vpn-browser-selkies:
-    image: teddy-selkies-browser:cft-152.0.7977.54-cleanui4-nopanel
+    # Production runtime digest: sha256:ec8872d6635adb33f68f2634ecdcb14484d00e91dffffa4d588e8625cc2e0c49
+    image: ghcr.io/ssikgun/missav-dlp-web:selkies-desktop-dc39fb6
     build:
       context: .
       dockerfile: browser/selkies/Dockerfile
