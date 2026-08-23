@@ -112,6 +112,7 @@ services:
       args:
         CFT_VERSION: "152.0.7977.54"
     container_name: missav-vpn-browser-selkies
+    hostname: missav-vpn-browser-selkies
     restart: unless-stopped
     depends_on:
       - gluetun
