@@ -6,7 +6,8 @@
 #     Proxy  -> free proxy pool
 #     VPN    -> Gluetun HTTP proxy (:8888)
 #
-#   vpn-browser -> shares only Gluetun's network namespace
+#   vpn-browser -> current jlesage desktop rollback; shares Gluetun's network namespace
+#   vpn-browser-selkies -> production Selkies desktop; normal Compose network + Chrome proxy via Gluetun (:8888)
 #   vpn-browser-mobile -> normal Compose network + Chromium proxy via Gluetun (:8888)
 #
 # Storage:
@@ -16,6 +17,7 @@
 # Security:
 #   - gluetun.env contains VPN credentials and MUST NOT be committed.
 #   - gluetun-control-auth.toml MUST NOT be committed.
+#   - Selkies Basic Auth credentials live outside this repository.
 #   - TEDDY_IMAGE should be an immutable GHCR image tag.
 
 services:
@@ -61,6 +63,8 @@ services:
   vpn-browser:
     image: jlesage/chromium:latest
     container_name: missav-vpn-browser
+    profiles:
+      - legacy-browser
     restart: unless-stopped
     network_mode: "service:gluetun"
     depends_on:
@@ -99,3 +103,47 @@ services:
       - /dev/dri/renderD128:/dev/dri/renderD128
     volumes:
       - /opt/missav-mobile-browser-config:/config:rw
+
+  vpn-browser-selkies:
+    image: teddy-selkies-browser:cft-152.0.7977.54-cleanui4-nopanel
+    build:
+      context: .
+      dockerfile: browser/selkies/Dockerfile
+      args:
+        CFT_VERSION: "152.0.7977.54"
+    container_name: missav-vpn-browser-selkies
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+      - missav-dlp-web
+    env_file:
+      - /opt/missav-selkies-browser-config/selkies-auth.env
+    environment:
+      - TZ=Asia/Seoul
+      - LIBVA_DRIVER_NAME=iHD
+      - SELKIES_PORT=8080
+      - SELKIES_MODE=websockets
+      - SELKIES_ENCODER=h264enc
+      - SELKIES_RENDER_DRI=/dev/dri/renderD128
+      - DRI_NODE=/dev/dri/renderD128
+      - SELKIES_WAYLAND=true
+      - SELKIES_WAYLAND_COMPOSITOR=labwc
+      - SELKIES_WAYLAND_OUTPUTS=1
+      - SELKIES_MANUAL_WIDTH=3840
+      - SELKIES_MANUAL_HEIGHT=2160
+      - SELKIES_SCALING_DPI=144
+      - SELKIES_UI_SHOW_SIDEBAR=false
+      - TEDDY_PROXY_SERVER=http://gluetun:8888
+      - TEDDY_START_URL=https://api.ipify.org
+    ports:
+      - "192.168.1.155:58010:8080/tcp"
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "992"
+    volumes:
+      - /opt/missav-selkies-browser-config/chrome-profile:/config/chrome-profile:rw
+    shm_size: "2gb"
+    mem_limit: "3g"
+    memswap_limit: "3g"
+    pids_limit: 512

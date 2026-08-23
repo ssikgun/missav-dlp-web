@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Teddy Browser
+Exec=/opt/teddy-browser/start-teddy-browser.sh
+OnlyShowIn=LXQt;
+Terminal=false
+X-LXQt-Need-Tray=false
