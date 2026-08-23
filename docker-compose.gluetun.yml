@@ -54,11 +54,16 @@ services:
       - TEDDY_MOBILE_BROWSER_URL=https://mobile-browser.ssikgun.com
       - GLUETUN_PROXY_URL=http://gluetun:8888
       - GLUETUN_CONTROL_URL=http://gluetun:8000
+      - TEDDY_AUTH_DIR=/run/secrets/teddy-auth
+      - TEDDY_AUTH_COOKIE_DOMAIN=.ssikgun.com
+      - TEDDY_INTERNAL_DOWNLOAD_HOST=missav-dlp-web:5000
+      - TEDDY_INTERNAL_DOWNLOAD_NET=172.18.0.0/16
     ports:
       - "58000:5000/tcp"
     volumes:
       - ./work:/downloads
       - /mnt/nas-downloads:/final
+      - /opt/missav-dlp-web/teddy-auth:/run/secrets/teddy-auth:ro
 
   vpn-browser:
     image: jlesage/chromium:latest
@@ -84,6 +89,8 @@ services:
   vpn-browser-mobile:
     image: jlesage/chromium:latest
     container_name: missav-vpn-browser-mobile
+    profiles:
+      - legacy-mobile-browser
     restart: unless-stopped
     depends_on:
       - gluetun
@@ -105,8 +112,8 @@ services:
       - /opt/missav-mobile-browser-config:/config:rw
 
   vpn-browser-selkies:
-    # Production runtime digest: sha256:ec8872d6635adb33f68f2634ecdcb14484d00e91dffffa4d588e8625cc2e0c49
-    image: ghcr.io/ssikgun/missav-dlp-web:selkies-desktop-dc39fb6
+    # Production runtime digest: sha256:4847869fecae749da18ee636e97752763037ecac094243e5859d368e88d5d518
+    image: ghcr.io/ssikgun/missav-dlp-web@sha256:4847869fecae749da18ee636e97752763037ecac094243e5859d368e88d5d518
     build:
       context: .
       dockerfile: browser/selkies/Dockerfile
@@ -121,6 +128,7 @@ services:
     env_file:
       - /opt/missav-selkies-browser-config/selkies-auth.env
     environment:
+      - SELKIES_ENABLE_BASIC_AUTH=false
       - TZ=Asia/Seoul
       - LIBVA_DRIVER_NAME=iHD
       - SELKIES_PORT=8080
@@ -151,11 +159,9 @@ services:
     pids_limit: 512
 
   vpn-browser-mobile-selkies:
-    image: ghcr.io/ssikgun/missav-dlp-web@sha256:ec8872d6635adb33f68f2634ecdcb14484d00e91dffffa4d588e8625cc2e0c49
+    image: ghcr.io/ssikgun/missav-dlp-web@sha256:4847869fecae749da18ee636e97752763037ecac094243e5859d368e88d5d518
     container_name: missav-vpn-browser-mobile-selkies
     hostname: missav-vpn-browser-mobile-selkies
-    profiles:
-      - selkies-mobile-canary
     restart: unless-stopped
     depends_on:
       - gluetun
@@ -163,6 +169,7 @@ services:
     env_file:
       - /opt/missav-selkies-browser-config/selkies-auth.env
     environment:
+      - SELKIES_ENABLE_BASIC_AUTH=false
       - TZ=Asia/Seoul
       - LIBVA_DRIVER_NAME=iHD
       - SELKIES_PORT=8080
