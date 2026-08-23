@@ -112,8 +112,8 @@ services:
       - /opt/missav-mobile-browser-config:/config:rw
 
   vpn-browser-selkies:
-    # Production runtime digest: sha256:4847869fecae749da18ee636e97752763037ecac094243e5859d368e88d5d518
-    image: ghcr.io/ssikgun/missav-dlp-web@sha256:4847869fecae749da18ee636e97752763037ecac094243e5859d368e88d5d518
+    # Production runtime digest: sha256:9ce283f5f676dff47e78eb2e4bd6b10091b1678851f46df9f95a39bd67f8e6d5
+    image: ghcr.io/ssikgun/missav-dlp-web@sha256:9ce283f5f676dff47e78eb2e4bd6b10091b1678851f46df9f95a39bd67f8e6d5
     build:
       context: .
       dockerfile: browser/selkies/Dockerfile
@@ -159,7 +159,7 @@ services:
     pids_limit: 512
 
   vpn-browser-mobile-selkies:
-    image: ghcr.io/ssikgun/missav-dlp-web@sha256:4847869fecae749da18ee636e97752763037ecac094243e5859d368e88d5d518
+    image: ghcr.io/ssikgun/missav-dlp-web@sha256:9ce283f5f676dff47e78eb2e4bd6b10091b1678851f46df9f95a39bd67f8e6d5
     container_name: missav-vpn-browser-mobile-selkies
     hostname: missav-vpn-browser-mobile-selkies
     restart: unless-stopped
