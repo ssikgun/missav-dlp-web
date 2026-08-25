@@ -643,6 +643,115 @@ def _replace_weekly_genres(
         )
 
 
+def _weekly_period_key(
+    period: str,
+) -> tuple[int, int]:
+    period = _text(
+        period
+    )
+
+    if (
+        not period
+        or not PERIOD_RE.fullmatch(
+            period
+        )
+    ):
+        raise ValueError(
+            "invalid weekly period"
+        )
+
+    year_raw, week_raw = (
+        period.split(
+            "-W",
+            1,
+        )
+    )
+
+    year = int(
+        year_raw
+    )
+
+    week = int(
+        week_raw
+    )
+
+    if (
+        year < 2000
+        or year > 2100
+        or week < 1
+        or week > 53
+    ):
+        raise ValueError(
+            "invalid weekly period"
+        )
+
+    return (
+        year,
+        week,
+    )
+
+
+def _existing_weekly_metadata_period(
+    raw_metadata: Any,
+) -> str:
+    if not isinstance(
+        raw_metadata,
+        str,
+    ) or not raw_metadata.strip():
+        raise RuntimeError(
+            "existing Weekly metadata "
+            "provenance missing"
+        )
+
+    try:
+        value = json.loads(
+            raw_metadata
+        )
+
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            "existing Weekly metadata "
+            "provenance malformed"
+        ) from exc
+
+    if not isinstance(
+        value,
+        dict,
+    ):
+        raise RuntimeError(
+            "existing Weekly metadata "
+            "provenance must be object"
+        )
+
+    if _text(
+        value.get(
+            "source"
+        )
+    ) != (
+        JAVDATABASE_WEEKLY_SOURCE
+    ):
+        raise RuntimeError(
+            "existing Weekly metadata "
+            "source provenance mismatch"
+        )
+
+    period = _text(
+        value.get(
+            "period"
+        )
+    )
+
+    #
+    # This validates both syntax and
+    # semantic week bounds.
+    #
+    _weekly_period_key(
+        period
+    )
+
+    return period
+
+
 def _upsert_weekly_metadata(
     connection: sqlite3.Connection,
     item: dict,
@@ -651,7 +760,9 @@ def _upsert_weekly_metadata(
 ) -> str:
     existing = connection.execute(
         """
-        SELECT metadata_source
+        SELECT
+            metadata_source,
+            raw_metadata
         FROM titles
         WHERE dvd_id = ?
         """,
@@ -672,30 +783,87 @@ def _upsert_weekly_metadata(
         else None
     )
 
-    can_replace = (
+    can_replace = False
+    preserve_without_touch = False
+
+    if (
         existing is None
         or existing_source is None
         or existing_source
-        in {
-            MISSAV_RELEASE_SOURCE,
-            JAVDATABASE_WEEKLY_SOURCE,
-        }
-    )
+        == MISSAV_RELEASE_SOURCE
+    ):
+        can_replace = True
+
+    elif existing_source == (
+        JAVDATABASE_WEEKLY_SOURCE
+    ):
+        existing_period = (
+            _existing_weekly_metadata_period(
+                existing[
+                    "raw_metadata"
+                ]
+            )
+        )
+
+        incoming_key = (
+            _weekly_period_key(
+                period
+            )
+        )
+
+        existing_key = (
+            _weekly_period_key(
+                existing_period
+            )
+        )
+
+        if incoming_key >= existing_key:
+            #
+            # Same-period recollection may
+            # refresh corrected metadata.
+            # Newer Weekly always supersedes
+            # older Weekly.
+            #
+            can_replace = True
+
+        else:
+            #
+            # Historical backfill must not
+            # make newer Weekly metadata,
+            # people, genres or provenance
+            # move backwards.
+            #
+            preserve_without_touch = True
+
+    else:
+        #
+        # Any richer metadata source keeps
+        # precedence over Weekly metadata.
+        #
+        can_replace = False
 
     if not can_replace:
-        connection.execute(
-            """
-            UPDATE titles
-            SET last_seen_at = ?
-            WHERE dvd_id = ?
-            """,
-            (
-                observed_at,
-                item[
-                    "dvd_id"
-                ],
-            ),
-        )
+        if not preserve_without_touch:
+            #
+            # Preserve the existing behavior
+            # for richer sources: seeing the
+            # title again can advance its
+            # observation timestamp without
+            # replacing rich metadata.
+            #
+            connection.execute(
+                """
+                UPDATE titles
+                SET last_seen_at = ?
+                WHERE dvd_id = ?
+                """,
+                (
+                    observed_at,
+                    item[
+                        "dvd_id"
+                    ],
+                ),
+            )
 
         return "preserved"
 
@@ -795,24 +963,11 @@ def _upsert_weekly_metadata(
     return "updated"
 
 
-def replace_weekly_snapshot(
+def _write_validated_weekly_snapshot(
     connection: sqlite3.Connection,
-    snapshot: dict,
-    *,
+    values: dict,
     observed_at: str,
 ) -> dict:
-    values = (
-        validate_weekly_snapshot(
-            snapshot
-        )
-    )
-
-    observed_at = (
-        _validated_observed_at(
-            observed_at
-        )
-    )
-
     chart_type = values[
         "chart_type"
     ]
@@ -828,149 +983,138 @@ def replace_weekly_snapshot(
     metadata_updated = 0
     metadata_preserved = 0
 
-    connection.execute(
-        "BEGIN IMMEDIATE"
-    )
+    for item in items:
+        result = (
+            _upsert_weekly_metadata(
+                connection,
+                item,
+                period,
+                observed_at,
+            )
+        )
 
-    try:
-        for item in items:
-            result = (
-                _upsert_weekly_metadata(
-                    connection,
-                    item,
-                    period,
-                    observed_at,
-                )
+        if result == "updated":
+            metadata_updated += 1
+
+        elif result == "preserved":
+            metadata_preserved += 1
+
+        else:
+            raise RuntimeError(
+                "unexpected weekly "
+                "metadata result"
             )
 
-            if result == "updated":
-                metadata_updated += 1
+    connection.execute(
+        """
+        DELETE FROM ranking_snapshots
+        WHERE chart_type = ?
+          AND period = ?
+        """,
+        (
+            chart_type,
+            period,
+        ),
+    )
 
-            elif result == "preserved":
-                metadata_preserved += 1
+    connection.executemany(
+        """
+        INSERT INTO ranking_snapshots(
+            chart_type,
+            period,
+            dvd_id,
+            rank,
+            score,
+            observed_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                chart_type,
+                period,
+                item[
+                    "dvd_id"
+                ],
+                item[
+                    "rank"
+                ],
+                None,
+                observed_at,
+            )
+            for item
+            in items
+        ],
+    )
 
-            else:
-                raise RuntimeError(
-                    "unexpected weekly "
-                    "metadata result"
-                )
-
+    stored = (
         connection.execute(
             """
-            DELETE FROM ranking_snapshots
+            SELECT
+                dvd_id,
+                rank
+            FROM ranking_snapshots
             WHERE chart_type = ?
               AND period = ?
+            ORDER BY rank ASC
             """,
             (
                 chart_type,
                 period,
             ),
+        ).fetchall()
+    )
+
+    if len(
+        stored
+    ) != WEEKLY_EXPECTED_COUNT:
+        raise RuntimeError(
+            "weekly snapshot "
+            "write count mismatch"
         )
 
-        connection.executemany(
-            """
-            INSERT INTO ranking_snapshots(
-                chart_type,
-                period,
-                dvd_id,
-                rank,
-                score,
-                observed_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            [
-                (
-                    chart_type,
-                    period,
-                    item[
-                        "dvd_id"
-                    ],
-                    item[
-                        "rank"
-                    ],
-                    None,
-                    observed_at,
-                )
-                for item
-                in items
-            ],
+    stored_ids = [
+        row[
+            "dvd_id"
+        ]
+        for row
+        in stored
+    ]
+
+    expected_ids = [
+        item[
+            "dvd_id"
+        ]
+        for item
+        in items
+    ]
+
+    if stored_ids != expected_ids:
+        raise RuntimeError(
+            "weekly snapshot "
+            "stored order mismatch"
         )
 
-        stored = (
-            connection.execute(
-                """
-                SELECT
-                    dvd_id,
-                    rank
-                FROM ranking_snapshots
-                WHERE chart_type = ?
-                  AND period = ?
-                ORDER BY rank ASC
-                """,
-                (
-                    chart_type,
-                    period,
-                ),
-            ).fetchall()
-        )
-
-        if len(
-            stored
-        ) != WEEKLY_EXPECTED_COUNT:
-            raise RuntimeError(
-                "weekly snapshot "
-                "write count mismatch"
-            )
-
-        stored_ids = [
+    stored_ranks = [
+        int(
             row[
-                "dvd_id"
+                "rank"
             ]
-            for row
-            in stored
-        ]
+        )
+        for row
+        in stored
+    ]
 
-        expected_ids = [
-            item[
-                "dvd_id"
-            ]
-            for item
-            in items
-        ]
-
-        if stored_ids != expected_ids:
-            raise RuntimeError(
-                "weekly snapshot "
-                "stored order mismatch"
-            )
-
-        stored_ranks = [
-            int(
-                row[
-                    "rank"
-                ]
-            )
-            for row
-            in stored
-        ]
-
-        if stored_ranks != list(
-            range(
-                1,
-                WEEKLY_EXPECTED_COUNT + 1,
-            )
-        ):
-            raise RuntimeError(
-                "weekly snapshot "
-                "stored rank mismatch"
-            )
-
-        connection.commit()
-
-    except Exception:
-        connection.rollback()
-        raise
+    if stored_ranks != list(
+        range(
+            1,
+            WEEKLY_EXPECTED_COUNT + 1,
+        )
+    ):
+        raise RuntimeError(
+            "weekly snapshot "
+            "stored rank mismatch"
+        )
 
     return {
         "chart_type":
@@ -991,6 +1135,231 @@ def replace_weekly_snapshot(
         "observed_at":
             observed_at,
     }
+
+
+def replace_weekly_snapshot(
+    connection: sqlite3.Connection,
+    snapshot: dict,
+    *,
+    observed_at: str,
+) -> dict:
+    #
+    # Preserve the existing public API:
+    # one Weekly snapshot owns one
+    # transaction.
+    #
+    values = (
+        validate_weekly_snapshot(
+            snapshot
+        )
+    )
+
+    observed_at = (
+        _validated_observed_at(
+            observed_at
+        )
+    )
+
+    connection.execute(
+        "BEGIN IMMEDIATE"
+    )
+
+    try:
+        result = (
+            _write_validated_weekly_snapshot(
+                connection,
+                values,
+                observed_at,
+            )
+        )
+
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    return result
+
+
+def replace_weekly_snapshots_batch(
+    connection: sqlite3.Connection,
+    entries: list[dict],
+) -> dict:
+    #
+    # Validate the entire batch before
+    # acquiring a write transaction.
+    #
+    if (
+        not isinstance(
+            entries,
+            list,
+        )
+        or not entries
+    ):
+        raise ValueError(
+            "weekly batch must be "
+            "non-empty list"
+        )
+
+    validated = []
+    seen_periods = set()
+
+    for entry in entries:
+        if not isinstance(
+            entry,
+            dict,
+        ):
+            raise ValueError(
+                "weekly batch entry "
+                "must be object"
+            )
+
+        if "snapshot" not in entry:
+            raise ValueError(
+                "weekly batch snapshot "
+                "missing"
+            )
+
+        if "observed_at" not in entry:
+            raise ValueError(
+                "weekly batch observed_at "
+                "missing"
+            )
+
+        values = (
+            validate_weekly_snapshot(
+                entry[
+                    "snapshot"
+                ]
+            )
+        )
+
+        observed_at = (
+            _validated_observed_at(
+                entry[
+                    "observed_at"
+                ]
+            )
+        )
+
+        period = values[
+            "period"
+        ]
+
+        if period in seen_periods:
+            raise ValueError(
+                "duplicate weekly batch "
+                "period: "
+                + period
+            )
+
+        seen_periods.add(
+            period
+        )
+
+        validated.append({
+            "period":
+                period,
+
+            "values":
+                values,
+
+            "observed_at":
+                observed_at,
+        })
+
+    #
+    # Oldest to newest is intentional.
+    # If a title appears in multiple
+    # historical weeks, its newest
+    # metadata wins deterministically.
+    #
+    validated.sort(
+        key=lambda value:
+            _weekly_period_key(
+                value[
+                    "period"
+                ]
+            )
+    )
+
+    connection.execute(
+        "BEGIN IMMEDIATE"
+    )
+
+    results = []
+
+    try:
+        for value in validated:
+            results.append(
+                _write_validated_weekly_snapshot(
+                    connection,
+                    value[
+                        "values"
+                    ],
+                    value[
+                        "observed_at"
+                    ],
+                )
+            )
+
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    return {
+        "chart_type":
+            WEEKLY_CHART_TYPE,
+
+        "periods":
+            [
+                result[
+                    "period"
+                ]
+                for result
+                in results
+            ],
+
+        "snapshots":
+            len(
+                results
+            ),
+
+        "written":
+            sum(
+                result[
+                    "written"
+                ]
+                for result
+                in results
+            ),
+
+        "metadata_updated":
+            sum(
+                result[
+                    "metadata_updated"
+                ]
+                for result
+                in results
+            ),
+
+        "metadata_preserved":
+            sum(
+                result[
+                    "metadata_preserved"
+                ]
+                for result
+                in results
+            ),
+
+        "results":
+            results,
+    }
+
+
 
 
 def list_weekly_snapshot(
