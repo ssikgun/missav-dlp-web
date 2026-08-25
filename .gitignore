@@ -15,3 +15,6 @@ gluetun.env
 gluetun-control-auth.toml
 work/
 vpn-browser-config/
+
+# Teddy Discovery local development data
+.stage1-data/
