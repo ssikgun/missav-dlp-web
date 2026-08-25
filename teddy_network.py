@@ -169,7 +169,7 @@ def is_recoverable_failure(message):
         'http 425', 'http error 425',
         'http 429', 'http error 429', '429 too many requests',
         'http 500', 'http error 500',
-        'http 502', 'http error 502',
+        'http 502', 'http error 502', '502 bad gateway',
         'http 503', 'http error 503',
         'http 504', 'http error 504',
         'http 520', 'http 521', 'http 522', 'http 523', 'http 524',
@@ -180,6 +180,7 @@ def is_recoverable_failure(message):
     network_tokens = (
         'timeout', 'timed out', 'connection reset', 'connection refused',
         'failed to connect', 'could not connect', "couldn't connect",
+        'tunnel connection failed',
         'network is unreachable', 'network error', 'recv failure',
         'empty reply', 'ssl connect', 'tls connect',
         'curl: (7)', 'curl: (28)', 'curl: (35)', 'curl: (52)', 'curl: (56)',
