@@ -1,6 +1,10 @@
 from pathlib import Path
 import tempfile
 
+from teddy_discovery_db import (
+    SCHEMA_VERSION,
+)
+
 from teddy_discovery_collector import (
     collect_release_pages,
     run_release_collection,
@@ -565,7 +569,7 @@ def successful_db_smoke():
         connection.close()
 
         require(
-            schema == 3,
+            schema == SCHEMA_VERSION,
             "collector DB schema changed",
         )
 

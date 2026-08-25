@@ -4,6 +4,7 @@ import sys
 import tempfile
 
 from teddy_discovery_db import (
+    SCHEMA_VERSION,
     connect,
     initialize,
 )
@@ -446,9 +447,10 @@ def main():
         ).fetchone()[0]
 
         require(
-            schema == 3,
+            schema == SCHEMA_VERSION,
             (
-                "schema expected 3, "
+                "schema expected "
+                f"{SCHEMA_VERSION}, "
                 f"got {schema}"
             ),
         )
@@ -757,7 +759,7 @@ def main():
         connection.close()
 
     print(
-        "SCHEMA_V3_RELEASE_SMOKE=PASS"
+        "SCHEMA_CURRENT_RELEASE_SMOKE=PASS"
     )
 
     print(

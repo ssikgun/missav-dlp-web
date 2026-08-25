@@ -5,6 +5,7 @@ import sys
 import tempfile
 
 from teddy_discovery_db import (
+    SCHEMA_VERSION,
     connect,
     initialize,
 )
@@ -61,8 +62,9 @@ def main():
         ).fetchone()[0]
 
         require(
-            schema == 3,
-            f"schema expected 3, "
+            schema == SCHEMA_VERSION,
+            f"schema expected "
+            f"{SCHEMA_VERSION}, "
             f"got {schema}",
         )
 

@@ -4,7 +4,7 @@ from pathlib import Path
 import sqlite3
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 SCHEMA = """
@@ -401,6 +401,116 @@ def _migrate_2_to_3(
 
 
 
+
+def _migrate_3_to_4(
+    connection: sqlite3.Connection,
+) -> None:
+    now = _utc_now()
+
+    connection.execute(
+        "BEGIN IMMEDIATE"
+    )
+
+    try:
+        duplicate_dvd = (
+            connection.execute(
+                """
+                SELECT
+                    chart_type,
+                    period,
+                    dvd_id,
+                    COUNT(*) AS row_count
+                FROM ranking_snapshots
+                GROUP BY
+                    chart_type,
+                    period,
+                    dvd_id
+                HAVING COUNT(*) > 1
+                LIMIT 1
+                """
+            ).fetchone()
+        )
+
+        if duplicate_dvd is not None:
+            raise RuntimeError(
+                "cannot migrate ranking "
+                "snapshots with duplicate "
+                "(chart_type, period, dvd_id)"
+            )
+
+        duplicate_rank = (
+            connection.execute(
+                """
+                SELECT
+                    chart_type,
+                    period,
+                    rank,
+                    COUNT(*) AS row_count
+                FROM ranking_snapshots
+                WHERE rank IS NOT NULL
+                GROUP BY
+                    chart_type,
+                    period,
+                    rank
+                HAVING COUNT(*) > 1
+                LIMIT 1
+                """
+            ).fetchone()
+        )
+
+        if duplicate_rank is not None:
+            raise RuntimeError(
+                "cannot migrate ranking "
+                "snapshots with duplicate "
+                "(chart_type, period, rank)"
+            )
+
+        connection.execute(
+            """
+            CREATE UNIQUE INDEX
+                ux_ranking_period_dvd
+            ON ranking_snapshots(
+                chart_type,
+                period,
+                dvd_id
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE UNIQUE INDEX
+                ux_ranking_period_rank
+            ON ranking_snapshots(
+                chart_type,
+                period,
+                rank
+            )
+            WHERE rank IS NOT NULL
+            """
+        )
+
+        connection.execute(
+            """
+            INSERT INTO schema_migrations(
+                version,
+                applied_at
+            )
+            VALUES (?, ?)
+            """,
+            (
+                4,
+                now,
+            ),
+        )
+
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+
 def initialize(
     connection: sqlite3.Connection,
 ) -> None:
@@ -465,6 +575,11 @@ def initialize(
 
         elif target == 3:
             _migrate_2_to_3(
+                connection
+            )
+
+        elif target == 4:
+            _migrate_3_to_4(
                 connection
             )
 
