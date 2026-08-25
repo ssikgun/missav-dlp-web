@@ -6,6 +6,7 @@ import time
 
 import teddy_routing
 import teddy_storage
+import teddy_123av
 
 
 _save_lock = threading.Lock()
@@ -213,6 +214,22 @@ def _apply_media_options(opts, options):
         opts['subtitlesformat'] = 'vtt/best'
 
 
+def _youtube_dl_for_url(core, opts, url):
+    """Keep the normal yt-dlp path unchanged except for Teddy site adapters."""
+    if not teddy_123av.Teddy123AVIE.suitable(url):
+        return core.yt_dlp.YoutubeDL(opts)
+
+    ydl = core.yt_dlp.YoutubeDL(
+        opts,
+        auto_init=False,
+    )
+    ydl.add_info_extractor(
+        teddy_123av.Teddy123AVIE()
+    )
+    ydl.add_default_info_extractors()
+    return ydl
+
+
 def download_generic(core, reliability, task_id, url, network_mode='direct'):
     temp_dir = _task_temp_dir(core, task_id)
     os.makedirs(temp_dir, exist_ok=True)
@@ -300,7 +317,7 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
         flush=True,
     )
     try:
-        with core.yt_dlp.YoutubeDL(opts) as ydl:
+        with _youtube_dl_for_url(core, opts, url) as ydl:
             info = ydl.extract_info(url, download=True)
             if info is None:
                 raise ValueError('yt-dlp가 다운로드 정보를 반환하지 않았습니다.')
