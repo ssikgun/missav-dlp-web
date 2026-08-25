@@ -11,6 +11,8 @@ from teddy_discovery_db import (
 from teddy_discovery_missav import (
     MISSAV_RELEASE_SOURCE,
     list_latest_items,
+    merge_missav_release_envelopes,
+    missav_release_next_url_from_envelope,
     parse_missav_release_envelope,
     upsert_latest_items,
 )
@@ -42,6 +44,268 @@ def require(
         )
 
 
+def synthetic_release_envelope(
+    page: int,
+    count: int = 12,
+):
+    if page < 1:
+        raise ValueError(
+            "page must be >= 1"
+        )
+
+    first = (
+        (page - 1)
+        * count
+        + 1
+    )
+
+    cards = []
+
+    for number in range(
+        first,
+        first + count,
+    ):
+        dvd_id = (
+            f"TST-{number:03d}"
+        )
+
+        slug = dvd_id.lower()
+
+        cards.append(
+            (
+                '<div class="thumbnail group">'
+                '<div>'
+                f'<a href="/ko/{slug}">'
+                '<img '
+                f'data-src="https://example.invalid/{slug}.jpg" '
+                f'alt="Synthetic {dvd_id}">'
+                '</a>'
+                '</div>'
+                '</div>'
+            )
+        )
+
+    if page < 5:
+        next_page = page + 1
+
+        cards.append(
+            (
+                '<nav>'
+                '<a '
+                'rel="next" '
+                f'href="https://missav.ws/'
+                f'dm635/ko/release?page={next_page}"'
+                '>'
+                'Next'
+                '</a>'
+                '</nav>'
+            )
+        )
+
+    requested = (
+        "https://missav.ws/ko/release"
+        if page == 1
+        else (
+            "https://missav.ws/dm635/"
+            f"ko/release?page={page}"
+        )
+    )
+
+    final_url = (
+        "https://missav.ws/dm635/"
+        "ko/release"
+        if page == 1
+        else (
+            "https://missav.ws/dm635/"
+            f"ko/release?page={page}"
+        )
+    )
+
+    return {
+        "status":
+            200,
+
+        "requested_url":
+            requested,
+
+        "final_url":
+            final_url,
+
+        "body":
+            "<html><body>"
+            + "".join(cards)
+            + "</body></html>",
+    }
+
+
+def pagination_smoke(
+    real_envelope,
+):
+    next_url = (
+        missav_release_next_url_from_envelope(
+            real_envelope
+        )
+    )
+
+    require(
+        next_url is not None,
+        "real release next URL missing",
+    )
+
+    require(
+        next_url.startswith(
+            "https://missav.ws/"
+        ),
+        "real next URL host changed",
+    )
+
+    require(
+        "/ko/release"
+        in next_url,
+        "real next URL route changed",
+    )
+
+    require(
+        "page=2"
+        in next_url,
+        "real next URL is not page 2",
+    )
+
+    print(
+        "MISSAV_REAL_NEXT_LINK_SMOKE=PASS"
+    )
+
+    synthetic = [
+        synthetic_release_envelope(
+            page
+        )
+        for page in range(
+            1,
+            6,
+        )
+    ]
+
+    for index in range(
+        4
+    ):
+        expected = (
+            "page="
+            + str(
+                index + 2
+            )
+        )
+
+        actual = (
+            missav_release_next_url_from_envelope(
+                synthetic[index]
+            )
+        )
+
+        require(
+            actual
+            and expected
+            in actual,
+            (
+                "synthetic next link "
+                f"failed at page "
+                f"{index + 1}"
+            ),
+        )
+
+    require(
+        missav_release_next_url_from_envelope(
+            synthetic[4]
+        )
+        is None,
+        "last synthetic page "
+        "must not have next",
+    )
+
+    merged = (
+        merge_missav_release_envelopes(
+            synthetic,
+            limit=50,
+        )
+    )
+
+    require(
+        len(merged) == 50,
+        "merged latest count changed",
+    )
+
+    require(
+        [
+            item[
+                "dvd_id"
+            ]
+            for item in merged
+        ]
+        == [
+            f"TST-{number:03d}"
+            for number in range(
+                1,
+                51,
+            )
+        ],
+        "merged page ordering changed",
+    )
+
+    require(
+        [
+            item[
+                "position"
+            ]
+            for item in merged
+        ]
+        == list(
+            range(
+                1,
+                51,
+            )
+        ),
+        "global positions changed",
+    )
+
+    try:
+        merge_missav_release_envelopes(
+            synthetic[:4],
+            limit=50,
+        )
+
+    except ValueError as exc:
+        require(
+            "insufficient unique"
+            in str(exc),
+            (
+                "unexpected insufficient "
+                "page failure"
+            ),
+        )
+
+    else:
+        raise RuntimeError(
+            "four 12-card pages "
+            "must not satisfy limit 50"
+        )
+
+    print(
+        "MISSAV_PAGINATION_CHAIN_SMOKE=PASS"
+    )
+
+    print(
+        "MISSAV_GLOBAL_POSITION_SMOKE=PASS"
+    )
+
+    print(
+        "MISSAV_LIMIT_50_SMOKE=PASS"
+    )
+
+    print(
+        "MISSAV_INSUFFICIENT_PAGES_FAIL_CLOSED_SMOKE=PASS"
+    )
+
+
+
 def main():
     envelope_path = Path(
         sys.argv[1]
@@ -51,6 +315,10 @@ def main():
         envelope_path.read_text(
             encoding="utf-8"
         )
+    )
+
+    pagination_smoke(
+        envelope
     )
 
     items = (

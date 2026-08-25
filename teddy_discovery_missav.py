@@ -5,6 +5,7 @@ from html.parser import HTMLParser
 import sqlite3
 from typing import Any, Iterable
 from urllib.parse import (
+    parse_qs,
     unquote,
     urljoin,
     urlparse,
@@ -175,6 +176,16 @@ class _MissavCardParser(
                 "href":
                     attributes.get(
                         "href"
+                    ),
+
+                "rel":
+                    attributes.get(
+                        "rel"
+                    ),
+
+                "aria_label":
+                    attributes.get(
+                        "aria-label"
                     ),
 
                 "in_thumbnail":
@@ -507,6 +518,314 @@ def parse_missav_release_envelope(
         base_url,
         language=language,
     )
+
+
+def parse_missav_release_next_url(
+    html: str,
+    base_url: str,
+    language: str = DEFAULT_LANGUAGE,
+):
+    if not isinstance(
+        html,
+        str,
+    ):
+        raise ValueError(
+            "MissAV HTML must be text"
+        )
+
+    if not html.strip():
+        raise ValueError(
+            "MissAV HTML is empty"
+        )
+
+    base_url = _required_https_url(
+        base_url,
+        "base URL",
+    )
+
+    base = urlparse(
+        base_url
+    )
+
+    language = _text(
+        language
+    )
+
+    if not language:
+        raise ValueError(
+            "missing language"
+        )
+
+    parser = _MissavCardParser()
+    parser.feed(
+        html
+    )
+
+    candidates = set()
+
+    for record in parser.records:
+        rel = (
+            _text(
+                record.get(
+                    "rel"
+                )
+            )
+            or ""
+        )
+
+        rel_tokens = {
+            token.lower()
+            for token
+            in rel.split()
+        }
+
+        if "next" not in rel_tokens:
+            continue
+
+        href = _text(
+            record.get(
+                "href"
+            )
+        )
+
+        if not href:
+            raise ValueError(
+                "MissAV rel=next "
+                "missing href"
+            )
+
+        absolute = urljoin(
+            base_url,
+            href,
+        )
+
+        parsed = urlparse(
+            absolute
+        )
+
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname
+            != base.hostname
+        ):
+            raise ValueError(
+                "MissAV rel=next "
+                "escaped expected host"
+            )
+
+        segments = [
+            unquote(segment)
+            for segment
+            in parsed.path.split("/")
+            if segment
+        ]
+
+        if (
+            len(segments) < 2
+            or segments[-2:]
+            != [
+                language,
+                "release",
+            ]
+        ):
+            raise ValueError(
+                "MissAV rel=next "
+                "escaped release route"
+            )
+
+        query = parse_qs(
+            parsed.query,
+            keep_blank_values=True,
+        )
+
+        pages = query.get(
+            "page"
+        )
+
+        if (
+            not pages
+            or len(pages) != 1
+            or not pages[0].isdigit()
+            or int(pages[0]) < 2
+        ):
+            raise ValueError(
+                "MissAV rel=next "
+                "has invalid page"
+            )
+
+        candidates.add(
+            absolute
+        )
+
+    if not candidates:
+        return None
+
+    if len(candidates) != 1:
+        raise ValueError(
+            "conflicting MissAV "
+            "rel=next URLs: "
+            + repr(
+                sorted(candidates)
+            )
+        )
+
+    return next(
+        iter(candidates)
+    )
+
+
+def missav_release_next_url_from_envelope(
+    envelope: dict,
+    language: str = DEFAULT_LANGUAGE,
+):
+    if not isinstance(
+        envelope,
+        dict,
+    ):
+        raise ValueError(
+            "forensic envelope must be object"
+        )
+
+    status = envelope.get(
+        "status"
+    )
+
+    if status != 200:
+        raise ValueError(
+            "cannot parse MissAV "
+            f"HTTP status {status!r}"
+        )
+
+    body = envelope.get(
+        "body"
+    )
+
+    if not isinstance(
+        body,
+        str,
+    ):
+        raise ValueError(
+            "MissAV envelope body "
+            "must be text"
+        )
+
+    base_url = (
+        envelope.get(
+            "final_url"
+        )
+        or envelope.get(
+            "requested_url"
+        )
+    )
+
+    return parse_missav_release_next_url(
+        body,
+        base_url,
+        language=language,
+    )
+
+
+def merge_missav_release_envelopes(
+    envelopes: Iterable[dict],
+    limit: int = 50,
+    language: str = DEFAULT_LANGUAGE,
+) -> list[dict]:
+    if (
+        not isinstance(
+            limit,
+            int,
+        )
+        or limit < 1
+        or limit > 500
+    ):
+        raise ValueError(
+            "release limit must "
+            "be 1..500"
+        )
+
+    pages = list(
+        envelopes
+    )
+
+    if not pages:
+        raise ValueError(
+            "no MissAV release pages"
+        )
+
+    result = []
+    seen = {}
+
+    for page_number, envelope in enumerate(
+        pages,
+        start=1,
+    ):
+        items = (
+            parse_missav_release_envelope(
+                envelope,
+                language=language,
+            )
+        )
+
+        if not items:
+            raise ValueError(
+                "empty MissAV release page: "
+                f"{page_number}"
+            )
+
+        for item in items:
+            dvd_id = item[
+                "dvd_id"
+            ]
+
+            previous = seen.get(
+                dvd_id
+            )
+
+            if previous is not None:
+                if (
+                    previous[
+                        "source_url"
+                    ]
+                    != item[
+                        "source_url"
+                    ]
+                ):
+                    raise ValueError(
+                        "conflicting duplicate "
+                        "release DVD ID: "
+                        + dvd_id
+                    )
+
+                continue
+
+            value = dict(
+                item
+            )
+
+            value[
+                "position"
+            ] = len(
+                result
+            ) + 1
+
+            seen[
+                dvd_id
+            ] = value
+
+            result.append(
+                value
+            )
+
+            if len(result) == limit:
+                return result
+
+    raise ValueError(
+        "insufficient unique "
+        "MissAV release items: "
+        f"wanted {limit}, "
+        f"got {len(result)}"
+    )
+
 
 
 def _validated_items(
