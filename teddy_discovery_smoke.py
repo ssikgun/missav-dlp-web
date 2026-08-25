@@ -231,12 +231,126 @@ def reconciliation_smoke():
         )
 
 
+def empty_scan_fail_closed_smoke():
+    with tempfile.TemporaryDirectory(
+        prefix="teddy-discovery-empty-"
+    ) as temp:
+        base = Path(temp)
+        root = base / "library"
+        db = base / "inventory.sqlite3"
+
+        root.mkdir()
+
+        first = root / "SNOS-334 title.mp4"
+        second = root / "SONE-978 title.mp4"
+
+        first.write_bytes(b"a")
+        second.write_bytes(b"bb")
+
+        initial = import_inventory(
+            db_path=db,
+            root=root,
+            storage_root="jav",
+        )
+
+        require(
+            initial["video_files"] == 2,
+            "initial empty-scan smoke must see 2 files",
+        )
+
+        first.unlink()
+        second.unlink()
+
+        failed_closed = False
+
+        try:
+            import_inventory(
+                db_path=db,
+                root=root,
+                storage_root="jav",
+            )
+        except RuntimeError as exc:
+            require(
+                "refusing empty inventory scan" in str(exc),
+                f"unexpected empty-scan error: {exc}",
+            )
+            failed_closed = True
+
+        require(
+            failed_closed,
+            "empty scan must fail closed",
+        )
+
+        require(
+            scalar(
+                db,
+                """
+                SELECT COUNT(*)
+                FROM holdings
+                WHERE present = 1
+                """
+            ) == 2,
+            "failed empty scan must not mark holdings absent",
+        )
+
+        require(
+            scalar(
+                db,
+                """
+                SELECT COUNT(*)
+                FROM inventory_runs
+                WHERE status = 'FAILED'
+                """
+            ) == 1,
+            "failed empty scan must be recorded",
+        )
+
+        # Explicit override is reserved for a genuinely emptied library.
+        final = import_inventory(
+            db_path=db,
+            root=root,
+            storage_root="jav",
+            allow_empty=True,
+        )
+
+        require(
+            final["video_files"] == 0,
+            "explicit empty scan must report 0 files",
+        )
+
+        require(
+            scalar(
+                db,
+                """
+                SELECT COUNT(*)
+                FROM holdings
+                WHERE present = 1
+                """
+            ) == 0,
+            "explicit empty scan must mark holdings absent",
+        )
+
+        require(
+            scalar(
+                db,
+                """
+                SELECT COUNT(*)
+                FROM holdings
+                WHERE present = 0
+                """
+            ) == 2,
+            "explicit empty scan must retain absent history",
+        )
+
+
 def main():
     parser_smoke()
     reconciliation_smoke()
+    empty_scan_fail_closed_smoke()
 
     print("PARSER_SMOKE=PASS")
     print("RECONCILIATION_SMOKE=PASS")
+    print("EMPTY_SCAN_FAIL_CLOSED_SMOKE=PASS")
     print("STAGE1_SMOKE=PASS")
 
 

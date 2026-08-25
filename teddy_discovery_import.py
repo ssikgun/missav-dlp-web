@@ -79,6 +79,7 @@ def import_inventory(
     db_path: Path,
     root: Path,
     storage_root: str,
+    allow_empty: bool = False,
 ):
     connection = connect(db_path)
     initialize(connection)
@@ -107,6 +108,32 @@ def import_inventory(
 
     try:
         records = scan(root)
+
+        existing_present = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM holdings
+            WHERE storage_root = ?
+              AND present = 1
+            """,
+            (
+                storage_root,
+            ),
+        ).fetchone()[0]
+
+        if (
+            not records
+            and existing_present > 0
+            and not allow_empty
+        ):
+            raise RuntimeError(
+                "refusing empty inventory scan: "
+                f"storage_root={storage_root!r} "
+                f"previously_present={existing_present}; "
+                "possible missing/unavailable mount. "
+                "Use allow_empty only for an intentional "
+                "empty library."
+            )
 
         counts = {
             "MATCHED": 0,
@@ -271,6 +298,14 @@ def main():
         "--storage-root",
         required=True,
     )
+    parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help=(
+            "allow an empty scan to mark previous holdings absent; "
+            "normally empty scans fail closed"
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -278,6 +313,7 @@ def main():
         db_path=args.db,
         root=args.root,
         storage_root=args.storage_root,
+        allow_empty=args.allow_empty,
     )
 
     print(
