@@ -61,8 +61,8 @@ def main():
         ).fetchone()[0]
 
         require(
-            schema == 2,
-            f"schema expected 2, "
+            schema == 3,
+            f"schema expected 3, "
             f"got {schema}",
         )
 
@@ -194,7 +194,7 @@ def main():
 
         connection.close()
 
-    print("SCHEMA_V2_SMOKE=PASS")
+    print("SCHEMA_V3_SMOKE=PASS")
     print("MOVIE_MAPPER_SMOKE=PASS")
     print("ROLE_MAPPING_SMOKE=PASS")
     print("IDEMPOTENCY_SMOKE=PASS")

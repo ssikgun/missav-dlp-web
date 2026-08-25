@@ -4,7 +4,7 @@ from pathlib import Path
 import sqlite3
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 SCHEMA = """
@@ -318,6 +318,89 @@ def _migrate_1_to_2(
         raise
 
 
+def _migrate_2_to_3(
+    connection: sqlite3.Connection,
+) -> None:
+    now = _utc_now()
+
+    connection.execute(
+        "BEGIN IMMEDIATE"
+    )
+
+    try:
+        connection.execute(
+            """
+            CREATE TABLE latest_items (
+                source TEXT NOT NULL,
+
+                dvd_id TEXT NOT NULL,
+
+                source_url TEXT NOT NULL,
+
+                title TEXT,
+
+                cover_url TEXT,
+
+                first_seen_at TEXT NOT NULL,
+
+                last_seen_at TEXT NOT NULL,
+
+                first_position INTEGER NOT NULL
+                    CHECK (
+                        first_position >= 1
+                    ),
+
+                last_position INTEGER NOT NULL
+                    CHECK (
+                        last_position >= 1
+                    ),
+
+                PRIMARY KEY (
+                    source,
+                    dvd_id
+                ),
+
+                FOREIGN KEY (dvd_id)
+                    REFERENCES titles(dvd_id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX
+                idx_latest_items_source_order
+            ON latest_items(
+                source,
+                last_seen_at DESC,
+                last_position ASC
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            INSERT INTO schema_migrations(
+                version,
+                applied_at
+            )
+            VALUES (?, ?)
+            """,
+            (
+                3,
+                now,
+            ),
+        )
+
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+
+
 def initialize(
     connection: sqlite3.Connection,
 ) -> None:
@@ -379,6 +462,12 @@ def initialize(
             _migrate_1_to_2(
                 connection
             )
+
+        elif target == 3:
+            _migrate_2_to_3(
+                connection
+            )
+
         else:
             raise RuntimeError(
                 "no database migration "
