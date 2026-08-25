@@ -4,7 +4,7 @@ from pathlib import Path
 import sqlite3
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 SCHEMA = """
@@ -202,9 +202,125 @@ def connect(path: str | Path) -> sqlite3.Connection:
     return connection
 
 
-def initialize(connection: sqlite3.Connection) -> None:
+def _utc_now() -> str:
     from datetime import datetime, timezone
 
+    return datetime.now(
+        timezone.utc
+    ).isoformat(timespec="seconds")
+
+
+def _migrate_1_to_2(
+    connection: sqlite3.Connection,
+) -> None:
+    now = _utc_now()
+
+    connection.execute(
+        "BEGIN IMMEDIATE"
+    )
+
+    try:
+        connection.execute(
+            """
+            CREATE TABLE title_people_v2 (
+                dvd_id TEXT NOT NULL,
+                person_id INTEGER NOT NULL,
+
+                role TEXT NOT NULL
+                    CHECK (
+                        role IN (
+                            'actress',
+                            'actor',
+                            'director',
+                            'author',
+                            'unknown'
+                        )
+                    ),
+
+                PRIMARY KEY (
+                    dvd_id,
+                    person_id,
+                    role
+                ),
+
+                FOREIGN KEY (person_id)
+                    REFERENCES people(person_id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            INSERT INTO title_people_v2(
+                dvd_id,
+                person_id,
+                role
+            )
+            SELECT
+                dvd_id,
+                person_id,
+                'unknown'
+            FROM title_people
+            """
+        )
+
+        connection.execute(
+            "DROP TABLE title_people"
+        )
+
+        connection.execute(
+            """
+            ALTER TABLE title_people_v2
+            RENAME TO title_people
+            """
+        )
+
+        connection.execute(
+            """
+            ALTER TABLE api_usage
+            ADD COLUMN http_status INTEGER
+            """
+        )
+
+        connection.execute(
+            """
+            ALTER TABLE api_usage
+            ADD COLUMN quota_limit INTEGER
+            """
+        )
+
+        connection.execute(
+            """
+            ALTER TABLE api_usage
+            ADD COLUMN quota_remaining INTEGER
+            """
+        )
+
+        connection.execute(
+            """
+            INSERT INTO schema_migrations(
+                version,
+                applied_at
+            )
+            VALUES (?, ?)
+            """,
+            (
+                2,
+                now,
+            ),
+        )
+
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+
+def initialize(
+    connection: sqlite3.Connection,
+) -> None:
     connection.executescript(SCHEMA)
 
     row = connection.execute(
@@ -216,30 +332,58 @@ def initialize(connection: sqlite3.Connection) -> None:
         """
     ).fetchone()
 
-    current = int(row["version"]) if row else 0
+    current = (
+        int(row["version"])
+        if row
+        else 0
+    )
 
     if current > SCHEMA_VERSION:
         raise RuntimeError(
-            f"database schema {current} is newer "
-            f"than supported {SCHEMA_VERSION}"
+            f"database schema {current} "
+            f"is newer than supported "
+            f"{SCHEMA_VERSION}"
         )
 
-    if current < SCHEMA_VERSION:
-        now = datetime.now(
-            timezone.utc
-        ).isoformat(timespec="seconds")
-
+    if current == 0:
         connection.execute(
-            """
-            INSERT INTO schema_migrations(
-                version,
-                applied_at
-            )
-            VALUES (?, ?)
-            """,
-            (
-                SCHEMA_VERSION,
-                now,
-            ),
+            "BEGIN IMMEDIATE"
         )
-        connection.commit()
+
+        try:
+            connection.execute(
+                """
+                INSERT INTO schema_migrations(
+                    version,
+                    applied_at
+                )
+                VALUES (?, ?)
+                """,
+                (
+                    1,
+                    _utc_now(),
+                ),
+            )
+
+            connection.commit()
+            current = 1
+
+        except Exception:
+            connection.rollback()
+            raise
+
+    while current < SCHEMA_VERSION:
+        target = current + 1
+
+        if target == 2:
+            _migrate_1_to_2(
+                connection
+            )
+        else:
+            raise RuntimeError(
+                "no database migration "
+                f"available for {current} "
+                f"-> {target}"
+            )
+
+        current = target
