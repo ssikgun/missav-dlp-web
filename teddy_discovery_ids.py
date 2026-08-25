@@ -28,12 +28,18 @@ LEADING_FC2_RE = re.compile(
 )
 
 LEADING_STANDARD_RE = re.compile(
-    r"^\s*\[?\s*([A-Z0-9]{2,12})[-_](\d{2,8})(?!\d)",
+    r"^\s*\[?\s*"
+    r"([A-Z0-9]{2,12})[-_]"
+    r"(\d{2,8})([A-Z]{0,3})"
+    r"(?=\]|\s|[._-]|$)",
     re.I,
 )
 
 LEADING_COMPACT_RE = re.compile(
-    r"^\s*\[?\s*([A-Z]{2,12})(\d{2,6})(?=\]|\s|[._-]|$)",
+    r"^\s*\[?\s*"
+    r"([A-Z]{2,12})"
+    r"(\d{2,6})([A-Z]{0,3})"
+    r"(?=\]|\s|[._-]|$)",
     re.I,
 )
 
@@ -76,7 +82,11 @@ def parse_dvd_id(filename: str) -> Optional[DvdIdMatch]:
         prefix = _normalize_prefix(match.group(1))
         if prefix:
             return DvdIdMatch(
-                dvd_id=f"{prefix}-{match.group(2)}",
+                dvd_id=(
+                    f"{prefix}-"
+                    f"{match.group(2)}"
+                    f"{match.group(3).upper()}"
+                ),
                 method="standard-leading",
             )
 
@@ -85,7 +95,11 @@ def parse_dvd_id(filename: str) -> Optional[DvdIdMatch]:
         prefix = _normalize_prefix(match.group(1))
         if prefix:
             return DvdIdMatch(
-                dvd_id=f"{prefix}-{match.group(2)}",
+                dvd_id=(
+                    f"{prefix}-"
+                    f"{match.group(2)}"
+                    f"{match.group(3).upper()}"
+                ),
                 method="compact-leading",
             )
 

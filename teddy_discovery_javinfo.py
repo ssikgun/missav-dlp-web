@@ -386,3 +386,187 @@ def upsert_movie_metadata(
             )
 
     return item["dvd_id"]
+
+
+def normalize_query_result(
+    item: dict,
+    source: str,
+) -> dict:
+    if not isinstance(item, dict):
+        raise ValueError(
+            "query result must be an object"
+        )
+
+    dvd_id = normalize_dvd_id(
+        item.get("dvdId")
+    )
+
+    extra = item.get("extra") or {}
+
+    if not isinstance(extra, dict):
+        extra = {}
+
+    title = (
+        _text(item.get("title"))
+        or _text(extra.get("titleEn"))
+        or _text(extra.get("titleJa"))
+    )
+
+    maker = (
+        _text(extra.get("maker"))
+        or _text(extra.get("studio"))
+    )
+
+    cover_url = (
+        _text(extra.get("jacketFullUrl"))
+        or _text(item.get("cover"))
+        or _text(extra.get("jacketThumbUrl"))
+    )
+
+    people = []
+
+    for field, role in PERSON_FIELDS:
+        values = (
+            extra.get(field)
+            or []
+        )
+
+        if not isinstance(
+            values,
+            list,
+        ):
+            values = [values]
+
+        for value in values:
+            name = _name(value)
+
+            if name:
+                people.append(
+                    (
+                        name,
+                        role,
+                    )
+                )
+
+    genres = []
+
+    category_values = (
+        extra.get("categories")
+        or extra.get("genres")
+        or []
+    )
+
+    if not isinstance(
+        category_values,
+        list,
+    ):
+        category_values = [
+            category_values
+        ]
+
+    for value in category_values:
+        name = _name(value)
+
+        if name:
+            genres.append(name)
+
+    raw = {
+        "source": source,
+        "result": item,
+    }
+
+    return {
+        "dvd_id":
+            dvd_id,
+
+        "title":
+            title,
+
+        "release_date":
+            _text(
+                item.get(
+                    "releaseDate"
+                )
+            ),
+
+        "maker":
+            maker,
+
+        "cover_url":
+            cover_url,
+
+        "metadata_source":
+            _text(source)
+            or "unknown",
+
+        "raw_metadata":
+            json.dumps(
+                raw,
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+
+        "people":
+            sorted(
+                set(people)
+            ),
+
+        "genres":
+            sorted(
+                set(genres)
+            ),
+    }
+
+
+def normalize_query_response(
+    payload: dict,
+) -> list[dict]:
+    if not isinstance(
+        payload,
+        dict,
+    ):
+        raise ValueError(
+            "query response must be an object"
+        )
+
+    source = _text(
+        payload.get("source")
+    )
+
+    if not source:
+        raise ValueError(
+            "query response missing source"
+        )
+
+    results = payload.get(
+        "results"
+    )
+
+    if not isinstance(
+        results,
+        list,
+    ):
+        raise ValueError(
+            "query response missing results list"
+        )
+
+    normalized = [
+        normalize_query_result(
+            item,
+            source,
+        )
+        for item in results
+    ]
+
+    ids = [
+        item["dvd_id"]
+        for item in normalized
+    ]
+
+    if len(ids) != len(set(ids)):
+        raise ValueError(
+            "query response contains "
+            "duplicate normalized dvdIds"
+        )
+
+    return normalized
