@@ -15,6 +15,7 @@ import teddy_network
 import teddy_routing
 import teddy_proxy_pool
 import teddy_storage
+import teddy_discovery_runtime
 
 
 core = reliability.core
@@ -28,6 +29,7 @@ teddy_duplicates.install(core)
 teddy_network.install(core)
 teddy_logging.install_routes(core)
 teddy_storage.install_file_routes(core)
+teddy_discovery_runtime.install(core)
 teddy_proxy_pool.install(core, teddy_routing, teddy_network)
 
 
