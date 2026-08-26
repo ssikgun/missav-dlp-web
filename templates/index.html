@@ -465,6 +465,7 @@
             font-size: 14px;
         }
     </style>
+    <link rel="stylesheet" href="/static/teddy-discovery.css">
 </head>
 <body>
     <!-- Sidebar -->
@@ -475,6 +476,9 @@
         </button>
         <button class="sidebar-btn" data-page="files" title="파일 관리">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        </button>
+        <button class="sidebar-btn" data-page="discovery" title="Discovery">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.4-3.4"/><path d="M8 11h6"/><path d="M11 8v6"/></svg>
         </button>
         <div style="flex:1"></div>
         <button class="sidebar-btn" data-page="settings" title="설정">
@@ -516,6 +520,41 @@
                 </div>
             </div>
             <div id="fileList"></div>
+        </div>
+
+        <!-- Discovery Page -->
+        <div id="page-discovery" class="page">
+            <div class="discovery-header">
+                <div>
+                    <div class="page-title">Discovery</div>
+                    <div class="page-subtitle">최신 출시 · 주간 · 월간 · 장르 랭킹과 보유/가용 상태</div>
+                </div>
+                <div id="discoverySummary" class="discovery-summary">데이터를 불러오지 않았습니다</div>
+            </div>
+
+            <div class="discovery-toolbar">
+                <div class="discovery-tabs" role="tablist" aria-label="Discovery 보기">
+                    <button class="discovery-tab active" type="button" data-discovery-view="latest">Latest</button>
+                    <button class="discovery-tab" type="button" data-discovery-view="weekly">Weekly</button>
+                    <button class="discovery-tab" type="button" data-discovery-view="monthly">Monthly</button>
+                    <button class="discovery-tab" type="button" data-discovery-view="genre">Genre</button>
+                </div>
+
+                <div id="discoveryGenreControls" class="discovery-genre-controls" hidden>
+                    <label for="discoveryGenreSelect">장르</label>
+                    <select id="discoveryGenreSelect" class="discovery-select">
+                        <option value="">불러오는 중...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="discoveryStatus" class="discovery-status" aria-live="polite"></div>
+
+            <div id="discoveryList" class="discovery-list">
+                <div class="discovery-empty">
+                    왼쪽 Discovery 메뉴를 열면 랭킹 데이터를 불러옵니다.
+                </div>
+            </div>
         </div>
 
         <!-- Settings Page -->
@@ -919,5 +958,6 @@ missav01.com</textarea>
         });
     });
     </script>
+    <script src="/static/teddy-discovery.js"></script>
 </body>
 </html>
