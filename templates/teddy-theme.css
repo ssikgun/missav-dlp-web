@@ -173,6 +173,55 @@ html[data-theme="dark"] .setting-actions {
     border-top-color: #253047;
 }
 
+/* Selkies browser system control */
+html[data-theme="dark"] .selkies-system-control {
+    border-top-color: #253047;
+}
+
+html[data-theme="dark"] .selkies-system-title,
+html[data-theme="dark"] .selkies-system-name {
+    color: #f8fafc;
+}
+
+html[data-theme="dark"] .selkies-system-card {
+    background: #111827;
+    border-color: #273449;
+}
+
+html[data-theme="dark"] .selkies-system-meta {
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] .selkies-system-status {
+    background: #1f2937;
+    color: #cbd5e1;
+}
+
+html[data-theme="dark"] .selkies-system-status.ok {
+    background: #0d2118;
+    color: #4ade80;
+}
+
+html[data-theme="dark"] .selkies-system-status.pending {
+    background: #2b2110;
+    color: #fbbf24;
+}
+
+html[data-theme="dark"] .selkies-system-status.error {
+    background: #281214;
+    color: #f87171;
+}
+
+html[data-theme="dark"] .selkies-restart-btn {
+    background: #111827;
+    border-color: #7f1d1d;
+    color: #f87171;
+}
+
+html[data-theme="dark"] .selkies-restart-btn:hover:not(:disabled) {
+    background: #281214;
+}
+
 html[data-theme="dark"] .toggle-slider {
     background: #475569;
 }

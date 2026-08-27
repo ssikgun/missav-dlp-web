@@ -63,6 +63,16 @@
         } else {
             sidebar.appendChild(button);
         }
+
+        // syncTheme() runs before this button exists on
+        // initial page load. Re-apply the already selected
+        // theme so the icon/title are rendered immediately.
+        applyTheme(
+            root.dataset.theme
+                || savedTheme()
+                || systemTheme(),
+            false
+        );
     }
 
     function syncTheme() {
