@@ -58,6 +58,9 @@ services:
       - TEDDY_AUTH_COOKIE_DOMAIN=.ssikgun.com
       - TEDDY_INTERNAL_DOWNLOAD_HOST=missav-dlp-web:5000
       - TEDDY_INTERNAL_DOWNLOAD_NET=172.18.0.0/16
+      - TEDDY_DISCOVERY_DB=/discovery/teddy-discovery.sqlite3
+      - TEDDY_DISCOVERY_COVER_CACHE=/discovery/cover-cache
+      - TEDDY_DISCOVERY_PREVIEW_CACHE=/discovery/preview-cache
     ports:
       - "58000:5000/tcp"
     volumes:
@@ -65,6 +68,9 @@ services:
       - /mnt/nas-downloads:/final
       - /opt/missav-dlp-web/teddy-auth:/run/secrets/teddy-auth:ro
       - /opt/missav-dlp-web/teddy-selkies-control:/run/secrets/teddy-selkies-control:ro
+      - /opt/missav-dlp-web/discovery/teddy-discovery.sqlite3:/discovery/teddy-discovery.sqlite3:ro
+      - /opt/missav-dlp-web/discovery/cover-cache:/discovery/cover-cache:rw
+      - /opt/missav-dlp-web/discovery/preview-cache:/discovery/preview-cache:rw
 
   vpn-browser:
     image: jlesage/chromium:latest
