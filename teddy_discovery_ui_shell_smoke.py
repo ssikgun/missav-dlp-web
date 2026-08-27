@@ -218,6 +218,7 @@ def main():
         "/api/discovery/monthly",
         "/api/discovery/categories",
         "/api/discovery/category?name=",
+        "/api/discovery/media/cover/",
     )
 
     for endpoint in expected_endpoints:
@@ -253,6 +254,70 @@ def main():
             "browser/write boundary: "
             + forbidden,
         )
+
+    require(
+        "function coverEndpoint("
+        in js,
+        "cover endpoint builder missing",
+    )
+
+    require(
+        "function loadCover("
+        in js,
+        "lazy cover loader missing",
+    )
+
+    require(
+        "function bindCoverLazyLoad("
+        in js,
+        "cover lazy binding missing",
+    )
+
+    require(
+        "row.addEventListener("
+        in js
+        and "'toggle'"
+        in js
+        and "if (row.open)"
+        in js,
+        "cover is not gated by details open",
+    )
+
+    require(
+        "row.dataset.coverRequested"
+        in js,
+        "cover repeat-request guard missing",
+    )
+
+    require(
+        "image.src = coverEndpoint("
+        in js,
+        "internal cover endpoint assignment missing",
+    )
+
+    require(
+        "bindCoverLazyLoad(\n            items"
+        in js,
+        "cover binding missing after list render",
+    )
+
+    require(
+        "discovery-cover-slot"
+        in js,
+        "cover placeholder slot missing",
+    )
+
+    require(
+        ".discovery-cover-slot"
+        in css,
+        "cover slot CSS missing",
+    )
+
+    require(
+        ".discovery-cover-image"
+        in css,
+        "cover image CSS missing",
+    )
 
     require(
         "#page-discovery"

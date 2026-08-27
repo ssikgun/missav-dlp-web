@@ -288,6 +288,147 @@
         return '—';
     }
 
+    function coverEndpoint(dvdId) {
+        return (
+            '/api/discovery/media/cover/'
+            + encodeURIComponent(
+                String(dvdId)
+            )
+        );
+    }
+
+
+    function loadCover(
+        row,
+        dvdId
+    ) {
+        const slot = row.querySelector(
+            '.discovery-cover-slot'
+        );
+
+        if (
+            !slot
+            || row.dataset.coverRequested
+            === '1'
+        ) {
+            return;
+        }
+
+        row.dataset.coverRequested = '1';
+
+        const placeholder = (
+            slot.querySelector(
+                '.discovery-cover-placeholder'
+            )
+        );
+
+        if (placeholder) {
+            placeholder.textContent = (
+                '표지를 불러오는 중...'
+            );
+        }
+
+        const image = document.createElement(
+            'img'
+        );
+
+        image.className = (
+            'discovery-cover-image'
+        );
+
+        image.alt = (
+            String(dvdId)
+            + ' 표지'
+        );
+
+        image.decoding = 'async';
+
+        image.addEventListener(
+            'load',
+            () => {
+                slot.replaceChildren(
+                    image
+                );
+            },
+            {
+                once: true,
+            }
+        );
+
+        image.addEventListener(
+            'error',
+            () => {
+                const failed = (
+                    document.createElement(
+                        'div'
+                    )
+                );
+
+                failed.className = (
+                    'discovery-cover-placeholder error'
+                );
+
+                failed.textContent = (
+                    '표지를 불러올 수 없습니다'
+                );
+
+                slot.replaceChildren(
+                    failed
+                );
+            },
+            {
+                once: true,
+            }
+        );
+
+        image.src = coverEndpoint(
+            dvdId
+        );
+    }
+
+
+    function bindCoverLazyLoad(
+        items
+    ) {
+        const rows = Array.from(
+            list.querySelectorAll(
+                '.discovery-row'
+            )
+        );
+
+        rows.forEach(
+            (row, index) => {
+                const item = items[index];
+
+                const dvdId = (
+                    item
+                    && item.dvd_id
+                )
+                    ? String(
+                        item.dvd_id
+                    )
+                    : '';
+
+                if (!dvdId) {
+                    return;
+                }
+
+                row.addEventListener(
+                    'toggle',
+                    () => {
+                        if (row.open) {
+                            loadCover(
+                                row,
+                                dvdId
+                            );
+                        }
+                    }
+                );
+            }
+        );
+    }
+
+
     function renderItems(data) {
         const items = Array.isArray(
             data.items
@@ -368,6 +509,11 @@
                     + '</div>'
                     + '</summary>'
                     + '<div class="discovery-detail">'
+                    + '<div class="discovery-cover-slot">'
+                    + '<div class="discovery-cover-placeholder">'
+                    + '표지를 보려면 항목을 펼치세요'
+                    + '</div>'
+                    + '</div>'
                     + '<div class="discovery-detail-grid">'
                     + '<div class="discovery-detail-block">'
                     + '<div class="discovery-detail-label">출연</div>'
@@ -407,6 +553,10 @@
                 );
             }
         ).join('');
+
+        bindCoverLazyLoad(
+            items
+        );
     }
 
     function viewUrl(view) {
