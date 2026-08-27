@@ -14,14 +14,8 @@ def replace_once(old, new, label):
 
 
 replace_once(
-    '''        <button class="sidebar-btn" data-page="files" title="파일 관리">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-        </button>
-        <div style="flex:1"></div>''',
-    '''        <button class="sidebar-btn" data-page="files" title="파일 관리">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-        </button>
-        <button class="sidebar-btn" data-page="logs" title="로그">
+    '        <div style="flex:1"></div>',
+    '''        <button class="sidebar-btn" data-page="logs" title="로그">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
         </button>
         <div style="flex:1"></div>''',
