@@ -101,7 +101,10 @@ def load_token(
 
 def _opener():
     return urllib.request.build_opener(
-        NoRedirectHandler()
+        urllib.request.ProxyHandler(
+            {}
+        ),
+        NoRedirectHandler(),
     )
 
 

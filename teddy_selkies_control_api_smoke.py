@@ -677,6 +677,53 @@ print(
 )
 
 
+original_getproxies = (
+    api.urllib.request.getproxies
+)
+
+sentinel_proxy = (
+    "http://127.0.0.1:48888"
+)
+
+api.urllib.request.getproxies = (
+    lambda: {
+        "http":
+            sentinel_proxy,
+    }
+)
+
+try:
+    direct_opener = api._opener()
+
+finally:
+    api.urllib.request.getproxies = (
+        original_getproxies
+    )
+
+proxy_handlers = [
+    handler
+    for handler
+    in direct_opener.handlers
+    if isinstance(
+        handler,
+        api.urllib.request.ProxyHandler,
+    )
+]
+
+assert not any(
+    handler.proxies.get(
+        "http"
+    )
+    == sentinel_proxy
+    for handler
+    in proxy_handlers
+)
+
+print(
+    "BACKEND_ENV_PROXY_BYPASS=PASS"
+)
+
+
 assert (
     api.DEFAULT_TOKEN_FILE
     == (
