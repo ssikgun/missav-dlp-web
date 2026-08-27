@@ -304,7 +304,42 @@ def verify_final():
         for needle in needles:
             require(path, needle)
 
-    forbid('templates/index.html', 'MissAV')
+    index_text = Path(
+        'templates/index.html'
+    ).read_text(
+        encoding='utf-8'
+    )
+
+    allowed_missav = (
+        'Discovery에서 MissAV와 123AV가 모두 확인된 경우 사용할 우선순위입니다.',
+        '<option value="auto">자동 · MissAV 우선</option>',
+        '<option value="missav">MissAV 우선</option>',
+    )
+
+    for needle in allowed_missav:
+        require(
+            'templates/index.html',
+            needle,
+        )
+
+    if index_text.count('MissAV') != len(
+        allowed_missav
+    ):
+        raise SystemExit(
+            'build verify failed: unexpected '
+            'MissAV UI occurrence count'
+        )
+
+    forbid(
+        'templates/index.html',
+        '<title>MissAV Downloader</title>',
+        'legacy MissAV title',
+    )
+    forbid(
+        'templates/index.html',
+        'MissAV URL을 입력하면 서버에서 다운로드합니다',
+        'legacy MissAV download subtitle',
+    )
     forbid('templates/index.html', 'taskList.innerHTML = entries.map')
     forbid('templates/teddy-hls-benchmark.js', 'HLS 연결 방식 (성능 테스트)', 'legacy detailed HLS transport selector')
     forbid('templates/teddy-hls-benchmark.js', 'Async pool 연결 수 (성능 테스트)', 'legacy detailed HLS pool selector')
