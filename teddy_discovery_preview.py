@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import sqlite3
 import tempfile
+import threading
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -26,6 +27,32 @@ MIN_PREVIEW_BYTES = 32
 MAX_PREVIEW_BYTES = 2 * 1024 * 1024
 
 STREAM_CHUNK_BYTES = 64 * 1024
+
+
+_PREVIEW_LOCKS_GUARD = threading.Lock()
+_PREVIEW_LOCKS = {}
+
+
+def _preview_lock(
+    dvd_id: Any,
+) -> threading.Lock:
+    dvd_id = canonical_dvd_id(
+        dvd_id
+    )
+
+    with _PREVIEW_LOCKS_GUARD:
+        lock = _PREVIEW_LOCKS.get(
+            dvd_id
+        )
+
+        if lock is None:
+            lock = threading.Lock()
+
+            _PREVIEW_LOCKS[
+                dvd_id
+            ] = lock
+
+        return lock
 
 
 class PreviewNotFound(
@@ -919,3 +946,121 @@ def read_preview_cache(
     )
 
     return validated
+
+
+
+def get_preview(
+    connection: sqlite3.Connection,
+    cache_root: Any,
+    dvd_id: Any,
+    *,
+    session=None,
+    timeout: int = DEFAULT_TIMEOUT_SECONDS,
+    impersonate: str = DEFAULT_IMPERSONATE,
+    max_bytes: int = MAX_PREVIEW_BYTES,
+) -> dict:
+    request_value = lookup_preview_request(
+        connection,
+        dvd_id,
+    )
+
+    dvd_id = request_value[
+        "dvd_id"
+    ]
+
+    #
+    # Fast path before taking the
+    # per-title singleflight lock.
+    #
+    cached = read_preview_cache(
+        cache_root,
+        dvd_id,
+    )
+
+    if cached is not None:
+        result = dict(
+            cached
+        )
+
+        result[
+            "route"
+        ] = "cache"
+
+        result[
+            "cache_hit"
+        ] = True
+
+        result[
+            "request_attempts"
+        ] = 0
+
+        result[
+            "redirects_followed"
+        ] = 0
+
+        return result
+
+    lock = _preview_lock(
+        dvd_id
+    )
+
+    with lock:
+        #
+        # Another request may have filled
+        # the cache while this request was
+        # waiting for the title lock.
+        #
+        cached = read_preview_cache(
+            cache_root,
+            dvd_id,
+        )
+
+        if cached is not None:
+            result = dict(
+                cached
+            )
+
+            result[
+                "route"
+            ] = "cache"
+
+            result[
+                "cache_hit"
+            ] = True
+
+            result[
+                "request_attempts"
+            ] = 0
+
+            result[
+                "redirects_followed"
+            ] = 0
+
+            return result
+
+        payload = fetch_preview_payload(
+            request_value,
+            session=session,
+            timeout=timeout,
+            impersonate=impersonate,
+            max_bytes=max_bytes,
+        )
+
+        cache_path = persist_preview_cache(
+            cache_root,
+            payload,
+        )
+
+        result = dict(
+            payload
+        )
+
+        result[
+            "cache_hit"
+        ] = False
+
+        result[
+            "cache_path"
+        ] = cache_path
+
+        return result

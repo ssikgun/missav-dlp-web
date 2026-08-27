@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 import sqlite3
 import tempfile
+import threading
 
 import teddy_discovery_preview as preview
 
@@ -81,6 +82,45 @@ class FakeSession:
         )
 
         return self.response
+
+
+class FactorySession:
+    def __init__(
+        self,
+    ):
+        self.calls = []
+        self.lock = threading.Lock()
+
+    def get(
+        self,
+        url,
+        **kwargs,
+    ):
+        with self.lock:
+            self.calls.append(
+                (
+                    url,
+                    kwargs,
+                )
+            )
+
+        return FakeResponse(
+            headers={
+                "Content-Type":
+                    "video/mp4",
+
+                "Content-Length":
+                    str(
+                        len(
+                            MP4_BODY
+                        )
+                    ),
+            },
+
+            chunks=[
+                MP4_BODY,
+            ],
+        )
 
 
 def connection_with_title():
@@ -473,6 +513,170 @@ def main():
 
     print(
         "PREVIEW_ATOMIC_CACHE_SMOKE=PASS"
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        orchestration_session = (
+            FactorySession()
+        )
+
+        results = []
+        errors = []
+        result_lock = threading.Lock()
+
+        def worker():
+            connection = (
+                connection_with_title()
+            )
+
+            try:
+                value = preview.get_preview(
+                    connection,
+                    tmp,
+                    "SDNM-560",
+                    session=
+                        orchestration_session,
+                )
+
+                with result_lock:
+                    results.append(
+                        value
+                    )
+
+            except Exception as exc:
+                with result_lock:
+                    errors.append(
+                        exc
+                    )
+
+            finally:
+                connection.close()
+
+        threads = [
+            threading.Thread(
+                target=worker
+            )
+            for _ in range(8)
+        ]
+
+        for thread in threads:
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
+        require(
+            not errors,
+            "preview singleflight worker failed",
+        )
+
+        require(
+            len(
+                results
+            ) == 8,
+            "preview singleflight "
+            "result count changed",
+        )
+
+        require(
+            len(
+                orchestration_session.calls
+            ) == 1,
+            "preview singleflight "
+            "performed duplicate upstream fetch",
+        )
+
+        miss_count = sum(
+            1
+            for value
+            in results
+            if value.get(
+                "cache_hit"
+            ) is False
+        )
+
+        hit_count = sum(
+            1
+            for value
+            in results
+            if value.get(
+                "cache_hit"
+            ) is True
+        )
+
+        require(
+            miss_count == 1,
+            "preview singleflight "
+            "cache miss count changed",
+        )
+
+        require(
+            hit_count == 7,
+            "preview singleflight "
+            "cache hit count changed",
+        )
+
+        require(
+            all(
+                value[
+                    "body"
+                ] == MP4_BODY
+                for value
+                in results
+            ),
+            "preview singleflight "
+            "body mismatch",
+        )
+
+        second_connection = (
+            connection_with_title()
+        )
+
+        try:
+            second = preview.get_preview(
+                second_connection,
+                tmp,
+                "SDNM-560",
+                session=
+                    orchestration_session,
+            )
+
+        finally:
+            second_connection.close()
+
+        require(
+            second[
+                "cache_hit"
+            ] is True,
+            "preview repeat cache hit missing",
+        )
+
+        require(
+            second[
+                "request_attempts"
+            ] == 0,
+            "preview cache hit "
+            "network accounting changed",
+        )
+
+        require(
+            len(
+                orchestration_session.calls
+            ) == 1,
+            "preview repeat caused "
+            "upstream request",
+        )
+
+    print(
+        "PREVIEW_GET_ORCHESTRATION_SMOKE=PASS"
+    )
+
+    print(
+        "PREVIEW_SINGLEFLIGHT_8_CONCURRENT_SMOKE=PASS"
+    )
+
+    print(
+        "PREVIEW_REPEAT_CACHE_NETWORK_ZERO_SMOKE=PASS"
     )
 
     print(
