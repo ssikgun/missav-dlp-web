@@ -228,7 +228,7 @@
 
 .discovery-detail {
     display: grid;
-    grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+    grid-template-columns: minmax(360px, 520px) minmax(0, 1fr);
     gap: 16px;
     padding: 0 14px 14px;
     border-top: 1px solid #f1f5f9;
