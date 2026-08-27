@@ -62,8 +62,8 @@ def main():
     # which made the existing toast renderer show an empty green box.
     replace_once(
         ROUTING,
-        """        return core.jsonify({\n            'status': 'success',\n            'task_id': task_id,\n""",
-        """        return core.jsonify({\n            'status': 'success',\n            'message': '다운로드 큐에 추가했습니다.',\n            'task_id': task_id,\n""",
+        """    return core.jsonify({\n        'status': 'success',\n        'task_id': task_id,\n""",
+        """    return core.jsonify({\n        'status': 'success',\n        'message': '다운로드 큐에 추가했습니다.',\n        'task_id': task_id,\n""",
         'download success toast message',
     )
 
