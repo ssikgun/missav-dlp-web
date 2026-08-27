@@ -11,6 +11,11 @@ from teddy_discovery_cover_api import (
     create_cover_blueprint,
 )
 
+from teddy_discovery_preview_api import (
+    PREVIEW_BLUEPRINT_NAME,
+    create_preview_blueprint,
+)
+
 
 DISCOVERY_DB_ENV = (
     "TEDDY_DISCOVERY_DB"
@@ -18,6 +23,10 @@ DISCOVERY_DB_ENV = (
 
 DISCOVERY_COVER_CACHE_ENV = (
     "TEDDY_DISCOVERY_COVER_CACHE"
+)
+
+DISCOVERY_PREVIEW_CACHE_ENV = (
+    "TEDDY_DISCOVERY_PREVIEW_CACHE"
 )
 
 DISCOVERY_BLUEPRINT_NAME = (
@@ -35,6 +44,13 @@ def configured_db_path() -> str:
 def configured_cover_cache_path() -> str:
     return os.environ.get(
         DISCOVERY_COVER_CACHE_ENV,
+        "",
+    ).strip()
+
+
+def configured_preview_cache_path() -> str:
+    return os.environ.get(
+        DISCOVERY_PREVIEW_CACHE_ENV,
         "",
     ).strip()
 
@@ -109,6 +125,30 @@ def install(core) -> dict:
             create_cover_blueprint(
                 db_path,
                 cover_cache_path,
+            )
+        )
+
+        installed_any = True
+
+    #
+    # Preview serving is independently
+    # opt-in. It shares only the Discovery
+    # DB front door with Cover serving.
+    #
+    preview_cache_path = (
+        configured_preview_cache_path()
+    )
+
+    if (
+        db_path
+        and preview_cache_path
+        and PREVIEW_BLUEPRINT_NAME
+        not in app.blueprints
+    ):
+        app.register_blueprint(
+            create_preview_blueprint(
+                db_path,
+                preview_cache_path,
             )
         )
 
