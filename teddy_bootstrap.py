@@ -16,6 +16,7 @@ import teddy_routing
 import teddy_proxy_pool
 import teddy_storage
 import teddy_discovery_runtime
+import teddy_selkies_control_api
 
 
 core = reliability.core
@@ -30,6 +31,7 @@ teddy_network.install(core)
 teddy_logging.install_routes(core)
 teddy_storage.install_file_routes(core)
 teddy_discovery_runtime.install(core)
+teddy_selkies_control_api.install(core)
 teddy_proxy_pool.install(core, teddy_routing, teddy_network)
 
 
