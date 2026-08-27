@@ -6,9 +6,18 @@ from teddy_discovery_api import (
     create_discovery_blueprint,
 )
 
+from teddy_discovery_cover_api import (
+    COVER_BLUEPRINT_NAME,
+    create_cover_blueprint,
+)
+
 
 DISCOVERY_DB_ENV = (
     "TEDDY_DISCOVERY_DB"
+)
+
+DISCOVERY_COVER_CACHE_ENV = (
+    "TEDDY_DISCOVERY_COVER_CACHE"
 )
 
 DISCOVERY_BLUEPRINT_NAME = (
@@ -19,6 +28,13 @@ DISCOVERY_BLUEPRINT_NAME = (
 def configured_db_path() -> str:
     return os.environ.get(
         DISCOVERY_DB_ENV,
+        "",
+    ).strip()
+
+
+def configured_cover_cache_path() -> str:
+    return os.environ.get(
+        DISCOVERY_COVER_CACHE_ENV,
         "",
     ).strip()
 
@@ -36,24 +52,22 @@ def install(core) -> dict:
             "core.app"
         )
 
-    if (
+    discovery_installed = (
         DISCOVERY_BLUEPRINT_NAME
         in app.blueprints
-    ):
-        return {
-            "enabled":
-                True,
-
-            "installed":
-                False,
-
-            "reason":
-                "already-installed",
-        }
+    )
 
     db_path = configured_db_path()
 
-    if not db_path:
+    #
+    # Preserve the original disabled
+    # behavior when no Discovery DB has
+    # ever been installed/configured.
+    #
+    if (
+        not discovery_installed
+        and not db_path
+    ):
         return {
             "enabled":
                 False,
@@ -65,19 +79,60 @@ def install(core) -> dict:
                 "not-configured",
         }
 
-    app.register_blueprint(
-        create_discovery_blueprint(
-            db_path
+    installed_any = False
+
+    if not discovery_installed:
+        app.register_blueprint(
+            create_discovery_blueprint(
+                db_path
+            )
         )
+
+        installed_any = True
+
+    #
+    # Cover serving is deliberately
+    # opt-in. The DB alone keeps the
+    # pre-cover runtime behavior.
+    #
+    cover_cache_path = (
+        configured_cover_cache_path()
     )
+
+    if (
+        db_path
+        and cover_cache_path
+        and COVER_BLUEPRINT_NAME
+        not in app.blueprints
+    ):
+        app.register_blueprint(
+            create_cover_blueprint(
+                db_path,
+                cover_cache_path,
+            )
+        )
+
+        installed_any = True
+
+    if installed_any:
+        return {
+            "enabled":
+                True,
+
+            "installed":
+                True,
+
+            "reason":
+                "configured",
+        }
 
     return {
         "enabled":
             True,
 
         "installed":
-            True,
+            False,
 
         "reason":
-            "configured",
+            "already-installed",
     }
