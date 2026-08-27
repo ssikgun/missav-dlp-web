@@ -220,6 +220,7 @@ def main():
         "/api/discovery/category?name=",
         "/api/discovery/media/cover/",
         "/api/discovery/media/preview/",
+        "/api/discovery/download",
     )
 
     for endpoint in expected_endpoints:
@@ -232,14 +233,31 @@ def main():
             + endpoint,
         )
 
+    require(
+        js.count(
+            "method: 'POST'"
+        ) == 1,
+        "Discovery JS POST count changed",
+    )
+
+    require(
+        'method: "POST"'
+        not in js,
+        "unexpected double-quoted POST added",
+    )
+
+    require(
+        js.count(
+            "dvd_id: dvdId"
+        ) == 1,
+        "Discovery download must send DVD ID only",
+    )
+
     for forbidden in (
         "http://",
         "https://",
         ".m3u8",
         "/stream",
-        "/download",
-        "method: 'POST'",
-        'method: "POST"',
         "method: 'PUT'",
         'method: "PUT"',
         "method: 'DELETE'",
@@ -584,7 +602,7 @@ def main():
     )
 
     print(
-        "DISCOVERY_UI_READ_ONLY_BROWSER_BOUNDARY_SMOKE=PASS"
+        "DISCOVERY_UI_SAME_ORIGIN_DOWNLOAD_BOUNDARY_SMOKE=PASS"
     )
 
     print(

@@ -561,3 +561,48 @@ html[data-theme="dark"] .discovery-cover-placeholder.error {
     color: #f87171;
     background: #281214;
 }
+
+/* Discovery download action */
+.discovery-download-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.discovery-download-btn {
+    min-width: 122px;
+    min-height: 36px;
+    padding: 8px 14px;
+    border: 1px solid #2563eb;
+    border-radius: 8px;
+    background: #2563eb;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 750;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        opacity 0.15s;
+}
+
+.discovery-download-btn:hover:not(:disabled) {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.discovery-download-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+html[data-theme="dark"] .discovery-download-btn {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: #ffffff;
+}
+
+html[data-theme="dark"] .discovery-download-btn:hover:not(:disabled) {
+    background: #2563eb;
+    border-color: #2563eb;
+}

@@ -192,6 +192,164 @@
         );
     }
 
+    function downloadButton(item) {
+        const sources = Array.isArray(
+            item.available_sources
+        )
+            ? item.available_sources
+            : [];
+
+        const available = (
+            sources.includes('missav')
+            || sources.includes('123av')
+        );
+
+        return (
+            '<button type="button"'
+            + ' class="discovery-download-btn"'
+            + ' data-discovery-download="'
+            + escapeHtml(item.dvd_id)
+            + '"'
+            + (available ? '' : ' disabled')
+            + '>'
+            + (
+                available
+                    ? '다운로드'
+                    : '다운로드 불가'
+            )
+            + '</button>'
+        );
+    }
+
+    function downloadMessage(message, error) {
+        status.className = (
+            'discovery-status'
+            + (error ? ' error' : '')
+        );
+
+        status.textContent = message;
+    }
+
+    async function requestDownload(
+        dvdId,
+        button
+    ) {
+        const originalText = (
+            button.textContent
+            || '다운로드'
+        );
+
+        button.disabled = true;
+        button.textContent = '추가 중...';
+
+        try {
+            const response = await fetch(
+                '/api/discovery/download',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        dvd_id: dvdId,
+                    }),
+                }
+            );
+
+            let payload = null;
+
+            try {
+                payload = await response.json();
+            } catch (_) {
+                throw new Error(
+                    '서버 응답을 읽을 수 없습니다'
+                );
+            }
+
+            if (
+                response.status === 409
+                && payload
+                && payload.status === 'duplicate'
+            ) {
+                button.textContent = '이미 큐에 있음';
+
+                downloadMessage(
+                    payload.message
+                    || '이미 다운로드 큐에 있습니다.',
+                    false,
+                );
+
+                return;
+            }
+
+            if (
+                !response.ok
+                || !payload
+                || payload.status !== 'success'
+            ) {
+                throw new Error(
+                    (
+                        payload
+                        && payload.message
+                    )
+                    || '다운로드를 추가하지 못했습니다'
+                );
+            }
+
+            button.textContent = '추가됨';
+
+            downloadMessage(
+                dvdId + ' 다운로드를 추가했습니다.',
+                false,
+            );
+
+        } catch (error) {
+            button.disabled = false;
+            button.textContent = originalText;
+
+            downloadMessage(
+                (
+                    error
+                    && error.message
+                )
+                    ? error.message
+                    : '다운로드를 추가하지 못했습니다',
+                true,
+            );
+        }
+    }
+
+    function bindDownloadActions() {
+        list.querySelectorAll(
+            '[data-discovery-download]'
+        ).forEach(
+            button => {
+                button.addEventListener(
+                    'click',
+                    event => {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        const dvdId = (
+                            button.dataset.discoveryDownload
+                            || ''
+                        ).trim();
+
+                        if (!dvdId) {
+                            return;
+                        }
+
+                        requestDownload(
+                            dvdId,
+                            button,
+                        );
+                    }
+                );
+            }
+        );
+    }
+
     function chips(values) {
         if (
             !Array.isArray(values)
@@ -952,6 +1110,10 @@
                     )
                     + '</div>'
                     + '</div>'
+                    + '<div class="discovery-detail-block discovery-download-block">'
+                    + '<div class="discovery-detail-label">다운로드</div>'
+                    + downloadButton(item)
+                    + '</div>'
                     + '</div>'
                     + '</div>'
                     + '</details>'
@@ -966,6 +1128,8 @@
         bindPreviewLazyLoad(
             items
         );
+
+        bindDownloadActions();
     }
 
     function viewUrl(view) {

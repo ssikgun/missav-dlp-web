@@ -79,38 +79,90 @@ def find_duplicate(core, url):
     return None, None
 
 
+def guarded_enqueue(
+    core,
+    url,
+    creator,
+):
+    """Run task creation under the canonical duplicate queue lock."""
+    url = str(url or '').strip()
+
+    if not url:
+        return creator()
+
+    # Keep duplicate check + task creation/queue insertion atomic.
+    with _QUEUE_LOCK:
+        task_id, task = find_duplicate(
+            core,
+            url,
+        )
+
+        if task_id:
+            status = str(
+                task.get('status')
+                or '대기 중'
+            )
+
+            title = str(
+                task.get('display_title')
+                or task.get('filename')
+                or ''
+            ).strip()
+
+            message = (
+                '이미 다운로드 큐에 있는 항목입니다.'
+            )
+
+            if status.startswith('에러'):
+                message = (
+                    '이미 작업 목록에 있습니다. '
+                    '기존 작업의 재시작을 사용하세요.'
+                )
+
+            print(
+                f'[Duplicate] 추가 차단: '
+                f'{duplicate_key(url)} · '
+                f'task={task_id} · '
+                f'status={status}',
+                flush=True,
+            )
+
+            return core.jsonify({
+                'status': 'duplicate',
+                'message': message,
+                'task_id': task_id,
+                'task_status': status,
+                'title': title,
+            }), 409
+
+        return creator()
+
+
 def install(core):
-    original = core.app.view_functions.get('handle_download')
+    original = core.app.view_functions.get(
+        'handle_download'
+    )
+
     if not original:
         return
 
     def handle_download_without_duplicates():
-        url = core.request.form.get('url', '').strip()
-        if not url:
-            return original()
+        url = core.request.form.get(
+            'url',
+            '',
+        ).strip()
 
-        # Keep duplicate check + task creation/queue insertion atomic. The wrapped
-        # front-door creates the task synchronously before it returns.
-        with _QUEUE_LOCK:
-            task_id, task = find_duplicate(core, url)
-            if task_id:
-                status = str(task.get('status') or '대기 중')
-                title = str(task.get('display_title') or task.get('filename') or '').strip()
-                message = '이미 다운로드 큐에 있는 항목입니다.'
-                if status.startswith('에러'):
-                    message = '이미 작업 목록에 있습니다. 기존 작업의 재시작을 사용하세요.'
-                print(
-                    f'[Duplicate] 추가 차단: {duplicate_key(url)} · task={task_id} · status={status}',
-                    flush=True,
-                )
-                return core.jsonify({
-                    'status': 'duplicate',
-                    'message': message,
-                    'task_id': task_id,
-                    'task_status': status,
-                    'title': title,
-                }), 409
-            return original()
+        return guarded_enqueue(
+            core,
+            url,
+            original,
+        )
 
-    core.app.view_functions['handle_download'] = handle_download_without_duplicates
-    print('[Teddy] duplicate queue guard enabled', flush=True)
+    core.app.view_functions[
+        'handle_download'
+    ] = handle_download_without_duplicates
+
+    print(
+        '[Teddy] duplicate queue guard enabled',
+        flush=True,
+    )

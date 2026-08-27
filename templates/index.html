@@ -566,11 +566,11 @@
         <button class="sidebar-btn active" data-page="download" title="다운로드">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         </button>
-        <button class="sidebar-btn" data-page="files" title="파일 관리">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-        </button>
         <button class="sidebar-btn" data-page="discovery" title="Discovery">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.4-3.4"/><path d="M8 11h6"/><path d="M11 8v6"/></svg>
+        </button>
+        <button class="sidebar-btn" data-page="files" title="파일 관리">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
         </button>
         <div style="flex:1"></div>
         <button class="sidebar-btn" data-page="settings" title="설정">
@@ -701,6 +701,22 @@
                         <option value="1080">1080p</option>
                         <option value="720">720p</option>
                         <option value="480">480p</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Discovery 다운로드 소스</label>
+                    <div class="setting-desc">
+                        Discovery에서 MissAV와 123AV가 모두 확인된 경우 사용할 우선순위입니다.
+                        한 소스만 확인되면 해당 소스를 자동으로 사용합니다.
+                    </div>
+                    <select
+                        id="set-discovery-download-preference"
+                        class="setting-select"
+                    >
+                        <option value="auto">자동 · MissAV 우선</option>
+                        <option value="missav">MissAV 우선</option>
+                        <option value="123av">123AV 우선</option>
                     </select>
                 </div>
 
@@ -1055,6 +1071,7 @@ missav01.com</textarea>
         video_quality: 'best',
         auto_retry: true,
         auto_retry_max: 30,
+        discovery_download_preference: 'auto',
         mirrors: ['missav.ai', 'missav.ws', 'missav.live', 'missav.fans', 'missav.media', 'missav123.com', 'missav01.com']
     };
 
@@ -1068,6 +1085,12 @@ missav01.com</textarea>
             document.getElementById('set-auto-retry').checked = s.auto_retry !== false;
             document.getElementById('set-auto-retry-max').value = s.auto_retry_max || 30;
             document.getElementById('set-quality').value = s.video_quality || 'best';
+            document.getElementById('set-discovery-download-preference').value =
+                ['auto', 'missav', '123av'].includes(
+                    s.discovery_download_preference
+                )
+                    ? s.discovery_download_preference
+                    : 'auto';
             document.getElementById('set-mirrors').value = (s.mirrors || defaultSettings.mirrors).join('\n');
             document.getElementById('set-cf-cookie').value = s.cf_cookie || '';
             document.getElementById('set-cf-ua').value = s.cf_user_agent || '';
@@ -1468,6 +1491,8 @@ missav01.com</textarea>
             spoofdpi_enabled: document.getElementById('set-spoofdpi').checked,
             auto_retry: document.getElementById('set-auto-retry').checked,
             auto_retry_max: parseInt(document.getElementById('set-auto-retry-max').value) || 30,
+            discovery_download_preference:
+                document.getElementById('set-discovery-download-preference').value,
             video_quality: document.getElementById('set-quality').value,
             mirrors: mirrors,
             cf_cookie: document.getElementById('set-cf-cookie').value.trim(),

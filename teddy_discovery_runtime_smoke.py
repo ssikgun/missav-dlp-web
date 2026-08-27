@@ -174,6 +174,7 @@ def main_rules():
     return [
         "/api/discovery/categories",
         "/api/discovery/category",
+        "/api/discovery/download",
         "/api/discovery/latest",
         "/api/discovery/monthly",
         "/api/discovery/weekly",
@@ -220,6 +221,26 @@ def assert_read_only_routes(
         methods = set(
             rule.methods
         )
+
+        if (
+            rule.rule
+            == "/api/discovery/download"
+        ):
+            require(
+                "POST" in methods,
+                "Discovery download lost POST",
+            )
+
+            require(
+                "GET" not in methods
+                and "PUT" not in methods
+                and "DELETE" not in methods
+                and "PATCH" not in methods,
+                "Discovery download exposed "
+                "unexpected method",
+            )
+
+            continue
 
         require(
             "GET" in methods,
@@ -711,7 +732,7 @@ def cover_configured_smoke(
     )
 
     print(
-        "DISCOVERY_RUNTIME_ALL_ROUTES_READ_ONLY_SMOKE=PASS"
+        "DISCOVERY_RUNTIME_DOWNLOAD_POST_BOUNDARY_SMOKE=PASS"
     )
 
 
@@ -1446,7 +1467,7 @@ def main():
             True,
 
         "write_methods":
-            0,
+            1,
     }
 
     oracle = hashlib.sha256(

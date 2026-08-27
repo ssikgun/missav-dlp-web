@@ -27,6 +27,7 @@ COPY . .
 RUN python -m py_compile \
     app.py teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py \
     teddy_routing.py teddy_duplicates.py teddy_logging.py teddy_storage.py teddy_browser_config.py teddy_auth.py \
+    teddy_discovery_runtime.py teddy_discovery_download_api.py teddy_discovery_runtime_smoke.py teddy_discovery_ui_shell_smoke.py teddy_discovery_download_api_smoke.py \
     teddy_generic.py teddy_123av.py teddy_bootstrap.py teddy_verify_build.py teddy_hls_transport.py teddy_hls_benchmark.py \
     teddy_patch_vpn_health.py teddy_patch_proxy_pool.py teddy_patch_proxy_speed.py \
     teddy_patch_proxy_learning.py teddy_patch_proxy_task_sync.py \
@@ -43,6 +44,8 @@ RUN python -c "import teddy_vpn_health as h; s=h.snapshot(); assert s['auto_fail
 RUN python -c "import teddy_proxy_pool as p; assert p._normalize_proxy('8.8.8.8:8080') == 'http://8.8.8.8:8080'; assert not p._normalize_proxy('127.0.0.1:8080'); assert not p._normalize_proxy('192.168.1.10:3128'); assert p.MAX_CANDIDATES <= 64; print('free proxy pool safety smoke test: OK')"
 RUN python -c "import teddy_routing as r; assert r.canonical_site('https://youtu.be/abc') == 'youtube.com'; assert r.canonical_site('https://www.youtube.com/watch?v=abc') == 'youtube.com'; assert r.canonical_site('https://missav123.com/ko/abc') == 'missav'; assert r.proxy_for_mode('direct') is None; r.set_proxy_provider(lambda: 'http://8.8.8.8:8080'); assert r.proxy_for_mode('proxy') == 'http://8.8.8.8:8080'; assert r.fallback_modes('direct') == ['proxy', 'vpn']; assert r.fallback_modes('proxy') == ['vpn']; assert r.fallback_modes('vpn') == []; print('adaptive three-route smoke test: OK')"
 RUN python -c "import teddy_duplicates as d; assert d.duplicate_key('https://youtu.be/abc') == d.duplicate_key('https://www.youtube.com/watch?v=abc'); assert d.duplicate_key('https://missav123.com/ko/ABC') == d.duplicate_key('https://missav01.com/en/ABC'); assert d.duplicate_key('https://example.com/a#one') == d.duplicate_key('https://example.com/a#two'); assert d.duplicate_key('https://example.com/a?x=1') != d.duplicate_key('https://example.com/a?x=2'); print('duplicate queue guard smoke test: OK')"
+RUN python -c "import teddy_discovery_download_api as d; assert d.normalize_preference('bad') == 'auto'; assert d.select_source([], 'auto') is None; assert d.select_source(['missav'], '123av') == 'missav'; assert d.select_source(['123av'], 'missav') == '123av'; assert d.select_source(['missav','123av'], 'auto') == 'missav'; assert d.select_source(['missav','123av'], 'missav') == 'missav'; assert d.select_source(['missav','123av'], '123av') == '123av'; print('Discovery download source selection smoke test: OK')"
+RUN python teddy_discovery_download_api_smoke.py
 RUN python -c "import teddy_logging as l; assert l._clean_for_viewer('\\x1b[31mRED\\x1b[0m') == 'RED'; assert l._clean_for_viewer(b'hello') == 'hello'; print('web log cleanup smoke test: OK')"
 RUN python -c "import teddy_generic as g; C=type('C',(),{'settings':{'video_quality':'1080'}}); s=g._format_selector(C); assert 'height<=1080' in s; assert 'ext=mp4' in s; print('generic yt-dlp engine smoke test: OK')"
 RUN python -c "import teddy_123av as a; assert a.Teddy123AVIE.suitable('https://123av.com/ko/v/jur-821'); assert not a.Teddy123AVIE.suitable('https://www.youtube.com/watch?v=test'); print('123AV extractor URL boundary smoke test: OK')"
@@ -76,8 +79,8 @@ RUN grep -Fq "def _fetch_segment_with_network_recovery(task_id, seg_url, headers
 # Patched runtime must compile and satisfy explicit semantic markers.
 RUN python -m py_compile \
     app.py teddy_entrypoint.py teddy_bootstrap.py teddy_vpn_health.py teddy_network.py \
-    teddy_proxy_pool.py teddy_routing.py teddy_generic.py teddy_123av.py teddy_hls_transport.py teddy_hls_benchmark.py \
-    teddy_browser_config.py teddy_auth.py teddy_patch_routing.py
+    teddy_proxy_pool.py teddy_routing.py teddy_duplicates.py teddy_generic.py teddy_123av.py teddy_hls_transport.py teddy_hls_benchmark.py \
+    teddy_browser_config.py teddy_auth.py teddy_discovery_runtime.py teddy_discovery_download_api.py teddy_patch_routing.py
 RUN python teddy_verify_build.py runtime
 
 # Teddy UI / file-manager / routing patches.
@@ -120,6 +123,8 @@ RUN grep -Fq 'rel="manifest" href="/static/teddy-manifest.webmanifest"' template
     test -s templates/teddy-icon-180.png && \
     test -s templates/teddy-icon.svg
 
+RUN python teddy_discovery_ui_shell_smoke.py templates/index.html templates/teddy-discovery.css templates/teddy-discovery.js
+
 # Split-storage production guards. /downloads remains local work/state;
 # TEDDY_FINAL_DIR points completed public files at the final filesystem.
 RUN grep -Fq "TEDDY_FINAL_DIR" teddy_storage.py && \
@@ -130,6 +135,7 @@ RUN grep -Fq "TEDDY_FINAL_DIR" teddy_storage.py && \
 
 RUN python -m py_compile \
     teddy_bootstrap.py teddy_browser_config.py teddy_auth.py teddy_storage.py \
+    teddy_routing.py teddy_duplicates.py teddy_discovery_runtime.py teddy_discovery_download_api.py \
     teddy_generic.py teddy_123av.py teddy_entrypoint.py teddy_patch_pwa.py
 RUN python teddy_verify_build.py final
 

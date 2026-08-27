@@ -39,6 +39,7 @@ DEFAULT_SETTINGS = {
     'filename_template': '[%(id)s] %(title).60s.%(ext)s',
     'spoofdpi_enabled': True,
     'video_quality': 'best',
+    'discovery_download_preference': 'auto',
     # 유저스크립트 @match 기준 현재 활성 도메인 (2026.3 기준). 죽은 미러(missav.net/com) 제거.
     'mirrors': ['missav.ai', 'missav.ws', 'missav.live', 'missav.fans', 'missav.media', 'missav123.com', 'missav01.com'],
     # (선택·대개 불필요) surrit.com이 쿠키를 요구하는 경우에만: 브라우저에서 복사한 cf_clearance 쿠키/UA.

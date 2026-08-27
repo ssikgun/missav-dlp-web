@@ -292,42 +292,82 @@ def should_fallback(network_module, error_message):
     return bool(network_module.is_recoverable_failure(error_message))
 
 
+def enqueue_download(
+    core,
+    url,
+    override='auto',
+):
+    """Create one download task through the canonical routing boundary."""
+    url = str(url or '').strip()
+    if not url:
+        return core.jsonify({
+            'status': 'error',
+            'message': 'URL 입력',
+        }), 400
+
+    override = str(
+        override or 'auto'
+    ).lower()
+
+    if override not in ('auto',) + VALID_MODES:
+        return core.jsonify({
+            'status': 'error',
+            'message': '잘못된 네트워크 모드입니다.',
+        }), 400
+
+    task_id = str(
+        core.uuid.uuid4()
+    )
+
+    decision = resolve(
+        url,
+        override=override,
+    )
+
+    core.tasks[task_id] = {
+        'url': url,
+        'status': '대기 중',
+        'progress': '0%',
+        'speed_bps': 0,
+        'downloaded_bytes': 0,
+        'total_bytes_estimate': 0,
+        'network_override': override,
+        'network_mode': decision['mode'],
+        'network_route_source': decision['source'],
+        'network_site': decision['site'],
+        'network_fallbacks': 0,
+    }
+
+    core.save_tasks()
+    core.download_queue.put(
+        task_id
+    )
+
+    return core.jsonify({
+        'status': 'success',
+        'task_id': task_id,
+        'network_mode': decision['mode'],
+        'network_source': decision['source'],
+    })
+
+
 def install(core):
     _load(core)
 
     # Replace the original download front-door so network selection is persisted
     # before a worker can pick the queued task.
     def handle_download_with_network():
-        url = core.request.form.get('url', '').strip()
-        if not url:
-            return core.jsonify({'status': 'error', 'message': 'URL 입력'}), 400
-        override = str(core.request.form.get('network_mode', 'auto') or 'auto').lower()
-        if override not in ('auto',) + VALID_MODES:
-            return core.jsonify({'status': 'error', 'message': '잘못된 네트워크 모드입니다.'}), 400
-
-        task_id = str(core.uuid.uuid4())
-        decision = resolve(url, override=override)
-        core.tasks[task_id] = {
-            'url': url,
-            'status': '대기 중',
-            'progress': '0%',
-            'speed_bps': 0,
-            'downloaded_bytes': 0,
-            'total_bytes_estimate': 0,
-            'network_override': override,
-            'network_mode': decision['mode'],
-            'network_route_source': decision['source'],
-            'network_site': decision['site'],
-            'network_fallbacks': 0,
-        }
-        core.save_tasks()
-        core.download_queue.put(task_id)
-        return core.jsonify({
-            'status': 'success',
-            'task_id': task_id,
-            'network_mode': decision['mode'],
-            'network_source': decision['source'],
-        })
+        return enqueue_download(
+            core,
+            core.request.form.get(
+                'url',
+                '',
+            ),
+            core.request.form.get(
+                'network_mode',
+                'auto',
+            ),
+        )
 
     if 'handle_download' in core.app.view_functions:
         core.app.view_functions['handle_download'] = handle_download_with_network
