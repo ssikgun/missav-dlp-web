@@ -64,6 +64,7 @@ services:
       - ./work:/downloads
       - /mnt/nas-downloads:/final
       - /opt/missav-dlp-web/teddy-auth:/run/secrets/teddy-auth:ro
+      - /opt/missav-dlp-web/teddy-selkies-control:/run/secrets/teddy-selkies-control:ro
 
   vpn-browser:
     image: jlesage/chromium:latest
@@ -145,6 +146,8 @@ services:
       - SELKIES_UI_SHOW_SIDEBAR=false
       - TEDDY_PROXY_SERVER=http://gluetun:8888
       - TEDDY_START_URL=https://api.ipify.org
+      - TEDDY_SELKIES_CONTROL_ENABLED=true
+      - TEDDY_SELKIES_ROLE=desktop
     ports:
       - "192.168.1.155:58010:8080/tcp"
     devices:
@@ -153,6 +156,7 @@ services:
       - "992"
     volumes:
       - /opt/missav-selkies-browser-config/chrome-profile:/config/chrome-profile:rw
+      - /opt/missav-dlp-web/teddy-selkies-control:/run/secrets/teddy-selkies-control:ro
     shm_size: "2gb"
     mem_limit: "3g"
     memswap_limit: "3g"
@@ -186,6 +190,8 @@ services:
       - SELKIES_UI_SHOW_SIDEBAR=true
       - TEDDY_PROXY_SERVER=http://gluetun:8888
       - TEDDY_START_URL=https://api.ipify.org
+      - TEDDY_SELKIES_CONTROL_ENABLED=true
+      - TEDDY_SELKIES_ROLE=mobile
     ports:
       - "192.168.1.155:58011:8080/tcp"
     devices:
@@ -194,6 +200,7 @@ services:
       - "992"
     volumes:
       - /opt/missav-selkies-mobile-browser-config/chrome-profile:/config/chrome-profile:rw
+      - /opt/missav-dlp-web/teddy-selkies-control:/run/secrets/teddy-selkies-control:ro
     shm_size: "1gb"
     mem_limit: "2g"
     memswap_limit: "2g"
