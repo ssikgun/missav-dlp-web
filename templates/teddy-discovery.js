@@ -865,6 +865,39 @@
     }
 
 
+    function bindExclusiveRows() {
+        const rows = Array.from(
+            list.querySelectorAll(
+                '.discovery-row'
+            )
+        );
+
+        rows.forEach(
+            row => {
+                row.addEventListener(
+                    'toggle',
+                    () => {
+                        if (!row.open) {
+                            return;
+                        }
+
+                        rows.forEach(
+                            otherRow => {
+                                if (
+                                    otherRow !== row
+                                    && otherRow.open
+                                ) {
+                                    otherRow.open = false;
+                                }
+                            }
+                        );
+                    }
+                );
+            }
+        );
+    }
+
+
     function bindPreviewLazyLoad(
         items
     ) {
@@ -1124,6 +1157,8 @@
         bindCoverLazyLoad(
             items
         );
+
+        bindExclusiveRows();
 
         bindPreviewLazyLoad(
             items
