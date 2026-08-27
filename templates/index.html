@@ -457,6 +457,98 @@
         }
         .btn-reset:hover { background: #e2e8f0; }
 
+        /* --- Selkies browser system control --- */
+        .selkies-system-control {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+        }
+        .selkies-system-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .selkies-system-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .selkies-system-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #f8fafc;
+            padding: 14px;
+        }
+        .selkies-system-card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .selkies-system-name {
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .selkies-system-status {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: #f1f5f9;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .selkies-system-status.ok {
+            background: #f0fdf4;
+            color: #16a34a;
+        }
+        .selkies-system-status.pending {
+            background: #fff7ed;
+            color: #ea580c;
+        }
+        .selkies-system-status.error {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+        .selkies-system-meta {
+            min-height: 18px;
+            margin-bottom: 12px;
+            color: #64748b;
+            font-size: 12px;
+        }
+        .selkies-restart-btn {
+            width: 100%;
+            min-height: 36px;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            background: #fff;
+            color: #dc2626;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition:
+                background 0.15s,
+                opacity 0.15s;
+        }
+        .selkies-restart-btn:hover:not(:disabled) {
+            background: #fef2f2;
+        }
+        .selkies-restart-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+
+        @media (max-width: 640px) {
+            .selkies-system-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         /* --- Empty state --- */
         .empty {
             text-align: center;
@@ -634,6 +726,82 @@ missav01.com</textarea>
                     <label class="setting-label">쿠키 발급 브라우저 User-Agent</label>
                     <div class="setting-desc">위 cf_clearance를 받은 브라우저의 User-Agent (쿠키는 UA에 묶임). 비우면 firefox 위장 UA 사용.</div>
                     <input type="text" id="set-cf-ua" class="setting-input-wide" placeholder="Mozilla/5.0 (...) Firefox/133.0">
+                </div>
+
+                <div
+                    class="selkies-system-control"
+                    id="selkies-system-control"
+                >
+                    <div class="selkies-system-title">
+                        브라우저 시스템
+                    </div>
+
+                    <div class="setting-desc">
+                        Selkies 브라우저 컨테이너만 재시작합니다.
+                        Downloader 백엔드, VPN(Gluetun), CT108은 재시작하지 않습니다.
+                    </div>
+
+                    <div class="selkies-system-grid">
+                        <div class="selkies-system-card">
+                            <div class="selkies-system-card-head">
+                                <div class="selkies-system-name">
+                                    데스크톱 브라우저
+                                </div>
+                                <span
+                                    class="selkies-system-status"
+                                    id="selkies-desktop-status"
+                                    aria-live="polite"
+                                >
+                                    확인 중
+                                </span>
+                            </div>
+
+                            <div
+                                class="selkies-system-meta"
+                                id="selkies-desktop-meta"
+                            >
+                                상태를 확인하고 있습니다.
+                            </div>
+
+                            <button
+                                type="button"
+                                class="selkies-restart-btn"
+                                id="restartSelkiesDesktop"
+                            >
+                                Selkies 재시작
+                            </button>
+                        </div>
+
+                        <div class="selkies-system-card">
+                            <div class="selkies-system-card-head">
+                                <div class="selkies-system-name">
+                                    모바일 브라우저
+                                </div>
+                                <span
+                                    class="selkies-system-status"
+                                    id="selkies-mobile-status"
+                                    aria-live="polite"
+                                >
+                                    확인 중
+                                </span>
+                            </div>
+
+                            <div
+                                class="selkies-system-meta"
+                                id="selkies-mobile-meta"
+                            >
+                                상태를 확인하고 있습니다.
+                            </div>
+
+                            <button
+                                type="button"
+                                class="selkies-restart-btn"
+                                id="restartSelkiesMobile"
+                            >
+                                Selkies 재시작
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="setting-actions">
@@ -891,6 +1059,8 @@ missav01.com</textarea>
     };
 
     function loadSettingsUI() {
+        loadSelkiesStatuses();
+
         fetch('/api/settings').then(r => r.json()).then(s => {
             document.getElementById('set-max-concurrent').value = s.max_concurrent || 4;
             document.getElementById('set-filename-template').value = s.filename_template || defaultSettings.filename_template;
@@ -914,6 +1084,377 @@ missav01.com</textarea>
 
     document.getElementById('set-spoofdpi').addEventListener('change', updateToggleText);
     document.getElementById('set-auto-retry').addEventListener('change', updateToggleText);
+
+    const selkiesControlLabels = {
+        desktop: '데스크톱',
+        mobile: '모바일'
+    };
+
+    const selkiesControlState = {
+        desktop: { busy: false },
+        mobile: { busy: false }
+    };
+
+    function formatSelkiesUptime(seconds) {
+        var value = Math.max(
+            0,
+            parseInt(seconds, 10) || 0
+        );
+
+        var days = Math.floor(
+            value / 86400
+        );
+
+        var hours = Math.floor(
+            (value % 86400) / 3600
+        );
+
+        var minutes = Math.floor(
+            (value % 3600) / 60
+        );
+
+        if (days > 0) {
+            return (
+                days + '일 '
+                + hours + '시간'
+            );
+        }
+
+        if (hours > 0) {
+            return (
+                hours + '시간 '
+                + minutes + '분'
+            );
+        }
+
+        if (minutes > 0) {
+            return (
+                minutes + '분'
+            );
+        }
+
+        return value + '초';
+    }
+
+    function setSelkiesBusy(target, busy) {
+        selkiesControlState[target].busy = busy;
+
+        var button = document.getElementById(
+            target === 'desktop'
+                ? 'restartSelkiesDesktop'
+                : 'restartSelkiesMobile'
+        );
+
+        button.disabled = busy;
+        button.textContent = busy
+            ? '재시작 중...'
+            : 'Selkies 재시작';
+    }
+
+    function renderSelkiesStatus(
+        target,
+        state,
+        text,
+        meta
+    ) {
+        var status = document.getElementById(
+            'selkies-' + target + '-status'
+        );
+
+        var metaEl = document.getElementById(
+            'selkies-' + target + '-meta'
+        );
+
+        status.className = (
+            'selkies-system-status '
+            + state
+        );
+
+        status.textContent = text;
+        metaEl.textContent = meta;
+    }
+
+    async function fetchSelkiesStatus(target) {
+        try {
+            var response = await fetch(
+                '/api/system/selkies/'
+                + target
+                + '/status',
+                {
+                    cache: 'no-store'
+                }
+            );
+
+            var payload = {};
+
+            try {
+                payload = await response.json();
+            } catch (error) {
+                payload = {};
+            }
+
+            if (!response.ok) {
+                throw new Error(
+                    payload.message
+                    || (
+                        'HTTP '
+                        + response.status
+                    )
+                );
+            }
+
+            if (
+                payload.status !== 'success'
+                || payload.role !== target
+            ) {
+                throw new Error(
+                    '잘못된 상태 응답'
+                );
+            }
+
+            if (payload.restart_pending) {
+                renderSelkiesStatus(
+                    target,
+                    'pending',
+                    '재시작 중',
+                    '컨테이너 재시작을 기다리고 있습니다.'
+                );
+            } else {
+                renderSelkiesStatus(
+                    target,
+                    'ok',
+                    '정상',
+                    '실행 시간 '
+                    + formatSelkiesUptime(
+                        payload.uptime_seconds
+                    )
+                );
+            }
+
+            return payload;
+
+        } catch (error) {
+            renderSelkiesStatus(
+                target,
+                'error',
+                '확인 실패',
+                '상태를 확인할 수 없습니다.'
+            );
+
+            return null;
+        }
+    }
+
+    async function loadSelkiesStatuses() {
+        await Promise.all([
+            fetchSelkiesStatus(
+                'desktop'
+            ),
+            fetchSelkiesStatus(
+                'mobile'
+            )
+        ]);
+    }
+
+    function sleepSelkies(ms) {
+        return new Promise(
+            function(resolve) {
+                setTimeout(
+                    resolve,
+                    ms
+                );
+            }
+        );
+    }
+
+    async function restartSelkies(target) {
+        var label = (
+            selkiesControlLabels[target]
+        );
+
+        if (
+            !confirm(
+                label
+                + ' Selkies 브라우저만 재시작하시겠습니까?\n\n'
+                + '해당 브라우저 연결은 잠시 끊기지만 '
+                + 'Downloader 백엔드와 VPN은 재시작하지 않습니다.'
+            )
+        ) {
+            return;
+        }
+
+        if (
+            selkiesControlState[target].busy
+        ) {
+            return;
+        }
+
+        setSelkiesBusy(
+            target,
+            true
+        );
+
+        renderSelkiesStatus(
+            target,
+            'pending',
+            '재시작 요청',
+            'Selkies 컨테이너에 재시작을 요청하고 있습니다.'
+        );
+
+        try {
+            var response = await fetch(
+                '/api/system/selkies/'
+                + target
+                + '/restart',
+                {
+                    method: 'POST'
+                }
+            );
+
+            var payload = {};
+
+            try {
+                payload = await response.json();
+            } catch (error) {
+                payload = {};
+            }
+
+            if (
+                response.status !== 202
+                || payload.status !== 'accepted'
+                || payload.role !== target
+            ) {
+                throw new Error(
+                    payload.message
+                    || (
+                        'HTTP '
+                        + response.status
+                    )
+                );
+            }
+
+            showToast(
+                label
+                + ' Selkies 재시작을 요청했습니다.',
+                'success'
+            );
+
+            renderSelkiesStatus(
+                target,
+                'pending',
+                '재시작 중',
+                '새 Selkies 세션이 올라오기를 기다리고 있습니다.'
+            );
+
+            await sleepSelkies(
+                1500
+            );
+
+            var recovered = false;
+
+            for (
+                var attempt = 0;
+                attempt < 40;
+                attempt += 1
+            ) {
+                var status = await fetchSelkiesStatus(
+                    target
+                );
+
+                if (
+                    status
+                    && status.status === 'success'
+                    && status.role === target
+                    && status.restart_pending === false
+                ) {
+                    recovered = true;
+                    break;
+                }
+
+                await sleepSelkies(
+                    1000
+                );
+            }
+
+            if (recovered) {
+                showToast(
+                    label
+                    + ' Selkies가 다시 연결되었습니다.',
+                    'success'
+                );
+            } else {
+                showToast(
+                    label
+                    + ' Selkies 상태 확인이 필요합니다.',
+                    'error'
+                );
+            }
+
+        } catch (error) {
+            showToast(
+                label
+                + ' Selkies 재시작 요청에 실패했습니다.',
+                'error'
+            );
+
+            renderSelkiesStatus(
+                target,
+                'error',
+                '재시작 실패',
+                '잠시 후 다시 시도하세요.'
+            );
+
+        } finally {
+            setSelkiesBusy(
+                target,
+                false
+            );
+
+            await loadSelkiesStatuses();
+        }
+    }
+
+    document.getElementById(
+        'restartSelkiesDesktop'
+    ).addEventListener(
+        'click',
+        function() {
+            restartSelkies(
+                'desktop'
+            );
+        }
+    );
+
+    document.getElementById(
+        'restartSelkiesMobile'
+    ).addEventListener(
+        'click',
+        function() {
+            restartSelkies(
+                'mobile'
+            );
+        }
+    );
+
+    setInterval(
+        function() {
+            var settingsPage = document.getElementById(
+                'page-settings'
+            );
+
+            if (
+                settingsPage
+                && settingsPage.classList.contains(
+                    'active'
+                )
+                && !selkiesControlState.desktop.busy
+                && !selkiesControlState.mobile.busy
+            ) {
+                loadSelkiesStatuses();
+            }
+        },
+        10000
+    );
 
     document.getElementById('saveSettings').addEventListener('click', function() {
         var mirrors = document.getElementById('set-mirrors').value
