@@ -434,3 +434,130 @@
         grid-column: 2;
     }
 }
+
+/* Discovery dark theme */
+html[data-theme="dark"] .discovery-summary {
+    background: #111827;
+    color: #cbd5e1;
+    border-color: #334155;
+}
+
+html[data-theme="dark"] .discovery-tabs {
+    background: #1f2937;
+}
+
+html[data-theme="dark"] .discovery-tab {
+    color: #cbd5e1;
+}
+
+html[data-theme="dark"] .discovery-tab:hover {
+    color: #f8fafc;
+    background: #334155;
+}
+
+html[data-theme="dark"] .discovery-tab.active {
+    color: #ffffff;
+    background: #3b82f6;
+}
+
+html[data-theme="dark"] .discovery-genre-controls {
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] .discovery-select {
+    background: #111827;
+    color: #e5e7eb;
+    border-color: #334155;
+}
+
+html[data-theme="dark"] .discovery-row {
+    background: #111827;
+    border-color: #273449;
+}
+
+html[data-theme="dark"] .discovery-row[open] {
+    border-color: #3b82f6;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="dark"] .discovery-rank {
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] .discovery-id {
+    color: #60a5fa;
+}
+
+html[data-theme="dark"] .discovery-title {
+    color: #f8fafc;
+}
+
+html[data-theme="dark"] .discovery-meta {
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] .discovery-unowned,
+html[data-theme="dark"] .discovery-unchecked {
+    background: #1f2937;
+    color: #94a3b8;
+    border-color: #334155;
+}
+
+html[data-theme="dark"] .discovery-found {
+    background: #102348;
+    color: #60a5fa;
+}
+
+html[data-theme="dark"] .discovery-not-found {
+    background: #281214;
+    color: #f87171;
+}
+
+html[data-theme="dark"] .discovery-unknown {
+    background: #2b2110;
+    color: #fbbf24;
+}
+
+html[data-theme="dark"] .discovery-owned {
+    background: #0d2118;
+    color: #4ade80;
+}
+
+html[data-theme="dark"] .discovery-detail {
+    border-top-color: #253047;
+}
+
+html[data-theme="dark"] .discovery-cover-slot,
+html[data-theme="dark"] .discovery-cover-image {
+    background: #0f172a;
+    border-color: #334155;
+}
+
+html[data-theme="dark"] .discovery-detail-label,
+html[data-theme="dark"] .discovery-cover-placeholder,
+html[data-theme="dark"] .discovery-status,
+html[data-theme="dark"] .discovery-empty {
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] .discovery-detail-value {
+    color: #cbd5e1;
+}
+
+html[data-theme="dark"] .discovery-chip {
+    background: #1f2937;
+    color: #cbd5e1;
+}
+
+html[data-theme="dark"] .discovery-loading {
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] .discovery-empty {
+    border-color: #334155;
+}
+
+html[data-theme="dark"] .discovery-cover-placeholder.error {
+    color: #f87171;
+    background: #281214;
+}

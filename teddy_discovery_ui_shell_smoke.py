@@ -490,6 +490,42 @@ def main():
         "assignment missing",
     )
 
+    # Regression guard:
+    # categories API exposes `name`, not `category`.
+    require(
+        js.count(
+            "item.name"
+        ) == 2,
+        "Genre UI must use "
+        "categories[].name contract",
+    )
+
+    require(
+        "item.category"
+        not in js,
+        "legacy Genre category field "
+        "returned",
+    )
+
+    # Regression guard:
+    # Discovery owns light styles, so it must
+    # also provide explicit dark-theme overrides.
+    for selector in (
+        'html[data-theme="dark"] .discovery-summary',
+        'html[data-theme="dark"] .discovery-tabs',
+        'html[data-theme="dark"] .discovery-select',
+        'html[data-theme="dark"] .discovery-row',
+        'html[data-theme="dark"] .discovery-title',
+        'html[data-theme="dark"] .discovery-detail-value',
+    ):
+        require(
+            selector
+            in css,
+            "Discovery dark-theme "
+            "selector missing: "
+            + selector,
+        )
+
     oracle_payload = {
         "index_sha256":
             sha256_file(

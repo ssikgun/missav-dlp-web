@@ -1112,12 +1112,12 @@
                     );
 
                     option.value = String(
-                        item.category
+                        item.name
                     );
 
                     option.textContent = (
                         String(
-                            item.category
+                            item.name
                         )
                         + ' ('
                         + String(
