@@ -219,6 +219,7 @@ def main():
         "/api/discovery/categories",
         "/api/discovery/category?name=",
         "/api/discovery/media/cover/",
+        "/api/discovery/media/preview/",
     )
 
     for endpoint in expected_endpoints:
@@ -302,6 +303,91 @@ def main():
     )
 
     require(
+        "function previewEndpoint("
+        in js,
+        "preview endpoint builder missing",
+    )
+
+    require(
+        "function startPreview("
+        in js
+        and "function stopActivePreview("
+        in js
+        and "function togglePreview("
+        in js,
+        "preview lifecycle functions missing",
+    )
+
+    require(
+        "function bindPreviewLazyLoad("
+        in js,
+        "preview lazy binding missing",
+    )
+
+    require(
+        "(hover: hover) and (pointer: fine)"
+        in js
+        and "'pointerenter'"
+        in js
+        and "'pointerleave'"
+        in js,
+        "desktop hover preview binding missing",
+    )
+
+    require(
+        "'click'"
+        in js
+        and "!hoverPreviewMedia.matches"
+        in js,
+        "mobile tap preview binding missing",
+    )
+
+    require(
+        "row.dataset.previewTouched = '1'"
+        in js,
+        "preview touched-only marker missing",
+    )
+
+    require(
+        "state.activePreview"
+        in js
+        and "stopActivePreview();"
+        in js,
+        "one-preview-at-a-time guard missing",
+    )
+
+    require(
+        "video.src = previewEndpoint("
+        in js,
+        "internal preview endpoint assignment missing",
+    )
+
+    require(
+        js.count(
+            "/api/discovery/media/preview/"
+        ) == 1,
+        "preview endpoint literal count changed",
+    )
+
+    require(
+        "bindPreviewLazyLoad(\n            items"
+        in js,
+        "preview binding missing after list render",
+    )
+
+    require(
+        "document.createElement(\n            'video'"
+        in js,
+        "lazy video DOM creation missing",
+    )
+
+    require(
+        "video.removeAttribute(\n            'src'"
+        in js,
+        "preview media cleanup missing",
+    )
+
+    require(
         "discovery-cover-slot"
         in js,
         "cover placeholder slot missing",
@@ -317,6 +403,24 @@ def main():
         ".discovery-cover-image"
         in css,
         "cover image CSS missing",
+    )
+
+    require(
+        ".discovery-cover-base"
+        in css,
+        "cover base CSS missing",
+    )
+
+    require(
+        ".discovery-preview-video"
+        in css,
+        "preview video CSS missing",
+    )
+
+    require(
+        ".discovery-preview-hint"
+        in css,
+        "preview hint CSS missing",
     )
 
     require(

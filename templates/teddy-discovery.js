@@ -53,7 +53,12 @@
         loadedOnce: false,
         categoriesLoaded: false,
         requestToken: 0,
+        activePreview: null,
     };
+
+    const hoverPreviewMedia = window.matchMedia(
+        '(hover: hover) and (pointer: fine)'
+    );
 
     function escapeHtml(value) {
         const div = document.createElement(
@@ -302,12 +307,12 @@
         row,
         dvdId
     ) {
-        const slot = row.querySelector(
-            '.discovery-cover-slot'
+        const base = row.querySelector(
+            '.discovery-cover-base'
         );
 
         if (
-            !slot
+            !base
             || row.dataset.coverRequested
             === '1'
         ) {
@@ -317,7 +322,7 @@
         row.dataset.coverRequested = '1';
 
         const placeholder = (
-            slot.querySelector(
+            base.querySelector(
                 '.discovery-cover-placeholder'
             )
         );
@@ -346,7 +351,7 @@
         image.addEventListener(
             'load',
             () => {
-                slot.replaceChildren(
+                base.replaceChildren(
                     image
                 );
             },
@@ -372,7 +377,7 @@
                     '표지를 불러올 수 없습니다'
                 );
 
-                slot.replaceChildren(
+                base.replaceChildren(
                     failed
                 );
             },
@@ -382,6 +387,279 @@
         );
 
         image.src = coverEndpoint(
+            dvdId
+        );
+    }
+
+
+    function previewEndpoint(dvdId) {
+        return (
+            '/api/discovery/media/preview/'
+            + encodeURIComponent(
+                String(dvdId)
+            )
+        );
+    }
+
+
+    function previewIdleText() {
+        return hoverPreviewMedia.matches
+            ? '마우스를 올리면 미리보기'
+            : '탭하면 미리보기';
+    }
+
+
+    function setPreviewHint(
+        slot,
+        text,
+        isError = false
+    ) {
+        const hint = slot.querySelector(
+            '.discovery-preview-hint'
+        );
+
+        if (!hint) {
+            return;
+        }
+
+        hint.textContent = text;
+
+        hint.classList.toggle(
+            'error',
+            isError
+        );
+    }
+
+
+    function stopActivePreview(
+        row = null,
+        restoreHint = true
+    ) {
+        const active = (
+            state.activePreview
+        );
+
+        if (
+            !active
+            || (
+                row
+                && active.row !== row
+            )
+        ) {
+            return;
+        }
+
+        state.activePreview = null;
+
+        active.row.classList.remove(
+            'discovery-preview-active'
+        );
+
+        try {
+            active.video.pause();
+        } catch (_) {
+            // Best-effort media cleanup.
+        }
+
+        active.video.removeAttribute(
+            'src'
+        );
+
+        try {
+            active.video.load();
+        } catch (_) {
+            // Best-effort media cleanup.
+        }
+
+        active.video.remove();
+
+        if (restoreHint) {
+            setPreviewHint(
+                active.slot,
+                previewIdleText(),
+                false
+            );
+        }
+    }
+
+
+    function startPreview(
+        row,
+        dvdId
+    ) {
+        const slot = row.querySelector(
+            '.discovery-cover-slot'
+        );
+
+        if (
+            !slot
+            || !row.open
+            || row.dataset.previewFailed
+            === '1'
+        ) {
+            return;
+        }
+
+        if (
+            state.activePreview
+            && state.activePreview.row
+            === row
+        ) {
+            return;
+        }
+
+        stopActivePreview();
+
+        row.dataset.previewTouched = '1';
+
+        setPreviewHint(
+            slot,
+            '미리보기를 불러오는 중...',
+            false
+        );
+
+        const video = document.createElement(
+            'video'
+        );
+
+        video.className = (
+            'discovery-preview-video'
+        );
+
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.preload = 'metadata';
+
+        video.setAttribute(
+            'aria-label',
+            String(dvdId)
+            + ' 미리보기'
+        );
+
+        video.addEventListener(
+            'playing',
+            () => {
+                if (
+                    !state.activePreview
+                    || state.activePreview.video
+                    !== video
+                ) {
+                    return;
+                }
+
+                row.classList.add(
+                    'discovery-preview-active'
+                );
+
+                setPreviewHint(
+                    slot,
+                    '미리보기 재생 중',
+                    false
+                );
+            },
+            {
+                once: true,
+            }
+        );
+
+        video.addEventListener(
+            'error',
+            () => {
+                if (
+                    !state.activePreview
+                    || state.activePreview.video
+                    !== video
+                ) {
+                    return;
+                }
+
+                row.dataset.previewFailed = '1';
+
+                stopActivePreview(
+                    row,
+                    false
+                );
+
+                setPreviewHint(
+                    slot,
+                    '미리보기를 불러올 수 없습니다',
+                    true
+                );
+            },
+            {
+                once: true,
+            }
+        );
+
+        slot.appendChild(
+            video
+        );
+
+        state.activePreview = {
+            row,
+            slot,
+            video,
+            dvdId,
+        };
+
+        video.src = previewEndpoint(
+            dvdId
+        );
+
+        const playResult = video.play();
+
+        if (
+            playResult
+            && typeof playResult.catch
+            === 'function'
+        ) {
+            playResult.catch(
+                () => {
+                    if (
+                        !state.activePreview
+                        || state.activePreview.video
+                        !== video
+                    ) {
+                        return;
+                    }
+
+                    row.dataset.previewFailed = '1';
+
+                    stopActivePreview(
+                        row,
+                        false
+                    );
+
+                    setPreviewHint(
+                        slot,
+                        '미리보기를 재생할 수 없습니다',
+                        true
+                    );
+                }
+            );
+        }
+    }
+
+
+    function togglePreview(
+        row,
+        dvdId
+    ) {
+        if (
+            state.activePreview
+            && state.activePreview.row
+            === row
+        ) {
+            stopActivePreview(
+                row
+            );
+
+            return;
+        }
+
+        startPreview(
+            row,
             dvdId
         );
     }
@@ -429,7 +707,128 @@
     }
 
 
+    function bindPreviewLazyLoad(
+        items
+    ) {
+        const rows = Array.from(
+            list.querySelectorAll(
+                '.discovery-row'
+            )
+        );
+
+        rows.forEach(
+            (row, index) => {
+                const item = items[index];
+
+                const dvdId = (
+                    item
+                    && item.dvd_id
+                )
+                    ? String(
+                        item.dvd_id
+                    )
+                    : '';
+
+                const slot = row.querySelector(
+                    '.discovery-cover-slot'
+                );
+
+                if (
+                    !dvdId
+                    || !slot
+                ) {
+                    return;
+                }
+
+                setPreviewHint(
+                    slot,
+                    previewIdleText(),
+                    false
+                );
+
+                slot.addEventListener(
+                    'pointerenter',
+                    () => {
+                        if (
+                            hoverPreviewMedia.matches
+                            && row.open
+                        ) {
+                            startPreview(
+                                row,
+                                dvdId
+                            );
+                        }
+                    }
+                );
+
+                slot.addEventListener(
+                    'pointerleave',
+                    () => {
+                        if (
+                            hoverPreviewMedia.matches
+                        ) {
+                            stopActivePreview(
+                                row
+                            );
+                        }
+                    }
+                );
+
+                slot.addEventListener(
+                    'click',
+                    () => {
+                        if (
+                            !hoverPreviewMedia.matches
+                            && row.open
+                        ) {
+                            togglePreview(
+                                row,
+                                dvdId
+                            );
+                        }
+                    }
+                );
+
+                slot.addEventListener(
+                    'keydown',
+                    event => {
+                        if (
+                            !row.open
+                            || (
+                                event.key !== 'Enter'
+                                && event.key !== ' '
+                            )
+                        ) {
+                            return;
+                        }
+
+                        event.preventDefault();
+
+                        togglePreview(
+                            row,
+                            dvdId
+                        );
+                    }
+                );
+
+                row.addEventListener(
+                    'toggle',
+                    () => {
+                        if (!row.open) {
+                            stopActivePreview(
+                                row
+                            );
+                        }
+                    }
+                );
+            }
+        );
+    }
+
+
     function renderItems(data) {
+        stopActivePreview();
+
         const items = Array.isArray(
             data.items
         )
@@ -509,10 +908,16 @@
                     + '</div>'
                     + '</summary>'
                     + '<div class="discovery-detail">'
-                    + '<div class="discovery-cover-slot">'
+                    + '<div class="discovery-cover-slot"'
+                    + ' tabindex="0" role="button"'
+                    + ' aria-label="미리보기 재생">'
+                    + '<div class="discovery-cover-base">'
                     + '<div class="discovery-cover-placeholder">'
                     + '표지를 보려면 항목을 펼치세요'
                     + '</div>'
+                    + '</div>'
+                    + '<div class="discovery-preview-hint"'
+                    + ' aria-hidden="true"></div>'
                     + '</div>'
                     + '<div class="discovery-detail-grid">'
                     + '<div class="discovery-detail-block">'
@@ -555,6 +960,10 @@
         ).join('');
 
         bindCoverLazyLoad(
+            items
+        );
+
+        bindPreviewLazyLoad(
             items
         );
     }
@@ -734,6 +1143,8 @@
             view
         );
 
+        stopActivePreview();
+
         status.className = (
             'discovery-status'
         );
@@ -834,6 +1245,34 @@
                 loadView(
                     state.activeView
                 );
+            }
+        }
+    );
+
+    Array.from(
+        document.querySelectorAll(
+            '.sidebar-btn[data-page]'
+        )
+    ).forEach(
+        button => {
+            if (button === pageButton) {
+                return;
+            }
+
+            button.addEventListener(
+                'click',
+                () => {
+                    stopActivePreview();
+                }
+            );
+        }
+    );
+
+    document.addEventListener(
+        'visibilitychange',
+        () => {
+            if (document.hidden) {
+                stopActivePreview();
             }
         }
     );
