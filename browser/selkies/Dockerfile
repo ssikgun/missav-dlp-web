@@ -52,6 +52,17 @@ COPY --chown=1000:1000 \
   browser/selkies/start-teddy-browser.sh \
   /opt/teddy-browser/start-teddy-browser.sh
 
+COPY --chown=1000:1000 --chmod=0755 \
+  browser/selkies/teddy_selkies_control.py \
+  /opt/teddy-browser/teddy_selkies_control.py
+
+COPY --chown=1000:1000 --chmod=0755 \
+  browser/selkies/teddy-selkies-control-run.sh \
+  /etc/service/teddy-selkies-control/run
+
+RUN chown -R 1000:1000 \
+  /etc/service/teddy-selkies-control
+
 COPY browser/selkies/teddy-browser.desktop \
   /etc/xdg/autostart/teddy-browser.desktop
 
