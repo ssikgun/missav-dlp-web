@@ -397,7 +397,7 @@
         if (ranking.kind === 'weekly') {
             return (
                 textOrDash(
-                    ranking.period
+                    ranking.period_display
                 )
                 + ' · 원본 순위 '
                 + textOrDash(
@@ -1167,6 +1167,119 @@
         bindDownloadActions();
     }
 
+    function formatRefreshedAt(value) {
+        const raw = String(
+            value || ''
+        ).trim();
+
+        if (!raw) {
+            return '';
+        }
+
+        const instant = new Date(
+            raw
+        );
+
+        if (
+            Number.isNaN(
+                instant.getTime()
+            )
+        ) {
+            return '';
+        }
+
+        const parts = {};
+
+        new Intl.DateTimeFormat(
+            'en-CA',
+            {
+                timeZone:
+                    'Asia/Seoul',
+                year:
+                    'numeric',
+                month:
+                    '2-digit',
+                day:
+                    '2-digit',
+                hour:
+                    '2-digit',
+                minute:
+                    '2-digit',
+                hourCycle:
+                    'h23',
+            }
+        ).formatToParts(
+            instant
+        ).forEach(
+            part => {
+                if (
+                    part.type
+                    !== 'literal'
+                ) {
+                    parts[
+                        part.type
+                    ] = part.value;
+                }
+            }
+        );
+
+        if (
+            !parts.year
+            || !parts.month
+            || !parts.day
+            || !parts.hour
+            || !parts.minute
+        ) {
+            return '';
+        }
+
+        return (
+            parts.year
+            + '-'
+            + parts.month
+            + '-'
+            + parts.day
+            + ' '
+            + parts.hour
+            + ':'
+            + parts.minute
+            + ' KST'
+        );
+    }
+
+
+    function discoveryStatusText(data) {
+        const label = String(
+            (
+                data
+                && data.label
+            )
+            || ''
+        ).trim();
+
+        const refreshed = (
+            formatRefreshedAt(
+                data
+                && data.refreshed_at
+            )
+        );
+
+        if (!refreshed) {
+            return label;
+        }
+
+        return (
+            (
+                label
+                    ? label + ' · '
+                    : ''
+            )
+            + '최근 갱신: '
+            + refreshed
+        );
+    }
+
+
     function viewUrl(view) {
         if (view === 'latest') {
             return '/api/discovery/latest';
@@ -1236,7 +1349,7 @@
         ) {
             return (
                 textOrDash(
-                    data.period
+                    data.period_display
                 )
                 + ' · '
                 + textOrDash(
@@ -1400,7 +1513,9 @@
             );
 
             status.textContent = (
-                data.label || ''
+                discoveryStatusText(
+                    data
+                )
             );
 
         } catch (error) {

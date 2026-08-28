@@ -544,6 +544,50 @@ def main():
             + selector,
         )
 
+    for required_marker in (
+        "function formatRefreshedAt(",
+        "function discoveryStatusText(",
+        "'Asia/Seoul'",
+        "'최근 갱신: '",
+        "ranking.period_display",
+        "data.period_display",
+        "discoveryStatusText(\n"
+        "                    data",
+    ):
+        require(
+            required_marker
+            in js,
+            "Discovery refresh/date "
+            "UI marker missing: "
+            + required_marker,
+        )
+
+    require(
+        """textOrDash(
+                    ranking.period
+                )"""
+        not in js,
+        "Weekly detail still "
+        "renders canonical W period",
+    )
+
+    require(
+        """textOrDash(
+                    data.period
+                )"""
+        not in js,
+        "Weekly summary still "
+        "renders canonical W period",
+    )
+
+    require(
+        js.count(
+            "'최근 갱신: '"
+        ) == 1,
+        "recent-refresh label "
+        "count changed",
+    )
+
     oracle_payload = {
         "index_sha256":
             sha256_file(
@@ -607,6 +651,14 @@ def main():
 
     print(
         "DISCOVERY_UI_DYNAMIC_ATTRIBUTE_SAFETY_SMOKE=PASS"
+    )
+
+    print(
+        "DISCOVERY_UI_WEEKLY_DATE_RANGE_SMOKE=PASS"
+    )
+
+    print(
+        "DISCOVERY_UI_REFRESHED_AT_KST_SMOKE=PASS"
     )
 
     print(

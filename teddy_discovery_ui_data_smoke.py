@@ -32,6 +32,7 @@ from teddy_discovery_rankings import (
 )
 
 from teddy_discovery_ui_data import (
+    _format_weekly_period_label,
     build_category_facets_view,
     build_category_view,
     build_latest_view,
@@ -877,6 +878,217 @@ def real_model_smoke(
     return oracle
 
 
+def refresh_display_smoke(
+    db_path: Path,
+):
+    connection = connect_ro(
+        db_path
+    )
+
+    try:
+        latest = build_latest_view(
+            connection,
+            limit=50,
+        )
+
+        weekly = build_weekly_view(
+            connection
+        )
+
+        monthly = build_monthly_view(
+            connection,
+            limit=25,
+        )
+
+        facets = (
+            build_category_facets_view(
+                connection
+            )
+        )
+
+        category = (
+            build_category_view(
+                connection,
+                TEST_CATEGORY,
+                limit=500,
+            )
+        )
+
+        expected_latest = (
+            connection.execute(
+                """
+                SELECT MAX(last_seen_at)
+                FROM latest_items
+                WHERE source =
+                    'missav-release'
+                """
+            ).fetchone()[0]
+        )
+
+        expected_weekly = (
+            connection.execute(
+                """
+                SELECT MAX(observed_at)
+                FROM ranking_snapshots
+                WHERE chart_type =
+                    'javdatabase-weekly'
+                  AND period =
+                    '2026-W33'
+                """
+            ).fetchone()[0]
+        )
+
+        labels = {
+            row[0]
+            for row
+            in connection.execute(
+                """
+                SELECT DISTINCT
+                    period_label
+                FROM ranking_snapshots
+                WHERE chart_type =
+                    'javdatabase-weekly'
+                  AND period =
+                    '2026-W33'
+                """
+            ).fetchall()
+        }
+
+    finally:
+        connection.close()
+
+    require(
+        _format_weekly_period_label(
+            "13th – 19th August 2026"
+        )
+        == "8/13~8/19",
+        "same-month Weekly "
+        "date display changed",
+    )
+
+    require(
+        _format_weekly_period_label(
+            "30th July – "
+            "5th August 2026"
+        )
+        == "7/30~8/5",
+        "cross-month Weekly "
+        "date display changed",
+    )
+
+    require(
+        labels
+        == {
+            "13th – 19th August 2026"
+        },
+        "W33 source period label changed",
+    )
+
+    require(
+        weekly[
+            "period"
+        ]
+        == "2026-W33",
+        "internal Weekly canonical "
+        "period changed",
+    )
+
+    require(
+        weekly[
+            "period_display"
+        ]
+        == "8/13~8/19",
+        "Weekly browser period "
+        "display changed",
+    )
+
+    require(
+        weekly[
+            "label"
+        ]
+        == (
+            "JAV Database 주간 랭킹 · "
+            "8/13~8/19"
+        ),
+        "Weekly browser label changed",
+    )
+
+    require(
+        "W33"
+        not in weekly[
+            "label"
+        ],
+        "canonical W33 leaked "
+        "into Weekly label",
+    )
+
+    require(
+        all(
+            item[
+                "ranking"
+            ][
+                "period_display"
+            ]
+            == "8/13~8/19"
+            for item
+            in weekly[
+                "items"
+            ]
+        ),
+        "Weekly item period display "
+        "changed",
+    )
+
+    require(
+        latest[
+            "refreshed_at"
+        ]
+        == expected_latest,
+        "Latest refreshed_at "
+        "provenance changed",
+    )
+
+    for name, view in (
+        (
+            "Weekly",
+            weekly,
+        ),
+        (
+            "Monthly",
+            monthly,
+        ),
+        (
+            "Category facets",
+            facets,
+        ),
+        (
+            "Category",
+            category,
+        ),
+    ):
+        require(
+            view[
+                "refreshed_at"
+            ]
+            == expected_weekly,
+            name
+            + " refreshed_at "
+            + "provenance changed",
+        )
+
+    print(
+        "UI_DATA_WEEKLY_DATE_RANGE_DISPLAY_SMOKE=PASS"
+    )
+
+    print(
+        "UI_DATA_INTERNAL_WEEK_KEY_PRESERVED_SMOKE=PASS"
+    )
+
+    print(
+        "UI_DATA_REFRESHED_AT_PROVENANCE_SMOKE=PASS"
+    )
+
+
 def temporary_ownership_smoke(
     real_db: Path,
 ):
@@ -1057,6 +1269,10 @@ def main():
     )
 
     real_model_smoke(
+        real_db
+    )
+
+    refresh_display_smoke(
         real_db
     )
 

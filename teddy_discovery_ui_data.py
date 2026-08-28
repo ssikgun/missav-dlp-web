@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+import re
 import sqlite3
 from typing import Any
 
@@ -16,6 +18,7 @@ from teddy_discovery_category import (
 )
 
 from teddy_discovery_missav import (
+    MISSAV_RELEASE_SOURCE,
     list_latest_items,
 )
 
@@ -31,6 +34,52 @@ from teddy_discovery_rankings import (
 
 
 UI_MAX_LIMIT = 500
+
+
+WEEKLY_SAME_MONTH_LABEL_RE = re.compile(
+    r"^(?P<start_day>\d{1,2})"
+    r"(?:st|nd|rd|th)"
+    r"\s*[–—-]\s*"
+    r"(?P<end_day>\d{1,2})"
+    r"(?:st|nd|rd|th)"
+    r"\s+"
+    r"(?P<month>[A-Za-z]+)"
+    r"\s+"
+    r"(?P<year>\d{4})$",
+    re.I,
+)
+
+
+WEEKLY_CROSS_MONTH_LABEL_RE = re.compile(
+    r"^(?P<start_day>\d{1,2})"
+    r"(?:st|nd|rd|th)"
+    r"\s+"
+    r"(?P<start_month>[A-Za-z]+)"
+    r"\s*[–—-]\s*"
+    r"(?P<end_day>\d{1,2})"
+    r"(?:st|nd|rd|th)"
+    r"\s+"
+    r"(?P<end_month>[A-Za-z]+)"
+    r"\s+"
+    r"(?P<year>\d{4})$",
+    re.I,
+)
+
+
+MONTH_NUMBER = {
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "may": 5,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
+    "december": 12,
+}
 
 
 def _require_connection(
@@ -593,6 +642,320 @@ def _build_ui_items(
     return result
 
 
+def _format_weekly_period_label(
+    value: Any,
+) -> str | None:
+    if value is None:
+        return None
+
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise RuntimeError(
+            "Weekly period label "
+            "must be text"
+        )
+
+    value = " ".join(
+        value.split()
+    )
+
+    if not value:
+        return None
+
+    same = (
+        WEEKLY_SAME_MONTH_LABEL_RE.fullmatch(
+            value
+        )
+    )
+
+    cross = (
+        None
+        if same is not None
+        else WEEKLY_CROSS_MONTH_LABEL_RE.fullmatch(
+            value
+        )
+    )
+
+    if (
+        same is None
+        and cross is None
+    ):
+        raise RuntimeError(
+            "unexpected Weekly "
+            "period label format"
+        )
+
+    if same is not None:
+        month = MONTH_NUMBER.get(
+            same.group(
+                "month"
+            ).lower()
+        )
+
+        if month is None:
+            raise RuntimeError(
+                "unknown Weekly month"
+            )
+
+        year = int(
+            same.group(
+                "year"
+            )
+        )
+
+        start = date(
+            year,
+            month,
+            int(
+                same.group(
+                    "start_day"
+                )
+            ),
+        )
+
+        end = date(
+            year,
+            month,
+            int(
+                same.group(
+                    "end_day"
+                )
+            ),
+        )
+
+    else:
+        start_month = MONTH_NUMBER.get(
+            cross.group(
+                "start_month"
+            ).lower()
+        )
+
+        end_month = MONTH_NUMBER.get(
+            cross.group(
+                "end_month"
+            ).lower()
+        )
+
+        if (
+            start_month is None
+            or end_month is None
+        ):
+            raise RuntimeError(
+                "unknown Weekly month"
+            )
+
+        end_year = int(
+            cross.group(
+                "year"
+            )
+        )
+
+        start_year = (
+            end_year
+            if start_month
+            <= end_month
+            else end_year - 1
+        )
+
+        start = date(
+            start_year,
+            start_month,
+            int(
+                cross.group(
+                    "start_day"
+                )
+            ),
+        )
+
+        end = date(
+            end_year,
+            end_month,
+            int(
+                cross.group(
+                    "end_day"
+                )
+            ),
+        )
+
+    if (
+        end - start
+    ).days != 6:
+        raise RuntimeError(
+            "Weekly period label "
+            "must span seven days"
+        )
+
+    return (
+        str(
+            start.month
+        )
+        + "/"
+        + str(
+            start.day
+        )
+        + "~"
+        + str(
+            end.month
+        )
+        + "/"
+        + str(
+            end.day
+        )
+    )
+
+
+def _required_timestamp(
+    value: Any,
+    *,
+    label: str,
+) -> str:
+    if (
+        not isinstance(
+            value,
+            str,
+        )
+        or not value.strip()
+    ):
+        raise RuntimeError(
+            label
+            + " refresh timestamp missing"
+        )
+
+    return value.strip()
+
+
+def _latest_refreshed_at(
+    connection: sqlite3.Connection,
+) -> str:
+    row = connection.execute(
+        """
+        SELECT MAX(last_seen_at)
+            AS refreshed_at
+        FROM latest_items
+        WHERE source = ?
+        """,
+        (
+            MISSAV_RELEASE_SOURCE,
+        ),
+    ).fetchone()
+
+    if row is None:
+        raise RuntimeError(
+            "Latest refresh timestamp missing"
+        )
+
+    return _required_timestamp(
+        row[
+            "refreshed_at"
+        ],
+        label="Latest",
+    )
+
+
+def _weekly_period_context(
+    connection: sqlite3.Connection,
+    period: str,
+) -> dict:
+    rows = connection.execute(
+        """
+        SELECT
+            rank,
+            observed_at,
+            period_label
+        FROM ranking_snapshots
+        WHERE chart_type = ?
+          AND period = ?
+        ORDER BY rank ASC
+        """,
+        (
+            WEEKLY_CHART_TYPE,
+            period,
+        ),
+    ).fetchall()
+
+    if len(
+        rows
+    ) != WEEKLY_EXPECTED_COUNT:
+        raise RuntimeError(
+            "Weekly period context "
+            "requires exactly 25 rows"
+        )
+
+    observed_values = {
+        row[
+            "observed_at"
+        ]
+        for row
+        in rows
+    }
+
+    if len(
+        observed_values
+    ) != 1:
+        raise RuntimeError(
+            "Weekly observed_at "
+            "is inconsistent"
+        )
+
+    label_values = {
+        row[
+            "period_label"
+        ]
+        for row
+        in rows
+        if row[
+            "period_label"
+        ]
+        is not None
+    }
+
+    if len(
+        label_values
+    ) > 1:
+        raise RuntimeError(
+            "Weekly period labels "
+            "are inconsistent"
+        )
+
+    period_label = (
+        next(
+            iter(
+                label_values
+            )
+        )
+        if label_values
+        else None
+    )
+
+    return {
+        "period":
+            period,
+
+        "period_label":
+            period_label,
+
+        "period_display":
+            _format_weekly_period_label(
+                period_label
+            ),
+
+        "refreshed_at":
+            _required_timestamp(
+                next(
+                    iter(
+                        observed_values
+                    )
+                ),
+                label=(
+                    "Weekly "
+                    + period
+                ),
+            ),
+    }
+
+
 def build_latest_view(
     connection: sqlite3.Connection,
     *,
@@ -645,9 +1008,18 @@ def build_latest_view(
         },
     )
 
+    refreshed_at = (
+        _latest_refreshed_at(
+            connection
+        )
+    )
+
     return {
         "view":
             "latest",
+
+        "refreshed_at":
+            refreshed_at,
 
         "label":
             "Teddy 최신 출시 · "
@@ -737,6 +1109,13 @@ def build_weekly_view(
             "exactly 25 rows"
         )
 
+    period_context = (
+        _weekly_period_context(
+            connection,
+            period,
+        )
+    )
+
     raw = [
         dict(row)
         for row
@@ -760,6 +1139,11 @@ def build_weekly_view(
             "period":
                 item[
                     "period"
+                ],
+
+            "period_display":
+                period_context[
+                    "period_display"
                 ],
 
             "snapshot_rank":
@@ -806,9 +1190,30 @@ def build_weekly_view(
         "period":
             period,
 
+        "period_display":
+            period_context[
+                "period_display"
+            ],
+
+        "refreshed_at":
+            period_context[
+                "refreshed_at"
+            ],
+
         "label":
-            "JAV Database 주간 랭킹 · "
-            + period,
+            (
+                "JAV Database 주간 랭킹"
+                + (
+                    " · "
+                    + period_context[
+                        "period_display"
+                    ]
+                    if period_context[
+                        "period_display"
+                    ]
+                    else ""
+                )
+            ),
 
         "total_items":
             WEEKLY_EXPECTED_COUNT,
@@ -839,6 +1244,15 @@ def build_monthly_view(
     monthly = derive_monthly_ranking(
         connection,
         limit=limit,
+    )
+
+    period_context = (
+        _weekly_period_context(
+            connection,
+            monthly[
+                "latest_period"
+            ],
+        )
     )
 
     raw = [
@@ -916,6 +1330,11 @@ def build_monthly_view(
         "view":
             "monthly",
 
+        "refreshed_at":
+            period_context[
+                "refreshed_at"
+            ],
+
         "source":
             monthly[
                 "source"
@@ -984,9 +1403,27 @@ def build_category_facets_view(
         connection
     )
 
+    latest_period = (
+        _latest_weekly_period(
+            connection
+        )
+    )
+
+    period_context = (
+        _weekly_period_context(
+            connection,
+            latest_period,
+        )
+    )
+
     return {
         "view":
             "category-facets",
+
+        "refreshed_at":
+            period_context[
+                "refreshed_at"
+            ],
 
         "source":
             facets[
@@ -1059,6 +1496,15 @@ def build_category_view(
             connection,
             category,
             limit=limit,
+        )
+    )
+
+    period_context = (
+        _weekly_period_context(
+            connection,
+            category_result[
+                "latest_period"
+            ],
         )
     )
 
@@ -1148,6 +1594,11 @@ def build_category_view(
     return {
         "view":
             "category",
+
+        "refreshed_at":
+            period_context[
+                "refreshed_at"
+            ],
 
         "source":
             category_result[
