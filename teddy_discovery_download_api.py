@@ -13,6 +13,18 @@ from flask import (
 import teddy_duplicates
 import teddy_routing
 
+from teddy_discovery_download_resolver import (
+    DiscoveryResolveNoTarget,
+    DiscoveryResolveRequestError,
+    DiscoveryResolveTitleNotFound,
+    DiscoveryResolveUnavailable,
+    resolve_discovery_download,
+)
+
+from teddy_discovery_ids import (
+    parse_dvd_id,
+)
+
 from teddy_discovery_availability import (
     AVAILABILITY_SOURCES,
     AVAILABILITY_STATUSES,
@@ -243,6 +255,45 @@ def load_available_sources(
         connection.close()
 
 
+def discovery_task_dvd_id(
+    task: Any,
+) -> str | None:
+    if not isinstance(
+        task,
+        dict,
+    ):
+        return None
+
+    url = str(
+        task.get(
+            "url"
+        )
+        or ""
+    ).strip()
+
+    if not url:
+        return None
+
+    site = teddy_routing.canonical_site(
+        url
+    )
+
+    if site not in {
+        SOURCE_MISSAV,
+        "123av.com",
+    }:
+        return None
+
+    parsed = parse_dvd_id(
+        url
+    )
+
+    if parsed is None:
+        return None
+
+    return parsed.dvd_id
+
+
 def create_discovery_download_blueprint(
     core,
     db_path: Any,
@@ -284,65 +335,49 @@ def create_discovery_download_blueprint(
             }), 400
 
         try:
-            dvd_id, available_sources = (
-                load_available_sources(
-                    db_path,
-                    payload.get(
-                        "dvd_id"
-                    ),
-                )
+            target = resolve_discovery_download(
+                db_path,
+                payload.get(
+                    "dvd_id"
+                ),
             )
 
-        except DiscoveryDownloadRequestError:
+        except DiscoveryResolveRequestError:
             return jsonify({
                 "status": "error",
                 "message": "잘못된 DVD ID입니다.",
             }), 400
 
-        except DiscoveryTitleNotFound:
+        except DiscoveryResolveTitleNotFound:
             return jsonify({
                 "status": "error",
                 "message": "Discovery 항목을 찾을 수 없습니다.",
             }), 404
 
-        except DiscoveryDownloadUnavailable:
-            return jsonify({
-                "status": "error",
-                "message": "Discovery 데이터를 확인할 수 없습니다.",
-            }), 503
-
-        preference = normalize_preference(
-            getattr(
-                core,
-                "settings",
-                {},
-            ).get(
-                "discovery_download_preference",
-                PREFERENCE_AUTO,
-            )
-        )
-
-        source = select_source(
-            available_sources,
-            preference,
-        )
-
-        if source is None:
+        except DiscoveryResolveNoTarget:
             return jsonify({
                 "status": "error",
                 "message": "확인된 다운로드 소스가 없습니다.",
             }), 409
 
-        # Browser never receives or constructs
-        # an upstream source URL.
-        page_url = canonical_page_url(
-            source,
-            dvd_id,
-        )
+        except DiscoveryResolveUnavailable:
+            return jsonify({
+                "status": "error",
+                "message": "Discovery 데이터를 확인할 수 없습니다.",
+            }), 503
 
-        return teddy_duplicates.guarded_enqueue(
+        dvd_id = target[
+            "dvd_id"
+        ]
+
+        page_url = target[
+            "page_url"
+        ]
+
+        return teddy_duplicates.guarded_enqueue_by_key(
             core,
-            page_url,
+            dvd_id,
+            discovery_task_dvd_id,
             lambda: teddy_routing.enqueue_download(
                 core,
                 page_url,

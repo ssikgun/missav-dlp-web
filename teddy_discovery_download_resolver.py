@@ -39,6 +39,12 @@ class DiscoveryResolveUnavailable(
     pass
 
 
+class DiscoveryResolveNoTarget(
+    DiscoveryResolveUnavailable
+):
+    pass
+
+
 class DiscoveryResolveTitleNotFound(
     LookupError
 ):
@@ -333,7 +339,7 @@ def resolve_discovery_download(
                     "123av-fallback",
             }
 
-        raise DiscoveryResolveUnavailable(
+        raise DiscoveryResolveNoTarget(
             "no confirmed download target"
         )
 

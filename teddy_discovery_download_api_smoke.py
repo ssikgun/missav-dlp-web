@@ -1,131 +1,254 @@
 from pathlib import Path
 import hashlib
-import sqlite3
 import tempfile
 
-from flask import Flask, jsonify
+from flask import (
+    Flask,
+    jsonify,
+)
 
+import teddy_discovery_db as db
 import teddy_discovery_download_api as api
 
-from teddy_discovery_availability import (
-    AVAILABILITY_STATUSES,
-    SOURCE_123AV,
-    SOURCE_MISSAV,
-    STATUS_FOUND,
-    canonical_page_url,
+from teddy_discovery_variants import (
+    persist_title_variant,
 )
 
 
-def require(value, message):
+NOW = "2026-08-28T00:00:00+00:00"
+
+
+def require(
+    value,
+    message,
+):
     if not value:
-        raise RuntimeError(message)
+        raise RuntimeError(
+            message
+        )
 
 
-def sha256(path):
+def sha256(
+    path,
+):
     return hashlib.sha256(
         Path(path).read_bytes()
     ).hexdigest()
 
 
 class Core:
-    def __init__(self):
+    def __init__(
+        self,
+    ):
         self.settings = {
             "discovery_download_preference":
-                "auto",
+                "123av",
         }
 
+        self.tasks = {}
 
-def create_db(path):
-    connection = sqlite3.connect(path)
+        self.jsonify = jsonify
+
+
+def add_title(
+    connection,
+    dvd_id,
+):
+    connection.execute(
+        """
+        INSERT INTO titles(
+            dvd_id,
+            title,
+            first_seen_at,
+            last_seen_at
+        )
+        VALUES (?, ?, ?, ?)
+        """,
+        (
+            dvd_id,
+            dvd_id + " test",
+            NOW,
+            NOW,
+        ),
+    )
+
+
+def add_availability(
+    connection,
+    dvd_id,
+    source,
+    status,
+):
+    connection.execute(
+        """
+        INSERT INTO availability(
+            dvd_id,
+            source,
+            status,
+            last_checked_at,
+            next_check_at,
+            fail_count
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            dvd_id,
+            source,
+            status,
+            NOW,
+            NOW,
+            0,
+        ),
+    )
+
+
+def create_db(
+    path,
+):
+    connection = db.connect(
+        path
+    )
 
     try:
-        connection.executescript(
+        db.initialize(
+            connection
+        )
+
+        for dvd_id in (
+            "SW-893",
+            "BTH-103",
+            "AVX-102",
+            "NON-104",
+            "BAD-105",
+        ):
+            add_title(
+                connection,
+                dvd_id,
+            )
+
+        add_availability(
+            connection,
+            "SW-893",
+            "missav",
+            "FOUND",
+        )
+
+        add_availability(
+            connection,
+            "SW-893",
+            "123av",
+            "FOUND",
+        )
+
+        add_availability(
+            connection,
+            "BTH-103",
+            "missav",
+            "FOUND",
+        )
+
+        add_availability(
+            connection,
+            "BTH-103",
+            "123av",
+            "FOUND",
+        )
+
+        add_availability(
+            connection,
+            "AVX-102",
+            "missav",
+            "NOT_FOUND",
+        )
+
+        add_availability(
+            connection,
+            "AVX-102",
+            "123av",
+            "FOUND",
+        )
+
+        add_availability(
+            connection,
+            "NON-104",
+            "missav",
+            "NOT_FOUND",
+        )
+
+        add_availability(
+            connection,
+            "NON-104",
+            "123av",
+            "UNKNOWN",
+        )
+
+        add_availability(
+            connection,
+            "BAD-105",
+            "missav",
+            "FOUND",
+        )
+
+        connection.commit()
+
+        persist_title_variant(
+            connection,
+            {
+                "dvd_id":
+                    "SW-893",
+
+                "source":
+                    "missav",
+
+                "variant_kind":
+                    "uncensored",
+
+                "variant_slug":
+                    "sw-893-uncensored-leak",
+
+                "page_url":
+                    (
+                        "https://missav123.com/"
+                        "ko/"
+                        "sw-893-uncensored-leak"
+                    ),
+
+                "confirmed":
+                    1,
+            },
+            observed_at=NOW,
+            checked_at=NOW,
+        )
+
+        connection.execute(
             """
-            CREATE TABLE titles (
-                dvd_id TEXT PRIMARY KEY
-            );
-
-            CREATE TABLE availability (
-                dvd_id TEXT NOT NULL,
-                source TEXT NOT NULL,
-                status TEXT NOT NULL
-            );
-            """
-        )
-
-        non_found = [
-            value
-            for value in AVAILABILITY_STATUSES
-            if value != STATUS_FOUND
-        ]
-
-        require(
-            len(non_found) >= 2,
-            "availability non-FOUND statuses changed",
-        )
-
-        rows = (
-            ("MIS-101",),
-            ("AVX-102",),
-            ("BTH-103",),
-            ("NON-104",),
-        )
-
-        connection.executemany(
-            "INSERT INTO titles(dvd_id) VALUES (?)",
-            rows,
-        )
-
-        connection.executemany(
-            """
-            INSERT INTO availability(
+            INSERT INTO title_variants(
                 dvd_id,
                 source,
-                status
+                variant_kind,
+                variant_slug,
+                page_url,
+                confirmed,
+                first_seen_at,
+                last_seen_at,
+                last_checked_at
             )
-            VALUES (?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                "BAD-105",
+                "missav",
+                "uncensored",
+                "bad-105-uncensored-leak",
                 (
-                    "MIS-101",
-                    SOURCE_MISSAV,
-                    STATUS_FOUND,
+                    "https://example.com/"
+                    "ko/"
+                    "bad-105-uncensored-leak"
                 ),
-                (
-                    "MIS-101",
-                    SOURCE_123AV,
-                    non_found[0],
-                ),
-                (
-                    "AVX-102",
-                    SOURCE_MISSAV,
-                    non_found[0],
-                ),
-                (
-                    "AVX-102",
-                    SOURCE_123AV,
-                    STATUS_FOUND,
-                ),
-                (
-                    "BTH-103",
-                    SOURCE_MISSAV,
-                    STATUS_FOUND,
-                ),
-                (
-                    "BTH-103",
-                    SOURCE_123AV,
-                    STATUS_FOUND,
-                ),
-                (
-                    "NON-104",
-                    SOURCE_MISSAV,
-                    non_found[0],
-                ),
-                (
-                    "NON-104",
-                    SOURCE_123AV,
-                    non_found[1],
-                ),
+                1,
+                NOW,
+                NOW,
+                NOW,
             ),
         )
 
@@ -137,17 +260,26 @@ def create_db(path):
 
 def main():
     with tempfile.TemporaryDirectory(
-        prefix="teddy-discovery-download-"
+        prefix="teddy-discovery-download-r2-"
     ) as temp:
-        db_path = Path(temp) / "discovery.sqlite3"
 
-        create_db(db_path)
+        db_path = (
+            Path(temp)
+            / "discovery.sqlite3"
+        )
 
-        before = sha256(db_path)
+        create_db(
+            db_path
+        )
+
+        before = sha256(
+            db_path
+        )
 
         core = Core()
+
         app = Flask(
-            "teddy-discovery-download-smoke"
+            "teddy-discovery-download-r2-smoke"
         )
 
         app.register_blueprint(
@@ -159,9 +291,6 @@ def main():
 
         calls = []
 
-        original_guard = (
-            api.teddy_duplicates.guarded_enqueue
-        )
         original_enqueue = (
             api.teddy_routing.enqueue_download
         )
@@ -172,7 +301,11 @@ def main():
             override,
         ):
             calls.append(
-                ("enqueue", url, override)
+                (
+                    "enqueue",
+                    url,
+                    override,
+                )
             )
 
             return jsonify({
@@ -180,20 +313,6 @@ def main():
                 "task_id": "smoke-task",
             })
 
-        def fake_guard(
-            received_core,
-            url,
-            creator,
-        ):
-            calls.append(
-                ("guard", url)
-            )
-
-            return creator()
-
-        api.teddy_duplicates.guarded_enqueue = (
-            fake_guard
-        )
         api.teddy_routing.enqueue_download = (
             fake_enqueue
         )
@@ -204,166 +323,349 @@ def main():
             require(
                 client.get(
                     "/api/discovery/download"
-                ).status_code == 405,
-                "download route must be POST-only",
+                ).status_code
+                == 405,
+                "download route must remain POST-only",
             )
 
             require(
                 client.post(
                     "/api/discovery/download",
                     data="not-json",
-                ).status_code == 400,
-                "non-JSON request must fail closed",
+                ).status_code
+                == 400,
+                "non-JSON must fail closed",
             )
 
             require(
                 client.post(
                     "/api/discovery/download",
                     json={
-                        "dvd_id": "BTH-103",
-                        "page_url": "ignored",
+                        "dvd_id": "SW-893",
+                        "page_url": "forbidden",
                     },
-                ).status_code == 400,
-                "extra JSON key must fail closed",
+                ).status_code
+                == 400,
+                "browser-controlled URL was accepted",
             )
 
             require(
                 client.post(
                     "/api/discovery/download",
-                    json={"dvd_id": "???"},
-                ).status_code == 400,
-                "invalid DVD ID must return 400",
+                    json={
+                        "dvd_id":
+                            "sw-893-uncensored-leak",
+                    },
+                ).status_code
+                == 400,
+                "variant slug accepted as DVD ID",
             )
 
             require(
                 client.post(
                     "/api/discovery/download",
-                    json={"dvd_id": "UNKNOWN-404"},
-                ).status_code == 404,
-                "unknown title must return 404",
+                    json={
+                        "dvd_id":
+                            "UNKNOWN-404",
+                    },
+                ).status_code
+                == 404,
+                "missing title must return 404",
             )
 
             require(
                 client.post(
                     "/api/discovery/download",
-                    json={"dvd_id": "NON-104"},
-                ).status_code == 409,
-                "no FOUND source must return 409",
+                    json={
+                        "dvd_id":
+                            "NON-104",
+                    },
+                ).status_code
+                == 409,
+                "no target must return 409",
+            )
+
+            require(
+                client.post(
+                    "/api/discovery/download",
+                    json={
+                        "dvd_id":
+                            "BAD-105",
+                    },
+                ).status_code
+                == 503,
+                "bad stored variant must fail closed",
             )
 
             cases = (
                 (
-                    "MIS-101",
-                    SOURCE_123AV,
-                    SOURCE_MISSAV,
+                    "SW-893",
+                    (
+                        "https://missav123.com/"
+                        "ko/"
+                        "sw-893-uncensored-leak"
+                    ),
+                ),
+                (
+                    "BTH-103",
+                    (
+                        "https://missav123.com/"
+                        "ko/bth-103"
+                    ),
                 ),
                 (
                     "AVX-102",
-                    SOURCE_MISSAV,
-                    SOURCE_123AV,
-                ),
-                (
-                    "BTH-103",
-                    "auto",
-                    SOURCE_MISSAV,
-                ),
-                (
-                    "BTH-103",
-                    SOURCE_MISSAV,
-                    SOURCE_MISSAV,
-                ),
-                (
-                    "BTH-103",
-                    SOURCE_123AV,
-                    SOURCE_123AV,
+                    (
+                        "https://123av.com/"
+                        "ko/v/avx-102"
+                    ),
                 ),
             )
 
-            for dvd_id, preference, expected in cases:
+            for dvd_id, expected_url in cases:
                 calls.clear()
-
-                core.settings[
-                    "discovery_download_preference"
-                ] = preference
+                core.tasks = {}
 
                 response = client.post(
                     "/api/discovery/download",
-                    json={"dvd_id": dvd_id},
+                    json={
+                        "dvd_id":
+                            dvd_id,
+                    },
                 )
 
                 require(
-                    response.status_code == 200,
-                    "valid download action failed: "
-                    + dvd_id,
-                )
-
-                expected_url = canonical_page_url(
-                    expected,
-                    dvd_id,
+                    response.status_code
+                    == 200,
+                    (
+                        "valid R2 download failed: "
+                        + dvd_id
+                    ),
                 )
 
                 require(
-                    calls == [
-                        ("guard", expected_url),
+                    calls
+                    == [
                         (
                             "enqueue",
                             expected_url,
                             "auto",
                         ),
                     ],
-                    "download boundary changed: "
-                    + dvd_id
-                    + " / "
-                    + preference,
+                    (
+                        "resolved URL mismatch: "
+                        + dvd_id
+                    ),
                 )
+
+            print(
+                "DISCOVERY_DOWNLOAD_R2_RESOLVER_WIRING_SMOKE=PASS"
+            )
+
+            print(
+                "DISCOVERY_DOWNLOAD_R2_FIXED_PRIORITY_SMOKE=PASS"
+            )
 
             calls.clear()
 
-            def duplicate_guard(
-                received_core,
-                url,
-                creator,
-            ):
-                calls.append(
-                    ("duplicate", url)
-                )
+            core.tasks = {
+                "existing-standard": {
+                    "status":
+                        "다운로드 중",
 
-                return jsonify({
-                    "status": "duplicate",
-                    "task_id": "existing",
-                }), 409
-
-            api.teddy_duplicates.guarded_enqueue = (
-                duplicate_guard
-            )
+                    "url":
+                        (
+                            "https://missav123.com/"
+                            "ko/sw-893"
+                        ),
+                },
+            }
 
             response = client.post(
                 "/api/discovery/download",
-                json={"dvd_id": "BTH-103"},
+                json={
+                    "dvd_id":
+                        "SW-893",
+                },
             )
 
             require(
-                response.status_code == 409,
-                "duplicate response changed",
-            )
-
-            require(
-                not any(
-                    call[0] == "enqueue"
-                    for call in calls
+                response.status_code
+                == 409,
+                (
+                    "standard task did not block "
+                    "uncensored duplicate"
                 ),
-                "duplicate path reached enqueue",
+            )
+
+            require(
+                calls == [],
+                "duplicate reached enqueue",
+            )
+
+            print(
+                "DISCOVERY_DOWNLOAD_STANDARD_BLOCKS_UNCENSORED_SMOKE=PASS"
+            )
+
+            calls.clear()
+
+            core.tasks = {
+                "existing-uncensored": {
+                    "status":
+                        "대기 중",
+
+                    "url":
+                        (
+                            "https://missav123.com/"
+                            "ko/"
+                            "bth-103-uncensored-leak"
+                        ),
+                },
+            }
+
+            response = client.post(
+                "/api/discovery/download",
+                json={
+                    "dvd_id":
+                        "BTH-103",
+                },
+            )
+
+            require(
+                response.status_code
+                == 409,
+                (
+                    "uncensored task did not block "
+                    "standard duplicate"
+                ),
+            )
+
+            require(
+                calls == [],
+                "reverse duplicate reached enqueue",
+            )
+
+            print(
+                "DISCOVERY_DOWNLOAD_UNCENSORED_BLOCKS_STANDARD_SMOKE=PASS"
+            )
+
+            calls.clear()
+
+            core.tasks = {
+                "existing-123av": {
+                    "status":
+                        "다운로드 중",
+
+                    "url":
+                        (
+                            "https://123av.com/"
+                            "ko/v/bth-103"
+                        ),
+                },
+            }
+
+            response = client.post(
+                "/api/discovery/download",
+                json={
+                    "dvd_id":
+                        "BTH-103",
+                },
+            )
+
+            require(
+                response.status_code
+                == 409,
+                "123AV same-title duplicate escaped",
+            )
+
+            require(
+                calls == [],
+                "123AV duplicate reached enqueue",
+            )
+
+            print(
+                "DISCOVERY_DOWNLOAD_CROSS_SOURCE_DUPLICATE_SMOKE=PASS"
+            )
+
+            calls.clear()
+
+            core.tasks = {
+                "completed-same-title": {
+                    "status":
+                        "완료",
+
+                    "url":
+                        (
+                            "https://missav123.com/"
+                            "ko/bth-103"
+                        ),
+                },
+            }
+
+            response = client.post(
+                "/api/discovery/download",
+                json={
+                    "dvd_id":
+                        "BTH-103",
+                },
+            )
+
+            require(
+                response.status_code
+                == 200,
+                "completed task incorrectly blocked retry",
+            )
+
+            require(
+                len(calls)
+                == 1,
+                "completed retry did not enqueue",
+            )
+
+            print(
+                "DISCOVERY_DOWNLOAD_TERMINAL_TASK_RETRY_SMOKE=PASS"
+            )
+
+            standard_key = (
+                api.teddy_duplicates.duplicate_key(
+                    (
+                        "https://missav123.com/"
+                        "ko/sw-893"
+                    )
+                )
+            )
+
+            variant_key = (
+                api.teddy_duplicates.duplicate_key(
+                    (
+                        "https://missav123.com/"
+                        "ko/"
+                        "sw-893-uncensored-leak"
+                    )
+                )
+            )
+
+            require(
+                standard_key
+                != variant_key,
+                (
+                    "generic duplicate behavior "
+                    "was globally rewritten"
+                ),
+            )
+
+            print(
+                "GENERIC_DUPLICATE_BEHAVIOR_UNCHANGED_SMOKE=PASS"
             )
 
         finally:
-            api.teddy_duplicates.guarded_enqueue = (
-                original_guard
-            )
             api.teddy_routing.enqueue_download = (
                 original_enqueue
             )
 
-        after = sha256(db_path)
+        after = sha256(
+            db_path
+        )
 
         require(
             before == after,
@@ -373,24 +675,15 @@ def main():
         print(
             "DISCOVERY_DOWNLOAD_POST_ONLY_SMOKE=PASS"
         )
+
         print(
             "DISCOVERY_DOWNLOAD_STRICT_PAYLOAD_SMOKE=PASS"
         )
-        print(
-            "DISCOVERY_DOWNLOAD_FOUND_ONLY_SMOKE=PASS"
-        )
-        print(
-            "DISCOVERY_DOWNLOAD_SOURCE_PREFERENCE_SMOKE=PASS"
-        )
-        print(
-            "DISCOVERY_DOWNLOAD_FRONTDOOR_BOUNDARY_SMOKE=PASS"
-        )
-        print(
-            "DISCOVERY_DOWNLOAD_DUPLICATE_BOUNDARY_SMOKE=PASS"
-        )
+
         print(
             "DISCOVERY_DOWNLOAD_DB_BYTE_UNCHANGED_SMOKE=PASS"
         )
+
         print(
             "TEDDY_DISCOVERY_DOWNLOAD_API_OFFLINE_SMOKE=PASS"
         )

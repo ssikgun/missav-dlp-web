@@ -79,6 +79,110 @@ def find_duplicate(core, url):
     return None, None
 
 
+def find_duplicate_by_key(
+    core,
+    wanted_key,
+    task_key,
+):
+    wanted_key = str(
+        wanted_key
+        or ''
+    ).strip()
+
+    if not wanted_key:
+        return None, None
+
+    if not callable(task_key):
+        raise ValueError(
+            'task key function required'
+        )
+
+    for task_id, task in core.tasks.items():
+        if _is_terminal(task):
+            continue
+
+        existing_key = str(
+            task_key(task)
+            or ''
+        ).strip()
+
+        if existing_key == wanted_key:
+            return task_id, task
+
+    return None, None
+
+
+def guarded_enqueue_by_key(
+    core,
+    wanted_key,
+    task_key,
+    creator,
+):
+    wanted_key = str(
+        wanted_key
+        or ''
+    ).strip()
+
+    if not wanted_key:
+        raise ValueError(
+            'duplicate key required'
+        )
+
+    if not callable(task_key):
+        raise ValueError(
+            'task key function required'
+        )
+
+    with _QUEUE_LOCK:
+        task_id, task = (
+            find_duplicate_by_key(
+                core,
+                wanted_key,
+                task_key,
+            )
+        )
+
+        if task_id:
+            status = str(
+                task.get('status')
+                or '대기 중'
+            )
+
+            title = str(
+                task.get('display_title')
+                or task.get('filename')
+                or ''
+            ).strip()
+
+            message = (
+                '이미 다운로드 큐에 있는 항목입니다.'
+            )
+
+            if status.startswith('에러'):
+                message = (
+                    '이미 작업 목록에 있습니다. '
+                    '기존 작업의 재시작을 사용하세요.'
+                )
+
+            print(
+                f'[Duplicate] 추가 차단: '
+                f'{wanted_key} · '
+                f'task={task_id} · '
+                f'status={status}',
+                flush=True,
+            )
+
+            return core.jsonify({
+                'status': 'duplicate',
+                'message': message,
+                'task_id': task_id,
+                'task_status': status,
+                'title': title,
+            }), 409
+
+        return creator()
+
+
 def guarded_enqueue(
     core,
     url,
