@@ -11,6 +11,8 @@ from teddy_discovery_variant_collector import (
 )
 
 from teddy_discovery_variants import (
+    VARIANT_STANDARD,
+    VARIANT_UNCENSORED,
     read_title_variants,
 )
 
@@ -659,6 +661,466 @@ def network_before_db_smoke():
     )
 
 
+def standard_probe_watermark_smoke():
+    session = FakeSession(
+        FakeResponse(
+            status_code=200,
+            url=(
+                "https://missav123.com/"
+                "dm13/ko/sw-893"
+            ),
+            text="""
+                <html>
+                  <body>
+                    <a href="/ko/sw-893">
+                      standard
+                    </a>
+                  </body>
+                </html>
+            """,
+        )
+    )
+
+    with tempfile.TemporaryDirectory(
+        prefix=
+            "teddy-variant-standard-watermark-"
+    ) as temp:
+
+        db_path = (
+            Path(temp)
+            / "collector.sqlite3"
+        )
+
+        connection = (
+            discovery_db.connect(
+                db_path
+            )
+        )
+
+        try:
+            discovery_db.initialize(
+                connection
+            )
+
+            connection.execute(
+                """
+                INSERT INTO titles(
+                    dvd_id,
+                    title,
+                    first_seen_at,
+                    last_seen_at
+                )
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    "SW-893",
+                    "SW-893 title",
+                    (
+                        "2026-08-28"
+                        "T00:00:00+00:00"
+                    ),
+                    (
+                        "2026-08-28"
+                        "T00:00:00+00:00"
+                    ),
+                ),
+            )
+
+            connection.commit()
+
+        finally:
+            connection.close()
+
+        first = run_variant_collection(
+            db_path,
+            "SW-893",
+            session=session,
+        )
+
+        require(
+            first[
+                "found"
+            ]
+            is False,
+            "plain standard page "
+            "became uncensored",
+        )
+
+        require(
+            first[
+                "stored"
+            ]
+            is False,
+            "standard probe changed "
+            "uncensored stored semantics",
+        )
+
+        require(
+            first[
+                "stored_variant"
+            ]
+            is None,
+            "standard probe returned "
+            "uncensored stored variant",
+        )
+
+        require(
+            first[
+                "standard_observation_stored"
+            ]
+            is True,
+            "standard probe watermark "
+            "was not stored",
+        )
+
+        observation = first[
+            "standard_observation"
+        ]
+
+        require(
+            observation[
+                "variant_kind"
+            ]
+            == VARIANT_STANDARD,
+            "standard watermark kind mismatch",
+        )
+
+        require(
+            observation[
+                "dvd_id"
+            ]
+            == "SW-893",
+            "standard watermark DVD mismatch",
+        )
+
+        require(
+            observation[
+                "confirmed"
+            ]
+            == 1,
+            "standard watermark "
+            "must be confirmed page",
+        )
+
+        connection = (
+            discovery_db.connect(
+                db_path
+            )
+        )
+
+        try:
+            discovery_db.initialize(
+                connection
+            )
+
+            rows = read_title_variants(
+                connection,
+                dvd_id="SW-893",
+                confirmed_only=True,
+            )
+
+            integrity = connection.execute(
+                "PRAGMA integrity_check"
+            ).fetchone()[0]
+
+        finally:
+            connection.close()
+
+        require(
+            len(rows) == 1,
+            "standard watermark row "
+            "count mismatch",
+        )
+
+        require(
+            rows[0][
+                "variant_kind"
+            ]
+            == VARIANT_STANDARD,
+            "stored watermark is not standard",
+        )
+
+        require(
+            rows[0][
+                "last_checked_at"
+            ]
+            is not None,
+            "standard watermark "
+            "last_checked_at missing",
+        )
+
+        require(
+            integrity == "ok",
+            "standard watermark DB "
+            "integrity failed",
+        )
+
+    print(
+        "VARIANT_STANDARD_PROBE_WATERMARK_SMOKE=PASS"
+    )
+
+    print(
+        "VARIANT_STANDARD_PROBE_LAST_CHECKED_SMOKE=PASS"
+    )
+
+
+def uncensored_does_not_create_standard_watermark_smoke():
+    session = FakeSession(
+        FakeResponse(
+            status_code=200,
+            url=(
+                "https://missav123.com/"
+                "dm13/ko/sw-893"
+            ),
+            text="""
+                <html>
+                  <body>
+                    <a href="/ko/sw-893-uncensored-leak">
+                      confirmed uncensored
+                    </a>
+                  </body>
+                </html>
+            """,
+        )
+    )
+
+    with tempfile.TemporaryDirectory(
+        prefix=
+            "teddy-variant-uncensored-only-"
+    ) as temp:
+
+        db_path = (
+            Path(temp)
+            / "collector.sqlite3"
+        )
+
+        connection = (
+            discovery_db.connect(
+                db_path
+            )
+        )
+
+        try:
+            discovery_db.initialize(
+                connection
+            )
+
+            connection.execute(
+                """
+                INSERT INTO titles(
+                    dvd_id,
+                    title,
+                    first_seen_at,
+                    last_seen_at
+                )
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    "SW-893",
+                    "SW-893 title",
+                    (
+                        "2026-08-28"
+                        "T00:00:00+00:00"
+                    ),
+                    (
+                        "2026-08-28"
+                        "T00:00:00+00:00"
+                    ),
+                ),
+            )
+
+            connection.commit()
+
+        finally:
+            connection.close()
+
+        result = run_variant_collection(
+            db_path,
+            "SW-893",
+            session=session,
+        )
+
+        require(
+            result[
+                "found"
+            ]
+            is True,
+            "uncensored variant missing",
+        )
+
+        require(
+            result[
+                "stored"
+            ]
+            is True,
+            "uncensored variant "
+            "was not stored",
+        )
+
+        require(
+            result[
+                "standard_observation_stored"
+            ]
+            is False,
+            "uncensored result created "
+            "standard watermark",
+        )
+
+        connection = (
+            discovery_db.connect(
+                db_path
+            )
+        )
+
+        try:
+            discovery_db.initialize(
+                connection
+            )
+
+            rows = read_title_variants(
+                connection,
+                dvd_id="SW-893",
+                confirmed_only=True,
+            )
+
+        finally:
+            connection.close()
+
+        require(
+            len(rows) == 1,
+            "uncensored-only row "
+            "count mismatch",
+        )
+
+        require(
+            rows[0][
+                "variant_kind"
+            ]
+            == VARIANT_UNCENSORED,
+            "uncensored result stored "
+            "wrong kind",
+        )
+
+    print(
+        "VARIANT_UNCENSORED_NO_STANDARD_WATERMARK_SMOKE=PASS"
+    )
+
+
+def http_404_does_not_create_standard_watermark_smoke():
+    session = FakeSession(
+        FakeResponse(
+            status_code=404,
+            url=(
+                "https://missav123.com/"
+                "ko/sw-893"
+            ),
+            text="not found",
+        )
+    )
+
+    with tempfile.TemporaryDirectory(
+        prefix=
+            "teddy-variant-404-watermark-"
+    ) as temp:
+
+        db_path = (
+            Path(temp)
+            / "collector.sqlite3"
+        )
+
+        connection = (
+            discovery_db.connect(
+                db_path
+            )
+        )
+
+        try:
+            discovery_db.initialize(
+                connection
+            )
+
+            connection.execute(
+                """
+                INSERT INTO titles(
+                    dvd_id,
+                    title,
+                    first_seen_at,
+                    last_seen_at
+                )
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    "SW-893",
+                    "SW-893 title",
+                    (
+                        "2026-08-28"
+                        "T00:00:00+00:00"
+                    ),
+                    (
+                        "2026-08-28"
+                        "T00:00:00+00:00"
+                    ),
+                ),
+            )
+
+            connection.commit()
+
+        finally:
+            connection.close()
+
+        result = run_variant_collection(
+            db_path,
+            "SW-893",
+            session=session,
+        )
+
+        require(
+            result[
+                "http_status"
+            ]
+            == 404,
+            "404 fixture changed",
+        )
+
+        require(
+            result[
+                "standard_observation_stored"
+            ]
+            is False,
+            "404 created standard watermark",
+        )
+
+        connection = (
+            discovery_db.connect(
+                db_path
+            )
+        )
+
+        try:
+            discovery_db.initialize(
+                connection
+            )
+
+            rows = read_title_variants(
+                connection,
+                dvd_id="SW-893",
+                confirmed_only=False,
+            )
+
+        finally:
+            connection.close()
+
+        require(
+            rows == [],
+            "404 wrote variant rows",
+        )
+
+    print(
+        "VARIANT_404_NO_STANDARD_WATERMARK_SMOKE=PASS"
+    )
+
+
+
 def main():
     canonical_url_smoke()
     page_link_smoke()
@@ -668,6 +1130,10 @@ def main():
     fail_closed_smoke()
     temp_db_storage_smoke()
     network_before_db_smoke()
+
+    standard_probe_watermark_smoke()
+    uncensored_does_not_create_standard_watermark_smoke()
+    http_404_does_not_create_standard_watermark_smoke()
 
     print(
         "TEDDY_DISCOVERY_VARIANT_COLLECTOR_OFFLINE_SMOKE=PASS"

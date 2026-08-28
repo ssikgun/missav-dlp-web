@@ -29,6 +29,7 @@ from teddy_discovery_variant_classifier import (
 )
 
 from teddy_discovery_variants import (
+    VARIANT_STANDARD,
     VARIANT_UNCENSORED,
     canonical_variant_dvd_id,
     persist_title_variant,
@@ -440,6 +441,161 @@ def collect_uncensored_missav_variant(
                 pass
 
 
+def standard_probe_variant(
+    collected: Any,
+) -> dict | None:
+    #
+    # A successful standard-title page with
+    # no confirmed uncensored variant is a
+    # useful recheck watermark.
+    #
+    # This does NOT mean uncensored is
+    # permanently absent. It only records
+    # when the standard page was last
+    # successfully inspected.
+    #
+    # Never manufacture a standard row from:
+    # - 404 / errors
+    # - an uncensored redirect target
+    # - a collection that already confirmed
+    #   an uncensored variant
+    #
+    if not isinstance(
+        collected,
+        dict,
+    ):
+        raise ValueError(
+            "variant collection "
+            "must be an object"
+        )
+
+    if collected.get(
+        "found"
+    ) is not False:
+        return None
+
+    if collected.get(
+        "http_status"
+    ) != 200:
+        return None
+
+    dvd_id = (
+        canonical_variant_dvd_id(
+            collected.get(
+                "dvd_id"
+            )
+        )
+    )
+
+    final_url = _text(
+        collected.get(
+            "final_url"
+        )
+    )
+
+    if not final_url:
+        raise ValueError(
+            "standard probe final URL missing"
+        )
+
+    cleaned_url = (
+        _clean_response_url(
+            final_url,
+            dvd_id=dvd_id,
+        )
+    )
+
+    if is_owned_uncensored_missav_url(
+        dvd_id=dvd_id,
+        page_url=cleaned_url,
+    ):
+        raise RuntimeError(
+            "uncensored URL cannot be "
+            "stored as standard probe"
+        )
+
+    path_parts = [
+        part
+        for part
+        in urlparse(
+            cleaned_url
+        ).path.split("/")
+        if part
+    ]
+
+    if not path_parts:
+        raise RuntimeError(
+            "standard probe slug missing"
+        )
+
+    slug = unquote(
+        path_parts[-1]
+    ).strip()
+
+    if not slug:
+        raise RuntimeError(
+            "standard probe slug empty"
+        )
+
+    if canonical_variant_dvd_id(
+        slug
+    ) != dvd_id:
+        raise RuntimeError(
+            "standard probe slug "
+            "DVD ID mismatch"
+        )
+
+    return {
+        "dvd_id":
+            dvd_id,
+
+        "source":
+            SOURCE_MISSAV,
+
+        "variant_kind":
+            VARIANT_STANDARD,
+
+        "variant_slug":
+            slug,
+
+        "page_url":
+            cleaned_url,
+
+        "confirmed":
+            1,
+    }
+
+
+def persist_standard_probe_observation(
+    connection,
+    collected: Any,
+) -> dict | None:
+    variant = standard_probe_variant(
+        collected
+    )
+
+    if variant is None:
+        return None
+
+    observed_at = _text(
+        collected.get(
+            "requested_at"
+        )
+    )
+
+    if not observed_at:
+        raise ValueError(
+            "collection timestamp missing"
+        )
+
+    return persist_title_variant(
+        connection,
+        variant,
+        observed_at=observed_at,
+        checked_at=observed_at,
+    )
+
+
 def persist_variant_collection(
     connection,
     collected: Any,
@@ -545,6 +701,13 @@ def run_variant_collection(
             collected,
         )
 
+        standard_observation = (
+            persist_standard_probe_observation(
+                connection,
+                collected,
+            )
+        )
+
         integrity = connection.execute(
             "PRAGMA integrity_check"
         ).fetchone()[0]
@@ -565,6 +728,19 @@ def run_variant_collection(
 
         result["stored_variant"] = (
             stored
+        )
+
+        result[
+            "standard_observation_stored"
+        ] = (
+            standard_observation
+            is not None
+        )
+
+        result[
+            "standard_observation"
+        ] = (
+            standard_observation
         )
 
         result["db_integrity"] = (
