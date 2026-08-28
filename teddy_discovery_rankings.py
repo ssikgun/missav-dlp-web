@@ -288,6 +288,26 @@ def validate_weekly_snapshot(
             "invalid weekly period"
         )
 
+    period_label = _text(
+        snapshot.get(
+            "period_label"
+        )
+    )
+
+    if (
+        period_label is not None
+        and (
+            len(
+                period_label
+            ) > 200
+            or "\n" in period_label
+            or "\r" in period_label
+        )
+    ):
+        raise ValueError(
+            "invalid weekly period label"
+        )
+
     items = snapshot.get(
         "items"
     )
@@ -485,6 +505,9 @@ def validate_weekly_snapshot(
 
         "period":
             period,
+
+        "period_label":
+            period_label,
 
         "items":
             values,
@@ -976,6 +999,10 @@ def _write_validated_weekly_snapshot(
         "period"
     ]
 
+    period_label = values[
+        "period_label"
+    ]
+
     items = values[
         "items"
     ]
@@ -1025,9 +1052,10 @@ def _write_validated_weekly_snapshot(
             dvd_id,
             rank,
             score,
-            observed_at
+            observed_at,
+            period_label
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (
@@ -1041,6 +1069,7 @@ def _write_validated_weekly_snapshot(
                 ],
                 None,
                 observed_at,
+                period_label,
             )
             for item
             in items
@@ -1052,7 +1081,8 @@ def _write_validated_weekly_snapshot(
             """
             SELECT
                 dvd_id,
-                rank
+                rank,
+                period_label
             FROM ranking_snapshots
             WHERE chart_type = ?
               AND period = ?
@@ -1116,12 +1146,31 @@ def _write_validated_weekly_snapshot(
             "stored rank mismatch"
         )
 
+    stored_period_labels = {
+        row[
+            "period_label"
+        ]
+        for row
+        in stored
+    }
+
+    if stored_period_labels != {
+        period_label
+    }:
+        raise RuntimeError(
+            "weekly snapshot "
+            "period label mismatch"
+        )
+
     return {
         "chart_type":
             chart_type,
 
         "period":
             period,
+
+        "period_label":
+            period_label,
 
         "written":
             WEEKLY_EXPECTED_COUNT,
@@ -1390,7 +1439,8 @@ def list_weekly_snapshot(
                 dvd_id,
                 rank,
                 score,
-                observed_at
+                observed_at,
+                period_label
             FROM ranking_snapshots
             WHERE chart_type = ?
               AND period = ?

@@ -4,7 +4,7 @@ from pathlib import Path
 import sqlite3
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 SCHEMA = """
@@ -136,7 +136,8 @@ CREATE TABLE IF NOT EXISTS ranking_snapshots (
     dvd_id TEXT NOT NULL,
     rank INTEGER,
     score REAL,
-    observed_at TEXT NOT NULL
+    observed_at TEXT NOT NULL,
+    period_label TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_ranking_lookup
@@ -511,6 +512,64 @@ def _migrate_3_to_4(
         raise
 
 
+def _migrate_4_to_5(
+    connection: sqlite3.Connection,
+) -> None:
+    now = _utc_now()
+
+    connection.execute(
+        "BEGIN IMMEDIATE"
+    )
+
+    try:
+        columns = {
+            str(
+                row[
+                    "name"
+                ]
+            )
+            for row
+            in connection.execute(
+                """
+                PRAGMA table_info(
+                    ranking_snapshots
+                )
+                """
+            ).fetchall()
+        }
+
+        if (
+            "period_label"
+            not in columns
+        ):
+            connection.execute(
+                """
+                ALTER TABLE ranking_snapshots
+                ADD COLUMN period_label TEXT
+                """
+            )
+
+        connection.execute(
+            """
+            INSERT INTO schema_migrations(
+                version,
+                applied_at
+            )
+            VALUES (?, ?)
+            """,
+            (
+                5,
+                now,
+            ),
+        )
+
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+
 def initialize(
     connection: sqlite3.Connection,
 ) -> None:
@@ -580,6 +639,11 @@ def initialize(
 
         elif target == 4:
             _migrate_3_to_4(
+                connection
+            )
+
+        elif target == 5:
+            _migrate_4_to_5(
                 connection
             )
 

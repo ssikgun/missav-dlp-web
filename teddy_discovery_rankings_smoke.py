@@ -94,7 +94,7 @@ def migration_smoke(
     base_db: Path,
 ):
     with tempfile.TemporaryDirectory(
-        prefix="teddy-ranking-v4-"
+        prefix="teddy-ranking-v5-"
     ) as temp:
         copied = (
             Path(temp)
@@ -147,8 +147,29 @@ def migration_smoke(
                 schema_version(
                     connection
                 )
-                == 4,
-                "v3 -> v4 migration failed",
+                == 5,
+                "v3 -> v5 migration failed",
+            )
+
+            ranking_columns = {
+                row[
+                    "name"
+                ]
+                for row
+                in connection.execute(
+                    """
+                    PRAGMA table_info(
+                        ranking_snapshots
+                    )
+                    """
+                ).fetchall()
+            }
+
+            require(
+                "period_label"
+                in ranking_columns,
+                "v5 period_label "
+                "column missing",
             )
 
             indexes = (
@@ -213,7 +234,7 @@ def migration_smoke(
             connection.close()
 
     print(
-        "SCHEMA_V3_TO_V4_SMOKE=PASS"
+        "SCHEMA_V3_TO_V5_SMOKE=PASS"
     )
 
     print(
@@ -221,7 +242,7 @@ def migration_smoke(
     )
 
     print(
-        "V4_EXISTING_DATA_PRESERVED_SMOKE=PASS"
+        "V5_EXISTING_DATA_PRESERVED_SMOKE=PASS"
     )
 
 
@@ -372,7 +393,7 @@ def weekly_write_smoke(
     ) as temp:
         copied = (
             Path(temp)
-            / "weekly-v4.sqlite3"
+            / "weekly-v5.sqlite3"
         )
 
         sqlite_backup(
@@ -464,6 +485,36 @@ def weekly_write_smoke(
                 == expected_ids,
                 "weekly DB order changed",
             )
+
+            require(
+                parsed.get(
+                    "period_label"
+                )
+                == (
+                    "13th – 19th "
+                    "August 2026"
+                ),
+                "fixture period_label "
+                "changed",
+            )
+
+            require(
+                {
+                    row[
+                        "period_label"
+                    ]
+                    for row
+                    in rows
+                }
+                == {
+                    parsed[
+                        "period_label"
+                    ]
+                },
+                "weekly period_label "
+                "was not persisted",
+            )
+
 
             second = (
                 replace_weekly_snapshot(
@@ -717,6 +768,10 @@ def weekly_write_smoke(
     )
 
     print(
+        "WEEKLY_PERIOD_LABEL_STORAGE_SMOKE=PASS"
+    )
+
+    print(
         "WEEKLY_SNAPSHOT_IDEMPOTENCY_SMOKE=PASS"
     )
 
@@ -766,7 +821,7 @@ def main():
     )
 
     print(
-        "RANKING_DB_V4_OFFLINE_SMOKE=PASS"
+        "RANKING_DB_V5_OFFLINE_SMOKE=PASS"
     )
 
 
