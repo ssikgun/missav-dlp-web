@@ -19,10 +19,6 @@ _DATE_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2}$"
 )
 
-_HANGUL_RE = re.compile(
-    r"[\uac00-\ud7a3]"
-)
-
 _ITEM_KEYS = {
     "dvd_id",
     "title",
@@ -60,7 +56,6 @@ def _string_list(
     *,
     field: str,
     allow_empty: bool,
-    reject_hangul: bool,
 ) -> list[str]:
     if not isinstance(
         value,
@@ -97,18 +92,6 @@ def _string_list(
             raise ValueError(
                 field
                 + " contains duplicate entry"
-            )
-
-        if (
-            reject_hangul
-            and _HANGUL_RE.search(
-                cleaned
-            )
-            is not None
-        ):
-            raise ValueError(
-                field
-                + " contains localized Korean value"
             )
 
         result.append(
@@ -253,7 +236,6 @@ def normalize_missav_en_item(
         ],
         field="idols",
         allow_empty=True,
-        reject_hangul=True,
     )
 
     genres = _string_list(
@@ -262,7 +244,6 @@ def normalize_missav_en_item(
         ],
         field="genres",
         allow_empty=False,
-        reject_hangul=True,
     )
 
     brand_tags = _string_list(
@@ -271,7 +252,6 @@ def normalize_missav_en_item(
         ],
         field="brand_tags",
         allow_empty=True,
-        reject_hangul=False,
     )
 
     source_url = _validate_source_url(

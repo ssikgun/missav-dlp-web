@@ -20,10 +20,6 @@ _DVD_RE = re.compile(
     r"^([A-Z0-9]+)-?([0-9]+)$"
 )
 
-_HANGUL_RE = re.compile(
-    r"[\uac00-\ud7a3]"
-)
-
 _VOID_TAGS = {
     "area",
     "base",
@@ -655,18 +651,6 @@ def _labeled_values(
     )
 
 
-def _contains_hangul(
-    values: list[str],
-) -> bool:
-    return any(
-        _HANGUL_RE.search(
-            value
-        )
-        is not None
-        for value in values
-    )
-
-
 def parse_missav_movie_html(
     html: str,
     *,
@@ -840,24 +824,13 @@ def parse_missav_movie_html(
         )
 
     #
-    # Fallback actor/genre values must come from
-    # the English locale. Maker names may remain
-    # Japanese proper names as supplied by the
-    # English page.
+    # Locale trust comes from the exact /en/
+    # source URL plus the English structural
+    # labels and cross-field equality checks
+    # above. Character script is not a locale
+    # selector: preserve Unicode values exactly
+    # as supplied by the English page.
     #
-    if _contains_hangul(
-        idols
-    ):
-        raise ValueError(
-            "MissAV detail actor locale mismatch"
-        )
-
-    if _contains_hangul(
-        genres
-    ):
-        raise ValueError(
-            "MissAV detail genre locale mismatch"
-        )
 
     #
     # CP32/33/35/36 proved these are catalog or

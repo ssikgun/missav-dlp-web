@@ -456,7 +456,8 @@ print(
 
 
 #
-# 7. Korean actor must fail before write.
+# 7. Unicode/Hangul actor from a validated
+# /en/ source must be persisted verbatim.
 #
 con7 = make_db()
 
@@ -465,57 +466,102 @@ add_title(
     dvd_id="GANA-3432",
 )
 
-bad_actor = item()
-bad_actor["idols"] = [
-    "한국 배우"
-]
+unicode_actor = item(
+    idols=[
+        "김미나"
+    ],
+)
 
-try:
+assert (
     apply_missav_en_movie_metadata(
         con7,
-        bad_actor,
+        unicode_actor,
     )
+    == "updated"
+)
 
-except ValueError:
-    print(
-        "MISSAV_EN_WRITER_HANGUL_ACTOR_REJECTED_SMOKE=PASS"
-    )
+stored_unicode_people = [
+    row[0]
+    for row in con7.execute(
+        """
+        SELECT p.name
+        FROM title_people AS tp
+        JOIN people AS p
+          ON p.person_id = tp.person_id
+        WHERE tp.dvd_id = 'GANA-3432'
+        ORDER BY p.name
+        """
+    ).fetchall()
+]
 
-else:
-    raise AssertionError(
-        "Korean actor did not fail"
-    )
+assert stored_unicode_people == [
+    "김미나"
+]
+
+print(
+    "MISSAV_EN_WRITER_UNICODE_ACTOR_ALLOWED_SMOKE=PASS"
+)
 
 
 #
-# 8. Korean genre must fail.
+# 8. Unicode/Hangul genre from a validated
+# /en/ source must also persist verbatim.
 #
-bad_genre = item()
-bad_genre["genres"] = [
+con8 = make_db()
+
+add_title(
+    con8,
+    dvd_id="GANA-3432",
+)
+
+unicode_genre = item(
+    genres=[
+        "Big Breasts",
+        "아마추어",
+    ],
+)
+
+assert (
+    apply_missav_en_movie_metadata(
+        con8,
+        unicode_genre,
+    )
+    == "updated"
+)
+
+stored_unicode_genres = {
+    row[0]
+    for row in con8.execute(
+        """
+        SELECT g.name
+        FROM title_genres AS tg
+        JOIN genres AS g
+          ON g.genre_id = tg.genre_id
+        WHERE tg.dvd_id = 'GANA-3432'
+        """
+    ).fetchall()
+}
+
+assert stored_unicode_genres == {
     "Big Breasts",
     "아마추어",
-]
+}
 
-try:
-    apply_missav_en_movie_metadata(
-        con7,
-        bad_genre,
-    )
-
-except ValueError:
-    print(
-        "MISSAV_EN_WRITER_HANGUL_GENRE_REJECTED_SMOKE=PASS"
-    )
-
-else:
-    raise AssertionError(
-        "Korean genre did not fail"
-    )
+print(
+    "MISSAV_EN_WRITER_UNICODE_GENRE_ALLOWED_SMOKE=PASS"
+)
 
 
 #
-# 9. /ko/ source URL must fail.
+# 9. /ko/ source URL must still fail.
 #
+con9 = make_db()
+
+add_title(
+    con9,
+    dvd_id="GANA-3432",
+)
+
 bad_url = item()
 
 bad_url[
@@ -526,7 +572,7 @@ bad_url[
 
 try:
     apply_missav_en_movie_metadata(
-        con7,
+        con9,
         bad_url,
     )
 

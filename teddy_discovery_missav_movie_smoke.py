@@ -355,29 +355,61 @@ expect_failure(
 
 
 #
-# 4. Localized Korean actor must fail.
+# 4. Unicode/Hangul actor supplied by the
+# exact English page is a value, not a
+# locale selector. Preserve it verbatim
+# when meta/link/label evidence agrees.
 #
-expect_failure(
-    "MISSAV_EN_HANGUL_ACTOR_REJECTED_SMOKE",
-    body=fixture(
-        actor="한국 배우",
-        actor_link="한국 배우",
-        actor_label="한국 배우",
+unicode_actor = parse_missav_movie_envelope(
+    envelope(
+        fixture(
+            actor="김미나",
+            actor_link="김미나",
+            actor_label="김미나",
+        )
     ),
+    expected_dvd_id=
+        "GANA-3432",
+)
+
+assert unicode_actor[
+    "idols"
+] == [
+    "김미나"
+]
+
+print(
+    "MISSAV_EN_UNICODE_ACTOR_ALLOWED_SMOKE=PASS"
 )
 
 
 #
-# 5. Localized Korean genre must fail.
+# 5. Same rule for genre values: the /en/
+# page and English structural contract are
+# authoritative; no translation is done.
 #
-expect_failure(
-    "MISSAV_EN_HANGUL_GENRE_REJECTED_SMOKE",
-    body=fixture(
-        genres=(
-            "Big Breasts",
-            "아마추어",
-        ),
+unicode_genre = parse_missav_movie_envelope(
+    envelope(
+        fixture(
+            genres=(
+                "Big Breasts",
+                "아마추어",
+            ),
+        )
     ),
+    expected_dvd_id=
+        "GANA-3432",
+)
+
+assert unicode_genre[
+    "genres"
+] == [
+    "Big Breasts",
+    "아마추어",
+]
+
+print(
+    "MISSAV_EN_UNICODE_GENRE_ALLOWED_SMOKE=PASS"
 )
 
 
