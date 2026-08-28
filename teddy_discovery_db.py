@@ -4,7 +4,7 @@ from pathlib import Path
 import sqlite3
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 SCHEMA = """
@@ -570,6 +570,85 @@ def _migrate_4_to_5(
         raise
 
 
+def _migrate_5_to_6(
+    connection: sqlite3.Connection,
+) -> None:
+    now = _utc_now()
+
+    connection.execute(
+        "BEGIN IMMEDIATE"
+    )
+
+    try:
+        connection.execute(
+            """
+            CREATE TABLE title_variants (
+                dvd_id TEXT NOT NULL,
+
+                source TEXT NOT NULL
+                    CHECK (
+                        source IN (
+                            'missav',
+                            '123av'
+                        )
+                    ),
+
+                variant_kind TEXT NOT NULL
+                    CHECK (
+                        variant_kind IN (
+                            'standard',
+                            'uncensored'
+                        )
+                    ),
+
+                variant_slug TEXT NOT NULL,
+
+                page_url TEXT NOT NULL
+                    UNIQUE,
+
+                confirmed INTEGER NOT NULL
+                    CHECK (
+                        confirmed IN (0, 1)
+                    ),
+
+                first_seen_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL,
+                last_checked_at TEXT,
+
+                PRIMARY KEY (
+                    dvd_id,
+                    source,
+                    variant_kind
+                ),
+
+                FOREIGN KEY (dvd_id)
+                    REFERENCES titles(dvd_id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            INSERT INTO schema_migrations(
+                version,
+                applied_at
+            )
+            VALUES (?, ?)
+            """,
+            (
+                6,
+                now,
+            ),
+        )
+
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+
 def initialize(
     connection: sqlite3.Connection,
 ) -> None:
@@ -644,6 +723,11 @@ def initialize(
 
         elif target == 5:
             _migrate_4_to_5(
+                connection
+            )
+
+        elif target == 6:
+            _migrate_5_to_6(
                 connection
             )
 
