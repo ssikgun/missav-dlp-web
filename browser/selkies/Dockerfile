@@ -20,6 +20,20 @@ ARG CFT_VERSION
 
 USER 0
 
+# Teddy desktop adaptive resolution ceiling.
+# Keep Selkies auto-resize enabled, but bound
+# desktop stream geometry to 3840x2160.
+# The patcher fail-closes unless the pinned
+# Selkies frontend matches the verified SHA.
+COPY --chown=0:0 --chmod=0755 \
+  browser/selkies/patch_selkies_resolution.py \
+  /tmp/patch_selkies_resolution.py
+
+RUN /usr/bin/python3 \
+      /tmp/patch_selkies_resolution.py && \
+    rm -f \
+      /tmp/patch_selkies_resolution.py
+
 RUN if [ -z "${CFT_VERSION}" ]; then \
       echo "ERROR: CFT_VERSION build argument is required"; \
       false; \
