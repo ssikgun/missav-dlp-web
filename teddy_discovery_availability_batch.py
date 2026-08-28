@@ -6,6 +6,7 @@ from typing import Any
 from teddy_discovery_availability import (
     SOURCE_123AV,
     SOURCE_MISSAV,
+    STATUS_NOT_FOUND,
 )
 
 from teddy_discovery_availability_store import (
@@ -200,59 +201,158 @@ def build_due_request_plan(
         SOURCE_123AV,
     )
 
-    due = []
+    primary_due = []
+    fallback_due = []
     fresh = []
+
+    fallback_deferred_count = 0
 
     for dvd_id in universe[
         "dvd_ids"
     ]:
-        for source in sources:
-            cache = read_availability_cache(
+        #
+        # MissAV is always the primary
+        # availability source.
+        #
+        # A 123AV request is eligible only
+        # while a recent, known MissAV result
+        # says NOT_FOUND.
+        #
+        # If MissAV itself is due for a
+        # re-check, re-check MissAV first and
+        # defer 123AV until a later cycle.
+        #
+        missav_cache = (
+            read_availability_cache(
                 connection,
-                source=source,
-                dvd_id=dvd_id,
-                now=now,
+                source=
+                    SOURCE_MISSAV,
+                dvd_id=
+                    dvd_id,
+                now=
+                    now,
+            )
+        )
+
+        missav_item = {
+            "dvd_id":
+                dvd_id,
+
+            "source":
+                SOURCE_MISSAV,
+
+            "known":
+                missav_cache[
+                    "known"
+                ],
+
+            "status":
+                missav_cache[
+                    "status"
+                ],
+
+            "fail_count":
+                missav_cache[
+                    "fail_count"
+                ],
+
+            "next_check_at":
+                missav_cache[
+                    "next_check_at"
+                ],
+        }
+
+        if missav_cache[
+            "due"
+        ]:
+            primary_due.append(
+                missav_item
             )
 
-            item = {
-                "dvd_id":
-                    dvd_id,
+        else:
+            fresh.append(
+                missav_item
+            )
 
-                "source":
-                    source,
-
-                "known":
-                    cache[
-                        "known"
-                    ],
-
-                "status":
-                    cache[
-                        "status"
-                    ],
-
-                "fail_count":
-                    cache[
-                        "fail_count"
-                    ],
-
-                "next_check_at":
-                    cache[
-                        "next_check_at"
-                    ],
-            }
-
-            if cache[
+        fallback_allowed = (
+            missav_cache[
+                "known"
+            ]
+            and missav_cache[
+                "status"
+            ] == STATUS_NOT_FOUND
+            and not missav_cache[
                 "due"
-            ]:
-                due.append(
-                    item
-                )
+            ]
+        )
 
-            else:
-                fresh.append(
-                    item
-                )
+        if not fallback_allowed:
+            fallback_deferred_count += 1
+            continue
+
+        fallback_cache = (
+            read_availability_cache(
+                connection,
+                source=
+                    SOURCE_123AV,
+                dvd_id=
+                    dvd_id,
+                now=
+                    now,
+            )
+        )
+
+        fallback_item = {
+            "dvd_id":
+                dvd_id,
+
+            "source":
+                SOURCE_123AV,
+
+            "known":
+                fallback_cache[
+                    "known"
+                ],
+
+            "status":
+                fallback_cache[
+                    "status"
+                ],
+
+            "fail_count":
+                fallback_cache[
+                    "fail_count"
+                ],
+
+            "next_check_at":
+                fallback_cache[
+                    "next_check_at"
+                ],
+        }
+
+        if fallback_cache[
+            "due"
+        ]:
+            fallback_due.append(
+                fallback_item
+            )
+
+        else:
+            fresh.append(
+                fallback_item
+            )
+
+    #
+    # Global priority:
+    #
+    # Fill the request budget with every
+    # due MissAV primary before spending
+    # any request on 123AV fallback.
+    #
+    due = (
+        primary_due
+        + fallback_due
+    )
 
     selected = due[
         :max_requests
@@ -284,6 +384,9 @@ def build_due_request_plan(
             len(
                 fresh
             ),
+
+        "fallback_deferred_count":
+            fallback_deferred_count,
 
         "max_requests":
             max_requests,

@@ -345,15 +345,22 @@ def real_baseline_smoke(
     require(
         plan[
             "due_count"
-        ] == 183,
-        "real due count changed",
+        ] == 91,
+        "real R2 due count changed",
     )
 
     require(
         plan[
             "fresh_count"
-        ] == 51,
-        "real fresh count changed",
+        ] == 26,
+        "real R2 fresh count changed",
+    )
+
+    require(
+        plan[
+            "fallback_deferred_count"
+        ] == 117,
+        "real R2 fallback deferred count changed",
     )
 
     require(
@@ -370,10 +377,10 @@ def real_baseline_smoke(
             ],
         )
         == (
-            "123av",
-            "NAMH-074",
+            "missav",
+            "GANA-3432",
         ),
-        "real next request changed",
+        "real R2 next request changed",
     )
 
     require(

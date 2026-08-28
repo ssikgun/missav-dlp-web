@@ -325,16 +325,24 @@ def real_baseline_smoke(
         plan[
             "due_count"
         ]
-        == 203,
-        "real due count changed",
+        == 101,
+        "real R2 due count changed",
     )
 
     require(
         plan[
             "fresh_count"
         ]
-        == 31,
-        "real fresh count changed",
+        == 16,
+        "real R2 fresh count changed",
+    )
+
+    require(
+        plan[
+            "fallback_deferred_count"
+        ]
+        == 117,
+        "real R2 fallback deferred count changed",
     )
 
     require(
@@ -343,8 +351,8 @@ def real_baseline_smoke(
         ][0][
             "source"
         ]
-        == "123av",
-        "real next source changed",
+        == "missav",
+        "real R2 next source changed",
     )
 
     require(
@@ -353,8 +361,8 @@ def real_baseline_smoke(
         ][0][
             "dvd_id"
         ]
-        == "EMBM-053",
-        "real next dvd_id changed",
+        == "EROFV-387",
+        "real R2 next dvd_id changed",
     )
 
     require(
