@@ -377,6 +377,235 @@ def collection_smoke():
     )
 
 
+class DuplicateHeavySession:
+    def __init__(
+        self,
+    ):
+        self.calls = []
+
+    def get(
+        self,
+        url,
+        **kwargs,
+    ):
+        self.calls.append({
+            "url":
+                url,
+
+            "kwargs":
+                kwargs,
+        })
+
+        call_number = len(
+            self.calls
+        )
+
+        if call_number == 1:
+            page = 1
+        else:
+            page = int(
+                url.rsplit(
+                    "page=",
+                    1,
+                )[-1]
+            )
+
+        numbers_by_page = {
+            1:
+                list(
+                    range(
+                        1,
+                        13,
+                    )
+                ),
+
+            2:
+                list(
+                    range(
+                        13,
+                        25,
+                    )
+                ),
+
+            3:
+                list(
+                    range(
+                        25,
+                        37,
+                    )
+                ),
+
+            4:
+                [
+                    37, 38, 39,
+                    40, 41, 42,
+                    43, 44, 45,
+                    1, 2, 3,
+                ],
+
+            5:
+                [
+                    46,
+                    1, 2, 3, 4,
+                    5, 6, 7, 8,
+                    9, 10, 11,
+                ],
+
+            6:
+                list(
+                    range(
+                        47,
+                        59,
+                    )
+                ),
+        }
+
+        numbers = (
+            numbers_by_page[
+                page
+            ]
+        )
+
+        parts = [
+            "<html><body>"
+        ]
+
+        for number in numbers:
+            dvd = (
+                f"TST-{number:03d}"
+            )
+
+            slug = (
+                dvd.lower()
+            )
+
+            parts.append(
+                '<div class="thumbnail group">'
+                '<div>'
+                f'<a href="/ko/{slug}">'
+                '<img '
+                f'data-src="https://example.invalid/{slug}.jpg" '
+                f'alt="Synthetic {dvd}">'
+                '</a>'
+                '</div>'
+                '</div>'
+            )
+
+        if page < 6:
+            parts.append(
+                '<nav>'
+                '<a '
+                'rel="next" '
+                f'href="https://missav.ws/'
+                f'dm635/ko/release?page={page + 1}"'
+                '>'
+                'Next'
+                '</a>'
+                '</nav>'
+            )
+
+        parts.append(
+            "</body></html>"
+        )
+
+        return FakeResponse(
+            final_url(
+                page
+            ),
+            "".join(
+                parts
+            ),
+        )
+
+
+def duplicate_heavy_sixth_page_smoke():
+    session = (
+        DuplicateHeavySession()
+    )
+
+    result = collect_release_pages(
+        session=session,
+        proxy_url=PROXY,
+        limit=50,
+    )
+
+    verify_calls(
+        session,
+        6,
+    )
+
+    require(
+        result[
+            "page_count"
+        ]
+        == 6,
+        (
+            "duplicate-heavy collector "
+            "did not reach page 6"
+        ),
+    )
+
+    require(
+        result[
+            "item_count"
+        ]
+        == 50,
+        (
+            "duplicate-heavy collector "
+            "did not preserve Latest 50"
+        ),
+    )
+
+    ids = [
+        item[
+            "dvd_id"
+        ]
+        for item
+        in result[
+            "items"
+        ]
+    ]
+
+    require(
+        ids
+        == [
+            f"TST-{number:03d}"
+            for number
+            in range(
+                1,
+                51,
+            )
+        ],
+        (
+            "duplicate-heavy global "
+            "ordering changed"
+        ),
+    )
+
+    require(
+        len(
+            session.calls
+        )
+        == 6,
+        (
+            "collector fetched past "
+            "the first sufficient page"
+        ),
+    )
+
+    print(
+        "DUPLICATE_HEAVY_FIVE_PAGE_46_SMOKE=PASS"
+    )
+
+    print(
+        "SIXTH_PAGE_RECOVERY_SMOKE=PASS"
+    )
+
+    print(
+        "STRICT_LATEST_50_PRESERVED_SMOKE=PASS"
+    )
+
+
 def fail_closed_before_db_smoke():
     with tempfile.TemporaryDirectory(
         prefix=
@@ -590,6 +819,8 @@ def successful_db_smoke():
 
 def main():
     collection_smoke()
+
+    duplicate_heavy_sixth_page_smoke()
 
     fail_closed_before_db_smoke()
 
