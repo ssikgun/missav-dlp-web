@@ -1079,6 +1079,16 @@
                         + '미보유</span>'
                     );
 
+                const uncensoredBadge = (
+                    item.uncensored_variant_confirmed
+                    === true
+                )
+                    ? (
+                        '<span class="discovery-badge discovery-uncensored">'
+                        + '무수정</span>'
+                    )
+                    : '';
+
                 const meta = [
                     item.release_date,
                     item.maker,
@@ -1115,6 +1125,7 @@
                     + '</div>'
                     + '<div class="discovery-badges">'
                     + ownedBadge
+                    + uncensoredBadge
                     + availabilityBadge(
                         'missav',
                         item.availability

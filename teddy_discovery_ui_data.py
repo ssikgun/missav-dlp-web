@@ -189,6 +189,7 @@ def _load_enrichment(
             "people": {},
             "genres": {},
             "holdings": {},
+            "confirmed_uncensored": {},
             "availability": {},
         }
 
@@ -318,6 +319,33 @@ def _load_enrichment(
             row["dvd_id"]
         ] = count
 
+    confirmed_uncensored = {
+        dvd_id:
+            False
+        for dvd_id
+        in dvd_ids
+    }
+
+    for row in connection.execute(
+        f"""
+        SELECT
+            dvd_id
+        FROM title_variants
+        WHERE dvd_id IN (
+            {placeholders}
+        )
+          AND source = 'missav'
+          AND variant_kind = 'uncensored'
+          AND confirmed = 1
+        GROUP BY dvd_id
+        ORDER BY dvd_id
+        """,
+        dvd_ids,
+    ).fetchall():
+        confirmed_uncensored[
+            row["dvd_id"]
+        ] = True
+
     availability = {
         dvd_id: {}
         for dvd_id
@@ -431,6 +459,9 @@ def _load_enrichment(
 
         "holdings":
             holdings,
+
+        "confirmed_uncensored":
+            confirmed_uncensored,
 
         "availability":
             availability,
@@ -615,6 +646,16 @@ def _build_ui_items(
 
             "holding_count":
                 holding_count,
+
+            "uncensored_variant_confirmed":
+                bool(
+                    enrichment[
+                        "confirmed_uncensored"
+                    ].get(
+                        dvd_id,
+                        False,
+                    )
+                ),
 
             "availability":
                 availability,

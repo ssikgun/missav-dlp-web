@@ -211,6 +211,12 @@
     border: 1px solid #e2e8f0;
 }
 
+.discovery-uncensored {
+    background: #f5f3ff;
+    color: #7c3aed;
+    border: 1px solid #ddd6fe;
+}
+
 .discovery-found {
     background: #eff6ff;
     color: #2563eb;
@@ -527,6 +533,12 @@ html[data-theme="dark"] .discovery-unknown {
 html[data-theme="dark"] .discovery-owned {
     background: #0d2118;
     color: #4ade80;
+}
+
+html[data-theme="dark"] .discovery-uncensored {
+    background: #251a3d;
+    color: #c4b5fd;
+    border-color: #4c1d95;
 }
 
 html[data-theme="dark"] .discovery-detail {

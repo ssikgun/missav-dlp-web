@@ -216,6 +216,7 @@ def assert_common_items(
             "genres",
             "owned",
             "holding_count",
+            "uncensored_variant_confirmed",
             "availability",
             "availability_complete",
             "available_sources",
@@ -288,6 +289,16 @@ def assert_common_items(
                 > 0
             ),
             "UI owned state mismatch",
+        )
+
+        require(
+            type(
+                item[
+                    "uncensored_variant_confirmed"
+                ]
+            ) is bool,
+            "UI uncensored variant "
+            "flag invalid",
         )
 
         availability = item[
@@ -1250,6 +1261,264 @@ def temporary_ownership_smoke(
     )
 
 
+
+def temporary_uncensored_badge_smoke(
+    real_db: Path,
+):
+    with tempfile.TemporaryDirectory(
+        prefix=
+            "teddy-ui-data-uncensored-"
+    ) as temp:
+        root = Path(
+            temp
+        )
+
+        temp_db = (
+            root
+            / "teddy-discovery.sqlite3"
+        )
+
+        copy_db(
+            real_db,
+            temp_db,
+        )
+
+        connection = sqlite3.connect(
+            temp_db
+        )
+
+        connection.row_factory = (
+            sqlite3.Row
+        )
+
+        try:
+            latest = (
+                list_latest_items(
+                    connection,
+                    limit=50,
+                )
+            )
+
+            candidates = []
+
+            for item in latest:
+                dvd_id = item[
+                    "dvd_id"
+                ]
+
+                title_count = (
+                    connection.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM titles
+                        WHERE dvd_id = ?
+                        """,
+                        (
+                            dvd_id,
+                        ),
+                    ).fetchone()[0]
+                )
+
+                variant_count = (
+                    connection.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM title_variants
+                        WHERE dvd_id = ?
+                        """,
+                        (
+                            dvd_id,
+                        ),
+                    ).fetchone()[0]
+                )
+
+                if (
+                    title_count == 1
+                    and variant_count == 0
+                ):
+                    candidates.append(
+                        dvd_id
+                    )
+
+                if len(
+                    candidates
+                ) == 3:
+                    break
+
+            require(
+                len(
+                    candidates
+                ) == 3,
+                "not enough uncensored "
+                "badge fixture titles",
+            )
+
+            (
+                confirmed_id,
+                standard_only_id,
+                unconfirmed_id,
+            ) = candidates
+
+            observed_at = (
+                "2026-08-29T00:00:00+00:00"
+            )
+
+            rows = [
+                (
+                    confirmed_id,
+                    "missav",
+                    "uncensored",
+                    confirmed_id.lower()
+                    + "-uncensored",
+                    "https://missav123.com/ko/"
+                    + confirmed_id.lower()
+                    + "-uncensored",
+                    1,
+                    observed_at,
+                    observed_at,
+                    observed_at,
+                ),
+                (
+                    standard_only_id,
+                    "missav",
+                    "standard",
+                    standard_only_id.lower()
+                    + "-uncensored-leak",
+                    "https://missav123.com/ko/"
+                    + standard_only_id.lower()
+                    + "-uncensored-leak",
+                    1,
+                    observed_at,
+                    observed_at,
+                    observed_at,
+                ),
+                (
+                    unconfirmed_id,
+                    "missav",
+                    "uncensored",
+                    unconfirmed_id.lower()
+                    + "-uncensored",
+                    "https://missav123.com/ko/"
+                    + unconfirmed_id.lower()
+                    + "-uncensored",
+                    0,
+                    observed_at,
+                    observed_at,
+                    observed_at,
+                ),
+            ]
+
+            connection.executemany(
+                """
+                INSERT INTO title_variants(
+                    dvd_id,
+                    source,
+                    variant_kind,
+                    variant_slug,
+                    page_url,
+                    confirmed,
+                    first_seen_at,
+                    last_seen_at,
+                    last_checked_at
+                )
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?
+                )
+                """,
+                rows,
+            )
+
+            connection.commit()
+
+            view = build_latest_view(
+                connection,
+                limit=50,
+            )
+
+            states = {
+                item[
+                    "dvd_id"
+                ]:
+                    item[
+                        "uncensored_variant_confirmed"
+                    ]
+                for item
+                in view[
+                    "items"
+                ]
+            }
+
+            require(
+                states.get(
+                    confirmed_id
+                ) is True,
+                "confirmed uncensored "
+                "badge not exposed",
+            )
+
+            require(
+                states.get(
+                    standard_only_id
+                ) is False,
+                "standard variant falsely "
+                "marked uncensored",
+            )
+
+            require(
+                states.get(
+                    unconfirmed_id
+                ) is False,
+                "unconfirmed variant falsely "
+                "marked uncensored",
+            )
+
+            serialized = json.dumps(
+                view,
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+
+            for forbidden in (
+                confirmed_id.lower()
+                + "-uncensored",
+
+                "missav123.com/ko/",
+            ):
+                require(
+                    forbidden
+                    not in serialized,
+                    "variant upstream identity "
+                    "leaked to browser model",
+                )
+
+            integrity = (
+                connection.execute(
+                    "PRAGMA integrity_check"
+                ).fetchone()[0]
+            )
+
+        finally:
+            connection.close()
+
+        require(
+            integrity == "ok",
+            "temporary uncensored "
+            "fixture DB integrity failed",
+        )
+
+    print(
+        "UI_DATA_UNCENSORED_CONFIRMED_ONLY_SMOKE=PASS"
+    )
+
+    print(
+        "UI_DATA_UNCENSORED_FALSE_POSITIVE_SMOKE=PASS"
+    )
+
+    print(
+        "UI_DATA_UNCENSORED_UPSTREAM_NOT_LEAKED_SMOKE=PASS"
+    )
+
+
 def main():
     if len(
         sys.argv
@@ -1277,6 +1546,10 @@ def main():
     )
 
     temporary_ownership_smoke(
+        real_db
+    )
+
+    temporary_uncensored_badge_smoke(
         real_db
     )
 

@@ -135,6 +135,29 @@ def main():
         encoding="utf-8"
     )
 
+    require(
+        "item.uncensored_variant_confirmed"
+        in js
+        and "=== true"
+        in js,
+        "uncensored confirmed-only "
+        "UI guard missing",
+    )
+
+    require(
+        "discovery-uncensored"
+        in js
+        and "무수정"
+        in js,
+        "uncensored badge UI missing",
+    )
+
+    require(
+        ".discovery-uncensored"
+        in css,
+        "uncensored badge CSS missing",
+    )
+
     parser = MarkerParser()
 
     parser.feed(
