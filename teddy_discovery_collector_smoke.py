@@ -297,7 +297,6 @@ def collection_smoke():
     result = collect_release_pages(
         session=session,
         proxy_url=PROXY,
-        limit=50,
         max_pages=5,
     )
 
@@ -316,9 +315,17 @@ def collection_smoke():
 
     require(
         result[
+            "has_more_pages"
+        ] is False,
+        "complete five-page chain "
+        "marked incomplete",
+    )
+
+    require(
+        result[
             "item_count"
         ]
-        == 50,
+        == 60,
         "collector item count changed",
     )
 
@@ -339,7 +346,7 @@ def collection_smoke():
             for number
             in range(
                 1,
-                51,
+                61,
             )
         ],
         "collector global order changed",
@@ -358,7 +365,7 @@ def collection_smoke():
         == list(
             range(
                 1,
-                51,
+                61,
             )
         ),
         "collector global positions changed",
@@ -373,7 +380,7 @@ def collection_smoke():
     )
 
     print(
-        "LATEST_50_COLLECTION_SMOKE=PASS"
+        "FULL_FIVE_PAGE_WINDOW_SMOKE=PASS"
     )
 
 
@@ -526,7 +533,6 @@ def duplicate_heavy_sixth_page_smoke():
     result = collect_release_pages(
         session=session,
         proxy_url=PROXY,
-        limit=50,
     )
 
     verify_calls(
@@ -547,12 +553,22 @@ def duplicate_heavy_sixth_page_smoke():
 
     require(
         result[
+            "has_more_pages"
+        ] is False,
+        (
+            "complete duplicate-heavy "
+            "chain marked incomplete"
+        ),
+    )
+
+    require(
+        result[
             "item_count"
         ]
-        == 50,
+        == 58,
         (
             "duplicate-heavy collector "
-            "did not preserve Latest 50"
+            "did not preserve full window"
         ),
     )
 
@@ -573,7 +589,7 @@ def duplicate_heavy_sixth_page_smoke():
             for number
             in range(
                 1,
-                51,
+                59,
             )
         ],
         (
@@ -588,8 +604,8 @@ def duplicate_heavy_sixth_page_smoke():
         )
         == 6,
         (
-            "collector fetched past "
-            "the first sufficient page"
+            "duplicate-heavy request "
+            "count changed"
         ),
     )
 
@@ -602,7 +618,73 @@ def duplicate_heavy_sixth_page_smoke():
     )
 
     print(
-        "STRICT_LATEST_50_PRESERVED_SMOKE=PASS"
+        "DUPLICATE_HEAVY_FULL_WINDOW_SMOKE=PASS"
+    )
+
+
+def bounded_page_window_smoke():
+    session = (
+        DuplicateHeavySession()
+    )
+
+    result = collect_release_pages(
+        session=session,
+        proxy_url=PROXY,
+        max_pages=5,
+    )
+
+    verify_calls(
+        session,
+        5,
+    )
+
+    require(
+        result[
+            "page_count"
+        ] == 5,
+        "bounded page count changed",
+    )
+
+    require(
+        result[
+            "item_count"
+        ] == 46,
+        "bounded unique item count "
+        "changed",
+    )
+
+    require(
+        result[
+            "has_more_pages"
+        ] is True,
+        "bounded continuation was "
+        "not surfaced",
+    )
+
+    require(
+        [
+            item[
+                "dvd_id"
+            ]
+            for item
+            in result[
+                "items"
+            ]
+        ]
+        == [
+            f"TST-{number:03d}"
+            for number
+            in range(
+                1,
+                47,
+            )
+        ],
+        "bounded window ordering "
+        "changed",
+    )
+
+    print(
+        "PAGE_WINDOW_BOUNDARY_VISIBLE_SMOKE=PASS"
     )
 
 
@@ -625,7 +707,6 @@ def fail_closed_before_db_smoke():
                 db_path,
                 session=session,
                 proxy_url=PROXY,
-                limit=50,
                 max_pages=5,
             )
 
@@ -664,7 +745,6 @@ def sequential_page_fail_closed_smoke():
         collect_release_pages(
             session=session,
             proxy_url=PROXY,
-            limit=50,
             max_pages=5,
         )
 
@@ -693,7 +773,6 @@ def direct_route_rejected_smoke():
         collect_release_pages(
             session=session,
             proxy_url="",
-            limit=50,
             max_pages=5,
         )
 
@@ -737,7 +816,6 @@ def successful_db_smoke():
                 db_path,
                 session=session,
                 proxy_url=PROXY,
-                limit=50,
                 max_pages=5,
             )
         )
@@ -746,8 +824,16 @@ def successful_db_smoke():
             result[
                 "written"
             ]
-            == 50,
+            == 60,
             "DB write count changed",
+        )
+
+        require(
+            result[
+                "has_more_pages"
+            ] is False,
+            "complete DB collection "
+            "marked incomplete",
         )
 
         require(
@@ -803,12 +889,12 @@ def successful_db_smoke():
         )
 
         require(
-            latest == 50,
+            latest == 60,
             "collector latest count changed",
         )
 
         require(
-            titles == 50,
+            titles == 60,
             "collector title count changed",
         )
 
@@ -821,6 +907,8 @@ def main():
     collection_smoke()
 
     duplicate_heavy_sixth_page_smoke()
+
+    bounded_page_window_smoke()
 
     fail_closed_before_db_smoke()
 

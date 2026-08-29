@@ -753,6 +753,171 @@ def candidate_and_apply_smoke():
         )
 
 
+def fanza_metadata_handoff_smoke():
+    with tempfile.TemporaryDirectory(
+        prefix="teddy-fanza-metadata-"
+    ) as temp:
+        db = (
+            Path(temp)
+            / "discovery.sqlite3"
+        )
+
+        connection = connect(
+            db
+        )
+
+        initialize(
+            connection
+        )
+
+        observed = (
+            "2026-08-29T00:00:00+00:00"
+        )
+
+        connection.executemany(
+            """
+            INSERT INTO titles(
+                dvd_id,
+                release_date,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            [
+                (
+                    "FAN-001",
+                    "2026-08-29",
+                    observed,
+                    observed,
+                ),
+                (
+                    "FAN-002",
+                    "2026-08-30",
+                    observed,
+                    observed,
+                ),
+            ],
+        )
+
+        connection.commit()
+        connection.close()
+
+        candidates = (
+            refresh.metadata_candidate_ids(
+                db,
+                limit=20,
+                today="2026-08-29",
+            )
+        )
+
+        require(
+            "FAN-001" in candidates,
+            "released FANZA seed "
+            "not selected",
+        )
+
+        require(
+            "FAN-002" not in candidates,
+            "future FANZA seed "
+            "selected too early",
+        )
+
+        collected = {
+            "dvd_id":
+                "FAN-001",
+
+            "status":
+                "FOUND",
+
+            "route":
+                "javdatabase-movie",
+
+            "request_count":
+                1,
+
+            "item": {
+                "dvd_id":
+                    "FAN-001",
+            },
+        }
+
+        def writer(
+            connection,
+            item,
+        ):
+            connection.execute(
+                """
+                UPDATE titles
+                SET metadata_source = ?
+                WHERE dvd_id = ?
+                """,
+                (
+                    "javdatabase-movie",
+                    item[
+                        "dvd_id"
+                    ],
+                ),
+            )
+
+        result = (
+            refresh.apply_collected_metadata(
+                db,
+                collected,
+                direct_writer=writer,
+            )
+        )
+
+        require(
+            result[
+                "applied"
+            ] is True,
+            "released FANZA seed "
+            "metadata apply failed",
+        )
+
+        require(
+            result[
+                "metadata_source"
+            ]
+            == "javdatabase-movie",
+            "released FANZA metadata "
+            "source wrong",
+        )
+
+        remaining = (
+            refresh.metadata_candidate_ids(
+                db,
+                limit=20,
+                today="2026-08-29",
+            )
+        )
+
+        require(
+            "FAN-001" not in remaining,
+            "upgraded FANZA seed "
+            "still selected",
+        )
+
+        require(
+            "FAN-002" not in remaining,
+            "future FANZA seed "
+            "entered metadata early",
+        )
+
+    print(
+        "FANZA_RELEASE_DAY_METADATA_HANDOFF_SMOKE=PASS"
+    )
+
+    print(
+        "FANZA_FUTURE_METADATA_DEFERRED_SMOKE=PASS"
+    )
+
+    print(
+        "FANZA_METADATA_SOURCE_SEPARATION_SMOKE=PASS"
+    )
+
+
 def orchestration_smoke():
     calls = []
 
@@ -773,6 +938,12 @@ def orchestration_smoke():
 
             "observed_at":
                 "2026-08-28T00:00:00+00:00",
+
+            "page_count":
+                5,
+
+            "has_more_pages":
+                False,
 
             "db_integrity":
                 "ok",
@@ -868,6 +1039,16 @@ def orchestration_smoke():
     require(
         result["core_ok"] is True,
         "successful core marked failed",
+    )
+
+    require(
+        result[
+            "release"
+        ][
+            "has_more_pages"
+        ] is False,
+        "release page-window state "
+        "was not preserved",
     )
 
     require(
@@ -1044,6 +1225,8 @@ def main():
     non404_fail_closed_smoke()
     failed_request_telemetry_smoke()
     candidate_and_apply_smoke()
+
+    fanza_metadata_handoff_smoke()
     orchestration_smoke()
 
     print(

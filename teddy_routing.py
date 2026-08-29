@@ -106,7 +106,7 @@ def canonical_site(value):
     if not host:
         return ''
 
-    if re.search(r'(^|\.)missav\d*\.', host):
+    if re.search(r'(^|\.)missav\d*\.[^.]+$', host):
         return 'missav'
 
     for domain, canonical in _ALIAS_HOSTS.items():

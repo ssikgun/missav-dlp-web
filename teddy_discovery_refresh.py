@@ -418,6 +418,7 @@ def metadata_candidate_ids(
     limit: int = (
         DEFAULT_METADATA_MAX
     ),
+    today: Any = None,
 ) -> list[str]:
     if (
         type(limit) is not int
@@ -428,6 +429,43 @@ def metadata_candidate_ids(
             "metadata limit must "
             "be 1..50"
         )
+
+    if today is None:
+        today_text = (
+            datetime.now(
+                timezone.utc
+            )
+            .date()
+            .isoformat()
+        )
+
+    else:
+        today_text = str(
+            today
+        ).strip()
+
+        try:
+            parsed_today = (
+                datetime.strptime(
+                    today_text,
+                    "%Y-%m-%d",
+                ).date()
+            )
+
+        except ValueError as exc:
+            raise ValueError(
+                "metadata today must "
+                "be YYYY-MM-DD"
+            ) from exc
+
+        if (
+            parsed_today.isoformat()
+            != today_text
+        ):
+            raise ValueError(
+                "metadata today must "
+                "be canonical YYYY-MM-DD"
+            )
 
     database = Path(
         db_path
@@ -453,20 +491,39 @@ def metadata_candidate_ids(
             LEFT JOIN latest_items AS li
               ON li.dvd_id = t.dvd_id
              AND li.source = ?
-            WHERE t.metadata_source = ?
+            WHERE (
+                t.metadata_source = ?
+                OR (
+                    t.metadata_source IS NULL
+                    AND t.release_date IS NOT NULL
+                    AND t.release_date <= ?
+                )
+            )
             ORDER BY
+                CASE
+                    WHEN t.metadata_source = ?
+                    THEN 0
+                    ELSE 1
+                END,
                 CASE
                     WHEN li.dvd_id IS NULL
                     THEN 1
                     ELSE 0
                 END,
                 li.last_seen_at DESC,
+                CASE
+                    WHEN t.metadata_source IS NULL
+                    THEN t.release_date
+                    ELSE NULL
+                END ASC,
                 li.last_position ASC,
                 t.dvd_id ASC
             LIMIT ?
             """,
             (
                 RELEASE_METADATA_SOURCE,
+                RELEASE_METADATA_SOURCE,
+                today_text,
                 RELEASE_METADATA_SOURCE,
                 limit,
             ),
@@ -479,7 +536,6 @@ def metadata_candidate_ids(
 
     finally:
         connection.close()
-
 
 def apply_collected_metadata(
     db_path: str | Path,
@@ -584,9 +640,9 @@ def apply_collected_metadata(
 
         current_source = row[0]
 
-        if (
-            current_source
-            != RELEASE_METADATA_SOURCE
+        if current_source not in (
+            None,
+            RELEASE_METADATA_SOURCE,
         ):
             return {
                 "dvd_id":
@@ -941,6 +997,7 @@ def _safe_release_result(
         "written",
         "observed_at",
         "page_count",
+        "has_more_pages",
         "request_count",
         "db_integrity",
     )

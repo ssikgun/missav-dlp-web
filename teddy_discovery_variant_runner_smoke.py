@@ -19,6 +19,23 @@ def require(
 calls = []
 
 
+default_args = runner._parser().parse_args(
+    [
+        "--db",
+        "/tmp/default.sqlite3",
+    ]
+)
+
+require(
+    default_args.max_items == 50,
+    "default max items must be 50",
+)
+
+print(
+    "VARIANT_RUNNER_DEFAULT_MAX_ITEMS_50_PASS=PASS"
+)
+
+
 def fake_batch(
     db_path,
     **kwargs,

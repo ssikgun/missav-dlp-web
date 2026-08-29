@@ -727,16 +727,19 @@ def missav_release_next_url_from_envelope(
 
 def merge_missav_release_envelopes(
     envelopes: Iterable[dict],
-    limit: int = 50,
+    limit: int | None = None,
     language: str = DEFAULT_LANGUAGE,
 ) -> list[dict]:
     if (
-        not isinstance(
-            limit,
-            int,
+        limit is not None
+        and (
+            not isinstance(
+                limit,
+                int,
+            )
+            or limit < 1
+            or limit > 500
         )
-        or limit < 1
-        or limit > 500
     ):
         raise ValueError(
             "release limit must "
@@ -816,8 +819,14 @@ def merge_missav_release_envelopes(
                 value
             )
 
-            if len(result) == limit:
+            if (
+                limit is not None
+                and len(result) == limit
+            ):
                 return result
+
+    if limit is None:
+        return result
 
     raise ValueError(
         "insufficient unique "

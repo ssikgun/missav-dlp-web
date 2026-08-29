@@ -388,6 +388,162 @@ def upsert_movie_metadata(
     return item["dvd_id"]
 
 
+def upsert_future_release_seeds(
+    connection: sqlite3.Connection,
+    items,
+    observed_at: str | None = None,
+) -> int:
+    values = list(
+        items
+    )
+
+    if not values:
+        raise ValueError(
+            "refusing empty FANZA "
+            "future seed import"
+        )
+
+    normalized = []
+    seen = set()
+
+    for item in values:
+        if not isinstance(
+            item,
+            dict,
+        ):
+            raise ValueError(
+                "FANZA seed item "
+                "must be object"
+            )
+
+        raw_dvd_id = _text(
+            item.get(
+                "dvd_id"
+            )
+        )
+
+        dvd_id = normalize_dvd_id(
+            raw_dvd_id
+        )
+
+        if dvd_id != raw_dvd_id:
+            raise ValueError(
+                "FANZA seed dvd_id "
+                "must already be canonical"
+            )
+
+        if dvd_id in seen:
+            raise ValueError(
+                "duplicate FANZA seed "
+                "dvd_id: "
+                + dvd_id
+            )
+
+        seen.add(
+            dvd_id
+        )
+
+        release_date = _text(
+            item.get(
+                "release_date"
+            )
+        )
+
+        if not release_date:
+            raise ValueError(
+                "FANZA seed missing "
+                "release_date: "
+                + dvd_id
+            )
+
+        try:
+            parsed_date = (
+                datetime.strptime(
+                    release_date,
+                    "%Y-%m-%d",
+                ).date()
+            )
+        except ValueError as exc:
+            raise ValueError(
+                "invalid FANZA seed "
+                "release_date: "
+                + repr(
+                    release_date
+                )
+            ) from exc
+
+        if (
+            parsed_date.isoformat()
+            != release_date
+        ):
+            raise ValueError(
+                "non-canonical FANZA "
+                "seed release_date: "
+                + repr(
+                    release_date
+                )
+            )
+
+        normalized.append({
+            "dvd_id":
+                dvd_id,
+
+            "release_date":
+                release_date,
+        })
+
+    observed_at = (
+        _text(
+            observed_at
+        )
+        or utc_now()
+    )
+
+    with connection:
+        for item in normalized:
+            connection.execute(
+                """
+                INSERT INTO titles(
+                    dvd_id,
+                    release_date,
+                    first_seen_at,
+                    last_seen_at
+                )
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(dvd_id)
+                DO UPDATE SET
+                    release_date =
+                        COALESCE(
+                            titles.release_date,
+                            excluded.release_date
+                        ),
+
+                    first_seen_at =
+                        COALESCE(
+                            titles.first_seen_at,
+                            excluded.first_seen_at
+                        ),
+
+                    last_seen_at =
+                        excluded.last_seen_at
+                """,
+                (
+                    item[
+                        "dvd_id"
+                    ],
+                    item[
+                        "release_date"
+                    ],
+                    observed_at,
+                    observed_at,
+                ),
+            )
+
+    return len(
+        normalized
+    )
+
+
 def normalize_query_result(
     item: dict,
     source: str,

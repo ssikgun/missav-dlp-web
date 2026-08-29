@@ -14,6 +14,7 @@ from teddy_discovery_availability import (
     STATUS_FOUND,
     STATUS_NOT_FOUND,
     STATUS_UNKNOWN,
+    SOURCE_MISSAV,
     canonical_dvd_id,
     canonical_page_url,
 )
@@ -57,6 +58,55 @@ def canonical_source(
         )
 
     return source
+
+
+def _cached_page_url_is_compatible(
+    *,
+    source: str,
+    dvd_id: str,
+    page_url: Any,
+) -> bool:
+    value = _text(
+        page_url
+    )
+
+    if not value:
+        return False
+
+    expected = canonical_page_url(
+        source,
+        dvd_id,
+    )
+
+    if value == expected:
+        return True
+
+    if source != SOURCE_MISSAV:
+        return False
+
+    slug = canonical_dvd_id(
+        dvd_id
+    ).lower()
+
+    #
+    # R2 separates the logical MissAV
+    # source from its physical mirrors.
+    #
+    # Old cache rows remain valid evidence
+    # when they point to an exact canonical
+    # DVD page on a known MissAV-family
+    # mirror. New requests/writes still use
+    # canonical_page_url(), whose preferred
+    # host is missav123.com.
+    #
+    legacy_family_urls = {
+        "https://missav01.com/ko/"
+        + slug,
+        "https://missav.ws/ko/"
+        + slug,
+    }
+
+    return value in legacy_family_urls
 
 
 def _parse_time(
@@ -580,12 +630,16 @@ def read_availability_cache(
         ]
     )
 
-    if value[
-        "page_url"
-    ] != page_url:
+    if not _cached_page_url_is_compatible(
+        source=source,
+        dvd_id=dvd_id,
+        page_url=value[
+            "page_url"
+        ],
+    ):
         raise RuntimeError(
             "cached page URL "
-            "is not canonical"
+            "is not compatible"
         )
 
     fail_count = _validated_fail_count(

@@ -119,7 +119,7 @@ def canonical_page_url(
 
     if source == SOURCE_MISSAV:
         return (
-            "https://missav.ws/ko/"
+            "https://missav123.com/ko/"
             + slug
         )
 

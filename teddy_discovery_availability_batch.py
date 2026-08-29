@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+from datetime import (
+    date,
+    datetime,
+    timezone,
+)
 import sqlite3
 from typing import Any
 
 from teddy_discovery_availability import (
     SOURCE_123AV,
     SOURCE_MISSAV,
+    STATUS_FOUND,
     STATUS_NOT_FOUND,
+    STATUS_UNKNOWN,
 )
 
 from teddy_discovery_availability_store import (
@@ -20,6 +27,7 @@ from teddy_discovery_monthly import (
 
 DEFAULT_MAX_REQUESTS = 20
 MAX_REQUESTS_LIMIT = 200
+DEFAULT_NEAR_FUTURE_DAYS = 7
 
 
 def _validated_max_requests(
@@ -35,6 +43,179 @@ def _validated_max_requests(
         )
 
     return value
+
+
+def _text(
+    value: Any,
+) -> str | None:
+    if value is None:
+        return None
+
+    value = str(
+        value
+    ).strip()
+
+    return value or None
+
+
+def _parse_now(
+    value: Any,
+) -> datetime:
+    if isinstance(
+        value,
+        datetime,
+    ):
+        parsed = value
+
+    else:
+        raw = _text(
+            value
+        )
+
+        if not raw:
+            raise ValueError(
+                "now missing"
+            )
+
+        try:
+            parsed = datetime.fromisoformat(
+                raw
+            )
+
+        except ValueError as exc:
+            raise ValueError(
+                "now must be ISO-8601"
+            ) from exc
+
+    if (
+        parsed.tzinfo is None
+        or parsed.utcoffset() is None
+    ):
+        raise ValueError(
+            "now must be timezone-aware"
+        )
+
+    return parsed.astimezone(
+        timezone.utc
+    ).replace(
+        microsecond=0
+    )
+
+
+def _parse_release_date(
+    value: Any,
+) -> date | None:
+    raw = _text(
+        value
+    )
+
+    if not raw:
+        return None
+
+    try:
+        return date.fromisoformat(
+            raw
+        )
+
+    except ValueError:
+        return None
+
+
+def _priority_for_release(
+    release_date: date | None,
+    *,
+    today: date,
+) -> tuple[int | None, str, int]:
+    if release_date is None:
+        return (
+            3,
+            "older-or-undated",
+            999999,
+        )
+
+    delta = (
+        release_date
+        - today
+    ).days
+
+    if delta > DEFAULT_NEAR_FUTURE_DAYS:
+        return (
+            None,
+            "far-future",
+            delta,
+        )
+
+    if delta == 0:
+        return (
+            0,
+            "today",
+            0,
+        )
+
+    if -6 <= delta < 0:
+        return (
+            1,
+            "recent7",
+            abs(
+                delta
+            ),
+        )
+
+    if (
+        1 <= delta
+        <= DEFAULT_NEAR_FUTURE_DAYS
+    ):
+        return (
+            2,
+            "near-future",
+            delta,
+        )
+
+    return (
+        3,
+        "older-or-undated",
+        abs(
+            delta
+        ),
+    )
+
+
+def _due_sort_key(
+    item: dict,
+) -> tuple:
+    #
+    # Inside the older bucket, negative
+    # and uncertain results stay ahead of
+    # already-FOUND rows.
+    #
+    older_found = (
+        1
+        if (
+            item[
+                "priority"
+            ] == 3
+            and item[
+                "status"
+            ] == STATUS_FOUND
+        )
+        else 0
+    )
+
+    return (
+        item[
+            "priority"
+        ],
+        older_found,
+        item[
+            "priority_distance_days"
+        ],
+        item[
+            "dvd_id"
+        ],
+        item[
+            "source"
+        ],
+    )
 
 
 def _append_unique(
@@ -125,13 +306,50 @@ def full_ui_universe(
         ]
     ]
 
+    catalog_rows = connection.execute(
+        """
+        SELECT
+            dvd_id,
+            release_date
+        FROM titles
+        ORDER BY
+            CASE
+                WHEN release_date IS NULL
+                THEN 1
+                ELSE 0
+            END,
+            release_date DESC,
+            dvd_id ASC
+        """
+    ).fetchall()
+
+    catalog_ids = [
+        row[
+            "dvd_id"
+        ]
+        for row in catalog_rows
+    ]
+
+    release_dates = {
+        row[
+            "dvd_id"
+        ]:
+            row[
+                "release_date"
+            ]
+        for row in catalog_rows
+    }
+
     ordered = []
     seen = set()
 
     #
-    # Priority intentionally follows UI:
-    # Latest first, then current Weekly,
-    # then remaining full Monthly universe.
+    # Keep the former UI members first only
+    # as a stable legacy tie-break order.
+    #
+    # The full catalog is appended so the
+    # availability worker is no longer
+    # limited to Latest / Weekly / Monthly.
     #
     _append_unique(
         ordered,
@@ -149,6 +367,12 @@ def full_ui_universe(
         ordered,
         seen,
         monthly_ids,
+    )
+
+    _append_unique(
+        ordered,
+        seen,
+        catalog_ids,
     )
 
     return {
@@ -169,6 +393,14 @@ def full_ui_universe(
             len(
                 monthly_ids
             ),
+
+        "catalog_count":
+            len(
+                catalog_ids
+            ),
+
+        "release_dates":
+            release_dates,
 
         "total":
             len(
@@ -196,6 +428,15 @@ def build_due_request_plan(
         connection
     )
 
+    now_dt = _parse_now(
+        now
+    )
+
+    release_dates = universe.get(
+        "release_dates",
+        {},
+    )
+
     sources = (
         SOURCE_MISSAV,
         SOURCE_123AV,
@@ -206,10 +447,37 @@ def build_due_request_plan(
     fresh = []
 
     fallback_deferred_count = 0
+    far_future_deferred_count = 0
+    eligible_title_count = 0
 
     for dvd_id in universe[
         "dvd_ids"
     ]:
+        release = _parse_release_date(
+            release_dates.get(
+                dvd_id
+            )
+        )
+
+        (
+            priority,
+            priority_name,
+            priority_distance_days,
+        ) = _priority_for_release(
+            release,
+            today=now_dt.date(),
+        )
+
+        #
+        # Do not spend availability requests
+        # on FANZA seeds that are still more
+        # than seven days from release.
+        #
+        if priority is None:
+            far_future_deferred_count += 1
+            continue
+
+        eligible_title_count += 1
         #
         # MissAV is always the primary
         # availability source.
@@ -240,6 +508,22 @@ def build_due_request_plan(
 
             "source":
                 SOURCE_MISSAV,
+
+            "release_date":
+                (
+                    release.isoformat()
+                    if release is not None
+                    else None
+                ),
+
+            "priority":
+                priority,
+
+            "priority_name":
+                priority_name,
+
+            "priority_distance_days":
+                priority_distance_days,
 
             "known":
                 missav_cache[
@@ -309,6 +593,22 @@ def build_due_request_plan(
             "source":
                 SOURCE_123AV,
 
+            "release_date":
+                (
+                    release.isoformat()
+                    if release is not None
+                    else None
+                ),
+
+            "priority":
+                priority,
+
+            "priority_name":
+                priority_name,
+
+            "priority_distance_days":
+                priority_distance_days,
+
             "known":
                 fallback_cache[
                     "known"
@@ -343,12 +643,25 @@ def build_due_request_plan(
             )
 
     #
-    # Global priority:
+    # R2 title priority:
     #
-    # Fill the request budget with every
-    # due MissAV primary before spending
-    # any request on 123AV fallback.
+    # today
+    # -> recent seven released dates
+    # -> near future (<= 7 days)
+    # -> older negative / uncertain
+    # -> older FOUND
     #
+    # MissAV remains globally ahead of
+    # 123AV fallback.
+    #
+    primary_due.sort(
+        key=_due_sort_key
+    )
+
+    fallback_due.sort(
+        key=_due_sort_key
+    )
+
     due = (
         primary_due
         + fallback_due
@@ -367,10 +680,22 @@ def build_due_request_plan(
                 sources
             ),
 
-        "possible_checks":
+        "catalog_title_count":
             universe[
                 "total"
-            ]
+            ],
+
+        "eligible_title_count":
+            eligible_title_count,
+
+        "far_future_deferred_count":
+            far_future_deferred_count,
+
+        "near_future_days":
+            DEFAULT_NEAR_FUTURE_DAYS,
+
+        "possible_checks":
+            eligible_title_count
             * len(
                 sources
             ),

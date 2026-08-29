@@ -32,7 +32,6 @@ DEFAULT_RELEASE_URL = (
     "https://missav.ws/ko/release"
 )
 
-DEFAULT_LIMIT = 50
 DEFAULT_MAX_PAGES = 10
 DEFAULT_TIMEOUT_SECONDS = 45
 DEFAULT_IMPERSONATE = "chrome"
@@ -390,25 +389,11 @@ def collect_release_pages(
     session=None,
     proxy_url: str | None = None,
     start_url: str = DEFAULT_RELEASE_URL,
-    limit: int = DEFAULT_LIMIT,
     max_pages: int = DEFAULT_MAX_PAGES,
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
     impersonate: str = DEFAULT_IMPERSONATE,
     language: str = DEFAULT_LANGUAGE,
 ) -> dict:
-    if (
-        not isinstance(
-            limit,
-            int,
-        )
-        or limit < 1
-        or limit > 500
-    ):
-        raise ValueError(
-            "release limit must "
-            "be 1..500"
-        )
-
     if (
         not isinstance(
             max_pages,
@@ -463,7 +448,7 @@ def collect_release_pages(
 
     envelopes = []
     seen_urls = set()
-    seen_ids = set()
+    has_more_pages = False
 
     try:
         for page_number in range(
@@ -525,18 +510,6 @@ def collect_release_pages(
                 envelope
             )
 
-            for item in page_items:
-                seen_ids.add(
-                    item[
-                        "dvd_id"
-                    ]
-                )
-
-            if len(
-                seen_ids
-            ) >= limit:
-                break
-
             next_url = (
                 missav_release_next_url_from_envelope(
                     envelope,
@@ -545,10 +518,8 @@ def collect_release_pages(
             )
 
             if not next_url:
-                raise RuntimeError(
-                    "MissAV release "
-                    "ended before limit"
-                )
+                has_more_pages = False
+                break
 
             next_url = (
                 _validate_release_page_url(
@@ -581,6 +552,10 @@ def collect_release_pages(
                     f"got {actual_page}"
                 )
 
+            if page_number == max_pages:
+                has_more_pages = True
+                break
+
             current_url = (
                 next_url
             )
@@ -588,16 +563,10 @@ def collect_release_pages(
         items = (
             merge_missav_release_envelopes(
                 envelopes,
-                limit=limit,
+                limit=None,
                 language=language,
             )
         )
-
-        if len(items) != limit:
-            raise RuntimeError(
-                "MissAV release merge "
-                "did not reach limit"
-            )
 
         return {
             "source":
@@ -616,6 +585,9 @@ def collect_release_pages(
 
             "item_count":
                 len(items),
+
+            "has_more_pages":
+                has_more_pages,
 
             "page_urls": [
                 envelope[
@@ -646,7 +618,6 @@ def run_release_collection(
     session=None,
     proxy_url: str | None = None,
     start_url: str = DEFAULT_RELEASE_URL,
-    limit: int = DEFAULT_LIMIT,
     max_pages: int = DEFAULT_MAX_PAGES,
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
     impersonate: str = DEFAULT_IMPERSONATE,
@@ -655,15 +626,15 @@ def run_release_collection(
     #
     # Critical fail-closed boundary:
     #
-    # Network + all pages + parser + 50-item
-    # merge must finish BEFORE opening the DB.
+    # Network + fetched page window + parser
+    # + full-window merge must finish BEFORE
+    # opening the DB.
     #
     collected = (
         collect_release_pages(
             session=session,
             proxy_url=proxy_url,
             start_url=start_url,
-            limit=limit,
             max_pages=max_pages,
             timeout=timeout,
             impersonate=

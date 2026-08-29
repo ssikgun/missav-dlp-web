@@ -42,7 +42,7 @@ def canonical_url_smoke():
             "SDNM-560",
         )
         == (
-            "https://missav.ws/"
+            "https://missav123.com/"
             "ko/sdnm-560"
         ),
         "MissAV canonical URL changed",
@@ -64,7 +64,7 @@ def canonical_url_smoke():
         "",
         "JUR-821 extra title",
         "movie-JUR-821",
-        "https://missav.ws/ko/jur-821",
+        "https://missav123.com/ko/jur-821",
     ):
         try:
             canonical_dvd_id(
@@ -183,6 +183,42 @@ def forensic_oracle_smoke(
             expected_status,
         ) = oracle
 
+        #
+        # Historical forensic evidence was
+        # captured from an older physical
+        # MissAV-family mirror.
+        #
+        # Preserve its real HTML/status/body
+        # evidence, but evaluate it through
+        # today's canonical physical host.
+        #
+        requested_url = record[
+            "requested_url"
+        ]
+
+        effective_url = record[
+            "effective_url"
+        ]
+
+        if (
+            record[
+                "source"
+            ] == SOURCE_MISSAV
+        ):
+            current_url = (
+                canonical_page_url(
+                    record[
+                        "source"
+                    ],
+                    record[
+                        "dvd_id"
+                    ],
+                )
+            )
+
+            requested_url = current_url
+            effective_url = current_url
+
         result = classify_page_response(
             source=record[
                 "source"
@@ -190,18 +226,14 @@ def forensic_oracle_smoke(
             dvd_id=record[
                 "dvd_id"
             ],
-            requested_url=record[
-                "requested_url"
-            ],
+            requested_url=requested_url,
             http_status=record[
                 "status"
             ],
             content_type=record[
                 "content_type"
             ],
-            effective_url=record[
-                "effective_url"
-            ],
+            effective_url=effective_url,
             location=record[
                 "location"
             ],
@@ -448,7 +480,7 @@ def unknown_fail_closed_smoke():
 
             "effective_url":
                 (
-                    "https://missav.ws/"
+                    "https://missav123.com/"
                     "ko/other-001"
                 ),
 
@@ -593,13 +625,13 @@ def request_escape_smoke():
             source=SOURCE_MISSAV,
             dvd_id="JUR-821",
             requested_url=(
-                "https://missav.ws/"
+                "https://missav123.com/"
                 "ko/not-jur-821"
             ),
             http_status=404,
             content_type="text/html",
             effective_url=(
-                "https://missav.ws/"
+                "https://missav123.com/"
                 "ko/not-jur-821"
             ),
             body="<html></html>",
