@@ -775,14 +775,25 @@ def parse_missav_movie_html(
             "MissAV detail actor contract mismatch"
         )
 
-    if (
-        actress_labels
-        and set(
+    actress_label_matches = (
+        not actress_labels
+        or set(
             actress_labels
-        ) != set(
+        ) == set(
             idols
         )
-    ):
+        or (
+            len(
+                actress_labels
+            ) == 1
+            and actress_labels[0]
+                == ", ".join(
+                    idols
+                )
+        )
+    )
+
+    if not actress_label_matches:
         raise ValueError(
             "MissAV detail actress label mismatch"
         )

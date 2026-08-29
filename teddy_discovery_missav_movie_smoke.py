@@ -192,6 +192,97 @@ def fixture(
     """
 
 
+def multi_actress_fixture(
+    *,
+    wrong_label: bool = False,
+) -> str:
+    if wrong_label:
+        actress_detail = """
+        <div class="text-secondary">
+          <span>Actress:</span>
+          WRONG ACTRESS LABEL
+        </div>
+
+        <div class="text-secondary">
+          <a
+            class="text-nord13 font-medium"
+            href="/en/actresses/ayase-kokoro">
+            Ayase Kokoro
+          </a>
+
+          <a
+            class="text-nord13 font-medium"
+            href="/en/actresses/sayu-nanahara">
+            Sayu Nanahara
+          </a>
+        </div>
+        """
+
+    else:
+        actress_detail = """
+        <div class="text-secondary"><span>Actress:</span> <a class="text-nord13 font-medium" href="/en/actresses/ayase-kokoro">Ayase Kokoro</a>, <a class="text-nord13 font-medium" href="/en/actresses/sayu-nanahara">Sayu Nanahara</a></div>
+        """
+
+    return f"""
+    <html>
+      <head>
+        <meta
+          property="og:title"
+          content="GANA-3432 English fixture title">
+
+        <meta
+          property="og:video:release_date"
+          content="2026-08-24">
+
+        <meta
+          property="og:video:actor"
+          content="Ayase Kokoro">
+
+        <meta
+          property="og:video:actor"
+          content="Sayu Nanahara">
+
+        <meta
+          property="og:video:tag"
+          content="GANA">
+      </head>
+
+      <body>
+        <div class="space-y-2">
+
+          <div class="text-secondary">
+            <span>Release date:</span>
+            2026-08-24
+          </div>
+
+          {actress_detail}
+
+          <div class="text-secondary">
+            <span>Genre:</span>
+
+            <a
+              class="text-nord13 font-medium"
+              href="/en/genres/big-breasts">
+              Big Breasts
+            </a>
+          </div>
+
+          <div class="text-secondary">
+            <span>Maker:</span>
+
+            <a
+              class="text-nord13 font-medium"
+              href="/en/makers/test-maker">
+              Test Maker
+            </a>
+          </div>
+
+        </div>
+      </body>
+    </html>
+    """
+
+
 def envelope(
     body: str,
     *,
@@ -340,6 +431,47 @@ assert actorless["idols"] == []
 
 print(
     "MISSAV_EN_ACTORLESS_SMOKE=PASS"
+)
+
+
+#
+# 2b. Multiple actresses are represented
+# by separate metadata/link values while
+# the visible Actress row is one
+# comma-joined label.
+#
+multi_actress = (
+    parse_missav_movie_envelope(
+        envelope(
+            multi_actress_fixture()
+        ),
+        expected_dvd_id=
+            "GANA-3432",
+    )
+)
+
+assert multi_actress[
+    "idols"
+] == [
+    "Ayase Kokoro",
+    "Sayu Nanahara",
+]
+
+print(
+    "MISSAV_EN_MULTI_ACTRESS_SMOKE=PASS"
+)
+
+
+#
+# A different visible Actress label must
+# still fail closed even when the actor
+# metadata and actress links agree.
+#
+expect_failure(
+    "MISSAV_EN_MULTI_ACTRESS_LABEL_MISMATCH_SMOKE",
+    body=multi_actress_fixture(
+        wrong_label=True,
+    ),
 )
 
 
