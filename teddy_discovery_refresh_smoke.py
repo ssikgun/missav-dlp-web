@@ -365,6 +365,199 @@ def non404_fail_closed_smoke():
     )
 
 
+def failed_request_telemetry_smoke():
+    dvd_id = "JUR-821"
+
+    direct_url = (
+        refresh.javdatabase_movie_url(
+            dvd_id
+        )
+    )
+
+    direct_session = FakeSession([
+        FakeResponse(
+            status=200,
+            url=direct_url,
+            text="<html>direct</html>",
+        ),
+    ])
+
+    try:
+        refresh.collect_metadata_candidate(
+            dvd_id,
+            session=
+                direct_session,
+            proxy_url=
+                "http://gluetun:8888",
+            jav_parser=
+                (
+                    lambda *args, **kwargs:
+                    (_ for _ in ()).throw(
+                        ValueError(
+                            "synthetic direct "
+                            "parser failure"
+                        )
+                    )
+                ),
+            missav_parser=
+                lambda *args, **kwargs: {},
+        )
+
+    except ValueError as exc:
+        require(
+            getattr(
+                exc,
+                "_teddy_request_count",
+                None,
+            ) == 1,
+            "direct failed request "
+            "count missing",
+        )
+
+    else:
+        raise AssertionError(
+            "direct parser failure "
+            "did not propagate"
+        )
+
+
+    fallback_url = (
+        refresh.missav_en_movie_url(
+            dvd_id
+        )
+    )
+
+    fallback_session = FakeSession([
+        FakeResponse(
+            status=404,
+            url=direct_url,
+        ),
+        FakeResponse(
+            status=200,
+            url=fallback_url,
+            text="<html>fallback</html>",
+        ),
+    ])
+
+    try:
+        refresh.collect_metadata_candidate(
+            dvd_id,
+            session=
+                fallback_session,
+            proxy_url=
+                "http://gluetun:8888",
+            jav_parser=
+                lambda *args, **kwargs: {},
+            missav_parser=
+                (
+                    lambda *args, **kwargs:
+                    (_ for _ in ()).throw(
+                        ValueError(
+                            "synthetic fallback "
+                            "parser failure"
+                        )
+                    )
+                ),
+        )
+
+    except ValueError as exc:
+        require(
+            getattr(
+                exc,
+                "_teddy_request_count",
+                None,
+            ) == 2,
+            "fallback failed request "
+            "count missing",
+        )
+
+    else:
+        raise AssertionError(
+            "fallback parser failure "
+            "did not propagate"
+        )
+
+
+    original_candidates = (
+        refresh.metadata_candidate_ids
+    )
+
+    try:
+        refresh.metadata_candidate_ids = (
+            lambda *args, **kwargs:
+                [dvd_id]
+        )
+
+        def failing_collector(
+            *args,
+            **kwargs,
+        ):
+            exc = ValueError(
+                "synthetic collected failure"
+            )
+
+            setattr(
+                exc,
+                "_teddy_request_count",
+                2,
+            )
+
+            raise exc
+
+        result = (
+            refresh.enrich_pending_metadata(
+                "/tmp/not-used.sqlite3",
+                max_items=1,
+                delay_seconds=0,
+                session=object(),
+                proxy_url=
+                    "http://gluetun:8888",
+                collector=
+                    failing_collector,
+            )
+        )
+
+    finally:
+        refresh.metadata_candidate_ids = (
+            original_candidates
+        )
+
+
+    require(
+        result[
+            "candidate_count"
+        ] == 1,
+        "failed telemetry candidate "
+        "count changed",
+    )
+
+    require(
+        result[
+            "failed_count"
+        ] == 1,
+        "failed telemetry failure "
+        "count changed",
+    )
+
+    require(
+        result[
+            "request_count"
+        ] == 2,
+        "failed telemetry aggregate "
+        "request count missing",
+    )
+
+    require(
+        result[
+            "results"
+        ][0][
+            "request_count"
+        ] == 2,
+        "failed telemetry per-item "
+        "request count missing",
+    )
+
+
 def seed_title(
     connection,
     dvd_id,
@@ -849,6 +1042,7 @@ def main():
     direct_route_smoke()
     fallback_route_smoke()
     non404_fail_closed_smoke()
+    failed_request_telemetry_smoke()
     candidate_and_apply_smoke()
     orchestration_smoke()
 
@@ -874,6 +1068,10 @@ def main():
 
     print(
         "DISCOVERY_REFRESH_FAILURE_ISOLATION=PASS"
+    )
+
+    print(
+        "DISCOVERY_REFRESH_FAILED_REQUEST_TELEMETRY=PASS"
     )
 
     print(

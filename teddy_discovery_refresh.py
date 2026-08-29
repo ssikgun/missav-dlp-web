@@ -287,6 +287,8 @@ def collect_metadata_candidate(
             )
         )
 
+        request_count += 1
+
         direct = (
             _fetch_html_envelope(
                 session,
@@ -299,8 +301,6 @@ def collect_metadata_candidate(
                     impersonate,
             )
         )
-
-        request_count += 1
 
         if direct["status"] == 200:
             item = jav_parser(
@@ -332,6 +332,8 @@ def collect_metadata_candidate(
             )
         )
 
+        request_count += 1
+
         fallback = (
             _fetch_html_envelope(
                 session,
@@ -344,8 +346,6 @@ def collect_metadata_candidate(
                     impersonate,
             )
         )
-
-        request_count += 1
 
         if fallback["status"] == 404:
             return {
@@ -387,6 +387,18 @@ def collect_metadata_candidate(
             "item":
                 item,
         }
+
+    except Exception as exc:
+        try:
+            setattr(
+                exc,
+                "_teddy_request_count",
+                request_count,
+            )
+        except Exception:
+            pass
+
+        raise
 
     finally:
         if (
@@ -831,6 +843,26 @@ def enrich_pending_metadata(
                 })
 
             except Exception as exc:
+                failed_request_count = (
+                    getattr(
+                        exc,
+                        "_teddy_request_count",
+                        0,
+                    )
+                )
+
+                if (
+                    type(
+                        failed_request_count
+                    ) is not int
+                    or failed_request_count < 0
+                ):
+                    failed_request_count = 0
+
+                request_count += (
+                    failed_request_count
+                )
+
                 failed_count += 1
 
                 results.append({
@@ -839,6 +871,9 @@ def enrich_pending_metadata(
 
                     "ok":
                         False,
+
+                    "request_count":
+                        failed_request_count,
 
                     "error_type":
                         type(
