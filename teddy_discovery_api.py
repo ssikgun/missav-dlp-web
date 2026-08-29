@@ -15,6 +15,7 @@ from teddy_discovery_ui_data import (
     build_category_facets_view,
     build_category_view,
     build_latest_view,
+    build_release_calendar_view,
     build_monthly_view,
     build_weekly_view,
 )
@@ -277,6 +278,45 @@ def create_discovery_blueprint(
                         connection,
                         limit=limit,
                     ),
+            )
+
+        except DiscoveryUnavailable:
+            return _error_response(
+                "discovery_unavailable",
+                "Discovery data unavailable",
+                503,
+            )
+
+        return _success(
+            data
+        )
+
+    @blueprint.get(
+        "/release-calendar"
+    )
+    def release_calendar():
+        selected_date = (
+            request.args.get(
+                "date"
+            )
+        )
+
+        try:
+            data = _read_model(
+                database,
+                lambda connection:
+                    build_release_calendar_view(
+                        connection,
+                        selected_date=
+                            selected_date,
+                    ),
+            )
+
+        except ValueError as exc:
+            return _error_response(
+                "invalid_request",
+                str(exc),
+                400,
             )
 
         except DiscoveryUnavailable:

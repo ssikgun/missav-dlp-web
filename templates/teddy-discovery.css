@@ -59,6 +59,7 @@
     background: #3b82f6;
 }
 
+.discovery-release-controls,
 .discovery-genre-controls {
     display: flex;
     align-items: center;
@@ -66,6 +67,11 @@
     color: #64748b;
     font-size: 12px;
     font-weight: 600;
+}
+
+.discovery-release-controls[hidden],
+.discovery-date-select {
+    min-width: 170px;
 }
 
 .discovery-genre-controls[hidden] {

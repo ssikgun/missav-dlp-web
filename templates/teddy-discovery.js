@@ -21,6 +21,14 @@
         'discoverySummary'
     );
 
+    const releaseControls = document.getElementById(
+        'discoveryReleaseControls'
+    );
+
+    const releaseDateSelect = document.getElementById(
+        'discoveryReleaseDateSelect'
+    );
+
     const genreControls = document.getElementById(
         'discoveryGenreControls'
     );
@@ -41,6 +49,8 @@
         || !list
         || !status
         || !summary
+        || !releaseControls
+        || !releaseDateSelect
         || !genreControls
         || !genreSelect
         || tabs.length !== 4
@@ -52,6 +62,7 @@
         activeView: 'latest',
         loadedOnce: false,
         categoriesLoaded: false,
+        selectedReleaseDate: null,
         requestToken: 0,
         activePreview: null,
     };
@@ -380,6 +391,22 @@
         )
             ? item.ranking
             : {};
+
+        if (
+            ranking.kind
+            === 'release-calendar'
+        ) {
+            return (
+                '출시일 '
+                + textOrDash(
+                    ranking.release_date
+                )
+                + ' · Teddy 최초 발견 '
+                + textOrDash(
+                    ranking.first_seen_at
+                )
+            );
+        }
 
         if (ranking.kind === 'latest') {
             return (
@@ -1282,7 +1309,16 @@
 
     function viewUrl(view) {
         if (view === 'latest') {
-            return '/api/discovery/latest';
+            if (state.selectedReleaseDate) {
+                return (
+                    '/api/discovery/release-calendar?date='
+                    + encodeURIComponent(
+                        state.selectedReleaseDate
+                    )
+                );
+            }
+
+            return '/api/discovery/release-calendar';
         }
 
         if (view === 'weekly') {
@@ -1326,12 +1362,31 @@
             }
         );
 
+        releaseControls.hidden = (
+            view !== 'latest'
+        );
+
         genreControls.hidden = (
             view !== 'genre'
         );
     }
 
     function summaryText(data) {
+        if (
+            data.view === 'release-calendar'
+        ) {
+            return (
+                textOrDash(
+                    data.selected_date
+                )
+                + ' · '
+                + textOrDash(
+                    data.item_count
+                )
+                + '개'
+            );
+        }
+
         if (
             data.view === 'latest'
         ) {
@@ -1392,6 +1447,77 @@
 
         return 'Discovery';
     }
+
+    function syncReleaseCalendarControls(data) {
+        if (
+            !data
+            || data.view !== 'release-calendar'
+        ) {
+            return;
+        }
+
+        const releaseDates = Array.isArray(
+            data.release_dates
+        )
+            ? data.release_dates
+            : [];
+
+        const selectedDate = String(
+            data.selected_date || ''
+        );
+
+        releaseDateSelect.replaceChildren(
+            ...releaseDates.map(
+                item => {
+                    const option = document.createElement(
+                        'option'
+                    );
+
+                    option.value = String(
+                        item.date
+                    );
+
+                    option.textContent = (
+                        String(
+                            item.date
+                        )
+                        + ' · '
+                        + String(
+                            item.item_count
+                        )
+                        + '개'
+                    );
+
+                    return option;
+                }
+            )
+        );
+
+        if (
+            selectedDate
+            && releaseDates.some(
+                item => (
+                    String(item.date)
+                    === selectedDate
+                )
+            )
+        ) {
+            releaseDateSelect.value = (
+                selectedDate
+            );
+
+            state.selectedReleaseDate = (
+                selectedDate
+            );
+        } else {
+            state.selectedReleaseDate = null;
+        }
+
+        releaseDateSelect.disabled = (
+            releaseDates.length === 0
+        );
+    }
+
 
     async function ensureCategories() {
         if (
@@ -1502,6 +1628,12 @@
                 return;
             }
 
+            if (view === 'latest') {
+                syncReleaseCalendarControls(
+                    data
+                );
+            }
+
             renderItems(
                 data
             );
@@ -1600,6 +1732,31 @@
                         tab.dataset.discoveryView
                     );
                 }
+            );
+        }
+    );
+
+    releaseDateSelect.addEventListener(
+        'change',
+        () => {
+            if (
+                state.activeView !== 'latest'
+            ) {
+                return;
+            }
+
+            const value = String(
+                releaseDateSelect.value || ''
+            ).trim();
+
+            if (!value) {
+                return;
+            }
+
+            state.selectedReleaseDate = value;
+
+            loadView(
+                'latest'
             );
         }
     );

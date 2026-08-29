@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 import re
 import sqlite3
 from typing import Any
@@ -1024,6 +1025,263 @@ def build_latest_view(
         "label":
             "Teddy 최신 출시 · "
             "MissAV 새로운 출시",
+
+        "item_count":
+            len(
+                items
+            ),
+
+        "items":
+            items,
+    }
+
+
+
+DISCOVERY_RELEASE_TIMEZONE = (
+    ZoneInfo("Asia/Seoul")
+)
+
+
+def _release_calendar_today() -> str:
+    return (
+        datetime.now(
+            DISCOVERY_RELEASE_TIMEZONE
+        )
+        .date()
+        .isoformat()
+    )
+
+
+def _validated_calendar_date(
+    value: Any,
+    *,
+    label: str,
+) -> str:
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise ValueError(
+            label
+            + " must use YYYY-MM-DD"
+        )
+
+    try:
+        parsed = date.fromisoformat(
+            value
+        )
+
+    except ValueError as exc:
+        raise ValueError(
+            label
+            + " must use YYYY-MM-DD"
+        ) from exc
+
+    normalized = (
+        parsed.isoformat()
+    )
+
+    if normalized != value:
+        raise ValueError(
+            label
+            + " must use YYYY-MM-DD"
+        )
+
+    return normalized
+
+
+def build_release_calendar_view(
+    connection: sqlite3.Connection,
+    *,
+    selected_date: str | None = None,
+    today: str | None = None,
+) -> dict:
+    _require_connection(
+        connection
+    )
+
+    if today is None:
+        today = (
+            _release_calendar_today()
+        )
+
+    today = (
+        _validated_calendar_date(
+            today,
+            label="today",
+        )
+    )
+
+    date_rows = (
+        connection.execute(
+            """
+            SELECT
+                release_date,
+                COUNT(*) AS item_count
+            FROM titles
+            WHERE release_date IS NOT NULL
+              AND TRIM(release_date) <> ''
+              AND release_date <= ?
+            GROUP BY release_date
+            ORDER BY release_date DESC
+            LIMIT 7
+            """,
+            (
+                today,
+            ),
+        ).fetchall()
+    )
+
+    release_dates = [
+        {
+            "date":
+                str(
+                    row[
+                        "release_date"
+                    ]
+                ),
+
+            "item_count":
+                int(
+                    row[
+                        "item_count"
+                    ]
+                ),
+        }
+        for row
+        in date_rows
+    ]
+
+    allowed_dates = {
+        item[
+            "date"
+        ]
+        for item
+        in release_dates
+    }
+
+    if selected_date is None:
+        selected_date = (
+            release_dates[0][
+                "date"
+            ]
+            if release_dates
+            else None
+        )
+
+    else:
+        selected_date = (
+            _validated_calendar_date(
+                selected_date,
+                label="date",
+            )
+        )
+
+        if (
+            selected_date
+            not in allowed_dates
+        ):
+            raise ValueError(
+                "date must be one of "
+                "the recent seven "
+                "release dates"
+            )
+
+    if selected_date is None:
+        raw = []
+
+    else:
+        raw = [
+            dict(
+                row
+            )
+            for row
+            in connection.execute(
+                """
+                SELECT
+                    dvd_id,
+                    title,
+                    release_date,
+                    maker,
+                    metadata_source,
+                    first_seen_at,
+                    last_seen_at
+                FROM titles
+                WHERE release_date = ?
+                ORDER BY
+                    dvd_id ASC
+                """,
+                (
+                    selected_date,
+                ),
+            ).fetchall()
+        ]
+
+    items = _build_ui_items(
+        connection,
+        raw,
+        ranking_builder=(
+            lambda item, rank: {
+                "kind":
+                    "release-calendar",
+
+                "release_date":
+                    item[
+                        "release_date"
+                    ],
+
+                "first_seen_at":
+                    item.get(
+                        "first_seen_at"
+                    ),
+
+                "last_seen_at":
+                    item.get(
+                        "last_seen_at"
+                    ),
+            }
+        ),
+    )
+
+    refreshed_candidates = [
+        str(
+            item[
+                "last_seen_at"
+            ]
+        )
+        for item
+        in raw
+        if item.get(
+            "last_seen_at"
+        )
+    ]
+
+    refreshed_at = (
+        max(
+            refreshed_candidates
+        )
+        if refreshed_candidates
+        else None
+    )
+
+    return {
+        "view":
+            "release-calendar",
+
+        "label":
+            "Teddy 출시 캘린더",
+
+        "today":
+            today,
+
+        "release_dates":
+            release_dates,
+
+        "selected_date":
+            selected_date,
+
+        "refreshed_at":
+            refreshed_at,
 
         "item_count":
             len(
