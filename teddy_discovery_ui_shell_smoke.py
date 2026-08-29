@@ -212,26 +212,51 @@ def main():
         "Discovery script hook changed",
     )
 
-    expected_endpoints = (
-        "/api/discovery/latest",
-        "/api/discovery/weekly",
-        "/api/discovery/monthly",
-        "/api/discovery/categories",
-        "/api/discovery/category?name=",
-        "/api/discovery/media/cover/",
-        "/api/discovery/media/preview/",
-        "/api/discovery/download",
-    )
+    expected_endpoint_counts = {
+        "/api/discovery/release-calendar":
+            2,
 
-    for endpoint in expected_endpoints:
+        "/api/discovery/weekly":
+            1,
+
+        "/api/discovery/monthly":
+            1,
+
+        "/api/discovery/categories":
+            1,
+
+        "/api/discovery/category?name=":
+            1,
+
+        "/api/discovery/media/cover/":
+            1,
+
+        "/api/discovery/media/preview/":
+            1,
+
+        "/api/discovery/download":
+            1,
+    }
+
+    for (
+        endpoint,
+        expected_count,
+    ) in expected_endpoint_counts.items():
         require(
             js.count(
                 endpoint
-            ) == 1,
+            ) == expected_count,
             "Discovery JS endpoint "
             "count changed: "
             + endpoint,
         )
+
+    require(
+        "/api/discovery/latest"
+        not in js,
+        "legacy Latest endpoint "
+        "returned to Discovery JS",
+    )
 
     require(
         js.count(
@@ -608,7 +633,7 @@ def main():
             parser.discovery_views,
 
         "endpoints":
-            expected_endpoints,
+            expected_endpoint_counts,
     }
 
     oracle = hashlib.sha256(
