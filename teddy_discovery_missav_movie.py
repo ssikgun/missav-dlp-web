@@ -710,19 +710,33 @@ def parse_missav_movie_html(
         )
     )
 
+    #
+    # The visible Release date is the catalog
+    # field used by Teddy. MissAV's OG video
+    # date can represent a different publication
+    # timestamp on current shard pages, so it
+    # remains structurally validated but is not
+    # required to equal the catalog field.
+    #
     if (
         len(releases) != 1
         or len(release_labels) != 1
-        or releases[0]
-            != release_labels[0]
         or _DATE_RE.fullmatch(
             releases[0]
+        )
+        is None
+        or _DATE_RE.fullmatch(
+            release_labels[0]
         )
         is None
     ):
         raise ValueError(
             "MissAV detail release contract mismatch"
         )
+
+    release_date = (
+        release_labels[0]
+    )
 
     links = _detail_link_values(
         parser,
@@ -860,7 +874,7 @@ def parse_missav_movie_html(
             titles[0],
 
         "release_date":
-            releases[0],
+            release_date,
 
         "studio":
             makers[0],

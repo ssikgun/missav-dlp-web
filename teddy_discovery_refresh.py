@@ -111,6 +111,10 @@ def _fetch_html_envelope(
     proxy_url: str,
     timeout: int,
     impersonate: str,
+    accepted_statuses: tuple[int, ...] = (
+        200,
+        404,
+    ),
 ) -> dict:
     requested_at = utc_now()
 
@@ -145,10 +149,7 @@ def _fetch_html_envelope(
         response.url
     )
 
-    if status not in (
-        200,
-        404,
-    ):
+    if status not in accepted_statuses:
         raise RuntimeError(
             "metadata HTTP "
             + str(status)
@@ -233,6 +234,211 @@ def _fetch_html_envelope(
         "body":
             body,
     }
+
+
+def _validated_missav_shard_url(
+    original_url: str,
+    location: str,
+    dvd_id: str,
+) -> str:
+    import re
+    from urllib.parse import (
+        unquote,
+        urljoin,
+        urlsplit,
+    )
+
+    dvd_id = normalize_dvd_id(
+        dvd_id
+    )
+
+    original = urlsplit(
+        original_url
+    )
+
+    if (
+        original.scheme != "https"
+        or original.hostname != "missav.ws"
+        or original.username is not None
+        or original.password is not None
+        or original.port is not None
+        or original.query
+        or original.fragment
+    ):
+        raise ValueError(
+            "unexpected canonical MissAV detail URL"
+        )
+
+    original_segments = [
+        unquote(segment)
+        for segment in original.path.split("/")
+        if segment
+    ]
+
+    if (
+        len(original_segments) != 2
+        or original_segments[0] != "en"
+        or normalize_dvd_id(
+            original_segments[1]
+        )
+        != dvd_id
+    ):
+        raise ValueError(
+            "unexpected canonical MissAV detail path"
+        )
+
+    target_url = urljoin(
+        original_url,
+        location,
+    )
+
+    target = urlsplit(
+        target_url
+    )
+
+    if (
+        target.scheme != "https"
+        or target.hostname
+            != original.hostname
+        or target.username is not None
+        or target.password is not None
+        or target.port is not None
+        or target.query
+        or target.fragment
+    ):
+        raise ValueError(
+            "MissAV shard redirect escaped "
+            "canonical transport boundary"
+        )
+
+    target_segments = [
+        unquote(segment)
+        for segment in target.path.split("/")
+        if segment
+    ]
+
+    if (
+        len(target_segments) != 3
+        or re.fullmatch(
+            r"dm[0-9]+",
+            target_segments[0],
+        )
+        is None
+        or target_segments[1] != "en"
+        or normalize_dvd_id(
+            target_segments[2]
+        )
+        != dvd_id
+    ):
+        raise ValueError(
+            "unexpected MissAV shard redirect path"
+        )
+
+    return target_url
+
+
+def _fetch_missav_html_envelope(
+    session,
+    url: str,
+    *,
+    dvd_id: str,
+    proxy_url: str,
+    timeout: int,
+    impersonate: str,
+) -> tuple[dict, int]:
+    request_count = 0
+
+    try:
+        request_count += 1
+
+        first = _fetch_html_envelope(
+            session,
+            url,
+            proxy_url=proxy_url,
+            timeout=timeout,
+            impersonate=impersonate,
+            accepted_statuses=(
+                200,
+                301,
+                404,
+            ),
+        )
+
+        if first["status"] != 301:
+            return (
+                first,
+                request_count,
+            )
+
+        location = (
+            first[
+                "response_headers"
+            ].get(
+                "location"
+            )
+        )
+
+        if not location:
+            raise ValueError(
+                "MissAV shard redirect "
+                "missing Location"
+            )
+
+        shard_url = (
+            _validated_missav_shard_url(
+                url,
+                location,
+                dvd_id,
+            )
+        )
+
+        request_count += 1
+
+        physical = _fetch_html_envelope(
+            session,
+            shard_url,
+            proxy_url=proxy_url,
+            timeout=timeout,
+            impersonate=impersonate,
+        )
+
+        logical = dict(
+            physical
+        )
+
+        #
+        # Transport provenance stays explicit,
+        # while the existing parser/writer
+        # continues to receive the canonical
+        # logical MissAV detail identity.
+        #
+        logical["requested_at"] = (
+            first["requested_at"]
+        )
+
+        logical["requested_url"] = url
+        logical["final_url"] = url
+        logical["redirect_count"] = 1
+        logical["transport_url"] = (
+            shard_url
+        )
+
+        return (
+            logical,
+            request_count,
+        )
+
+    except Exception as exc:
+        try:
+            setattr(
+                exc,
+                "_teddy_request_count_delta",
+                request_count,
+            )
+        except Exception:
+            pass
+
+        raise
 
 
 def collect_metadata_candidate(
@@ -332,19 +538,36 @@ def collect_metadata_candidate(
             )
         )
 
-        request_count += 1
-
-        fallback = (
-            _fetch_html_envelope(
+        try:
+            (
+                fallback,
+                fallback_request_count,
+            ) = _fetch_missav_html_envelope(
                 session,
                 fallback_url,
-                proxy_url=
-                    proxy_url,
-                timeout=
-                    timeout,
-                impersonate=
-                    impersonate,
+                dvd_id=dvd_id,
+                proxy_url=proxy_url,
+                timeout=timeout,
+                impersonate=impersonate,
             )
+
+        except Exception as exc:
+            delta = getattr(
+                exc,
+                "_teddy_request_count_delta",
+                0,
+            )
+
+            if (
+                type(delta) is int
+                and delta > 0
+            ):
+                request_count += delta
+
+            raise
+
+        request_count += (
+            fallback_request_count
         )
 
         if fallback["status"] == 404:
