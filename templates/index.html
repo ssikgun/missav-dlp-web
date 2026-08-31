@@ -944,10 +944,6 @@ missav01.com</textarea>
                 let actions = '';
                 if (t.status === '다운로드 중') {
                     actions = '<button class="btn btn-danger" onclick="deleteTask(\'' + id + '\')">취소</button>';
-                } else if (t.status.includes('대기')) {
-                    actions =
-                        '<span class="btn stat-waiting" role="status">대기 중</span>' +
-                        '<button class="btn btn-ghost" onclick="deleteTask(\'' + id + '\')">삭제</button>';
                 } else if (t.status.includes('완료') && t.filename) {
                     actions =
                         '<a class="btn btn-primary" href="/api/files/' + encodeURIComponent(t.filename) + '/download" style="text-decoration:none">\u2193 받기</a>' +

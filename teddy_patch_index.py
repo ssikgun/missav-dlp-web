@@ -132,6 +132,7 @@ replace_between(
         if (task.status === '다운로드 중') return 'downloading';
         if (task.status === '일시정지 요청 중') return 'pausing';
         if (task.status === '일시정지') return 'paused';
+        if (task.status.includes('대기')) return 'waiting';
         if (task.status.includes('완료') && task.filename) return 'done:' + task.filename;
         if (task.status.includes('에러') || task.status.includes('취소')) return 'retry';
         return 'other';
@@ -147,6 +148,10 @@ replace_between(
         if (task.status === '일시정지') {
             return '<button class="btn btn-primary" onclick="teddyResumeTask(\\'' + id + '\\')">▶ 재개</button>' +
                    '<button class="btn btn-danger" onclick="teddyDeleteTask(\\'' + id + '\\')">삭제</button>';
+        }
+        if (task.status.includes('대기')) {
+            return '<span class="btn stat-waiting" role="status">대기 중</span>' +
+                   '<button class="btn btn-ghost" onclick="teddyDeleteTask(\\'' + id + '\\')">삭제</button>';
         }
         if (task.status.includes('완료') && task.filename) {
             return '<a class="btn btn-primary" href="/api/files/' + encodeURIComponent(task.filename) + '/download" style="text-decoration:none">↓ 받기</a>' +
