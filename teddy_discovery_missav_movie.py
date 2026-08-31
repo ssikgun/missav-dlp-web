@@ -16,10 +16,6 @@ _DATE_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2}$"
 )
 
-_DVD_RE = re.compile(
-    r"^([A-Z0-9]+)-?([0-9]+)$"
-)
-
 _VOID_TAGS = {
     "area",
     "base",
@@ -86,6 +82,10 @@ def _class_tokens(
 def normalize_dvd_id(
     value: object,
 ) -> str:
+    from teddy_discovery_ids import (
+        parse_dvd_id,
+    )
+
     candidate = (
         _clean(value)
         .upper()
@@ -93,20 +93,26 @@ def normalize_dvd_id(
         .replace(" ", "")
     )
 
-    match = _DVD_RE.fullmatch(
+    parsed = parse_dvd_id(
         candidate
     )
 
-    if match is None:
+    if parsed is None:
         raise ValueError(
             "invalid dvd_id"
         )
 
-    return (
-        match.group(1)
-        + "-"
-        + match.group(2)
-    )
+    canonical = parsed.dvd_id
+
+    if (
+        candidate.replace("-", "")
+        != canonical.replace("-", "")
+    ):
+        raise ValueError(
+            "invalid dvd_id"
+        )
+
+    return canonical
 
 
 def _validate_detail_url(
