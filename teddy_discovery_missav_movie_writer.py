@@ -219,16 +219,14 @@ def normalize_missav_en_item(
             "invalid release_date"
         )
 
-    studio = _clean(
-        item[
-            "studio"
-        ]
-    )
-
-    if not studio:
-        raise ValueError(
-            "studio must not be blank"
+    studio = (
+        _clean(
+            item[
+                "studio"
+            ]
         )
+        or None
+    )
 
     idols = _string_list(
         item[
@@ -243,7 +241,7 @@ def normalize_missav_en_item(
             "genres"
         ],
         field="genres",
-        allow_empty=False,
+        allow_empty=True,
     )
 
     brand_tags = _string_list(

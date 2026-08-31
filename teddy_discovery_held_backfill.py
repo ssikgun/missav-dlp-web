@@ -111,9 +111,12 @@ def collected_to_javinfo_payload(
             "release date missing"
         )
 
-    if not studio:
+    if (
+        route == DIRECT_ROUTE
+        and not studio
+    ):
         raise ValueError(
-            "studio missing"
+            "direct metadata studio missing"
         )
 
     if not source_url:
@@ -143,7 +146,12 @@ def collected_to_javinfo_payload(
         "dvdId": dvd_id,
         "titleEn": title,
         "releaseDate": release_date,
-        "makers": [studio],
+        "makers":
+            (
+                [studio]
+                if studio
+                else []
+            ),
         "actresses": list(idols),
         "actors": [],
         "directors": [],

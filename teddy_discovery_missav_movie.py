@@ -760,15 +760,26 @@ def parse_missav_movie_html(
         )
     )
 
-    if (
-        len(makers) != 1
-        or len(maker_labels) != 1
-        or makers[0]
-            != maker_labels[0]
-    ):
-        raise ValueError(
-            "MissAV detail maker contract mismatch"
-        )
+    #
+    # Maker is optional on sparse catalog pages.
+    # Absence is valid only when BOTH structural
+    # representations are absent. Partial or
+    # conflicting maker data remains fail-closed.
+    #
+    studio = None
+
+    if makers or maker_labels:
+        if (
+            len(makers) != 1
+            or len(maker_labels) != 1
+            or makers[0]
+                != maker_labels[0]
+        ):
+            raise ValueError(
+                "MissAV detail maker contract mismatch"
+            )
+
+        studio = makers[0]
 
     actor_meta = _meta_values(
         parser,
@@ -845,11 +856,13 @@ def parse_missav_movie_html(
         genre_labels
     )
 
-    if (
-        not genres
-        or set(genres)
-            != set(genre_labels)
-    ):
+    #
+    # Genre is also optional when BOTH the
+    # detail links and Genre label are absent.
+    # Tag/brand fields are deliberately NOT
+    # promoted into genres.
+    #
+    if set(genres) != set(genre_labels):
         raise ValueError(
             "MissAV detail genre contract mismatch"
         )
@@ -883,7 +896,7 @@ def parse_missav_movie_html(
             release_date,
 
         "studio":
-            makers[0],
+            studio,
 
         "idols":
             idols,
