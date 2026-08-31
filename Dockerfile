@@ -5,7 +5,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # 2. 필수 패키지 설치
 RUN apt-get update && \
-    apt-get install -y ffmpeg curl bash && \
+    apt-get install -y ffmpeg curl bash openssh-client rsync && \
     rm -rf /var/lib/apt/lists/*
 
 # 3. SpoofDPI 설치
