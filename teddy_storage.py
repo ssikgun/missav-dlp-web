@@ -246,6 +246,44 @@ def _pending_paths(task):
 
 
 def publish_pending_task(core, task_id):
+    # Downloads may run concurrently, but final-storage publication is serialized.
+    # The lock file is local to the container and never lives on NAS.
+    import fcntl
+
+    lock_path = str(
+        os.environ.get("TEDDY_PUBLISH_LOCK_PATH")
+        or "/tmp/teddy-nas-publish.lock"
+    )
+    lock_fd = None
+
+    print(f"[Storage] NAS 게시 대기: {task_id}", flush=True)
+
+    try:
+        lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+    except OSError as exc:
+        if lock_fd is not None:
+            try:
+                os.close(lock_fd)
+            except OSError:
+                pass
+        raise PublishError(f"NAS 게시 직렬화 잠금 실패: {exc}") from exc
+
+    try:
+        print(f"[Storage] NAS 게시 시작: {task_id}", flush=True)
+        return _publish_pending_task_unlocked(core, task_id)
+    finally:
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
+        try:
+            os.close(lock_fd)
+        except OSError:
+            pass
+
+
+def _publish_pending_task_unlocked(core, task_id):
     """Publish every completed local output for a task, main media last."""
     task = core.tasks.get(task_id)
     if not task:
