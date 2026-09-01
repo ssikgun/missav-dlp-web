@@ -1,4 +1,7 @@
 import os
+import posixpath
+import shlex
+import subprocess
 import re
 import shutil
 import uuid
@@ -163,6 +166,472 @@ def _copy_to_partial(source, partial):
         pass
 
 
+
+def _final_backend():
+    raw = str(
+        os.environ.get("TEDDY_FINAL_BACKEND")
+        or "local"
+    ).strip().lower()
+
+    if raw in ("", "local", "filesystem", "fs"):
+        return "local"
+
+    if raw == "ssh":
+        return "ssh"
+
+    raise PublishError(
+        f"지원하지 않는 완료 저장소 방식입니다: {raw}"
+    )
+
+
+def _ssh_storage_config():
+    config = {
+        "host": str(
+            os.environ.get("TEDDY_FINAL_SSH_HOST")
+            or ""
+        ).strip(),
+        "user": str(
+            os.environ.get("TEDDY_FINAL_SSH_USER")
+            or ""
+        ).strip(),
+        "key": str(
+            os.environ.get("TEDDY_FINAL_SSH_KEY")
+            or ""
+        ).strip(),
+        "known_hosts": str(
+            os.environ.get(
+                "TEDDY_FINAL_SSH_KNOWN_HOSTS"
+            )
+            or ""
+        ).strip(),
+        "root": str(
+            os.environ.get("TEDDY_FINAL_REMOTE_ROOT")
+            or ""
+        ).strip(),
+    }
+
+    missing = [
+        key
+        for key, value in config.items()
+        if not value
+    ]
+
+    if missing:
+        raise PublishError(
+            "SSH 완료 저장소 설정 누락: "
+            + ", ".join(missing)
+        )
+
+    root = posixpath.normpath(
+        config["root"]
+    )
+
+    if not root.startswith("/") or root == "/":
+        raise PublishError(
+            "SSH 완료 저장소 root 경로가 잘못되었습니다."
+        )
+
+    config["root"] = root
+    return config
+
+
+def _ssh_base_command(config=None):
+    config = config or _ssh_storage_config()
+
+    return [
+        "ssh",
+        "-i",
+        config["key"],
+        "-o",
+        "IdentitiesOnly=yes",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-o",
+        "ServerAliveInterval=15",
+        "-o",
+        "ServerAliveCountMax=3",
+        "-o",
+        "StrictHostKeyChecking=yes",
+        "-o",
+        (
+            "UserKnownHostsFile="
+            + config["known_hosts"]
+        ),
+    ]
+
+
+def _ssh_target(config=None):
+    config = config or _ssh_storage_config()
+
+    return (
+        config["user"]
+        + "@"
+        + config["host"]
+    )
+
+
+def _safe_remote_relative(relative):
+    raw = str(
+        relative or ""
+    ).replace("\\", "/")
+
+    if (
+        not raw
+        or raw.startswith("/")
+        or "\x00" in raw
+        or "\n" in raw
+        or "\r" in raw
+    ):
+        return None
+
+    parts = [
+        part
+        for part in raw.split("/")
+        if part not in ("", ".")
+    ]
+
+    if (
+        not parts
+        or any(
+            part == ".."
+            for part in parts
+        )
+    ):
+        return None
+
+    return "/".join(parts)
+
+
+def _ssh_remote_path(relative):
+    relative = _safe_remote_relative(
+        relative
+    )
+
+    if not relative:
+        raise PublishError(
+            "잘못된 원격 완료 파일 경로입니다."
+        )
+
+    config = _ssh_storage_config()
+
+    path = posixpath.normpath(
+        posixpath.join(
+            config["root"],
+            relative,
+        )
+    )
+
+    prefix = (
+        config["root"].rstrip("/")
+        + "/"
+    )
+
+    if not path.startswith(prefix):
+        raise PublishError(
+            "원격 완료 파일이 저장소 밖을 가리킵니다."
+        )
+
+    return path
+
+
+def _ssh_run(remote_command):
+    config = _ssh_storage_config()
+
+    command = (
+        _ssh_base_command(config)
+        + [
+            _ssh_target(config),
+            remote_command,
+        ]
+    )
+
+    result = subprocess.run(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        detail = str(
+            result.stderr or ""
+        ).strip()
+
+        raise PublishError(
+            "SSH 완료 저장소 명령 실패"
+            + (
+                ": " + detail[-500:]
+                if detail
+                else ""
+            )
+        )
+
+    return result
+
+
+def _ssh_remote_stat(relative):
+    path = _ssh_remote_path(
+        relative
+    )
+    quoted = shlex.quote(path)
+
+    command = (
+        "if [ -f "
+        + quoted
+        + " ] && [ ! -L "
+        + quoted
+        + " ]; then "
+        + "stat -c "
+        + shlex.quote("%s %Y")
+        + " "
+        + quoted
+        + "; "
+        + "elif [ -e "
+        + quoted
+        + " ] || [ -L "
+        + quoted
+        + " ]; then "
+        + "printf "
+        + shlex.quote("__INVALID__")
+        + "; "
+        + "else printf "
+        + shlex.quote("__MISSING__")
+        + "; fi"
+    )
+
+    result = _ssh_run(command)
+
+    raw = str(
+        result.stdout or ""
+    ).strip()
+
+    if raw == "__MISSING__":
+        return None
+
+    if raw == "__INVALID__":
+        raise PublishError(
+            "원격 완료 경로가 일반 파일이 아닙니다."
+        )
+
+    parts = raw.split()
+
+    if len(parts) != 2:
+        raise PublishError(
+            "원격 완료 파일 상태를 해석할 수 없습니다."
+        )
+
+    try:
+        return {
+            "size": int(parts[0]),
+            "modified": int(parts[1]),
+        }
+    except ValueError as exc:
+        raise PublishError(
+            "원격 완료 파일 상태 값이 잘못되었습니다."
+        ) from exc
+
+
+def _ssh_ensure_site_dir(site_key):
+    key = _sanitize_folder(
+        site_key
+    )
+
+    config = _ssh_storage_config()
+
+    root = shlex.quote(
+        config["root"]
+    )
+
+    path = _ssh_remote_path(
+        key
+    )
+    quoted = shlex.quote(
+        path
+    )
+
+    _ssh_run(
+        "test -d "
+        + root
+        + " && "
+        + "test ! -L "
+        + root
+        + " && "
+        + "mkdir -p "
+        + quoted
+        + " && "
+        + "test -d "
+        + quoted
+        + " && "
+        + "test ! -L "
+        + quoted
+    )
+
+    return key
+
+
+def _ssh_publish_completed_file(
+    core,
+    source_path,
+    site_key,
+):
+    source = os.path.realpath(
+        source_path
+    )
+    work = work_root(core)
+
+    try:
+        if (
+            os.path.commonpath(
+                [work, source]
+            )
+            != work
+        ):
+            raise PublishError(
+                "게시 원본이 로컬 작업 디렉터리 밖에 있습니다."
+            )
+    except ValueError as exc:
+        raise PublishError(
+            "게시 원본 경로를 확인할 수 없습니다."
+        ) from exc
+
+    if not os.path.isfile(source):
+        raise PublishError(
+            f"로컬 완료 파일이 없습니다: {source}"
+        )
+
+    key = _ssh_ensure_site_dir(
+        site_key
+    )
+
+    filename = os.path.basename(
+        source
+    )
+
+    if (
+        not filename
+        or filename.startswith(".")
+        or filename in (".", "..")
+    ):
+        raise PublishError(
+            "완료 파일 이름이 잘못되었습니다."
+        )
+
+    relative = (
+        key
+        + "/"
+        + filename
+    )
+
+    partial_relative = (
+        key
+        + "/."
+        + filename
+        + ".teddy-partial"
+    )
+
+    final_path = _ssh_remote_path(
+        relative
+    )
+
+    partial_path = _ssh_remote_path(
+        partial_relative
+    )
+
+    config = _ssh_storage_config()
+
+    ssh_shell = shlex.join(
+        _ssh_base_command(config)
+    )
+
+    remote_target = (
+        _ssh_target(config)
+        + ":"
+        + partial_path
+    )
+
+    source_size = os.path.getsize(
+        source
+    )
+
+    command = [
+        "rsync",
+        "--partial",
+        "--append-verify",
+        "--protect-args",
+        "-e",
+        ssh_shell,
+        source,
+        remote_target,
+    ]
+
+    result = subprocess.run(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        detail = str(
+            result.stderr or ""
+        ).strip()
+
+        # Keep the hidden partial file so a later retry
+        # can resume rather than restarting a large copy.
+        raise PublishError(
+            "rsync 완료 파일 전송 실패"
+            + (
+                ": " + detail[-500:]
+                if detail
+                else ""
+            )
+        )
+
+    partial_stat = _ssh_remote_stat(
+        partial_relative
+    )
+
+    if (
+        not partial_stat
+        or partial_stat["size"]
+        != source_size
+    ):
+        raise PublishError(
+            "rsync 후 원격 파일 크기 검증에 실패했습니다."
+        )
+
+    _ssh_run(
+        "mv -f "
+        + shlex.quote(partial_path)
+        + " "
+        + shlex.quote(final_path)
+    )
+
+    final_stat = _ssh_remote_stat(
+        relative
+    )
+
+    if (
+        not final_stat
+        or final_stat["size"]
+        != source_size
+    ):
+        raise PublishError(
+            "원격 최종 파일 크기 검증에 실패했습니다."
+        )
+
+    # Local source is removed only after remote
+    # transfer, size verification and final rename.
+    os.remove(source)
+
+    return (
+        relative,
+        final_stat["size"],
+    )
+
+
 def publish_completed_file(core, source_path, site_key):
     """Publish one fully finished local file to the completed-file root.
 
@@ -283,8 +752,163 @@ def publish_pending_task(core, task_id):
             pass
 
 
+
+def _publish_pending_task_ssh(core, task_id):
+    """Publish completed task outputs through rsync over SSH."""
+    task = core.tasks.get(task_id)
+
+    if not task:
+        raise PublishError(
+            "작업이 없습니다."
+        )
+
+    main_rel, paths = _pending_paths(
+        task
+    )
+
+    if not main_rel or not paths:
+        raise PublishError(
+            "게시할 로컬 완료 결과가 없습니다."
+        )
+
+    site_key = _sanitize_folder(
+        str(
+            task.get("storage_folder")
+            or "other"
+        )
+    )
+
+    published_main = ""
+    published_main_size = 0
+    local_parents = set()
+
+    for relative in paths:
+        source = _safe_work_path(
+            core,
+            relative,
+        )
+
+        if not source:
+            raise PublishError(
+                "잘못된 로컬 완료 경로입니다: "
+                + str(relative)
+            )
+
+        local_parents.add(
+            os.path.dirname(source)
+        )
+
+        remote_relative = (
+            site_key
+            + "/"
+            + os.path.basename(source)
+        )
+
+        if os.path.isfile(source):
+            (
+                published_relative,
+                published_size,
+            ) = _ssh_publish_completed_file(
+                core,
+                source,
+                site_key,
+            )
+        else:
+            # Crash recovery:
+            # remote final rename may have completed
+            # just before task state was saved.
+            remote_stat = _ssh_remote_stat(
+                remote_relative
+            )
+
+            if not remote_stat:
+                raise PublishError(
+                    "로컬/원격 완료 파일을 찾을 수 없습니다: "
+                    + str(relative)
+                )
+
+            published_relative = (
+                remote_relative
+            )
+            published_size = (
+                remote_stat["size"]
+            )
+
+        if relative == main_rel:
+            published_main = (
+                published_relative
+            )
+            published_main_size = (
+                published_size
+            )
+
+    if not published_main:
+        raise PublishError(
+            "주 완료 파일 게시 결과를 확인하지 못했습니다."
+        )
+
+    task["status"] = "완료"
+    task["progress"] = "100%"
+    task["speed_bps"] = 0
+    task["filename"] = published_main
+    task["filesize"] = published_main_size
+    task["downloaded_bytes"] = (
+        published_main_size
+    )
+    task["total_bytes_estimate"] = (
+        published_main_size
+    )
+
+    task.pop(
+        "local_result_path",
+        None,
+    )
+    task.pop(
+        "local_result_paths",
+        None,
+    )
+    task.pop(
+        "last_error_detail",
+        None,
+    )
+
+    core.save_tasks()
+
+    work = work_root(core)
+
+    for parent in sorted(
+        local_parents,
+        key=len,
+        reverse=True,
+    ):
+        if parent == work:
+            continue
+
+        try:
+            if (
+                os.path.commonpath(
+                    [work, parent]
+                )
+                == work
+                and os.path.basename(
+                    parent
+                ).startswith(".")
+            ):
+                os.rmdir(parent)
+        except (OSError, ValueError):
+            pass
+
+    return published_main
+
+
 def _publish_pending_task_unlocked(core, task_id):
     """Publish every completed local output for a task, main media last."""
+    if _final_backend() == "ssh":
+        return _publish_pending_task_ssh(
+            core,
+            task_id,
+        )
+
     task = core.tasks.get(task_id)
     if not task:
         raise PublishError('작업이 없습니다.')
