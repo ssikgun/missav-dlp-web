@@ -1124,8 +1124,29 @@ print(
     return items
 
 
+
+def _safe_remote_public_relative(relative):
+    safe = _safe_remote_relative(
+        relative
+    )
+
+    if not safe:
+        return None
+
+    parts = safe.split("/")
+
+    if any(
+        part.startswith(".")
+        or part == "@eaDir"
+        for part in parts
+    ):
+        return None
+
+    return safe
+
+
 def _ssh_delete_file(relative):
-    relative = _safe_remote_relative(
+    relative = _safe_remote_public_relative(
         relative
     )
 
@@ -1172,6 +1193,236 @@ def _ssh_delete_file(relative):
         )
 
     return True
+
+
+
+def _parse_single_byte_range(value, size):
+    size = int(size)
+
+    if value is None:
+        return None
+
+    raw = str(value).strip()
+
+    if not raw:
+        return None
+
+    if not raw.lower().startswith("bytes="):
+        raise ValueError(
+            "unsupported range unit"
+        )
+
+    spec = raw[len("bytes="):].strip()
+
+    if (
+        not spec
+        or "," in spec
+        or "-" not in spec
+    ):
+        raise ValueError(
+            "invalid range"
+        )
+
+    if size <= 0:
+        raise ValueError(
+            "range on empty file"
+        )
+
+    first, last = spec.split("-", 1)
+
+    first = first.strip()
+    last = last.strip()
+
+    if not first:
+        if (
+            not last.isdigit()
+            or int(last) <= 0
+        ):
+            raise ValueError(
+                "invalid suffix range"
+            )
+
+        suffix = int(last)
+        length = min(suffix, size)
+
+        return (
+            size - length,
+            size - 1,
+        )
+
+    if not first.isdigit():
+        raise ValueError(
+            "invalid range start"
+        )
+
+    start = int(first)
+
+    if start >= size:
+        raise ValueError(
+            "range start beyond body"
+        )
+
+    if not last:
+        return (
+            start,
+            size - 1,
+        )
+
+    if not last.isdigit():
+        raise ValueError(
+            "invalid range end"
+        )
+
+    end = int(last)
+
+    if end < start:
+        raise ValueError(
+            "range end before start"
+        )
+
+    return (
+        start,
+        min(end, size - 1),
+    )
+
+
+def _ssh_media_process(
+    relative,
+    start,
+    length,
+):
+    relative = _safe_remote_public_relative(
+        relative
+    )
+
+    if not relative:
+        raise ValueError(
+            "잘못된 파일 경로입니다."
+        )
+
+    start = int(start)
+
+    if start < 0:
+        raise ValueError(
+            "잘못된 스트림 시작 위치입니다."
+        )
+
+    if length is not None:
+        length = int(length)
+
+        if length < 0:
+            raise ValueError(
+                "잘못된 스트림 길이입니다."
+            )
+
+    path = _ssh_remote_path(
+        relative
+    )
+
+    remote_command = (
+        "tail -c +"
+        + str(start + 1)
+        + " "
+        + shlex.quote(path)
+    )
+
+    if length is not None:
+        remote_command += (
+            " | head -c "
+            + str(length)
+        )
+
+    config = _ssh_storage_config()
+
+    command = (
+        _ssh_base_command(config)
+        + [
+            _ssh_target(config),
+            remote_command,
+        ]
+    )
+
+    try:
+        return subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=0,
+        )
+    except OSError as exc:
+        raise PublishError(
+            "SSH 완료 파일 스트림 시작 실패: "
+            + str(exc)
+        ) from exc
+
+
+def _ssh_media_chunks(
+    process,
+    expected_length,
+):
+    remaining = int(
+        expected_length
+    )
+
+    if remaining < 0:
+        raise ValueError(
+            "잘못된 예상 스트림 길이입니다."
+        )
+
+    completed = False
+
+    try:
+        while remaining > 0:
+            if process.stdout is None:
+                break
+
+            chunk = process.stdout.read(
+                min(
+                    1024 * 1024,
+                    remaining,
+                )
+            )
+
+            if not chunk:
+                break
+
+            remaining -= len(chunk)
+            yield chunk
+
+        completed = (
+            remaining == 0
+        )
+
+    finally:
+        if process.stdout is not None:
+            try:
+                process.stdout.close()
+            except OSError:
+                pass
+
+        if process.poll() is None:
+            try:
+                process.terminate()
+            except OSError:
+                pass
+
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                pass
+
+    if not completed:
+        raise PublishError(
+            "SSH 완료 파일 스트림 길이가 예상보다 짧습니다."
+        )
 
 
 def _recursive_files(core):
