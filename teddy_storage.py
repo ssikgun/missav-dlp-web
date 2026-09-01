@@ -1,12 +1,13 @@
 import os
 import json
+import mimetypes
 import posixpath
 import shlex
 import subprocess
 import re
 import shutil
 import uuid
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 
 
 _SITE_ALIASES = {
@@ -1425,6 +1426,177 @@ def _ssh_media_chunks(
         )
 
 
+
+def _ssh_file_response(
+    core,
+    filename,
+    *,
+    as_attachment=False,
+):
+    relative = _safe_remote_public_relative(
+        filename
+    )
+
+    if not relative:
+        return core.Response(
+            status=400
+        )
+
+    try:
+        stat = _ssh_remote_stat(
+            relative
+        )
+    except PublishError:
+        return core.Response(
+            status=503
+        )
+
+    if stat is None:
+        return core.Response(
+            status=404
+        )
+
+    size = int(
+        stat["size"]
+    )
+
+    range_value = core.request.headers.get(
+        "Range"
+    )
+
+    try:
+        byte_range = _parse_single_byte_range(
+            range_value,
+            size,
+        )
+    except ValueError:
+        response = core.Response(
+            b"",
+            status=416,
+        )
+
+        response.headers[
+            "Accept-Ranges"
+        ] = "bytes"
+
+        response.headers[
+            "Content-Range"
+        ] = (
+            "bytes */"
+            + str(size)
+        )
+
+        response.headers[
+            "Content-Length"
+        ] = "0"
+
+        return response
+
+    if byte_range is None:
+        start = 0
+        end = (
+            size - 1
+            if size > 0
+            else -1
+        )
+        length = size
+        status = 200
+    else:
+        start, end = byte_range
+        length = end - start + 1
+        status = 206
+
+    content_type = (
+        mimetypes.guess_type(
+            relative
+        )[0]
+        or "application/octet-stream"
+    )
+
+    method = str(
+        core.request.method or "GET"
+    ).upper()
+
+    if (
+        method == "HEAD"
+        or length == 0
+    ):
+        body = b""
+    else:
+        try:
+            process = _ssh_media_process(
+                relative,
+                start,
+                length,
+            )
+        except (
+            PublishError,
+            ValueError,
+        ):
+            return core.Response(
+                status=503
+            )
+
+        body = _ssh_media_chunks(
+            process,
+            length,
+        )
+
+    response = core.Response(
+        body,
+        status=status,
+        content_type=content_type,
+    )
+
+    response.headers[
+        "Accept-Ranges"
+    ] = "bytes"
+
+    response.headers[
+        "Content-Length"
+    ] = str(length)
+
+    response.headers[
+        "Cache-Control"
+    ] = "private, no-cache"
+
+    response.headers[
+        "X-Content-Type-Options"
+    ] = "nosniff"
+
+    if status == 206:
+        response.headers[
+            "Content-Range"
+        ] = (
+            "bytes "
+            + str(start)
+            + "-"
+            + str(end)
+            + "/"
+            + str(size)
+        )
+
+    if as_attachment:
+        basename = posixpath.basename(
+            relative
+        )
+
+        encoded = quote(
+            basename,
+            safe="",
+        )
+
+        response.headers[
+            "Content-Disposition"
+        ] = (
+            "attachment; "
+            "filename*=UTF-8''"
+            + encoded
+        )
+
+    return response
+
+
 def _recursive_files(core):
     items = []
     root = public_root(core)
@@ -1471,7 +1643,7 @@ def install_file_routes(core):
     def delete_file_nested(filename):
         if _final_backend() == "ssh":
             try:
-                relative = _safe_remote_relative(filename)
+                relative = _safe_remote_public_relative(filename)
                 if not relative:
                     return core.jsonify({
                         "status": "error",
@@ -1519,6 +1691,13 @@ def install_file_routes(core):
         core.app.view_functions['delete_file'] = delete_file_nested
 
     def download_file_nested(filename):
+        if _final_backend() == "ssh":
+            return _ssh_file_response(
+                core,
+                filename,
+                as_attachment=True,
+            )
+
         path = _safe_public_path(core, filename)
         if not path:
             return core.Response(status=400)
@@ -1527,6 +1706,13 @@ def install_file_routes(core):
         return core.send_file(path, as_attachment=True, download_name=os.path.basename(path), conditional=True)
 
     def stream_file_nested(filename):
+        if _final_backend() == "ssh":
+            return _ssh_file_response(
+                core,
+                filename,
+                as_attachment=False,
+            )
+
         path = _safe_public_path(core, filename)
         if not path:
             return core.Response(status=400)
