@@ -257,6 +257,7 @@ def verify_final():
             '🚀 최고속',
             '⚖️ 균형 (권장)',
             '🛡️ 보수',
+            '🧘 안정',
             '직접 설정됨 (터미널/진단)',
             'hls_workers: preset.workers',
             'hls_pool_clients: preset.pool',

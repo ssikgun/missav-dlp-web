@@ -23,7 +23,14 @@
             workers: 8,
             pool: 8,
             description: '동시 다운로드 8개 · 연결 풀 8개 · Async 공유 연결 · HTTP/1.1 · 안전한 임시파일 저장',
-            note: '동시 요청 부담을 가장 낮게 유지합니다.'
+            note: '동시 요청 부담을 낮게 유지합니다.'
+        },
+        stable: {
+            label: '🧘 안정',
+            workers: 4,
+            pool: 4,
+            description: '동시 다운로드 4개 · 연결 풀 4개 · Async 공유 연결 · HTTP/1.1 · 안전한 임시파일 저장',
+            note: '동시 요청을 가장 낮게 유지해 CDN/VPN 경로가 불안정할 때 재시도 부담을 줄입니다.'
         }
     };
 
@@ -146,6 +153,7 @@
                 '<option value="fastest">🚀 최고속</option>' +
                 '<option value="balanced">⚖️ 균형 (권장)</option>' +
                 '<option value="conservative">🛡️ 보수</option>' +
+                '<option value="stable">🧘 안정</option>' +
             '</select>' +
             '<div id="' + PRESET_HELP_ID + '" class="setting-desc" style="margin-top:8px"></div>';
         anchor.insertAdjacentElement('afterend', presetGroup);
