@@ -1,4 +1,5 @@
 import os
+import json
 import posixpath
 import shlex
 import subprocess
@@ -996,6 +997,183 @@ def cleanup_local_results(core, task):
             pass
 
 
+
+def _ssh_list_files():
+    config = _ssh_storage_config()
+
+    script = r"""
+import json
+import os
+import sys
+
+root = sys.argv[1]
+items = []
+
+def ignored(name):
+    return (
+        name.startswith(".")
+        or name == "@eaDir"
+    )
+
+with os.scandir(root) as entries:
+    for entry in entries:
+        name = entry.name
+
+        if ignored(name):
+            continue
+
+        if entry.is_symlink():
+            continue
+
+        if entry.is_file(follow_symlinks=False):
+            stat = entry.stat(follow_symlinks=False)
+            items.append({
+                "name": name,
+                "size": stat.st_size,
+                "modified": stat.st_mtime,
+            })
+            continue
+
+        if not entry.is_dir(follow_symlinks=False):
+            continue
+
+        site = name
+
+        with os.scandir(entry.path) as children:
+            for child in children:
+                child_name = child.name
+
+                if ignored(child_name):
+                    continue
+
+                if child.is_symlink():
+                    continue
+
+                if not child.is_file(follow_symlinks=False):
+                    continue
+
+                stat = child.stat(follow_symlinks=False)
+
+                items.append({
+                    "name": site + "/" + child_name,
+                    "size": stat.st_size,
+                    "modified": stat.st_mtime,
+                })
+
+items.sort(
+    key=lambda item: item["modified"],
+    reverse=True,
+)
+
+print(
+    json.dumps(
+        items,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+)
+"""
+
+    command = (
+        _ssh_base_command(config)
+        + [
+            _ssh_target(config),
+            (
+                "python3 - "
+                + shlex.quote(config["root"])
+            ),
+        ]
+    )
+
+    result = subprocess.run(
+        command,
+        input=script,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        detail = str(
+            result.stderr or ""
+        ).strip()
+
+        raise PublishError(
+            "SSH 완료 파일 목록 조회 실패"
+            + (
+                ": " + detail[-500:]
+                if detail
+                else ""
+            )
+        )
+
+    try:
+        items = json.loads(
+            result.stdout or "[]"
+        )
+    except json.JSONDecodeError as exc:
+        raise PublishError(
+            "SSH 완료 파일 목록을 해석할 수 없습니다."
+        ) from exc
+
+    if not isinstance(items, list):
+        raise PublishError(
+            "SSH 완료 파일 목록 형식이 잘못되었습니다."
+        )
+
+    return items
+
+
+def _ssh_delete_file(relative):
+    relative = _safe_remote_relative(
+        relative
+    )
+
+    if not relative:
+        raise ValueError(
+            "잘못된 파일 경로입니다."
+        )
+
+    stat = _ssh_remote_stat(
+        relative
+    )
+
+    if stat is None:
+        return False
+
+    path = _ssh_remote_path(
+        relative
+    )
+
+    config = _ssh_storage_config()
+    root = config["root"]
+
+    parent = posixpath.dirname(
+        path
+    )
+
+    command = (
+        "rm -f "
+        + shlex.quote(path)
+    )
+
+    if parent != root:
+        command += (
+            "; rmdir "
+            + shlex.quote(parent)
+            + " 2>/dev/null || true"
+        )
+
+    _ssh_run(command)
+
+    if _ssh_remote_stat(relative) is not None:
+        raise PublishError(
+            "원격 완료 파일 삭제 확인에 실패했습니다."
+        )
+
+    return True
+
+
 def _recursive_files(core):
     items = []
     root = public_root(core)
@@ -1026,12 +1204,47 @@ def _recursive_files(core):
 def install_file_routes(core):
     """Make the existing file manager recursive and safe for site subfolders."""
     def list_files_recursive():
-        return core.jsonify(_recursive_files(core))
+        try:
+            if _final_backend() == "ssh":
+                return core.jsonify(_ssh_list_files())
+            return core.jsonify(_recursive_files(core))
+        except PublishError as exc:
+            return core.jsonify({
+                "status": "error",
+                "message": str(exc),
+            }), 503
 
     if 'list_files' in core.app.view_functions:
         core.app.view_functions['list_files'] = list_files_recursive
 
     def delete_file_nested(filename):
+        if _final_backend() == "ssh":
+            try:
+                relative = _safe_remote_relative(filename)
+                if not relative:
+                    return core.jsonify({
+                        "status": "error",
+                        "message": "잘못된 파일 경로입니다.",
+                    }), 400
+
+                deleted = _ssh_delete_file(relative)
+
+                if not deleted:
+                    return core.jsonify({
+                        "status": "error",
+                        "message": "파일이 없습니다.",
+                    }), 404
+
+                return core.jsonify({
+                    "status": "success",
+                    "message": "파일을 삭제했습니다.",
+                })
+            except PublishError as exc:
+                return core.jsonify({
+                    "status": "error",
+                    "message": f"파일 삭제 실패: {exc}",
+                }), 503
+
         path = _safe_public_path(core, filename)
         if not path:
             return core.jsonify({'status': 'error', 'message': '잘못된 파일 경로입니다.'}), 400
