@@ -30,6 +30,10 @@ from teddy_discovery_media_pipeline import (
 from teddy_discovery_media_publish import (
     MediaMetadataSSHMutator,
 )
+from teddy_discovery_operation_lock import (
+    DEFAULT_OPERATION_LOCK_PATH,
+    OperationLockError,
+)
 
 
 CONFIRMATION = (
@@ -55,6 +59,7 @@ def run_once(
     media_max_items=1,
     media_db_path=None,
     media_writer_lock_path=None,
+    operation_lock_path=DEFAULT_OPERATION_LOCK_PATH,
 ):
     plans = planner(
         items,
@@ -80,6 +85,7 @@ def run_once(
         "eligible": len(eligible),
         "held": len(held),
         "applied": 0,
+        "operation_lock_skipped": 0,
         "plans": [
             asdict(plan)
             for plan in plans
@@ -100,14 +106,22 @@ def run_once(
         )
 
     for plan in eligible[:max_items]:
-        processor(
-            plan,
-            ssh=ssh,
-            mutator=mutator,
-            db_path=db_path,
-            writer_lock_path=
-                writer_lock_path,
-        )
+        try:
+            processor(
+                plan,
+                ssh=ssh,
+                mutator=mutator,
+                db_path=db_path,
+                writer_lock_path=
+                    writer_lock_path,
+                operation_lock_path=
+                    operation_lock_path,
+            )
+
+        except OperationLockError:
+            result["operation_lock"] = "BUSY_OR_UNAVAILABLE"
+            result["operation_lock_skipped"] += 1
+            break
 
         result["applied"] += 1
 
@@ -156,6 +170,11 @@ def main():
         "--writer-lock",
         required=True,
         type=Path,
+    )
+    parser.add_argument(
+        "--operation-lock",
+        type=Path,
+        default=DEFAULT_OPERATION_LOCK_PATH,
     )
     parser.add_argument(
         "--host",
@@ -292,6 +311,8 @@ def main():
         ),
         writer_lock_path=
             args.writer_lock,
+        operation_lock_path=
+            args.operation_lock,
         apply=args.apply,
         confirm=args.confirm,
         max_items=args.max_items,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from pathlib import PurePosixPath
 import argparse
@@ -23,12 +23,24 @@ from teddy_discovery_organizer import (
     VIDEO_EXTENSIONS,
     canonical_destination,
 )
+from teddy_discovery_organizer_apply import (
+    exclusive_lock,
+)
+from teddy_discovery_operation_lock import (
+    DEFAULT_OPERATION_LOCK_PATH,
+    OperationLockBusy,
+    OperationLockError,
+    operation_lock,
+)
 
 
 STORAGE_ROOT = "jav"
 SYNLOGY_METADATA_DIR = "@eaDir"
 REMOTE_LIBRARY_ROOT_ENV = "TEDDY_FINAL_LIBRARY_ROOT"
 STAGING_ROOT_ENV = "TEDDY_FINAL_REMOTE_ROOT"
+DEFAULT_WRITER_LOCK_PATH = Path(
+    "/run/lock/teddy-discovery-r2-writer.lock"
+)
 
 
 class RemoteLibraryRootError(OSError):
@@ -556,7 +568,7 @@ class BoundedScan:
 @dataclass(frozen=True)
 class ReconciliationReport:
     root: str
-    db_available: bool
+    db_available: bool | None
     root_available: bool
     mount_available: bool | None
     root_entry_count: int
@@ -766,6 +778,7 @@ def _canonical_record(
 
     return {
         "classification": "CANONICAL_PRESENT",
+        "entry_type": "regular_file",
         "relative_path": relative_path,
         "dvd_id": dvd_id,
         "parse_status": "MATCHED",
@@ -777,6 +790,103 @@ def _canonical_record(
         "size_bytes": int(file_stat.st_size),
         "mtime_ns": int(file_stat.st_mtime_ns),
     }
+
+
+def _canonical_identity(report):
+    return tuple(
+        sorted(
+            (
+                item.get("relative_path"),
+                item.get("dvd_id"),
+                item.get("entry_type", "regular_file"),
+                int(item.get("size_bytes") or 0),
+                int(item.get("mtime_ns") or 0),
+            )
+            for item in report.canonical_present_files
+        )
+    )
+
+
+def _blocking_identity(report):
+    return tuple(
+        sorted(
+            (
+                finding.category,
+                finding.relative_path,
+                finding.dvd_id or "",
+                finding.detail,
+            )
+            for finding in report.findings
+            if finding.blocking
+        )
+    )
+
+
+def _same_bounded_state(first, second):
+    return (
+        _canonical_identity(first)
+        == _canonical_identity(second)
+        and _blocking_identity(first)
+        == _blocking_identity(second)
+    )
+
+
+def _stability_changed(report):
+    finding = Finding(
+        category="STABILITY_CHANGED",
+        relative_path=".",
+        dvd_id=None,
+        detail=(
+            "bounded filesystem identity changed between scans"
+        ),
+        blocking=True,
+    )
+
+    findings = tuple(
+        sorted(
+            (*report.findings, finding),
+            key=lambda item: (
+                item.category,
+                item.relative_path,
+                item.dvd_id or "",
+                item.detail,
+            ),
+        )
+    )
+
+    return replace(
+        report,
+        apply_eligible=False,
+        findings=findings,
+    )
+
+
+def _operation_lock_report(root, exc):
+    category = (
+        "OPERATION_LOCK_BUSY"
+        if isinstance(exc, OperationLockBusy)
+        else "OPERATION_LOCK_ERROR"
+    )
+
+    return ReconciliationReport(
+        root=str(root),
+        db_available=None,
+        root_available=False,
+        mount_available=None,
+        root_entry_count=0,
+        scan_complete=False,
+        apply_eligible=False,
+        canonical_present_files=(),
+        findings=(
+            Finding(
+                category=category,
+                relative_path=".",
+                dvd_id=None,
+                detail=str(exc),
+                blocking=True,
+            ),
+        ),
+    )
 
 
 def scan_bounded(
@@ -1407,44 +1517,83 @@ def apply_reconciliation(
     *,
     expected_mount: Path | None = None,
     filesystem=None,
+    operation_lock_path=DEFAULT_OPERATION_LOCK_PATH,
+    writer_lock_path=DEFAULT_WRITER_LOCK_PATH,
 ):
-    report = reconcile(
-        db_path,
-        root,
-        expected_mount=expected_mount,
-        filesystem=filesystem,
-    )
+    try:
+        with operation_lock(
+            operation_lock_path
+        ):
+            report = reconcile(
+                db_path,
+                root,
+                expected_mount=expected_mount,
+                filesystem=filesystem,
+            )
 
-    if not report.apply_eligible:
-        raise ReconciliationUnsafe(
-            report
-        )
-
-    result = import_inventory(
-        db_path=db_path,
-        root=root,
-        storage_root=STORAGE_ROOT,
-        scanner=lambda _root: list(
-            report.canonical_present_files
-        ),
-    )
-
-    payload = report.to_dict()
-    payload.update(
-        {
-            "applied": True,
-            "run_id": result["run_id"],
-            "counts": {
-                key: result[key]
-                for key in (
-                    "MATCHED",
-                    "AMBIGUOUS",
-                    "UNMATCHED",
+            if not report.apply_eligible:
+                raise ReconciliationUnsafe(
+                    report
                 )
-            },
-        }
-    )
-    return payload
+
+            stable_report = reconcile(
+                db_path,
+                root,
+                expected_mount=expected_mount,
+                filesystem=filesystem,
+            )
+
+            if not stable_report.apply_eligible:
+                raise ReconciliationUnsafe(
+                    stable_report
+                )
+
+            if not _same_bounded_state(
+                report,
+                stable_report,
+            ):
+                raise ReconciliationUnsafe(
+                    _stability_changed(
+                        stable_report
+                    )
+                )
+
+            with exclusive_lock(
+                writer_lock_path
+            ):
+                result = import_inventory(
+                    db_path=db_path,
+                    root=root,
+                    storage_root=STORAGE_ROOT,
+                    scanner=lambda _root: list(
+                        stable_report.canonical_present_files
+                    ),
+                )
+
+            payload = stable_report.to_dict()
+            payload.update(
+                {
+                    "applied": True,
+                    "run_id": result["run_id"],
+                    "counts": {
+                        key: result[key]
+                        for key in (
+                            "MATCHED",
+                            "AMBIGUOUS",
+                            "UNMATCHED",
+                        )
+                    },
+                }
+            )
+            return payload
+
+    except OperationLockError as exc:
+        raise ReconciliationUnsafe(
+            _operation_lock_report(
+                root,
+                exc,
+            )
+        ) from exc
 
 
 def reconcile_remote(
@@ -1471,6 +1620,8 @@ def apply_remote_reconciliation(
     ssh,
     *,
     library_root=None,
+    operation_lock_path=DEFAULT_OPERATION_LOCK_PATH,
+    writer_lock_path=DEFAULT_WRITER_LOCK_PATH,
 ):
     filesystem = RemoteJAVFilesystem(
         ssh,
@@ -1482,6 +1633,8 @@ def apply_remote_reconciliation(
         filesystem.library_root
         or "<remote-library-root>",
         filesystem=filesystem,
+        operation_lock_path=operation_lock_path,
+        writer_lock_path=writer_lock_path,
     )
 
 
@@ -1527,6 +1680,17 @@ def main():
                 "mountpoint that must be mounted before scanning"
             ),
         )
+        if command == "apply":
+            subparser.add_argument(
+                "--operation-lock",
+                type=Path,
+                default=DEFAULT_OPERATION_LOCK_PATH,
+            )
+            subparser.add_argument(
+                "--writer-lock",
+                type=Path,
+                default=DEFAULT_WRITER_LOCK_PATH,
+            )
 
     for command in ("remote-report", "remote-apply"):
         subparser = subparsers.add_parser(
@@ -1572,6 +1736,17 @@ def main():
                 "",
             ),
         )
+        if command == "remote-apply":
+            subparser.add_argument(
+                "--operation-lock",
+                type=Path,
+                default=DEFAULT_OPERATION_LOCK_PATH,
+            )
+            subparser.add_argument(
+                "--writer-lock",
+                type=Path,
+                default=DEFAULT_WRITER_LOCK_PATH,
+            )
 
     args = parser.parse_args()
 
@@ -1640,6 +1815,8 @@ def main():
                 args.db,
                 ssh,
                 library_root=library_root,
+                operation_lock_path=args.operation_lock,
+                writer_lock_path=args.writer_lock,
             )
 
         except ReconciliationUnsafe as exc:
@@ -1660,6 +1837,8 @@ def main():
             args.db,
             args.root,
             expected_mount=args.expected_mount,
+            operation_lock_path=args.operation_lock,
+            writer_lock_path=args.writer_lock,
         )
 
     except ReconciliationUnsafe as exc:

@@ -94,7 +94,7 @@ def categories(report):
 
 def apply_must_fail(db_path, root, **kwargs):
     try:
-        reconcile_mod.apply_reconciliation(
+        apply_with_locks(
             db_path,
             root,
             **kwargs,
@@ -104,6 +104,17 @@ def apply_must_fail(db_path, root, **kwargs):
 
     raise RuntimeError(
         "unsafe reconciliation unexpectedly applied"
+    )
+
+
+def apply_with_locks(db_path, root, **kwargs):
+    base = Path(db_path).parent
+    return reconcile_mod.apply_reconciliation(
+        db_path,
+        root,
+        operation_lock_path=base / "operation.lock",
+        writer_lock_path=base / "writer.lock",
+        **kwargs,
     )
 
 
@@ -179,7 +190,7 @@ def test_db_missing_file_and_apply_semantics():
             "DB-present filesystem-missing row was not reported",
         )
 
-        result = reconcile_mod.apply_reconciliation(
+        result = apply_with_locks(
             db_path,
             root,
         )
@@ -240,7 +251,7 @@ def test_same_path_revive():
             "same-path absent row was not reported",
         )
 
-        reconcile_mod.apply_reconciliation(
+        apply_with_locks(
             db_path,
             root,
         )

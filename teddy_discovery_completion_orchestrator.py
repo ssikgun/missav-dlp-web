@@ -12,6 +12,10 @@ from teddy_discovery_organizer_apply import (
     set_job_status,
     writer_transaction,
 )
+from teddy_discovery_operation_lock import (
+    DEFAULT_OPERATION_LOCK_PATH,
+    operation_lock,
+)
 
 
 class CompletionOrchestratorError(RuntimeError):
@@ -235,7 +239,7 @@ def _verify_destination(
         )
 
 
-def process_one(
+def _process_one(
     plan: CompletionPlan,
     *,
     ssh,
@@ -500,3 +504,24 @@ def process_one(
     )
 
     return job_id
+
+
+def process_one(
+    plan: CompletionPlan,
+    *,
+    ssh,
+    mutator,
+    db_path: Path,
+    writer_lock_path: Path,
+    operation_lock_path=DEFAULT_OPERATION_LOCK_PATH,
+) -> int:
+    with operation_lock(
+        operation_lock_path
+    ):
+        return _process_one(
+            plan,
+            ssh=ssh,
+            mutator=mutator,
+            db_path=db_path,
+            writer_lock_path=writer_lock_path,
+        )

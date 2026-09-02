@@ -54,6 +54,16 @@ def categories(report):
     }
 
 
+def apply_with_locks(db_path, root):
+    base = Path(db_path).parent
+    return reconcile_mod.apply_reconciliation(
+        db_path,
+        root,
+        operation_lock_path=base / "operation.lock",
+        writer_lock_path=base / "writer.lock",
+    )
+
+
 def test_live_layout_and_sidecars():
     sidecar_sets = (
         ("ADN-785.nfo",),
@@ -164,7 +174,7 @@ def test_live_layout_and_sidecars():
                 "scanner crossed the bounded layout boundary",
             )
 
-            reconcile_mod.apply_reconciliation(
+            apply_with_locks(
                 db_path,
                 root,
             )
@@ -302,7 +312,7 @@ def test_fail_closed_and_no_recursive_source():
             "SELECT COUNT(*) FROM inventory_runs",
         )
         try:
-            reconcile_mod.apply_reconciliation(
+            apply_with_locks(
                 db_path,
                 root,
             )

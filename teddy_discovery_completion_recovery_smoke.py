@@ -114,6 +114,7 @@ with tempfile.TemporaryDirectory() as temp:
         mutator=mutator,
         db_path=db_path,
         writer_lock_path=lock,
+        operation_lock_path=root / "operation.lock",
     )
 
     assert mutator.calls == [
@@ -180,6 +181,7 @@ with tempfile.TemporaryDirectory() as temp:
         mutator=mutator,
         db_path=db_path,
         writer_lock_path=lock,
+        operation_lock_path=root / "operation.lock",
     )
 
     assert mutator.calls == [
@@ -267,6 +269,7 @@ with tempfile.TemporaryDirectory() as temp:
         mutator=mutator,
         db_path=db_path,
         writer_lock_path=lock,
+        operation_lock_path=root / "operation.lock",
     )
 
     assert mutator.calls == [
@@ -302,6 +305,7 @@ with tempfile.TemporaryDirectory() as temp:
             mutator=mutator,
             db_path=db_path,
             writer_lock_path=lock,
+            operation_lock_path=root / "operation.lock",
         )
     except CompletionOrchestratorError:
         pass

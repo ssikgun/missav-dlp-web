@@ -37,6 +37,7 @@ def main():
         mutator,
         db_path,
         writer_lock_path,
+        operation_lock_path,
     ):
         calls.append(
             "organizer"

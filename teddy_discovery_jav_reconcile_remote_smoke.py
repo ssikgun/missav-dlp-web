@@ -255,7 +255,7 @@ def categories(report):
 
 def apply_must_fail(db_path, ssh, library_root):
     try:
-        reconcile_mod.apply_remote_reconciliation(
+        apply_with_locks(
             db_path,
             ssh,
             library_root=library_root,
@@ -265,6 +265,17 @@ def apply_must_fail(db_path, ssh, library_root):
 
     raise RuntimeError(
         "unsafe remote reconciliation unexpectedly applied"
+    )
+
+
+def apply_with_locks(db_path, ssh, *, library_root):
+    base = Path(db_path).parent
+    return reconcile_mod.apply_remote_reconciliation(
+        db_path,
+        ssh,
+        library_root=library_root,
+        operation_lock_path=base / "operation.lock",
+        writer_lock_path=base / "writer.lock",
     )
 
 
@@ -382,7 +393,7 @@ def test_remote_missing_apply_and_revive():
             "remote DB-present missing file was not reported",
         )
 
-        reconcile_mod.apply_remote_reconciliation(
+        apply_with_locks(
             db_path,
             ssh,
             library_root="/remote/JAV",
@@ -436,7 +447,7 @@ def test_remote_missing_apply_and_revive():
             "ABSENT_HOLDING_REAPPEARED" in categories(report),
             "remote absent holding reappearance was not reported",
         )
-        reconcile_mod.apply_remote_reconciliation(
+        apply_with_locks(
             db_path,
             ssh,
             library_root="/remote/JAV",
