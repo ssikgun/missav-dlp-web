@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Teddy Discovery JAV holdings reconciliation every six hours
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:35:00 Asia/Seoul
+Persistent=false
+Unit=teddy-discovery-jav-reconcile.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+runtime_dir=${TEDDY_DISCOVERY_RUNTIME:-/opt/missav-dlp-web/stage9-runtime}
+
+export PYTHONPATH="${runtime_dir}${PYTHONPATH:+:${PYTHONPATH}}"
+
+exec /usr/bin/python3 \
+    "${runtime_dir}/teddy_discovery_jav_reconcile_report.py"
