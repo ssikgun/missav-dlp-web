@@ -120,6 +120,7 @@ def create_db(
             "AVX-102",
             "NON-104",
             "BAD-105",
+            "OWN-106",
         ):
             add_title(
                 connection,
@@ -187,6 +188,30 @@ def create_db(
             "BAD-105",
             "missav",
             "FOUND",
+        )
+
+        add_availability(
+            connection,
+            "OWN-106",
+            "missav",
+            "FOUND",
+        )
+
+        connection.execute(
+            """
+            INSERT INTO holdings(
+                storage_root, relative_path, dvd_id,
+                parse_status, parse_method,
+                parse_candidates_json, size_bytes,
+                mtime_ns, discovered_by, present,
+                first_seen_at, last_seen_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "/library", "OWN-106.mp4", "OWN-106",
+                "MATCHED", "smoke", "[]", 1, 1,
+                "smoke", 1, NOW, NOW,
+            ),
         )
 
         connection.commit()
@@ -396,6 +421,25 @@ def main():
                 == 503,
                 "bad stored variant must fail closed",
             )
+
+            calls.clear()
+            core.tasks = {
+                "already-active": {
+                    "status": "대기 중",
+                    "url": "https://missav123.com/ko/own-106",
+                },
+            }
+            owned_response = client.post(
+                "/api/discovery/download",
+                json={"dvd_id": "OWN-106"},
+            )
+            require(
+                owned_response.status_code == 409
+                and owned_response.get_json().get("status") == "owned"
+                and calls == [],
+                "owned Discovery item was not blocked before duplicate/enqueue",
+            )
+            print("DISCOVERY_DOWNLOAD_OWNED_PRIORITY_SMOKE=PASS")
 
             cases = (
                 (

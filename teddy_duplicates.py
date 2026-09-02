@@ -1,4 +1,6 @@
 import threading
+
+import teddy_ownership
 from urllib.parse import parse_qs, urlparse
 
 
@@ -112,11 +114,50 @@ def find_duplicate_by_key(
     return None, None
 
 
+def _owned_response(core, dvd_id, db_path=None):
+    dvd_id = str(dvd_id or "").strip()
+
+    if not dvd_id:
+        return None
+
+    try:
+        owned = teddy_ownership.is_owned(
+            dvd_id,
+            db_path=db_path,
+        )
+    except teddy_ownership.OwnershipUnavailable as exc:
+        print(
+            f"[Ownership] 보유 여부 확인 실패: {dvd_id} · {exc}",
+            flush=True,
+        )
+        return core.jsonify({
+            "status": "ownership_unavailable",
+            "message": "보유 여부를 확인할 수 없습니다.",
+            "dvd_id": dvd_id,
+        }), 503
+
+    if not owned:
+        return None
+
+    print(
+        f"[Ownership] 보유작 다운로드 차단: {dvd_id}",
+        flush=True,
+    )
+
+    return core.jsonify({
+        "status": "owned",
+        "message": "이미 보유 중인 작품입니다.",
+        "dvd_id": dvd_id,
+    }), 409
+
+
 def guarded_enqueue_by_key(
     core,
     wanted_key,
     task_key,
     creator,
+    ownership_dvd_id=None,
+    ownership_db_path=None,
 ):
     wanted_key = str(
         wanted_key
@@ -132,6 +173,14 @@ def guarded_enqueue_by_key(
         raise ValueError(
             'task key function required'
         )
+
+    owned = _owned_response(
+        core,
+        ownership_dvd_id,
+        db_path=ownership_db_path,
+    )
+    if owned is not None:
+        return owned
 
     with _QUEUE_LOCK:
         task_id, task = (
@@ -193,6 +242,17 @@ def guarded_enqueue(
 
     if not url:
         return creator()
+
+    dvd_id = teddy_ownership.dvd_id_from_supported_url(
+        url
+    )
+
+    owned = _owned_response(
+        core,
+        dvd_id,
+    )
+    if owned is not None:
+        return owned
 
     # Keep duplicate check + task creation/queue insertion atomic.
     with _QUEUE_LOCK:

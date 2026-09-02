@@ -162,6 +162,8 @@ def create_discovery_download_blueprint(
                 page_url,
                 "auto",
             ),
+            ownership_dvd_id=dvd_id,
+            ownership_db_path=db_path,
         )
 
     return blueprint
