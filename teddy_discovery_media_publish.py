@@ -27,6 +27,32 @@ VIDEO_EXTENSIONS = {
     ".m4v",
 }
 
+POSTER_FILENAMES = frozenset(
+    {
+        "poster.jpg",
+        "poster.png",
+        "poster.webp",
+    }
+)
+
+LIBRARY_SIDECAR_FILENAMES = frozenset(
+    {
+        "movie.nfo",
+        *POSTER_FILENAMES,
+    }
+)
+
+
+def canonical_nfo_filename(dvd_id):
+    return str(dvd_id).strip().upper() + ".nfo"
+
+
+def is_library_sidecar(filename, dvd_id):
+    return (
+        filename == canonical_nfo_filename(dvd_id)
+        or filename in LIBRARY_SIDECAR_FILENAMES
+    )
+
 
 REMOTE_PUBLISH_SCRIPT = r'''
 import hashlib
@@ -497,7 +523,7 @@ class MediaMetadataSSHMutator:
 
         if (
             bundle.nfo_filename
-            != dvd_id + ".nfo"
+            != canonical_nfo_filename(dvd_id)
         ):
             raise MediaMetadataPublishError(
                 "invalid nfo filename"
@@ -505,11 +531,7 @@ class MediaMetadataSSHMutator:
 
         if (
             bundle.poster.filename
-            not in {
-                "poster.jpg",
-                "poster.png",
-                "poster.webp",
-            }
+            not in POSTER_FILENAMES
         ):
             raise MediaMetadataPublishError(
                 "invalid poster filename"

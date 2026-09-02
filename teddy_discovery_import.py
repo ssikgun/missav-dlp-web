@@ -80,6 +80,7 @@ def import_inventory(
     root: Path,
     storage_root: str,
     allow_empty: bool = False,
+    scanner=scan,
 ):
     connection = connect(db_path)
     initialize(connection)
@@ -107,7 +108,7 @@ def import_inventory(
     connection.commit()
 
     try:
-        records = scan(root)
+        records = scanner(root)
 
         existing_present = connection.execute(
             """
