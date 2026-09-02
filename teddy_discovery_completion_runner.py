@@ -53,6 +53,8 @@ def run_once(
     media_reconciler=reconcile_media_jobs,
     media_runner=run_retryable_media_jobs,
     media_max_items=1,
+    media_db_path=None,
+    media_writer_lock_path=None,
 ):
     plans = planner(
         items,
@@ -110,15 +112,26 @@ def run_once(
         result["applied"] += 1
 
     if media_processor is not None:
+        if media_db_path is None:
+            raise RuntimeError(
+                "media_db_path required"
+            )
+
+        if media_writer_lock_path is None:
+            raise RuntimeError(
+                "media_writer_lock_path required"
+            )
+
         reconciled = media_reconciler(
             db_path,
-            writer_lock_path,
+            media_db_path,
+            media_writer_lock_path,
         )
 
         media_result = media_runner(
-            db_path=db_path,
+            db_path=media_db_path,
             writer_lock_path=
-                writer_lock_path,
+                media_writer_lock_path,
             processor=media_processor,
             max_items=media_max_items,
         )
@@ -179,6 +192,14 @@ def main():
         default=1,
     )
     parser.add_argument(
+        "--media-db",
+        type=Path,
+    )
+    parser.add_argument(
+        "--media-writer-lock",
+        type=Path,
+    )
+    parser.add_argument(
         "--jellyfin-base-url",
         default="",
     )
@@ -225,6 +246,18 @@ def main():
                 "required with --apply"
             )
 
+        if args.media_db is None:
+            parser.error(
+                "--media-db is "
+                "required with --apply"
+            )
+
+        if args.media_writer_lock is None:
+            parser.error(
+                "--media-writer-lock is "
+                "required with --apply"
+            )
+
         metadata_mutator = (
             MediaMetadataSSHMutator(
                 ssh
@@ -266,6 +299,10 @@ def main():
             media_processor,
         media_max_items=
             args.media_max_items,
+        media_db_path=
+            args.media_db,
+        media_writer_lock_path=
+            args.media_writer_lock,
     )
 
     print(

@@ -4,7 +4,7 @@ from pathlib import Path
 import sqlite3
 
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 6
 
 
 SCHEMA = """
@@ -649,84 +649,6 @@ def _migrate_5_to_6(
         raise
 
 
-
-def _migrate_6_to_7(
-    connection: sqlite3.Connection,
-) -> None:
-    now = _utc_now()
-
-    connection.execute(
-        "BEGIN IMMEDIATE"
-    )
-
-    try:
-        connection.execute(
-            """
-            CREATE TABLE media_jobs (
-                media_job_id INTEGER
-                    PRIMARY KEY AUTOINCREMENT,
-
-                dvd_id TEXT NOT NULL
-                    UNIQUE,
-
-                status TEXT NOT NULL
-                    CHECK (
-                        status IN (
-                            'PENDING',
-                            'RUNNING',
-                            'COMPLETED',
-                            'FAILED'
-                        )
-                    ),
-
-                attempt_count INTEGER
-                    NOT NULL DEFAULT 0
-                    CHECK (
-                        attempt_count >= 0
-                    ),
-
-                error TEXT,
-
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-
-                FOREIGN KEY (dvd_id)
-                    REFERENCES titles(dvd_id)
-                    ON DELETE CASCADE
-            )
-            """
-        )
-
-        connection.execute(
-            """
-            CREATE INDEX idx_media_jobs_status
-            ON media_jobs(
-                status,
-                media_job_id
-            )
-            """
-        )
-
-        connection.execute(
-            """
-            INSERT INTO schema_migrations(
-                version,
-                applied_at
-            )
-            VALUES (?, ?)
-            """,
-            (
-                7,
-                now,
-            ),
-        )
-
-        connection.commit()
-
-    except Exception:
-        connection.rollback()
-        raise
-
 def initialize(
     connection: sqlite3.Connection,
 ) -> None:
@@ -806,11 +728,6 @@ def initialize(
 
         elif target == 6:
             _migrate_5_to_6(
-                connection
-            )
-
-        elif target == 7:
-            _migrate_6_to_7(
                 connection
             )
 

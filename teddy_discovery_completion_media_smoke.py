@@ -46,7 +46,8 @@ def main():
 
     def reconciler(
         db_path,
-        writer_lock_path,
+        media_db_path,
+        media_writer_lock_path,
     ):
         calls.append(
             "reconcile"
@@ -127,6 +128,9 @@ def main():
         media_runner=
             media_runner,
         media_max_items=1,
+        media_db_path="media.db",
+        media_writer_lock_path=
+            "media.lock",
     )
 
     assert applied["applied"] == 1
