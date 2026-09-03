@@ -4,8 +4,10 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 import argparse
+import errno
 import fcntl
 import json
+import math
 import os
 import sqlite3
 import time
@@ -29,6 +31,10 @@ COPY_CHUNK = (
 
 class ApplyError(RuntimeError):
     pass
+
+
+class ExclusiveLockBusy(BlockingIOError):
+    """An exclusive lock could not be acquired within its bound."""
 
 
 @dataclass(frozen=True)
@@ -86,7 +92,28 @@ def _has_symlink_component(
 @contextmanager
 def exclusive_lock(
     path: Path,
+    *,
+    blocking: bool = True,
+    timeout: float | None = None,
 ):
+    if not blocking and timeout is not None:
+        raise ValueError(
+            "exclusive lock cannot combine nonblocking and timeout"
+        )
+
+    if timeout is not None:
+        try:
+            timeout = float(timeout)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "exclusive lock timeout must be numeric"
+            ) from exc
+
+        if not math.isfinite(timeout) or timeout < 0:
+            raise ValueError(
+                "exclusive lock timeout must be finite and non-negative"
+            )
+
     path.parent.mkdir(
         parents=True,
         exist_ok=True,
@@ -98,10 +125,58 @@ def exclusive_lock(
     )
 
     try:
-        fcntl.flock(
-            handle.fileno(),
-            fcntl.LOCK_EX,
-        )
+        try:
+            fcntl.flock(
+                handle.fileno(),
+                fcntl.LOCK_EX
+                | (
+                    fcntl.LOCK_NB
+                    if not blocking or timeout is not None
+                    else 0
+                ),
+            )
+
+        except OSError as exc:
+            if exc.errno not in {
+                errno.EACCES,
+                errno.EAGAIN,
+            } or (blocking and timeout is None):
+                raise
+
+            deadline = time.monotonic() + float(timeout or 0)
+
+            while True:
+                if time.monotonic() >= deadline:
+                    raise ExclusiveLockBusy(
+                        "exclusive lock is busy: "
+                        + str(path)
+                    ) from exc
+
+                time.sleep(
+                    min(
+                        0.05,
+                        max(
+                            0.0,
+                            deadline - time.monotonic(),
+                        ),
+                    )
+                )
+
+                try:
+                    fcntl.flock(
+                        handle.fileno(),
+                        fcntl.LOCK_EX | fcntl.LOCK_NB,
+                    )
+                    break
+
+                except OSError as retry_exc:
+                    if retry_exc.errno not in {
+                        errno.EACCES,
+                        errno.EAGAIN,
+                    }:
+                        raise
+
+                    exc = retry_exc
 
         yield
 

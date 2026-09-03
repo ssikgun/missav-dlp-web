@@ -1,0 +1,14 @@
+[Unit]
+Description=Teddy Discovery JAV holdings reconciliation (strict apply)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/missav-dlp-web/stage9-runtime
+EnvironmentFile=-/etc/default/teddy-discovery
+Environment=TEDDY_DISCOVERY_RUNTIME=/opt/missav-dlp-web/stage9-runtime
+Environment=TEDDY_DISCOVERY_DB=/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3
+Environment=TEDDY_FINAL_LIBRARY_ROOT=/volume1/video/video2/JAV
+Environment=TEDDY_JAV_RECONCILE_WRITER_LOCK_TIMEOUT=2
+ExecStart=/usr/local/sbin/teddy-discovery-jav-reconcile-apply

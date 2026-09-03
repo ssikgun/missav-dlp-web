@@ -547,6 +547,12 @@ class ReconciliationUnsafe(RuntimeError):
 
 
 @dataclass(frozen=True)
+class ReconciliationDecision:
+    action: str
+    reason: str = ""
+
+
+@dataclass(frozen=True)
 class Finding:
     category: str
     relative_path: str
@@ -576,6 +582,7 @@ class ReconciliationReport:
     apply_eligible: bool
     canonical_present_files: tuple[dict, ...]
     findings: tuple[Finding, ...]
+    holdings: tuple[dict, ...] = ()
 
     def to_dict(self):
         findings = [
@@ -611,6 +618,32 @@ def _finding_counts(findings):
 
     return dict(
         sorted(counts.items())
+    )
+
+
+def _holdings_identity(rows):
+    fields = (
+        "holding_id",
+        "storage_root",
+        "relative_path",
+        "dvd_id",
+        "parse_status",
+        "parse_method",
+        "parse_candidates_json",
+        "size_bytes",
+        "mtime_ns",
+        "discovered_by",
+        "present",
+        "first_seen_at",
+        "last_seen_at",
+        "last_seen_run_id",
+    )
+
+    return tuple(
+        sorted(
+            tuple(row.get(field) for field in fields)
+            for row in rows
+        )
     )
 
 
@@ -1278,6 +1311,33 @@ def _db_finding(relative_path, detail):
     )
 
 
+def _policy_hold_report(report, reason):
+    finding = Finding(
+        category="AUTO_APPLY_POLICY_HOLD",
+        relative_path=".",
+        dvd_id=None,
+        detail=str(reason),
+        blocking=True,
+    )
+    findings = tuple(
+        sorted(
+            (*report.findings, finding),
+            key=lambda item: (
+                item.category,
+                item.relative_path,
+                item.dvd_id or "",
+                item.detail,
+            ),
+        )
+    )
+
+    return replace(
+        report,
+        apply_eligible=False,
+        findings=findings,
+    )
+
+
 def reconcile(
     db_path: Path,
     root: Path,
@@ -1292,6 +1352,7 @@ def reconcile(
     )
 
     findings = list(scan.findings)
+    holdings = []
 
     try:
         holdings = _read_holdings(
@@ -1508,7 +1569,152 @@ def reconcile(
         apply_eligible=apply_eligible,
         canonical_present_files=scan.records,
         findings=tuple(findings),
+        holdings=tuple(holdings),
     )
+
+
+def _mutation_counts(before_rows, after_rows):
+    before = {
+        row["relative_path"]: row
+        for row in before_rows
+    }
+    after = {
+        row["relative_path"]: row
+        for row in after_rows
+    }
+
+    inserted = sum(
+        path not in before
+        for path in after
+    )
+    absent_marked = sum(
+        int(before[path].get("present") or 0) == 1
+        and int(after[path].get("present") or 0) == 0
+        for path in before.keys() & after.keys()
+    )
+    revived = sum(
+        int(before[path].get("present") or 0) == 0
+        and int(after[path].get("present") or 0) == 1
+        for path in before.keys() & after.keys()
+    )
+    metadata_updated = sum(
+        (
+            before[path].get("size_bytes")
+            != after[path].get("size_bytes")
+            or before[path].get("mtime_ns")
+            != after[path].get("mtime_ns")
+        )
+        for path in before.keys() & after.keys()
+    )
+
+    return {
+        "INSERTED": inserted,
+        "ABSENT_MARKED": absent_marked,
+        "REVIVED": revived,
+        "METADATA_UPDATED": metadata_updated,
+    }
+
+
+def _verify_applied_state(db_path, stable_report):
+    rows = _read_holdings(db_path)
+    expected = {
+        row["relative_path"]: row
+        for row in stable_report.canonical_present_files
+    }
+    actual = {
+        row["relative_path"]: row
+        for row in rows
+    }
+
+    for relative_path, expected_row in expected.items():
+        actual_row = actual.get(relative_path)
+
+        if actual_row is None:
+            raise RuntimeError(
+                "post-apply canonical holding is missing: "
+                + relative_path
+            )
+
+        for field in (
+            "storage_root",
+            "relative_path",
+            "dvd_id",
+            "parse_status",
+            "parse_method",
+            "parse_candidates_json",
+            "size_bytes",
+            "mtime_ns",
+        ):
+            expected_value = (
+                STORAGE_ROOT
+                if field == "storage_root"
+                else expected_row.get(field)
+            )
+
+            if actual_row.get(field) != expected_value:
+                raise RuntimeError(
+                    "post-apply holding field mismatch: "
+                    + relative_path
+                    + ":"
+                    + field
+                )
+
+        if int(actual_row.get("present") or 0) != 1:
+            raise RuntimeError(
+                "post-apply canonical holding is not present: "
+                + relative_path
+            )
+
+    unexpected_present = [
+        row["relative_path"]
+        for row in rows
+        if int(row.get("present") or 0) == 1
+        and row["relative_path"] not in expected
+    ]
+
+    if unexpected_present:
+        raise RuntimeError(
+            "post-apply unexpected present holding: "
+            + sorted(unexpected_present)[0]
+        )
+
+    return rows
+
+
+def _apply_transaction_under_writer_lock(
+    db_path,
+    root,
+    stable_report,
+):
+    latest_holdings = _read_holdings(
+        db_path
+    )
+
+    if _holdings_identity(latest_holdings) != _holdings_identity(
+        stable_report.holdings
+    ):
+        raise ReconciliationUnsafe(
+            _policy_hold_report(
+                stable_report,
+                "DB_STATE_CHANGED_AFTER_PREFLIGHT",
+            )
+        )
+
+    result = import_inventory(
+        db_path=db_path,
+        root=root,
+        storage_root=STORAGE_ROOT,
+        scanner=lambda _root: list(
+            stable_report.canonical_present_files
+        ),
+    )
+
+    after_holdings = _verify_applied_state(
+        db_path,
+        stable_report,
+    )
+
+    return result, after_holdings
 
 
 def apply_reconciliation(
@@ -1519,6 +1725,8 @@ def apply_reconciliation(
     filesystem=None,
     operation_lock_path=DEFAULT_OPERATION_LOCK_PATH,
     writer_lock_path=DEFAULT_WRITER_LOCK_PATH,
+    writer_lock_timeout=None,
+    policy_fn=None,
 ):
     try:
         with operation_lock(
@@ -1558,22 +1766,75 @@ def apply_reconciliation(
                     )
                 )
 
-            with exclusive_lock(
-                writer_lock_path
-            ):
-                result = import_inventory(
-                    db_path=db_path,
-                    root=root,
-                    storage_root=STORAGE_ROOT,
-                    scanner=lambda _root: list(
-                        stable_report.canonical_present_files
-                    ),
-                )
+            decision = ReconciliationDecision(
+                action="APPLY"
+            )
+
+            if policy_fn is not None:
+                decision = policy_fn(stable_report)
+
+                if not isinstance(
+                    decision,
+                    ReconciliationDecision,
+                ):
+                    raise TypeError(
+                        "reconciliation policy returned an invalid decision"
+                    )
+
+                if decision.action == "NOOP":
+                    payload = stable_report.to_dict()
+                    payload.update(
+                        {
+                            "applied": False,
+                            "action": "NOOP",
+                            "counts": {
+                                "INSERTED": 0,
+                                "ABSENT_MARKED": 0,
+                                "REVIVED": 0,
+                                "METADATA_UPDATED": 0,
+                            },
+                        }
+                    )
+                    return payload
+
+                if decision.action != "APPLY":
+                    raise ReconciliationUnsafe(
+                        _policy_hold_report(
+                            stable_report,
+                            decision.reason
+                            or "policy rejected reconciliation",
+                        )
+                    )
+
+            if writer_lock_timeout is None:
+                with exclusive_lock(
+                    writer_lock_path
+                ):
+                    result, after_holdings = (
+                        _apply_transaction_under_writer_lock(
+                            db_path,
+                            root,
+                            stable_report,
+                        )
+                    )
+            else:
+                with exclusive_lock(
+                    writer_lock_path,
+                    timeout=writer_lock_timeout,
+                ):
+                    result, after_holdings = (
+                        _apply_transaction_under_writer_lock(
+                            db_path,
+                            root,
+                            stable_report,
+                        )
+                    )
 
             payload = stable_report.to_dict()
             payload.update(
                 {
                     "applied": True,
+                    "action": "APPLIED",
                     "run_id": result["run_id"],
                     "counts": {
                         key: result[key]
@@ -1583,6 +1844,10 @@ def apply_reconciliation(
                             "UNMATCHED",
                         )
                     },
+                    "mutation_counts": _mutation_counts(
+                        stable_report.holdings,
+                        after_holdings,
+                    ),
                 }
             )
             return payload
@@ -1622,6 +1887,8 @@ def apply_remote_reconciliation(
     library_root=None,
     operation_lock_path=DEFAULT_OPERATION_LOCK_PATH,
     writer_lock_path=DEFAULT_WRITER_LOCK_PATH,
+    writer_lock_timeout=None,
+    policy_fn=None,
 ):
     filesystem = RemoteJAVFilesystem(
         ssh,
@@ -1635,6 +1902,8 @@ def apply_remote_reconciliation(
         filesystem=filesystem,
         operation_lock_path=operation_lock_path,
         writer_lock_path=writer_lock_path,
+        writer_lock_timeout=writer_lock_timeout,
+        policy_fn=policy_fn,
     )
 
 
