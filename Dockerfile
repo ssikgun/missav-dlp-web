@@ -26,7 +26,7 @@ COPY . .
 # Source + patch scripts must all parse before any build-time mutation.
 RUN python -m py_compile \
     app.py teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py \
-    teddy_routing.py teddy_duplicates.py teddy_logging.py teddy_storage.py teddy_browser_config.py teddy_auth.py \
+    teddy_routing.py teddy_duplicates.py teddy_ownership.py teddy_ownership_smoke.py teddy_logging.py teddy_storage.py teddy_browser_config.py teddy_auth.py \
     teddy_discovery_runtime.py teddy_discovery_download_api.py teddy_discovery_runtime_smoke.py teddy_discovery_ui_shell_smoke.py teddy_discovery_download_api_smoke.py \
     teddy_generic.py teddy_123av.py teddy_bootstrap.py teddy_verify_build.py teddy_hls_transport.py teddy_hls_benchmark.py \
     teddy_patch_vpn_health.py teddy_patch_proxy_pool.py teddy_patch_proxy_speed.py \
@@ -37,6 +37,9 @@ RUN python -m py_compile \
     teddy_patch_index.py teddy_patch_logs.py teddy_patch_storage.py teddy_patch_routing.py \
     teddy_patch_ytdlp_options.py teddy_patch_browser.py teddy_patch_split_storage.py teddy_patch_mobile.py teddy_patch_browser_runtime.py \
     teddy_patch_auth.py teddy_patch_pwa.py
+
+# Holdings ownership guard policy must pass inside the image build context.
+RUN python teddy_ownership_smoke.py
 
 # Existing deterministic boundary smoke tests.
 RUN python -c "import teddy_network as n; assert n.is_recoverable_failure('HTTP 403'); assert n.is_recoverable_failure('HTTP Error 403: Forbidden'); assert n.is_recoverable_failure('Tunnel connection failed: 502 Bad Gateway'); assert n.is_recoverable_failure('operation timed out'); assert n.is_recoverable_failure('connection reset by peer'); assert n.is_recoverable_failure('curl: (35) TLS connect error'); assert not n.is_recoverable_failure('HTTP 404'); assert not n.is_recoverable_failure('HTTP 401'); print('adaptive network failure boundary smoke test: OK')"
@@ -134,7 +137,7 @@ RUN grep -Fq "TEDDY_FINAL_DIR" teddy_storage.py && \
 
 RUN python -m py_compile \
     teddy_bootstrap.py teddy_browser_config.py teddy_auth.py teddy_storage.py \
-    teddy_routing.py teddy_duplicates.py teddy_discovery_runtime.py teddy_discovery_download_api.py \
+    teddy_routing.py teddy_duplicates.py teddy_ownership.py teddy_ownership_smoke.py teddy_discovery_runtime.py teddy_discovery_download_api.py \
     teddy_generic.py teddy_123av.py teddy_entrypoint.py teddy_patch_pwa.py
 RUN python teddy_verify_build.py final
 
