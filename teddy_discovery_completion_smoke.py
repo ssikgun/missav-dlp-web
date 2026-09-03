@@ -57,6 +57,8 @@ state = ready_state()
 state["holdings"] = [
     {
         "dvd_id": "ABC-123",
+        "storage_root": "jav",
+        "parse_status": "MATCHED",
         "present": 1,
     },
 ]

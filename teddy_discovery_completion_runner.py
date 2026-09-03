@@ -14,6 +14,10 @@ from teddy_discovery_completion_apply import (
 from teddy_discovery_completion_orchestrator import (
     process_one,
 )
+from teddy_discovery_completion_metadata import (
+    DEFAULT_METADATA_RECOVERY_MAX_ITEMS,
+    recover_held_metadata,
+)
 from teddy_discovery_completion_ssh import (
     CompletionSSH,
 )
@@ -60,6 +64,12 @@ def run_once(
     media_db_path=None,
     media_writer_lock_path=None,
     operation_lock_path=DEFAULT_OPERATION_LOCK_PATH,
+    metadata_recovery_max_items=(
+        DEFAULT_METADATA_RECOVERY_MAX_ITEMS
+    ),
+    metadata_state_path=None,
+    metadata_collector=None,
+    metadata_applier=None,
 ):
     plans = planner(
         items,
@@ -93,6 +103,17 @@ def run_once(
     }
 
     if not apply:
+        result["metadata_recovery"] = (
+            recover_held_metadata(
+                plans,
+                db_path=db_path,
+                writer_lock_path=writer_lock_path,
+                apply=False,
+                max_items=
+                    metadata_recovery_max_items,
+                state_path=metadata_state_path,
+            )
+        )
         return result
 
     if confirm != CONFIRMATION:
@@ -155,6 +176,32 @@ def run_once(
             **media_result,
         }
 
+    recovery_kwargs = {}
+
+    if metadata_collector is not None:
+        recovery_kwargs[
+            "collector"
+        ] = metadata_collector
+
+    if metadata_applier is not None:
+        recovery_kwargs[
+            "applier"
+        ] = metadata_applier
+
+    result["metadata_recovery"] = (
+        recover_held_metadata(
+            plans,
+            db_path=db_path,
+            writer_lock_path=writer_lock_path,
+            apply=True,
+            max_items=(
+                metadata_recovery_max_items
+            ),
+            state_path=metadata_state_path,
+            **recovery_kwargs,
+        )
+    )
+
     return result
 
 
@@ -204,6 +251,17 @@ def main():
         "--max-items",
         type=int,
         default=1,
+    )
+    parser.add_argument(
+        "--metadata-recovery-max-items",
+        type=int,
+        default=(
+            DEFAULT_METADATA_RECOVERY_MAX_ITEMS
+        ),
+    )
+    parser.add_argument(
+        "--metadata-recovery-state-db",
+        type=Path,
     )
     parser.add_argument(
         "--media-max-items",
@@ -316,6 +374,12 @@ def main():
         apply=args.apply,
         confirm=args.confirm,
         max_items=args.max_items,
+        metadata_recovery_max_items=(
+            args.metadata_recovery_max_items
+        ),
+        metadata_state_path=(
+            args.metadata_recovery_state_db
+        ),
         media_processor=
             media_processor,
         media_max_items=

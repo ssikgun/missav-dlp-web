@@ -1,4 +1,5 @@
 from pathlib import Path
+import tempfile
 
 from teddy_discovery_completion import (
     CompletionPlan,
@@ -55,6 +56,10 @@ def fake_planner(
 
 
 calls = []
+state_temp = tempfile.TemporaryDirectory(
+    prefix="teddy-stage9-runner-state-"
+)
+state_path = Path(state_temp.name) / "metadata.sqlite3"
 
 
 def fake_processor(
@@ -64,6 +69,17 @@ def fake_processor(
     calls.append(
         plan.dvd_id
     )
+
+
+def fake_metadata_collector(
+    dvd_id,
+):
+    return {
+        "dvd_id": dvd_id,
+        "status": "NOT_FOUND",
+        "route": None,
+        "item": None,
+    }
 
 
 # Dry-run must never mutate.
@@ -76,6 +92,8 @@ result = run_once(
         Path("/fake/lock"),
     planner=fake_planner,
     processor=fake_processor,
+    metadata_collector=
+        fake_metadata_collector,
 )
 
 assert result["total"] == 2
@@ -96,8 +114,12 @@ try:
             Path("/fake/lock"),
         apply=True,
         confirm="WRONG",
+        metadata_state_path=
+            state_path,
         planner=fake_planner,
         processor=fake_processor,
+        metadata_collector=
+            fake_metadata_collector,
     )
 except RuntimeError:
     pass
@@ -120,14 +142,20 @@ result = run_once(
     apply=True,
     confirm=CONFIRMATION,
     max_items=1,
+    metadata_state_path=
+        state_path,
     planner=fake_planner,
     processor=fake_processor,
+    metadata_collector=
+        fake_metadata_collector,
 )
 
 assert result["applied"] == 1
 assert calls == [
     "ABC-123",
 ]
+
+state_temp.cleanup()
 
 print(
     "STAGE9_COMPLETION_RUNNER_SMOKE=PASS"

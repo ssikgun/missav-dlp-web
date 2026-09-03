@@ -11,6 +11,9 @@ from teddy_discovery_organizer import (
     canonical_destination,
     load_db_state,
 )
+from teddy_discovery_ownership import (
+    is_canonical_present_holding,
+)
 
 
 @dataclass(frozen=True)
@@ -159,9 +162,9 @@ def _plan_one(
             [],
         )
         if row.get("dvd_id") == dvd_id
-        and int(
-            row.get("present") or 0
-        ) == 1
+        and is_canonical_present_holding(
+            row
+        )
     ]
 
     holding_count = len(
