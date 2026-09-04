@@ -513,6 +513,163 @@ def test_duplicate_nested_symlink_unmatched():
         )
 
 
+def test_korean_sidecar_and_stage11_partial_policy():
+    with tempfile.TemporaryDirectory(
+        prefix="teddy-jav-reconcile-ko-sidecar-"
+    ) as temp:
+        base = Path(temp)
+
+        def make_case(name, extra_names):
+            root = base / name
+            db_path = base / (name + ".sqlite3")
+            root.mkdir()
+            create_db(db_path)
+            dvd_dir = root / "ABC/ABC-123"
+            dvd_dir.mkdir(parents=True)
+            (dvd_dir / "ABC-123.mp4").write_bytes(b"video")
+            for extra_name in extra_names:
+                (dvd_dir / extra_name).write_bytes(b"sidecar")
+            return root, db_path
+
+        root, db_path = make_case(
+            "canonical-ko",
+            ("ABC-123.ko.srt",),
+        )
+        report = reconcile_mod.reconcile(
+            db_path,
+            root,
+        )
+        require(
+            not any(
+                finding.category == "UNEXPECTED_LAYOUT"
+                for finding in report.findings
+            ),
+            "canonical KO sidecar was treated as unknown",
+        )
+
+        usable_sibling_names = (
+            "ABC-123.ja.srt",
+            "ABC-123.ja.vtt",
+            "ABC-123.jpn.srt",
+            "ABC-123.jpn.vtt",
+            "ABC-123.japanese.srt",
+            "ABC-123.japanese.vtt",
+            "ABC-123.en.srt",
+            "ABC-123.en.vtt",
+            "ABC-123.eng.srt",
+            "ABC-123.eng.vtt",
+            "ABC-123.english.srt",
+            "ABC-123.english.vtt",
+            "ABC-123.JPN.SRT",
+            "ABC-123.ENGLISH.VTT",
+        )
+
+        for number, sibling_name in enumerate(
+            usable_sibling_names
+        ):
+            root, db_path = make_case(
+                "usable-sibling-" + str(number),
+                (sibling_name,),
+            )
+            report = reconcile_mod.reconcile(
+                db_path,
+                root,
+            )
+            require(
+                not any(
+                    finding.category == "UNEXPECTED_LAYOUT"
+                    for finding in report.findings
+                ),
+                sibling_name
+                + " was treated as unknown",
+            )
+
+        for number, sibling_name in enumerate(
+            (
+                "ABC-123.srt",
+                "ABC-123.vtt",
+                "ABC-123.ko.vtt",
+                "ABC-123.fr.srt",
+                "ABC-123.es.vtt",
+                "ABC-124.ja.srt",
+                ".ABC-124.ko.srt.stage11-partial."
+                "0123456789abcdef0123456789abcdef",
+                ".ABC-123.ko.srt.stage11-partial."
+                "0123456789ABCDEf0123456789abcdef",
+                "random.srt",
+                "random.vtt",
+            )
+        ):
+            root, db_path = make_case(
+                "unknown-sibling-" + str(number),
+                (sibling_name,),
+            )
+            report = reconcile_mod.reconcile(
+                db_path,
+                root,
+            )
+            require(
+                "UNEXPECTED_LAYOUT"
+                in categories(report),
+                sibling_name
+                + " was not held as unknown",
+            )
+
+        partial_name = (
+            ".ABC-123.ko.srt.stage11-partial."
+            "0123456789abcdef0123456789abcdef"
+        )
+        root, db_path = make_case(
+            "stage11-partial",
+            (partial_name,),
+        )
+        report = reconcile_mod.reconcile(
+            db_path,
+            root,
+        )
+        require(
+            not any(
+                finding.category == "UNEXPECTED_LAYOUT"
+                for finding in report.findings
+            ),
+            "exact Stage11 partial was treated as unknown",
+        )
+
+        for suffix in (
+            ".something-random",
+            ".ABC-123.ko.srt.stage11-partial.BAD",
+        ):
+            root, db_path = make_case(
+                "bad-" + str(len(suffix)),
+                (suffix,),
+            )
+            report = reconcile_mod.reconcile(
+                db_path,
+                root,
+            )
+            require(
+                "UNEXPECTED_LAYOUT"
+                in categories(report),
+                "unrelated hidden file was not held",
+            )
+
+        require(
+            reconcile_mod.is_stage11_subtitle_partial(
+                partial_name,
+                "ABC-123",
+            ),
+            "exact Stage11 partial predicate rejected valid name",
+        )
+        require(
+            not reconcile_mod.is_stage11_subtitle_partial(
+                ".ABC-124.ko.srt.stage11-partial."
+                "0123456789abcdef0123456789abcdef",
+                "ABC-123",
+            ),
+            "partial predicate accepted a different DVD-ID",
+        )
+
+
 def test_size_mtime_bounded_and_incomplete_apply():
     with tempfile.TemporaryDirectory(
         prefix="teddy-jav-reconcile-drift-"
@@ -636,12 +793,15 @@ def main():
     test_empty_root_and_unavailable_root()
     test_expected_mount_and_permission_io()
     test_duplicate_nested_symlink_unmatched()
+    test_korean_sidecar_and_stage11_partial_policy()
     test_size_mtime_bounded_and_incomplete_apply()
 
     print("JAV_RECONCILIATION_CANONICAL_SCAN=PASS")
     print("JAV_RECONCILIATION_FAIL_CLOSED=PASS")
     print("JAV_RECONCILIATION_APPLY_SEMANTICS=PASS")
     print("JAV_RECONCILIATION_BOUNDED_DEPTH=PASS")
+    print("JAV_RECONCILIATION_KO_SIDECAR=PASS")
+    print("JAV_RECONCILIATION_STAGE11_PARTIAL_POLICY=PASS")
     print("JAV_RECONCILIATION_SMOKE=PASS")
 
 

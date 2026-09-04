@@ -42,14 +42,66 @@ LIBRARY_SIDECAR_FILENAMES = frozenset(
     }
 )
 
+CANONICAL_TEXT_SUBTITLE_LANGUAGES = frozenset(
+    {
+        "ja",
+        "jpn",
+        "japanese",
+        "en",
+        "eng",
+        "english",
+    }
+)
+
+CANONICAL_TEXT_SUBTITLE_FORMATS = frozenset(
+    {
+        "srt",
+        "vtt",
+    }
+)
+
 
 def canonical_nfo_filename(dvd_id):
     return str(dvd_id).strip().upper() + ".nfo"
 
 
+def canonical_ko_subtitle_filename(dvd_id):
+    return str(dvd_id).strip().upper() + ".ko.srt"
+
+
+def is_canonical_text_subtitle_filename(filename, dvd_id):
+    """Recognize only sibling text names usable by frozen Stage11 Slice 1."""
+
+    if not isinstance(filename, str):
+        return False
+
+    canonical_dvd_id = str(dvd_id).strip().upper()
+    prefix = canonical_dvd_id + "."
+
+    if not filename.startswith(prefix):
+        return False
+
+    parts = filename[len(prefix):].split(".")
+
+    if len(parts) != 2:
+        return False
+
+    language, text_format = parts
+
+    return (
+        language.lower() in CANONICAL_TEXT_SUBTITLE_LANGUAGES
+        and text_format.lower() in CANONICAL_TEXT_SUBTITLE_FORMATS
+    )
+
+
 def is_library_sidecar(filename, dvd_id):
     return (
         filename == canonical_nfo_filename(dvd_id)
+        or filename == canonical_ko_subtitle_filename(dvd_id)
+        or is_canonical_text_subtitle_filename(
+            filename,
+            dvd_id,
+        )
         or filename in LIBRARY_SIDECAR_FILENAMES
     )
 

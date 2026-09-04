@@ -8,6 +8,7 @@ import argparse
 import json
 import os
 import posixpath
+import re
 import sqlite3
 import stat
 
@@ -707,6 +708,42 @@ def _is_synology_metadata(entry):
     )
 
 
+def is_stage11_subtitle_partial(filename, dvd_id):
+    """Recognize only one exact transient Stage11 Korean subtitle name."""
+
+    if (
+        not isinstance(filename, str)
+        or not isinstance(dvd_id, str)
+        or not filename
+        or not dvd_id
+        or "/" in filename
+        or "\\" in filename
+        or "/" in dvd_id
+        or "\\" in dvd_id
+        or not filename.startswith(".")
+        or dvd_id.startswith(".")
+        or any(
+            ord(character) < 32 or ord(character) == 127
+            for character in filename + dvd_id
+        )
+    ):
+        return False
+
+    prefix = (
+        "."
+        + dvd_id
+        + ".ko.srt.stage11-partial."
+    )
+
+    if not filename.startswith(prefix):
+        return False
+
+    return re.fullmatch(
+        r"[0-9a-f]{32}",
+        filename[len(prefix):],
+    ) is not None
+
+
 def _unexpected(
     findings,
     relative_path,
@@ -1153,6 +1190,12 @@ def scan_bounded(
                         relative_path,
                         "nested directory exceeds bounded depth",
                     )
+                    continue
+
+                if is_stage11_subtitle_partial(
+                    leaf_entry.name,
+                    dvd_entry.name,
+                ):
                     continue
 
                 suffix = Path(

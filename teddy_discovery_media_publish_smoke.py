@@ -12,10 +12,72 @@ from teddy_discovery_media_metadata import (
 from teddy_discovery_media_publish import (
     MediaMetadataPublishError,
     MediaMetadataSSHMutator,
+    canonical_ko_subtitle_filename,
+    is_library_sidecar,
 )
 
 
+def test_library_sidecar_allowlist():
+    dvd_id = "ABC-123"
+
+    assert (
+        canonical_ko_subtitle_filename(dvd_id)
+        == "ABC-123.ko.srt"
+    )
+
+    for filename in (
+        "ABC-123.nfo",
+        "movie.nfo",
+        "poster.jpg",
+        "poster.png",
+        "poster.webp",
+        "ABC-123.ko.srt",
+        "ABC-123.ja.srt",
+        "ABC-123.ja.vtt",
+        "ABC-123.jpn.srt",
+        "ABC-123.jpn.vtt",
+        "ABC-123.japanese.srt",
+        "ABC-123.japanese.vtt",
+        "ABC-123.en.srt",
+        "ABC-123.en.vtt",
+        "ABC-123.eng.srt",
+        "ABC-123.eng.vtt",
+        "ABC-123.english.srt",
+        "ABC-123.english.vtt",
+        "ABC-123.JPN.SRT",
+        "ABC-123.ENGLISH.VTT",
+    ):
+        assert is_library_sidecar(
+            filename,
+            dvd_id,
+        )
+
+    for filename in (
+        "abc-123.ko.srt",
+        "ABC-124.ko.srt",
+        "random.ko.srt",
+        "ABC-123.srt",
+        "ABC-123.vtt",
+        "ABC-123.ko.vtt",
+        "ABC-123.fr.srt",
+        "ABC-123.es.vtt",
+        "ABC-123.ja.txt",
+        "ABC-123.ja.srt.bak",
+        "ABC-123.ja.extra.srt",
+        "ABC-124.ja.srt",
+        "abc-123.ja.srt",
+        "subtitle.srt",
+        "subtitle.vtt",
+    ):
+        assert not is_library_sidecar(
+            filename,
+            dvd_id,
+        )
+
+
 def main():
+    test_library_sidecar_allowlist()
+
     with tempfile.TemporaryDirectory(
         prefix="teddy-stage9-media-publish-"
     ) as temp:
@@ -204,6 +266,9 @@ def main():
 
     print(
         "STAGE9_MEDIA_PUBLISH_SMOKE=PASS"
+    )
+    print(
+        "STAGE11_KO_SIDECAR_ALLOWLIST=PASS"
     )
 
 
