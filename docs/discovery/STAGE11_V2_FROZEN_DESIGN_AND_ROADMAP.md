@@ -134,9 +134,10 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
   - `teddy_discovery_subtitle_external_smoke.py`
 - V2-1A offline review: existing v1 modules unchanged; 4 requested smokes PASS; `git diff --check` PASS.
 
-### Current blocker
+### Current checkpoint
 
-V2-1B live SubtitleCat JUR-750 canary: **FAIL**.
+Checkpoint: `V2-1B — LIVE SUBTITLECAT JUR-750 CANARY`
+Verdict: **FAIL**
 
 Observed error:
 `SubtitleCatDetailError: Japanese subtitle link is not an unambiguous original`
@@ -151,6 +152,8 @@ Required handling:
 - do not loosen validation blindly
 - do not add JUR-750-specific exceptions
 - rerun offline smokes and live canary
+
+Next planned checkpoint: diagnose the real SubtitleCat anchor/context evidence before changing code.
 
 ## 8. Roadmap
 
@@ -279,6 +282,21 @@ Then report only:
 Do not repeat long logs or long theory. Teddy needs to be able to read the result before executing the next command and stop the work if the direction is wrong.
 
 Before giving the next command, summarize the important meaning first.
+
+### Checkpoint documentation — mandatory
+
+After **every completed checkpoint (CP)**, before advancing to another checkpoint:
+
+1. update this canonical document
+2. record the CP name and PASS / FAIL / INCOMPLETE verdict
+3. record only the important finding or decision
+4. record the current blocker, if any
+5. record the exact next planned checkpoint
+6. if architecture/roadmap changed, update the relevant frozen/roadmap section in the same document
+
+A checkpoint is not considered fully closed until its result is reflected in this document.
+
+Do not let implementation progress get ahead of the documented current state.
 
 ### Terminal commands
 
