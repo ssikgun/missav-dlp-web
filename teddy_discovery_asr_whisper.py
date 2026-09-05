@@ -153,13 +153,8 @@ def _convert_words(
             field_name="Whisper word start",
         )
         if raw_end_seconds == raw_start_seconds:
-            if (
-                relative_start_ms < segment_start_ms
-                or relative_start_ms > segment_end_ms
-            ):
-                raise ASRValidationError(
-                    "Whisper word timestamp lies outside its segment"
-                )
+            # Zero-duration word metadata is unusable optional metadata.  Its
+            # position must not invalidate the authoritative segment.
             continue
 
         relative_end_ms = seconds_to_milliseconds(
@@ -171,19 +166,21 @@ def _convert_words(
                 "positive Whisper word duration collapsed to milliseconds"
             )
 
+        # faster-whisper 1.2.1 may intentionally preserve segment-level
+        # boundaries while leaving a long first/last word outside them.  Word
+        # timing is optional here: omit only the unrepresentable metadata and
+        # keep the authoritative segment text/timing unchanged.
+        if (
+            relative_start_ms < segment_start_ms
+            or relative_end_ms > segment_end_ms
+        ):
+            continue
+
         relative_word = ASRWord(
             start_ms=relative_start_ms,
             end_ms=relative_end_ms,
             text=raw_word_text,
         )
-
-        if (
-            relative_word.start_ms < segment_start_ms
-            or relative_word.end_ms > segment_end_ms
-        ):
-            raise ASRValidationError(
-                "Whisper word timestamp lies outside its segment"
-            )
 
         if (
             previous_start_ms is not None

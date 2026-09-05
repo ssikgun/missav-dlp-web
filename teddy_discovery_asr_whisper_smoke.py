@@ -181,6 +181,103 @@ def main():
     assert all_zero_result[0].text == "ABC"
     assert all_zero_result[0].words == ()
 
+    # faster-whisper 1.2.1 can preserve a segment-level boundary while a
+    # long first/last word extends beyond it.  The segment remains
+    # authoritative and only incompatible optional word metadata is omitted.
+    boundary_chunk = make_chunk(start_ms=1_200_000, end_ms=1_220_000)
+
+    def transcribe_boundary_words(raw_words, *, text="경계"):
+        model = FakeModel(
+            [
+                SimpleNamespace(
+                    start=10.0,
+                    end=12.0,
+                    text=text,
+                    words=raw_words,
+                )
+            ]
+        )
+        boundary_adapter = FasterWhisperASR(
+            model_factory=factory_for(model, []),
+        )
+        return boundary_adapter.transcribe_chunk(boundary_chunk)[0]
+
+    first_outside = transcribe_boundary_words(
+        [SimpleNamespace(start=9.0, end=10.5, word="first")],
+        text="first boundary",
+    )
+    assert first_outside.start_ms == 1_210_000
+    assert first_outside.end_ms == 1_212_000
+    assert first_outside.text == "first boundary"
+    assert first_outside.words == ()
+
+    last_outside = transcribe_boundary_words(
+        [SimpleNamespace(start=11.5, end=13.0, word="last")],
+        text="last boundary",
+    )
+    assert last_outside.start_ms == 1_210_000
+    assert last_outside.end_ms == 1_212_000
+    assert last_outside.text == "last boundary"
+    assert last_outside.words == ()
+
+    both_outside = transcribe_boundary_words(
+        [SimpleNamespace(start=9.0, end=13.0, word="both")],
+        text="both boundaries",
+    )
+    assert both_outside.start_ms == 1_210_000
+    assert both_outside.end_ms == 1_212_000
+    assert both_outside.text == "both boundaries"
+    assert both_outside.words == ()
+
+    mixed_words = transcribe_boundary_words(
+        [
+            SimpleNamespace(start=9.0, end=10.5, word="drop-first"),
+            SimpleNamespace(start=10.5, end=11.0, word="keep-one"),
+            SimpleNamespace(start=11.0, end=11.5, word="keep-two"),
+            SimpleNamespace(start=11.5, end=13.0, word="drop-last"),
+        ],
+        text="mixed boundaries",
+    )
+    assert mixed_words.start_ms == 1_210_000
+    assert mixed_words.end_ms == 1_212_000
+    assert mixed_words.text == "mixed boundaries"
+    assert [word.text for word in mixed_words.words] == [
+        "keep-one",
+        "keep-two",
+    ]
+    assert [word.start_ms for word in mixed_words.words] == [
+        1_210_500,
+        1_211_000,
+    ]
+    assert [word.end_ms for word in mixed_words.words] == [
+        1_211_000,
+        1_211_500,
+    ]
+
+    all_outside = transcribe_boundary_words(
+        [
+            SimpleNamespace(start=9.0, end=10.5, word="drop-first"),
+            SimpleNamespace(start=11.5, end=13.0, word="drop-last"),
+        ],
+        text="all omitted",
+    )
+    assert all_outside.start_ms == 1_210_000
+    assert all_outside.end_ms == 1_212_000
+    assert all_outside.text == "all omitted"
+    assert all_outside.words == ()
+
+    zero_outside = transcribe_boundary_words(
+        [
+            SimpleNamespace(start=9.0, end=9.0, word="zero-outside"),
+            SimpleNamespace(start=10.5, end=10.5, word="zero-inside"),
+        ],
+        text="zero duration",
+    )
+    assert zero_outside.start_ms == 1_210_000
+    assert zero_outside.end_ms == 1_212_000
+    assert zero_outside.text == "zero duration"
+    assert zero_outside.words == ()
+
     negative_word_model = FakeModel(
         [
             SimpleNamespace(
@@ -259,12 +356,14 @@ def main():
             )
         ]
     )
-    expect(
-        ASRValidationError,
-        lambda: FasterWhisperASR(
-            model_factory=factory_for(outside_word_model, []),
-        ).transcribe_chunk(chunk),
+    outside_adapter = FasterWhisperASR(
+        model_factory=factory_for(outside_word_model, []),
     )
+    outside_result = outside_adapter.transcribe_chunk(chunk)
+    assert outside_result[0].start_ms == 1_200_000
+    assert outside_result[0].end_ms == 1_201_000
+    assert outside_result[0].text == "outside"
+    assert outside_result[0].words == ()
 
     decreasing_word_model = FakeModel(
         [
