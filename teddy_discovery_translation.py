@@ -1,4 +1,4 @@
-"""Bounded Stage11 Japanese-to-Korean translation adapter.
+"""Bounded Stage11 source-language-to-Korean translation adapter.
 
 This module is the E4B boundary only.  It accepts one caller-owned timed cue
 and explicitly supplied context, sends only semantic text to an
@@ -23,6 +23,9 @@ from teddy_discovery_subtitle_text import MAX_CUE_TEXT_CHARS
 
 E4B_MODEL = "gemma-4-e4b-stage11"
 E4B_ROLE = "JA_TO_KO_TRANSLATION_ONLY"
+E4B_ROLE_JA = E4B_ROLE
+E4B_ROLE_EN = "EN_TO_KO_TRANSLATION_ONLY"
+SUPPORTED_SOURCE_LANGUAGES = frozenset({"ja", "en"})
 MAX_TRANSLATION_RETRY = 1
 INVALID_KO_ACTION = "OMIT_CUE"
 
@@ -89,6 +92,56 @@ SYSTEM_INSTRUCTION = """너는 일본어 영상용 한국어 자막 전문 번�
 9. ko 필드에는 반드시 자연스러운 한국어 번역문을 넣는다.
 10. 일본어 TARGET을 그대로 복사해서는 안 된다.
 """
+
+SYSTEM_INSTRUCTION_JA = SYSTEM_INSTRUCTION
+
+SYSTEM_INSTRUCTION_EN = """너는 영어 영상 대사용 한국어 자막 전문 번역가다.
+
+목표:
+
+* English TARGET의 핵심 의미와 말투를 자연스러운 한국어 영상 자막으로 번역한다.
+* 영어 문장 구조를 그대로 옮긴 번역투보다 실제 한국어 대사처럼 자연스럽게 표현한다.
+* 짧은 대사는 짧게 유지한다.
+* 화자 관계에 맞는 존댓말/반말, 감정, 장난스러운 말투를 가능한 범위에서 유지한다.
+* 성적 표현, 은어, 신체 표현을 임의로 순화하거나 검열하지 않는다.
+* 원문보다 더 노골적으로 과장하지 않는다.
+
+입력:
+
+* target
+* before_context
+* after_context
+
+규칙:
+
+1. 오직 target만 번역한다.
+2. before_context와 after_context는 의미와 말투 파악용 참고 자료다.
+3. context의 내용을 번역 결과에 새로 추가하지 않는다.
+4. TARGET에 구어체, 생략, 어색한 표현이 있어도 핵심 의미가 분명하면 자연스럽게 정리한다.
+5. 정확하지 않은 세부사항을 억지로 복원하거나 구체적인 내용을 새로 만들어내지 않는다.
+6. 원문에 없는 이름, 숫자, 사건을 만들어내지 않는다.
+7. 고유명사는 가능한 자연스러운 한국어 표기로 옮기되 다른 이름으로 바꾸지 않는다.
+8. 의미가 불분명한 세부사항은 생략하거나 일반화할 수 있다.
+9. ko 필드에는 반드시 자연스러운 한국어 번역문을 넣는다.
+10. 정확한 영어 TARGET을 그대로 복사해서는 안 된다.
+"""
+
+
+def _translation_profile(
+    source_language: object,
+) -> tuple[str, str]:
+    if (
+        type(source_language) is not str
+        or source_language not in SUPPORTED_SOURCE_LANGUAGES
+    ):
+        raise TranslationValidationError(
+            "source_language must be exactly 'ja' or 'en'"
+        )
+
+    if source_language == "ja":
+        return E4B_ROLE_JA, SYSTEM_INSTRUCTION_JA
+
+    return E4B_ROLE_EN, SYSTEM_INSTRUCTION_EN
 
 
 def _has_disallowed_control_characters(value: str) -> bool:
@@ -298,7 +351,11 @@ def _response_format() -> dict[str, object]:
     }
 
 
-def _request_payload(cue: TranslationCue) -> dict[str, object]:
+def _request_payload(
+    cue: TranslationCue,
+    *,
+    system_instruction: str = SYSTEM_INSTRUCTION,
+) -> dict[str, object]:
     # Timing/index/source-path data intentionally never enters this payload.
     semantic_input = {
         "target": cue.target,
@@ -313,7 +370,7 @@ def _request_payload(cue: TranslationCue) -> dict[str, object]:
         "messages": [
             {
                 "role": "system",
-                "content": SYSTEM_INSTRUCTION,
+                "content": system_instruction,
             },
             {
                 "role": "user",
@@ -472,7 +529,10 @@ class E4BTranslationAdapter:
         base_url: str,
         request_timeout_seconds: int | float,
         transport=None,
+        source_language: str = "ja",
     ):
+        role, system_instruction = _translation_profile(source_language)
+
         if transport is not None and not callable(transport):
             raise TranslationValidationError("transport must be callable")
 
@@ -481,6 +541,9 @@ class E4BTranslationAdapter:
             request_timeout_seconds
         )
         self._transport = transport or _default_transport
+        self.source_language = source_language
+        self.role = role
+        self.system_instruction = system_instruction
 
     def translate_cue(self, cue: TranslationCue) -> TranslationOutcome:
         """Translate only cue.target and return an explicit cue outcome."""
@@ -490,7 +553,10 @@ class E4BTranslationAdapter:
                 "translate_cue requires a TranslationCue"
             )
 
-        payload = _request_payload(cue)
+        payload = _request_payload(
+            cue,
+            system_instruction=self.system_instruction,
+        )
         try:
             body = json.dumps(
                 payload,
@@ -564,12 +630,17 @@ class E4BTranslationAdapter:
 __all__ = [
     "E4B_MODEL",
     "E4B_ROLE",
+    "E4B_ROLE_EN",
+    "E4B_ROLE_JA",
     "E4BTranslationAdapter",
     "INVALID_KO_ACTION",
     "MAX_TRANSLATION_RESPONSE_BYTES",
     "MAX_TRANSLATION_RETRY",
     "MAX_TRANSLATION_TEXT_CHARS",
     "SYSTEM_INSTRUCTION",
+    "SYSTEM_INSTRUCTION_EN",
+    "SYSTEM_INSTRUCTION_JA",
+    "SUPPORTED_SOURCE_LANGUAGES",
     "TRANSLATION_ACCEPTED",
     "TRANSLATION_OMITTED",
     "TranslationContentError",

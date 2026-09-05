@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+import json
 from pathlib import Path
 
 import teddy_discovery_translation_route as route_module
@@ -10,7 +11,9 @@ from teddy_discovery_asr import ASRSegment, ASRWord
 from teddy_discovery_nonlexical import NONLEXICAL_KEEP, NONLEXICAL_OMIT
 from teddy_discovery_subtitle_text import SubtitleCue
 from teddy_discovery_translation import (
+    E4BTranslationAdapter,
     MAX_TRANSLATION_TEXT_CHARS,
+    SYSTEM_INSTRUCTION_EN,
     TRANSLATION_ACCEPTED,
     TRANSLATION_OMITTED,
     TranslationCue,
@@ -60,6 +63,43 @@ class FakeTranslator:
                 reason="synthetic_translation_omitted",
             )
         raise AssertionError("unsupported fake translator action")
+
+
+class FakeE4BTransport:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls = []
+
+    def __call__(self, endpoint, body, headers, timeout):
+        self.calls.append(
+            {
+                "endpoint": endpoint,
+                "body": json.loads(body.decode("utf-8")),
+                "headers": dict(headers),
+                "timeout": timeout,
+            }
+        )
+        if not self.responses:
+            raise AssertionError("fake EN transport called beyond its fixtures")
+        return self.responses.pop(0)
+
+
+def response_from_ko(ko: str) -> bytes:
+    return json.dumps(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {"ko": ko},
+                            ensure_ascii=False,
+                        ),
+                    },
+                },
+            ],
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
 
 
 def route_one(source_text, translator, **overrides):
@@ -189,6 +229,53 @@ def main():
     assert reaction.state == ROUTE_TRANSLATION_ACCEPTED
     assert reaction.filter_decision.action == NONLEXICAL_KEEP
     assert len(reaction_translator.calls) == 1
+
+    # EN source is language-neutral at the route boundary.  The injected
+    # profile adapter supplies the EN instruction while the frozen classifier
+    # keeps ordinary English lexical text.
+    english_transport = FakeE4BTransport(
+        [response_from_ko("오늘은 비가 오네요.")]
+    )
+    english_adapter = E4BTranslationAdapter(
+        base_url="http://e4b.example:8080",
+        request_timeout_seconds=12.5,
+        transport=english_transport,
+        source_language="en",
+    )
+    english_calls = []
+
+    def translate_english(cue):
+        english_calls.append(cue)
+        return english_adapter.translate_cue(cue)
+
+    english_source = SubtitleCue(
+        start_ms=21_987,
+        end_ms=23_654,
+        text="It's raining today.",
+    )
+    english_route = route_translation_sequence(
+        (english_source,),
+        translate_cue=translate_english,
+    )
+    assert len(english_route) == 1
+    assert english_route[0].state == ROUTE_TRANSLATION_ACCEPTED
+    assert english_route[0].filter_decision.action == NONLEXICAL_KEEP
+    assert len(english_calls) == 1
+    assert len(english_transport.calls) == 1
+    assert english_route[0].translation_outcome.cue is english_calls[0]
+    assert (
+        english_route[0].index,
+        english_route[0].start_ms,
+        english_route[0].end_ms,
+        english_calls[0].target,
+    ) == (1, 21_987, 23_654, english_source.text)
+    english_payload = english_transport.calls[0]["body"]
+    assert english_payload["messages"][0]["content"] == SYSTEM_INSTRUCTION_EN
+    assert json.loads(english_payload["messages"][1]["content"]) == {
+        "target": english_source.text,
+        "before_context": "",
+        "after_context": "",
+    }
 
     # F. Ordered source topology, source indices, and exact timing survive a
     # filtered middle cue without sorting or compressed numbering.

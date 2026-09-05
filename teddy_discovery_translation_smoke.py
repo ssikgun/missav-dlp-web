@@ -9,10 +9,16 @@ from pathlib import Path
 from teddy_discovery_translation import (
     E4B_MODEL,
     E4B_ROLE,
+    E4B_ROLE_EN,
+    E4B_ROLE_JA,
     E4BTranslationAdapter,
     INVALID_KO_ACTION,
     MAX_TRANSLATION_RESPONSE_BYTES,
     MAX_TRANSLATION_RETRY,
+    SYSTEM_INSTRUCTION,
+    SYSTEM_INSTRUCTION_EN,
+    SYSTEM_INSTRUCTION_JA,
+    SUPPORTED_SOURCE_LANGUAGES,
     TRANSLATION_ACCEPTED,
     TRANSLATION_OMITTED,
     TranslationCue,
@@ -77,6 +83,9 @@ def response_from_ko(ko: object, *, extra_key: object = None) -> bytes:
     )
 
 
+_SOURCE_LANGUAGE_UNSET = object()
+
+
 def cue(
     *,
     target="こんにちは",
@@ -93,28 +102,43 @@ def cue(
     )
 
 
-def adapter_for(transport):
-    return E4BTranslationAdapter(
-        base_url="http://e4b.example:8080",
-        request_timeout_seconds=12.5,
-        transport=transport,
-    )
+def adapter_for(transport, *, source_language=_SOURCE_LANGUAGE_UNSET):
+    values = {
+        "base_url": "http://e4b.example:8080",
+        "request_timeout_seconds": 12.5,
+        "transport": transport,
+    }
+    if source_language is not _SOURCE_LANGUAGE_UNSET:
+        values["source_language"] = source_language
+    return E4BTranslationAdapter(**values)
 
 
 def main():
     assert E4B_MODEL == "gemma-4-e4b-stage11"
     assert E4B_ROLE == "JA_TO_KO_TRANSLATION_ONLY"
+    assert E4B_ROLE_JA == E4B_ROLE
+    assert E4B_ROLE_EN == "EN_TO_KO_TRANSLATION_ONLY"
+    assert SUPPORTED_SOURCE_LANGUAGES == frozenset({"ja", "en"})
+    assert SYSTEM_INSTRUCTION_JA == SYSTEM_INSTRUCTION
+    assert "일본어" in SYSTEM_INSTRUCTION_JA
+    assert "STT" in SYSTEM_INSTRUCTION_JA
+    assert "일본어" not in SYSTEM_INSTRUCTION_EN
+    assert "STT" not in SYSTEM_INSTRUCTION_EN
     assert MAX_TRANSLATION_RETRY == 1
     assert INVALID_KO_ACTION == "OMIT_CUE"
 
     transport = FakeTransport([response_from_ko("자연스러운 한국어")])
     original = cue()
-    outcome = adapter_for(transport).translate_cue(original)
+    default_adapter = adapter_for(transport)
+    outcome = default_adapter.translate_cue(original)
     assert outcome.action == TRANSLATION_ACCEPTED
     assert outcome.attempts == 1
     assert outcome.ko_text == "자연스러운 한국어"
     assert outcome.reason is None
     assert outcome.cue is original
+    assert default_adapter.source_language == "ja"
+    assert default_adapter.role == E4B_ROLE_JA
+    assert default_adapter.system_instruction == SYSTEM_INSTRUCTION
     assert (
         outcome.cue.index,
         outcome.cue.start_ms,
@@ -124,6 +148,18 @@ def main():
     assert adapter_for(
         FakeTransport([response_from_ko("한국어")])
     ).endpoint_url == "http://e4b.example:8080/v1/chat/completions"
+
+    explicit_ja_transport = FakeTransport([response_from_ko("자연스러운 한국어")])
+    explicit_ja_adapter = adapter_for(
+        explicit_ja_transport,
+        source_language="ja",
+    )
+    explicit_ja_outcome = explicit_ja_adapter.translate_cue(original)
+    assert explicit_ja_outcome.action == TRANSLATION_ACCEPTED
+    assert explicit_ja_adapter.source_language == "ja"
+    assert explicit_ja_adapter.role == E4B_ROLE_JA
+    assert explicit_ja_adapter.system_instruction == SYSTEM_INSTRUCTION_JA
+    assert explicit_ja_transport.calls[0]["body"] == transport.calls[0]["body"]
 
     request = transport.calls[0]
     assert request["endpoint"] == "http://e4b.example:8080/v1/chat/completions"
@@ -158,9 +194,97 @@ def main():
         "start_ms",
         "end_ms",
         "output_path",
+        "source_language",
     ):
         assert forbidden not in user_input
         assert forbidden not in payload["messages"][1]["content"]
+    assert "role" not in user_input
+
+    # EN uses the same cue/result and wire contract with only its explicit
+    # source-language system instruction changed.
+    en_target = "It's raining today."
+    en_transport = FakeTransport([response_from_ko("오늘은 비가 오네요.")])
+    en_adapter = adapter_for(en_transport, source_language="en")
+    en_cue = cue(
+        target=en_target,
+        before_context="Yesterday was sunny.",
+        after_context="Bring an umbrella.",
+    )
+    en_outcome = en_adapter.translate_cue(en_cue)
+    assert en_outcome.action == TRANSLATION_ACCEPTED
+    assert en_outcome.attempts == 1
+    assert en_outcome.ko_text == "오늘은 비가 오네요."
+    assert en_outcome.cue is en_cue
+    assert en_adapter.source_language == "en"
+    assert en_adapter.role == E4B_ROLE_EN
+    assert en_adapter.system_instruction == SYSTEM_INSTRUCTION_EN
+
+    en_payload = en_transport.calls[0]["body"]
+    assert en_payload["model"] == payload["model"] == E4B_MODEL
+    assert en_payload["temperature"] == payload["temperature"] == 0
+    assert en_payload["stream"] is payload["stream"] is False
+    assert en_payload["response_format"] == payload["response_format"]
+    assert en_payload["messages"][0]["role"] == payload["messages"][0]["role"] == "system"
+    assert en_payload["messages"][0]["content"] == SYSTEM_INSTRUCTION_EN
+    assert payload["messages"][0]["content"] == SYSTEM_INSTRUCTION
+    assert en_payload["messages"][0]["content"] != payload["messages"][0]["content"]
+
+    en_user_input = json.loads(en_payload["messages"][1]["content"])
+    assert set(en_user_input) == {"target", "before_context", "after_context"}
+    assert en_user_input == {
+        "target": en_cue.target,
+        "before_context": en_cue.before_context,
+        "after_context": en_cue.after_context,
+    }
+    for forbidden in (
+        "index",
+        "start_ms",
+        "end_ms",
+        "output_path",
+        "dvd_id",
+        "source_language",
+    ):
+        encoded_en_payload = json.dumps(en_payload, ensure_ascii=False)
+        assert forbidden not in en_user_input
+        assert forbidden not in encoded_en_payload
+    assert "role" not in en_user_input
+
+    parity_cue = cue(
+        target="shared source",
+        before_context="shared before",
+        after_context="shared after",
+    )
+    parity_ja_transport = FakeTransport([response_from_ko("공통 한국어")])
+    parity_en_transport = FakeTransport([response_from_ko("공통 한국어")])
+    adapter_for(parity_ja_transport).translate_cue(parity_cue)
+    adapter_for(
+        parity_en_transport,
+        source_language="en",
+    ).translate_cue(parity_cue)
+    parity_ja_payload = parity_ja_transport.calls[0]["body"]
+    parity_en_payload = parity_en_transport.calls[0]["body"]
+    assert set(parity_ja_payload) == set(parity_en_payload)
+    for field in ("model", "temperature", "stream", "response_format"):
+        assert parity_ja_payload[field] == parity_en_payload[field]
+    assert parity_ja_payload["messages"][1] == parity_en_payload["messages"][1]
+    assert parity_ja_payload["messages"][0]["role"] == parity_en_payload["messages"][0]["role"]
+    assert parity_ja_payload["messages"][0]["content"] == SYSTEM_INSTRUCTION
+    assert parity_en_payload["messages"][0]["content"] == SYSTEM_INSTRUCTION_EN
+    assert parity_ja_payload["messages"][0]["content"] != parity_en_payload["messages"][0]["content"]
+
+    # Unknown languages, including Slice 1 aliases, fail during construction
+    # and never reach the injected transport.
+    for invalid_language in ("fr", "", None, "jpn", "japanese", "eng", "english"):
+        invalid_language_transport = FakeTransport([])
+        expect(
+            TranslationValidationError,
+            lambda invalid_language=invalid_language,
+            invalid_language_transport=invalid_language_transport: adapter_for(
+                invalid_language_transport,
+                source_language=invalid_language,
+            ),
+        )
+        assert invalid_language_transport.calls == []
 
     empty_context_transport = FakeTransport([response_from_ko("한국어")])
     empty_context_cue = cue(before_context="", after_context="")
@@ -225,6 +349,57 @@ def main():
     exact_copy_outcome = adapter_for(exact_copy).translate_cue(cue())
     assert exact_copy_outcome.action == TRANSLATION_OMITTED
     assert exact_copy_outcome.reason == "invalid_ko"
+
+    en_retry = FakeTransport(
+        [
+            b"not-json",
+            response_from_ko("두 번째 영어 번역"),
+        ]
+    )
+    en_retry_outcome = adapter_for(
+        en_retry,
+        source_language="en",
+    ).translate_cue(en_cue)
+    assert en_retry_outcome.action == TRANSLATION_ACCEPTED
+    assert en_retry_outcome.attempts == 2
+    assert en_retry_outcome.ko_text == "두 번째 영어 번역"
+    assert len(en_retry.calls) == MAX_TRANSLATION_RETRY + 1
+    assert en_retry.calls[0]["body"]["messages"][0]["content"] == SYSTEM_INSTRUCTION_EN
+    assert en_retry.calls[0]["body"]["messages"][1] == en_retry.calls[1]["body"]["messages"][1]
+
+    en_both_invalid = FakeTransport([b"not-json", b"not-json"])
+    en_omitted = adapter_for(
+        en_both_invalid,
+        source_language="en",
+    ).translate_cue(en_cue)
+    assert en_omitted.action == TRANSLATION_OMITTED
+    assert en_omitted.attempts == MAX_TRANSLATION_RETRY + 1
+    assert en_omitted.reason == "malformed_structured_response"
+
+    en_invalid_responses = (
+        b"not-json",
+        response_from_assistant_content("not-json"),
+        response_from_assistant_content(json.dumps({})),
+        response_from_ko(""),
+    )
+    for invalid_response in en_invalid_responses:
+        invalid_en_transport = FakeTransport([invalid_response, invalid_response])
+        invalid_en_outcome = adapter_for(
+            invalid_en_transport,
+            source_language="en",
+        ).translate_cue(en_cue)
+        assert invalid_en_outcome.action == TRANSLATION_OMITTED
+        assert invalid_en_outcome.attempts == MAX_TRANSLATION_RETRY + 1
+
+    en_exact_copy = FakeTransport(
+        [response_from_ko(en_target), response_from_ko(en_target)]
+    )
+    en_exact_copy_outcome = adapter_for(
+        en_exact_copy,
+        source_language="en",
+    ).translate_cue(en_cue)
+    assert en_exact_copy_outcome.action == TRANSLATION_OMITTED
+    assert en_exact_copy_outcome.reason == "invalid_ko"
 
     invalid_responses = [
         b"not-json",
