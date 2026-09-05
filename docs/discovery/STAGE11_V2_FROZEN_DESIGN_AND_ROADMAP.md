@@ -1,0 +1,330 @@
+# Stage11 v2 Frozen Design and Roadmap
+
+Status: FROZEN ARCHITECTURE / IMPLEMENTATION IN PROGRESS
+Canonical working branch: `teddy-subtitle-stage11`
+Design anchor branch: `teddy-subtitle-stage11-doc-anchor`
+Baseline commit: `dcc835a27e129d051a6dc171b524d1ae6cf6a256`
+Last updated: 2026-09-06 KST
+
+## 1. Purpose
+
+Stage11 v2 generates a safe, synchronized Korean subtitle for a completed JAV title while preserving Stage9 completion semantics and existing safe publication boundaries.
+
+Core principle:
+
+> Trust video/audio/Whisper for timing, use Japanese as the primary meaning source, and let Hermes reconstruct context and produce Korean. Deterministic code owns identity, alignment, timestamps, validation, and publication.
+
+## 2. Frozen architecture
+
+### Source roles
+
+- Trusted existing canonical KO: protect and skip. Never overwrite automatically.
+- Trusted same-media local JA: may translate directly without ASR when synchronization/trust is established.
+- Validated external JA: text reference. Intended to run together with Whisper for HYBRID evidence.
+- Whisper large-v3: audio/timing reference and second Japanese hypothesis.
+- External EN: optional supporting evidence only.
+- External KO: ignored as translation truth and must not enter the generated-KO source path.
+- No usable JA: ASR_ONLY path.
+
+### Model roles
+
+- Whisper: `faster-whisper large-v3`, CUDA, float16 on VM122.
+- Translation/text judge primary: Hermes `gpt-5.6-luna`, provider `openai-codex`, reasoning `xhigh` on CT120.
+- Qwen and E4B are not automatic fallbacks. The benchmark selected one primary based on blind semantic quality review.
+
+Blind model benchmark result:
+
+1. Hermes / gpt-5.6-luna
+2. Qwen 3.6 35B
+3. E4B
+
+Model-selection record SHA256:
+`98ac470267c1c54d8f49ffd6d924936993d2cf5804ab5427cdff86ca5aa6a9d1`
+
+### Ownership boundaries
+
+Hermes may output only semantic fields such as:
+
+- cue_id
+- repaired_ja
+- ko
+
+Hermes must never own or edit:
+
+- start timestamp
+- end timestamp
+- cue ordering
+- canonical identity
+- output path
+- publication decision
+
+Deterministic code owns all timestamps and safety gates.
+
+## 3. Alignment policy
+
+For external JA + Whisper:
+
+1. normalize Japanese text for matching
+2. build monotonic anchors
+3. infer per-title timing transform from evidence
+4. use robust affine mapping when sufficient
+5. use a more complex mapping only when residual evidence requires it
+6. never hardcode a title-specific scale, intercept, cue number, phrase, or JUR-750 special case
+7. if external content represents a different release/content, reject it and continue ASR_ONLY
+8. if external text is useful but a cue is missing/uncertain, targeted re-ASR may be used later
+
+JUR-750 proved that a global offset is insufficient and a robust affine mapping can be sufficient. Those numeric parameters are evidence for that title only and are not production constants.
+
+## 4. Reused frozen v1 components
+
+Prefer reuse over reimplementation:
+
+- `SubtitleCandidate` canonical/external identity contracts
+- `SubtitleSSHReader` bounded sibling sidecar reads
+- `teddy_discovery_subtitle_text.py` parser and limits
+- `teddy_discovery_asr.py` ASR identity/result/word timestamp contracts
+- `teddy_discovery_asr_audio.py` 16 kHz mono float32 audio boundary with PTS-gap silence preservation
+- remote GPU ASR client/worker
+- deterministic ASR artifact serialization and source matching
+- Korean guard/completeness guard
+- generated SRT boundary
+- safe atomic Korean subtitle publisher and collision protection
+- Jellyfin refresh/readback boundary when integrated
+
+Do not casually modify frozen v1 modules merely to fit v2. Add isolated v2 contracts/orchestration first and connect only after canaries pass.
+
+## 5. Source lifecycle / Stage9 interaction
+
+Desired flow:
+
+1. CT108 local MP4 download/postprocess completes.
+2. Parse canonical dvd_id/destination.
+3. Stage11 may consume the local source for ASR before local deletion.
+4. Produce and validate immutable ASR artifact.
+5. Mark Stage11 source as released only after the ASR artifact/source identity is safe for later work.
+6. NAS downloads publish/verify proceeds.
+7. CT108 local MP4 may be deleted only when normal downloader publish is verified and Stage11 no longer needs the local source.
+8. Stage9 independently moves/copies NAS downloads to canonical JAV destination and verifies it.
+9. Stage11 failure must not indefinitely block Stage9 or normal downloader completion.
+
+No direct Jellyfin DB writes. No video re-encode/burn-in.
+
+## 6. Security and privacy invariants
+
+- VM122 receives no NAS credentials.
+- Do not put raw dialogue in job/state DB or ordinary HTTP logs.
+- Transcript/evidence artifacts belong in bounded spool/cache files with hashes and identity metadata.
+- No broad NAS recursive scans.
+- Exact/bounded paths only.
+- External provider paths/IDs are never guessed from adjacent numeric IDs.
+- External subtitle payloads must be bounded, identity-checked, hashed, and parsed through the existing parser.
+
+## 7. Current implementation status
+
+### Completed / accepted
+
+- v1 Stage11 baseline at `dcc835a27e129d051a6dc171b524d1ae6cf6a256` confirmed clean before v2 work.
+- Whisper word timestamps confirmed.
+- SubtitleCat JUR-750 Japanese payload previously retrieved: 661 cues, known SHA256 `88edae14fefd7a7838b50c55e4ae4b0b65fb9998e80a147cda81b35412142709`.
+- JUR-750 robust affine alignment feasibility confirmed.
+- Blind E4B/Qwen/Hermes semantic benchmark completed and unblinded.
+- Hermes selected as primary text judge/translator.
+- V2-1A isolated external provider boundary implemented locally in uncommitted files:
+  - `teddy_discovery_subtitle_external.py`
+  - `teddy_discovery_subtitle_external_smoke.py`
+- V2-1A offline review: existing v1 modules unchanged; 4 requested smokes PASS; `git diff --check` PASS.
+
+### Current blocker
+
+V2-1B live SubtitleCat JUR-750 canary: **FAIL**.
+
+Observed error:
+`SubtitleCatDetailError: Japanese subtitle link is not an unambiguous original`
+
+Meaning:
+The offline parser logic is too strict for the real current SubtitleCat HTML. The architecture remains valid; this is an implementation/detail-page parsing issue.
+
+Required handling:
+- inspect the actual bounded live HTML evidence around candidate `.srt` anchors
+- identify why JA anchor evidence is being contaminated by translated/generated/other-language context
+- fix the smallest provider parser boundary
+- do not loosen validation blindly
+- do not add JUR-750-specific exceptions
+- rerun offline smokes and live canary
+
+## 8. Roadmap
+
+### R1 — External Japanese provider boundary
+
+- diagnose/fix current real SubtitleCat HTML parsing failure
+- live read-only JUR-750 canary must recover the actual JA href
+- verify payload SHA and 661 cues
+- freeze provider contract
+
+### R2 — Hybrid evidence contract
+
+Add immutable structures for:
+
+- external JA cue
+- Whisper segment/word evidence
+- optional EN evidence
+- cue identity and neighboring context
+- alignment confidence/provenance
+
+No LLM timestamps.
+
+### R3 — Deterministic alignment engine
+
+- Japanese normalization
+- monotonic anchor matching
+- robust affine inference
+- residual/inlier thresholds
+- release/content mismatch rejection
+- ASR_ONLY fallback when external evidence is invalid
+- targeted re-ASR hook only if justified
+
+### R4 — Hermes v2 adapter
+
+New contract separate from old E4B translation adapter.
+
+Input should include bounded semantic/context evidence such as:
+
+- cue_id
+- external_ja
+- stt_ja
+- optional en
+- before_context
+- after_context
+
+Output:
+
+- cue_id
+- repaired_ja
+- ko
+
+No timestamps and no extra ownership fields.
+
+### R5 — Stage11 v2 per-title orchestrator
+
+Create a separate v2 orchestration path first. Do not immediately rewrite `run_subtitle_pipeline()`.
+
+Responsibilities:
+
+- trusted KO skip
+- local JA direct route where appropriate
+- external JA + ASR hybrid
+- ASR_ONLY route
+- alignment
+- Hermes semantic translation
+- deterministic timestamp projection
+- existing validation/KO guard/SRT generation/publisher reuse
+
+### R6 — State/lifecycle persistence
+
+Candidate states:
+
+- PENDING
+- SOURCE_DISCOVERY
+- ASR_READY / SOURCE_RELEASED
+- ALIGNING
+- TRANSLATING
+- VALIDATING
+- READY_TO_PUBLISH
+- COMPLETED
+- SKIPPED_EXISTING_KO
+- FAILED_RETRYABLE
+- FAILED_FINAL
+
+Do not store raw dialogue in DB.
+
+### R7 — Downloader/Stage9 integration
+
+- invoke Stage11 at the safe local-media lifecycle point
+- ensure source release before local deletion
+- preserve Stage9 independence
+- Stage11 failure must not break normal completion
+
+### R8 — Real semantic canary
+
+- JUR-750 full-path dry/candidate run
+- inspect alignment and difficult dialogue cases
+- publish only through existing safe publisher after validation
+- Jellyfin refresh/readback
+- actual playback confirmation
+
+### R9 — Freeze / production
+
+- smoke suite
+- minimal additional real-title canary(s) with ordinary dialogue, not only hard correction cases
+- semantic review
+- freeze commit/identity
+- production wiring
+
+## 9. Working protocol with Teddy — mandatory
+
+### Reporting
+
+When Teddy pastes terminal/checkpoint output, the first visible token of the response must be exactly one of:
+
+- `PASS`
+- `FAIL`
+- `INCOMPLETE`
+
+Then report only:
+
+1. verdict
+2. short plain-Korean meaning / important finding
+3. exactly one next checkpoint
+
+Do not repeat long logs or long theory. Teddy needs to be able to read the result before executing the next command and stop the work if the direction is wrong.
+
+Before giving the next command, summarize the important meaning first.
+
+### Terminal commands
+
+Always label execution location, e.g.:
+
+- `실행 위치: root@downloader (CT108)`
+- `실행 위치: teddy@local-llm (VM122)`
+- `실행 위치: root@media (CT112)`
+- `실행 위치: root@pve`
+- `실행 위치: teddy@hermes-lxc-slack (CT120)`
+
+Give one checkpoint at a time.
+
+Do not give unnecessary SSH/login commands.
+
+Do not provide dangerous interactive shell control such as:
+
+- `exit`
+- `logout`
+- naked `false`
+- interactive `set -e`, `set -eu`, `set -euo pipefail`
+- `|| exit 1`
+- shell-replacing `exec`
+- `kill $$`
+
+Use guarded `if` logic and `ok=1/0` patterns.
+
+Wrong host must print `WRONG_HOST` and do nothing else.
+
+If a lone `>` continuation prompt appears, tell Teddy to press Ctrl+C and rerun a clean block.
+
+### Development discipline
+
+- Inspect exact current source before modifications.
+- Reuse frozen/native components.
+- Minimal changes, but never omit correctness/safety requirements merely to minimize diff size.
+- Codex may implement deterministic tooling/source boundaries and run smokes; it does not replace architecture/final review.
+- No title-specific phrase hacks.
+- Validation flow: smoke -> minimal real canary -> semantic review -> freeze.
+- Actual Jellyfin playback feedback is high-value evidence.
+- If a checkpoint fails, fix that slice before advancing the roadmap.
+
+## 10. Canonical rule for future work
+
+Before proposing or implementing a Stage11 v2 change, compare it with this document.
+
+If a proposed change conflicts with a frozen item above, stop and explicitly call out the conflict before implementation.
+
+Implementation details may evolve as evidence is collected. Architecture and invariants above must not drift silently.
