@@ -146,25 +146,16 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-1B-DIAG — bounded live SubtitleCat anchor/context evidence inspection`
-Verdict: **PASS**
+Checkpoint: `V2-1B-FIX — minimal SubtitleCat anchor-local evidence fix + offline/live canary`
+Verdict: **FAIL**
 
 Important finding:
-- live detail page contained 27 `.srt` anchors
-- actual Japanese source href was `/subs/1528/JUR-750.ja.whisperjav-ja.srt`
-- every SRT anchor was incorrectly classified as JA+KO+EN because parser evidence inherited the shared `All language subtitles` parent/container text
-- architecture is unchanged; this is a parser evidence-scope bug
-- no title-specific exception is required
-
-Required fix:
-- keep exact real href discovery
-- restrict language/original-source evidence to anchor-local or tightly bounded row/local metadata
-- do not infer numeric `/subs/` paths
-- keep ambiguous/malformed cases fail-closed
-- keep external KO excluded
+- V2-1B-FIX verification did not fully pass
+- do not advance beyond the external Japanese provider boundary
+- architecture remains unchanged until the failing evidence is diagnosed
 
 Next planned checkpoint:
-`V2-1B-FIX — minimal SubtitleCat anchor-local evidence fix + offline/live canary`
+`V2-1B-FIX-DIAG — inspect remaining provider failure`
 
 ## 8. Stage11 implementation roadmap
 
