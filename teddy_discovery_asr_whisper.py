@@ -7,6 +7,7 @@ uses faster-whisper's NumPy path and avoids whole-media ``decode_audio``.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import math
@@ -33,6 +34,18 @@ DEFAULT_ENGINE_VERSION = "1.2.1"
 
 class ASRWhisperError(ASRError):
     """Raised when one bounded faster-whisper request cannot complete."""
+
+
+PRIMARY_VAD_THRESHOLD = 0.54
+PRIMARY_VAD_SPEECH_PAD_MS = 2_500
+SECONDARY_VAD_THRESHOLD = 0.50
+SECONDARY_VAD_SPEECH_PAD_MS = 2_500
+
+_PATHOLOGICAL_MIN_SEGMENTS = 5
+_PATHOLOGICAL_MIN_DOMINANT_SEGMENTS = 5
+_PATHOLOGICAL_MAX_TEXT_CHARS = 8
+_PATHOLOGICAL_DOMINANCE_NUMERATOR = 4
+_PATHOLOGICAL_DOMINANCE_DENOMINATOR = 5
 
 
 def _default_model_factory(model_name: str, **kwargs):
@@ -266,6 +279,37 @@ def _convert_segments(
     return tuple(converted)
 
 
+def _is_pathological_result(
+    segments: tuple[ASRSegment, ...],
+) -> bool:
+    """Detect only an extreme repeated-short-text result pattern."""
+
+    if len(segments) < _PATHOLOGICAL_MIN_SEGMENTS:
+        return False
+
+    normalized = tuple(
+        " ".join(segment.text.split())
+        for segment in segments
+    )
+
+    if any(
+        not text
+        or len(text) > _PATHOLOGICAL_MAX_TEXT_CHARS
+        for text in normalized
+    ):
+        return False
+
+    counts = Counter(normalized)
+    dominant_count = max(counts.values())
+
+    return (
+        len(counts) <= 2
+        and dominant_count >= _PATHOLOGICAL_MIN_DOMINANT_SEGMENTS
+        and dominant_count * _PATHOLOGICAL_DOMINANCE_DENOMINATOR
+        >= len(normalized) * _PATHOLOGICAL_DOMINANCE_NUMERATOR
+    )
+
+
 class FasterWhisperASR:
     """One frozen-runtime, one-call faster-whisper chunk adapter."""
 
@@ -317,24 +361,25 @@ class FasterWhisperASR:
             )
         return response[0], response[1]
 
-    def transcribe_chunk(
+    def _transcribe_with_vad(
         self,
+        model: object,
         chunk: ASRAudioChunk,
+        *,
+        threshold: float,
+        speech_pad_ms: int,
     ) -> tuple[ASRSegment, ...]:
-        """Transcribe one bounded audio chunk as Japanese speech."""
-
-        if not isinstance(chunk, ASRAudioChunk):
-            raise ASRValidationError(
-                "chunk must be an ASRAudioChunk"
-            )
-
-        model = self._get_model()
         try:
             response = model.transcribe(
                 chunk.samples,
                 language="ja",
                 task="transcribe",
                 word_timestamps=True,
+                vad_filter=True,
+                vad_parameters={
+                    "threshold": threshold,
+                    "speech_pad_ms": speech_pad_ms,
+                },
             )
         except (ASRValidationError, ASRLimitError):
             raise
@@ -352,6 +397,45 @@ class FasterWhisperASR:
 
         return _convert_segments(raw_segments, chunk=chunk)
 
+    def transcribe_chunk(
+        self,
+        chunk: ASRAudioChunk,
+    ) -> tuple[ASRSegment, ...]:
+        """Transcribe one bounded audio chunk as Japanese speech."""
+
+        if not isinstance(chunk, ASRAudioChunk):
+            raise ASRValidationError(
+                "chunk must be an ASRAudioChunk"
+            )
+
+        model = self._get_model()
+        primary = self._transcribe_with_vad(
+            model,
+            chunk,
+            threshold=PRIMARY_VAD_THRESHOLD,
+            speech_pad_ms=PRIMARY_VAD_SPEECH_PAD_MS,
+        )
+
+        if not primary:
+            return primary
+
+        if not _is_pathological_result(primary):
+            return primary
+
+        secondary = self._transcribe_with_vad(
+            model,
+            chunk,
+            threshold=SECONDARY_VAD_THRESHOLD,
+            speech_pad_ms=SECONDARY_VAD_SPEECH_PAD_MS,
+        )
+
+        if _is_pathological_result(secondary):
+            raise ASRWhisperError(
+                "faster-whisper VAD fallback result is pathological"
+            )
+
+        return secondary
+
 
 __all__ = [
     "ASRWhisperError",
@@ -363,5 +447,9 @@ __all__ = [
     "LOCAL_FILES_ONLY",
     "MODEL_NAME",
     "NUM_WORKERS",
+    "PRIMARY_VAD_SPEECH_PAD_MS",
+    "PRIMARY_VAD_THRESHOLD",
+    "SECONDARY_VAD_SPEECH_PAD_MS",
+    "SECONDARY_VAD_THRESHOLD",
     "seconds_to_milliseconds",
 ]

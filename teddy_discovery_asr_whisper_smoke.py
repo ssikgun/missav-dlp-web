@@ -19,6 +19,10 @@ from teddy_discovery_asr_audio import (
 from teddy_discovery_asr_whisper import (
     ASRWhisperError,
     FasterWhisperASR,
+    PRIMARY_VAD_SPEECH_PAD_MS,
+    PRIMARY_VAD_THRESHOLD,
+    SECONDARY_VAD_SPEECH_PAD_MS,
+    SECONDARY_VAD_THRESHOLD,
     seconds_to_milliseconds,
 )
 from teddy_discovery_subtitle import validate_canonical_holding
@@ -77,12 +81,47 @@ class FakeModel:
         return self.raw_segments, SimpleNamespace(language=self.language)
 
 
+class SequencedFakeModel:
+    def __init__(self, responses, *, language="ja"):
+        self.responses = list(responses)
+        self.language = language
+        self.calls = []
+
+    def transcribe(self, audio, **kwargs):
+        self.calls.append((audio, kwargs))
+        if not self.responses:
+            raise AssertionError("unexpected extra Whisper call")
+        response = self.responses.pop(0)
+        if isinstance(response, BaseException):
+            raise response
+        return response, SimpleNamespace(language=self.language)
+
+
+def raw_segment(start, end, text, words=()):
+    return SimpleNamespace(
+        start=start,
+        end=end,
+        text=text,
+        words=list(words),
+    )
+
+
 def factory_for(model, calls):
     def factory(model_name, **kwargs):
         calls.append((model_name, kwargs))
         return model
 
     return factory
+
+
+def sequenced_adapter(responses):
+    model = SequencedFakeModel(responses)
+    factory_calls = []
+    adapter = FasterWhisperASR(
+        model_factory=factory_for(model, factory_calls),
+        engine_version="test-engine-vad",
+    )
+    return adapter, model, factory_calls
 
 
 def main():
@@ -137,6 +176,11 @@ def main():
         "language": "ja",
         "task": "transcribe",
         "word_timestamps": True,
+        "vad_filter": True,
+        "vad_parameters": {
+            "threshold": PRIMARY_VAD_THRESHOLD,
+            "speech_pad_ms": PRIMARY_VAD_SPEECH_PAD_MS,
+        },
     }
     assert "clip_timestamps" not in received_kwargs
     assert result[0].start_ms == 1_200_001
@@ -148,6 +192,75 @@ def main():
     assert result[0].words[1].end_ms == 1_201_235
     assert result[1].start_ms == 1_201_235
     assert result[1].end_ms == 1_202_000
+
+    # A normal primary result does not trigger a secondary pass.  An empty
+    # primary result is accepted as confirmed no speech for this chunk, so it
+    # also does not trigger a secondary pass.
+    quiet_segment = raw_segment(
+        6.25,
+        7.5,
+        "小声",
+        words=[SimpleNamespace(start=6.5, end=7.0, word="小声")],
+    )
+    empty_adapter, empty_model, empty_factory_calls = sequenced_adapter(
+        [[]]
+    )
+    empty_result = empty_adapter.transcribe_chunk(chunk)
+    assert len(empty_factory_calls) == 1
+    assert empty_result == ()
+    assert len(empty_model.calls) == 1
+    assert empty_model.calls[0][0] is chunk.samples
+    assert empty_model.calls[0][1]["vad_filter"] is True
+    assert empty_model.calls[0][1]["vad_parameters"] == {
+        "threshold": PRIMARY_VAD_THRESHOLD,
+        "speech_pad_ms": PRIMARY_VAD_SPEECH_PAD_MS,
+    }
+
+    # The detector is generic: it uses an extreme repeated-short-text shape,
+    # not a hard-coded hallucinated token.  A pathological primary invokes
+    # one secondary pass; a pathological secondary fails closed.
+    repeated_short = [
+        raw_segment(index, index + 1, "la")
+        for index in range(5)
+    ]
+    pathological_adapter, pathological_model, _ = sequenced_adapter(
+        [repeated_short, [quiet_segment]]
+    )
+    pathological_fallback = pathological_adapter.transcribe_chunk(chunk)
+    assert len(pathological_model.calls) == 2
+    assert pathological_model.calls[0][1]["vad_parameters"] == {
+        "threshold": PRIMARY_VAD_THRESHOLD,
+        "speech_pad_ms": PRIMARY_VAD_SPEECH_PAD_MS,
+    }
+    assert pathological_model.calls[1][1]["vad_parameters"] == {
+        "threshold": SECONDARY_VAD_THRESHOLD,
+        "speech_pad_ms": SECONDARY_VAD_SPEECH_PAD_MS,
+    }
+    assert pathological_fallback[0].text == "小声"
+
+    secondary_pathological_adapter, secondary_pathological_model, _ = (
+        sequenced_adapter([repeated_short, repeated_short])
+    )
+    expect(
+        ASRWhisperError,
+        lambda: secondary_pathological_adapter.transcribe_chunk(chunk),
+    )
+    assert len(secondary_pathological_model.calls) == 2
+
+    secondary_empty_adapter, secondary_empty_model, _ = sequenced_adapter(
+        [repeated_short, []]
+    )
+    assert secondary_empty_adapter.transcribe_chunk(chunk) == ()
+    assert len(secondary_empty_model.calls) == 2
+
+    # A sparse result is not pathological merely because it is short or has
+    # one segment.
+    sparse_model = FakeModel([raw_segment(0, 1, "la")])
+    sparse_adapter = FasterWhisperASR(
+        model_factory=factory_for(sparse_model, []),
+    )
+    assert len(sparse_adapter.transcribe_chunk(chunk)) == 1
+    assert len(sparse_model.calls) == 1
 
     # Calling the adapter again is an independent request, but one request
     # still has exactly one model invocation and no internal retry loop.
