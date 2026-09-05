@@ -5,12 +5,17 @@ from dataclasses import FrozenInstanceError, replace
 from teddy_discovery_asr import (
     ASRLimitError,
     ASRResult,
+    ASRRuntimeIdentity,
     ASRSegment,
     ASRSourceSnapshot,
     ASRValidationError,
     ASRWord,
+    ASR_RUNTIME_PROFILE_LOCAL_CPU_MEDIUM,
+    ASR_RUNTIME_PROFILE_REMOTE_GPU_LARGE_V3,
+    LOCAL_CPU_MEDIUM_RUNTIME_IDENTITY,
     MAX_ASR_SEGMENT_TEXT_CHARS,
     MAX_ASR_SEGMENTS,
+    REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY,
     validate_canonical_video,
 )
 from teddy_discovery_subtitle import (
@@ -93,6 +98,8 @@ def main():
     assert valid.compute_type == "int8"
     assert valid.cpu_threads == 8
     assert valid.num_workers == 1
+    assert valid.runtime_identity == LOCAL_CPU_MEDIUM_RUNTIME_IDENTITY
+    assert valid.runtime_identity.profile == ASR_RUNTIME_PROFILE_LOCAL_CPU_MEDIUM
     try:
         valid.source_language = "en"
     except FrozenInstanceError:
@@ -159,7 +166,61 @@ def main():
         ("cpu_threads", 4),
         ("num_workers", 2),
     ):
-        expect(ASRValidationError, lambda field=field, value=value: replace(valid, **{field: value}))
+        expect(
+            ASRValidationError,
+            lambda field=field, value=value: replace(
+                valid,
+                **{field: value},
+            ),
+        )
+
+    gpu = result(
+        segments=(ASRSegment(0, 1_000, "こんにちは"),),
+        engine="faster-whisper",
+        model="large-v3",
+        device="cuda",
+        compute_type="float16",
+        cpu_threads=None,
+        num_workers=1,
+    )
+    assert gpu.runtime_identity == REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY
+    assert gpu.runtime_identity.profile == ASR_RUNTIME_PROFILE_REMOTE_GPU_LARGE_V3
+    assert gpu.model == "large-v3"
+    assert gpu.device == "cuda"
+    assert gpu.compute_type == "float16"
+    assert gpu.cpu_threads is None
+    assert gpu.num_workers == 1
+
+    for mixed in (
+        {
+            "engine": "faster-whisper",
+            "model": "large-v3",
+            "device": "cpu",
+            "compute_type": "float16",
+            "cpu_threads": None,
+            "num_workers": 1,
+        },
+        {
+            "engine": "faster-whisper",
+            "model": "medium",
+            "device": "cuda",
+            "compute_type": "int8",
+            "cpu_threads": 8,
+            "num_workers": 1,
+        },
+        {
+            "engine": "faster-whisper",
+            "model": "large-v3",
+            "device": "cuda",
+            "compute_type": "int8",
+            "cpu_threads": None,
+            "num_workers": 1,
+        },
+    ):
+        expect(
+            ASRValidationError,
+            lambda mixed=mixed: ASRRuntimeIdentity(**mixed),
+        )
 
     assert not {
         "translation",

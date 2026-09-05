@@ -18,6 +18,7 @@ from teddy_discovery_asr import (
     ASRSegment,
     ASRValidationError,
     ASRWord,
+    LOCAL_CPU_MEDIUM_RUNTIME_IDENTITY,
     MAX_ASR_SEGMENTS,
 )
 from teddy_discovery_asr_audio import ASRAudioChunk
@@ -333,6 +334,7 @@ class FasterWhisperASR:
 
         self._model_factory = model_factory or _default_model_factory
         self.engine_version = engine_version
+        self.runtime_identity = LOCAL_CPU_MEDIUM_RUNTIME_IDENTITY
         self._model = None
 
     def _get_model(self):

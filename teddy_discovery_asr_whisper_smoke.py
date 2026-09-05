@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from teddy_discovery_asr import (
+    LOCAL_CPU_MEDIUM_RUNTIME_IDENTITY,
     ASRSourceSnapshot,
     ASRValidationError,
     ASRWord,
@@ -154,6 +155,7 @@ def main():
         model_factory=factory_for(fake_model, factory_calls),
         engine_version="test-engine-1",
     )
+    assert adapter.runtime_identity == LOCAL_CPU_MEDIUM_RUNTIME_IDENTITY
 
     # Constructor/import must not create a model.
     assert factory_calls == []

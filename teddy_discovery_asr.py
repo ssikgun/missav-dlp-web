@@ -22,6 +22,9 @@ from teddy_discovery_subtitle import (
 MAX_ASR_SEGMENTS = 50_000
 MAX_ASR_SEGMENT_TEXT_CHARS = 16_384
 
+ASR_RUNTIME_PROFILE_LOCAL_CPU_MEDIUM = "LOCAL_CPU_MEDIUM"
+ASR_RUNTIME_PROFILE_REMOTE_GPU_LARGE_V3 = "REMOTE_GPU_LARGE_V3"
+
 
 class ASRError(Exception):
     """Base class for deterministic Stage11 ASR failures."""
@@ -33,6 +36,98 @@ class ASRValidationError(ASRError):
 
 class ASRLimitError(ASRError):
     """Raised when a bounded ASR result exceeds a fixed resource limit."""
+
+
+@dataclass(frozen=True)
+class ASRRuntimeIdentity:
+    """One of the explicitly approved Stage11 ASR runtime profiles."""
+
+    engine: str
+    model: str
+    device: str
+    compute_type: str
+    cpu_threads: int | None
+    num_workers: int
+
+    def __post_init__(self):
+        if any(
+            type(value) is not str
+            for value in (
+                self.engine,
+                self.model,
+                self.device,
+                self.compute_type,
+            )
+        ):
+            raise ASRValidationError(
+                "runtime identity string fields must be exact strings"
+            )
+        if self.cpu_threads is not None and type(self.cpu_threads) is not int:
+            raise ASRValidationError(
+                "runtime identity cpu_threads must be an integer or None"
+            )
+        if type(self.num_workers) is not int:
+            raise ASRValidationError(
+                "runtime identity num_workers must be an integer"
+            )
+
+        if self._fields() not in _APPROVED_RUNTIME_PROFILES:
+            raise ASRValidationError(
+                "runtime identity is not an approved Stage11 profile"
+            )
+
+    def _fields(self) -> tuple[object, ...]:
+        return (
+            self.engine,
+            self.model,
+            self.device,
+            self.compute_type,
+            self.cpu_threads,
+            self.num_workers,
+        )
+
+    @property
+    def profile(self) -> str:
+        return _APPROVED_RUNTIME_PROFILES[self._fields()]
+
+
+_APPROVED_RUNTIME_PROFILES = {
+    (
+        "faster-whisper",
+        "medium",
+        "cpu",
+        "int8",
+        8,
+        1,
+    ): ASR_RUNTIME_PROFILE_LOCAL_CPU_MEDIUM,
+    (
+        "faster-whisper",
+        "large-v3",
+        "cuda",
+        "float16",
+        None,
+        1,
+    ): ASR_RUNTIME_PROFILE_REMOTE_GPU_LARGE_V3,
+}
+
+
+LOCAL_CPU_MEDIUM_RUNTIME_IDENTITY = ASRRuntimeIdentity(
+    engine="faster-whisper",
+    model="medium",
+    device="cpu",
+    compute_type="int8",
+    cpu_threads=8,
+    num_workers=1,
+)
+
+REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY = ASRRuntimeIdentity(
+    engine="faster-whisper",
+    model="large-v3",
+    device="cuda",
+    compute_type="float16",
+    cpu_threads=None,
+    num_workers=1,
+)
 
 
 def _has_disallowed_control_characters(value: str) -> bool:
@@ -272,7 +367,7 @@ class ASRResult:
     model: str = "medium"
     device: str = "cpu"
     compute_type: str = "int8"
-    cpu_threads: int = 8
+    cpu_threads: int | None = 8
     num_workers: int = 1
 
     def __post_init__(self):
@@ -325,29 +420,43 @@ class ASRResult:
                 "engine_version must be a nonempty safe string"
             )
 
-        if type(self.engine) is not str or self.engine != "faster-whisper":
-            raise ASRValidationError("engine identity is not frozen")
-        if type(self.model) is not str or self.model != "medium":
-            raise ASRValidationError("model identity is not frozen")
-        if type(self.device) is not str or self.device != "cpu":
-            raise ASRValidationError("device identity is not frozen")
-        if type(self.compute_type) is not str or self.compute_type != "int8":
-            raise ASRValidationError("compute_type identity is not frozen")
-        if type(self.cpu_threads) is not int or self.cpu_threads != 8:
-            raise ASRValidationError("cpu_threads identity is not frozen")
-        if type(self.num_workers) is not int or self.num_workers != 1:
-            raise ASRValidationError("num_workers identity is not frozen")
+        ASRRuntimeIdentity(
+            engine=self.engine,
+            model=self.model,
+            device=self.device,
+            compute_type=self.compute_type,
+            cpu_threads=self.cpu_threads,
+            num_workers=self.num_workers,
+        )
+
+    @property
+    def runtime_identity(self) -> ASRRuntimeIdentity:
+        """Return the exact approved profile represented by this result."""
+
+        return ASRRuntimeIdentity(
+            engine=self.engine,
+            model=self.model,
+            device=self.device,
+            compute_type=self.compute_type,
+            cpu_threads=self.cpu_threads,
+            num_workers=self.num_workers,
+        )
 
 
 __all__ = [
     "ASRError",
     "ASRLimitError",
     "ASRResult",
+    "ASRRuntimeIdentity",
     "ASRSegment",
     "ASRSourceSnapshot",
     "ASRValidationError",
     "ASRWord",
     "MAX_ASR_SEGMENT_TEXT_CHARS",
     "MAX_ASR_SEGMENTS",
+    "ASR_RUNTIME_PROFILE_LOCAL_CPU_MEDIUM",
+    "ASR_RUNTIME_PROFILE_REMOTE_GPU_LARGE_V3",
+    "LOCAL_CPU_MEDIUM_RUNTIME_IDENTITY",
+    "REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY",
     "validate_canonical_video",
 ]

@@ -16,6 +16,7 @@ from teddy_discovery_asr import (
     ASRError,
     ASRLimitError,
     ASRResult,
+    ASRRuntimeIdentity,
     ASRSegment,
     ASRSourceSnapshot,
     ASRValidationError,
@@ -60,6 +61,21 @@ def _require_transcribe_chunk(whisper: object) -> Callable:
             "whisper.transcribe_chunk must be callable"
         )
     return transcribe_chunk
+
+
+def _require_runtime_identity(whisper: object) -> ASRRuntimeIdentity:
+    try:
+        runtime_identity = whisper.runtime_identity
+    except AttributeError as error:
+        raise FullTitleASRValidationError(
+            "whisper is missing runtime_identity"
+        ) from error
+
+    if type(runtime_identity) is not ASRRuntimeIdentity:
+        raise FullTitleASRValidationError(
+            "whisper runtime_identity is invalid"
+        )
+    return runtime_identity
 
 
 def _validate_max_media_bytes(value: object) -> int:
@@ -300,6 +316,7 @@ class FullTitleASRTranscriber:
 
         self.whisper = whisper if whisper is not None else FasterWhisperASR()
         self._transcribe_chunk = _require_transcribe_chunk(self.whisper)
+        self._runtime_identity = _require_runtime_identity(self.whisper)
 
     def _transcribe_local_source(
         self,
@@ -377,11 +394,18 @@ class FullTitleASRTranscriber:
                     "whisper is missing engine_version"
                 ) from error
 
+            runtime_identity = self._runtime_identity
             return ASRResult(
                 source_snapshot=snapshot,
                 source_language="ja",
                 segments=tuple(aggregated),
                 engine_version=engine_version,
+                engine=runtime_identity.engine,
+                model=runtime_identity.model,
+                device=runtime_identity.device,
+                compute_type=runtime_identity.compute_type,
+                cpu_threads=runtime_identity.cpu_threads,
+                num_workers=runtime_identity.num_workers,
             )
         finally:
             _cleanup_source_preserving_primary(local_source)

@@ -12,6 +12,8 @@ from teddy_discovery_asr import (
     ASRResult,
     ASRSegment,
     ASRSourceSnapshot,
+    LOCAL_CPU_MEDIUM_RUNTIME_IDENTITY,
+    REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY,
 )
 from teddy_discovery_asr_audio import ASRAudioChunk, ASRAudioError
 from teddy_discovery_asr_source import (
@@ -124,9 +126,16 @@ class OnePassChunks:
 
 
 class FakeWhisper:
-    def __init__(self, responses, *, engine_version="smoke-whisper"):
+    def __init__(
+        self,
+        responses,
+        *,
+        engine_version="smoke-whisper",
+        runtime_identity=LOCAL_CPU_MEDIUM_RUNTIME_IDENTITY,
+    ):
         self.responses = tuple(responses)
         self.engine_version = engine_version
+        self.runtime_identity = runtime_identity
         self.calls = []
 
     def transcribe_chunk(self, chunk):
@@ -231,6 +240,10 @@ def main():
     require(result.source_language == "ja", "ONE_LANGUAGE")
     require(result.segments == segments, "ONE_SEGMENTS")
     require(result.engine_version == "smoke-whisper", "ONE_ENGINE_VERSION")
+    require(
+        result.runtime_identity == LOCAL_CPU_MEDIUM_RUNTIME_IDENTITY,
+        "ONE_LOCAL_RUNTIME_IDENTITY",
+    )
     require(len(provider.calls) == 1, "ONE_SOURCE_CALL")
     require(len(whisper.calls) == 1 and whisper.calls[0] is chunk, "ONE_WHISPER_CALL")
     require(one_pass.iterations == 1, "ONE_PASS")
@@ -425,6 +438,7 @@ def main():
 
     class FailingWhisper:
         engine_version = "smoke-whisper"
+        runtime_identity = LOCAL_CPU_MEDIUM_RUNTIME_IDENTITY
 
         def __init__(self):
             self.calls = 0
@@ -587,6 +601,66 @@ def main():
     require(custom_chunks.iterations == 1, "CUSTOM_ONE_PASS")
     require(not path.exists() and not directory.exists(), "CUSTOM_CLEANUP")
 
+    # The approved remote profile is carried through the same full-title
+    # result contract without changing the transcriber interface.
+    gpu_segment = ASRSegment(100, 200, "GPU")
+    source, path, directory = local_source(title)
+    gpu_provider = FakeSourceProvider(source)
+    gpu_whisper = FakeWhisper(
+        [(gpu_segment,)],
+        runtime_identity=REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY,
+    )
+    gpu_transcriber = transcriber_module.FullTitleASRTranscriber(
+        source_provider=gpu_provider,
+        max_media_bytes=100,
+        whisper=gpu_whisper,
+        audio_chunk_iterator=lambda _local, **_kwargs: OnePassChunks(
+            [forced_chunk(snapshot, 0, 1_000)]
+        ),
+    )
+    gpu_result = gpu_transcriber(title)
+    require(gpu_result.segments == (gpu_segment,), "GPU_SEGMENTS")
+    require(
+        gpu_result.runtime_identity == REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY,
+        "GPU_RUNTIME_IDENTITY",
+    )
+    require(gpu_result.model == "large-v3", "GPU_MODEL")
+    require(gpu_result.device == "cuda", "GPU_DEVICE")
+    require(gpu_result.compute_type == "float16", "GPU_COMPUTE_TYPE")
+    require(gpu_result.cpu_threads is None, "GPU_CPU_THREADS")
+    require(gpu_result.num_workers == 1, "GPU_NUM_WORKERS")
+    require(not path.exists() and not directory.exists(), "GPU_CLEANUP")
+
+    # Missing or malformed backend provenance fails during construction, before
+    # the source provider can be touched.
+    class MissingIdentityWhisper:
+        engine_version = "smoke-whisper"
+
+        def transcribe_chunk(self, _chunk):
+            raise AssertionError("missing-identity whisper must not run")
+
+    for bad_whisper, label in (
+        (MissingIdentityWhisper(), "IDENTITY_MISSING"),
+        (FakeWhisper([()], runtime_identity=object()), "IDENTITY_MALFORMED"),
+    ):
+        source, path, directory = local_source(title)
+        provider = FakeSourceProvider(source)
+        expect(
+            transcriber_module.FullTitleASRValidationError,
+            lambda bad_whisper=bad_whisper, provider=provider: (
+                transcriber_module.FullTitleASRTranscriber(
+                    source_provider=provider,
+                    max_media_bytes=100,
+                    whisper=bad_whisper,
+                    audio_chunk_iterator=lambda *_args, **_kwargs: (),
+                )
+            ),
+            label,
+        )
+        require(not provider.calls, label + "_NO_SOURCE")
+        source.cleanup()
+        require(not path.exists() and not directory.exists(), label + "_CLEANUP")
+
     # The production default creates one lazy Whisper adapter without loading
     # its model during construction.
     source, path, directory = local_source(title)
@@ -598,6 +672,11 @@ def main():
     )
     require(isinstance(default_adapter.whisper, FasterWhisperASR), "DEFAULT_WHISPER_TYPE")
     require(default_adapter.whisper._model is None, "DEFAULT_WHISPER_LAZY")
+    require(
+        default_adapter.whisper.runtime_identity
+        == LOCAL_CPU_MEDIUM_RUNTIME_IDENTITY,
+        "DEFAULT_LOCAL_RUNTIME_IDENTITY",
+    )
     source.cleanup()
     require(not path.exists() and not directory.exists(), "DEFAULT_WHISPER_CLEANUP")
 
