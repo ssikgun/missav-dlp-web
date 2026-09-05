@@ -142,6 +142,7 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
   - `teddy_discovery_subtitle_external_smoke.py`
 - V2-1A offline review: existing v1 modules unchanged; 4 requested smokes PASS; `git diff --check` PASS.
 - V2-DOC1: frozen design/roadmap document synchronized to CT108 at commit `327c29cbabd4269701befe3aeff1aa8a0f7a6760`; PASS.
+- V2-DOC2: full Stage11 -> Stage12 project roadmap synchronized to CT108 at commit `3b4f55efe91f52b3fb2c34005a665e37caa6b35b`; PASS.
 
 ### Current checkpoint
 
