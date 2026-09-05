@@ -50,6 +50,9 @@ from teddy_discovery_subtitle_text import (
     MAX_SUBTITLE_CUES,
     parse_subtitle_bytes,
 )
+from teddy_discovery_translation_completeness import (
+    guard_translation_completeness,
+)
 
 
 PIPELINE_EXISTING_KO = "EXISTING_KO"
@@ -445,6 +448,7 @@ def _route_to_artifact(
         source_cues,
         translate_cue=translator,
     )
+    route_results = guard_translation_completeness(route_results)
     guarded_results = guard_korean_sequence(route_results)
     ready_cues = ready_subtitle_cues(guarded_results)
     artifact = generate_korean_srt(ready_cues)

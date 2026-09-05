@@ -37,6 +37,9 @@ from teddy_discovery_translation import (
     TRANSLATION_OMITTED,
     TranslationOutcome,
 )
+from teddy_discovery_translation_completeness import (
+    TranslationCompletenessError,
+)
 
 
 def expect(error_type, callback, marker: str):
@@ -486,7 +489,7 @@ def main():
     # never invoke the publisher.
     omitted_reader = FakeSubtitleReader(
         [sibling(ja_path)],
-        {ja_path: srt_payload((1_000, 2_000, "ああああ"))},
+        {ja_path: srt_payload((1_000, 2_000, "翻訳対象の文"))},
     )
     omitted_ja = FakeTranslator(omit=True)
     omitted_publisher = FakePublisher()
@@ -500,7 +503,45 @@ def main():
     require(omitted_result.state == pipeline_module.PIPELINE_NO_KO_ARTIFACT, "NO_ARTIFACT_STATE")
     require(omitted_result.source_route == pipeline_module.SOURCE_ROUTE_TEXT_JA, "NO_ARTIFACT_ROUTE")
     require(omitted_result.cue_count == 0 and omitted_result.sha256 is None and omitted_result.byte_size == 0, "NO_ARTIFACT_METADATA")
-    require(not omitted_ja.calls and not omitted_publisher.calls, "NO_ARTIFACT_NO_PUBLISH")
+    require(len(omitted_ja.calls) == 1 and not omitted_publisher.calls, "NO_ARTIFACT_NO_PUBLISH")
+
+    # The historical failure shape (all lexical translation attempts omitted)
+    # is blocked before SRT generation or publication.
+    completeness_cues = tuple(
+        (10_000 + index * 1_000, 10_500 + index * 1_000, "번역 대상 " + str(index))
+        for index in range(5)
+    )
+    completeness_reader = FakeSubtitleReader(
+        [sibling(ja_path)],
+        {ja_path: srt_payload(*completeness_cues)},
+    )
+    completeness_ja = FakeTranslator(omit=True)
+    completeness_publisher = FakePublisher()
+    generated_calls = []
+    original_generate = pipeline_module.generate_korean_srt
+
+    def forbidden_generate(_ready_cues):
+        generated_calls.append(True)
+        raise AssertionError("completeness failure reached SRT generation")
+
+    pipeline_module.generate_korean_srt = forbidden_generate
+    try:
+        expect(
+            TranslationCompletenessError,
+            lambda: run(
+                **dependencies(
+                    reader=completeness_reader,
+                    ja=completeness_ja,
+                    publisher=completeness_publisher,
+                )
+            ),
+            "TRANSLATION_COMPLETENESS_BLOCKS_PUBLISH",
+        )
+    finally:
+        pipeline_module.generate_korean_srt = original_generate
+    require(len(completeness_ja.calls) == 5, "TRANSLATION_COMPLETENESS_ATTEMPTS")
+    require(not generated_calls, "TRANSLATION_COMPLETENESS_NO_SRT")
+    require(not completeness_publisher.calls, "TRANSLATION_COMPLETENESS_NO_PUBLISH")
 
     # J. Publisher skip retains the actual upstream source route.
     skip_publisher = FakePublisher(state=SUBTITLE_SKIPPED_EXISTING_KO)
