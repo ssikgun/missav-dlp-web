@@ -146,26 +146,22 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-3I — targeted re-ASR necessity and R3 closure audit`
+Checkpoint: `R4-A — Hermes v2 adapter baseline audit`
 Verdict: **PASS**
 
 Important finding:
-- R3 core deterministic alignment capability is complete
-- Japanese normalization and lexical candidate generation are implemented
-- strict monotonic anchor selection is implemented
-- robust affine inference and residual/inlier analysis are implemented
-- deterministic acceptance decisions are implemented
-- release/content mismatch rejection is implemented
-- rejected external JA evidence can be safely converted to canonical ASR_ONLY evidence
-- UNRESOLVED evidence never silently becomes ASR_ONLY
-- no current targeted re-ASR implementation exists
-- no concrete gap/coverage signal currently justifies adding targeted re-ASR complexity
-- targeted re-ASR is therefore deferred and should be added only if later real-title evidence demonstrates a need
-- no subtitle timestamp projection, publication, model call or ASR execution is owned by R3
-- R3 deterministic alignment engine is CLOSED
+- the existing `teddy_discovery_translation.py` boundary is specifically the old E4B adapter
+- existing `TranslationCue` and translation routing contracts carry `start_ms` and `end_ms`, so they must not become the Hermes v2 semantic contract
+- the new Hermes v2 adapter must remain separate from the old E4B adapter and old timestamp-bearing translation route
+- existing translation code still provides reusable patterns for bounded text validation, JSON response validation, transport error handling and fail-closed behavior
+- R3 `HybridEvidenceBundle` already provides deterministic cue identity plus external JA, ASR, optional EN and bounded neighbor references needed by R4
+- Hermes v2 input ownership is semantic/context evidence only: cue_id, external_ja, stt_ja, optional en, before_context and after_context
+- Hermes v2 output ownership is limited to cue_id, optional repaired_ja and ko
+- Hermes must not receive or return timestamps, subtitle paths, publication fields or workflow ownership
+- R4-A baseline audit is CLOSED
 
 Next planned checkpoint:
-`R4 — Hermes v2 adapter baseline audit`
+`R4-B — define and implement isolated Hermes v2 semantic adapter contract`
 
 ## 8. Stage11 implementation roadmap
 
