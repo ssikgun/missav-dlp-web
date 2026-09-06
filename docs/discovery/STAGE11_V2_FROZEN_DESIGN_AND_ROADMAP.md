@@ -146,44 +146,35 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R5-C — isolated v2 per-title orchestrator execution`
-Verdict: **PASS / CLOSED**
+Checkpoint: `R5-D — Stage11 v2 per-title orchestrator closure audit`
+Verdict: **PASS / R5 CLOSED**
 
-Important finding:
-- R5-C isolated v2 per-title execution path is implemented and frozen
-- the legacy `run_subtitle_pipeline()` remains unchanged
-- R5-B required one narrow explicit amendment because its original frozen timing assumptions predated the later accepted affine HYBRID ownership design
-- the amendment preserves existing R5-B route, source, identity, semantic-result, artifact, and fail-closed safety checks
-- `AlignmentAcceptanceApplicationResult` now preserves `decision`, `bundle`, and accepted `alignment`
-- ACCEPT_HYBRID requires an exact validated `RobustAffineAlignment`
-- REJECT_EXTERNAL and UNRESOLVED retain `alignment=None`
-- `_validated_application()` now preserves and revalidates accepted alignment instead of discarding it
-- the v2 execution API is `run_subtitle_v2_pipeline(route_decision, *, semantic_boundary=None)`
-- caller-owned `hybrid_asr_indices` is removed
-- EXISTING_KO terminates without semantic invocation
-- LOCAL_JA uses exact local Japanese text and original local `SubtitleCue` timing
-- ASR_ONLY uses exact R2 ASR identities/text and original `ASRSegment` timing
-- HYBRID uses external JA as the semantic cue sequence and accepted robust affine evidence as deterministic timing ownership
-- HYBRID timestamp projection uses the single frozen helper `project_affine_timestamp_ms(alignment, source_ms)`
-- projection materialization uses `Decimal(str(scale))`, `Decimal(str(intercept_ms))`, and `ROUND_HALF_UP`
-- negative projection, nonfinite values, collapsed duration, and decreasing projected starts fail closed
-- equal starts and overlapping cues remain valid under the existing subtitle contract
-- no clamp, shift, reorder, fallback, or timestamp repair is performed
-- HYBRID selected residuals provide optional authoritative ASR/STT support only
-- a HYBRID cue without a selected residual remains a valid external-only semantic cue with `asr_identity=None`
-- ASR identity never owns final HYBRID timing
-- all semantic routes invoke the injected semantic boundary exactly once
-- EXISTING_KO and UNRESOLVED invoke it zero times
-- no retry or fallback is introduced
-- no live Hermes transport, ASR execution, filesystem/network effect, publication, DB/state write, or Stage9 integration exists in this isolated execution boundary
-- R1/R2/R4 remain unchanged
-- R3 alignment and acceptance remain unchanged; only the R3 acceptance-application boundary was extended to preserve accepted affine evidence
-- full R5-B-AMEND1 / R5-C source review passed
-- all requested regression smokes passed
+Closure finding:
+- Stage11 R5 deterministic per-title orchestration is complete
+- frozen source identities at commit `cf54ea7ea5d1aca73f847d536b430ef937bcf3b0` were independently reverified
+- R1 external provider boundary is PASS
+- R2 immutable hybrid evidence contract is PASS
+- R3 deterministic alignment, acceptance, accepted-alignment preservation, and ASR_ONLY fallback are PASS
+- R4 Hermes semantic contract and separate one-shot transport boundary are PASS
+- EXISTING_KO terminates safely with zero semantic calls and no replacement artifact
+- LOCAL_JA covers exact local Japanese cues, uses original SubtitleCue timing, and invokes semantic work exactly once
+- HYBRID uses external JA as semantic cue sequence, accepted RobustAffineAlignment as timing ownership, sparse residual-owned ASR evidence only for optional STT support, and no caller-owned mapping
+- HYBRID timing uses the single deterministic Decimal/ROUND_HALF_UP affine projection helper
+- HYBRID performs no rematch, ordinal guess, nearest-ASR mapping, clamp, repair, shift, or reorder
+- ASR_ONLY supports both direct R2 and R3 REJECT_EXTERNAL forms with exact ASR identity, text, and ASRSegment timing
+- UNRESOLVED remains terminal fail-closed with zero semantic calls and no artifact
+- Hermes owns semantic text only and never timestamps
+- missing, extra, duplicate, or reordered semantic results fail closed
+- deterministic output construction and canonical Korean SRT prepublication validation are complete
+- no retry or fallback exists inside R5
+- no source discovery execution, live ASR execution, live Hermes transport invocation, publication execution, DB/state write, Stage9 invocation, source deletion, Jellyfin refresh, or rollout is owned by R5
+- all requested R1-R5 and reusable v1 regression smokes passed
 - `git diff --check` passed
-- R5-B amendment and R5-C execution implementation are frozen together
+- worktree remained clean
+- no missing deterministic per-title composition responsibility remains before R6
+- R5 is formally CLOSED
 
-Frozen reviewed identities:
+Frozen R5 reviewed identities:
 - `teddy_discovery_alignment_application.py`: `cb436ff92238c9a0ea40124180662438a7011a4ccf5a66f63409e572e853c9f1`
 - `teddy_discovery_alignment_application_smoke.py`: `434c6401fd2c87132060fb0ae955c6d73500c5b50e23493592c946a85c900e4c`
 - `teddy_discovery_subtitle_v2_orchestrator.py`: `a6603776456f44717b15d76169193dc6b9c74131e490d88765436017672aded2`
@@ -191,8 +182,14 @@ Frozen reviewed identities:
 - `teddy_discovery_subtitle_v2_pipeline.py`: `11d552c056291848d6c7bcf9d2a8d84b7fc4dd3f6db01f7da6f5ad9bf47dfd5e`
 - `teddy_discovery_subtitle_v2_pipeline_smoke.py`: `fece961b0f4f3e1dc74c62ddb1003b84d4d688718eb415e73fc2e7e60a6918dd`
 
+Deferred responsibilities remain unchanged:
+- R6: job/state persistence, lifecycle state, retryability/recovery, artifact/cache persistence and retention
+- R7: downloader/Stage9 integration, source-release/delete choreography, Stage9 independence and failure isolation
+- R8: real-title semantic canary, real publication/readback, Jellyfin refresh and playback confirmation
+- R9: rollout canaries, semantic review, production wiring, final freeze and operational automation
+
 Next planned checkpoint:
-`R5-D — Stage11 v2 per-title orchestrator closure audit`
+`R6-A — audit existing Stage11/Downloader persistence and lifecycle boundaries before state implementation`
 
 ## 8. Stage11 implementation roadmap
 
@@ -246,7 +243,7 @@ Output:
 
 No timestamps and no extra ownership fields.
 
-### R5 — Stage11 v2 per-title orchestrator
+### R5 — Stage11 v2 per-title orchestrator — CLOSED / PASS
 
 Create a separate v2 orchestration path first. Do not immediately rewrite `run_subtitle_pipeline()`.
 
