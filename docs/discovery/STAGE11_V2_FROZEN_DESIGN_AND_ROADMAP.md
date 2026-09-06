@@ -146,49 +146,37 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R5-C-FIX1C — deterministic affine timestamp materialization rule`
-Verdict: **PASS**
+Checkpoint: `R5-C-FIX2 — accepted affine preservation and deterministic HYBRID projection`
+Verdict: **INCOMPLETE**
 
 Important finding:
-- existing `SubtitleCue` requires exact integer `start_ms >= 0` and exact integer `end_ms > start_ms`
-- global cue start ordering is nondecreasing
-- global end ordering is not required
-- cue overlap is permitted
-- gaps are not required
-- SRT serialization does not silently shift, clamp, repair, or normalize timestamps
-- SRT cue numbering is independent of source timing
-- the repository already has a deterministic time materialization convention using `Decimal(str(value))` with `ROUND_HALF_UP`
-- Python built-in `round()` is not used for this contract because its ties-to-even behavior differs from the existing repository convention
-- floor(start)/ceil(end) is rejected because it systematically expands intervals and changes the affine coordinate model
-- HYBRID continuous timeline projection is `P(t_ms) = scale * t_ms + intercept_ms`
-- deterministic integer materialization is:
-  `D(t_ms) = Decimal(str(scale)) * Decimal(t_ms) + Decimal(str(intercept_ms))`
-  then
-  `M(t_ms) = int(D(t_ms).quantize(Decimal("1"), rounding=ROUND_HALF_UP))`
-- projected subtitle start is `M(source_cue.start_ms)`
-- projected subtitle end is `M(source_cue.end_ms)`
-- any nonfinite projection or numeric conversion failure fails closed
-- any continuous projected endpoint below zero fails closed
-- any materialized endpoint below zero fails closed
-- materialized `end_ms <= start_ms` fails closed
-- no 1 ms expansion, clamp, shift, or timestamp repair is permitted
-- projected source cue order is preserved
-- a decreasing materialized start timestamp fails closed
-- equal adjacent start timestamps are permitted because the existing contract requires nondecreasing rather than strictly increasing starts
-- overlap remains permitted and is preserved
-- no new arbitrary timestamp upper bound is introduced
-- existing cue-count and serialized payload bounds continue to apply downstream
-- persisted `RobustAffineAlignment` floats cannot reconstruct the original exact Fraction fit
-- `Decimal(str(float))` is therefore the explicit deterministic repository-consistent materialization boundary
-- the minimal future helper is `project_affine_timestamp_ms(alignment: RobustAffineAlignment, source_ms: int) -> int`
-- R5 must project both endpoints through this helper and then reuse existing `SubtitleCue` and SRT validation
-- no source file was modified during this audit
-- the two untracked R5-C implementation files remain preserved
-- timestamp materialization design is now frozen
-- remaining implementation work is to preserve accepted `RobustAffineAlignment` through the R3 application result, remove caller-owned `hybrid_asr_indices`, and update the R5-C HYBRID execution path accordingly
+- R5-C-FIX2 implemented the frozen accepted-affine preservation and HYBRID projection direction in the R3 application boundary and isolated R5-C execution layer
+- `AlignmentAcceptanceApplicationResult` now carries `decision`, `bundle`, and `alignment`
+- `ACCEPT_HYBRID` requires a validated accepted `RobustAffineAlignment`
+- REJECT_EXTERNAL and UNRESOLVED reject supplied alignment and retain `alignment=None`
+- caller-owned `hybrid_asr_indices` was removed from the isolated R5-C execution API
+- HYBRID anchor cues use only residual-owned ASR identities for optional STT support
+- HYBRID non-anchor cues remain valid external-only semantic cues
+- HYBRID final timing uses deterministic affine projection with the frozen Decimal/ROUND_HALF_UP rule
+- EXISTING_KO, LOCAL_JA, ASR_ONLY, and UNRESOLVED route behavior remains conceptually unchanged
+- R3 application smoke passes
+- R1/R2/R4, alignment, alignment-acceptance, legacy pipeline, completeness, publication, Hermes semantic, and Hermes transport regressions pass
+- R5-C and frozen R5-B orchestrator smokes fail because the frozen R5-B contract contains two assumptions superseded by the later frozen HYBRID ownership design
+- first conflict: R5-B `_validated_application()` reconstructs `AlignmentAcceptanceApplicationResult` using only `decision` and `bundle`, so the newly required accepted `alignment` is discarded and validation fails
+- second conflict: R5-B `_validate_ready_artifact()` treats every non-LOCAL_JA route as ASRSegment-timed output and requires every semantic binding to contain `asr_identity`
+- that assumption is valid for ASR_ONLY but is no longer valid for HYBRID
+- frozen HYBRID ownership now requires projected `SubtitleCue` timing for every external JA cue
+- sparse residual-owned `asr_identity` is optional semantic STT support and is not final timing ownership
+- therefore non-anchor HYBRID cues must legally have `asr_identity=None`
+- no safe R5-C-only workaround exists because the conflicting validation is owned by the frozen R5-B contract itself
+- bypassing or fabricating ASR identities would violate the frozen architecture
+- the required correction is a narrow explicit R5-B contract amendment, not a redesign
+- the amendment must preserve all existing R5-B route/evidence/identity/result safety checks while updating only accepted-alignment preservation and HYBRID output timing ownership
+- current R5-C implementation changes remain uncommitted pending that amendment
+- no live Hermes call, ASR execution, publication, DB/state write, or Stage9 integration occurred
 
 Next planned checkpoint:
-`R5-C-FIX2 — implement accepted affine preservation and deterministic HYBRID projection`
+`R5-B-AMEND1 — minimally update frozen orchestrator contract for accepted affine HYBRID timing ownership`
 
 ## 8. Stage11 implementation roadmap
 
