@@ -947,8 +947,88 @@ Architecture implication:
 - production implementation remains NOT STARTED
 - worker lease duration and scheduler cadence remain UNFROZEN
 
+R6-B Hermes invocation-form audit:
+- checkpoint execution: PASS
+- contract resolution: INCOMPLETE
+- audit remained read-only:
+  - no model invocation
+  - no profile creation/change
+  - no session creation/resume execution
+  - no cron creation/run
+  - no gateway/config/production mutation
+
+Confirmed native contracts:
+
+Profile management:
+- `hermes profile use PROFILE_NAME`
+- `hermes profile create PROFILE_NAME`
+- `hermes profile create` supports:
+  - `--clone`
+  - `--clone-all`
+  - `--clone-from SOURCE`
+  - `--no-alias`
+  - `--no-skills`
+  - `--description DESCRIPTION`
+- `hermes profile show PROFILE_NAME`
+
+Session/resume:
+- `hermes chat` supports:
+  - `-q / --query`
+  - `--resume SESSION_ID / -r SESSION_ID`
+  - `--continue [SESSION_NAME] / -c [SESSION_NAME]`
+  - `--source SOURCE`
+- Hermes source explicitly contains a headless resume example equivalent to:
+  `hermes chat -Q --resume <session_id> -q "..."`
+- native session store:
+  `/home/teddy/.hermes/sessions/sessions.json`
+- persistent session IDs are first-class native state
+- exact machine-readable capture of the NEW session ID after the first headless invocation is still UNRESOLVED
+
+Cron create:
+- exact native form:
+  `hermes cron create [options] schedule [prompt]`
+- schedule accepts forms such as:
+  - `30m`
+  - `every 2h`
+  - cron expression such as `0 9 * * *`
+- supported relevant options include:
+  - `--name`
+  - `--deliver`
+  - `--repeat`
+  - `--skill`
+  - `--script`
+  - `--no-agent`
+  - `--workdir`
+  - `--model`
+  - `--provider`
+- `--no-agent --script` can run deterministic scheduler logic without invoking an LLM
+- this is a strong candidate for Stage11 periodic DB discovery / claim dispatch
+
+Still unresolved:
+
+Exact profile-selection ownership:
+- `hermes --profile summary --version` parsed successfully
+- `hermes chat --profile summary --help` also parsed successfully
+- parser success alone does not prove which placement actually selects the profile for a real headless semantic invocation
+- Hermes source contains explicit argv handling for `--profile`, but the exact ownership / precedence path was not yet inspected closely enough
+- therefore translator profile invocation syntax remains UNFROZEN
+
+New-session ID capture:
+- resume semantics are confirmed
+- persistent session storage is confirmed
+- exact deterministic / machine-readable way to obtain the newly created session ID from a first headless translation task remains UNFROZEN
+- implementation must not scrape unstable human-facing output unless native source proves that is the intended contract
+
+Architecture remains unchanged:
+- dedicated stateful translator remains leading direction
+- Stage11 DB owns claim fencing
+- Hermes session owns semantic continuity only
+- native cron / deterministic `--no-agent --script` is a leading scheduler candidate
+- translator runtime implementation has NOT started
+- worker lease and scheduler cadence remain UNFROZEN
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-HERMES-INVOCATION-FORM-AUDIT — read-only resolve the exact profile-selection placement, new-session/session-id capture behavior, resume/continue invocation form, and cron-create argument contract from native Hermes help/source without invoking a model or creating runtime state`
+`R6-B-HERMES-PROFILE-SESSION-CAPTURE-SOURCE-AUDIT — inspect the exact Hermes v0.20.0 source paths that parse/apply --profile and create/persist/report a new headless chat session ID, read-only, so the translator launcher can use native stable contracts without output scraping`
 
 ## 8. Stage11 implementation roadmap
 
