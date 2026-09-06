@@ -426,8 +426,24 @@ R6-B Hermes batching boundary audit:
 - numeric batch size must be selected from real latency measurements using the frozen provider/model/reasoning path before implementation
 - no source code, Hermes invocation, SSH state, DB, publication, source lifecycle, or Stage9 state changed during this audit
 
+R6-B Hermes 16-cue batch latency measurement:
+- exact frozen R4 transport used unchanged
+- JUR-750 frozen ASR evidence used in memory only
+- contiguous source indices: `64` through `79`
+- batch cues: `16`
+- prompt bytes: `4589`
+- per-invocation timeout: `120 s`
+- observed outcome: `PASS`
+- wall time: `24.189 s`
+- validated result cue count: `16`
+- independent observer samples: `24`
+- missed observer intervals: `0`
+- no raw JA dialogue or Korean translation output was stored or printed
+- no retry, fallback, DB write, publication, source deletion, Stage9 mutation, or production-code change occurred
+- this measurement alone does not yet freeze the numeric batch size
+
 Next checkpoint:
-`R6-B-HERMES-BATCH-SIZE-MEASURE — measure bounded real Hermes batch latency with the exact frozen R4 transport and JUR-750 ASR evidence, without changing production code`
+`R6-B-HERMES-BATCH-SIZE-MEASURE-32 — measure one contiguous 32-cue real Hermes batch before freezing the numeric batch size`
 
 ## 8. Stage11 implementation roadmap
 
