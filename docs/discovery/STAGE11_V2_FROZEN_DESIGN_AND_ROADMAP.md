@@ -146,29 +146,24 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-3F — deterministic alignment acceptance / release-mismatch decision contract`
+Checkpoint: `V2-3G — ASR_ONLY fallback / acceptance application baseline audit`
 Verdict: **PASS**
 
 Important finding:
-- a separate deterministic acceptance layer now consumes completed affine analysis
-- verdicts are `ACCEPT_HYBRID`, `REJECT_EXTERNAL`, and `UNRESOLVED`
-- insufficient evidence is evaluated first and always returns `UNRESOLVED`
-- quality rejection is evaluated only after evidence sufficiency passes
-- accepted evidence recommends `EXTERNAL_ASR_HYBRID`
-- rejected external evidence recommends `ASR_ONLY`
-- unresolved evidence recommends `UNRESOLVED`
-- all acceptance thresholds are explicit caller-owned policy inputs
-- no title-specific production thresholds or JUR-specific constants exist
-- equality at all policy boundaries is accepted
-- verdict reason ordering is deterministic
-- `REJECT_EXTERNAL` is recommendation only; no ASR_ONLY fallback execution or external-evidence mutation exists
-- no subtitle timestamp projection or output ownership was added
-- acceptance smoke and all six existing regression smoke suites passed
-- independent grep reported a false positive only because the smoke test intentionally contains the string `jur-750` to verify title-specific behavior is absent
-- V2-3F acceptance decision contract is CLOSED
+- deterministic acceptance decisions already exist
+- `HybridEvidenceBundle.from_asr_only()` already provides the canonical ASR_ONLY representation
+- no current code applies `REJECT_EXTERNAL` to build an ASR_ONLY bundle
+- no current pipeline consumes alignment acceptance decisions
+- existing subtitle publication pipeline already owns later publication behavior and should not be expanded prematurely
+- the missing R3 boundary is therefore a small deterministic application layer between acceptance decision and hybrid evidence representation
+- `ACCEPT_HYBRID` should preserve validated external+ASR hybrid evidence
+- `REJECT_EXTERNAL` should create a fresh canonical ASR_ONLY evidence bundle using existing builder semantics
+- `UNRESOLVED` must remain unresolved and must not silently become ASR_ONLY
+- this application boundary must not publish subtitles, mutate source evidence, transform timestamps, or call translation/model logic
+- V2-3G baseline audit is CLOSED
 
 Next planned checkpoint:
-`V2-3G — ASR_ONLY fallback / acceptance application baseline audit`
+`V2-3H — implement deterministic acceptance application / ASR_ONLY fallback boundary`
 
 ## 8. Stage11 implementation roadmap
 
