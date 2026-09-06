@@ -528,8 +528,19 @@ R6-B live full-title 16-cue batched Hermes measurement:
 - no retry, fallback, DB write, publication, source deletion, Stage9 mutation, SSH-key change, or production-code change occurred
 - worker lease duration and heartbeat cadence remain unfrozen until this measurement result is reviewed
 
+R6-B failed Batch6 split audit:
+- original failed range: indices `80-95`
+- original request: `16 cues`, `6074` prompt bytes
+- original outcome: `TIMEOUT` at `120.101 s`
+- exact failed range was measured as two contiguous 8-cue diagnostic requests
+- split evidence: `80-87:8c/4831B/120.101s/TIMEOUT, 88-95:8c/2710B/15.787s/PASS`
+- raw JA dialogue and Korean output were not printed or persisted
+- this was measurement-only and did not change production code, transport, model, retry policy, DB, publication, source lifecycle, or Stage9
+- batched-vs-whole translation quality comparison remains REQUIRED before final semantic strategy approval
+- worker lease duration and heartbeat cadence remain UNFROZEN
+
 Next checkpoint:
-`R6-B-HERMES-BATCHING-LIVE-BLOCKER-AUDIT — inspect the controlled full-title batched failure before changing the frozen batch size, transport, model, or retry policy`
+`R6-B-HERMES-BATCH6-DEEPER-SPLIT-AUDIT — further split only the still-failing exact problem range before changing production policy`
 
 ## 8. Stage11 implementation roadmap
 
