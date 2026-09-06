@@ -146,17 +146,20 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-1B-FIX2-DIAG — conflicting local signal inspection`
+Checkpoint: `V2-1B-FIX2-DIAG2 — identify first non-JA resolver failure`
 Verdict: **PASS**
 
 Important finding:
-- the real Japanese `-ja.srt` anchor resolves successfully to `ja`
-- the Japanese anchor itself has no conflicting local-language metadata
-- the remaining failure occurs while scanning another SRT anchor
-- architecture remains unchanged
+- Japanese anchor still resolves correctly to `ja`
+- resolver failures occur on non-Japanese SRT anchors
+- first failing href: `/subs/1529/JUR-750.ja.whisperjav-ar.srt`
+- terminal target language resolved as: `None`
+- error: `Japanese subtitle anchor has conflicting local language metadata`
+- the provider currently aborts discovery because a non-JA anchor cannot be resolved cleanly
+- architecture is unchanged
 
 Next planned checkpoint:
-`V2-1B-FIX2-DIAG2 — identify the first non-JA resolver failure`
+`V2-1B-FIX3 — safely skip non-JA unsupported anchors without weakening JA conflict checks`
 
 ## 8. Stage11 implementation roadmap
 
