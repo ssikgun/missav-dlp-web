@@ -585,8 +585,44 @@ R6-B Luna whole-file translation provenance audit:
 - worker lease duration and heartbeat cadence remain UNFROZEN
 - no production source code, transport, model policy, DB, publication, source lifecycle, or Stage9 state changed during this provenance audit
 
+R6-B Luna whole-file helper script audit:
+- verdict: PASS
+- exact helper/output identities remained unchanged:
+  - `translate_jur750.py`:
+    `dc4ab6b16364d72e700d424112d7dbdf55b9ce716ba148f1d647e074415c5cb6`
+  - `/tmp/patch_jur750.py`:
+    `f036445e42558f6fd0a86cf12ea44993b46d8b63660142a3cdeab02f9f651aaa`
+  - `JUR-750.ko.srt`:
+    `30a69ed8ce12a345cce0b5cf212bd867f575ea3a5a1ea990db2b5c2ea0fccd75`
+- translator helper string constants: `16`
+- translator Hangul-containing constants: `1`
+- patch helper string constants: `17`
+- patch helper Hangul-containing constants: `10`
+- total helper literal characters: `7406`
+- Hangul literal characters: `4220`
+- largest string literal: `6871 characters`
+- largest Hangul-containing literal: `6871 characters`
+- final output cues: `661`
+- output cues exactly equal to one individual literal: `1`
+- output cues present inside helper literals: `661 / 661` (`100%`)
+- no suspicious OpenAI, Hermes, HTTP, subprocess, requests, urllib, Ollama, Qwen, NLLB, chat, or completion call was found in either helper
+- provenance classification:
+  `TRANSLATION_TEXT_STRONGLY_EMBEDDED_IN_HELPERS`
+- therefore the helpers themselves are not translation/model boundaries
+- the Korean translation text had already been produced during Luna's agent execution and was embedded into deterministic helper material before final SRT assembly/patching
+- the observed approximately 9–10 minute Slack workflow is therefore an end-to-end Luna agent workflow, not evidence of one direct whole-file Hermes/model invocation
+- Luna's workflow is architecturally different from the current Stage11 stateless per-request Hermes semantic boundary:
+  - Luna retained an ongoing agent/task context across multiple iterations
+  - the final helper only materialized translation content already generated during that context
+- this provides evidence that a stateful whole-task semantic workflow can successfully materialize a complete `661`-cue subtitle while retaining broader task context
+- it does NOT yet prove that this approach has better translation quality than bounded Stage11 batching
+- no Stage11 production batching, transport, model, retry, fallback, DB, publication, source lifecycle, or Stage9 policy is changed from this audit
+- further `4 -> 2` cue shrinking is paused until the Luna whole-file result is evaluated as a translation-quality baseline
+- batched-vs-whole/stateful translation quality comparison remains REQUIRED before final semantic execution strategy approval
+- worker lease duration and heartbeat cadence remain UNFROZEN
+
 Next checkpoint:
-`R6-B-LUNA-WHOLEFILE-SCRIPT-AUDIT — read-only inspect the exact Luna translation and patch helper structure, without printing dialogue, to determine whether translation text was model-generated during agent iterations, embedded deterministically, or produced through another local path`
+`R6-B-LUNA-WHOLEFILE-QUALITY-BASELINE-AUDIT — evaluate the exact 661-cue Luna Korean result against the exact 661-cue Japanese source for structural preservation, STT correction behavior, natural Korean continuity, and representative long-context quality before changing the Stage11 semantic execution strategy`
 
 ## 8. Stage11 implementation roadmap
 
