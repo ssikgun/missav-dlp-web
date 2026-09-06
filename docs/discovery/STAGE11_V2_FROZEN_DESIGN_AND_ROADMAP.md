@@ -269,8 +269,28 @@ Lease measurement preparation:
 - existing JUR-750 ASR forensic artifact remains present and unchanged
 - no subtitle publication, DB write, source deletion, Stage9 mutation, or Jellyfin operation occurred during preparation
 
+ASR measurement runtime diagnostic:
+- first `R6-B-MEASURE-ASR` attempt did not reach usable ASR measurement
+- failure class was `ASRAudioError`
+- root cause was the measurement harness using CT108 system `/usr/bin/python3`
+- CT108 system Python has neither NumPy nor PyAV
+- the correct Stage11 execution interpreter is `/opt/stage11-stt-venv/bin/python`
+- the Stage11 venv contains:
+  - NumPy `2.5.2`
+  - PyAV `18.1.0`
+  - faster-whisper `1.2.1`
+  - CTranslate2 `4.8.1`
+- with the correct Stage11 venv:
+  - `teddy_discovery_asr_audio_smoke.py` PASS
+  - `teddy_discovery_asr_remote_smoke.py` PASS
+  - `teddy_discovery_asr_transcriber_smoke.py` PASS
+- VM122 `192.168.1.134:8091` remained reachable
+- therefore the failed measurement is classified as harness/interpreter error, not a Stage11 ASR contract failure
+- the retry must use `/opt/stage11-stt-venv/bin/python`
+- no DB write, publication, source deletion, or repository source change occurred
+
 Next measurement checkpoint:
-`R6-B-MEASURE-ASR — run one JUR-750 full-title large-v3 ASR timing canary with independent heartbeat-jitter observation`
+`R6-B-MEASURE-ASR-RETRY — rerun the JUR-750 full-title large-v3 ASR timing canary with the correct Stage11 venv and independent heartbeat-jitter observation`
 
 ## 8. Stage11 implementation roadmap
 
