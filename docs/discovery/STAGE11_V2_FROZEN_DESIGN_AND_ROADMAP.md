@@ -146,34 +146,29 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R4-D — isolated Hermes v2 one-shot transport boundary`
-Verdict: **PASS**
+Checkpoint: `R4-E — live Hermes v2 one-shot semantic canary`
+Verdict: **INCOMPLETE**
 
 Important finding:
-- an isolated Hermes v2 transport boundary is implemented between CT108 and CT120
-- transport target is `teddy@192.168.1.230`
-- Hermes executable is fixed to `/home/teddy/.local/bin/hermes`
-- every invocation explicitly selects provider `openai-codex`
-- every invocation explicitly selects model `gpt-5.6-luna`
-- every invocation explicitly selects reasoning `xhigh`
-- Hermes is invoked in one-shot mode with `-z`
-- subtitle/request data is never interpolated as executable shell syntax
-- subprocess execution uses `shell=False`
-- CT120 uses a fixed Python wrapper and fixed Hermes argv
-- stdout is the only semantic result channel
-- stderr is diagnostic only and is never parsed as translation output
-- nonzero exit, timeout, empty stdout, oversized output and invalid semantic JSON fail closed
-- no retry and no provider/model fallback are present
-- no timestamp, subtitle publication, DB, ASR or workflow ownership was added
-- smoke tests use an injected fake runner and made no live Hermes/model request
-- Hermes transport smoke and all seven requested regression smoke suites passed
-- independent structural verification passed
-- the initial new-file diff-check FAIL was only a verifier artifact caused by `git diff --no-index` returning status 1 for ordinary file differences
-- corrected whitespace and formatting verification passed for both new files
-- R4-D one-shot transport boundary is CLOSED
+- CT108 to CT120 dedicated SSH authentication and pinned host trust are operational
+- the first live Hermes invocation reached provider `openai-codex`, model `gpt-5.6-luna`, reasoning `xhigh`
+- transport execution succeeded but strict semantic validation correctly failed closed
+- a shape-only live diagnostic confirmed valid JSON with top-level field `results`
+- the frozen R4-B parser correctly requires exactly one top-level field named `cues`
+- prompt/schema audit found the model-output envelope was underspecified
+- the strict parser remains unchanged
+- the system instruction now explicitly requires exactly one top-level field named `cues`
+- the instruction explicitly rejects `results` and any other top-level field name
+- cue array order and exact cue output fields remain frozen
+- the first FIX1 smoke failure was only a case-sensitive test-marker error because the smoke compares required phrases against a lowercased system instruction
+- the smoke marker was corrected without changing production semantics
+- Hermes v2 smoke, transport smoke, and all six additional requested regression suites passed after correction
+- no live model request was made during FIX1/FIX1B
+- no retry or provider/model fallback was added
+- R4-E remains open pending one live semantic retry
 
 Next planned checkpoint:
-`R4-E — live Hermes v2 one-shot semantic canary`
+`R4-E-RETRY1 — live Hermes v2 semantic canary after explicit cues envelope fix`
 
 ## 8. Stage11 implementation roadmap
 

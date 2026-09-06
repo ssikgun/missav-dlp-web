@@ -535,6 +535,8 @@ def main():
         ("repaired_ja is optional", "SYSTEM_OPTIONAL_REPAIR"),
         ("en is support evidence only", "SYSTEM_EN_SUPPORT_ONLY"),
         ("preserve every cue_id", "SYSTEM_PRESERVE_IDS"),
+        ("top-level json object must contain exactly one field named cues", "SYSTEM_TOP_LEVEL_CUES"),
+        ("do not use results or any other top-level field name", "SYSTEM_REJECT_RESULTS_ENVELOPE"),
         ("exactly one result for every input cue", "SYSTEM_ONE_RESULT_PER_CUE"),
         ("return json only", "SYSTEM_JSON_ONLY"),
         ("do not output timestamps", "SYSTEM_NO_TIMESTAMPS"),
