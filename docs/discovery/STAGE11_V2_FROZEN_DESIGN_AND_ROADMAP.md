@@ -146,27 +146,34 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R4-C — Hermes transport / invocation baseline audit`
+Checkpoint: `R4-D — isolated Hermes v2 one-shot transport boundary`
 Verdict: **PASS**
 
 Important finding:
-- Hermes Agent v0.20.0 is installed on CT120
-- one-shot invocation supports `-z/--oneshot`
-- invocation-level provider override supports `--provider`
-- invocation-level model override supports `-m/--model`
-- invocation-level reasoning override supports `--reasoning`
-- the Stage11 frozen invocation can therefore explicitly select `openai-codex`, `gpt-5.6-luna`, and `xhigh` without changing Hermes persistent defaults
-- current Hermes configuration uses provider `openai-codex`
-- current Codex backend base URL is `https://chatgpt.com/backend-api/codex`
-- current reasoning configuration is `xhigh`
-- Stage11 must explicitly pass `-m gpt-5.6-luna` rather than depend on the persistent model configuration
-- `-z` one-shot mode prints only the assistant response and is suitable for the isolated Stage11 transport boundary
-- no live model request was made during this audit
-- no Hermes configuration or repository files were changed
-- R4-C transport/invocation baseline audit is CLOSED
+- an isolated Hermes v2 transport boundary is implemented between CT108 and CT120
+- transport target is `teddy@192.168.1.230`
+- Hermes executable is fixed to `/home/teddy/.local/bin/hermes`
+- every invocation explicitly selects provider `openai-codex`
+- every invocation explicitly selects model `gpt-5.6-luna`
+- every invocation explicitly selects reasoning `xhigh`
+- Hermes is invoked in one-shot mode with `-z`
+- subtitle/request data is never interpolated as executable shell syntax
+- subprocess execution uses `shell=False`
+- CT120 uses a fixed Python wrapper and fixed Hermes argv
+- stdout is the only semantic result channel
+- stderr is diagnostic only and is never parsed as translation output
+- nonzero exit, timeout, empty stdout, oversized output and invalid semantic JSON fail closed
+- no retry and no provider/model fallback are present
+- no timestamp, subtitle publication, DB, ASR or workflow ownership was added
+- smoke tests use an injected fake runner and made no live Hermes/model request
+- Hermes transport smoke and all seven requested regression smoke suites passed
+- independent structural verification passed
+- the initial new-file diff-check FAIL was only a verifier artifact caused by `git diff --no-index` returning status 1 for ordinary file differences
+- corrected whitespace and formatting verification passed for both new files
+- R4-D one-shot transport boundary is CLOSED
 
 Next planned checkpoint:
-`R4-D — implement isolated Hermes v2 one-shot transport boundary`
+`R4-E — live Hermes v2 one-shot semantic canary`
 
 ## 8. Stage11 implementation roadmap
 
