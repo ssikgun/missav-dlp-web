@@ -834,8 +834,121 @@ R6-B Hermes native stateful translator capability audit:
 - exact profile creation/copy mechanism, noninteractive invocation syntax, persistent session identifier handling, resume syntax, and cron dispatch syntax remain UNFROZEN
 - worker lease duration and heartbeat/scheduler cadence remain UNFROZEN
 
+R6-B Hermes native stateful translator contract audit:
+- verdict: PASS
+- audit was read-only; no model invocation, profile/session creation, cron execution, gateway change, or production mutation occurred
+- Hermes version remained:
+  `Hermes Agent v0.20.0 (2026.8.3)`
+
+Native top-level / chat execution contract:
+- top-level one-shot:
+  `-z PROMPT / --oneshot PROMPT`
+- top-level model override:
+  `-m MODEL / --model MODEL`
+- top-level provider override:
+  `--provider PROVIDER`
+- top-level reasoning override:
+  `--reasoning LEVEL`
+- top-level resume:
+  `--resume SESSION / -r SESSION`
+- top-level continue:
+  `--continue [SESSION_NAME] / -c [SESSION_NAME]`
+- documented resume example:
+  `hermes --resume <session_id>`
+- `hermes chat` independently exposes:
+  - `--resume SESSION_ID / -r SESSION_ID`
+  - `--continue [SESSION_NAME] / -c [SESSION_NAME]`
+  - model
+  - provider
+  - reasoning
+  - non-interactive/headless-oriented operation
+
+Native session management:
+- `hermes sessions` supports persistent history management
+- observed subcommands include:
+  - list
+  - export
+  - delete
+  - prune
+  - archive
+  - optimize
+  - repair
+  - recover
+  - stats
+  - rename
+  - browse
+- exact native session store:
+  `/home/teddy/.hermes/sessions`
+- store contained `sessions.json` plus existing request-dump artifacts
+- no session contents were printed
+- exact new-session identifier capture mechanism remains UNFROZEN
+
+Native profile management:
+- `hermes profile` supports:
+  - list
+  - use
+  - create
+  - delete
+  - describe
+  - show
+  - alias
+  - rename
+  - export
+  - import
+  - install
+  - update
+  - info
+- `hermes profile create` exists and exposes clone-oriented options
+- existing profiles demonstrate native isolated profile state
+- representative profile state can include:
+  - `SOUL.md`
+  - `config.yaml`
+  - `profile.yaml`
+  - provider/auth state
+  - runtime/state DBs
+- therefore a dedicated Stage11 translator profile can use Hermes' native profile model rather than a custom agent framework
+- exact minimal translator-profile creation/clone command remains UNFROZEN
+
+Native cron contract:
+- `hermes cron` supports:
+  - list
+  - create/add
+  - edit
+  - pause
+  - resume
+  - run
+  - remove/delete
+  - status
+  - runs/history
+  - tick
+- durable native cron storage exists at:
+  `/home/teddy/.hermes/cron`
+- durable execution DB and scheduler heartbeat/tick state already exist
+- exact `cron create` argument contract was not captured by the nested parser because the help renders the command with an alias form
+- exact Stage11 scheduler/cron creation syntax remains UNFROZEN
+
+Important unresolved parser evidence:
+- global-profile placement probe was inconclusive:
+  - `hermes --profile <probe> chat --help` returned RC `2`
+  - `hermes chat --profile <probe> --help` returned RC `0`
+- because help parsing may terminate before normal execution semantics, this does NOT prove that both placements are valid
+- exact dedicated-profile invocation placement must be established before implementation
+
+Architecture implication:
+- existing Hermes native primitives are sufficient in principle for:
+  - dedicated translator profile
+  - persistent title-level session
+  - resume/continue
+  - headless/noninteractive invocation
+  - native scheduled discovery
+- no custom conversation database, custom agent framework, or custom heartbeat engine is justified by current evidence
+- Stage11 job DB claim-token fencing remains authoritative outside Hermes
+- translator session is semantic execution state, not job ownership state
+- production implementation remains NOT STARTED
+- worker lease duration and scheduler cadence remain UNFROZEN
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-HERMES-NATIVE-CONTRACT-AUDIT — inspect exact native Hermes profile structure and the concrete noninteractive chat/session/resume/cron command contracts required for one dedicated Stage11 translator task, read-only and without model invocation`
+`R6-B-STATEFUL-TRANSLATOR-HERMES-INVOCATION-FORM-AUDIT — read-only resolve the exact profile-selection placement, new-session/session-id capture behavior, resume/continue invocation form, and cron-create argument contract from native Hermes help/source without invoking a model or creating runtime state`
 
 ## 8. Stage11 implementation roadmap
 
