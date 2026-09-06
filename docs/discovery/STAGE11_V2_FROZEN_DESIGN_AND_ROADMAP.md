@@ -146,29 +146,38 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R5-C-FIX1 — deterministic HYBRID correspondence investigation`
-Verdict: **PASS / OUTCOME B**
+Checkpoint: `R5-C-FIX1B — R3-to-R5 alignment output ownership audit`
+Verdict: **PASS**
 
 Important finding:
-- R5-C-FIX1 inspected the frozen R2/R3 alignment and acceptance chain before modifying production code
-- `MonotonicAnchorCandidate` preserves external and ASR identities while alignment candidates are being evaluated
-- `RobustAffineAlignment.residuals` also carries selected external/ASR identities and residual evidence
-- `AlignmentAcceptanceDecision` retains only aggregate acceptance metrics such as counts, ratios, residuals, span, and scale
-- `AlignmentAcceptanceApplicationResult` retains only the decision and resulting evidence bundle
-- `HybridEvidenceBundle` retains external subtitle evidence, ASR evidence, cue evidence, and provenance, but no authoritative per-cue external-JA-to-ASR correspondence map
-- therefore accepted R3 output proves alignment quality and provenance but does not preserve the exact monotonic per-cue correspondence required later by R5
-- the lost information includes the selected external-JA cue to ASR segment identity/index relation, accepted correspondence ownership, and per-cue timing correspondence
-- R5 cannot safely reconstruct this relation from ordinal position, caller-supplied tuples, or a second independent rematch
-- caller-supplied `hybrid_asr_indices` must not become semantic or timing truth
-- the correct architectural direction is to preserve validated monotonic external-JA-to-ASR correspondence in an immutable R3-owned result and carry it through the R3 application boundary
-- existing R2/R3 identity types such as `MonotonicAnchorCandidate`, `AffineAnchorResidual`, and `HybridCueIdentity` should be reused rather than inventing another identity scheme
-- no source file was modified during this investigation
-- the two untracked R5-C execution files remain preserved
-- no live Hermes call, ASR execution, publication, DB/state write, or Stage9 integration occurred
-- R5-C remains open pending an explicit correspondence-preservation contract
+- HYBRID does not require a full one-to-one external-JA-cue-to-ASR-segment map
+- `MonotonicAnchorCandidate` contains external identity, ASR identity, lexical evidence, timing evidence, and score
+- selected monotonic anchors are a sparse strict-monotonic subset rather than complete external cue coverage
+- `AffineAnchorResidual` contains external identity, ASR identity, midpoint evidence, predicted ASR midpoint, residual values, and inlier state
+- `RobustAffineAlignment.residuals` therefore covers selected anchors only, not every external JA cue
+- `RobustAffineAlignment` preserves `scale`, `intercept_ms`, anchor/inlier metrics, residual threshold, residual identities, and median residual
+- the accepted affine transform defines a global deterministic timeline transform `P(t_ms) = scale * t_ms + intercept_ms`
+- the affine transform can project arbitrary external JA source timeline coordinates even when that cue is not a selected lexical anchor
+- `AlignmentAcceptanceDecision` preserves scale and aggregate metrics but loses `intercept_ms` and residual identities
+- `AlignmentAcceptanceApplicationResult` currently preserves only decision and bundle, so the accepted `RobustAffineAlignment` does not survive into R5
+- R4 permits external-only semantic cues where `external_ja` is present and `stt_ja` is absent
+- therefore an unmatched external JA cue may remain a valid external-only Hermes cue
+- ASR text must be attached only when authoritative preserved residual evidence supplies a specific ASR identity
+- selected lexical anchors are evidence used to estimate and validate the affine transform; they are not a mandatory final per-cue timing ownership map
+- full per-cue ASR correspondence is not required
+- caller-owned `hybrid_asr_indices` is unsafe and must be removed
+- the smallest R3-to-R5 preservation change is to extend `AlignmentAcceptanceApplicationResult` with `alignment: RobustAffineAlignment | None`
+- `alignment` must be required and exact for ACCEPT_HYBRID
+- existing `RobustAffineAlignment`, `AffineAnchorResidual`, and `HybridCueIdentity` must be reused; no new correspondence identity scheme is required
+- HYBRID deterministic timing ownership is affine projection from external JA source timestamps
+- sparse residual identities provide optional authoritative STT support only
+- semantic ASR evidence and timing projection must remain separate ownership concepts
+- no source file was modified during this audit
+- the two untracked R5-C implementation files remain preserved
+- one design detail remains unresolved before implementation: exact deterministic integer materialization of projected subtitle start/end timestamps
 
 Next planned checkpoint:
-`R5-C-FIX1B — audit and freeze the minimal R3-to-R5 correspondence preservation contract`
+`R5-C-FIX1C — freeze deterministic affine timestamp materialization rule`
 
 ## 8. Stage11 implementation roadmap
 
