@@ -461,8 +461,29 @@ R6-B Hermes 32-cue batch latency measurement:
 - no retry, fallback, DB write, publication, source deletion, Stage9 mutation, or production-code change occurred
 - numeric batch size remains unfrozen in this checkpoint
 
+R6-B Hermes live batch-size freeze:
+- numeric live Hermes batch size is now FROZEN at `16 cues`
+- evidence:
+  - `16` cues / `4589` prompt bytes -> PASS in `24.189 s`
+  - `32` cues / `9196` prompt bytes -> TIMEOUT at `120.101 s`
+  - full-title `166` cues / `36166` prompt bytes -> TIMEOUT at the transport ceiling of `600 s`
+- the selected value is deliberately conservative rather than the largest theoretically possible batch
+- every live batch must contain at most `16` contiguous cues
+- each existing `HermesV2CueInput` is preserved unchanged inside its batch
+- each batch is attempted exactly once
+- no retry, provider fallback, model fallback, partial-success publication, context reconstruction, cue rematching, or cross-batch inference is permitted
+- batch results must be concatenated strictly in original request order
+- the reconstructed complete result must pass the existing full-request `validate_hermes_v2_result()` contract
+- the existing R5 pipeline continues to call its injected `semantic_boundary` exactly once
+- batching remains an internal implementation detail behind that callable boundary
+- R5 route, timing ownership, semantic bindings, deterministic SRT generation, and publication readiness remain unchanged
+- the per-live-invocation transport timeout remains governed by the existing frozen R4 transport contract; this checkpoint changes only batch cardinality
+- worker lease duration and heartbeat cadence remain UNFROZEN
+- they require one real full-title run through the implemented 16-cue batched semantic boundary so total semantic phase timing can be measured
+- no production source code, DB, publication, source lifecycle, SSH state, or Stage9 state changed in this checkpoint
+
 Next checkpoint:
-`R6-B-HERMES-BATCH-SIZE-FREEZE-16 — freeze the conservative 16-cue batch size from the 24.189-second PASS and the 32-cue 120-second timeout evidence`
+`R6-B-HERMES-BATCHING-IMPLEMENT — implement the frozen 16-cue fail-closed semantic-boundary batching adapter behind the existing R5 callable interface, with offline deterministic smokes before any new live Hermes canary`
 
 ## 8. Stage11 implementation roadmap
 
