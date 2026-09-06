@@ -393,8 +393,41 @@ R6-B Hermes full-title latency blocker:
 - the next work must determine whether bounded semantic batching is required and how to preserve exact cue coverage/order, deterministic timing ownership, fail-closed behavior, and no retry/fallback semantics
 - no DB write, publication, source deletion, Stage9 mutation, SSH-key change, or production source-code change occurred
 
+R6-B Hermes batching boundary audit:
+- verdict: PASS
+- the existing R5 pipeline boundary is:
+  `semantic_boundary: Callable[[HermesV2Request], HermesV2Result]`
+- `run_subtitle_v2_pipeline()` builds one complete semantic plan and calls the injected semantic boundary exactly once
+- the pipeline then validates the returned complete result against the original complete request
+- R5 pipeline must remain transport-agnostic and must not import Hermes transport, subprocess, network, database, or publication modules
+- bounded Hermes batching therefore belongs behind the existing callable semantic-boundary interface, not inside the R5 pipeline
+- the semantic-boundary adapter receives the original complete `HermesV2Request`
+- the adapter may partition only the ordered `request.cues` tuple into contiguous bounded batches
+- each existing `HermesV2CueInput` object is preserved unchanged inside its batch, including:
+  - `cue_id`
+  - `external_ja`
+  - `stt_ja`
+  - `en`
+  - `before_context`
+  - `after_context`
+- no context reconstruction, trimming, rematching, or cross-batch inference is permitted
+- each batch is itself a valid `HermesV2Request`
+- every batch is attempted exactly once
+- no retry, provider fallback, model fallback, or partial-success publication is permitted
+- failure or invalid output from any batch fails the whole semantic boundary
+- successful batch results are concatenated strictly in batch/request order
+- the reconstructed complete `HermesV2Result` must then pass the existing full-request `validate_hermes_v2_result()` against the original unpartitioned request
+- duplicate, missing, extra, reordered, or empty-invalid cue output remains fail-closed under the existing contracts
+- the R5 route decision, semantic bindings, source/timing ownership, deterministic SRT generation, and publication readiness logic remain unchanged
+- the R5 invariant that the pipeline itself calls `semantic_boundary` once remains unchanged; multiple live Hermes calls are an internal implementation detail of the injected adapter
+- batching does not change the frozen maximum complete request contract of `512` cues or `4 MiB`; it only creates smaller live model invocations behind that contract
+- no numeric batch size is frozen yet
+- the full-title `166` cue / `36166` byte / `600 s` timeout proves that one whole-title live invocation is not operationally safe, but does not by itself establish the correct batch size
+- numeric batch size must be selected from real latency measurements using the frozen provider/model/reasoning path before implementation
+- no source code, Hermes invocation, SSH state, DB, publication, source lifecycle, or Stage9 state changed during this audit
+
 Next checkpoint:
-`R6-B-HERMES-BATCHING-AUDIT — read-only audit of the frozen R4/R5 semantic contracts and pipeline call sites to define the minimal safe batching boundary before any implementation change`
+`R6-B-HERMES-BATCH-SIZE-MEASURE — measure bounded real Hermes batch latency with the exact frozen R4 transport and JUR-750 ASR evidence, without changing production code`
 
 ## 8. Stage11 implementation roadmap
 
