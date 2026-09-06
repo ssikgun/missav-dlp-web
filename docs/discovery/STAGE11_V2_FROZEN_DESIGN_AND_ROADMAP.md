@@ -147,28 +147,33 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 ### Current checkpoint
 
 Checkpoint: `R4-E — live Hermes v2 one-shot semantic canary`
-Verdict: **INCOMPLETE**
+Verdict: **PASS**
 
 Important finding:
 - CT108 to CT120 dedicated SSH authentication and pinned host trust are operational
+- the dedicated Stage11-Hermes SSH identity is separate from the existing Stage11 local-LLM identity
 - the first live Hermes invocation reached provider `openai-codex`, model `gpt-5.6-luna`, reasoning `xhigh`
-- transport execution succeeded but strict semantic validation correctly failed closed
-- a shape-only live diagnostic confirmed valid JSON with top-level field `results`
-- the frozen R4-B parser correctly requires exactly one top-level field named `cues`
-- prompt/schema audit found the model-output envelope was underspecified
-- the strict parser remains unchanged
-- the system instruction now explicitly requires exactly one top-level field named `cues`
-- the instruction explicitly rejects `results` and any other top-level field name
-- cue array order and exact cue output fields remain frozen
-- the first FIX1 smoke failure was only a case-sensitive test-marker error because the smoke compares required phrases against a lowercased system instruction
-- the smoke marker was corrected without changing production semantics
-- Hermes v2 smoke, transport smoke, and all six additional requested regression suites passed after correction
-- no live model request was made during FIX1/FIX1B
-- no retry or provider/model fallback was added
-- R4-E remains open pending one live semantic retry
+- the first live response used top-level field `results`, so the frozen strict parser correctly failed closed
+- shape-only diagnosis confirmed the transport itself was working and the response was valid JSON
+- root cause was an underspecified output envelope in the Hermes v2 system instruction
+- the strict parser was not relaxed
+- the system instruction was corrected to require exactly one top-level field named `cues`
+- `results` and every other top-level field name are explicitly rejected
+- Hermes v2 semantic and transport smoke suites plus all requested regression suites passed after the correction
+- R4-E-RETRY1 then executed exactly one live Hermes semantic invocation
+- the live retry passed the strict R4-B response parser
+- exactly two requested cues produced exactly two outputs
+- cue IDs and request order were preserved
+- every cue returned non-empty natural Korean
+- canary Korean outputs were semantically appropriate for the synthetic Japanese evidence
+- `repaired_ja` remained optional and was not unnecessarily emitted
+- timestamp ownership remained entirely outside the LLM
+- no retry or provider/model fallback was used by the transport
+- the repository remained clean after the live invocation
+- R4-E live semantic canary is CLOSED
 
 Next planned checkpoint:
-`R4-E-RETRY1 — live Hermes v2 semantic canary after explicit cues envelope fix`
+`R4-F — R4 Hermes v2 adapter closure audit`
 
 ## 8. Stage11 implementation roadmap
 
