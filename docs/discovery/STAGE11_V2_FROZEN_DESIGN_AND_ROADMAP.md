@@ -146,19 +146,19 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-1B-FIX3 — safely skip unsupported non-JA anchors`
+Checkpoint: `V2-2A — Hybrid evidence contract baseline/source audit`
 Verdict: **PASS**
 
 Important finding:
-- unsupported but internally consistent non-JA anchors are safely skipped
-- JA/non-JA conflicting local signals remain fail-closed
-- all requested offline regression smokes passed
-- live SubtitleCat discovery recovered the actual Japanese SRT href
-- known Japanese payload SHA and 661 cues matched
-- Stage11 R1 external Japanese provider boundary is validated and CLOSED
+- no existing Stage11 Hybrid/Alignment contract exists
+- external Japanese evidence can reuse `SubtitleCue` / `SubtitleDocument`
+- Whisper evidence can reuse `ASRWord` / `ASRSegment` / `ASRResult`
+- external source identity/hash can reuse `ExternalSubtitlePayload`
+- current subtitle pipeline only directly consumes `ASRResult`; no v2 hybrid contract is wired yet
+- R2 should add an isolated immutable evidence contract before any pipeline rewrite
 
 Next planned checkpoint:
-`V2-2A — Hybrid evidence contract baseline/source audit`
+`V2-2B — define isolated immutable Hybrid evidence contract`
 
 ## 8. Stage11 implementation roadmap
 
