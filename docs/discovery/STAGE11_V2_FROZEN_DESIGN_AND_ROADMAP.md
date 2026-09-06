@@ -1339,8 +1339,66 @@ Implementation freeze:
 - production cron: NOT YET
 - production implementation: NOT YET
 
+### R6-B-STATEFUL-TRANSLATOR-MINIMAL-IMPLEMENTATION-A — PASS
+
+Repository-side deterministic stateful translator boundary implemented and
+verified offline. This is Part A only; no native CT120 profile or live
+translator runtime was created.
+
+Exact new files:
+- `teddy_discovery_stateful_translator.py`
+- `teddy_discovery_stateful_translator_smoke.py`
+- `teddy_discovery_stateful_translator_policy.txt`
+
+New-file SHA256:
+- `teddy_discovery_stateful_translator.py`:
+  `ec23f1f78f31f5e5b8c7d0190c0de7fdb521773e2e361f95d974f13fb3ffc08a`
+- `teddy_discovery_stateful_translator_smoke.py`:
+  `36f787ed613b922c7cb5588b3dc2244d2587d38a66c5b2ac7b6674ff3963a22f`
+- `teddy_discovery_stateful_translator_policy.txt`:
+  `37c487cc90e828b70c4d8343ab0949ccaffa9168d01aff4b828f6fa1b994c9e6`
+
+Frozen Part A repository contract:
+- stateful-only semantic package/result cue ceiling: `4096`
+- stateful-only serialized package/result ceiling: `16 MiB` each
+- the existing Hermes v2 `512`-cue request ceiling is unchanged
+- package fields are exactly schema version, `dvd_id`, `generation_key`,
+  `claim_token`, and immutable ordered semantic cue evidence
+- result fields are exactly schema version, identity metadata, deterministic
+  session ID, and ordered `cue_id` / `repaired_ja` / `ko` outputs
+- UUID5 session ID uses the fixed Stage11 namespace
+  `4d6f4e10-9b8d-5af3-83c0-6c46f7a1e4ab` and canonical JSON identity
+  `[dvd_id, generation_key, claim_token]`; dialogue is excluded
+- the injected native SessionDB adapter calls only
+  `create_session(session_id=<derived-id>, source="stage11-subtitle-translator")`
+  and requires the exact returned ID
+- the pure CT120 command uses
+  `/home/teddy/.local/bin/hermes --profile subtitle-translator chat -Q
+  --resume <session-id> --provider openai-codex --model gpt-5.6-luna
+  --reasoning xhigh -q <fixed staging task>`; it does not use `-z`, retry, or
+  fallback
+- staging task directories are `0700`, dialogue-bearing files are `0600`,
+  filenames are fixed and traversal-safe, result symlinks are rejected, and
+  result consumption requires observed process completion
+- result parsing rejects duplicate JSON keys, malformed/oversized data,
+  identity/session mismatches, duplicate/missing/extra/reordered cues, and
+  partial output; no timestamp fields are accepted
+
+Offline verification:
+- `teddy_discovery_stateful_translator_smoke.py`: PASS
+- `teddy_discovery_hermes_v2_smoke.py`: PASS
+- `teddy_discovery_hermes_v2_transport_smoke.py`: PASS
+- `teddy_discovery_hermes_v2_batching_smoke.py`: PASS
+- new Python files `py_compile`: PASS
+- `git diff --check`: PASS
+- known 661-cue package and complete 661-cue result: PASS
+- frozen Hermes v2 one-shot/batching production modules: unchanged
+- no CT120 profile, provider/auth, model, cron, or runtime changes occurred
+- no Hermes/model invocation, SSH, database write, publication, source
+  deletion, Stage9 change, or profile creation occurred
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-MINIMAL-IMPLEMENTATION — implement the repository-side deterministic launcher/package/validation adapters and offline smokes, then create the minimal CT120 subtitle-translator native profile and verify its non-model runtime/auth preconditions without running a real subtitle translation`
+`R6-B-STATEFUL-TRANSLATOR-MINIMAL-IMPLEMENTATION-B — create the empty native CT120 subtitle-translator profile, deploy only the frozen translator SOUL/policy and launcher prerequisites, verify native provider/auth and SessionDB premint/resume preconditions without invoking a model or translating a real subtitle`
 
 ## 8. Stage11 implementation roadmap
 
