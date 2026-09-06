@@ -1071,8 +1071,55 @@ Architecture consequence:
 - translator runtime implementation remains NOT STARTED
 - worker lease and scheduler cadence remain UNFROZEN
 
+R6-B Hermes new headless session-ID contract audit:
+- checkpoint execution: PASS
+- contract resolution: INCOMPLETE
+- audit was read-only:
+  - no profile/session/runtime mutation
+  - no model invocation
+  - no cron/config/gateway change
+
+Confirmed parser semantics:
+- `-Q / --quiet` is quiet mode for programmatic use
+- quiet mode suppresses banner, spinner, and tool previews
+- quiet-mode resume diagnostics are intentionally moved to stderr so stdout remains automation-friendly
+- `--pass-session-id` does NOT mean "print the session ID"
+- native help defines `--pass-session-id` as:
+  "Include the session ID in the agent's system prompt"
+- therefore Stage11 must not misuse `--pass-session-id` as a session-ID capture mechanism
+
+One-shot semantics:
+- `-z / --oneshot` explicitly prints only final response text
+- native help explicitly states one-shot has:
+  `no session_id line`
+- therefore one-shot is not an acceptable stateful title-session creation/capture boundary
+
+Native SessionDB contract:
+- `hermes_state.SessionDB` exists
+- `create_session(self, session_id, source, **kwargs) -> str` exists
+- native implementation inserts the supplied ID and returns the same ID
+- `get_session`, `end_session`, `resolve_session_id`, and
+  `resolve_resume_session_id` are also native
+- resume/compression lineage handling is therefore confirmed
+- SessionDB itself does NOT mint the ID in `create_session`; the caller supplies it
+
+Still unresolved:
+- exact caller that mints the initial NEW CLI/headless session ID
+- exact stable machine-readable way for a Stage11 launcher to receive that new ID after the first stateful headless invocation
+- no stdout scraping, session-store diff guessing, or timing-based MRU inference is approved
+
+Architecture consequence:
+- canonical translator profile placement remains frozen:
+  `hermes --profile <translator-profile> ...`
+- stateful Hermes session remains required
+- `-z` must not replace the persistent-session path
+- `--pass-session-id` must not be treated as an output/capture option
+- Stage11 DB remains authoritative for job ownership
+- translator launcher implementation remains NOT STARTED
+- worker lease duration and scheduler cadence remain UNFROZEN
+
 Next checkpoint:
-`R6-B-HERMES-NEW-SESSION-ID-CONTRACT-AUDIT — inspect the exact -Q/pass-session-id parser contract and hermes_state SessionDB initial-session creation/persistence path, read-only, to identify a stable machine-readable new-session ID contract before implementing the translator launcher`
+`R6-B-HERMES-INITIAL-SESSION-MINT-OUTPUT-SOURCE-AUDIT — inspect only the native CLI code that mints the initial non-resumed session ID and the quiet/headless completion output path, read-only, to determine whether Hermes exposes that ID through a stable native automation contract`
 
 ## 8. Stage11 implementation roadmap
 
