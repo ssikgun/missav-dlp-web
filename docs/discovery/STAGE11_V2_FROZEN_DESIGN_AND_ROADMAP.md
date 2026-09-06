@@ -146,22 +146,27 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R4-A — Hermes v2 adapter baseline audit`
+Checkpoint: `R4-B — isolated Hermes v2 semantic adapter contract`
 Verdict: **PASS**
 
 Important finding:
-- the existing `teddy_discovery_translation.py` boundary is specifically the old E4B adapter
-- existing `TranslationCue` and translation routing contracts carry `start_ms` and `end_ms`, so they must not become the Hermes v2 semantic contract
-- the new Hermes v2 adapter must remain separate from the old E4B adapter and old timestamp-bearing translation route
-- existing translation code still provides reusable patterns for bounded text validation, JSON response validation, transport error handling and fail-closed behavior
-- R3 `HybridEvidenceBundle` already provides deterministic cue identity plus external JA, ASR, optional EN and bounded neighbor references needed by R4
-- Hermes v2 input ownership is semantic/context evidence only: cue_id, external_ja, stt_ja, optional en, before_context and after_context
-- Hermes v2 output ownership is limited to cue_id, optional repaired_ja and ko
-- Hermes must not receive or return timestamps, subtitle paths, publication fields or workflow ownership
-- R4-A baseline audit is CLOSED
+- a new Hermes v2 semantic contract is implemented separately from the old E4B adapter and timestamp-bearing translation route
+- immutable input fields are exactly `cue_id`, `external_ja`, `stt_ja`, `en`, `before_context`, and `after_context`
+- immutable output fields are exactly `cue_id`, `repaired_ja`, and `ko`
+- supported evidence modes are external JA + STT JA, external-JA-only, and STT-only, with optional EN support
+- EN-only input is rejected
+- every request cue ID must be unique
+- every response must contain exactly one result for every requested cue in the original request order
+- missing, extra, duplicate, reordered or mismatched cue IDs are rejected fail-closed
+- request and response JSON shapes are strict and reject extra fields, duplicate JSON keys, prose and markdown-wrapped responses
+- subtitle evidence is explicitly treated as untrusted data and never as instructions
+- no timestamp, path, publication or workflow ownership exists in the Hermes v2 semantic contract
+- no Hermes transport, provider/model invocation, filesystem, database, ASR or publication behavior exists in this checkpoint
+- Hermes v2 smoke and all six requested regression smoke suites passed
+- R4-B semantic contract is CLOSED
 
 Next planned checkpoint:
-`R4-B — define and implement isolated Hermes v2 semantic adapter contract`
+`R4-C — Hermes transport / invocation baseline audit`
 
 ## 8. Stage11 implementation roadmap
 
