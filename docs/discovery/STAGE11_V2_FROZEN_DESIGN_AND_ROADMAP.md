@@ -146,25 +146,16 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-1B-FIX-DIAG — local language signal inspection`
-Verdict: **PASS**
+Checkpoint: `V2-1B-FIX2 — terminal language marker precedence + offline/live canary`
+Verdict: **FAIL**
 
 Important finding:
-- anchor-local scope fixed the shared-container contamination
-- a second deterministic bug remains in language classification
-- translated filenames retain the original source stem `.ja.whisperjav-`
-- therefore KO and EN SRT hrefs also match the generic JA regex
-- actual terminal language markers remain distinct: `-ja.srt`, `-ko.srt`, `-en.srt`
-- architecture is unchanged and no title-specific exception is required
-
-Required fix:
-- derive/validate the subtitle target language from terminal/local language metadata
-- do not treat `.ja.` inside the common source stem as target-language evidence
-- conflicting local signals must remain fail-closed
-- external KO remains excluded
+- V2-1B-FIX2 verification did not fully pass
+- Stage11 R1 external Japanese provider boundary remains open
+- do not advance to hybrid evidence work
 
 Next planned checkpoint:
-`V2-1B-FIX2 — terminal language marker precedence + offline/live canary`
+`V2-1B-FIX2-DIAG — inspect remaining provider failure`
 
 ## 8. Stage11 implementation roadmap
 
