@@ -312,8 +312,46 @@ R6-B ASR measurement blocker finding:
 - R6-B lease timing must use the already-PASS baseline worker path, not the unfinished gated-context experiment
 - no Stage11 production source, DB, publication, Stage9 state, or NAS source was changed during diagnostics
 
+Baseline CUDA ASR boundary restoration and real canary:
+- existing successful Stage11 remote CUDA architecture remains authoritative
+- CT108 `root@downloader` is orchestration/client only
+- CT108 uses `/opt/stage11-stt-venv/bin/python`
+- CT108 creates bounded 16 kHz mono float32 chunks
+- CT108 sends NPY payloads through `RemoteFasterWhisperASR`
+- VM122 `teddy@local-llm` owns CUDA execution
+- VM122 worker source remains exact commit:
+  `dcc835a27e129d051a6dc171b524d1ae6cf6a256`
+- VM122 worker venv:
+  `/home/teddy/stage11-whisper-v3-venv`
+- model cache:
+  `/home/teddy/.cache/stage11-faster-whisper`
+- remote boundary:
+  `http://192.168.1.134:8091`
+- CUDA model:
+  - `large-v3`
+  - `device=cuda`
+  - `compute_type=float16`
+- baseline worker strategy restored:
+  - per-VAD transcription
+  - VAD threshold `0.54`
+  - speech pad `2500 ms`
+  - `vad_filter=False`
+  - deterministic region-offset restoration
+- Qwen `8082` remained UP
+- E4B `8080` remained DOWN
+- no SSH-per-request Whisper execution is used
+- real JUR-750 first 600-second chunk canary PASS:
+  - source copy: `13.405 s`
+  - chunk: `0-600000 ms`
+  - samples: `9600000`
+  - remote CUDA ASR request: `12.316 s`
+  - returned segments: `46`
+- VM122 `8091` remained reachable after the request
+- no DB write, publication, source deletion, Stage9 mutation, or Hermes invocation occurred
+- CUDA/Whisper functionality is considered already-established baseline and must not be re-investigated during R6-B unless new evidence directly contradicts it
+
 Next measurement checkpoint:
-`R6-B-RESTORE-BASELINE-ASR-WORKER — stop the temporary diagnostic/gated-context 8091 worker and restore the already-PASS per-VAD large-v3 baseline worker for lease measurement`
+`R6-B-MEASURE-ASR-FULLTITLE — measure one complete JUR-750 baseline per-VAD large-v3 run with independent 1-second heartbeat-jitter observation`
 
 ## 8. Stage11 implementation roadmap
 
