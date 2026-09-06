@@ -146,20 +146,26 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-3B — isolated Japanese normalization and monotonic anchor matching foundation`
-Verdict: **FAIL**
+Checkpoint: `V2-3B-FIX — cardinality-independent lexical candidate discovery`
+Verdict: **PASS**
 
 Important finding:
-- normalization and immutable lexical candidate contracts passed smoke review
-- no affine/timestamp transformation or side-effect code was introduced
-- however candidate generation uses an ordinal-local window around the same external/ASR index
-- external subtitle cue counts and Whisper segment counts may differ substantially
-- therefore same-index local-window generation can miss valid matches and cannot serve as the production alignment foundation
-- synthetic smoke coverage did not expose this cardinality mismatch
-- do not advance to affine fitting
+- Japanese matching normalization and immutable lexical candidate contracts passed independent review
+- ordinal-local ASR window logic was removed completely
+- candidate generation now compares the full external-JA × ASR Cartesian product only within a fixed resource safety bound
+- `MAX_LEXICAL_PAIR_COMPARISONS = 256000`
+- known 661 × 166 cardinality produces 109726 comparisons and remains safely within the bound
+- over-bound comparison sets fail closed instead of sampling or guessing
+- memory remains bounded by the candidate cap rather than the comparison product
+- cardinality-mismatch regression proved valid lexical pairs are found independent of ordinal proximity
+- strict monotonic selection still rejects crossing, duplicate and equal-strength ambiguous mappings
+- no affine fitting, scale/intercept inference, residual/inlier logic or timestamp transformation exists yet
+- no filesystem, network, DB, subprocess or model side effects exist
+- all six requested smoke suites passed
+- V2-3B lexical normalization + monotonic anchor foundation is CLOSED
 
 Next planned checkpoint:
-`V2-3B-FIX — replace ordinal-local candidate generation with cardinality-independent bounded lexical candidate discovery`
+`V2-3C — robust affine inference and residual/inlier contract`
 
 ## 8. Stage11 implementation roadmap
 
