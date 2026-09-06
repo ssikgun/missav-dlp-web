@@ -146,29 +146,28 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R4 — Hermes v2 semantic adapter and isolated one-shot transport`
+Checkpoint: `R5-A — v2 per-title orchestrator baseline audit`
 Verdict: **PASS**
 
 Important finding:
-- R4-A baseline audit established that the legacy E4B translation route must remain separate from the Hermes v2 contract
-- R4-B froze the isolated semantic contract with caller-owned cue evidence, exact cue identity, strict JSON, optional repaired Japanese, and Korean output only
-- LLM ownership excludes timestamps, paths, publication decisions, state, ASR, and workflow control
-- R4-C confirmed Hermes v0.20.0 supports explicit one-shot provider, model, and reasoning selection
-- R4-D implemented the isolated CT108 to CT120 transport boundary with `shell=False`, bounded output, fail-closed errors, and no retry or fallback
-- frozen live invocation is provider `openai-codex`, model `gpt-5.6-luna`, reasoning `xhigh`, one-shot `-z`
-- R4-E established dedicated Stage11-Hermes SSH authentication and pinned CT120 host trust
-- the first live semantic response exposed an underspecified output envelope by returning `results`
-- the strict parser correctly rejected that response and was not relaxed
-- the system instruction was minimally corrected to require exactly the top-level `cues` field and reject `results`
-- the subsequent live semantic canary passed strict parsing, cue count, identity, order, Korean completeness, and semantic review
-- `repaired_ja` remained optional
-- no title-specific production hack was introduced
-- no Hermes v2 orchestration, publication, state DB, or `run_subtitle_pipeline` wiring exists yet
-- full R4 regression suite passed at closure
-- R4 semantic adapter and isolated transport are frozen and CLOSED
+- the legacy `run_subtitle_pipeline()` remains the v1 orchestration path and must not be rewritten in place for R5
+- the legacy path already owns reusable trusted-existing-KO termination, local JA/EN and ASR routing, translation completeness validation, SRT artifact generation, and safe subtitle publication
+- validated external subtitle handling remains intentionally separate from the legacy v1 pipeline
+- R1 external Japanese discovery/fetch is available as an isolated provider boundary
+- R2 immutable hybrid evidence is available as an isolated evidence contract
+- R3 alignment, deterministic acceptance, and acceptance application are available as isolated deterministic boundaries
+- `AlignmentAcceptanceApplicationResult` ends at the accepted evidence bundle and does not own Hermes invocation, timestamp projection, publication, filesystem, network, or state
+- R4 Hermes v2 semantic contract and CT108-to-CT120 one-shot transport are isolated and have no premature production wiring
+- no existing module currently assembles R1 through R4 into one Stage11 v2 per-title execution path
+- no Hermes v2 integration exists in `run_subtitle_pipeline()`, publication flow, or state DB
+- R5 should therefore add a separate v2 per-title orchestrator and reuse frozen components rather than change their ownership
+- the new orchestrator must deterministically own composition of source routing, evidence assembly, alignment decision/application, Hermes semantic requests, timestamp/output reconstruction, existing validation, and publisher handoff
+- legacy E4B translation behavior must remain unchanged
+- no live Hermes call, ASR execution, publication, DB write, or repository modification occurred during this audit
+- R5-A baseline audit is CLOSED
 
 Next planned checkpoint:
-`R5 — v2 per-title orchestrator baseline audit`
+`R5-B — freeze isolated v2 per-title orchestrator contract`
 
 ## 8. Stage11 implementation roadmap
 
