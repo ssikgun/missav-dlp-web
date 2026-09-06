@@ -1118,8 +1118,50 @@ Architecture consequence:
 - translator launcher implementation remains NOT STARTED
 - worker lease duration and scheduler cadence remain UNFROZEN
 
+R6-B Hermes initial-session mint/output source audit:
+- verdict: PASS
+- audit was read-only and made no runtime/profile/session/model/cron/config/production changes
+
+Native headless output finding:
+- no sufficiently stable native contract was established for obtaining a newly auto-created CLI session ID from headless stdout
+- `-Q / --quiet` is automation-oriented and keeps resume diagnostics off stdout, but this does not constitute a guaranteed new-session-ID return channel
+- one-shot remains explicitly unsuitable because it has no session-ID line
+- Stage11 will not use stdout scraping, MRU lookup, session-store diff guessing, or timing inference to discover newly created session IDs
+
+Native SessionDB finding:
+- `SessionDB.create_session(self, session_id, source, **kwargs) -> str` is the native creation API
+- it does not mint an ID internally
+- it persists the caller-supplied ID and returns that same ID
+- native resume handling accepts an existing session record
+- an existing session with no messages is explicitly treated as a fresh session when resumed
+- native `resolve_resume_session_id` remains responsible for later compression/continuation lineage
+
+Stage11 session ownership decision:
+- Stage11 will NOT depend on Hermes auto-minting a session ID
+- the CT120 Stage11 translator launcher will mint/own the initial translator-session identifier before semantic execution
+- the launcher will create that identifier through native `hermes_state.SessionDB`
+- Hermes will then enter that exact persistent session via the native resume boundary
+- canonical semantic invocation shape is therefore conceptually:
+  `hermes --profile <translator-profile> chat -Q --resume <precreated-session-id> -q <task>`
+- exact quoting/input transport and launcher implementation remain implementation-time details
+- session IDs are semantic execution identifiers only
+- Stage11 subtitle job DB remains authoritative for job ownership / claim-token fencing
+- no direct manipulation of Hermes SQLite internals is allowed; use the native SessionDB API
+- no custom conversation database is required
+- no session-ID output scraping is allowed
+
+Architecture consequence:
+- profile-selection contract: RESOLVED
+- persistent-session/resume contract: RESOLVED
+- session-ID creation/capture contract: RESOLVED by deterministic pre-mint
+- cron discovery contract: RESOLVED sufficiently for implementation planning
+- Hermes/session forensic sequence is CLOSED
+- dedicated stateful subtitle translator remains the leading implementation direction
+- translator production implementation has NOT started
+- worker lease duration and scheduler cadence remain UNFROZEN
+
 Next checkpoint:
-`R6-B-HERMES-INITIAL-SESSION-MINT-OUTPUT-SOURCE-AUDIT — inspect only the native CLI code that mints the initial non-resumed session ID and the quiet/headless completion output path, read-only, to determine whether Hermes exposes that ID through a stable native automation contract`
+`R6-B-STATEFUL-TRANSLATOR-MINIMAL-IMPLEMENTATION-DESIGN — define the exact dedicated translator profile contents, CT120 pre-mint/resume launcher contract, CT108 job-dispatch boundary, staged input/output artifact contract, and offline smoke plan before creating any runtime files`
 
 ## 8. Stage11 implementation roadmap
 
