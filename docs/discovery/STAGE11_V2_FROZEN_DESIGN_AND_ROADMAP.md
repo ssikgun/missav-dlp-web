@@ -146,37 +146,53 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R5-C-FIX2 — accepted affine preservation and deterministic HYBRID projection`
-Verdict: **INCOMPLETE**
+Checkpoint: `R5-C — isolated v2 per-title orchestrator execution`
+Verdict: **PASS / CLOSED**
 
 Important finding:
-- R5-C-FIX2 implemented the frozen accepted-affine preservation and HYBRID projection direction in the R3 application boundary and isolated R5-C execution layer
-- `AlignmentAcceptanceApplicationResult` now carries `decision`, `bundle`, and `alignment`
-- `ACCEPT_HYBRID` requires a validated accepted `RobustAffineAlignment`
-- REJECT_EXTERNAL and UNRESOLVED reject supplied alignment and retain `alignment=None`
-- caller-owned `hybrid_asr_indices` was removed from the isolated R5-C execution API
-- HYBRID anchor cues use only residual-owned ASR identities for optional STT support
-- HYBRID non-anchor cues remain valid external-only semantic cues
-- HYBRID final timing uses deterministic affine projection with the frozen Decimal/ROUND_HALF_UP rule
-- EXISTING_KO, LOCAL_JA, ASR_ONLY, and UNRESOLVED route behavior remains conceptually unchanged
-- R3 application smoke passes
-- R1/R2/R4, alignment, alignment-acceptance, legacy pipeline, completeness, publication, Hermes semantic, and Hermes transport regressions pass
-- R5-C and frozen R5-B orchestrator smokes fail because the frozen R5-B contract contains two assumptions superseded by the later frozen HYBRID ownership design
-- first conflict: R5-B `_validated_application()` reconstructs `AlignmentAcceptanceApplicationResult` using only `decision` and `bundle`, so the newly required accepted `alignment` is discarded and validation fails
-- second conflict: R5-B `_validate_ready_artifact()` treats every non-LOCAL_JA route as ASRSegment-timed output and requires every semantic binding to contain `asr_identity`
-- that assumption is valid for ASR_ONLY but is no longer valid for HYBRID
-- frozen HYBRID ownership now requires projected `SubtitleCue` timing for every external JA cue
-- sparse residual-owned `asr_identity` is optional semantic STT support and is not final timing ownership
-- therefore non-anchor HYBRID cues must legally have `asr_identity=None`
-- no safe R5-C-only workaround exists because the conflicting validation is owned by the frozen R5-B contract itself
-- bypassing or fabricating ASR identities would violate the frozen architecture
-- the required correction is a narrow explicit R5-B contract amendment, not a redesign
-- the amendment must preserve all existing R5-B route/evidence/identity/result safety checks while updating only accepted-alignment preservation and HYBRID output timing ownership
-- current R5-C implementation changes remain uncommitted pending that amendment
-- no live Hermes call, ASR execution, publication, DB/state write, or Stage9 integration occurred
+- R5-C isolated v2 per-title execution path is implemented and frozen
+- the legacy `run_subtitle_pipeline()` remains unchanged
+- R5-B required one narrow explicit amendment because its original frozen timing assumptions predated the later accepted affine HYBRID ownership design
+- the amendment preserves existing R5-B route, source, identity, semantic-result, artifact, and fail-closed safety checks
+- `AlignmentAcceptanceApplicationResult` now preserves `decision`, `bundle`, and accepted `alignment`
+- ACCEPT_HYBRID requires an exact validated `RobustAffineAlignment`
+- REJECT_EXTERNAL and UNRESOLVED retain `alignment=None`
+- `_validated_application()` now preserves and revalidates accepted alignment instead of discarding it
+- the v2 execution API is `run_subtitle_v2_pipeline(route_decision, *, semantic_boundary=None)`
+- caller-owned `hybrid_asr_indices` is removed
+- EXISTING_KO terminates without semantic invocation
+- LOCAL_JA uses exact local Japanese text and original local `SubtitleCue` timing
+- ASR_ONLY uses exact R2 ASR identities/text and original `ASRSegment` timing
+- HYBRID uses external JA as the semantic cue sequence and accepted robust affine evidence as deterministic timing ownership
+- HYBRID timestamp projection uses the single frozen helper `project_affine_timestamp_ms(alignment, source_ms)`
+- projection materialization uses `Decimal(str(scale))`, `Decimal(str(intercept_ms))`, and `ROUND_HALF_UP`
+- negative projection, nonfinite values, collapsed duration, and decreasing projected starts fail closed
+- equal starts and overlapping cues remain valid under the existing subtitle contract
+- no clamp, shift, reorder, fallback, or timestamp repair is performed
+- HYBRID selected residuals provide optional authoritative ASR/STT support only
+- a HYBRID cue without a selected residual remains a valid external-only semantic cue with `asr_identity=None`
+- ASR identity never owns final HYBRID timing
+- all semantic routes invoke the injected semantic boundary exactly once
+- EXISTING_KO and UNRESOLVED invoke it zero times
+- no retry or fallback is introduced
+- no live Hermes transport, ASR execution, filesystem/network effect, publication, DB/state write, or Stage9 integration exists in this isolated execution boundary
+- R1/R2/R4 remain unchanged
+- R3 alignment and acceptance remain unchanged; only the R3 acceptance-application boundary was extended to preserve accepted affine evidence
+- full R5-B-AMEND1 / R5-C source review passed
+- all requested regression smokes passed
+- `git diff --check` passed
+- R5-B amendment and R5-C execution implementation are frozen together
+
+Frozen reviewed identities:
+- `teddy_discovery_alignment_application.py`: `cb436ff92238c9a0ea40124180662438a7011a4ccf5a66f63409e572e853c9f1`
+- `teddy_discovery_alignment_application_smoke.py`: `434c6401fd2c87132060fb0ae955c6d73500c5b50e23493592c946a85c900e4c`
+- `teddy_discovery_subtitle_v2_orchestrator.py`: `a6603776456f44717b15d76169193dc6b9c74131e490d88765436017672aded2`
+- `teddy_discovery_subtitle_v2_orchestrator_smoke.py`: `19cfdf38ff76781f995db7565319f617236614a93880f4f0482eb31bc9c159a9`
+- `teddy_discovery_subtitle_v2_pipeline.py`: `11d552c056291848d6c7bcf9d2a8d84b7fc4dd3f6db01f7da6f5ad9bf47dfd5e`
+- `teddy_discovery_subtitle_v2_pipeline_smoke.py`: `fece961b0f4f3e1dc74c62ddb1003b84d4d688718eb415e73fc2e7e60a6918dd`
 
 Next planned checkpoint:
-`R5-B-AMEND1 — minimally update frozen orchestrator contract for accepted affine HYBRID timing ownership`
+`R5-D — Stage11 v2 per-title orchestrator closure audit`
 
 ## 8. Stage11 implementation roadmap
 

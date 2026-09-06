@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from teddy_discovery_alignment import AffineAnchorResidual, RobustAffineAlignment
 from teddy_discovery_alignment_acceptance import (
     ACCEPT_HYBRID,
     ALIGNMENT_POLICY_SATISFIED,
@@ -15,6 +16,7 @@ from teddy_discovery_alignment_acceptance import (
     AlignmentAcceptanceDecision,
 )
 from teddy_discovery_alignment_application import (
+    AlignmentAcceptanceApplicationValidationError,
     apply_alignment_acceptance,
 )
 from teddy_discovery_asr import (
@@ -67,6 +69,7 @@ from teddy_discovery_subtitle_v2_orchestrator import (
     SubtitleV2SemanticBinding,
     SubtitleV2SemanticPlan,
     SubtitleV2SemanticResult,
+    project_affine_timestamp_ms,
     validate_subtitle_v2_pre_publish_result,
 )
 
@@ -163,8 +166,9 @@ def hybrid_bundle() -> HybridEvidenceBundle:
         "ja",
         (
             (900, 1_400, "日本語一"),
-            (1_900, 2_400, "日本語二"),
-            (2_900, 3_400, "日本語三"),
+            (1_500, 2_400, "日本語二"),
+            (1_900, 2_400, "日本語三"),
+            (2_900, 3_400, "日本語四"),
         ),
     )
     en_payload = external_payload(
@@ -172,8 +176,9 @@ def hybrid_bundle() -> HybridEvidenceBundle:
         "en",
         (
             (900, 1_400, "support one"),
-            (1_900, 2_400, "support two"),
-            (2_900, 3_400, "support three"),
+            (1_500, 2_400, "support two"),
+            (1_900, 2_400, "support three"),
+            (2_900, 3_400, "support four"),
         ),
     )
     return HybridEvidenceBundle.from_external_ja_and_asr(
@@ -188,6 +193,35 @@ def hybrid_bundle() -> HybridEvidenceBundle:
         ),
         external_en_payload=en_payload,
         external_en_document=en_payload.parse(),
+    )
+
+
+def accepted_alignment() -> RobustAffineAlignment:
+    residuals = tuple(
+        AffineAnchorResidual(
+            external_identity=HybridCueIdentity.for_external_ja(external_index),
+            asr_identity=HybridCueIdentity.for_asr_segment(asr_index),
+            external_midpoint_x2=external_midpoint_x2,
+            asr_midpoint_x2=external_midpoint_x2 + 300,
+            predicted_asr_midpoint_ms=(external_midpoint_x2 / 2) + 150.0,
+            signed_residual_ms=0.0,
+            absolute_residual_ms=0.0,
+            is_inlier=True,
+        )
+        for external_index, asr_index, external_midpoint_x2 in (
+            (0, 0, 2_300),
+            (2, 1, 4_300),
+            (3, 2, 6_300),
+        )
+    )
+    return RobustAffineAlignment(
+        scale=1.0,
+        intercept_ms=150.0,
+        anchor_count=3,
+        inlier_count=3,
+        residual_threshold_ms=1,
+        residuals=residuals,
+        median_absolute_residual_ms=0.0,
     )
 
 
@@ -228,7 +262,7 @@ def hermes_request(
     external: bool = True,
     stt: bool = True,
     external_texts: tuple[str, ...] | None = None,
-    stt_texts: tuple[str, ...] | None = None,
+    stt_texts: tuple[str | None, ...] | None = None,
 ) -> HermesV2Request:
     resolved_external = external_texts or tuple(
         "外部日本語" for _ in cue_ids
@@ -282,14 +316,22 @@ def hybrid_bindings(
 ) -> tuple[SubtitleV2SemanticBinding, ...]:
     require(route.alignment_application is not None, "HYBRID_BINDING_FIXTURE_HAS_APPLICATION")
     bundle = route.alignment_application.bundle
+    alignment = route.alignment_application.alignment
+    require(alignment is not None, "HYBRID_BINDING_FIXTURE_HAS_ALIGNMENT")
+    residuals_by_external_index = {
+        residual.external_identity.source_index: residual
+        for residual in alignment.residuals
+    }
     return tuple(
         SubtitleV2SemanticBinding(
             cue.cue_id,
             index,
             external_ja_identity=bundle.cue_evidence[index].identity,
-            asr_identity=HybridCueIdentity.for_asr_segment(index)
-            if cue.stt_ja is not None
-            else None,
+            asr_identity=(
+                residuals_by_external_index[index].asr_identity
+                if cue.stt_ja is not None
+                else None
+            ),
         )
         for index, cue in enumerate(request.cues)
     )
@@ -460,6 +502,19 @@ def main():
 
     bundle = hybrid_bundle()
     direct_bundle = direct_asr_only_bundle()
+    alignment = accepted_alignment()
+    expect_raises(
+        AlignmentAcceptanceApplicationValidationError,
+        lambda: apply_alignment_acceptance(
+            bundle,
+            acceptance_decision(
+                ACCEPT_HYBRID,
+                ALIGNMENT_PROVENANCE_EXTERNAL_ASR_HYBRID,
+                (ALIGNMENT_POLICY_SATISFIED,),
+            ),
+        ),
+        "ACCEPT_HYBRID_MISSING_ALIGNMENT_REJECTED",
+    )
     accepted_application = apply_alignment_acceptance(
         bundle,
         acceptance_decision(
@@ -467,6 +522,7 @@ def main():
             ALIGNMENT_PROVENANCE_EXTERNAL_ASR_HYBRID,
             (ALIGNMENT_POLICY_SATISFIED,),
         ),
+        alignment=alignment,
     )
     rejected_application = apply_alignment_acceptance(
         bundle,
@@ -507,6 +563,25 @@ def main():
         state=V2_READY_FOR_SEMANTIC,
         alignment_application=accepted_application,
     )
+    require(
+        hybrid_route.alignment_application is not None
+        and hybrid_route.alignment_application.alignment == alignment,
+        "VALIDATED_APPLICATION_PRESERVES_ACCEPTED_ALIGNMENT",
+    )
+    detached_application = object.__new__(type(accepted_application))
+    object.__setattr__(detached_application, "decision", accepted_application.decision)
+    object.__setattr__(detached_application, "bundle", accepted_application.bundle)
+    object.__setattr__(detached_application, "alignment", None)
+    expect_raises(
+        SubtitleV2OrchestratorError,
+        lambda: SubtitleV2RouteDecision(
+            canonical_video=canonical,
+            route=V2_ROUTE_HYBRID,
+            state=V2_READY_FOR_SEMANTIC,
+            alignment_application=detached_application,
+        ),
+        "DETACHED_ACCEPTED_ALIGNMENT_REJECTED",
+    )
     asr_only_route = SubtitleV2RouteDecision(
         canonical_video=canonical,
         route=V2_ROUTE_ASR_ONLY,
@@ -525,6 +600,11 @@ def main():
         state=V2_FAILED_CLOSED,
         alignment_application=unresolved_application,
     )
+    require(
+        rejected_application.alignment is None
+        and unresolved_application.alignment is None,
+        "REJECTED_AND_UNRESOLVED_APPLICATIONS_HAVE_NO_ALIGNMENT",
+    )
 
     local_request = hermes_request(
         ("local-001", "local-002"),
@@ -537,9 +617,9 @@ def main():
         semantic_bindings=local_bindings(local_request),
     )
     hybrid_request = hermes_request(
-        ("ja-000001", "ja-000002", "ja-000003"),
-        external_texts=("日本語一", "日本語二", "日本語三"),
-        stt_texts=("音声一", "音声二", "音声三"),
+        ("ja-000001", "ja-000002", "ja-000003", "ja-000004"),
+        external_texts=("日本語一", "日本語二", "日本語三", "日本語四"),
+        stt_texts=("音声一", None, "音声二", "音声三"),
     )
     hybrid_plan = SubtitleV2SemanticPlan(
         route_decision=hybrid_route,
@@ -717,9 +797,9 @@ def main():
     )
 
     arbitrary_hybrid_request = hermes_request(
-        ("arbitrary-001", "arbitrary-002", "arbitrary-003"),
-        external_texts=("日本語一", "日本語二", "日本語三"),
-        stt_texts=("音声一", "音声二", "音声三"),
+        ("arbitrary-001", "arbitrary-002", "arbitrary-003", "arbitrary-004"),
+        external_texts=("日本語一", "日本語二", "日本語三", "日本語四"),
+        stt_texts=("音声一", None, "音声二", "音声三"),
     )
     expect_raises(
         SubtitleV2OrchestratorError,
@@ -734,9 +814,9 @@ def main():
         "HYBRID_ARBITRARY_CUE_ID_REJECTED",
     )
     unrelated_hybrid_request = hermes_request(
-        ("ja-000001", "ja-000002", "ja-000003"),
-        external_texts=("無関係な外部", "日本語二", "日本語三"),
-        stt_texts=("音声一", "音声二", "音声三"),
+        ("ja-000001", "ja-000002", "ja-000003", "ja-000004"),
+        external_texts=("無関係な外部", "日本語二", "日本語三", "日本語四"),
+        stt_texts=("音声一", None, "音声二", "音声三"),
     )
     expect_raises(
         SubtitleV2OrchestratorError,
@@ -751,9 +831,9 @@ def main():
         "HYBRID_UNRELATED_EXTERNAL_JA_REJECTED",
     )
     unrelated_hybrid_stt_request = hermes_request(
-        ("ja-000001", "ja-000002", "ja-000003"),
-        external_texts=("日本語一", "日本語二", "日本語三"),
-        stt_texts=("無関係なSTT", "音声二", "音声三"),
+        ("ja-000001", "ja-000002", "ja-000003", "ja-000004"),
+        external_texts=("日本語一", "日本語二", "日本語三", "日本語四"),
+        stt_texts=("無関係なSTT", None, "音声二", "音声三"),
     )
     expect_raises(
         SubtitleV2OrchestratorError,
@@ -769,13 +849,14 @@ def main():
     )
     duplicate_hybrid_bindings = (
         hybrid_plan.semantic_bindings[0],
+        hybrid_plan.semantic_bindings[1],
         SubtitleV2SemanticBinding(
-            "ja-000002",
-            1,
-            external_ja_identity=bundle.cue_evidence[1].identity,
+            "ja-000003",
+            2,
+            external_ja_identity=bundle.cue_evidence[2].identity,
             asr_identity=HybridCueIdentity.for_asr_segment(0),
         ),
-        hybrid_plan.semantic_bindings[2],
+        hybrid_plan.semantic_bindings[3],
     )
     expect_raises(
         SubtitleV2OrchestratorError,
@@ -814,6 +895,14 @@ def main():
         semantic_plan=hybrid_plan,
         hermes_result=hermes_result(hybrid_plan.hermes_request),
     )
+    asr_semantic_result = SubtitleV2SemanticResult(
+        semantic_plan=asr_plan,
+        hermes_result=hermes_result(asr_plan.hermes_request),
+    )
+    direct_asr_semantic_result = SubtitleV2SemanticResult(
+        semantic_plan=direct_asr_plan,
+        hermes_result=hermes_result(direct_asr_plan.hermes_request),
+    )
     require(
         local_semantic_result.hermes_result.cues[0].cue_id == "local-001"
         and hybrid_semantic_result.hermes_result.cues[1].cue_id == "ja-000002",
@@ -823,6 +912,128 @@ def main():
     local_output_cues, local_artifact = ready_artifact(
         local_semantic_result,
         local_route.source_document.cues,
+    )
+    hybrid_source_cues = hybrid_route.alignment_application.bundle.external_ja_document.cues
+    hybrid_projected_timing = tuple(
+        SubtitleCue(
+            start_ms=project_affine_timestamp_ms(
+                alignment,
+                source_cue.start_ms,
+            ),
+            end_ms=project_affine_timestamp_ms(
+                alignment,
+                source_cue.end_ms,
+            ),
+            text=source_cue.text,
+        )
+        for source_cue in hybrid_source_cues
+    )
+    hybrid_output_cues, hybrid_artifact = ready_artifact(
+        hybrid_semantic_result,
+        hybrid_projected_timing,
+    )
+    hybrid_pre_publish = SubtitleV2PrePublishResult(
+        route_decision=hybrid_route,
+        state=V2_READY_TO_PUBLISH,
+        semantic_result=hybrid_semantic_result,
+        output_cues=hybrid_output_cues,
+        artifact=hybrid_artifact,
+    )
+    asr_output_cues, asr_artifact = ready_artifact(
+        asr_semantic_result,
+        asr_only_route.alignment_application.bundle.asr_result.segments,
+    )
+    asr_pre_publish = SubtitleV2PrePublishResult(
+        route_decision=asr_only_route,
+        state=V2_READY_TO_PUBLISH,
+        semantic_result=asr_semantic_result,
+        output_cues=asr_output_cues,
+        artifact=asr_artifact,
+    )
+    direct_asr_output_cues, direct_asr_artifact = ready_artifact(
+        direct_asr_semantic_result,
+        direct_asr_only_route.evidence_bundle.asr_result.segments,
+    )
+    direct_asr_pre_publish = SubtitleV2PrePublishResult(
+        route_decision=direct_asr_only_route,
+        state=V2_READY_TO_PUBLISH,
+        semantic_result=direct_asr_semantic_result,
+        output_cues=direct_asr_output_cues,
+        artifact=direct_asr_artifact,
+    )
+    require(
+        tuple(type(output.timing_evidence) for output in hybrid_output_cues)
+        == (SubtitleCue, SubtitleCue, SubtitleCue, SubtitleCue)
+        and tuple(output.source_index for output in hybrid_output_cues)
+        == (0, 1, 2, 3)
+        and tuple(
+            binding.asr_identity.source_index
+            if binding.asr_identity is not None
+            else None
+            for binding in hybrid_plan.semantic_bindings
+        )
+        == (0, None, 1, 2)
+        and tuple(
+            (cue.start_ms, cue.end_ms)
+            for cue in parse_subtitle_bytes(hybrid_artifact.payload, "srt").cues
+        )
+        == tuple(
+            (cue.start_ms, cue.end_ms)
+            for cue in hybrid_projected_timing
+        )
+        and (
+            hybrid_projected_timing[0].start_ms,
+            hybrid_projected_timing[0].end_ms,
+        )
+        != (
+            asr_result().segments[0].start_ms,
+            asr_result().segments[0].end_ms,
+        )
+        and asr_pre_publish.artifact is not None
+        and direct_asr_pre_publish.artifact is not None,
+        "ROUTE_SPECIFIC_TIMING_OWNERSHIP_ACCEPTED",
+    )
+    wrong_projected_timing = (
+        SubtitleCue(
+            hybrid_projected_timing[0].start_ms + 1,
+            hybrid_projected_timing[0].end_ms,
+            hybrid_projected_timing[0].text,
+        ),
+        *hybrid_projected_timing[1:],
+    )
+    wrong_output_cues, wrong_artifact = ready_artifact(
+        hybrid_semantic_result,
+        wrong_projected_timing,
+    )
+    expect_raises(
+        SubtitleV2OrchestratorError,
+        lambda: SubtitleV2PrePublishResult(
+            route_decision=hybrid_route,
+            state=V2_READY_TO_PUBLISH,
+            semantic_result=hybrid_semantic_result,
+            output_cues=wrong_output_cues,
+            artifact=wrong_artifact,
+        ),
+        "HYBRID_ARTIFACT_TIMING_NOT_AFFINE_PROJECTION_REJECTED",
+    )
+    arbitrary_projected_timing = tuple(
+        SubtitleCue(source_cue.start_ms, source_cue.end_ms, source_cue.text)
+        for source_cue in hybrid_source_cues
+    )
+    arbitrary_output_cues, arbitrary_artifact = ready_artifact(
+        hybrid_semantic_result,
+        arbitrary_projected_timing,
+    )
+    expect_raises(
+        SubtitleV2OrchestratorError,
+        lambda: SubtitleV2PrePublishResult(
+            route_decision=hybrid_route,
+            state=V2_READY_TO_PUBLISH,
+            semantic_result=hybrid_semantic_result,
+            output_cues=arbitrary_output_cues,
+            artifact=arbitrary_artifact,
+        ),
+        "HYBRID_ARBITRARY_SUBTITLE_CUE_REJECTED",
     )
     local_pre_publish = SubtitleV2PrePublishResult(
         route_decision=local_route,

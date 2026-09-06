@@ -1,12 +1,14 @@
 """Offline smoke tests for deterministic alignment-decision application."""
 
-from dataclasses import FrozenInstanceError, fields
+from dataclasses import FrozenInstanceError, fields, replace
 from pathlib import Path
 
 from teddy_discovery_alignment import (
     AnchorTimingEvidence,
+    AffineAnchorResidual,
     JapaneseComparisonEvidence,
     MonotonicAnchorCandidate,
+    RobustAffineAlignment,
 )
 from teddy_discovery_alignment_acceptance import (
     ACCEPT_HYBRID,
@@ -89,9 +91,9 @@ def asr_result(dvd_id: str = DVD_ID) -> ASRResult:
         source_snapshot=snapshot,
         source_language="ja",
         segments=(
-            ASRSegment(1_000, 2_000, "同じ"),
-            ASRSegment(3_000, 4_000, "同じ"),
-            ASRSegment(5_000, 6_000, "同じ"),
+            ASRSegment(1_000, 1_500, "同じ"),
+            ASRSegment(2_000, 2_500, "同じ"),
+            ASRSegment(3_000, 3_500, "同じ"),
         ),
         engine_version="application-smoke-engine",
     )
@@ -130,8 +132,8 @@ def external_payload(
 
 
 def hybrid_bundle() -> HybridEvidenceBundle:
-    ja_payload = external_payload(JA_URL, "ja", ("日本語", "字幕"))
-    en_payload = external_payload(EN_URL, "en", ("support", "evidence"))
+    ja_payload = external_payload(JA_URL, "ja", ("日本語", "字幕", "三番"))
+    en_payload = external_payload(EN_URL, "en", ("support", "evidence", "third"))
     return HybridEvidenceBundle.from_external_ja_and_asr(
         dvd_id=DVD_ID,
         external_ja_payload=ja_payload,
@@ -155,6 +157,10 @@ def decision(
     anchor_count: int = 3,
     inlier_count: int = 3,
     inlier_ratio: float = 1.0,
+    median_absolute_residual_ms: float = 0.0,
+    external_evidence_span_ms: float = 2_000.0,
+    asr_evidence_span_ms: float = 2_000.0,
+    scale: float = 1.0,
 ) -> AlignmentAcceptanceDecision:
     return AlignmentAcceptanceDecision(
         verdict=verdict,
@@ -163,10 +169,35 @@ def decision(
         anchor_count=anchor_count,
         inlier_count=inlier_count,
         inlier_ratio=inlier_ratio,
-        median_absolute_residual_ms=0.0,
-        external_evidence_span_ms=2_000.0,
-        asr_evidence_span_ms=2_000.0,
+        median_absolute_residual_ms=median_absolute_residual_ms,
+        external_evidence_span_ms=external_evidence_span_ms,
+        asr_evidence_span_ms=asr_evidence_span_ms,
+        scale=scale,
+    )
+
+
+def accepted_alignment() -> RobustAffineAlignment:
+    residuals = tuple(
+        AffineAnchorResidual(
+            external_identity=HybridCueIdentity.for_external_ja(index),
+            asr_identity=HybridCueIdentity.for_asr_segment(index),
+            external_midpoint_x2=2 * midpoint_ms,
+            asr_midpoint_x2=2 * midpoint_ms,
+            predicted_asr_midpoint_ms=float(midpoint_ms),
+            signed_residual_ms=0.0,
+            absolute_residual_ms=0.0,
+            is_inlier=True,
+        )
+        for index, midpoint_ms in enumerate((1_250, 2_250, 3_250))
+    )
+    return RobustAffineAlignment(
         scale=1.0,
+        intercept_ms=0.0,
+        anchor_count=3,
+        inlier_count=3,
+        residual_threshold_ms=1,
+        residuals=residuals,
+        median_absolute_residual_ms=0.0,
     )
 
 
@@ -207,8 +238,28 @@ def main():
         ALIGNMENT_PROVENANCE_UNRESOLVED,
         (INSUFFICIENT_ANCHOR_COUNT,),
     )
+    alignment = accepted_alignment()
 
-    accepted = apply_alignment_acceptance(source_bundle, accept_decision)
+    expect_raises(
+        AlignmentAcceptanceApplicationValidationError,
+        lambda: apply_alignment_acceptance(source_bundle, accept_decision),
+        "ACCEPT_WITHOUT_ALIGNMENT_REJECTED",
+    )
+    accepted = apply_alignment_acceptance(
+        source_bundle,
+        accept_decision,
+        alignment=alignment,
+    )
+    require(
+        accepted.alignment == alignment
+        and accepted.alignment.scale == alignment.scale
+        and accepted.alignment.intercept_ms == alignment.intercept_ms
+        and accepted.alignment.residuals == alignment.residuals
+        and accepted.alignment.anchor_count == alignment.anchor_count
+        and accepted.alignment.inlier_count == alignment.inlier_count,
+        "ACCEPT_PRESERVES_EXACT_ALIGNMENT",
+    )
+
     require(
         accepted.bundle.external_ja_payload is source_bundle.external_ja_payload
         and accepted.bundle.external_ja_document is source_bundle.external_ja_document
@@ -222,6 +273,7 @@ def main():
     )
 
     rejected = apply_alignment_acceptance(source_bundle, reject_decision)
+    require(rejected.alignment is None, "REJECT_ALIGNMENT_IS_NONE")
     require(
         rejected.bundle is not source_bundle
         and rejected.bundle.external_ja_payload is None
@@ -245,6 +297,7 @@ def main():
     )
 
     unresolved = apply_alignment_acceptance(source_bundle, unresolved_decision)
+    require(unresolved.alignment is None, "UNRESOLVED_ALIGNMENT_IS_NONE")
     require(
         unresolved.bundle.external_ja_payload is source_bundle.external_ja_payload
         and unresolved.bundle.external_ja_document is source_bundle.external_ja_document
@@ -278,11 +331,133 @@ def main():
         )
 
     require(
-        accepted == apply_alignment_acceptance(source_bundle, accept_decision)
+        accepted
+        == apply_alignment_acceptance(
+            source_bundle,
+            accept_decision,
+            alignment=alignment,
+        )
         and rejected == apply_alignment_acceptance(source_bundle, reject_decision)
         and unresolved
         == apply_alignment_acceptance(source_bundle, unresolved_decision),
         "APPLICATION_REPEATABILITY",
+    )
+
+    expect_raises(
+        AlignmentAcceptanceApplicationValidationError,
+        lambda: apply_alignment_acceptance(
+            source_bundle,
+            reject_decision,
+            alignment=alignment,
+        ),
+        "REJECT_SUPPLIED_ALIGNMENT_REJECTED",
+    )
+    expect_raises(
+        AlignmentAcceptanceApplicationValidationError,
+        lambda: apply_alignment_acceptance(
+            source_bundle,
+            unresolved_decision,
+            alignment=alignment,
+        ),
+        "UNRESOLVED_SUPPLIED_ALIGNMENT_REJECTED",
+    )
+
+    expect_raises(
+        AlignmentAcceptanceApplicationValidationError,
+        lambda: apply_alignment_acceptance(
+            source_bundle,
+            decision(
+                ACCEPT_HYBRID,
+                ALIGNMENT_PROVENANCE_EXTERNAL_ASR_HYBRID,
+                (ALIGNMENT_POLICY_SATISFIED,),
+                scale=2.0,
+            ),
+            alignment=alignment,
+        ),
+        "DETACHED_SCALE_REJECTED",
+    )
+    expect_raises(
+        AlignmentAcceptanceApplicationValidationError,
+        lambda: apply_alignment_acceptance(
+            source_bundle,
+            decision(
+                ACCEPT_HYBRID,
+                ALIGNMENT_PROVENANCE_EXTERNAL_ASR_HYBRID,
+                (ALIGNMENT_POLICY_SATISFIED,),
+                anchor_count=4,
+                inlier_count=4,
+                inlier_ratio=1.0,
+            ),
+            alignment=alignment,
+        ),
+        "DETACHED_ANCHOR_INLIER_METRICS_REJECTED",
+    )
+    expect_raises(
+        AlignmentAcceptanceApplicationValidationError,
+        lambda: apply_alignment_acceptance(
+            source_bundle,
+            decision(
+                ACCEPT_HYBRID,
+                ALIGNMENT_PROVENANCE_EXTERNAL_ASR_HYBRID,
+                (ALIGNMENT_POLICY_SATISFIED,),
+                external_evidence_span_ms=2_001.0,
+            ),
+            alignment=alignment,
+        ),
+        "DETACHED_EVIDENCE_SPAN_REJECTED",
+    )
+    detached_identity_residuals = tuple(
+        replace(
+            residual,
+            external_identity=HybridCueIdentity.for_external_ja(index + 1),
+        )
+        for index, residual in enumerate(alignment.residuals)
+    )
+    detached_identity_alignment = replace(
+        alignment,
+        residuals=detached_identity_residuals,
+    )
+    expect_raises(
+        AlignmentAcceptanceApplicationValidationError,
+        lambda: apply_alignment_acceptance(
+            source_bundle,
+            accept_decision,
+            alignment=detached_identity_alignment,
+        ),
+        "DETACHED_RESIDUAL_IDENTITY_REJECTED",
+    )
+    detached_midpoint_residuals = (
+        replace(
+            alignment.residuals[0],
+            external_midpoint_x2=3_000,
+            asr_midpoint_x2=3_000,
+            predicted_asr_midpoint_ms=1_500.0,
+        ),
+        replace(
+            alignment.residuals[1],
+            external_midpoint_x2=4_500,
+            asr_midpoint_x2=4_500,
+            predicted_asr_midpoint_ms=2_250.0,
+        ),
+        replace(
+            alignment.residuals[2],
+            external_midpoint_x2=7_000,
+            asr_midpoint_x2=7_000,
+            predicted_asr_midpoint_ms=3_500.0,
+        ),
+    )
+    detached_midpoint_alignment = replace(
+        alignment,
+        residuals=detached_midpoint_residuals,
+    )
+    expect_raises(
+        AlignmentAcceptanceApplicationValidationError,
+        lambda: apply_alignment_acceptance(
+            source_bundle,
+            accept_decision,
+            alignment=detached_midpoint_alignment,
+        ),
+        "DETACHED_RESIDUAL_SOURCE_TIMING_REJECTED",
     )
 
     asr_only_bundle = HybridEvidenceBundle.from_asr_only(
@@ -337,6 +512,7 @@ def main():
         lambda: AlignmentAcceptanceApplicationResult(
             accept_decision,
             unresolved.bundle,
+            None,
         ),
         "DETACHED_RESULT_PROVENANCE_REJECTED",
     )
@@ -368,9 +544,14 @@ def main():
     )
     for field in fields(AlignmentAcceptanceApplicationResult):
         require(
-            field.name in {"decision", "bundle"},
+            field.name in {"decision", "bundle", "alignment"},
             "APPLICATION_RESULT_FIELD_BOUNDARY",
         )
+    require(
+        tuple(field.name for field in fields(AlignmentAcceptanceApplicationResult))
+        == ("decision", "bundle", "alignment"),
+        "APPLICATION_RESULT_EXACT_FIELD_ORDER",
+    )
 
     application_source = Path(__file__).with_name(
         "teddy_discovery_alignment_application.py"

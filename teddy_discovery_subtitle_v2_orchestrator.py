@@ -9,17 +9,20 @@ Existing immutable source objects remain authoritative:
 * ``CanonicalVideoHolding`` owns canonical title/video identity.
 * ``HybridEvidenceBundle`` and its R3 application result own aligned evidence.
 * ``HermesV2Request`` and ``HermesV2Result`` own semantic model data.
-* ``SubtitleCue``/``ASRSegment`` own deterministic timing evidence.
+* ``SubtitleCue``/``ASRSegment`` own route-specific deterministic timing
+  evidence.
 * ``GeneratedKoreanSRT`` owns the supplied pre-publication artifact.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal, DecimalException, ROUND_HALF_UP
 from pathlib import PurePosixPath
 import unicodedata
 from typing import Final
 
+from teddy_discovery_alignment import RobustAffineAlignment
 from teddy_discovery_alignment_acceptance import (
     ACCEPT_HYBRID,
     REJECT_EXTERNAL,
@@ -113,6 +116,72 @@ class SubtitleV2OrchestratorError(ValueError):
 
 class SubtitleV2OrchestratorValidationError(SubtitleV2OrchestratorError):
     """Raised when a route, semantic value, or artifact is unsafe."""
+
+
+def _validated_alignment(value: object) -> RobustAffineAlignment:
+    if not isinstance(value, RobustAffineAlignment):
+        raise SubtitleV2OrchestratorValidationError(
+            "alignment must be a RobustAffineAlignment"
+        )
+    try:
+        return RobustAffineAlignment(
+            scale=value.scale,
+            intercept_ms=value.intercept_ms,
+            anchor_count=value.anchor_count,
+            inlier_count=value.inlier_count,
+            residual_threshold_ms=value.residual_threshold_ms,
+            residuals=value.residuals,
+            median_absolute_residual_ms=value.median_absolute_residual_ms,
+        )
+    except (AttributeError, TypeError, ValueError, OverflowError) as error:
+        raise SubtitleV2OrchestratorValidationError(
+            "alignment is invalid or detached"
+        ) from error
+
+
+def project_affine_timestamp_ms(
+    alignment: RobustAffineAlignment,
+    source_ms: int,
+) -> int:
+    """Materialize one accepted affine source timestamp deterministically."""
+
+    validated_alignment = _validated_alignment(alignment)
+    if type(source_ms) is not int or source_ms < 0:
+        raise SubtitleV2OrchestratorValidationError(
+            "source_ms must be an exact nonnegative integer"
+        )
+
+    try:
+        projected = (
+            Decimal(str(validated_alignment.scale)) * Decimal(source_ms)
+            + Decimal(str(validated_alignment.intercept_ms))
+        )
+    except (DecimalException, TypeError, ValueError, OverflowError) as error:
+        raise SubtitleV2OrchestratorValidationError(
+            "affine timestamp projection is not representable"
+        ) from error
+
+    if not projected.is_finite() or projected < 0:
+        raise SubtitleV2OrchestratorValidationError(
+            "affine timestamp projection is negative or nonfinite"
+        )
+
+    try:
+        materialized = projected.quantize(
+            Decimal("1"),
+            rounding=ROUND_HALF_UP,
+        )
+        result = int(materialized)
+    except (DecimalException, TypeError, ValueError, OverflowError) as error:
+        raise SubtitleV2OrchestratorValidationError(
+            "affine timestamp materialization is not representable"
+        ) from error
+
+    if type(result) is not int or result < 0:
+        raise SubtitleV2OrchestratorValidationError(
+            "affine timestamp materialization is negative or invalid"
+        )
+    return result
 
 
 def _has_control_characters(value: str) -> bool:
@@ -291,6 +360,7 @@ def _validated_application(
         validated = AlignmentAcceptanceApplicationResult(
             decision=value.decision,
             bundle=value.bundle,
+            alignment=value.alignment,
         )
     except Exception as error:
         raise SubtitleV2OrchestratorValidationError(
@@ -920,12 +990,12 @@ class SubtitleV2SemanticResult:
 
 @dataclass(frozen=True)
 class SubtitleV2OutputCue:
-    """Deterministic output identity plus a reference to source timing.
+    """Deterministic output identity plus route-owned timing evidence.
 
     Korean text is intentionally not copied here: it remains owned by the
     Hermes result and the supplied ``GeneratedKoreanSRT`` artifact.  The
-    timing object is an existing deterministic source object, never an LLM
-    timestamp field.
+    timing object is either an original source object or a deterministic
+    affine-projected ``SubtitleCue``; it is never an LLM timestamp field.
     """
 
     cue_id: str
@@ -940,7 +1010,7 @@ class SubtitleV2OutputCue:
         )
         if not isinstance(self.timing_evidence, (SubtitleCue, ASRSegment)):
             raise SubtitleV2OrchestratorValidationError(
-                "timing_evidence must be an existing SubtitleCue or ASRSegment"
+                "timing_evidence must be a SubtitleCue or ASRSegment"
             )
 
 
@@ -1031,6 +1101,7 @@ def _validate_ready_artifact(
         )
 
     previous_source_index = None
+    previous_projected_start_ms = None
     semantic_bindings = semantic_result.semantic_plan.semantic_bindings
     if route_decision.route == V2_ROUTE_LOCAL_JA:
         timing_source = route_decision.source_document
@@ -1038,12 +1109,26 @@ def _validate_ready_artifact(
             raise SubtitleV2OrchestratorValidationError(
                 "local JA output has no deterministic timing source"
             )
-        expected_timing_type = SubtitleCue
         timing_values = timing_source.cues
-    else:
+    elif route_decision.route == V2_ROUTE_HYBRID:
+        application = route_decision.alignment_application
+        if application is None or application.alignment is None:
+            raise SubtitleV2OrchestratorValidationError(
+                "hybrid output has no accepted affine alignment"
+            )
+        timing_source = _asr_bundle(route_decision).external_ja_document
+        if timing_source is None:
+            raise SubtitleV2OrchestratorValidationError(
+                "hybrid output has no external JA timing source"
+            )
+        timing_values = timing_source.cues
+    elif route_decision.route == V2_ROUTE_ASR_ONLY:
         timing_source = _asr_bundle(route_decision).asr_result
-        expected_timing_type = ASRSegment
         timing_values = timing_source.segments
+    else:
+        raise SubtitleV2OrchestratorValidationError(
+            "ready artifact route has no deterministic timing ownership"
+        )
 
     for output_cue, artifact_cue, semantic_cue, binding in zip(
         output_cues,
@@ -1051,22 +1136,69 @@ def _validate_ready_artifact(
         result_cues,
         semantic_bindings,
     ):
-        if not isinstance(output_cue.timing_evidence, expected_timing_type):
-            raise SubtitleV2OrchestratorValidationError(
-                "output timing type does not match route ownership"
+        if route_decision.route == V2_ROUTE_LOCAL_JA:
+            expected_source_index = binding.source_index
+            if not isinstance(output_cue.timing_evidence, SubtitleCue):
+                raise SubtitleV2OrchestratorValidationError(
+                    "LOCAL_JA output timing must be a SubtitleCue"
+                )
+        elif route_decision.route == V2_ROUTE_HYBRID:
+            expected_source_index = binding.source_index
+            if not isinstance(output_cue.timing_evidence, SubtitleCue):
+                raise SubtitleV2OrchestratorValidationError(
+                    "HYBRID output timing must be a SubtitleCue"
+                )
+            external_identity = binding.external_ja_identity
+            if (
+                external_identity is None
+                or external_identity.source != EVIDENCE_SOURCE_EXTERNAL_JA
+                or external_identity.source_index != expected_source_index
+                or expected_source_index >= len(timing_values)
+            ):
+                raise SubtitleV2OrchestratorValidationError(
+                    "HYBRID output source is detached from external JA"
+                )
+            source_cue = timing_values[expected_source_index]
+            projected_start_ms = project_affine_timestamp_ms(
+                route_decision.alignment_application.alignment,
+                source_cue.start_ms,
             )
-        if output_cue.source_index >= len(timing_values):
+            projected_end_ms = project_affine_timestamp_ms(
+                route_decision.alignment_application.alignment,
+                source_cue.end_ms,
+            )
+            try:
+                expected_timing = SubtitleCue(
+                    start_ms=projected_start_ms,
+                    end_ms=projected_end_ms,
+                    text=source_cue.text,
+                )
+            except Exception as error:
+                raise SubtitleV2OrchestratorValidationError(
+                    "HYBRID projected timing is invalid"
+                ) from error
+            if (
+                previous_projected_start_ms is not None
+                and projected_start_ms < previous_projected_start_ms
+            ):
+                raise SubtitleV2OrchestratorValidationError(
+                    "HYBRID projected starts must be nondecreasing"
+                )
+            previous_projected_start_ms = projected_start_ms
+        else:
+            if not isinstance(output_cue.timing_evidence, ASRSegment):
+                raise SubtitleV2OrchestratorValidationError(
+                    "ASR_ONLY output timing must be an ASRSegment"
+                )
+            if binding.asr_identity is None:
+                raise SubtitleV2OrchestratorValidationError(
+                    "ASR_ONLY output lacks deterministic ASR binding"
+                )
+            expected_source_index = binding.asr_identity.source_index
+        if expected_source_index >= len(timing_values):
             raise SubtitleV2OrchestratorValidationError(
                 "output timing source index is outside deterministic evidence"
             )
-        if route_decision.route == V2_ROUTE_LOCAL_JA:
-            expected_source_index = binding.source_index
-        else:
-            if binding.asr_identity is None:
-                raise SubtitleV2OrchestratorValidationError(
-                    "ASR-backed publish output lacks deterministic ASR binding"
-                )
-            expected_source_index = binding.asr_identity.source_index
         if output_cue.source_index != expected_source_index:
             raise SubtitleV2OrchestratorValidationError(
                 "output timing index is detached from semantic source binding"
@@ -1076,7 +1208,10 @@ def _validate_ready_artifact(
                 "output timing source indexes must be strictly ordered"
             )
         previous_source_index = output_cue.source_index
-        expected_timing = timing_values[output_cue.source_index]
+        if route_decision.route == V2_ROUTE_LOCAL_JA:
+            expected_timing = timing_values[output_cue.source_index]
+        elif route_decision.route == V2_ROUTE_ASR_ONLY:
+            expected_timing = timing_values[output_cue.source_index]
         if output_cue.timing_evidence != expected_timing:
             raise SubtitleV2OrchestratorValidationError(
                 "output timing evidence is detached from its source"
@@ -1297,6 +1432,7 @@ __all__ = [
     "SubtitleV2SemanticBinding",
     "SubtitleV2SemanticPlan",
     "SubtitleV2SemanticResult",
+    "project_affine_timestamp_ms",
     "validate_subtitle_v2_pre_publish_result",
     "validate_subtitle_v2_route_decision",
     "validate_subtitle_v2_semantic_plan",
