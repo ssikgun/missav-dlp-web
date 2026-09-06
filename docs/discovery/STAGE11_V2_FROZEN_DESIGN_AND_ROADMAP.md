@@ -350,8 +350,27 @@ Baseline CUDA ASR boundary restoration and real canary:
 - no DB write, publication, source deletion, Stage9 mutation, or Hermes invocation occurred
 - CUDA/Whisper functionality is considered already-established baseline and must not be re-investigated during R6-B unless new evidence directly contradicts it
 
+R6-B full-title baseline ASR timing measurement:
+- JUR-750 complete baseline per-VAD large-v3 run PASS
+- source transfer: `13.103 s`
+- full-title wall time: `102.682 s`
+- remote chunks: `13`
+- slowest remote chunk: `12.283 s`
+- output segments: `166`
+- independent observer cadence: `1.0 s`
+- observer samples: `102`
+- missed observer intervals: `0`
+- observer max delay: `9.848 ms`
+- observer p50 delay: `0.116 ms`
+- observer p95 delay: `0.186 ms`
+- observer p99 delay: `0.202 ms`
+- max-delay phase: `ASR_REMOTE`
+- raw dialogue was neither logged nor stored in the measurement artifact
+- no Stage11 job DB write, publication, source deletion, Stage9 mutation, or Hermes invocation occurred
+- this is real timing evidence for R6-B lease/heartbeat selection; numeric lease values remain unfrozen until Hermes timing evidence is also measured
+
 Next measurement checkpoint:
-`R6-B-MEASURE-ASR-FULLTITLE — measure one complete JUR-750 baseline per-VAD large-v3 run with independent 1-second heartbeat-jitter observation`
+`R6-B-MEASURE-HERMES — measure the frozen Stage11 Hermes semantic boundary latency before freezing numeric lease and heartbeat values`
 
 ## 8. Stage11 implementation roadmap
 
