@@ -146,34 +146,29 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R4-E — live Hermes v2 one-shot semantic canary`
+Checkpoint: `R4 — Hermes v2 semantic adapter and isolated one-shot transport`
 Verdict: **PASS**
 
 Important finding:
-- CT108 to CT120 dedicated SSH authentication and pinned host trust are operational
-- the dedicated Stage11-Hermes SSH identity is separate from the existing Stage11 local-LLM identity
-- the first live Hermes invocation reached provider `openai-codex`, model `gpt-5.6-luna`, reasoning `xhigh`
-- the first live response used top-level field `results`, so the frozen strict parser correctly failed closed
-- shape-only diagnosis confirmed the transport itself was working and the response was valid JSON
-- root cause was an underspecified output envelope in the Hermes v2 system instruction
-- the strict parser was not relaxed
-- the system instruction was corrected to require exactly one top-level field named `cues`
-- `results` and every other top-level field name are explicitly rejected
-- Hermes v2 semantic and transport smoke suites plus all requested regression suites passed after the correction
-- R4-E-RETRY1 then executed exactly one live Hermes semantic invocation
-- the live retry passed the strict R4-B response parser
-- exactly two requested cues produced exactly two outputs
-- cue IDs and request order were preserved
-- every cue returned non-empty natural Korean
-- canary Korean outputs were semantically appropriate for the synthetic Japanese evidence
-- `repaired_ja` remained optional and was not unnecessarily emitted
-- timestamp ownership remained entirely outside the LLM
-- no retry or provider/model fallback was used by the transport
-- the repository remained clean after the live invocation
-- R4-E live semantic canary is CLOSED
+- R4-A baseline audit established that the legacy E4B translation route must remain separate from the Hermes v2 contract
+- R4-B froze the isolated semantic contract with caller-owned cue evidence, exact cue identity, strict JSON, optional repaired Japanese, and Korean output only
+- LLM ownership excludes timestamps, paths, publication decisions, state, ASR, and workflow control
+- R4-C confirmed Hermes v0.20.0 supports explicit one-shot provider, model, and reasoning selection
+- R4-D implemented the isolated CT108 to CT120 transport boundary with `shell=False`, bounded output, fail-closed errors, and no retry or fallback
+- frozen live invocation is provider `openai-codex`, model `gpt-5.6-luna`, reasoning `xhigh`, one-shot `-z`
+- R4-E established dedicated Stage11-Hermes SSH authentication and pinned CT120 host trust
+- the first live semantic response exposed an underspecified output envelope by returning `results`
+- the strict parser correctly rejected that response and was not relaxed
+- the system instruction was minimally corrected to require exactly the top-level `cues` field and reject `results`
+- the subsequent live semantic canary passed strict parsing, cue count, identity, order, Korean completeness, and semantic review
+- `repaired_ja` remained optional
+- no title-specific production hack was introduced
+- no Hermes v2 orchestration, publication, state DB, or `run_subtitle_pipeline` wiring exists yet
+- full R4 regression suite passed at closure
+- R4 semantic adapter and isolated transport are frozen and CLOSED
 
 Next planned checkpoint:
-`R4-F — R4 Hermes v2 adapter closure audit`
+`R5 — v2 per-title orchestrator baseline audit`
 
 ## 8. Stage11 implementation roadmap
 
