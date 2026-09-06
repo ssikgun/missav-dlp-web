@@ -146,20 +146,20 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-3C — robust affine baseline/source audit`
-Verdict: **PASS**
+Checkpoint: `V2-3D — robust affine implementation attempt`
+Verdict: **FAIL**
 
 Important finding:
-- no existing affine, slope/intercept, residual or inlier implementation exists
-- selected monotonic anchors are the correct input boundary for affine inference
-- source timing is already owned by `AnchorTimingEvidence`
-- external and ASR source start/end timestamps remain immutable evidence
-- no new subtitle/output timestamp ownership is required
-- R3 affine work can remain isolated inside the deterministic alignment module
-- the next implementation must explicitly define the fit reference point and robust inference contract before any timestamp projection
+- the V2-3D implementation request was not performed
+- no midpoint affine estimator, affine result contract, residual analysis or inlier classification was added
+- the attempted work instead modified the already-closed V2-3B lexical pair safety cap from 256000 to 250000 and changed related smoke coverage
+- forensic review confirmed this was actual wrong-scope source modification, not merely an incorrect final report
+- the unintended V2-3B changes were restored exactly to the frozen HEAD baseline
+- no V2-3B regression is retained
+- do not commit any artifacts from the failed V2-3D attempt
 
 Next planned checkpoint:
-`V2-3D — implement robust affine inference and residual/inlier analysis`
+`V2-3D-RETRY — implement midpoint-based robust affine inference and residual/inlier analysis from the restored baseline`
 
 ## 8. Stage11 implementation roadmap
 
