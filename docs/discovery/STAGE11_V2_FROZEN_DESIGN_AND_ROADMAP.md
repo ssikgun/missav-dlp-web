@@ -552,8 +552,41 @@ R6-B failed range 80-87 deeper split audit:
 - batched-vs-whole translation quality comparison remains REQUIRED before final semantic strategy approval
 - worker lease duration and heartbeat cadence remain UNFROZEN
 
+R6-B Luna whole-file translation provenance audit:
+- Teddy independently asked the main Slack-connected Luna/Hermes agent to translate the complete JUR-750 Japanese SRT with natural Korean dialogue and contextual STT correction
+- Luna completed the user-visible task in approximately 9–10 minutes
+- returned Korean artifact identity:
+  - SHA-256: `30a69ed8ce12a345cce0b5cf212bd867f575ea3a5a1ea990db2b5c2ea0fccd75`
+  - cue count: `661`
+  - cue index sequence: PASS
+  - empty cues: `0`
+  - `[불명확한 ...]` markers: `3`
+  - WhisperJAV metadata cues: `1`
+- the expected Japanese input identity is:
+  `88edae14fefd7a7838b50c55e4ae4b0b65fb9998e80a147cda81b35412142709`
+- that exact Japanese source was not recovered from the current Hermes cache during the bounded audit
+- Luna workspace helper:
+  `/home/teddy/hermes-workspace/translate_jur750.py`
+  - SHA-256:
+    `dc4ab6b16364d72e700d424112d7dbdf55b9ce716ba148f1d647e074415c5cb6`
+  - valid Python AST
+  - no subprocess, requests, urllib, hermes_tools, or OpenAI ownership detected
+- Luna temporary patch helper:
+  `/tmp/patch_jur750.py`
+  - SHA-256:
+    `f036445e42558f6fd0a86cf12ea44993b46d8b63660142a3cdeab02f9f651aaa`
+  - valid Python AST
+  - no subprocess, requests, urllib, hermes_tools, or OpenAI ownership detected
+- therefore the 9–10 minute Luna result MUST NOT yet be interpreted as one direct whole-file model invocation
+- current evidence is compatible with Luna performing multi-iteration agent reasoning/tool work and writing deterministic helper files, but exact translation provenance remains unproven
+- before further shrinking the Stage11 Hermes live batch from 4 cues to 2, the Luna helper implementation must be audited read-only to determine how the 661-cue translation was actually materialized
+- the Luna 661-cue output is valuable whole-file quality evidence, but it is not directly comparable to the current 166-segment R6 ASR semantic request because the source cue sequence differs
+- batched-vs-whole translation quality comparison remains REQUIRED using equivalent source evidence before final semantic strategy approval
+- worker lease duration and heartbeat cadence remain UNFROZEN
+- no production source code, transport, model policy, DB, publication, source lifecycle, or Stage9 state changed during this provenance audit
+
 Next checkpoint:
-`R6-B-HERMES-BATCH6-SPLIT2-AUDIT — split only the still-failing 4-cue subrange into 2-cue requests before changing any production batching or timeout policy`
+`R6-B-LUNA-WHOLEFILE-SCRIPT-AUDIT — read-only inspect the exact Luna translation and patch helper structure, without printing dialogue, to determine whether translation text was model-generated during agent iterations, embedded deterministically, or produced through another local path`
 
 ## 8. Stage11 implementation roadmap
 
