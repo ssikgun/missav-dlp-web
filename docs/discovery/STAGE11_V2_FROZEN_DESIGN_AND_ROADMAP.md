@@ -1027,8 +1027,52 @@ Architecture remains unchanged:
 - translator runtime implementation has NOT started
 - worker lease and scheduler cadence remain UNFROZEN
 
+R6-B Hermes profile/session capture source audit:
+- checkpoint execution: PASS
+- contract resolution: INCOMPLETE
+- audit was read-only and made no Hermes/profile/session/cron/config/production changes
+
+Profile-selection contract — RESOLVED:
+- Hermes source explicitly states that `--profile / -p` is consumed by
+  `main._apply_profile_override()` BEFORE argparse
+- the pre-argparse profile selector:
+  - resolves the named profile
+  - redirects `HERMES_HOME` to that profile namespace
+  - strips the profile selector from argv before normal command parsing
+- `_parser.py` records `--profile` and `-p` as inherited pre-argparse flags
+- native Hermes source/examples consistently support the global form:
+  `hermes --profile <profile_name> <command> ...`
+- Stage11 will therefore use the canonical global placement before the subcommand
+- translator profile selection ownership is now FROZEN at the native Hermes profile-home boundary
+
+Session persistence / resume — CONFIRMED:
+- Hermes uses native persistent SessionDB state
+- resume/session resolution is first-class
+- `hermes chat --resume <session_id>` remains the native resume contract
+- source resolves compressed/rotated sessions through
+  `resolve_resume_session_id`
+- session IDs are propagated into agent/runtime state
+
+New-session ID capture — STILL UNRESOLVED:
+- source contains a `pass_session_id` path
+- the inspected context showed TUI propagation through:
+  `HERMES_TUI_PASS_SESSION_ID`
+- this does not yet prove the stable machine-readable contract for a NEW headless CLI/chat session
+- `_parser.py` also contains one-shot help text indicating one-shot output does not include a session-id line, so one-shot must not be assumed to provide persistent session capture
+- the current scan was limited to `hermes_cli`; `SessionDB` implementation lives outside that package boundary, so `SESSION_API_COUNT=0` is not evidence that SessionDB lacks native create/session APIs
+- Stage11 must not scrape unstable human-facing output to recover session IDs
+
+Architecture consequence:
+- dedicated native Hermes profile remains approved
+- canonical invocation will use:
+  `hermes --profile <translator-profile> ...`
+- Stage11 DB remains authoritative for job ownership
+- Hermes session remains semantic continuity state only
+- translator runtime implementation remains NOT STARTED
+- worker lease and scheduler cadence remain UNFROZEN
+
 Next checkpoint:
-`R6-B-HERMES-PROFILE-SESSION-CAPTURE-SOURCE-AUDIT — inspect the exact Hermes v0.20.0 source paths that parse/apply --profile and create/persist/report a new headless chat session ID, read-only, so the translator launcher can use native stable contracts without output scraping`
+`R6-B-HERMES-NEW-SESSION-ID-CONTRACT-AUDIT — inspect the exact -Q/pass-session-id parser contract and hermes_state SessionDB initial-session creation/persistence path, read-only, to identify a stable machine-readable new-session ID contract before implementing the translator launcher`
 
 ## 8. Stage11 implementation roadmap
 
