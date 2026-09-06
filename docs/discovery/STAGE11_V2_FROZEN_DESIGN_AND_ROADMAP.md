@@ -146,31 +146,29 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R5-C — isolated v2 per-title orchestrator execution implementation`
-Verdict: **INCOMPLETE**
+Checkpoint: `R5-C-FIX1 — deterministic HYBRID correspondence investigation`
+Verdict: **PASS / OUTCOME B**
 
 Important finding:
-- the initial isolated R5-C execution layer was implemented without changing the frozen R5-B contract
-- EXISTING_KO terminates without semantic work
-- LOCAL_JA builds its Hermes request from exact local Japanese cues and reuses local subtitle timing
-- direct ASR_ONLY and R3-rejected ASR_ONLY build their requests from canonical R2 ASR identities and reuse ASR timing
-- UNRESOLVED fails closed without semantic work or artifact generation
-- semantic routes invoke the injected semantic boundary exactly once with no retry or fallback
-- output Korean SRT construction remains deterministic and LLM timestamps remain forbidden
-- no live Hermes transport, ASR execution, network, publication, DB/state, Stage9 integration, or legacy pipeline modification was introduced
-- full requested regression suite passed
-- independent source review found one HYBRID ownership blocker
-- the current `hybrid_asr_indices` input is caller-supplied and is validated only for tuple shape, full cue-count coverage, in-range indices, and strict ordering
-- those checks do not prove that a supplied ASR index is the ASR segment actually corresponding to the external-JA cue under deterministic R3 alignment evidence
-- therefore a structurally valid but semantically wrong index tuple could attach unrelated ASR text and timing to an external-JA cue
-- caller-supplied ordinal validity is not sufficient evidence ownership for the frozen HYBRID architecture
-- HYBRID per-cue ASR correspondence must instead be derived from authoritative deterministic alignment evidence, or HYBRID must fail closed when such correspondence cannot be proven
-- arbitrary caller mapping must not become production timing or semantic truth
-- R5-C remains open
-- the two untracked R5-C implementation files remain uncommitted pending this correction
+- R5-C-FIX1 inspected the frozen R2/R3 alignment and acceptance chain before modifying production code
+- `MonotonicAnchorCandidate` preserves external and ASR identities while alignment candidates are being evaluated
+- `RobustAffineAlignment.residuals` also carries selected external/ASR identities and residual evidence
+- `AlignmentAcceptanceDecision` retains only aggregate acceptance metrics such as counts, ratios, residuals, span, and scale
+- `AlignmentAcceptanceApplicationResult` retains only the decision and resulting evidence bundle
+- `HybridEvidenceBundle` retains external subtitle evidence, ASR evidence, cue evidence, and provenance, but no authoritative per-cue external-JA-to-ASR correspondence map
+- therefore accepted R3 output proves alignment quality and provenance but does not preserve the exact monotonic per-cue correspondence required later by R5
+- the lost information includes the selected external-JA cue to ASR segment identity/index relation, accepted correspondence ownership, and per-cue timing correspondence
+- R5 cannot safely reconstruct this relation from ordinal position, caller-supplied tuples, or a second independent rematch
+- caller-supplied `hybrid_asr_indices` must not become semantic or timing truth
+- the correct architectural direction is to preserve validated monotonic external-JA-to-ASR correspondence in an immutable R3-owned result and carry it through the R3 application boundary
+- existing R2/R3 identity types such as `MonotonicAnchorCandidate`, `AffineAnchorResidual`, and `HybridCueIdentity` should be reused rather than inventing another identity scheme
+- no source file was modified during this investigation
+- the two untracked R5-C execution files remain preserved
+- no live Hermes call, ASR execution, publication, DB/state write, or Stage9 integration occurred
+- R5-C remains open pending an explicit correspondence-preservation contract
 
 Next planned checkpoint:
-`R5-C-FIX1 — replace caller-trusted HYBRID ASR indices with deterministic alignment-owned correspondence`
+`R5-C-FIX1B — audit and freeze the minimal R3-to-R5 correspondence preservation contract`
 
 ## 8. Stage11 implementation roadmap
 
