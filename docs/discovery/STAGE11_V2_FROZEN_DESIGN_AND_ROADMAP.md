@@ -289,8 +289,31 @@ ASR measurement runtime diagnostic:
 - the retry must use `/opt/stage11-stt-venv/bin/python`
 - no DB write, publication, source deletion, or repository source change occurred
 
+R6-B ASR measurement blocker finding:
+- the corrected CT108 Stage11 venv removed the first harness/interpreter failure
+- subsequent real 600-second requests reached VM122 and loaded large-v3 on GPU
+- CUDA, cuBLAS, cuDNN, networking, and worker liveness were not the blocker
+- diagnostic instrumentation identified the fail-closed class as `ASRValidationError`
+- exact production-source validation branch:
+  `ASR segment starts are not nondecreasing`
+- this occurred while the measurement was using temporary experiment
+  `VAD054_GATED_CONTEXT`
+- that gated-context prototype was already documented as pre-production and had unresolved overlap/duplicate handling
+- therefore its failure is not evidence that the frozen baseline GPU ASR worker is broken
+- the gated-context prototype must not be repaired or promoted as part of R6-B lease measurement
+- existing successful baseline remains authoritative:
+  - per-VAD large-v3
+  - VAD threshold `0.54`
+  - speech pad `2500 ms`
+  - each VAD region transcribed separately
+  - `vad_filter=False`
+  - deterministic region-offset restoration
+  - JUR-750 full-title baseline completed with 13 chunks, 82 VAD regions, and 166 segments
+- R6-B lease timing must use the already-PASS baseline worker path, not the unfinished gated-context experiment
+- no Stage11 production source, DB, publication, Stage9 state, or NAS source was changed during diagnostics
+
 Next measurement checkpoint:
-`R6-B-MEASURE-ASR-RETRY — rerun the JUR-750 full-title large-v3 ASR timing canary with the correct Stage11 venv and independent heartbeat-jitter observation`
+`R6-B-RESTORE-BASELINE-ASR-WORKER — stop the temporary diagnostic/gated-context 8091 worker and restore the already-PASS per-VAD large-v3 baseline worker for lease measurement`
 
 ## 8. Stage11 implementation roadmap
 
