@@ -146,24 +146,20 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-2B — isolated immutable Hybrid evidence contract`
+Checkpoint: `V2-3A — Deterministic alignment baseline/source audit`
 Verdict: **PASS**
 
 Important finding:
-- isolated frozen Hybrid evidence contract implemented
-- reuses validated external JA/EN payload and subtitle document contracts
-- reuses ASRResult / ASRSegment / ASRWord for Whisper evidence
-- deterministic cue IDs and bounded neighbor references are enforced
-- DVD-ID, language, SHA/byte metadata, ordering, references, provenance and confidence fail closed
-- ASR_ONLY and external-JA+ASR HYBRID evidence states are representable
-- no filesystem, network, DB or model I/O exists in this contract
-- no LLM timestamp ownership exists
-- no alignment algorithm was implemented; R3 boundary remains intact
-- all five requested smoke suites and diff check passed
-- Stage11 R2 Hybrid evidence contract is CLOSED
+- no existing Stage11 Japanese matching/alignment engine exists
+- no robust affine, monotonic anchor matching, residual or inlier implementation exists
+- the audit's `EXISTING_R3_LOGIC=FOUND_REVIEW_REQUIRED` was a grep false positive from `transaction` matching the `ransac` substring
+- `teddy_discovery_nonlexical.py` uses NFKC only for nonlexical classification and is not a reusable alignment API
+- `_normalize_transcript_text()` in ASR is validation/trim normalization, not Japanese semantic matching normalization
+- the R2 Hybrid evidence contract remains the correct input boundary
+- R3 should be implemented in a new isolated deterministic alignment module without modifying the existing v1 pipeline
 
 Next planned checkpoint:
-`V2-3A — Deterministic alignment baseline/source audit`
+`V2-3B — isolated Japanese normalization and monotonic anchor matching foundation`
 
 ## 8. Stage11 implementation roadmap
 
