@@ -1623,8 +1623,66 @@ Offline verification:
 - no Hermes/model/SSH/session/profile/auth/DB/cron/publication/source-delete/
   Stage9 operation occurred
 
+### R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-ASR-SCHEMA-AUDIT — PASS
+
+Frozen JUR-750 ASR schema was verified read-only:
+- `166` segments
+- segment fields:
+  `start_ms`, `end_ms`, `text`, `words`
+- the initial failed preflight assumed `start` / `end`; that assumption was
+  corrected without modifying the frozen ASR artifact
+- raw dialogue was not printed
+
+### R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-PREFLIGHT — PASS
+
+Frozen canary:
+- title: `JUR-750`
+- route evidence: ASR-only Japanese
+- source SHA256:
+  `155c76c25cd1944f6fd85fc4f30b64a05fb34bf236307a7f62d6766ec7133a21`
+- segments: `166`
+- generation_key:
+  `r6b-live-canary-asr166-155c76c25cd1944f-v1`
+- canary-only claim_token:
+  `1`
+- deterministic session_id:
+  `9f6efe0a-f89f-574c-8136-87d5371973b3`
+- package SHA256:
+  `d5371ebe63828f5715cb27c2897c1d249e3b0ab2ae099abd387480004aefc3de`
+- package bytes:
+  `22557`
+- package path:
+  `/var/tmp/stage11-r6b-stateful-canary/9f6efe0a-f89f-574c-8136-87d5371973b3/stage11-semantic-input.json`
+- package mode: `0600`
+- task directory mode: `0700`
+- cue IDs: `asr-0001` through `asr-0166`
+- no production Stage11 DB claim was created
+
+CT120 transport/profile preflight:
+- existing CT108 -> CT120 SSH trust: PASS
+- non-login SSH does not guarantee the interactive user PATH
+- canonical Hermes executable therefore uses the already-frozen absolute path:
+  `/home/teddy/.local/bin/hermes`
+- remote Hermes executable: PASS
+- `subtitle-translator` profile: PASS
+- frozen SOUL SHA: PASS
+- profile-local auth.json: ABSENT
+- global `openai-codex` auth visibility: PASS
+- native `--pass-session-id`: PASS
+
+Safety:
+- no model invocation
+- no translation
+- no Hermes session creation
+- no Stage11 DB write
+- no profile/auth mutation
+- no publication
+- no source deletion
+- no Stage9 change
+- no raw dialogue in canonical/log output
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-PREFLIGHT — freeze one real JUR-750 ASR-only whole-title semantic canary package from the existing 166-segment frozen ASR artifact, derive and record its deterministic session identity and private staging artifact hash, and verify all transport/profile safety preconditions without invoking the model`
+`R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-EXECUTION — transfer the exact frozen package to CT120 private staging, premint the exact deterministic native Hermes session, execute subtitle-translator once with the frozen stateful command, retrieve the complete result, and run deterministic result validation without publication`
 
 ## 8. Stage11 implementation roadmap
 
