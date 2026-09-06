@@ -442,8 +442,27 @@ R6-B Hermes 16-cue batch latency measurement:
 - no retry, fallback, DB write, publication, source deletion, Stage9 mutation, or production-code change occurred
 - this measurement alone does not yet freeze the numeric batch size
 
+R6-B Hermes 32-cue batch latency measurement:
+- exact frozen R4 transport used unchanged
+- JUR-750 frozen ASR evidence used in memory only
+- contiguous source indices: `64` through `95`
+- batch cues: `32`
+- prompt bytes: `9196`
+- per-invocation timeout: `120 s`
+- observed outcome: `TIMEOUT`
+- wall time: `120.101 s`
+- validated result cue count: `none because the invocation timed out`
+- independent observer samples: `120`
+- missed observer intervals: `0`
+- comparison evidence:
+  - 16 cues: `24.189 s` PASS
+  - 32 cues: `120.101 s` `TIMEOUT`
+- no raw JA dialogue or Korean translation output was stored or printed
+- no retry, fallback, DB write, publication, source deletion, Stage9 mutation, or production-code change occurred
+- numeric batch size remains unfrozen in this checkpoint
+
 Next checkpoint:
-`R6-B-HERMES-BATCH-SIZE-MEASURE-32 — measure one contiguous 32-cue real Hermes batch before freezing the numeric batch size`
+`R6-B-HERMES-BATCH-SIZE-FREEZE-16 — freeze the conservative 16-cue batch size from the 24.189-second PASS and the 32-cue 120-second timeout evidence`
 
 ## 8. Stage11 implementation roadmap
 
