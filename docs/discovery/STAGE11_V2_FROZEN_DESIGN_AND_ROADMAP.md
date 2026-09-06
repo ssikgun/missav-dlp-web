@@ -482,8 +482,32 @@ R6-B Hermes live batch-size freeze:
 - they require one real full-title run through the implemented 16-cue batched semantic boundary so total semantic phase timing can be measured
 - no production source code, DB, publication, source lifecycle, SSH state, or Stage9 state changed in this checkpoint
 
+R6-B frozen Hermes batching implementation:
+- implemented pure semantic-boundary adapter:
+  `teddy_discovery_hermes_v2_batching.py`
+- frozen live batch cardinality: `16 cues`
+- batching module SHA-256:
+  `8f1cd3bb197610ca711518bd1fb561285aefd4a7896cf6341f581a7502fdfd40`
+- offline smoke:
+  `teddy_discovery_hermes_v2_batching_smoke.py`
+- batching smoke SHA-256:
+  `c80c3bb1827c80ce212b3cb2f4358cebfc72b6a7842ef179983227cd1f2d9add`
+- original complete `HermesV2Request` remains the R5 pipeline-facing contract
+- adapter partitions only the existing ordered cue tuple into contiguous batches of at most 16
+- original `HermesV2CueInput` objects and their context fields are preserved unchanged
+- every batch is attempted exactly once
+- any execution failure, missing cue, reordered cue, invalid result type, or strict batch-validation failure aborts the complete semantic boundary
+- no retry, fallback, partial-success result, context reconstruction, cue rematching, or cross-batch inference was added
+- successful batch results are concatenated in original order and revalidated against the original complete request
+- adapter contains no transport, subprocess, socket, database, filesystem, publication, or source-lifecycle ownership
+- R4 Hermes request/result contract and transport are unchanged
+- R5 pipeline is unchanged and still invokes its injected `semantic_boundary` exactly once
+- offline batching, Hermes contract, Hermes transport, and R5 pipeline smoke suites PASS
+- no live Hermes request, DB write, publication, source deletion, or Stage9 mutation occurred
+- worker lease duration and heartbeat cadence remain UNFROZEN
+
 Next checkpoint:
-`R6-B-HERMES-BATCHING-IMPLEMENT — implement the frozen 16-cue fail-closed semantic-boundary batching adapter behind the existing R5 callable interface, with offline deterministic smokes before any new live Hermes canary`
+`R6-B-HERMES-BATCHING-LIVE-FULLTITLE — run one real JUR-750 166-cue semantic pass through the frozen 16-cue adapter, measure complete semantic wall time and per-batch timings, then use that evidence for worker lease and heartbeat selection`
 
 ## 8. Stage11 implementation roadmap
 
