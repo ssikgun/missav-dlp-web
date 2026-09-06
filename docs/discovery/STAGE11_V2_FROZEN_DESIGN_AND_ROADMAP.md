@@ -201,6 +201,77 @@ Important finding:
 Next planned checkpoint:
 `R6-B — freeze minimal Stage11 subtitle job schema, artifact retention, and stale-worker recovery contract`
 
+### R6-B contract progress — INCOMPLETE
+
+Status:
+- R6-B persistence/recovery contract is otherwise complete
+- remaining blocker is numeric Stage11 worker lease duration and heartbeat cadence
+- do not freeze `LEASE_DURATION_SECONDS` or `HEARTBEAT_INTERVAL_SECONDS` until real timing evidence exists
+
+Frozen R6-B direction so far:
+- Stage11 job DB: `/opt/missav-dlp-web/discovery/teddy-subtitle-jobs.sqlite3`
+- required tables: `schema_migrations`, `subtitle_jobs`, `subtitle_artifacts`
+- durable states:
+  - `PENDING`
+  - `RUNNING`
+  - `READY_TO_PUBLISH`
+  - `COMPLETED`
+  - `SKIPPED_EXISTING_KO`
+  - `FAILED_RETRYABLE`
+  - `FAILED_FINAL`
+- transient RUNNING phases:
+  - `SOURCE_DISCOVERY`
+  - `ASR`
+  - `ALIGNMENT`
+  - `TRANSLATION`
+  - `VALIDATION`
+  - `PREPUBLICATION`
+- worker ownership uses `worker_id` plus monotonically increasing `claim_token`
+- heartbeat uses the same claim token and extends only `lease_expires_at`
+- stale workers are fenced by compare-and-set ownership
+- stale RUNNING recovery becomes `FAILED_RETRYABLE / STALE_RUNNING / WORKER_LOST`
+- `attempt_count` increments only on a successful RUNNING claim
+- artifact root direction: `/opt/missav-dlp-web/discovery/stage11-artifacts/`
+- raw subtitle/ASR/Hermes dialogue is forbidden in ordinary job DB and normal logs
+- dialogue-bearing recovery data may exist only in confined artifact files
+- `READY_TO_PUBLISH` requires a durable, hash-verified KO SRT artifact
+- `source_released_at` means only that Stage11 no longer requires the local video for that exact source generation
+- `source_released_at` alone never authorizes Stage9 deletion
+- numeric artifact retention TTL is intentionally not frozen yet
+
+Lease measurement preparation:
+- Stage11 worker heartbeat model: independent in-process heartbeat thread/timer
+- phase-boundary-only renewal rejected
+- CT108 -> VM122 direct route verified at `192.168.1.134:8091`
+- CT108 -> Hermes SSH verified at `192.168.1.230:22`
+- VM122 gated-context large-v3 worker restored on port 8091
+- restored worker identity:
+  - experiment `VAD054_GATED_CONTEXT`
+  - VAD threshold `0.54`
+  - VAD pad `2500 ms`
+  - context `5 s`
+  - merge gap `10 s`
+  - max window `60 s`
+  - model `large-v3`
+  - production flag `NO`
+- VM122 Qwen 8082 remains running
+- temporary Stage11 E4B 8080 process was stopped before restoring Whisper worker
+- JUR-750 canary exact source snapshot independently reverified:
+  - relative path `JUR/JUR-750/JUR-750.mp4`
+  - size `1574462325`
+  - mtime_ns `1788438767795262724`
+- live NAS source configuration verified:
+  - host `192.168.1.201`
+  - user `ssikgun`
+  - library root `/volume1/video/video2/JAV`
+  - SSH key and known-hosts paths exist with expected access
+- NAS SSH read-only connectivity PASS
+- existing JUR-750 ASR forensic artifact remains present and unchanged
+- no subtitle publication, DB write, source deletion, Stage9 mutation, or Jellyfin operation occurred during preparation
+
+Next measurement checkpoint:
+`R6-B-MEASURE-ASR — run one JUR-750 full-title large-v3 ASR timing canary with independent heartbeat-jitter observation`
+
 ## 8. Stage11 implementation roadmap
 
 ### R1 — External Japanese provider boundary
