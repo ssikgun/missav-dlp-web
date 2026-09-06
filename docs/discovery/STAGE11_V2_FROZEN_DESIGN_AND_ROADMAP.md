@@ -621,8 +621,41 @@ R6-B Luna whole-file helper script audit:
 - batched-vs-whole/stateful translation quality comparison remains REQUIRED before final semantic execution strategy approval
 - worker lease duration and heartbeat cadence remain UNFROZEN
 
+R6-B Luna whole-file translation quality baseline:
+- semantic quality audit verdict: PASS as a promising baseline, NOT final production acceptance
+- exact Japanese source identity:
+  `88edae14fefd7a7838b50c55e4ae4b0b65fb9998e80a147cda81b35412142709`
+- exact Luna Korean output identity:
+  `30a69ed8ce12a345cce0b5cf212bd867f575ea3a5a1ea990db2b5c2ea0fccd75`
+- structural evidence:
+  - source cues: `661`
+  - Korean cues: `661`
+  - all cue indices and timestamps preserved exactly
+  - empty Korean cues: `0`
+  - untranslated Japanese-script cues in Korean output: `0`
+  - explicit unclear markers: `3`
+  - WhisperJAV metadata cue preserved: `1`
+- representative beginning, middle, known problematic dialogue, farewell, and ending-narration regions were reviewed
+- Korean dialogue continuity was generally natural across those representative long-context regions
+- multiple obvious STT lexical confusions were contextually repaired into meanings consistent with surrounding dialogue
+- this confirms that Luna's stateful whole-task workflow can use broader context to repair malformed STT text rather than translating every malformed token literally
+- observed limitations:
+  - generator metadata was preserved instead of excluded from semantic dialogue output
+  - many tiny nonlexical / single-syllable STT cues were transliterated rather than semantically filtered
+  - three cues were explicitly marked unclear
+  - at least one late narration transition remained grammatically awkward across cue boundaries
+- therefore deterministic post-agent validation / cleanup remains mandatory
+- the translator agent must not own timestamps, cue identity, publication, source deletion, or arbitrary DB mutation
+- the current stateless tiny-batch Hermes path is NOT approved as the final translation strategy
+- further `4 -> 2` shrinking remains paused
+- a dedicated stateful subtitle-translation agent, operating one title as one persistent task/session, is now the leading architecture candidate
+- heartbeat/scheduler should discover and claim work; it should not itself perform the long translation synchronously
+- Stage11 job DB should remain the authoritative work-state boundary; the artifact folder remains storage, not the source of truth for claim/ownership
+- equivalent-source stateful-vs-bounded quality comparison remains required before final semantic strategy freeze
+- worker lease duration and heartbeat cadence remain UNFROZEN
+
 Next checkpoint:
-`R6-B-LUNA-WHOLEFILE-QUALITY-BASELINE-AUDIT — evaluate the exact 661-cue Luna Korean result against the exact 661-cue Japanese source for structural preservation, STT correction behavior, natural Korean continuity, and representative long-context quality before changing the Stage11 semantic execution strategy`
+`R6-B-STATEFUL-TRANSLATOR-ARCHITECTURE-REVIEW — design the dedicated persistent-task subtitle translator agent, heartbeat/job-claim boundary, deterministic validation contract, failure/recovery semantics, and an equivalent-source canary plan without implementing or changing production yet`
 
 ## 8. Stage11 implementation roadmap
 
