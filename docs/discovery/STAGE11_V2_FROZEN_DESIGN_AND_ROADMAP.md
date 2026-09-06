@@ -146,16 +146,17 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-1B-FIX2 — terminal language marker precedence + offline/live canary`
-Verdict: **FAIL**
+Checkpoint: `V2-1B-FIX2-DIAG — conflicting local signal inspection`
+Verdict: **PASS**
 
 Important finding:
-- V2-1B-FIX2 verification did not fully pass
-- Stage11 R1 external Japanese provider boundary remains open
-- do not advance to hybrid evidence work
+- the real Japanese `-ja.srt` anchor resolves successfully to `ja`
+- the Japanese anchor itself has no conflicting local-language metadata
+- the remaining failure occurs while scanning another SRT anchor
+- architecture remains unchanged
 
 Next planned checkpoint:
-`V2-1B-FIX2-DIAG — inspect remaining provider failure`
+`V2-1B-FIX2-DIAG2 — identify the first non-JA resolver failure`
 
 ## 8. Stage11 implementation roadmap
 
