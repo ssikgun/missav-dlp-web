@@ -146,28 +146,28 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R5-A — v2 per-title orchestrator baseline audit`
-Verdict: **PASS**
+Checkpoint: `R5-B — freeze isolated v2 per-title orchestrator contract`
+Verdict: **INCOMPLETE**
 
 Important finding:
-- the legacy `run_subtitle_pipeline()` remains the v1 orchestration path and must not be rewritten in place for R5
-- the legacy path already owns reusable trusted-existing-KO termination, local JA/EN and ASR routing, translation completeness validation, SRT artifact generation, and safe subtitle publication
-- validated external subtitle handling remains intentionally separate from the legacy v1 pipeline
-- R1 external Japanese discovery/fetch is available as an isolated provider boundary
-- R2 immutable hybrid evidence is available as an isolated evidence contract
-- R3 alignment, deterministic acceptance, and acceptance application are available as isolated deterministic boundaries
-- `AlignmentAcceptanceApplicationResult` ends at the accepted evidence bundle and does not own Hermes invocation, timestamp projection, publication, filesystem, network, or state
-- R4 Hermes v2 semantic contract and CT108-to-CT120 one-shot transport are isolated and have no premature production wiring
-- no existing module currently assembles R1 through R4 into one Stage11 v2 per-title execution path
-- no Hermes v2 integration exists in `run_subtitle_pipeline()`, publication flow, or state DB
-- R5 should therefore add a separate v2 per-title orchestrator and reuse frozen components rather than change their ownership
-- the new orchestrator must deterministically own composition of source routing, evidence assembly, alignment decision/application, Hermes semantic requests, timestamp/output reconstruction, existing validation, and publisher handoff
-- legacy E4B translation behavior must remain unchanged
-- no live Hermes call, ASR execution, publication, DB write, or repository modification occurred during this audit
-- R5-A baseline audit is CLOSED
+- the initial isolated R5-B contract and offline smoke were created without modifying legacy production modules
+- independent source review found three contract gaps that must be fixed before R5-B can freeze
+- direct ASR_ONLY must support the frozen no-usable-JA path without fabricating an R3 reject decision
+- R2 already provides the correct direct ASR_ONLY owner through `HybridEvidenceBundle.from_asr_only()`
+- R2 already provides deterministic cue identity through `HybridCueIdentity`, `HybridCueEvidence`, and `stable_cue_id()`
+- therefore R5 must reuse the R2 ASR-only bundle and cue identities rather than invent a parallel identity type
+- the current `SubtitleV2SemanticPlan` validates the Hermes request internally but does not yet bind its cue identity/evidence to the selected LOCAL_JA, HYBRID, or ASR_ONLY source evidence
+- this evidence-detachment gap must fail closed before Hermes invocation is allowed
+- the current EXISTING_KO route accepts `source_document=None`, which is weaker than the legacy trusted-KO path
+- the legacy path parses and validates the existing Korean subtitle before terminal skip
+- R5 v2 EXISTING_KO must likewise require a validated canonical SRT document
+- no R1, R2, R3, or R4 production change is required by these findings
+- no new cue-ID scheme is required
+- no live Hermes call, ASR execution, publication, state write, or repository mutation occurred during the diagnostic
+- R5-B remains open
 
 Next planned checkpoint:
-`R5-B — freeze isolated v2 per-title orchestrator contract`
+`R5-B-FIX1 — close direct ASR_ONLY, semantic evidence binding, and trusted-KO gaps`
 
 ## 8. Stage11 implementation roadmap
 
