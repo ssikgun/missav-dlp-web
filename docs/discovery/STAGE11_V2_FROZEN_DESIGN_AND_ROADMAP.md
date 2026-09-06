@@ -146,41 +146,31 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R5-B — isolated v2 per-title orchestrator contract`
-Verdict: **PASS**
+Checkpoint: `R5-C — isolated v2 per-title orchestrator execution implementation`
+Verdict: **INCOMPLETE**
 
 Important finding:
-- R5-B introduced an isolated immutable contract for the future Stage11 v2 per-title orchestrator
-- the legacy `run_subtitle_pipeline()` remains unchanged
-- route vocabulary is frozen as EXISTING_KO, LOCAL_JA, HYBRID, ASR_ONLY, and UNRESOLVED
-- trusted EXISTING_KO requires the canonical KO candidate and a validated non-empty parsed SRT document before terminal skip
-- LOCAL_JA requires canonical sibling Japanese source evidence
-- HYBRID requires the accepted R3 application result and R2 external-JA/ASR evidence
-- ASR_ONLY supports both R3 REJECT_EXTERNAL application results and the direct no-usable-JA path through `HybridEvidenceBundle.from_asr_only()`
-- direct ASR_ONLY does not fabricate an R3 alignment decision
-- canonical DVD identity is checked across canonical holding, R2/R3 evidence, and ASR source snapshot
-- `SubtitleV2SemanticBinding` is an immutable index/reference-only bridge from one Hermes request cue to existing deterministic source evidence
-- semantic bindings contain no copied dialogue, timestamps, payloads, paths, or publication ownership
-- existing R2 `HybridCueIdentity` and cue evidence remain the authoritative identity scheme
-- no alternate cue-ID algorithm was introduced
-- LOCAL_JA Hermes input is bound to exact source cue count, order, and Japanese text
-- ASR_ONLY Hermes input is bound to exact R2 ASR identity/order and ASR Japanese text
-- HYBRID Hermes input is bound to existing R2 external-JA identity and, when STT evidence is supplied, an exact referenced ASR identity
-- unrelated Japanese/STT text, arbitrary IDs, reordered evidence, missing/extra bindings, and duplicate bindings fail closed
-- Hermes result identity/order continues to be validated by the frozen R4 semantic contract
-- deterministic timing remains outside the LLM and is referenced only from existing SubtitleCue or ASRSegment evidence
-- GeneratedKoreanSRT remains the existing pre-publication artifact owner
-- no filesystem, network, subprocess, Hermes transport, ASR execution, publication, DB/state, or Stage9 integration exists in this contract
-- R1/R2/R3/R4 production modules were not modified
-- full requested regression suite and independent source review passed
-- R5-B contract is frozen and CLOSED
-
-Frozen reviewed identities:
-- `teddy_discovery_subtitle_v2_orchestrator.py`: `9127f6edcec332edf3e4946e129a9285e1df5a930bf8d85072f07829d5d06993`
-- `teddy_discovery_subtitle_v2_orchestrator_smoke.py`: `4576bddb60a13040a07529f6f6bd1a3171e1e4c2347b268f3e743287510c75ea`
+- the initial isolated R5-C execution layer was implemented without changing the frozen R5-B contract
+- EXISTING_KO terminates without semantic work
+- LOCAL_JA builds its Hermes request from exact local Japanese cues and reuses local subtitle timing
+- direct ASR_ONLY and R3-rejected ASR_ONLY build their requests from canonical R2 ASR identities and reuse ASR timing
+- UNRESOLVED fails closed without semantic work or artifact generation
+- semantic routes invoke the injected semantic boundary exactly once with no retry or fallback
+- output Korean SRT construction remains deterministic and LLM timestamps remain forbidden
+- no live Hermes transport, ASR execution, network, publication, DB/state, Stage9 integration, or legacy pipeline modification was introduced
+- full requested regression suite passed
+- independent source review found one HYBRID ownership blocker
+- the current `hybrid_asr_indices` input is caller-supplied and is validated only for tuple shape, full cue-count coverage, in-range indices, and strict ordering
+- those checks do not prove that a supplied ASR index is the ASR segment actually corresponding to the external-JA cue under deterministic R3 alignment evidence
+- therefore a structurally valid but semantically wrong index tuple could attach unrelated ASR text and timing to an external-JA cue
+- caller-supplied ordinal validity is not sufficient evidence ownership for the frozen HYBRID architecture
+- HYBRID per-cue ASR correspondence must instead be derived from authoritative deterministic alignment evidence, or HYBRID must fail closed when such correspondence cannot be proven
+- arbitrary caller mapping must not become production timing or semantic truth
+- R5-C remains open
+- the two untracked R5-C implementation files remain uncommitted pending this correction
 
 Next planned checkpoint:
-`R5-C — isolated v2 per-title orchestrator execution implementation`
+`R5-C-FIX1 — replace caller-trusted HYBRID ASR indices with deterministic alignment-owned correspondence`
 
 ## 8. Stage11 implementation roadmap
 
