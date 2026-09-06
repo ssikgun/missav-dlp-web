@@ -146,21 +146,29 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-3E — alignment acceptance and release/content mismatch baseline audit`
+Checkpoint: `V2-3F — deterministic alignment acceptance / release-mismatch decision contract`
 Verdict: **PASS**
 
 Important finding:
-- no existing alignment acceptance, inlier-ratio policy, release/content mismatch verdict or external-evidence rejection implementation exists
-- `RobustAffineAlignment` already provides anchor count, inlier count, residual threshold, ordered residuals and median absolute residual evidence
-- existing hybrid evidence already owns explicit `EXTERNAL_ASR_HYBRID`, `ASR_ONLY` and `UNRESOLVED` provenance states
-- acceptance logic should therefore consume deterministic affine analysis and produce a separate decision/verdict rather than modifying timestamp ownership
-- ASR_ONLY fallback should reuse the existing provenance boundary when external JA evidence is rejected
-- no subtitle timestamp projection currently exists
-- production acceptance thresholds must remain generic policy inputs and must not be frozen from one title's forensic values
-- V2-3E baseline audit is CLOSED
+- a separate deterministic acceptance layer now consumes completed affine analysis
+- verdicts are `ACCEPT_HYBRID`, `REJECT_EXTERNAL`, and `UNRESOLVED`
+- insufficient evidence is evaluated first and always returns `UNRESOLVED`
+- quality rejection is evaluated only after evidence sufficiency passes
+- accepted evidence recommends `EXTERNAL_ASR_HYBRID`
+- rejected external evidence recommends `ASR_ONLY`
+- unresolved evidence recommends `UNRESOLVED`
+- all acceptance thresholds are explicit caller-owned policy inputs
+- no title-specific production thresholds or JUR-specific constants exist
+- equality at all policy boundaries is accepted
+- verdict reason ordering is deterministic
+- `REJECT_EXTERNAL` is recommendation only; no ASR_ONLY fallback execution or external-evidence mutation exists
+- no subtitle timestamp projection or output ownership was added
+- acceptance smoke and all six existing regression smoke suites passed
+- independent grep reported a false positive only because the smoke test intentionally contains the string `jur-750` to verify title-specific behavior is absent
+- V2-3F acceptance decision contract is CLOSED
 
 Next planned checkpoint:
-`V2-3F — define deterministic alignment acceptance / release-mismatch decision contract`
+`V2-3G — ASR_ONLY fallback / acceptance application baseline audit`
 
 ## 8. Stage11 implementation roadmap
 
