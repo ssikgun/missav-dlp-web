@@ -146,24 +146,25 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-3G — ASR_ONLY fallback / acceptance application baseline audit`
+Checkpoint: `V2-3H — deterministic acceptance application / ASR_ONLY fallback boundary`
 Verdict: **PASS**
 
 Important finding:
-- deterministic acceptance decisions already exist
-- `HybridEvidenceBundle.from_asr_only()` already provides the canonical ASR_ONLY representation
-- no current code applies `REJECT_EXTERNAL` to build an ASR_ONLY bundle
-- no current pipeline consumes alignment acceptance decisions
-- existing subtitle publication pipeline already owns later publication behavior and should not be expanded prematurely
-- the missing R3 boundary is therefore a small deterministic application layer between acceptance decision and hybrid evidence representation
-- `ACCEPT_HYBRID` should preserve validated external+ASR hybrid evidence
-- `REJECT_EXTERNAL` should create a fresh canonical ASR_ONLY evidence bundle using existing builder semantics
-- `UNRESOLVED` must remain unresolved and must not silently become ASR_ONLY
-- this application boundary must not publish subtitles, mutate source evidence, transform timestamps, or call translation/model logic
-- V2-3G baseline audit is CLOSED
+- deterministic acceptance decisions are now safely applied to immutable hybrid evidence
+- `ACCEPT_HYBRID` preserves external JA, ASR, optional EN, cue evidence and alignment method/confidence
+- `REJECT_EXTERNAL` alone creates a fresh canonical ASR_ONLY bundle through `HybridEvidenceBundle.from_asr_only()`
+- rejected evidence contains no external JA while preserving ASR and optional EN evidence
+- `UNRESOLVED` preserves external JA and ASR evidence and never silently becomes ASR_ONLY
+- the original input bundle is never mutated
+- applied provenance must exactly match the decision's recommended provenance
+- no subtitle publication, translation, ASR execution, timestamp transformation, model call or I/O was added
+- application smoke and all seven requested regression smoke suites passed
+- independent verification result 0 was caused only by a forbidden-word grep matching the explanatory module docstring stating that publication/model/ASR operations are not performed
+- structural inspection confirms the single `from_asr_only()` production call is confined to the `REJECT_EXTERNAL` branch
+- V2-3H acceptance application / ASR_ONLY fallback boundary is CLOSED
 
 Next planned checkpoint:
-`V2-3H — implement deterministic acceptance application / ASR_ONLY fallback boundary`
+`V2-3I — targeted re-ASR necessity and R3 closure baseline audit`
 
 ## 8. Stage11 implementation roadmap
 
