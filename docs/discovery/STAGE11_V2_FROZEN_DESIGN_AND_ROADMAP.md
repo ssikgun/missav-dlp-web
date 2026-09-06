@@ -146,26 +146,20 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-3B-FIX — cardinality-independent lexical candidate discovery`
+Checkpoint: `V2-3C — robust affine baseline/source audit`
 Verdict: **PASS**
 
 Important finding:
-- Japanese matching normalization and immutable lexical candidate contracts passed independent review
-- ordinal-local ASR window logic was removed completely
-- candidate generation now compares the full external-JA × ASR Cartesian product only within a fixed resource safety bound
-- `MAX_LEXICAL_PAIR_COMPARISONS = 256000`
-- known 661 × 166 cardinality produces 109726 comparisons and remains safely within the bound
-- over-bound comparison sets fail closed instead of sampling or guessing
-- memory remains bounded by the candidate cap rather than the comparison product
-- cardinality-mismatch regression proved valid lexical pairs are found independent of ordinal proximity
-- strict monotonic selection still rejects crossing, duplicate and equal-strength ambiguous mappings
-- no affine fitting, scale/intercept inference, residual/inlier logic or timestamp transformation exists yet
-- no filesystem, network, DB, subprocess or model side effects exist
-- all six requested smoke suites passed
-- V2-3B lexical normalization + monotonic anchor foundation is CLOSED
+- no existing affine, slope/intercept, residual or inlier implementation exists
+- selected monotonic anchors are the correct input boundary for affine inference
+- source timing is already owned by `AnchorTimingEvidence`
+- external and ASR source start/end timestamps remain immutable evidence
+- no new subtitle/output timestamp ownership is required
+- R3 affine work can remain isolated inside the deterministic alignment module
+- the next implementation must explicitly define the fit reference point and robust inference contract before any timestamp projection
 
 Next planned checkpoint:
-`V2-3C — robust affine inference and residual/inlier contract`
+`V2-3D — implement robust affine inference and residual/inlier analysis`
 
 ## 8. Stage11 implementation roadmap
 
