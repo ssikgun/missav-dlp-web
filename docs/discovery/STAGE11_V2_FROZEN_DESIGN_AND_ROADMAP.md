@@ -1397,8 +1397,65 @@ Offline verification:
 - no Hermes/model invocation, SSH, database write, publication, source
   deletion, Stage9 change, or profile creation occurred
 
+### R6-B-STATEFUL-TRANSLATOR-MINIMAL-IMPLEMENTATION-B — INCOMPLETE
+
+CT120 native translator profile/runtime preflight was executed.
+
+Completed successfully:
+- native profile `subtitle-translator` was created
+- profile was created with no bundled skills
+- no alias/gateway/messaging integration was introduced
+- frozen translator SOUL was deployed exactly
+- deployed SOUL SHA256:
+  `37c487cc90e828b70c4d8343ab0949ccaffa9168d01aff4b828f6fa1b994c9e6`
+- no unrelated gateway / Slack / channel state was present
+- native profile CLI parsing confirmed:
+  - `-Q / --quiet`
+  - `--resume`
+  - `-q / --query`
+  - `--provider`
+  - `--model`
+  - `--reasoning`
+- native SessionDB API preflight confirmed:
+  - `create_session`
+  - `get_session`
+  - `end_session`
+  - `resolve_session_id`
+  - `resolve_resume_session_id`
+- no session pre-mint was executed
+- no Hermes model invocation occurred
+- no real subtitle translation occurred
+- no cron/gateway/Stage11 job DB/publication/source-delete/Stage9 change occurred
+
+Blocking result:
+- provider/auth preflight remains INCOMPLETE
+- attempted native command path:
+  `hermes --profile subtitle-translator auth status`
+- return code:
+  `2`
+- output did not confirm `openai-codex`
+- no positive or negative authentication signal was available
+- therefore the new empty translator profile's exact native access path to the already-authorized Codex provider remains unresolved
+
+Safety decision:
+- do NOT manually copy `.env`, `auth.json`, credentials, tokens, or other profile state
+- do NOT clone the existing `summary`, `homeboy`, or main Luna profile
+- do NOT invoke a model merely to probe authentication
+- resolve the native Hermes shared/provider-auth contract first
+
+Architecture remains unchanged:
+- dedicated stateful translator profile remains approved
+- SessionDB deterministic pre-mint remains approved
+- CT108 Stage11 job DB remains authoritative
+- provider/model/reasoning remain pinned to:
+  - `openai-codex`
+  - `gpt-5.6-luna`
+  - `xhigh`
+- live semantic canary remains NOT STARTED
+- worker lease and scheduler cadence remain UNFROZEN
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-MINIMAL-IMPLEMENTATION-B — create the empty native CT120 subtitle-translator profile, deploy only the frozen translator SOUL/policy and launcher prerequisites, verify native provider/auth and SessionDB premint/resume preconditions without invoking a model or translating a real subtitle`
+`R6-B-STATEFUL-TRANSLATOR-AUTH-CONTRACT-AUDIT — inspect native Hermes v0.20.0 auth help/source read-only to determine the exact supported way for a new named profile to use the existing openai-codex authentication without copying credentials or invoking a model`
 
 ## 8. Stage11 implementation roadmap
 
