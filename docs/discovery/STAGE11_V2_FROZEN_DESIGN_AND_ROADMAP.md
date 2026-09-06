@@ -146,38 +146,49 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R5-C-FIX1B — R3-to-R5 alignment output ownership audit`
+Checkpoint: `R5-C-FIX1C — deterministic affine timestamp materialization rule`
 Verdict: **PASS**
 
 Important finding:
-- HYBRID does not require a full one-to-one external-JA-cue-to-ASR-segment map
-- `MonotonicAnchorCandidate` contains external identity, ASR identity, lexical evidence, timing evidence, and score
-- selected monotonic anchors are a sparse strict-monotonic subset rather than complete external cue coverage
-- `AffineAnchorResidual` contains external identity, ASR identity, midpoint evidence, predicted ASR midpoint, residual values, and inlier state
-- `RobustAffineAlignment.residuals` therefore covers selected anchors only, not every external JA cue
-- `RobustAffineAlignment` preserves `scale`, `intercept_ms`, anchor/inlier metrics, residual threshold, residual identities, and median residual
-- the accepted affine transform defines a global deterministic timeline transform `P(t_ms) = scale * t_ms + intercept_ms`
-- the affine transform can project arbitrary external JA source timeline coordinates even when that cue is not a selected lexical anchor
-- `AlignmentAcceptanceDecision` preserves scale and aggregate metrics but loses `intercept_ms` and residual identities
-- `AlignmentAcceptanceApplicationResult` currently preserves only decision and bundle, so the accepted `RobustAffineAlignment` does not survive into R5
-- R4 permits external-only semantic cues where `external_ja` is present and `stt_ja` is absent
-- therefore an unmatched external JA cue may remain a valid external-only Hermes cue
-- ASR text must be attached only when authoritative preserved residual evidence supplies a specific ASR identity
-- selected lexical anchors are evidence used to estimate and validate the affine transform; they are not a mandatory final per-cue timing ownership map
-- full per-cue ASR correspondence is not required
-- caller-owned `hybrid_asr_indices` is unsafe and must be removed
-- the smallest R3-to-R5 preservation change is to extend `AlignmentAcceptanceApplicationResult` with `alignment: RobustAffineAlignment | None`
-- `alignment` must be required and exact for ACCEPT_HYBRID
-- existing `RobustAffineAlignment`, `AffineAnchorResidual`, and `HybridCueIdentity` must be reused; no new correspondence identity scheme is required
-- HYBRID deterministic timing ownership is affine projection from external JA source timestamps
-- sparse residual identities provide optional authoritative STT support only
-- semantic ASR evidence and timing projection must remain separate ownership concepts
+- existing `SubtitleCue` requires exact integer `start_ms >= 0` and exact integer `end_ms > start_ms`
+- global cue start ordering is nondecreasing
+- global end ordering is not required
+- cue overlap is permitted
+- gaps are not required
+- SRT serialization does not silently shift, clamp, repair, or normalize timestamps
+- SRT cue numbering is independent of source timing
+- the repository already has a deterministic time materialization convention using `Decimal(str(value))` with `ROUND_HALF_UP`
+- Python built-in `round()` is not used for this contract because its ties-to-even behavior differs from the existing repository convention
+- floor(start)/ceil(end) is rejected because it systematically expands intervals and changes the affine coordinate model
+- HYBRID continuous timeline projection is `P(t_ms) = scale * t_ms + intercept_ms`
+- deterministic integer materialization is:
+  `D(t_ms) = Decimal(str(scale)) * Decimal(t_ms) + Decimal(str(intercept_ms))`
+  then
+  `M(t_ms) = int(D(t_ms).quantize(Decimal("1"), rounding=ROUND_HALF_UP))`
+- projected subtitle start is `M(source_cue.start_ms)`
+- projected subtitle end is `M(source_cue.end_ms)`
+- any nonfinite projection or numeric conversion failure fails closed
+- any continuous projected endpoint below zero fails closed
+- any materialized endpoint below zero fails closed
+- materialized `end_ms <= start_ms` fails closed
+- no 1 ms expansion, clamp, shift, or timestamp repair is permitted
+- projected source cue order is preserved
+- a decreasing materialized start timestamp fails closed
+- equal adjacent start timestamps are permitted because the existing contract requires nondecreasing rather than strictly increasing starts
+- overlap remains permitted and is preserved
+- no new arbitrary timestamp upper bound is introduced
+- existing cue-count and serialized payload bounds continue to apply downstream
+- persisted `RobustAffineAlignment` floats cannot reconstruct the original exact Fraction fit
+- `Decimal(str(float))` is therefore the explicit deterministic repository-consistent materialization boundary
+- the minimal future helper is `project_affine_timestamp_ms(alignment: RobustAffineAlignment, source_ms: int) -> int`
+- R5 must project both endpoints through this helper and then reuse existing `SubtitleCue` and SRT validation
 - no source file was modified during this audit
 - the two untracked R5-C implementation files remain preserved
-- one design detail remains unresolved before implementation: exact deterministic integer materialization of projected subtitle start/end timestamps
+- timestamp materialization design is now frozen
+- remaining implementation work is to preserve accepted `RobustAffineAlignment` through the R3 application result, remove caller-owned `hybrid_asr_indices`, and update the R5-C HYBRID execution path accordingly
 
 Next planned checkpoint:
-`R5-C-FIX1C — freeze deterministic affine timestamp materialization rule`
+`R5-C-FIX2 — implement accepted affine preservation and deterministic HYBRID projection`
 
 ## 8. Stage11 implementation roadmap
 
