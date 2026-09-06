@@ -146,19 +146,24 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-2A — Hybrid evidence contract baseline/source audit`
+Checkpoint: `V2-2B — isolated immutable Hybrid evidence contract`
 Verdict: **PASS**
 
 Important finding:
-- no existing Stage11 Hybrid/Alignment contract exists
-- external Japanese evidence can reuse `SubtitleCue` / `SubtitleDocument`
-- Whisper evidence can reuse `ASRWord` / `ASRSegment` / `ASRResult`
-- external source identity/hash can reuse `ExternalSubtitlePayload`
-- current subtitle pipeline only directly consumes `ASRResult`; no v2 hybrid contract is wired yet
-- R2 should add an isolated immutable evidence contract before any pipeline rewrite
+- isolated frozen Hybrid evidence contract implemented
+- reuses validated external JA/EN payload and subtitle document contracts
+- reuses ASRResult / ASRSegment / ASRWord for Whisper evidence
+- deterministic cue IDs and bounded neighbor references are enforced
+- DVD-ID, language, SHA/byte metadata, ordering, references, provenance and confidence fail closed
+- ASR_ONLY and external-JA+ASR HYBRID evidence states are representable
+- no filesystem, network, DB or model I/O exists in this contract
+- no LLM timestamp ownership exists
+- no alignment algorithm was implemented; R3 boundary remains intact
+- all five requested smoke suites and diff check passed
+- Stage11 R2 Hybrid evidence contract is CLOSED
 
 Next planned checkpoint:
-`V2-2B — define isolated immutable Hybrid evidence contract`
+`V2-3A — Deterministic alignment baseline/source audit`
 
 ## 8. Stage11 implementation roadmap
 
