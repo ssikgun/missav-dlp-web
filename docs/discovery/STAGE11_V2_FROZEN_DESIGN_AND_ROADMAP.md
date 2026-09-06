@@ -146,27 +146,27 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R4-B — isolated Hermes v2 semantic adapter contract`
+Checkpoint: `R4-C — Hermes transport / invocation baseline audit`
 Verdict: **PASS**
 
 Important finding:
-- a new Hermes v2 semantic contract is implemented separately from the old E4B adapter and timestamp-bearing translation route
-- immutable input fields are exactly `cue_id`, `external_ja`, `stt_ja`, `en`, `before_context`, and `after_context`
-- immutable output fields are exactly `cue_id`, `repaired_ja`, and `ko`
-- supported evidence modes are external JA + STT JA, external-JA-only, and STT-only, with optional EN support
-- EN-only input is rejected
-- every request cue ID must be unique
-- every response must contain exactly one result for every requested cue in the original request order
-- missing, extra, duplicate, reordered or mismatched cue IDs are rejected fail-closed
-- request and response JSON shapes are strict and reject extra fields, duplicate JSON keys, prose and markdown-wrapped responses
-- subtitle evidence is explicitly treated as untrusted data and never as instructions
-- no timestamp, path, publication or workflow ownership exists in the Hermes v2 semantic contract
-- no Hermes transport, provider/model invocation, filesystem, database, ASR or publication behavior exists in this checkpoint
-- Hermes v2 smoke and all six requested regression smoke suites passed
-- R4-B semantic contract is CLOSED
+- Hermes Agent v0.20.0 is installed on CT120
+- one-shot invocation supports `-z/--oneshot`
+- invocation-level provider override supports `--provider`
+- invocation-level model override supports `-m/--model`
+- invocation-level reasoning override supports `--reasoning`
+- the Stage11 frozen invocation can therefore explicitly select `openai-codex`, `gpt-5.6-luna`, and `xhigh` without changing Hermes persistent defaults
+- current Hermes configuration uses provider `openai-codex`
+- current Codex backend base URL is `https://chatgpt.com/backend-api/codex`
+- current reasoning configuration is `xhigh`
+- Stage11 must explicitly pass `-m gpt-5.6-luna` rather than depend on the persistent model configuration
+- `-z` one-shot mode prints only the assistant response and is suitable for the isolated Stage11 transport boundary
+- no live model request was made during this audit
+- no Hermes configuration or repository files were changed
+- R4-C transport/invocation baseline audit is CLOSED
 
 Next planned checkpoint:
-`R4-C — Hermes transport / invocation baseline audit`
+`R4-D — implement isolated Hermes v2 one-shot transport boundary`
 
 ## 8. Stage11 implementation roadmap
 
