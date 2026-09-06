@@ -146,20 +146,30 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-3D — robust affine implementation attempt`
-Verdict: **FAIL**
+Checkpoint: `V2-3D-RETRY — midpoint-based robust affine inference and residual/inlier analysis`
+Verdict: **PASS**
 
 Important finding:
-- the V2-3D implementation request was not performed
-- no midpoint affine estimator, affine result contract, residual analysis or inlier classification was added
-- the attempted work instead modified the already-closed V2-3B lexical pair safety cap from 256000 to 250000 and changed related smoke coverage
-- forensic review confirmed this was actual wrong-scope source modification, not merely an incorrect final report
-- the unintended V2-3B changes were restored exactly to the frozen HEAD baseline
-- no V2-3B regression is retained
-- do not commit any artifacts from the failed V2-3D attempt
+- robust affine inference is implemented inside the isolated deterministic alignment module
+- selected strict-monotonic anchors are the affine input boundary
+- source interval midpoints are represented exactly as doubled integers before fitting
+- deterministic Theil-Sen-style pairwise slope median is used for scale
+- deterministic median per-anchor intercept is used for intercept
+- exact Fraction arithmetic is used internally before finite public float conversion
+- `MIN_AFFINE_ANCHORS = 3`
+- `MAX_AFFINE_ANCHORS = 512`
+- explicit caller-owned positive integer `residual_threshold_ms` controls inlier classification
+- equality at the residual threshold is classified as inlier
+- immutable `AffineAnchorResidual` and `RobustAffineAlignment` contracts retain analysis evidence only
+- no final subtitle timestamp projection, rewrite or output-timing ownership was added
+- `MAX_LEXICAL_PAIR_COMPARISONS = 256000` and the closed V2-3B behavior remain unchanged
+- exact affine, offset-only, drift, robust-outlier, midpoint, threshold-boundary and resource-bound tests passed
+- all six requested regression smoke suites passed
+- the independent verify shell reported result 0 only because a forbidden-word grep matched the explanatory docstring phrase `never projects or rewrites subtitle cue timestamps`; AST structural review confirms no forbidden timestamp projection function exists
+- V2-3D robust affine inference and residual/inlier analysis is CLOSED
 
 Next planned checkpoint:
-`V2-3D-RETRY — implement midpoint-based robust affine inference and residual/inlier analysis from the restored baseline`
+`V2-3E — alignment acceptance and release/content mismatch baseline audit`
 
 ## 8. Stage11 implementation roadmap
 

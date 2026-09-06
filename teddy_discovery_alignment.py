@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from difflib import SequenceMatcher
+from fractions import Fraction
 import math
 import unicodedata
 from typing import Final
@@ -26,6 +27,7 @@ from teddy_discovery_hybrid_evidence import (
     EVIDENCE_SOURCE_EXTERNAL_JA,
     HybridCueIdentity,
     HybridEvidenceBundle,
+    stable_cue_id,
 )
 from teddy_discovery_subtitle_text import (
     MAX_CUE_TEXT_CHARS,
@@ -42,6 +44,10 @@ MAX_ANCHOR_CANDIDATES: Final[int] = 4_096
 # This fixed CPU-safety cap is deliberately above the known 661 * 166
 # comparison workload (109,726), but it is not a matching-quality threshold.
 MAX_LEXICAL_PAIR_COMPARISONS: Final[int] = 256_000
+MIN_AFFINE_ANCHORS: Final[int] = 3
+# Pairwise slope generation is quadratic; this fixed bound protects CPU and
+# memory while still covering ordinary selected-anchor evidence sets.
+MAX_AFFINE_ANCHORS: Final[int] = 512
 
 
 class AlignmentError(ValueError):
@@ -536,6 +542,619 @@ def select_monotonic_anchors(
 select_monotonic_anchor_candidates = select_monotonic_anchors
 
 
+def _require_exact_positive_int(value: object, *, field_name: str) -> int:
+    if type(value) is not int or value <= 0:
+        raise AlignmentValidationError(
+            field_name + " must be an exact positive integer"
+        )
+    return value
+
+
+def _require_finite_float(
+    value: object,
+    *,
+    field_name: str,
+    strictly_positive: bool = False,
+) -> float:
+    if type(value) is not float or not math.isfinite(value):
+        raise AlignmentValidationError(field_name + " must be a finite float")
+    if strictly_positive and value <= 0.0:
+        raise AlignmentValidationError(
+            field_name + " must be strictly positive"
+        )
+    return value
+
+
+def _fraction_to_finite_float(value: Fraction, *, field_name: str) -> float:
+    try:
+        converted = float(value)
+    except (OverflowError, ValueError) as error:
+        raise AlignmentValidationError(
+            field_name + " cannot be represented as a finite float"
+        ) from error
+    return _require_finite_float(converted, field_name=field_name)
+
+
+def _median_fraction(values: list[Fraction]) -> Fraction:
+    if not values:
+        raise AlignmentValidationError("median requires at least one value")
+
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2
+
+
+def _validate_affine_identity(
+    identity: object,
+    *,
+    expected_source: str,
+    field_name: str,
+) -> HybridCueIdentity:
+    if not isinstance(identity, HybridCueIdentity):
+        raise AlignmentValidationError(
+            field_name + " must be a HybridCueIdentity"
+        )
+    if identity.source != expected_source:
+        raise AlignmentValidationError(
+            field_name + " has an invalid source kind"
+        )
+
+    _require_exact_nonnegative_int(
+        identity.source_index,
+        field_name=field_name + " source_index",
+    )
+    try:
+        expected_cue_id = stable_cue_id(
+            expected_source,
+            identity.source_index,
+        )
+    except (TypeError, ValueError) as error:
+        raise AlignmentValidationError(
+            field_name + " source_index is outside the source identity bound"
+        ) from error
+
+    if type(identity.cue_id) is not str or identity.cue_id != expected_cue_id:
+        raise AlignmentValidationError(
+            field_name + " is not a stable source identity"
+        )
+    return identity
+
+
+def _validate_affine_timing(
+    timing: object,
+    *,
+    field_name: str,
+) -> AnchorTimingEvidence:
+    if not isinstance(timing, AnchorTimingEvidence):
+        raise AlignmentValidationError(
+            field_name + " must be AnchorTimingEvidence"
+        )
+
+    _require_timing(
+        timing.external_start_ms,
+        timing.external_end_ms,
+        field_prefix=field_name + " external source timing",
+    )
+    _require_timing(
+        timing.asr_start_ms,
+        timing.asr_end_ms,
+        field_prefix=field_name + " ASR source timing",
+    )
+    return timing
+
+
+def _validate_affine_anchors(
+    anchors: object,
+) -> tuple[MonotonicAnchorCandidate, ...]:
+    if type(anchors) is not tuple:
+        raise AlignmentValidationError(
+            "anchors must be an immutable tuple"
+        )
+    if len(anchors) < MIN_AFFINE_ANCHORS:
+        raise AlignmentValidationError(
+            "anchors must contain at least MIN_AFFINE_ANCHORS values"
+        )
+    if len(anchors) > MAX_AFFINE_ANCHORS:
+        raise AlignmentLimitError(
+            "anchors exceeds MAX_AFFINE_ANCHORS"
+        )
+
+    seen_external = set()
+    seen_asr = set()
+    previous_external_index = None
+    previous_asr_index = None
+
+    for position, anchor in enumerate(anchors):
+        if not isinstance(anchor, MonotonicAnchorCandidate):
+            raise AlignmentValidationError(
+                "anchors must contain MonotonicAnchorCandidate values"
+            )
+
+        external_identity = _validate_affine_identity(
+            anchor.external_identity,
+            expected_source=EVIDENCE_SOURCE_EXTERNAL_JA,
+            field_name="anchor " + str(position) + " external_identity",
+        )
+        asr_identity = _validate_affine_identity(
+            anchor.asr_identity,
+            expected_source=EVIDENCE_SOURCE_ASR_SEGMENT,
+            field_name="anchor " + str(position) + " asr_identity",
+        )
+        _validate_affine_timing(
+            anchor.timing,
+            field_name="anchor " + str(position),
+        )
+
+        external_index = external_identity.source_index
+        asr_index = asr_identity.source_index
+        if external_identity.cue_id in seen_external:
+            raise AlignmentValidationError(
+                "anchors contain a duplicate external source identity"
+            )
+        if asr_identity.cue_id in seen_asr:
+            raise AlignmentValidationError(
+                "anchors contain a duplicate ASR source identity"
+            )
+        if (
+            previous_external_index is not None
+            and external_index <= previous_external_index
+        ):
+            raise AlignmentValidationError(
+                "external anchor indexes must increase strictly"
+            )
+        if (
+            previous_asr_index is not None
+            and asr_index <= previous_asr_index
+        ):
+            raise AlignmentValidationError(
+                "ASR anchor indexes must increase strictly"
+            )
+
+        seen_external.add(external_identity.cue_id)
+        seen_asr.add(asr_identity.cue_id)
+        previous_external_index = external_index
+        previous_asr_index = asr_index
+
+    return anchors
+
+
+def _midpoint_x2(timing: AnchorTimingEvidence, *, source: str) -> int:
+    if source == EVIDENCE_SOURCE_EXTERNAL_JA:
+        start_ms = timing.external_start_ms
+        end_ms = timing.external_end_ms
+    elif source == EVIDENCE_SOURCE_ASR_SEGMENT:
+        start_ms = timing.asr_start_ms
+        end_ms = timing.asr_end_ms
+    else:
+        raise AlignmentValidationError("unsupported midpoint source")
+
+    _require_exact_nonnegative_int(
+        start_ms,
+        field_name=source + " midpoint start_ms",
+    )
+    _require_exact_nonnegative_int(
+        end_ms,
+        field_name=source + " midpoint end_ms",
+    )
+    if end_ms <= start_ms:
+        raise AlignmentValidationError(
+            source + " midpoint interval must have positive duration"
+        )
+    midpoint_x2 = start_ms + end_ms
+    _require_exact_nonnegative_int(
+        midpoint_x2,
+        field_name=source + " midpoint_x2",
+    )
+    return midpoint_x2
+
+
+@dataclass(frozen=True)
+class AffineAnchorResidual:
+    """Immutable midpoint/residual evidence for one selected anchor."""
+
+    external_identity: HybridCueIdentity
+    asr_identity: HybridCueIdentity
+    external_midpoint_x2: int
+    asr_midpoint_x2: int
+    predicted_asr_midpoint_ms: float
+    signed_residual_ms: float
+    absolute_residual_ms: float
+    is_inlier: bool
+
+    def __post_init__(self):
+        _validate_affine_identity(
+            self.external_identity,
+            expected_source=EVIDENCE_SOURCE_EXTERNAL_JA,
+            field_name="residual external_identity",
+        )
+        _validate_affine_identity(
+            self.asr_identity,
+            expected_source=EVIDENCE_SOURCE_ASR_SEGMENT,
+            field_name="residual asr_identity",
+        )
+        _require_exact_nonnegative_int(
+            self.external_midpoint_x2,
+            field_name="external_midpoint_x2",
+        )
+        _require_exact_nonnegative_int(
+            self.asr_midpoint_x2,
+            field_name="asr_midpoint_x2",
+        )
+        _fraction_to_finite_float(
+            Fraction(self.external_midpoint_x2, 2),
+            field_name="external midpoint",
+        )
+        _fraction_to_finite_float(
+            Fraction(self.asr_midpoint_x2, 2),
+            field_name="ASR midpoint",
+        )
+        _require_finite_float(
+            self.predicted_asr_midpoint_ms,
+            field_name="predicted_asr_midpoint_ms",
+        )
+        signed_residual_ms = _require_finite_float(
+            self.signed_residual_ms,
+            field_name="signed_residual_ms",
+        )
+        absolute_residual_ms = _require_finite_float(
+            self.absolute_residual_ms,
+            field_name="absolute_residual_ms",
+        )
+        if absolute_residual_ms < 0.0:
+            raise AlignmentValidationError(
+                "absolute_residual_ms must be nonnegative"
+            )
+        if not math.isclose(
+            absolute_residual_ms,
+            abs(signed_residual_ms),
+            rel_tol=1e-12,
+            abs_tol=1e-9,
+        ):
+            raise AlignmentValidationError(
+                "absolute_residual_ms must equal the signed residual magnitude"
+            )
+        if type(self.is_inlier) is not bool:
+            raise AlignmentValidationError("is_inlier must be an exact bool")
+
+    @property
+    def external_midpoint_ms(self) -> float:
+        """Return external midpoint evidence without changing source timing."""
+
+        return _fraction_to_finite_float(
+            Fraction(self.external_midpoint_x2, 2),
+            field_name="external midpoint",
+        )
+
+    @property
+    def asr_midpoint_ms(self) -> float:
+        """Return ASR midpoint evidence without changing source timing."""
+
+        return _fraction_to_finite_float(
+            Fraction(self.asr_midpoint_x2, 2),
+            field_name="ASR midpoint",
+        )
+
+
+@dataclass(frozen=True)
+class RobustAffineAlignment:
+    """Immutable analysis-only Theil-Sen midpoint alignment evidence."""
+
+    scale: float
+    intercept_ms: float
+    anchor_count: int
+    inlier_count: int
+    residual_threshold_ms: int
+    residuals: tuple[AffineAnchorResidual, ...]
+    median_absolute_residual_ms: float
+
+    def __post_init__(self):
+        _require_finite_float(
+            self.scale,
+            field_name="scale",
+            strictly_positive=True,
+        )
+        _require_finite_float(
+            self.intercept_ms,
+            field_name="intercept_ms",
+        )
+        anchor_count = _require_exact_nonnegative_int(
+            self.anchor_count,
+            field_name="anchor_count",
+        )
+        if not MIN_AFFINE_ANCHORS <= anchor_count <= MAX_AFFINE_ANCHORS:
+            raise AlignmentValidationError(
+                "anchor_count is outside the affine anchor bounds"
+            )
+        inlier_count = _require_exact_nonnegative_int(
+            self.inlier_count,
+            field_name="inlier_count",
+        )
+        if inlier_count > anchor_count:
+            raise AlignmentValidationError(
+                "inlier_count cannot exceed anchor_count"
+            )
+        residual_threshold_ms = _require_exact_positive_int(
+            self.residual_threshold_ms,
+            field_name="residual_threshold_ms",
+        )
+        if type(self.residuals) is not tuple:
+            raise AlignmentValidationError(
+                "residuals must be an immutable tuple"
+            )
+        if len(self.residuals) != anchor_count:
+            raise AlignmentValidationError(
+                "residual count must equal anchor_count"
+            )
+        _require_finite_float(
+            self.median_absolute_residual_ms,
+            field_name="median_absolute_residual_ms",
+        )
+        if self.median_absolute_residual_ms < 0.0:
+            raise AlignmentValidationError(
+                "median_absolute_residual_ms must be nonnegative"
+            )
+
+        seen_external = set()
+        seen_asr = set()
+        previous_external_index = None
+        previous_asr_index = None
+        absolute_residuals = []
+        actual_inlier_count = 0
+        for position, residual in enumerate(self.residuals):
+            if not isinstance(residual, AffineAnchorResidual):
+                raise AlignmentValidationError(
+                    "residuals must contain AffineAnchorResidual values"
+                )
+
+            external_identity = residual.external_identity
+            asr_identity = residual.asr_identity
+            if external_identity.cue_id in seen_external:
+                raise AlignmentValidationError(
+                    "residuals contain a duplicate external source identity"
+                )
+            if asr_identity.cue_id in seen_asr:
+                raise AlignmentValidationError(
+                    "residuals contain a duplicate ASR source identity"
+                )
+            if (
+                previous_external_index is not None
+                and external_identity.source_index <= previous_external_index
+            ):
+                raise AlignmentValidationError(
+                    "residual external indexes must increase strictly"
+                )
+            if (
+                previous_asr_index is not None
+                and asr_identity.source_index <= previous_asr_index
+            ):
+                raise AlignmentValidationError(
+                    "residual ASR indexes must increase strictly"
+                )
+
+            expected_predicted = (
+                self.scale * residual.external_midpoint_ms
+                + self.intercept_ms
+            )
+            expected_signed = residual.asr_midpoint_ms - expected_predicted
+            expected_absolute = abs(expected_signed)
+            if not all(
+                math.isfinite(value)
+                for value in (
+                    expected_predicted,
+                    expected_signed,
+                    expected_absolute,
+                )
+            ):
+                raise AlignmentValidationError(
+                    "residual validation produced a nonfinite value"
+                )
+            if not math.isclose(
+                residual.predicted_asr_midpoint_ms,
+                expected_predicted,
+                rel_tol=1e-12,
+                abs_tol=1e-9,
+            ):
+                raise AlignmentValidationError(
+                    "residual predicted midpoint is detached from fit"
+                )
+            if not math.isclose(
+                residual.signed_residual_ms,
+                expected_signed,
+                rel_tol=1e-12,
+                abs_tol=1e-9,
+            ) or not math.isclose(
+                residual.absolute_residual_ms,
+                expected_absolute,
+                rel_tol=1e-12,
+                abs_tol=1e-9,
+            ):
+                raise AlignmentValidationError(
+                    "residual values are detached from fit"
+                )
+            expected_inlier = (
+                residual.absolute_residual_ms <= residual_threshold_ms
+            )
+            if residual.is_inlier != expected_inlier:
+                raise AlignmentValidationError(
+                    "residual inlier classification is detached from threshold"
+                )
+
+            seen_external.add(external_identity.cue_id)
+            seen_asr.add(asr_identity.cue_id)
+            previous_external_index = external_identity.source_index
+            previous_asr_index = asr_identity.source_index
+            absolute_residuals.append(residual.absolute_residual_ms)
+            if residual.is_inlier:
+                actual_inlier_count += 1
+
+        if actual_inlier_count != inlier_count:
+            raise AlignmentValidationError(
+                "inlier_count does not match residual classifications"
+            )
+        median_absolute_residual = _median_fraction(
+            [
+                Fraction(str(value))
+                for value in absolute_residuals
+            ]
+        )
+        median_absolute_residual_float = _fraction_to_finite_float(
+            median_absolute_residual,
+            field_name="median_absolute_residual_ms",
+        )
+        if not math.isclose(
+            self.median_absolute_residual_ms,
+            median_absolute_residual_float,
+            rel_tol=1e-12,
+            abs_tol=1e-9,
+        ):
+            raise AlignmentValidationError(
+                "median_absolute_residual_ms does not match residuals"
+            )
+
+    @property
+    def anchor_residuals(self) -> tuple[AffineAnchorResidual, ...]:
+        """Return the immutable residual evidence in selected-anchor order."""
+
+        return self.residuals
+
+
+def infer_robust_affine_alignment(
+    anchors: tuple[MonotonicAnchorCandidate, ...],
+    *,
+    residual_threshold_ms: int,
+) -> RobustAffineAlignment:
+    """Infer midpoint evidence with a deterministic Theil-Sen-style fit.
+
+    Pairwise slopes and per-anchor intercepts use exact ``Fraction`` values;
+    only the immutable public analysis result is converted to finite floats.
+    This function consumes selected lexical anchors and never projects or
+    rewrites subtitle cue timestamps.
+    """
+
+    residual_threshold_ms = _require_exact_positive_int(
+        residual_threshold_ms,
+        field_name="residual_threshold_ms",
+    )
+    validated_anchors = _validate_affine_anchors(anchors)
+
+    midpoint_pairs: list[tuple[int, int]] = []
+    for anchor in validated_anchors:
+        midpoint_pairs.append(
+            (
+                _midpoint_x2(
+                    anchor.timing,
+                    source=EVIDENCE_SOURCE_EXTERNAL_JA,
+                ),
+                _midpoint_x2(
+                    anchor.timing,
+                    source=EVIDENCE_SOURCE_ASR_SEGMENT,
+                ),
+            )
+        )
+
+    if len({external_x2 for external_x2, _ in midpoint_pairs}) < 2:
+        raise AlignmentValidationError(
+            "affine inference requires distinct external midpoint evidence"
+        )
+
+    pairwise_slopes: list[Fraction] = []
+    for left_index, (left_external_x2, left_asr_x2) in enumerate(
+        midpoint_pairs
+    ):
+        for right_external_x2, right_asr_x2 in midpoint_pairs[left_index + 1:]:
+            external_delta_x2 = right_external_x2 - left_external_x2
+            if external_delta_x2 == 0:
+                continue
+            asr_delta_x2 = right_asr_x2 - left_asr_x2
+            pairwise_slopes.append(
+                Fraction(asr_delta_x2, external_delta_x2)
+            )
+
+    if not pairwise_slopes:
+        raise AlignmentValidationError(
+            "affine inference has no valid pairwise slopes"
+        )
+
+    scale_fraction = _median_fraction(pairwise_slopes)
+    if scale_fraction <= 0:
+        raise AlignmentValidationError(
+            "affine scale must be strictly positive"
+        )
+
+    intercepts = []
+    for external_x2, asr_x2 in midpoint_pairs:
+        intercepts.append(
+            Fraction(asr_x2, 2)
+            - scale_fraction * Fraction(external_x2, 2)
+        )
+    intercept_fraction = _median_fraction(intercepts)
+
+    scale = _fraction_to_finite_float(scale_fraction, field_name="scale")
+    _require_finite_float(scale, field_name="scale", strictly_positive=True)
+    intercept_ms = _fraction_to_finite_float(
+        intercept_fraction,
+        field_name="intercept_ms",
+    )
+
+    residuals = []
+    absolute_residuals = []
+    inlier_count = 0
+    for anchor, (external_x2, asr_x2) in zip(
+        validated_anchors,
+        midpoint_pairs,
+    ):
+        external_midpoint = Fraction(external_x2, 2)
+        asr_midpoint = Fraction(asr_x2, 2)
+        predicted_fraction = scale_fraction * external_midpoint + intercept_fraction
+        signed_fraction = asr_midpoint - predicted_fraction
+        absolute_fraction = abs(signed_fraction)
+
+        predicted = _fraction_to_finite_float(
+            predicted_fraction,
+            field_name="predicted_asr_midpoint_ms",
+        )
+        signed = _fraction_to_finite_float(
+            signed_fraction,
+            field_name="signed_residual_ms",
+        )
+        absolute = _fraction_to_finite_float(
+            absolute_fraction,
+            field_name="absolute_residual_ms",
+        )
+        is_inlier = absolute_fraction <= residual_threshold_ms
+        if is_inlier:
+            inlier_count += 1
+        absolute_residuals.append(absolute_fraction)
+        residuals.append(
+            AffineAnchorResidual(
+                external_identity=anchor.external_identity,
+                asr_identity=anchor.asr_identity,
+                external_midpoint_x2=external_x2,
+                asr_midpoint_x2=asr_x2,
+                predicted_asr_midpoint_ms=predicted,
+                signed_residual_ms=signed,
+                absolute_residual_ms=absolute,
+                is_inlier=is_inlier,
+            )
+        )
+
+    median_absolute_residual_ms = _fraction_to_finite_float(
+        _median_fraction(absolute_residuals),
+        field_name="median_absolute_residual_ms",
+    )
+    return RobustAffineAlignment(
+        scale=scale,
+        intercept_ms=intercept_ms,
+        anchor_count=len(validated_anchors),
+        inlier_count=inlier_count,
+        residual_threshold_ms=residual_threshold_ms,
+        residuals=tuple(residuals),
+        median_absolute_residual_ms=median_absolute_residual_ms,
+    )
+
+
 __all__ = [
     "AlignmentAmbiguityError",
     "AlignmentError",
@@ -543,15 +1162,20 @@ __all__ = [
     "AlignmentValidationError",
     "AnchorTimingEvidence",
     "DEFAULT_MINIMUM_LEXICAL_SCORE",
+    "AffineAnchorResidual",
     "JapaneseAnchorCandidate",
     "JapaneseComparisonEvidence",
     "MAX_ANCHOR_CANDIDATES",
     "MAX_ALIGNMENT_TEXT_CHARS",
+    "MAX_AFFINE_ANCHORS",
     "MAX_LEXICAL_PAIR_COMPARISONS",
+    "MIN_AFFINE_ANCHORS",
     "MonotonicAnchorCandidate",
     "NormalizedComparisonEvidence",
     "generate_anchor_candidates",
     "generate_monotonic_anchor_candidates",
+    "RobustAffineAlignment",
+    "infer_robust_affine_alignment",
     "japanese_lexical_similarity",
     "normalize_japanese_for_matching",
     "select_monotonic_anchors",

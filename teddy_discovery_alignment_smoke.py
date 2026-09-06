@@ -1,6 +1,6 @@
 """Offline smoke tests for the isolated Stage11 R3 alignment foundation."""
 
-from dataclasses import FrozenInstanceError, fields
+from dataclasses import FrozenInstanceError, fields, replace
 import math
 from pathlib import Path
 
@@ -8,14 +8,19 @@ from teddy_discovery_alignment import (
     AlignmentAmbiguityError,
     AlignmentLimitError,
     AlignmentValidationError,
+    AffineAnchorResidual,
     AnchorTimingEvidence,
     DEFAULT_MINIMUM_LEXICAL_SCORE,
     JapaneseComparisonEvidence,
+    MAX_AFFINE_ANCHORS,
     MAX_ALIGNMENT_TEXT_CHARS,
     MAX_ANCHOR_CANDIDATES,
     MAX_LEXICAL_PAIR_COMPARISONS,
+    MIN_AFFINE_ANCHORS,
     MonotonicAnchorCandidate,
+    RobustAffineAlignment,
     generate_monotonic_anchor_candidates,
+    infer_robust_affine_alignment,
     japanese_lexical_similarity,
     normalize_japanese_for_matching,
     select_monotonic_anchors,
@@ -250,6 +255,25 @@ def candidate(
     )
 
 
+def timed_candidate(
+    external_index: int,
+    asr_index: int,
+    external_start_ms: int,
+    external_end_ms: int,
+    asr_start_ms: int,
+    asr_end_ms: int,
+) -> MonotonicAnchorCandidate:
+    return replace(
+        candidate(external_index, asr_index, "同じ", "同じ"),
+        timing=AnchorTimingEvidence(
+            external_start_ms=external_start_ms,
+            external_end_ms=external_end_ms,
+            asr_start_ms=asr_start_ms,
+            asr_end_ms=asr_end_ms,
+        ),
+    )
+
+
 def main():
     # Matching normalization is NFKC + case-fold + removal of Unicode
     # whitespace/punctuation, while Japanese lexical content remains intact.
@@ -391,8 +415,10 @@ def main():
 
     # The known real cardinality remains under the generic resource bound.
     require(
+        MAX_LEXICAL_PAIR_COMPARISONS == 256_000
+        and
         661 * 166 <= MAX_LEXICAL_PAIR_COMPARISONS,
-        "KNOWN_CARDINALITY_WITHIN_PAIR_BOUND",
+        "V2_3B_PAIR_BOUND_UNCHANGED_AND_KNOWN_CARDINALITY_SAFE",
     )
 
     # Exact product boundary: pair evaluation is allowed at the cap, while
@@ -564,6 +590,310 @@ def main():
         "BOOLEAN_TIMESTAMP_REJECTED",
     )
 
+    # V2-3D uses exact doubled-integer midpoint evidence and a deterministic
+    # Theil-Sen-style fit.  Source intervals deliberately have different
+    # durations and their starts do not carry the tested affine relationship.
+    exact_affine_anchors = (
+        timed_candidate(0, 0, 0, 1_000, 650, 800),
+        timed_candidate(1, 1, 1_200, 1_800, 1_880, 2_070),
+        timed_candidate(2, 2, 2_500, 3_500, 3_750, 3_950),
+        timed_candidate(3, 3, 4_100, 4_500, 5_300, 5_650),
+    )
+    exact_affine = infer_robust_affine_alignment(
+        exact_affine_anchors,
+        residual_threshold_ms=1,
+    )
+    require(
+        math.isclose(exact_affine.scale, 1.25, abs_tol=1e-12)
+        and math.isclose(exact_affine.intercept_ms, 100.0, abs_tol=1e-12)
+        and exact_affine.anchor_count == 4
+        and exact_affine.inlier_count == 4
+        and all(
+            residual.absolute_residual_ms == 0.0
+            and residual.is_inlier
+            for residual in exact_affine.residuals
+        ),
+        "EXACT_AFFINE_RECOVERED_FROM_MIDPOINTS",
+    )
+    require(
+        tuple(
+            residual.external_identity.source_index
+            for residual in exact_affine.residuals
+        )
+        == (0, 1, 2, 3)
+        and tuple(
+            residual.asr_identity.source_index
+            for residual in exact_affine.residuals
+        )
+        == (0, 1, 2, 3)
+        and exact_affine.residuals[0].external_midpoint_x2 == 1_000
+        and exact_affine.residuals[0].asr_midpoint_x2 == 1_450
+        and exact_affine.residuals[0].external_midpoint_ms == 500.0
+        and exact_affine.residuals[0].asr_midpoint_ms == 725.0,
+        "MIDPOINT_EVIDENCE_AND_SELECTED_ORDER_PRESERVED",
+    )
+
+    offset_only_anchors = (
+        timed_candidate(0, 0, 0, 1_000, 700, 800),
+        timed_candidate(1, 1, 1_200, 1_800, 1_600, 1_900),
+        timed_candidate(2, 2, 2_500, 3_500, 3_150, 3_350),
+        timed_candidate(3, 3, 4_100, 4_500, 4_400, 4_700),
+    )
+    offset_only = infer_robust_affine_alignment(
+        offset_only_anchors,
+        residual_threshold_ms=1,
+    )
+    require(
+        math.isclose(offset_only.scale, 1.0, abs_tol=1e-12)
+        and math.isclose(offset_only.intercept_ms, 250.0, abs_tol=1e-12)
+        and offset_only.inlier_count == 4,
+        "OFFSET_ONLY_AFFINE_RECOVERED",
+    )
+
+    drift_anchors = (
+        timed_candidate(0, 0, 0, 1_000, 540, 640),
+        timed_candidate(1, 1, 1_200, 1_800, 1_550, 1_670),
+        timed_candidate(2, 2, 2_500, 3_500, 3_040, 3_240),
+        timed_candidate(3, 3, 4_100, 4_500, 4_350, 4_582),
+    )
+    drift = infer_robust_affine_alignment(
+        drift_anchors,
+        residual_threshold_ms=1,
+    )
+    require(
+        math.isclose(drift.scale, 1.02, abs_tol=1e-12)
+        and math.isclose(drift.intercept_ms, 80.0, abs_tol=1e-12)
+        and drift.inlier_count == 4,
+        "DRIFT_AFFINE_RECOVERED",
+    )
+
+    robust_outlier_anchors = (
+        timed_candidate(0, 0, 50, 150, 110, 210),
+        timed_candidate(1, 1, 650, 750, 770, 870),
+        timed_candidate(2, 2, 1_250, 1_350, 1_430, 1_530),
+        timed_candidate(3, 3, 1_950, 2_050, 2_200, 2_300),
+        timed_candidate(4, 4, 2_750, 2_850, 3_080, 3_180),
+        timed_candidate(5, 5, 3_450, 3_550, 11_950, 12_050),
+    )
+    robust_outlier = infer_robust_affine_alignment(
+        robust_outlier_anchors,
+        residual_threshold_ms=5,
+    )
+    require(
+        math.isclose(robust_outlier.scale, 1.1, abs_tol=1e-12)
+        and math.isclose(robust_outlier.intercept_ms, 50.0, abs_tol=1e-12)
+        and robust_outlier.inlier_count == 5
+        and all(
+            residual.is_inlier
+            for residual in robust_outlier.residuals[:5]
+        )
+        and not robust_outlier.residuals[-1].is_inlier
+        and robust_outlier.residuals[-1].absolute_residual_ms > 5.0,
+        "ROBUST_OUTLIER_RETAINED_AS_OUTLIER",
+    )
+
+    boundary_anchors = (
+        timed_candidate(0, 0, 50, 150, 50, 150),
+        timed_candidate(1, 1, 150, 250, 150, 250),
+        timed_candidate(2, 2, 250, 350, 250, 350),
+        timed_candidate(3, 3, 350, 450, 350, 450),
+        timed_candidate(4, 4, 450, 550, 460, 560),
+    )
+    residual_at_boundary = infer_robust_affine_alignment(
+        boundary_anchors,
+        residual_threshold_ms=10,
+    )
+    residual_over_boundary = infer_robust_affine_alignment(
+        boundary_anchors,
+        residual_threshold_ms=9,
+    )
+    require(
+        residual_at_boundary.residuals[-1].absolute_residual_ms == 10.0
+        and residual_at_boundary.residuals[-1].is_inlier
+        and not residual_over_boundary.residuals[-1].is_inlier,
+        "RESIDUAL_THRESHOLD_EQUALITY_BOUNDARY",
+    )
+
+    require(
+        MIN_AFFINE_ANCHORS == 3
+        and 89 <= MAX_AFFINE_ANCHORS == 512,
+        "AFFINE_RESOURCE_BOUNDS_COVER_PRIOR_EVIDENCE",
+    )
+    max_affine_anchors = tuple(
+        timed_candidate(
+            index,
+            index,
+            index * 2_000,
+            index * 2_000 + 1_000,
+            index * 2_000 + 100,
+            index * 2_000 + 1_100,
+        )
+        for index in range(MAX_AFFINE_ANCHORS)
+    )
+    max_affine = infer_robust_affine_alignment(
+        max_affine_anchors,
+        residual_threshold_ms=1,
+    )
+    require(
+        max_affine.anchor_count == MAX_AFFINE_ANCHORS,
+        "MAX_AFFINE_ANCHOR_BOUNDARY_ACCEPTED",
+    )
+    expect_raises(
+        AlignmentLimitError,
+        lambda: infer_robust_affine_alignment(
+            max_affine_anchors
+            + (
+                timed_candidate(
+                    MAX_AFFINE_ANCHORS,
+                    MAX_AFFINE_ANCHORS,
+                    MAX_AFFINE_ANCHORS * 2_000,
+                    MAX_AFFINE_ANCHORS * 2_000 + 1_000,
+                    MAX_AFFINE_ANCHORS * 2_000 + 100,
+                    MAX_AFFINE_ANCHORS * 2_000 + 1_100,
+                ),
+            ),
+            residual_threshold_ms=1,
+        ),
+        "OVER_MAX_AFFINE_ANCHOR_BOUND_REJECTED",
+    )
+
+    # Affine input is already selected monotonic evidence: malformed order,
+    # duplicate source use, non-tuple input, and unsupported members fail
+    # closed without reordering or repair.
+    expect_raises(
+        AlignmentValidationError,
+        lambda: infer_robust_affine_alignment(
+            exact_affine_anchors[:2],
+            residual_threshold_ms=1,
+        ),
+        "TOO_FEW_AFFINE_ANCHORS_REJECTED",
+    )
+    expect_raises(
+        AlignmentValidationError,
+        lambda: infer_robust_affine_alignment(
+            list(exact_affine_anchors),
+            residual_threshold_ms=1,
+        ),
+        "NON_TUPLE_AFFINE_INPUT_REJECTED",
+    )
+    expect_raises(
+        AlignmentValidationError,
+        lambda: infer_robust_affine_alignment(
+            (object(), exact_affine_anchors[1], exact_affine_anchors[2]),
+            residual_threshold_ms=1,
+        ),
+        "WRONG_AFFINE_MEMBER_REJECTED",
+    )
+    expect_raises(
+        AlignmentValidationError,
+        lambda: infer_robust_affine_alignment(
+            (
+                exact_affine_anchors[0],
+                exact_affine_anchors[0],
+                exact_affine_anchors[2],
+            ),
+            residual_threshold_ms=1,
+        ),
+        "DUPLICATE_AFFINE_SOURCE_REJECTED",
+    )
+    expect_raises(
+        AlignmentValidationError,
+        lambda: infer_robust_affine_alignment(
+            (
+                exact_affine_anchors[0],
+                exact_affine_anchors[2],
+                exact_affine_anchors[1],
+            ),
+            residual_threshold_ms=1,
+        ),
+        "OUT_OF_ORDER_AFFINE_INPUT_REJECTED",
+    )
+    expect_raises(
+        AlignmentValidationError,
+        lambda: infer_robust_affine_alignment(
+            (
+                timed_candidate(0, 0, 100, 300, 100, 200),
+                timed_candidate(1, 1, 100, 300, 300, 400),
+                timed_candidate(2, 2, 100, 300, 500, 600),
+            ),
+            residual_threshold_ms=1,
+        ),
+        "NO_DISTINCT_EXTERNAL_MIDPOINTS_REJECTED",
+    )
+
+    zero_scale_anchors = (
+        timed_candidate(0, 0, 50, 150, 450, 550),
+        timed_candidate(1, 1, 150, 250, 450, 550),
+        timed_candidate(2, 2, 250, 350, 450, 550),
+    )
+    expect_raises(
+        AlignmentValidationError,
+        lambda: infer_robust_affine_alignment(
+            zero_scale_anchors,
+            residual_threshold_ms=1,
+        ),
+        "ZERO_AFFINE_SCALE_REJECTED",
+    )
+    negative_scale_anchors = (
+        timed_candidate(0, 0, 50, 150, 250, 350),
+        timed_candidate(1, 1, 150, 250, 150, 250),
+        timed_candidate(2, 2, 250, 350, 50, 150),
+    )
+    expect_raises(
+        AlignmentValidationError,
+        lambda: infer_robust_affine_alignment(
+            negative_scale_anchors,
+            residual_threshold_ms=1,
+        ),
+        "NEGATIVE_AFFINE_SCALE_REJECTED",
+    )
+    for invalid_residual_threshold, marker in (
+        (True, "BOOLEAN_RESIDUAL_THRESHOLD_REJECTED"),
+        (0, "ZERO_RESIDUAL_THRESHOLD_REJECTED"),
+        (-1, "NEGATIVE_RESIDUAL_THRESHOLD_REJECTED"),
+        (1.0, "FLOAT_RESIDUAL_THRESHOLD_REJECTED"),
+    ):
+        expect_raises(
+            AlignmentValidationError,
+            lambda value=invalid_residual_threshold: infer_robust_affine_alignment(
+                exact_affine_anchors,
+                residual_threshold_ms=value,
+            ),
+            marker,
+        )
+
+    malformed_timing = object.__new__(AnchorTimingEvidence)
+    object.__setattr__(malformed_timing, "external_start_ms", 10**400)
+    object.__setattr__(malformed_timing, "external_end_ms", 10**400 + 2)
+    object.__setattr__(malformed_timing, "asr_start_ms", 1)
+    object.__setattr__(malformed_timing, "asr_end_ms", 2)
+    expect_raises(
+        AlignmentValidationError,
+        lambda: infer_robust_affine_alignment(
+            (
+                replace(exact_affine_anchors[0], timing=malformed_timing),
+                exact_affine_anchors[1],
+                exact_affine_anchors[2],
+            ),
+            residual_threshold_ms=1,
+        ),
+        "NONFINITE_MIDPOINT_CONVERSION_REJECTED",
+    )
+
+    # A frozen result cannot be mutated, and its residual collection is an
+    # immutable tuple of source identities rather than dialogue or output
+    # subtitle timing.
+    require(
+        isinstance(exact_affine.residuals, tuple)
+        and exact_affine.anchor_residuals is exact_affine.residuals,
+        "IMMUTABLE_AFFINE_RESIDUAL_TUPLE",
+    )
+    expect_raises(
+        FrozenInstanceError,
+        lambda: setattr(exact_affine, "scale", 2.0),
+        "ROBUST_AFFINE_RESULT_FROZEN",
+    )
+
     # ASR_ONLY has no external document, so candidate generation remains an
     # empty immutable result and cannot fabricate external anchors.
     asr_only = HybridEvidenceBundle.from_asr_only(
@@ -585,6 +915,8 @@ def main():
         JapaneseComparisonEvidence,
         AnchorTimingEvidence,
         MonotonicAnchorCandidate,
+        AffineAnchorResidual,
+        RobustAffineAlignment,
     ):
         require(
             getattr(contract_type.__dataclass_params__, "frozen", False),
@@ -609,11 +941,11 @@ def main():
     source_text = alignment_source.read_text(encoding="utf-8").lower()
     for forbidden, marker in (
         ("jur", "NO_TITLE_SPECIFIC_PRODUCTION_STRING"),
-        ("affine", "NO_AFFINE_LOGIC"),
-        ("scale", "NO_SCALE_LOGIC"),
-        ("intercept", "NO_INTERCEPT_LOGIC"),
-        ("residual", "NO_RESIDUAL_LOGIC"),
-        ("inlier", "NO_INLIER_LOGIC"),
+        ("project_timestamp", "NO_TIMESTAMP_PROJECTION"),
+        ("transform_timestamp", "NO_TIMESTAMP_TRANSFORMATION"),
+        ("aligned_start_ms", "NO_ALIGNED_START_OWNERSHIP"),
+        ("aligned_end_ms", "NO_ALIGNED_END_OWNERSHIP"),
+        ("rewrite_cue_timing", "NO_CUE_TIMING_REWRITE"),
         ("open(", "NO_FILESYSTEM_IO"),
         ("urllib", "NO_NETWORK_IO"),
         ("subprocess", "NO_SUBPROCESS_IO"),
