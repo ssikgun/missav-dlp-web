@@ -146,25 +146,26 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-3H — deterministic acceptance application / ASR_ONLY fallback boundary`
+Checkpoint: `V2-3I — targeted re-ASR necessity and R3 closure audit`
 Verdict: **PASS**
 
 Important finding:
-- deterministic acceptance decisions are now safely applied to immutable hybrid evidence
-- `ACCEPT_HYBRID` preserves external JA, ASR, optional EN, cue evidence and alignment method/confidence
-- `REJECT_EXTERNAL` alone creates a fresh canonical ASR_ONLY bundle through `HybridEvidenceBundle.from_asr_only()`
-- rejected evidence contains no external JA while preserving ASR and optional EN evidence
-- `UNRESOLVED` preserves external JA and ASR evidence and never silently becomes ASR_ONLY
-- the original input bundle is never mutated
-- applied provenance must exactly match the decision's recommended provenance
-- no subtitle publication, translation, ASR execution, timestamp transformation, model call or I/O was added
-- application smoke and all seven requested regression smoke suites passed
-- independent verification result 0 was caused only by a forbidden-word grep matching the explanatory module docstring stating that publication/model/ASR operations are not performed
-- structural inspection confirms the single `from_asr_only()` production call is confined to the `REJECT_EXTERNAL` branch
-- V2-3H acceptance application / ASR_ONLY fallback boundary is CLOSED
+- R3 core deterministic alignment capability is complete
+- Japanese normalization and lexical candidate generation are implemented
+- strict monotonic anchor selection is implemented
+- robust affine inference and residual/inlier analysis are implemented
+- deterministic acceptance decisions are implemented
+- release/content mismatch rejection is implemented
+- rejected external JA evidence can be safely converted to canonical ASR_ONLY evidence
+- UNRESOLVED evidence never silently becomes ASR_ONLY
+- no current targeted re-ASR implementation exists
+- no concrete gap/coverage signal currently justifies adding targeted re-ASR complexity
+- targeted re-ASR is therefore deferred and should be added only if later real-title evidence demonstrates a need
+- no subtitle timestamp projection, publication, model call or ASR execution is owned by R3
+- R3 deterministic alignment engine is CLOSED
 
 Next planned checkpoint:
-`V2-3I — targeted re-ASR necessity and R3 closure baseline audit`
+`R4 — Hermes v2 adapter baseline audit`
 
 ## 8. Stage11 implementation roadmap
 
@@ -187,15 +188,15 @@ Add immutable structures for:
 
 No LLM timestamps.
 
-### R3 — Deterministic alignment engine
+### R3 — Deterministic alignment engine — CLOSED / PASS
 
-- Japanese normalization
-- monotonic anchor matching
-- robust affine inference
-- residual/inlier thresholds
-- release/content mismatch rejection
-- ASR_ONLY fallback when external evidence is invalid
-- targeted re-ASR hook only if justified
+- Japanese normalization — implemented
+- monotonic anchor matching — implemented
+- robust affine inference — implemented
+- residual/inlier analysis — implemented
+- release/content mismatch rejection — implemented
+- ASR_ONLY fallback when external evidence is invalid — implemented
+- targeted re-ASR hook — deferred; no current evidence justifies implementation
 
 ### R4 — Hermes v2 adapter
 
