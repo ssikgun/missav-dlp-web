@@ -506,8 +506,30 @@ R6-B frozen Hermes batching implementation:
 - no live Hermes request, DB write, publication, source deletion, or Stage9 mutation occurred
 - worker lease duration and heartbeat cadence remain UNFROZEN
 
+R6-B live full-title 16-cue batched Hermes measurement:
+- exact committed batching adapter used
+- frozen live batch size: `16 cues`
+- JUR-750 frozen ASR evidence: `166 cues`
+- expected live batches: `11` (`10 x 16` plus final `6`)
+- per-batch frozen transport timeout used: `120 s`
+- provider: `openai-codex`
+- model: `gpt-5.6-luna`
+- reasoning: `xhigh`
+- semantic outcome: `BATCH_TIMEOUT`
+- complete semantic wall time: `216.787 s`
+- attempted batches: `6`
+- successful batches: `5`
+- slowest successful batch: `21.831 s`
+- reconstructed full result cue count: `none`
+- per-batch evidence: `1:16c/20.275s/PASS, 2:16c/15.935s/PASS, 3:16c/20.703s/PASS, 4:16c/17.938s/PASS, 5:16c/21.831s/PASS, 6:16c/120.101s/TIMEOUT`
+- independent observer samples: `216`
+- missed observer intervals: `0`
+- no raw JA dialogue or Korean translation output was stored or printed
+- no retry, fallback, DB write, publication, source deletion, Stage9 mutation, SSH-key change, or production-code change occurred
+- worker lease duration and heartbeat cadence remain unfrozen until this measurement result is reviewed
+
 Next checkpoint:
-`R6-B-HERMES-BATCHING-LIVE-FULLTITLE — run one real JUR-750 166-cue semantic pass through the frozen 16-cue adapter, measure complete semantic wall time and per-batch timings, then use that evidence for worker lease and heartbeat selection`
+`R6-B-HERMES-BATCHING-LIVE-BLOCKER-AUDIT — inspect the controlled full-title batched failure before changing the frozen batch size, transport, model, or retry policy`
 
 ## 8. Stage11 implementation roadmap
 
