@@ -1519,8 +1519,71 @@ Architecture consequence:
 - live semantic canary remains NOT STARTED
 - worker lease and scheduler cadence remain UNFROZEN
 
+### R6-B-STATEFUL-TRANSLATOR-MINIMAL-IMPLEMENTATION-B — CLOSED / PASS
+
+The dedicated CT120 translator profile and its non-model runtime/auth
+preconditions are now fully verified.
+
+Profile state:
+- native profile:
+  `subtitle-translator`
+- frozen SOUL SHA256:
+  `37c487cc90e828b70c4d8343ab0949ccaffa9168d01aff4b828f6fa1b994c9e6`
+- bundled skills: NONE
+- gateway/messaging integration: NONE
+- profile-local `auth.json`: ABSENT
+- no credential files were copied into the profile
+
+Native CLI/session contract:
+- profile selection: PASS
+- quiet chat: PASS
+- resume: PASS
+- query: PASS
+- provider/model/reasoning selectors: PASS
+- native SessionDB APIs:
+  - `create_session`: PASS
+  - `get_session`: PASS
+  - `end_session`: PASS
+  - `resolve_session_id`: PASS
+  - `resolve_resume_session_id`: PASS
+
+Provider/auth verification:
+- exact native command contract:
+  `hermes auth status <provider>`
+- translator-profile verification:
+  `hermes --profile subtitle-translator auth status openai-codex`
+- return code:
+  `0`
+- native result:
+  `openai-codex: logged in`
+- therefore the existing global OpenAI Codex authorization is visible through
+  the native Hermes profile fallback exactly as expected
+- no profile-local auth shadow was created
+
+Safety:
+- no model invocation
+- no real subtitle translation
+- no session creation
+- no credential copy
+- no manual auth mutation
+- no profile config mutation during auth verification
+- no cron/gateway change
+- no Stage11 job DB write
+- no publication
+- no source deletion
+- no Stage9 change
+
+R6-B minimal implementation status:
+- Part A repository-side deterministic stateful boundary: PASS
+- Part B CT120 dedicated profile/runtime/auth preflight: PASS
+- profile/session/auth contracts: RESOLVED
+- live semantic canary: NOT STARTED
+- production cron: NOT CREATED
+- worker lease duration: UNFROZEN
+- scheduler cadence: UNFROZEN
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-MINIMAL-IMPLEMENTATION-B-AUTH-VERIFY — run the exact provider-specific native openai-codex auth-status preflight for subtitle-translator, with no model invocation or credential mutation, and close PART-B if the existing global authorization is visible through the native profile fallback`
+`R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-PREFLIGHT — prepare one bounded real stateful semantic canary using the frozen subtitle-translator profile and deterministic premint/staging boundary, verify exact source/package/session identities and safety preconditions, but do not invoke the model until the canary input is frozen`
 
 ## 8. Stage11 implementation roadmap
 
