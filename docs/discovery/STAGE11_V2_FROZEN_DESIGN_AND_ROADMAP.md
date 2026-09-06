@@ -1454,8 +1454,73 @@ Architecture remains unchanged:
 - live semantic canary remains NOT STARTED
 - worker lease and scheduler cadence remain UNFROZEN
 
+### R6-B-STATEFUL-TRANSLATOR-AUTH-CONTRACT-AUDIT — PASS
+
+The Hermes v0.20.0 native auth/profile contract was inspected read-only.
+
+Resolved native profile-auth contract:
+- profile mode uses profile-local `auth.json` when that profile has its own
+  provider entry
+- when a named profile has no entry for a provider, native Hermes falls back
+  to the global-root `auth.json` provider state
+- Hermes source explicitly documents this behavior in
+  `_load_provider_state()` / `_load_provider_state_with_source()`
+- once a provider is authenticated directly inside a profile, that profile's
+  provider state shadows the global state
+- this per-provider fallback mirrors native credential-pool profile fallback
+- therefore a new isolated profile does NOT require copied credentials merely
+  to use an already-authorized global provider
+
+Observed translator-profile state:
+- `subtitle-translator/auth.json`: ABSENT
+- `subtitle-translator/.env`: PRESENT but minimal profile-local file
+- global `~/.hermes/auth.json`: PRESENT, mode `0600`
+- global `~/.hermes/.env`: PRESENT, mode `0600`
+- `~/.codex/auth.json`: PRESENT, mode `0600`
+- no OPENAI/CODEX/HERMES credential environment variable names were present
+  in the audit environment
+- no secret values were printed
+
+OpenAI Codex runtime contract:
+- native auth dispatcher maps provider `openai-codex` to
+  `get_codex_auth_status()`
+- native Codex runtime resolution supports the normal auth state and
+  credential pool
+- source explicitly states that profile workers can see providers that were
+  authenticated only at global scope
+- Codex credential-pool resolution is also native and does not require a
+  Stage11 credential-copy mechanism
+
+Previous PART-B auth preflight reinterpretation:
+- the previous command:
+  `hermes --profile subtitle-translator auth status`
+  returned rc `2`
+- this result is NOT evidence that the profile lacks Codex authentication
+- `auth status` is provider-oriented, and the previous invocation did not
+  explicitly identify `openai-codex`
+- the exact provider-specific non-model preflight must therefore use the native
+  OpenAI Codex status path rather than treating rc `2` as an auth failure
+
+Frozen safety decision:
+- NEVER copy `.env`, `auth.json`, OAuth tokens, Codex credentials, or credential
+  pool files into `subtitle-translator`
+- NEVER clone another operational profile solely for authentication
+- use only Hermes native global-provider fallback / credential-pool resolution
+- a profile-local auth block may exist only if the user intentionally performs
+  Hermes native authentication for that profile in the future
+- Stage11 itself never handles raw provider credentials
+
+Architecture consequence:
+- dedicated isolated `subtitle-translator` profile remains approved
+- global-to-profile native provider fallback is the approved auth boundary
+- SessionDB deterministic pre-mint remains approved
+- profile/session/auth contract is now RESOLVED
+- no model invocation occurred in this audit
+- live semantic canary remains NOT STARTED
+- worker lease and scheduler cadence remain UNFROZEN
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-AUTH-CONTRACT-AUDIT — inspect native Hermes v0.20.0 auth help/source read-only to determine the exact supported way for a new named profile to use the existing openai-codex authentication without copying credentials or invoking a model`
+`R6-B-STATEFUL-TRANSLATOR-MINIMAL-IMPLEMENTATION-B-AUTH-VERIFY — run the exact provider-specific native openai-codex auth-status preflight for subtitle-translator, with no model invocation or credential mutation, and close PART-B if the existing global authorization is visible through the native profile fallback`
 
 ## 8. Stage11 implementation roadmap
 
