@@ -539,8 +539,21 @@ R6-B failed Batch6 split audit:
 - batched-vs-whole translation quality comparison remains REQUIRED before final semantic strategy approval
 - worker lease duration and heartbeat cadence remain UNFROZEN
 
+R6-B failed range 80-87 deeper split audit:
+- parent range: indices `80-87`
+- parent request: `8 cues`, `4831` prompt bytes
+- parent result: `TIMEOUT` at `120.101 s`
+- diagnostic split: two contiguous 4-cue requests
+- evidence: `80-83:4c/3512B/120.101s/TIMEOUT, 84-87:4c/2786B/9.185s/PASS`
+- production batch cardinality remains unchanged
+- production transport timeout remains unchanged
+- no retry, fallback, DB write, publication, source deletion, Stage9 mutation, or source-code change occurred
+- cue-count alone is not accepted as an operational safety predictor
+- batched-vs-whole translation quality comparison remains REQUIRED before final semantic strategy approval
+- worker lease duration and heartbeat cadence remain UNFROZEN
+
 Next checkpoint:
-`R6-B-HERMES-BATCH6-DEEPER-SPLIT-AUDIT — further split only the still-failing exact problem range before changing production policy`
+`R6-B-HERMES-BATCH6-SPLIT2-AUDIT — split only the still-failing 4-cue subrange into 2-cue requests before changing any production batching or timeout policy`
 
 ## 8. Stage11 implementation roadmap
 
