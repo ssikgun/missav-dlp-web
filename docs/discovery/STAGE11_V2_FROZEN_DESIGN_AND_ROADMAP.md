@@ -654,8 +654,137 @@ R6-B Luna whole-file translation quality baseline:
 - equivalent-source stateful-vs-bounded quality comparison remains required before final semantic strategy freeze
 - worker lease duration and heartbeat cadence remain UNFROZEN
 
+R6-B dedicated stateful subtitle translator architecture review:
+
+Architecture decision:
+- a dedicated stateful subtitle-translation agent is the leading Stage11 semantic execution architecture
+- this checkpoint freezes architecture only; no production implementation is performed
+- one subtitle title is treated as one persistent semantic task
+- the translator may internally reason, inspect context, revisit earlier cues, and perform multiple agent iterations while preserving one title-level task context
+- the translator must not be forced into independent stateless fixed-size cue calls
+- the existing stateless Hermes batching implementation remains available only as comparison / fallback research evidence and is NOT the approved production semantic strategy
+
+Scheduling / heartbeat boundary:
+- the Stage11 subtitle job DB remains the authoritative source of work ownership and state
+- the artifact directory remains durable storage only; directory presence alone never grants ownership
+- a scheduler / heartbeat discovers eligible translation work from the Stage11 job state
+- scheduler / heartbeat must claim work through the existing claim-token fencing model before translation starts
+- scheduler / heartbeat must NOT perform the long translation synchronously inside its own periodic execution
+- after a successful claim it launches or dispatches exactly one dedicated translator task for that job
+- only one active translator task may own a given job generation / claim token
+- repeated heartbeat scans while the task is owned must not start duplicate translations
+
+Translator authority:
+- translator owns semantic interpretation only:
+  - understand Japanese dialogue in full-title context
+  - use ASR Japanese and trusted external Japanese according to the already-frozen route
+  - use optional English only as supporting evidence
+  - repair contextually obvious STT lexical mistakes
+  - create natural Korean dialogue
+  - identify genuinely unclear dialogue rather than inventing certainty
+- translator does NOT own:
+  - cue identity generation
+  - timestamps
+  - affine timing
+  - route selection
+  - publication path
+  - publication itself
+  - Stage9 state
+  - source deletion
+  - arbitrary Stage11 DB mutation
+  - retry policy
+  - job ownership
+- no external Korean subtitle may be used as semantic source
+
+Persistent-task input contract:
+- deterministic Stage11 code constructs the title-level semantic work package
+- the package contains stable cue IDs plus the already-authorized Japanese / ASR / optional English evidence
+- ordering is immutable
+- timestamps may be supplied for reference only if useful to the agent, but the agent has no authority to modify them
+- complete title context is available to the stateful task
+- the agent may work incrementally internally, but incremental partial Korean output is staging evidence only and is never publishable
+
+Output / validation boundary:
+- translator returns a complete title-level semantic result keyed by the original stable cue IDs
+- deterministic code verifies:
+  - exact cue-ID set
+  - exact cue-ID order
+  - no missing or duplicate cues unless a separately frozen cleanup rule explicitly permits a non-dialogue metadata exclusion
+  - Korean output presence / allowed unclear marker policy
+  - no timestamp ownership by the translator
+  - no unauthorized Japanese/English replacement of Korean output
+- deterministic Stage11 code reconstructs final subtitle timing from the already-frozen route/timing owner
+- final full-title result must pass the existing semantic / prepublication validation boundary before READY_TO_PUBLISH
+- partial agent work is never accepted as READY_TO_PUBLISH
+
+Metadata / non-dialogue handling:
+- WhisperJAV or other generator metadata must not be translated as dialogue
+- metadata detection must be generic and deterministic, not title-specific
+- nonlexical / extremely short utterances must not be silently deleted by the agent
+- any future suppression / merge policy for such cues requires its own deterministic frozen rule
+- the translator may classify uncertainty, but deterministic code owns whether a cue is preserved, suppressed, merged, or rejected
+
+Failure semantics:
+- translator failure, timeout, malformed result, ownership loss, or validator rejection fails closed
+- no partial publication
+- no provider fallback
+- no model fallback
+- no silent switch back to stateless tiny batches
+- claim-token loss causes produced output to be discarded
+- stale RUNNING recovery remains governed by the already-frozen Stage11 stale-job contract
+- a failed task becomes retryable or final only through Stage11 job policy, never through autonomous translator-agent choice
+
+Recovery / persistence:
+- title-level agent/task identity must be recorded outside raw dialogue logs
+- raw Japanese/Korean dialogue must not be placed in ordinary job DB fields or ordinary HTTP logs
+- durable subtitle artifacts may contain dialogue under the already-frozen Stage11 artifact permissions
+- if native Hermes persistent task/session identifiers are usable, implementation should reuse them rather than inventing a parallel conversation store
+- exact Hermes profile/session invocation mechanism remains implementation-time evidence and is NOT invented in this architecture checkpoint
+
+Dedicated agent profile:
+- use a separate translator profile / role rather than the main Luna assistant
+- purpose is subtitle semantic work only
+- it should receive narrowly scoped tools required for reading its staged title package and writing staged translation output
+- it receives no publication/delete/Stage9 authority
+- the main Luna assistant is evidence for the stateful workflow behavior, not the production translator identity
+
+Concurrency:
+- begin with translator concurrency `1`
+- one title at a time is preferred until real resource / model / provider behavior is measured
+- concurrency expansion requires later evidence and is not frozen here
+
+Canary plan:
+1. inspect native Hermes capabilities for dedicated profile, persistent task/session execution, resumability, and noninteractive launch
+2. implement only the minimum adapter/launcher required to expose one Stage11 title as one stateful translation task
+3. run offline deterministic ownership / validation / stale-result smokes
+4. run a real stateful canary on a frozen source
+5. compare stateful and bounded strategies using the SAME semantic source evidence
+6. review:
+   - Korean naturalness
+   - long-context consistency
+   - STT correction quality
+   - unclear-dialogue handling
+   - completion reliability
+   - wall time
+7. only after semantic strategy selection, freeze worker lease duration and heartbeat cadence
+
+Equivalent-source comparison requirement:
+- the existing Luna 661-cue result is a valuable quality baseline but cannot by itself be compared numerically with the current 166-segment ASR-only batching run because their semantic input sequences differ
+- final strategy comparison must use equivalent source evidence
+- semantic quality has priority over minimizing translation wall time, because Stage11 translation is asynchronous and nonblocking
+
+Current freeze state:
+- stateful dedicated translator architecture: FROZEN as leading implementation direction
+- exact Hermes native launch/session mechanism: UNFROZEN
+- translator profile name/path/config: UNFROZEN
+- scheduler interval: UNFROZEN
+- worker lease duration: UNFROZEN
+- heartbeat cadence: UNFROZEN
+- retry count/backoff numeric values: UNFROZEN
+- stateless fixed cue batch size remains historical experimental evidence and is NOT sufficient for final production strategy approval
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-ARCHITECTURE-REVIEW — design the dedicated persistent-task subtitle translator agent, heartbeat/job-claim boundary, deterministic validation contract, failure/recovery semantics, and an equivalent-source canary plan without implementing or changing production yet`
+`R6-B-STATEFUL-TRANSLATOR-HERMES-NATIVE-CAPABILITY-AUDIT — inspect the existing CT120 Hermes installation read-only for native dedicated-profile, persistent-task/session, resumability, noninteractive invocation, and heartbeat/cron integration capabilities before implementing any new translator runtime`
 
 ## 8. Stage11 implementation roadmap
 
