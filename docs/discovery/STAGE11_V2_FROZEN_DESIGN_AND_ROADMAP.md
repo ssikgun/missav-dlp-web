@@ -146,20 +146,20 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-3A — Deterministic alignment baseline/source audit`
-Verdict: **PASS**
+Checkpoint: `V2-3B — isolated Japanese normalization and monotonic anchor matching foundation`
+Verdict: **FAIL**
 
 Important finding:
-- no existing Stage11 Japanese matching/alignment engine exists
-- no robust affine, monotonic anchor matching, residual or inlier implementation exists
-- the audit's `EXISTING_R3_LOGIC=FOUND_REVIEW_REQUIRED` was a grep false positive from `transaction` matching the `ransac` substring
-- `teddy_discovery_nonlexical.py` uses NFKC only for nonlexical classification and is not a reusable alignment API
-- `_normalize_transcript_text()` in ASR is validation/trim normalization, not Japanese semantic matching normalization
-- the R2 Hybrid evidence contract remains the correct input boundary
-- R3 should be implemented in a new isolated deterministic alignment module without modifying the existing v1 pipeline
+- normalization and immutable lexical candidate contracts passed smoke review
+- no affine/timestamp transformation or side-effect code was introduced
+- however candidate generation uses an ordinal-local window around the same external/ASR index
+- external subtitle cue counts and Whisper segment counts may differ substantially
+- therefore same-index local-window generation can miss valid matches and cannot serve as the production alignment foundation
+- synthetic smoke coverage did not expose this cardinality mismatch
+- do not advance to affine fitting
 
 Next planned checkpoint:
-`V2-3B — isolated Japanese normalization and monotonic anchor matching foundation`
+`V2-3B-FIX — replace ordinal-local candidate generation with cardinality-independent bounded lexical candidate discovery`
 
 ## 8. Stage11 implementation roadmap
 
