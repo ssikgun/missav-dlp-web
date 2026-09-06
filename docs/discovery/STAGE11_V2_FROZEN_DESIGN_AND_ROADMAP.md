@@ -146,50 +146,60 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R5-D — Stage11 v2 per-title orchestrator closure audit`
-Verdict: **PASS / R5 CLOSED**
+Checkpoint: `R6-A — existing persistence and lifecycle boundary audit`
+Verdict: **PASS**
 
-Closure finding:
-- Stage11 R5 deterministic per-title orchestration is complete
-- frozen source identities at commit `cf54ea7ea5d1aca73f847d536b430ef937bcf3b0` were independently reverified
-- R1 external provider boundary is PASS
-- R2 immutable hybrid evidence contract is PASS
-- R3 deterministic alignment, acceptance, accepted-alignment preservation, and ASR_ONLY fallback are PASS
-- R4 Hermes semantic contract and separate one-shot transport boundary are PASS
-- EXISTING_KO terminates safely with zero semantic calls and no replacement artifact
-- LOCAL_JA covers exact local Japanese cues, uses original SubtitleCue timing, and invokes semantic work exactly once
-- HYBRID uses external JA as semantic cue sequence, accepted RobustAffineAlignment as timing ownership, sparse residual-owned ASR evidence only for optional STT support, and no caller-owned mapping
-- HYBRID timing uses the single deterministic Decimal/ROUND_HALF_UP affine projection helper
-- HYBRID performs no rematch, ordinal guess, nearest-ASR mapping, clamp, repair, shift, or reorder
-- ASR_ONLY supports both direct R2 and R3 REJECT_EXTERNAL forms with exact ASR identity, text, and ASRSegment timing
-- UNRESOLVED remains terminal fail-closed with zero semantic calls and no artifact
-- Hermes owns semantic text only and never timestamps
-- missing, extra, duplicate, or reordered semantic results fail closed
-- deterministic output construction and canonical Korean SRT prepublication validation are complete
-- no retry or fallback exists inside R5
-- no source discovery execution, live ASR execution, live Hermes transport invocation, publication execution, DB/state write, Stage9 invocation, source deletion, Jellyfin refresh, or rollout is owned by R5
-- all requested R1-R5 and reusable v1 regression smokes passed
-- `git diff --check` passed
-- worktree remained clean
-- no missing deterministic per-title composition responsibility remains before R6
-- R5 is formally CLOSED
-
-Frozen R5 reviewed identities:
-- `teddy_discovery_alignment_application.py`: `cb436ff92238c9a0ea40124180662438a7011a4ccf5a66f63409e572e853c9f1`
-- `teddy_discovery_alignment_application_smoke.py`: `434c6401fd2c87132060fb0ae955c6d73500c5b50e23493592c946a85c900e4c`
-- `teddy_discovery_subtitle_v2_orchestrator.py`: `a6603776456f44717b15d76169193dc6b9c74131e490d88765436017672aded2`
-- `teddy_discovery_subtitle_v2_orchestrator_smoke.py`: `19cfdf38ff76781f995db7565319f617236614a93880f4f0482eb31bc9c159a9`
-- `teddy_discovery_subtitle_v2_pipeline.py`: `11d552c056291848d6c7bcf9d2a8d84b7fc4dd3f6db01f7da6f5ad9bf47dfd5e`
-- `teddy_discovery_subtitle_v2_pipeline_smoke.py`: `fece961b0f4f3e1dc74c62ddb1003b84d4d688718eb415e73fc2e7e60a6918dd`
-
-Deferred responsibilities remain unchanged:
-- R6: job/state persistence, lifecycle state, retryability/recovery, artifact/cache persistence and retention
-- R7: downloader/Stage9 integration, source-release/delete choreography, Stage9 independence and failure isolation
-- R8: real-title semantic canary, real publication/readback, Jellyfin refresh and playback confirmation
-- R9: rollout canaries, semantic review, production wiring, final freeze and operational automation
+Important finding:
+- R5 remains frozen and R6 begins as a persistence/lifecycle wrapper around the immutable R1-R5 boundary
+- active persistent databases discovered on CT108 are:
+  - `/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3`
+  - `/opt/missav-dlp-web/discovery/teddy-stage9-media.sqlite3`
+  - `/opt/missav-dlp-web/discovery/teddy-discovery-completion-metadata.sqlite3`
+- no active Stage11 subtitle-job database currently exists
+- Discovery `holdings` remains bounded inventory metadata for verified canonical NAS presence and must not become Stage11 job truth
+- the physical NAS filesystem remains authoritative for physical media existence
+- Discovery `organizer_jobs` owns Stage9 completion workflow only
+- `teddy-stage9-media.sqlite3` owns Stage9 media/Jellyfin retry state only
+- completion-metadata DB owns metadata recovery only
+- Downloader `.tasks.json` owns Downloader task UUID/progress state and is not a canonical per-title Stage11 identity
+- none of the existing persistence mechanisms is an appropriate owner for Stage11 subtitle job truth
+- the minimal R6 direction is a separate `/opt/missav-dlp-web/discovery/teddy-subtitle-jobs.sqlite3`
+- the initial Stage11 durable owner should be a `subtitle_jobs` table rather than extending Discovery schema v6 or reusing Stage9/media recovery tables
+- the logical per-title identity is canonical `dvd_id`, fenced by an immutable source generation/snapshot
+- the source generation must include canonical video relative identity plus exact source size and source mtime_ns
+- a changed source snapshot creates a new generation rather than silently mutating prior work identity
+- repeated attempts for one unchanged source generation update the same logical job and increment bounded attempt metadata
+- a separate attempt-history table is not required for minimal R6
+- durable state should be kept smaller than the original candidate phase list
+- PENDING is a required durable initial state
+- SOURCE_DISCOVERY, ALIGNING, TRANSLATING, and VALIDATING are normally transient phases and need not each become durable top-level states
+- ASR-ready artifact/source evidence may be durable, but ASR_READY does not imply SOURCE_RELEASED
+- SOURCE_RELEASED is separate lifecycle evidence and is primarily relevant to later R7 choreography
+- READY_TO_PUBLISH is required durable handoff state because validated semantic work must survive a worker crash
+- COMPLETED is a required durable terminal state after safe publication verification
+- SKIPPED_EXISTING_KO is a required durable terminal state
+- FAILED_RETRYABLE is required with bounded error classification, attempt count, and retry time
+- FAILED_FINAL is required for permanent identity, safety, collision, unsupported-route, invalid-artifact, or permanent contract failures
+- Stage11 job persistence must never become authoritative for NAS/holdings existence
+- the ordinary Stage11 job DB must never store raw JA dialogue, ASR segment text, Hermes request/result dialogue, or KO dialogue
+- persisted artifact information should be bounded metadata only: artifact kind/schema, path or cache key, SHA-256, byte size, cue/segment count, source identity, provider/model/version, retention state, and timestamps
+- final KO target path/hash must only become completion evidence after safe publication verification
+- transient source discovery, ASR, alignment, translation, validation, and prepublication work may be safely rerun from validated persisted source/artifact evidence after a crash
+- READY_TO_PUBLISH must survive restart without requiring semantic work to rerun
+- post-publication recovery must verify target identity/hash before marking COMPLETED
+- R6 owns durable Stage11 retry classification and scheduling metadata; it does not reuse Stage9 retry ownership
+- temporary transport/worker/provider/filesystem/lock failures are retryable
+- permanent identity/safety/path/collision/artifact/contract failures are final
+- exact later R7 attachment point is after verified Stage9 `publish_to_library()` and successful `commit_remote_holding()`, while the source still exists, and before `CompletionSSHMutator.cleanup_source()`
+- R7 must preserve `NEVER_DELETE_LOCAL_VIDEO_IF_STAGE9_COPY_NOT_VERIFIED`
+- R7 must also keep Stage11 failure non-blocking for normal Stage9 completion
+- no R6-essential blocker was found
+- before implementation, R6 still needs to freeze the artifact-root/retention policy and stale-RUNNING crash-recovery policy
+- the Stage9 runtime marker/handoff commit discrepancy is recorded for later R7 reconciliation and does not block R6
+- no source files or databases were changed during this audit
 
 Next planned checkpoint:
-`R6-A — audit existing Stage11/Downloader persistence and lifecycle boundaries before state implementation`
+`R6-B — freeze minimal Stage11 subtitle job schema, artifact retention, and stale-worker recovery contract`
 
 ## 8. Stage11 implementation roadmap
 
