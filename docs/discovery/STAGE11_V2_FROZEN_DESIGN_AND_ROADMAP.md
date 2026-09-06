@@ -146,28 +146,41 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `R5-B — freeze isolated v2 per-title orchestrator contract`
-Verdict: **INCOMPLETE**
+Checkpoint: `R5-B — isolated v2 per-title orchestrator contract`
+Verdict: **PASS**
 
 Important finding:
-- the initial isolated R5-B contract and offline smoke were created without modifying legacy production modules
-- independent source review found three contract gaps that must be fixed before R5-B can freeze
-- direct ASR_ONLY must support the frozen no-usable-JA path without fabricating an R3 reject decision
-- R2 already provides the correct direct ASR_ONLY owner through `HybridEvidenceBundle.from_asr_only()`
-- R2 already provides deterministic cue identity through `HybridCueIdentity`, `HybridCueEvidence`, and `stable_cue_id()`
-- therefore R5 must reuse the R2 ASR-only bundle and cue identities rather than invent a parallel identity type
-- the current `SubtitleV2SemanticPlan` validates the Hermes request internally but does not yet bind its cue identity/evidence to the selected LOCAL_JA, HYBRID, or ASR_ONLY source evidence
-- this evidence-detachment gap must fail closed before Hermes invocation is allowed
-- the current EXISTING_KO route accepts `source_document=None`, which is weaker than the legacy trusted-KO path
-- the legacy path parses and validates the existing Korean subtitle before terminal skip
-- R5 v2 EXISTING_KO must likewise require a validated canonical SRT document
-- no R1, R2, R3, or R4 production change is required by these findings
-- no new cue-ID scheme is required
-- no live Hermes call, ASR execution, publication, state write, or repository mutation occurred during the diagnostic
-- R5-B remains open
+- R5-B introduced an isolated immutable contract for the future Stage11 v2 per-title orchestrator
+- the legacy `run_subtitle_pipeline()` remains unchanged
+- route vocabulary is frozen as EXISTING_KO, LOCAL_JA, HYBRID, ASR_ONLY, and UNRESOLVED
+- trusted EXISTING_KO requires the canonical KO candidate and a validated non-empty parsed SRT document before terminal skip
+- LOCAL_JA requires canonical sibling Japanese source evidence
+- HYBRID requires the accepted R3 application result and R2 external-JA/ASR evidence
+- ASR_ONLY supports both R3 REJECT_EXTERNAL application results and the direct no-usable-JA path through `HybridEvidenceBundle.from_asr_only()`
+- direct ASR_ONLY does not fabricate an R3 alignment decision
+- canonical DVD identity is checked across canonical holding, R2/R3 evidence, and ASR source snapshot
+- `SubtitleV2SemanticBinding` is an immutable index/reference-only bridge from one Hermes request cue to existing deterministic source evidence
+- semantic bindings contain no copied dialogue, timestamps, payloads, paths, or publication ownership
+- existing R2 `HybridCueIdentity` and cue evidence remain the authoritative identity scheme
+- no alternate cue-ID algorithm was introduced
+- LOCAL_JA Hermes input is bound to exact source cue count, order, and Japanese text
+- ASR_ONLY Hermes input is bound to exact R2 ASR identity/order and ASR Japanese text
+- HYBRID Hermes input is bound to existing R2 external-JA identity and, when STT evidence is supplied, an exact referenced ASR identity
+- unrelated Japanese/STT text, arbitrary IDs, reordered evidence, missing/extra bindings, and duplicate bindings fail closed
+- Hermes result identity/order continues to be validated by the frozen R4 semantic contract
+- deterministic timing remains outside the LLM and is referenced only from existing SubtitleCue or ASRSegment evidence
+- GeneratedKoreanSRT remains the existing pre-publication artifact owner
+- no filesystem, network, subprocess, Hermes transport, ASR execution, publication, DB/state, or Stage9 integration exists in this contract
+- R1/R2/R3/R4 production modules were not modified
+- full requested regression suite and independent source review passed
+- R5-B contract is frozen and CLOSED
+
+Frozen reviewed identities:
+- `teddy_discovery_subtitle_v2_orchestrator.py`: `9127f6edcec332edf3e4946e129a9285e1df5a930bf8d85072f07829d5d06993`
+- `teddy_discovery_subtitle_v2_orchestrator_smoke.py`: `4576bddb60a13040a07529f6f6bd1a3171e1e4c2347b268f3e743287510c75ea`
 
 Next planned checkpoint:
-`R5-B-FIX1 — close direct ASR_ONLY, semantic evidence binding, and trusted-KO gaps`
+`R5-C — isolated v2 per-title orchestrator execution implementation`
 
 ## 8. Stage11 implementation roadmap
 
