@@ -55,6 +55,7 @@ STATEFUL_TRANSLATOR_EXECUTABLE: Final[str] = "/home/teddy/.local/bin/hermes"
 STATEFUL_TRANSLATOR_PROFILE: Final[str] = "subtitle-translator"
 STATEFUL_TRANSLATOR_SUBCOMMAND: Final[str] = "chat"
 STATEFUL_TRANSLATOR_QUIET_FLAG: Final[str] = "-Q"
+STATEFUL_TRANSLATOR_PASS_SESSION_ID_FLAG: Final[str] = "--pass-session-id"
 STATEFUL_TRANSLATOR_RESUME_FLAG: Final[str] = "--resume"
 STATEFUL_TRANSLATOR_QUERY_FLAG: Final[str] = "-q"
 STATEFUL_TRANSLATOR_PROVIDER: Final[str] = "openai-codex"
@@ -70,14 +71,21 @@ STATEFUL_TRANSLATOR_RESULT_FILENAME: Final[str] = (
     "stage11-semantic-result.json"
 )
 STATEFUL_TRANSLATOR_QUERY: Final[str] = (
-    "Read the complete authorized semantic cue evidence from "
+    "Read all authorized cue evidence from "
     + STATEFUL_TRANSLATOR_INPUT_FILENAME
-    + ". Produce one complete stateful semantic result for every cue in its "
-    "original order. Preserve every cue_id, use no external Korean source, "
-    "create no timestamps, and write only the complete JSON result envelope "
-    "to "
+    + ". Copy these input identity fields exactly: schema_version, dvd_id, "
+    "generation_key, claim_token. The current Hermes session ID is supplied "
+    "by Hermes in the system prompt because --pass-session-id is active; "
+    "copy that exact value into result field session_id. Write exactly one "
+    "JSON object to "
     + STATEFUL_TRANSLATOR_RESULT_FILENAME
-    + ". Partial output is not a valid result."
+    + ". Top-level fields must be exactly: schema_version, dvd_id, "
+    "generation_key, claim_token, session_id, cues. Every cue object must "
+    "contain exactly: cue_id, repaired_ja, ko. Set repaired_ja to null "
+    "unless a materially justified Japanese repair exists. Preserve cue IDs "
+    "and order exactly. Every cue requires Korean output. Use no external "
+    "Korean source. Do not output timestamps, additional fields, or prose "
+    "outside the JSON. A partial result is not valid."
 )
 
 
@@ -732,6 +740,7 @@ def build_stateful_translator_command(session_id: str) -> list[str]:
         STATEFUL_TRANSLATOR_PROFILE,
         STATEFUL_TRANSLATOR_SUBCOMMAND,
         STATEFUL_TRANSLATOR_QUIET_FLAG,
+        STATEFUL_TRANSLATOR_PASS_SESSION_ID_FLAG,
         STATEFUL_TRANSLATOR_RESUME_FLAG,
         session_id,
         "--provider",
@@ -1041,6 +1050,7 @@ __all__ = [
     "STATEFUL_TRANSLATOR_MAX_PACKAGE_BYTES",
     "STATEFUL_TRANSLATOR_MAX_RESULT_BYTES",
     "STATEFUL_TRANSLATOR_MODEL",
+    "STATEFUL_TRANSLATOR_PASS_SESSION_ID_FLAG",
     "STATEFUL_TRANSLATOR_PRIVATE_FILE_MODE",
     "STATEFUL_TRANSLATOR_PROFILE",
     "STATEFUL_TRANSLATOR_PROVIDER",

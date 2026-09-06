@@ -1582,8 +1582,49 @@ R6-B minimal implementation status:
 - worker lease duration: UNFROZEN
 - scheduler cadence: UNFROZEN
 
+### R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-PREFLIGHT-CONTRACT-REPAIR — PASS
+
+The pre-canary contract audit found one deterministic boundary gap:
+- stateful result validation already required the exact deterministic
+  pre-minted `session_id`
+- the initial native command did not expose that current session ID to the
+  semantic agent
+- the fixed query described only a vague complete result envelope, which was
+  insufficient for a fail-closed live canary
+
+Minimal repair:
+- the native command now includes `--pass-session-id` strictly for its Hermes
+  system-prompt behavior; it is not a stdout/session-discovery mechanism
+- the fixed query now explicitly requires the exact six-field result envelope:
+  `schema_version`, `dvd_id`, `generation_key`, `claim_token`, `session_id`,
+  `cues`
+- each cue result is explicitly limited to `cue_id`, `repaired_ja`, and `ko`
+- the query requires the Hermes-supplied current session ID, exact identity
+  copying, complete ordered cue coverage, Korean output, and no timestamps,
+  extra fields, prose, or partial result
+- deterministic UUID5 derivation, package/result/session/staging boundaries,
+  cue/byte limits, SessionDB premint, and the existing Hermes v2 512-cue
+  boundary remain unchanged
+- translator policy/SOUL remains unchanged at SHA256:
+  `37c487cc90e828b70c4d8343ab0949ccaffa9168d01aff4b828f6fa1b994c9e6`
+
+Modified-file SHA256:
+- `teddy_discovery_stateful_translator.py`:
+  `cecbd34f4f898fd13f632d82075b8c9ea553bccb45679c17f13fb352d48d9824`
+- `teddy_discovery_stateful_translator_smoke.py`:
+  `bd3261d133f68b1e95c645f5a7a0a0d84e0b71669135780bd636467a3f2c6cfc`
+
+Offline verification:
+- stateful translator smoke: PASS
+- 661-cue stateful package/result coverage: PASS
+- Hermes v2 semantic, transport, and batching smokes: PASS
+- Python compilation: PASS
+- `git diff --check`: PASS
+- no Hermes/model/SSH/session/profile/auth/DB/cron/publication/source-delete/
+  Stage9 operation occurred
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-PREFLIGHT — prepare one bounded real stateful semantic canary using the frozen subtitle-translator profile and deterministic premint/staging boundary, verify exact source/package/session identities and safety preconditions, but do not invoke the model until the canary input is frozen`
+`R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-PREFLIGHT — freeze one real JUR-750 ASR-only whole-title semantic canary package from the existing 166-segment frozen ASR artifact, derive and record its deterministic session identity and private staging artifact hash, and verify all transport/profile safety preconditions without invoking the model`
 
 ## 8. Stage11 implementation roadmap
 

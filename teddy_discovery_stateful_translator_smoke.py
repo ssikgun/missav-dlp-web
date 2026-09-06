@@ -19,6 +19,7 @@ from teddy_discovery_stateful_translator import (
     STATEFUL_TRANSLATOR_MAX_PACKAGE_BYTES,
     STATEFUL_TRANSLATOR_MAX_RESULT_BYTES,
     STATEFUL_TRANSLATOR_MODEL,
+    STATEFUL_TRANSLATOR_PASS_SESSION_ID_FLAG,
     STATEFUL_TRANSLATOR_PRIVATE_FILE_MODE,
     STATEFUL_TRANSLATOR_PROFILE,
     STATEFUL_TRANSLATOR_PROVIDER,
@@ -337,11 +338,19 @@ def main():
 
     command = build_stateful_translator_command(session_id)
     command_text = " ".join(command)
+    chat_index = command.index("chat")
+    pass_session_id_index = command.index(
+        STATEFUL_TRANSLATOR_PASS_SESSION_ID_FLAG
+    )
+    resume_index = command.index("--resume")
+    query_index = command.index("-q")
     require(
         command[:3]
         == [STATEFUL_TRANSLATOR_EXECUTABLE, "--profile", STATEFUL_TRANSLATOR_PROFILE]
         and "chat" in command
         and "-Q" in command
+        and command.count(STATEFUL_TRANSLATOR_PASS_SESSION_ID_FLAG) == 1
+        and chat_index < pass_session_id_index < resume_index < query_index
         and "--resume" in command
         and session_id in command
         and "--provider" in command
@@ -353,10 +362,47 @@ def main():
         and "-q" in command
         and command[-1] == STATEFUL_TRANSLATOR_QUERY
         and "-z" not in command
+        and "retry" not in command_text.lower()
+        and "fallback" not in command_text.lower()
         and "external-ja" not in command_text
         and "authorized-ja" not in command_text
         and "한국어" not in command_text,
         "EXACT_STATEFUL_COMMAND_WITHOUT_DIALOGUE_OR_ONESHOT",
+    )
+    for required_phrase, marker in (
+        (STATEFUL_TRANSLATOR_INPUT_FILENAME, "QUERY_INPUT_FILENAME"),
+        (STATEFUL_TRANSLATOR_RESULT_FILENAME, "QUERY_RESULT_FILENAME"),
+        (
+            "schema_version, dvd_id, generation_key, claim_token",
+            "QUERY_INPUT_IDENTITY_FIELDS",
+        ),
+        (
+            "current Hermes session ID is supplied by Hermes in the system prompt",
+            "QUERY_SESSION_SOURCE",
+        ),
+        (
+            "--pass-session-id is active",
+            "QUERY_PASS_SESSION_ID_SEMANTICS",
+        ),
+        (
+            "copy that exact value into result field session_id",
+            "QUERY_RESULT_SESSION_ID",
+        ),
+        (
+            "Top-level fields must be exactly: schema_version, dvd_id, "
+            "generation_key, claim_token, session_id, cues",
+            "QUERY_EXACT_RESULT_FIELDS",
+        ),
+        (
+            "Every cue object must contain exactly: cue_id, repaired_ja, ko",
+            "QUERY_EXACT_CUE_FIELDS",
+        ),
+    ):
+        require(required_phrase in STATEFUL_TRANSLATOR_QUERY, marker)
+    require(
+        "authorized-ja" not in STATEFUL_TRANSLATOR_QUERY
+        and "한국어" not in STATEFUL_TRANSLATOR_QUERY,
+        "QUERY_HAS_NO_DIALOGUE",
     )
     stateful_source = Path(__file__).with_name(
         "teddy_discovery_stateful_translator.py"
