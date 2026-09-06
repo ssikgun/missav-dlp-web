@@ -146,20 +146,19 @@ No direct Jellyfin DB writes. No video re-encode/burn-in.
 
 ### Current checkpoint
 
-Checkpoint: `V2-1B-FIX2-DIAG2 — identify first non-JA resolver failure`
+Checkpoint: `V2-1B-FIX3 — safely skip unsupported non-JA anchors`
 Verdict: **PASS**
 
 Important finding:
-- Japanese anchor still resolves correctly to `ja`
-- resolver failures occur on non-Japanese SRT anchors
-- first failing href: `/subs/1529/JUR-750.ja.whisperjav-ar.srt`
-- terminal target language resolved as: `None`
-- error: `Japanese subtitle anchor has conflicting local language metadata`
-- the provider currently aborts discovery because a non-JA anchor cannot be resolved cleanly
-- architecture is unchanged
+- unsupported but internally consistent non-JA anchors are safely skipped
+- JA/non-JA conflicting local signals remain fail-closed
+- all requested offline regression smokes passed
+- live SubtitleCat discovery recovered the actual Japanese SRT href
+- known Japanese payload SHA and 661 cues matched
+- Stage11 R1 external Japanese provider boundary is validated and CLOSED
 
 Next planned checkpoint:
-`V2-1B-FIX3 — safely skip non-JA unsupported anchors without weakening JA conflict checks`
+`V2-2A — Hybrid evidence contract baseline/source audit`
 
 ## 8. Stage11 implementation roadmap
 
