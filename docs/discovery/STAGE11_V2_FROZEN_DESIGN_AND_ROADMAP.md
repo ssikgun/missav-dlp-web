@@ -783,8 +783,59 @@ Current freeze state:
 - retry count/backoff numeric values: UNFROZEN
 - stateless fixed cue batch size remains historical experimental evidence and is NOT sufficient for final production strategy approval
 
+R6-B Hermes native stateful translator capability audit:
+- verdict: PASS
+- existing CT120 Hermes installation was inspected read-only
+- Hermes identity:
+  - executable: `/home/teddy/.local/bin/hermes`
+  - version: `Hermes Agent v0.20.0 (2026.8.3)`
+  - install directory: `/home/teddy/.hermes/hermes-agent`
+  - Python: `3.11.15`
+- native profile capability: PRESENT
+- native session capability: PRESENT
+- native resume / continue capability: PRESENT
+- native non-interactive chat capability: PRESENT
+- native provider / model / reasoning selection: PRESENT
+- native cron capability: PRESENT
+- dedicated `heartbeat` CLI command: NOT PRESENT
+- Hermes state already includes:
+  - `/home/teddy/.hermes/profiles`
+  - `/home/teddy/.hermes/sessions`
+  - `/home/teddy/.hermes/cron`
+  - `/home/teddy/.hermes/heartbeat_state`
+- existing profile count: `11`
+- existing profile names:
+  `builder,builder-ha,default,executor-ha,homeboy,planner,planner-ha,reviewer,reviewer-ha-kanban,reviewer-kanban,summary`
+- existing native session storage was present with `5` entries at audit time
+- existing native cron storage was present with `9` entries at audit time
+- `hermes chat --help` exposes:
+  - session
+  - resume
+  - continue
+  - non-interactive operation
+  - provider
+  - model
+  - reasoning
+- `hermes sessions --help` exposes session / resume / JSON-oriented functionality
+- `hermes cron --help` exposes list/add/create/remove/delete/schedule/run functionality
+- top-level help exposes one-shot `-z`
+- a dedicated heartbeat CLI is therefore NOT required as an assumed Stage11 dependency
+- existing native Hermes cron or the Stage11 scheduler may serve as the periodic discovery trigger, while the Stage11 subtitle job DB remains authoritative for claim/ownership
+- existing runtime evidence also shows Hermes supports profile-specific gateway operation:
+  `hermes --profile homeboy gateway run`
+- therefore a new conversation database, custom agent framework, or custom heartbeat engine should NOT be invented unless later native-contract evidence proves necessary
+- the leading implementation direction remains:
+  - dedicated subtitle translator profile
+  - one title = one persistent Hermes semantic task/session
+  - Stage11 DB claim-token fencing outside the agent
+  - asynchronous launch from scheduler/cron
+  - deterministic validation and publication outside the agent
+- no profile, session, cron, heartbeat, gateway, config, source code, DB, publication, source lifecycle, or Stage9 state was changed by this audit
+- exact profile creation/copy mechanism, noninteractive invocation syntax, persistent session identifier handling, resume syntax, and cron dispatch syntax remain UNFROZEN
+- worker lease duration and heartbeat/scheduler cadence remain UNFROZEN
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-HERMES-NATIVE-CAPABILITY-AUDIT — inspect the existing CT120 Hermes installation read-only for native dedicated-profile, persistent-task/session, resumability, noninteractive invocation, and heartbeat/cron integration capabilities before implementing any new translator runtime`
+`R6-B-STATEFUL-TRANSLATOR-HERMES-NATIVE-CONTRACT-AUDIT — inspect exact native Hermes profile structure and the concrete noninteractive chat/session/resume/cron command contracts required for one dedicated Stage11 translator task, read-only and without model invocation`
 
 ## 8. Stage11 implementation roadmap
 
