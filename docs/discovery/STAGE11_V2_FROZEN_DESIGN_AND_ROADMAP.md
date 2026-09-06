@@ -1160,8 +1160,187 @@ Architecture consequence:
 - translator production implementation has NOT started
 - worker lease duration and scheduler cadence remain UNFROZEN
 
+R6-B stateful subtitle translator minimal implementation design:
+- verdict: PASS
+- this checkpoint freezes implementation design only
+- no translator profile, launcher, session, cron, model call, or production runtime was created
+
+Dedicated Hermes profile:
+- profile name:
+  `subtitle-translator`
+- create as a NEW native Hermes profile
+- do NOT clone `summary`, `homeboy`, or another operational profile
+- rationale:
+  - existing profiles contain unrelated runtime state, auth/cache files, DBs, hooks, gateways, Slack state, and task-specific policy
+  - the subtitle translator needs only a narrow semantic role
+- intended native creation form:
+  `hermes profile create subtitle-translator --no-skills --no-alias --description <description>`
+- `--no-skills` is required initially:
+  - no bundled skill inheritance
+  - no unrelated Homeboy/Luna behavior
+- no gateway is required for the translator profile
+- no Slack/Telegram/Discord integration is required
+- no kanban ownership is required
+
+Translator SOUL contract:
+- one title is one persistent subtitle-translation task
+- understand full-title Japanese dialogue context
+- use only Stage11-authorized Japanese / ASR / optional English evidence
+- repair contextually obvious Japanese STT lexical errors
+- produce natural Korean dialogue
+- preserve uncertainty rather than invent unsupported meaning
+- do not use external Korean subtitles
+- do not change cue IDs
+- do not create or change timestamps
+- do not select routes
+- do not publish
+- do not delete source media
+- do not modify Stage9
+- do not claim/retry jobs
+- do not decide whether partial output is publishable
+- do not silently remove tiny/nonlexical cues or metadata unless a deterministic rule explicitly authorizes it
+
+Profile configuration:
+- do not clone `.env`, `auth.json`, `state.db`, project DBs, gateway files, Slack state, caches, or existing profile runtime data
+- do not depend on copied summary/homeboy config
+- provider/model/reasoning are pinned by Stage11 invocation rather than trusted to mutable profile defaults:
+  - provider: `openai-codex`
+  - model: `gpt-5.6-luna`
+  - reasoning: `xhigh`
+- no model fallback
+- no provider fallback
+- exact native provider-auth availability for the newly created profile must be verified at implementation preflight
+- if the profile cannot use the already-authorized native Hermes provider path, implementation stops fail-closed
+- credentials must not be copied manually as an ad-hoc workaround
+
+Canonical source/deployment ownership:
+- canonical Stage11 implementation source remains in the `missav-dlp-web` Stage11 branch/repository
+- CT120 runtime files are deployment copies, not an independent source of truth
+- initial implementation adds the minimum deterministic translator-launcher source plus offline smoke coverage to the Stage11 repository
+- deployment to CT120 occurs only after repository/offline validation
+
+CT108 job-dispatch boundary:
+- CT108 Stage11 job DB remains authoritative
+- CT108 performs job eligibility, claim, claim-token fencing, retry policy, and final job-state transition
+- CT108 prepares the exact title-level semantic work package only after successful ownership
+- existing CT108 -> CT120 Hermes SSH trust/transport should be reused rather than inventing another network control plane
+- CT108 does not delegate claim ownership to Hermes
+- CT120 never independently scans or mutates the Stage11 job DB
+
+Title-level semantic package:
+- one package per claimed title/generation
+- deterministic schema/version field
+- stable job/generation identity metadata without raw-dialogue DB logging
+- stable cue IDs in immutable order
+- authorized semantic evidence only:
+  - trusted external/local Japanese when route permits it
+  - ASR Japanese when route permits/requires it
+  - optional English support evidence when available
+- timing may be present as read-only context if later proven useful, but translator output never owns timing
+- no external Korean semantic source
+- package validation occurs on CT108 before dispatch
+
+CT120 staging boundary:
+- use one isolated staging directory per translator session/task
+- staging directory mode: `0700`
+- dialogue-bearing artifact files mode: `0600`
+- input work package is materialized locally on CT120
+- agent operates from that task staging/work directory
+- no NAS path and no publication destination is exposed as an agent responsibility
+- partial translation output is staging evidence only
+
+Session premint / launcher contract:
+- CT120 launcher mints one unique Stage11 semantic session ID
+- launcher creates that exact ID through native:
+  `hermes_state.SessionDB.create_session(...)`
+- direct Hermes SQLite manipulation is forbidden
+- launcher then invokes the native profile/session path conceptually as:
+  `hermes --profile subtitle-translator chat -Q --resume <session-id> ...`
+- provider/model/reasoning are explicitly pinned by the invocation
+- the first run intentionally resumes the precreated empty session, which Hermes natively treats as a fresh session
+- later continuation uses the same native resume contract
+- native `resolve_resume_session_id` handles Hermes compression descendants
+- no stdout/session-list scraping is used to discover identity
+
+Stateful execution:
+- one title remains one Hermes semantic session/task
+- agent may use multiple turns/iterations and revisit earlier cues
+- it may internally work in sections, but those are NOT independent stateless translation requests
+- complete title context remains available to the ongoing task
+- initial production concurrency target remains `1`
+
+Output artifact contract:
+- translator semantic result is keyed by the original stable cue IDs
+- output contains semantic fields only, such as:
+  - cue ID
+  - repaired Japanese when justified
+  - Korean translation
+  - bounded uncertainty indication when needed
+- translator result contains no authoritative timestamps
+- agent-written work remains partial/staging until launcher completion
+- CT120 launcher must not mark anything publishable
+- result is returned/retrieved to CT108 for deterministic validation
+- raw Japanese/Korean dialogue must not be written to ordinary logs
+
+Deterministic CT108 validation after retrieval:
+- exact expected cue-ID set
+- exact expected cue order
+- no duplicates
+- no unauthorized missing cues
+- complete result required
+- Korean output present according to frozen validation policy
+- no unauthorized timestamp ownership
+- no external-Korean provenance
+- no partial success
+- existing R5 semantic/prepublication validation remains authoritative
+- only a fully validated result may advance toward `READY_TO_PUBLISH`
+
+Failure / ownership semantics:
+- any CT120 launcher/Hermes/model/output/transport/validator failure fails closed
+- no partial publication
+- no fallback to the historical stateless batching path
+- no provider/model fallback
+- claim-token loss causes returned semantic work to be discarded
+- retries remain owned by Stage11 job policy
+- translator session identity does not confer job ownership
+
+Scheduler:
+- no cron is created in the first implementation checkpoint
+- first implementation validates the profile/launcher boundary manually/offline
+- native Hermes cron with deterministic `--no-agent --script` remains the leading later scheduler candidate
+- scheduler interval, worker lease, heartbeat cadence, and retry numeric values remain UNFROZEN
+
+Offline / implementation smoke order:
+1. create repository-side launcher contract and tests without live Hermes model invocation
+2. validate semantic package schema and refusal of malformed packages
+3. validate deterministic session-ID generation contract
+4. validate native SessionDB premint adapter against an isolated translator profile
+5. validate command construction:
+   profile + quiet chat + resume + provider + model + reasoning
+6. validate staging permissions and atomic result handling
+7. validate ownership-loss / malformed-output / partial-output fail-closed paths
+8. create the dedicated `subtitle-translator` profile on CT120
+9. verify native provider/auth availability without translating a title
+10. only then run a minimal live stateful semantic canary
+11. after canary, perform equivalent-source quality comparison before semantic strategy final freeze
+
+Implementation freeze:
+- profile: `subtitle-translator`
+- profile base: NEW EMPTY NATIVE PROFILE
+- bundled skills: NONE initially
+- gateway: NONE
+- messaging platform integration: NONE
+- concurrency: `1`
+- job ownership: CT108 Stage11 DB
+- semantic continuity: CT120 Hermes native session
+- session creation: native SessionDB deterministic premint
+- translation authority: agent
+- timing/identity/validation/publication authority: deterministic Stage11 code
+- production cron: NOT YET
+- production implementation: NOT YET
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-MINIMAL-IMPLEMENTATION-DESIGN — define the exact dedicated translator profile contents, CT120 pre-mint/resume launcher contract, CT108 job-dispatch boundary, staged input/output artifact contract, and offline smoke plan before creating any runtime files`
+`R6-B-STATEFUL-TRANSLATOR-MINIMAL-IMPLEMENTATION — implement the repository-side deterministic launcher/package/validation adapters and offline smokes, then create the minimal CT120 subtitle-translator native profile and verify its non-model runtime/auth preconditions without running a real subtitle translation`
 
 ## 8. Stage11 implementation roadmap
 
