@@ -369,8 +369,32 @@ R6-B full-title baseline ASR timing measurement:
 - no Stage11 job DB write, publication, source deletion, Stage9 mutation, or Hermes invocation occurred
 - this is real timing evidence for R6-B lease/heartbeat selection; numeric lease values remain unfrozen until Hermes timing evidence is also measured
 
-Next measurement checkpoint:
-`R6-B-MEASURE-HERMES — measure the frozen Stage11 Hermes semantic boundary latency before freezing numeric lease and heartbeat values`
+R6-B Hermes full-title latency blocker:
+- the exact already-PASS R4-E Stage11-Hermes SSH identity was recovered from the original successful command history:
+  - `/root/.ssh/id_ed25519_stage11_hermes`
+  - `/root/.ssh/known_hosts_stage11_hermes`
+- the exact frozen JUR-750 ASR artifact was verified by SHA-256:
+  `155c76c25cd1944f6fd85fc4f30b64a05fb34bf236307a7f62d6766ec7133a21`
+- one real frozen Hermes semantic invocation was attempted with:
+  - provider `openai-codex`
+  - model `gpt-5.6-luna`
+  - reasoning `xhigh`
+  - `166` cues
+  - prompt size `36166` bytes
+- the request reached the real Hermes/model boundary
+- it did not complete within the transport ceiling of `600 s`
+- observed failure:
+  `HermesV2TransportTimeoutError`
+- this is not an SSH/authentication failure and not an ASR failure
+- current Hermes transport contract permits at most `600 s`
+- current R5 per-title pipeline presents one complete semantic request to the injected semantic boundary
+- therefore numeric worker lease/heartbeat values MUST NOT be frozen yet
+- simply increasing the measurement timeout beyond the frozen transport ceiling is not an acceptable workaround
+- the next work must determine whether bounded semantic batching is required and how to preserve exact cue coverage/order, deterministic timing ownership, fail-closed behavior, and no retry/fallback semantics
+- no DB write, publication, source deletion, Stage9 mutation, SSH-key change, or production source-code change occurred
+
+Next checkpoint:
+`R6-B-HERMES-BATCHING-AUDIT — read-only audit of the frozen R4/R5 semantic contracts and pipeline call sites to define the minimal safe batching boundary before any implementation change`
 
 ## 8. Stage11 implementation roadmap
 
