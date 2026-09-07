@@ -2355,8 +2355,75 @@ Safety:
 - Stage9 change: NO
 - generated code/error/output/dialogue printed or committed: NO
 
+### R6-B-STATEFUL-TRANSLATOR-ROW15-ERROR-SAFE-CLASSIFICATION — PASS
+
+The persisted row 15 execute_code error/output was classified read-only using
+bounded marker checks without printing raw code, error text, output text, or
+dialogue.
+
+Persisted identity:
+- generated code SHA256:
+  `0ae6cbbe04d74366012f285c32df4d1ddfa6d45763f9e7fa1f47a18b46ff03d4`
+- error SHA256:
+  `31d2a61e4341f2bf324fc3c47cdab3599dfcb575ed81df985544e7125dabbb15`
+- output SHA256:
+  `77abcb073471ad0a9826bfc6dd636fe0fc4e2f1209c6c198b2448af7e2b84c4a`
+- persisted identity check: PASS
+
+Safe classification:
+- wrapper rejection: NO
+- policy or sandbox marker: YES
+- policy/sandbox marker count: `1`
+- unsupported operation: NO
+- process launch failure: NO
+- interpreter failure: NO
+- permission failure: NO
+- path/file failure: NO
+- timeout marker: NO
+- resource-limit marker: NO
+- validation failure: NO
+- Python exception marker: NO
+- classification candidates:
+  `POLICY_OR_SANDBOX`
+
+Additional structural evidence:
+- generated-code lines embedded in error: `1`
+- generated-code lines embedded in output: `1`
+- bounded line-89 reference: YES
+
+Interpretation:
+- `POLICY_OR_SANDBOX` is now the only positive marker class
+- this is NOT yet sufficient to prove an actual Hermes sandbox/policy rejection
+- only one matching marker exists
+- because one generated-code line is also embedded in both persisted error and
+  output, the positive marker may originate from quoted/generated code or
+  diagnostic context rather than the controlling wrapper error itself
+- no continuation or recovery action should be chosen until the marker origin
+  is distinguished safely
+
+Session remained unchanged:
+- active rows: `1..11,13,14,15`
+- inactive rows: `12`
+- message_count: `15`
+- API calls: `6`
+- tool calls: `6`
+- rewind_count: `1`
+- end_reason: `None`
+
+Safety:
+- file write: NO
+- model invocation: NO
+- translation retry: NO
+- session rewind/mutation: NO
+- direct SQLite access: NO
+- production Stage11 DB write: NO
+- publication: NO
+- source deletion: NO
+- Stage9 change: NO
+- raw code/error/output/dialogue printed or committed: NO
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-ROW15-ERROR-SAFE-CLASSIFICATION — read-only classify the persisted row 15 execute_code error/output with bounded exact marker checks for execute_code wrapper rejection, sandbox/runtime policy, command-construction failure, unsupported operation, timeout/admission failure, or interpreter/process-launch failure, without printing raw error/output content or mutating the session`
+`R6-B-STATEFUL-TRANSLATOR-ROW15-POLICY-MARKER-ORIGIN-AUDIT — read-only determine whether the single policy/sandbox marker occurs in wrapper-controlled diagnostic text versus embedded generated-code/context, using only bounded position/category metadata and hashes without printing the raw marker context, then decide whether the blocker is a real execute_code policy/runtime restriction or a false-positive classification`
 
 ## 8. Stage11 implementation roadmap
 
