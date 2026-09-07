@@ -2187,8 +2187,95 @@ Safety:
 - stateless batching fallback: NO
 - raw dialogue printed/committed: NO
 
+### R6-B-STATEFUL-TRANSLATOR-POST-CONTINUATION-TIMEOUT-TAIL-AUDIT — PASS
+
+The durable tail created by the post-rewind continuation was inspected read-only
+without printing dialogue, tool arguments, or tool-result content.
+
+Durable transcript:
+- active rows:
+  `1..11,13,14,15`
+- inactive rows:
+  `12`
+- active messages: `14`
+- all rows including inactive: `15`
+- historical row `12` remains inactive with exact continuation SHA
+- row `13` is the exact active continuation user turn
+- row `13` chars: `1229`
+- row `13` SHA256:
+  `1341cfd43878ec5e4c5ddc281d4cad5c0726620dd5b3cdf4b7df947e826b9739`
+
+Continuation tail structure:
+- row `13`: `user`
+- row `14`: `assistant`
+- row `14` finish_reason: `tool_calls`
+- row `14` tool calls: `1`
+- row `14` tool:
+  `execute_code`
+- row `14` tool argument chars: `8863`
+- row `14` tool argument SHA256:
+  `4565c9edd35f7c025d6ba39f82d84c123bd000200af2a27f8cba27b84a3ad97d`
+- row `15`: `tool`
+- row `15` tool:
+  `execute_code`
+- row `15` result chars: `14073`
+- row `15` result SHA256:
+  `6941badb49fc58256d178c9053ada72d582dcf0ab1e9461e3754fe336ed7c279`
+
+Row 15 safe result metadata:
+- result parse: JSON object
+- keys:
+  `duration_seconds,error,exit_code,output,status,stdout_bytes_captured,stdout_bytes_omitted,stdout_bytes_total,stdout_truncated,tool_calls_made`
+- status: `error`
+- exit_code: `1`
+- error present: YES
+
+Therefore the second 1200-second continuation did not merely stop at an
+arbitrary semantic boundary. The single persisted `execute_code` operation
+itself returned an error before a complete result artifact was produced.
+
+Session remains resumable:
+- message_count: `15`
+- API calls: `6`
+- tool calls: `6`
+- input tokens: `51109`
+- output tokens: `30381`
+- reasoning tokens: `23067`
+- cache-read tokens: `102400`
+- rewind_count: `1`
+- end_reason: `None`
+- final semantic result artifact: absent
+
+Private stderr scan:
+- auth error signal: NO
+- rate-limit signal: NO
+- network signal: NO
+- traceback signal: NO
+- provider/model error signal: NO
+
+Decision:
+- do NOT submit another continuation blindly
+- do NOT rewind or mutate the session yet
+- do NOT restart the title
+- inspect the row `15` execute_code failure safely first
+- identify the error class / failed operation without printing raw dialogue or
+  unrestricted tool output
+- only after that forensic result decide whether the same session can continue
+  safely or whether the stateful implementation has exposed a different blocker
+
+Safety:
+- model invocation during audit: NO
+- translation retry during audit: NO
+- session mutation: NO
+- direct SQLite access: NO
+- production Stage11 DB write: NO
+- publication: NO
+- source deletion: NO
+- Stage9 change: NO
+- raw dialogue/tool arguments/tool result content printed or committed: NO
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-POST-CONTINUATION-TIMEOUT-TAIL-AUDIT — read-only inspect durable rows 13..15, their roles/tool metadata/finish state and the current session counters without printing dialogue, confirm the result artifact remains absent, and determine whether another same-session continuation is justified or whether the stateful strategy has reached a different blocker`
+`R6-B-STATEFUL-TRANSLATOR-ROW15-EXECUTE-CODE-ERROR-FORENSIC — read-only inspect only safe structural/error metadata from the persisted row 15 execute_code result and, if needed, bounded non-dialogue error fragments or deterministic error classification, without session mutation or another model call, to identify the exact blocker before choosing the next continuation action`
 
 ## 8. Stage11 implementation roadmap
 
