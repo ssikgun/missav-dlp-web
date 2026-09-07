@@ -1681,8 +1681,80 @@ Safety:
 - no Stage9 change
 - no raw dialogue in canonical/log output
 
+### R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-IMMEDIATE-FAILURE-AUDIT — PASS
+
+The first live stateful canary did not reach model execution.
+
+Observed failure:
+- frozen package transfer: PASS
+- deterministic native session pre-mint: PASS
+- Hermes process return code: `1`
+- wall time: `0` seconds
+- semantic result artifact: ABSENT
+- private diagnostic output reported:
+  `It looks like Hermes isn't configured yet -- no API keys or providers found.`
+- the pre-minted session remained present and resolved to the exact deterministic
+  session ID
+- therefore this was a Hermes startup/configuration gate failure, not a model,
+  translation-quality, or timeout failure
+
+### R6-B-STATEFUL-TRANSLATOR-CHAT-PROVIDER-GATE-AUDIT — PASS
+
+Hermes v0.20.0 source was inspected read-only.
+
+Root cause:
+- `cmd_chat` executes `_has_any_provider_configured()` as a first-run guard
+  before normal runtime provider resolution
+- the dedicated `subtitle-translator` profile had no `config.yaml`
+- global `openai-codex` authentication was visible through native auth fallback,
+  but that alone did not satisfy the chat first-run explicit-provider gate
+- explicit CLI `--provider openai-codex` is processed too late to satisfy this
+  startup guard
+- therefore `auth status openai-codex` could PASS while `chat` still stopped
+  before model execution
+
+Architecture decision:
+- do NOT copy credentials or another profile
+- do NOT create a profile-local `auth.json` merely to bypass the guard
+- configure the dedicated profile explicitly with native Hermes config
+- keep global native Codex authentication fallback unchanged
+
+### R6-B-STATEFUL-TRANSLATOR-PROFILE-MODEL-CONFIG — PASS
+
+Native profile configuration was applied on CT120:
+
+- profile: `subtitle-translator`
+- `model.provider = openai-codex`
+- `model.default = gpt-5.6-luna`
+- config path:
+  `/home/teddy/.hermes/profiles/subtitle-translator/config.yaml`
+- config mode: `0600`
+- config SHA256:
+  `e41d8fb98a9e13689a2870a876d4d6c2cc82f0070d84b5a8d18c40da0124d8b9`
+
+Verification:
+- native config readback: PASS
+- global `openai-codex` auth visibility after config: PASS
+- `_has_any_provider_configured()`: `YES`
+- first-run provider gate: PASS
+
+Safety:
+- no credential copy
+- no auth mutation
+- no model invocation
+- no translation retry
+- no session creation/deletion/mutation
+- no cron change
+- no Stage11 DB write
+- no publication
+- no source deletion
+- no Stage9 change
+
+The existing deterministic canary session remains:
+`9f6efe0a-f89f-574c-8136-87d5371973b3`
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-EXECUTION — transfer the exact frozen package to CT120 private staging, premint the exact deterministic native Hermes session, execute subtitle-translator once with the frozen stateful command, retrieve the complete result, and run deterministic result validation without publication`
+`R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-EXECUTION-RETRY — reuse the already-frozen JUR-750 166-cue package and the existing deterministic native Hermes session, rerun the exact stateful translator command now that the dedicated profile passes the first-run provider gate, retrieve the complete result, and validate it without publication`
 
 ## 8. Stage11 implementation roadmap
 
