@@ -1860,8 +1860,97 @@ Safety remained intact:
 - no credential/profile mutation during forensics
 - no raw dialogue in Git/canonical output
 
+### R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-CONTINUATION-PRECONDITION — INCOMPLETE
+
+The planned continuation model call did not run.
+
+Precondition observation:
+- frozen package identity: PASS
+- profile config identity: PASS
+- deterministic session identity: PASS
+- result artifact still absent
+- expected persisted message count was `11`
+- actual persisted message count was `12`
+- API call count remained `5`
+- tool call count remained `5`
+- therefore the safety precondition stopped before any continuation model call
+
+No model/API/tool continuation occurred in this checkpoint.
+
+### R6-B-STATEFUL-TRANSLATOR-SESSION-MESSAGE-12-AUDIT — PASS
+
+The extra persisted row was inspected without printing its content.
+
+Message structure:
+- total active messages: `12`
+- message 12 role: `user`
+- message 12 tool: none
+- API calls remained `5`
+- tool calls remained `5`
+- session end_reason remained `None`
+- result artifact remained absent
+- exact deterministic session remained resumable
+
+Therefore message 12 was a persisted user turn, not a model response, tool result,
+or timeout lifecycle assistant message.
+
+### R6-B-STATEFUL-TRANSLATOR-MESSAGE-12-IDENTITY-AUDIT — PASS
+
+Content identity was compared by exact string/SHA without printing the message.
+
+Message 12:
+- role: `user`
+- chars: `1229`
+- SHA256:
+  `1341cfd43878ec5e4c5ddc281d4cad5c0726620dd5b3cdf4b7df947e826b9739`
+- exact match to the intended continuation-only prompt: YES
+- exact match to the original first-turn prompt: NO
+
+Therefore the intended continuation instruction is already durably present as
+the last user message, but no subsequent model/API/tool work has processed it.
+
+### R6-B-STATEFUL-TRANSLATOR-PENDING-USER-TURN-RESUME-CONTRACT-AUDIT — PASS
+
+Hermes v0.20.0 source was inspected read-only to determine whether an already
+persisted last user turn can be executed directly without adding another user
+message.
+
+Observed native CLI behavior:
+- non-interactive `hermes chat -q <query>` reaches `cli.chat(query)`
+- supplying the continuation prompt again would therefore create/resend a user
+  turn rather than acting as a dedicated "process the existing pending user row"
+  command
+- no dedicated non-interactive CLI path for executing only the already-persisted
+  unanswered final user message was identified in the audited source paths
+- `/retry` is a native higher-level mechanism that trims the last user exchange
+  in in-memory history and re-queues that user message
+- `/undo` / rewind machinery has native SessionDB support for making rewound
+  rows inactive while preserving them for audit
+
+Recovery decision:
+- do NOT send the continuation prompt again while message 12 remains active
+- do NOT directly edit SQLite
+- do NOT delete the session
+- do NOT create a replacement session
+- do NOT restart the title from the original prompt
+- before any mutation, inspect the exact native rewind/resubmit contract and
+  choose a native auditable recovery that removes the duplicate-pending state
+  without losing prior 11-message semantic/tool progress
+
+Safety:
+- model invocation: NO
+- translation retry: NO
+- session mutation during audits: NO
+- direct SQLite access: NO
+- profile/auth change: NO
+- Stage11 production DB write: NO
+- publication: NO
+- source deletion: NO
+- Stage9 change: NO
+- raw dialogue printed/committed: NO
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-CONTINUATION — resume the exact existing session 9f6efe0a-f89f-574c-8136-87d5371973b3 with a continuation-only instruction that explicitly forbids restarting the title, asks the agent to use its persisted context/tool results to finish the already-started translation, write the single complete frozen result artifact, and then run deterministic validation without publication`
+`R6-B-STATEFUL-TRANSLATOR-NATIVE-REWIND-RESUBMIT-CONTRACT-AUDIT — inspect the exact native SessionDB rewind/undo/retry semantics needed to safely make only the already-unprocessed continuation user row inactive and then resubmit that exact continuation once, preserving the preceding 11-message state and audit history, with no model invocation or session mutation during the audit`
 
 ## 8. Stage11 implementation roadmap
 
