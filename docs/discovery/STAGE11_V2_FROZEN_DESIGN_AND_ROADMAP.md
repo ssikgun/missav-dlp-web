@@ -2042,8 +2042,76 @@ Audit safety:
 - Stage9 change: NO
 - raw dialogue printed/committed: NO
 
+### R6-B-STATEFUL-TRANSLATOR-CONTINUATION-QUERY-IDENTITY-REPAIR — PASS
+
+The continuation prompt was reconstructed without a trailing newline.
+
+Exact identity:
+- chars: `1229`
+- bytes: `1229`
+- trailing newline: NO
+- SHA256:
+  `1341cfd43878ec5e4c5ddc281d4cad5c0726620dd5b3cdf4b7df947e826b9739`
+
+No remote/session/model activity occurred during this repair.
+
+### R6-B-REMOTE-PENDING-STATE-PREFLIGHT-QUOTING-REPAIR — PASS
+
+The previous recovery retry stopped safely because nested SSH/heredoc quoting
+corrupted the remote Python source before any session mutation.
+
+The corrected stdin-heredoc preflight verified:
+- deterministic session identity: PASS
+- active rows: `1..12`
+- total rows: `12`
+- row `12` role: `user`
+- row `12` active: `1`
+- row `12` continuation SHA: exact
+- session message_count: `12`
+- API calls: `5`
+- tool calls: `5`
+- rewind_count: `0`
+- result artifact: absent
+
+### R6-B-STATEFUL-TRANSLATOR-NATIVE-REWIND-EXECUTION — PASS
+
+Hermes native `SessionDB.rewind_to_message()` was executed exactly once against
+the unprocessed continuation row.
+
+Mutation:
+- session:
+  `9f6efe0a-f89f-574c-8136-87d5371973b3`
+- target row: `12`
+- rewound_count: `1`
+- new_head_id: `11`
+- active rows after rewind: `1..11`
+- active row count after rewind: `11`
+- historical row `12` remains stored
+- historical row `12` active: `0`
+- historical row `12` content SHA256 remains:
+  `1341cfd43878ec5e4c5ddc281d4cad5c0726620dd5b3cdf4b7df947e826b9739`
+- session rewind_count: `1`
+- direct SQLite access: NO
+
+Counter note:
+- cumulative session `message_count` remains historical telemetry and was not
+  used as active-transcript cardinality
+- active row state is authoritative for the continuation recovery
+
+Safety:
+- model invocation: NO
+- translation retry: NO
+- new session: NO
+- package replacement: NO
+- profile/auth change: NO
+- production Stage11 DB write: NO
+- publication: NO
+- source deletion: NO
+- Stage9 change: NO
+- raw dialogue printed/committed: NO
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-NATIVE-REWIND-AND-CONTINUATION-EXECUTION — verify the exact 12-row pending state, native-rewind only row 12, verify rows 1..11 remain active and row 12 remains inactive for audit, then resume the same deterministic session and submit the exact continuation prompt once to complete and deterministically validate the frozen 166-cue result without publication`
+`R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-CONTINUATION-AFTER-NATIVE-REWIND — resume the same deterministic session whose active transcript now ends at row 11, submit the exact verified 1229-byte continuation prompt exactly once, allow the agent to reuse the persisted semantic/tool context rather than restart the title, retrieve the complete 166-cue result, and run deterministic validation without publication`
 
 ## 8. Stage11 implementation roadmap
 
