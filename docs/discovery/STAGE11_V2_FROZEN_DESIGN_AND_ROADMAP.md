@@ -2274,8 +2274,89 @@ Safety:
 - Stage9 change: NO
 - raw dialogue/tool arguments/tool result content printed or committed: NO
 
+### R6-B-STATEFUL-TRANSLATOR-ROW15-EXECUTE-CODE-ERROR-FORENSIC — PASS
+
+The persisted row 15 execute_code failure was inspected read-only without
+printing the generated code, tool arguments, raw error text, raw output, or
+dialogue.
+
+Row 14 generated execute_code request:
+- argument payload: JSON object
+- argument key: `code`
+- argument chars: `8863`
+- argument SHA256:
+  `4565c9edd35f7c025d6ba39f82d84c123bd000200af2a27f8cba27b84a3ad97d`
+- code chars: `8677`
+- code SHA256:
+  `0ae6cbbe04d74366012f285c32df4d1ddfa6d45763f9e7fa1f47a18b46ff03d4`
+- references frozen semantic input: YES
+- references final semantic result path: YES
+- attempts file write through `open(..., write-mode)`: YES
+- contains assertions: YES
+- contains literal expected cue count `166`: YES
+- references `cue_id`: YES
+- references `repaired_ja`: YES
+
+Row 15 execute_code result:
+- status: `error`
+- exit_code: `1`
+- duration: `0.02` seconds
+- stdout total/captured/omitted bytes: `0 / 0 / 0`
+- stdout truncated: NO
+- nested tool calls made: `0`
+- result JSON keys:
+  `duration_seconds,error,exit_code,output,status,stdout_bytes_captured,stdout_bytes_omitted,stdout_bytes_total,stdout_truncated,tool_calls_made`
+- error chars: `6914`
+- error SHA256:
+  `31d2a61e4341f2bf324fc3c47cdab3599dfcb575ed81df985544e7125dabbb15`
+- output chars: `6930`
+- output SHA256:
+  `77abcb073471ad0a9826bfc6dd636fe0fc4e2f1209c6c198b2448af7e2b84c4`
+- detected Python exception classes: NONE
+- traceback signal: NO
+- invalid syntax signal: NO
+- missing-file signal: NO
+- permission-denied signal: NO
+- JSON-decode signal: NO
+- assertion signal: NO
+- final exception class: UNKNOWN
+- only bounded line-number signal observed: `89`
+- final semantic result artifact: absent
+
+Interpretation:
+- the execute_code operation failed essentially immediately (`0.02s`)
+- no stdout was produced
+- no ordinary Python traceback/exception class was detectable
+- therefore this does not look like a long-running semantic translation failure
+  inside the generated Python program
+- current leading hypothesis is an execute_code runtime/wrapper/admission failure
+  occurring before or at process launch, but this is NOT yet proven
+- the next forensic step must classify the persisted error/output text using
+  bounded safe markers without printing dialogue or unrestricted error bodies
+
+Session remained unchanged during forensic inspection:
+- active rows: `1..11,13,14,15`
+- inactive rows: `12`
+- message_count: `15`
+- API calls: `6`
+- tool calls: `6`
+- rewind_count: `1`
+- end_reason: `None`
+
+Safety:
+- file write: NO
+- model invocation: NO
+- translation retry: NO
+- session rewind/mutation: NO
+- direct SQLite access: NO
+- production Stage11 DB write: NO
+- publication: NO
+- source deletion: NO
+- Stage9 change: NO
+- generated code/error/output/dialogue printed or committed: NO
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-ROW15-EXECUTE-CODE-ERROR-FORENSIC — read-only inspect only safe structural/error metadata from the persisted row 15 execute_code result and, if needed, bounded non-dialogue error fragments or deterministic error classification, without session mutation or another model call, to identify the exact blocker before choosing the next continuation action`
+`R6-B-STATEFUL-TRANSLATOR-ROW15-ERROR-SAFE-CLASSIFICATION — read-only classify the persisted row 15 execute_code error/output with bounded exact marker checks for execute_code wrapper rejection, sandbox/runtime policy, command-construction failure, unsupported operation, timeout/admission failure, or interpreter/process-launch failure, without printing raw error/output content or mutating the session`
 
 ## 8. Stage11 implementation roadmap
 
