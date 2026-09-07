@@ -1753,8 +1753,115 @@ Safety:
 The existing deterministic canary session remains:
 `9f6efe0a-f89f-574c-8136-87d5371973b3`
 
+### R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-EXECUTION-RETRY — INCOMPLETE
+
+The corrected dedicated profile passed startup and the real stateful model run
+began successfully, but the external canary timeout ended the process before a
+final result artifact was written.
+
+Frozen identity remained unchanged:
+- title: `JUR-750`
+- frozen ASR cues: `166`
+- deterministic session_id:
+  `9f6efe0a-f89f-574c-8136-87d5371973b3`
+- frozen package SHA256:
+  `d5371ebe63828f5715cb27c2897c1d249e3b0ab2ae099abd387480004aefc3de`
+- existing session reused
+- existing remote package reused
+- no replacement session/package created
+
+Observed execution:
+- profile: `subtitle-translator`
+- provider: `openai-codex`
+- model: `gpt-5.6-luna`
+- reasoning: `xhigh`
+- process rc: `124`
+- wall time: `1203` seconds
+- stdout bytes: `4761`
+- stderr bytes: `138`
+- result artifact: ABSENT
+- rc `124` was produced by the external GNU `timeout` canary boundary
+- this does NOT freeze a production worker timeout or lease duration
+
+### R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-TIMEOUT-FORENSIC — PASS
+
+Read-only post-timeout forensic inspection showed:
+- no authentication error signal
+- no rate-limit signal
+- no model-resolution error signal
+- no network/DNS error signal
+- no traceback/exception signal
+- no result artifact
+- the deterministic Hermes session remained present and resumable
+- no model retry occurred during forensic inspection
+
+### R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-TIMEOUT-EVENT-AUDIT — PASS
+
+Native session metadata after the timeout:
+- message_count: `11`
+- api_call_count: `5`
+- tool_call_count: `5`
+- input_tokens: `50464`
+- output_tokens: `25897`
+- reasoning_tokens: `22533`
+- cache_read_tokens: `47616`
+- cache_write_tokens: `0`
+- model: `gpt-5.6-luna`
+- profile: `subtitle-translator`
+- source: `stage11-subtitle-translator`
+- end_reason: `None`
+
+The model therefore performed substantial real semantic work before the external
+timeout. The run was not stuck at startup or authentication.
+
+Sanitized runtime evidence showed repeated contextual Japanese ASR-repair and
+translation reasoning. No raw Japanese or Korean dialogue was committed or
+printed.
+
+### R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-SESSION-STRUCTURE-AUDIT — PASS
+
+Native SessionDB message structure was inspected without reading dialogue,
+reasoning content, tool arguments, or tool outputs.
+
+Persisted conversation structure:
+- total messages: `11`
+- user messages: `1`
+- assistant messages: `5`
+- tool messages: `5`
+- tool sequence:
+  - `read_file`
+  - `execute_code`
+  - `execute_code`
+  - `execute_code`
+  - `execute_code`
+- last persisted message role: `tool`
+- last persisted tool: `execute_code`
+- session end_reason: `None`
+- `resolve_resume_session_id()` still returns the exact deterministic session ID
+
+Architecture consequence:
+- the title-level stateful persistence contract is now proven live
+- the first model process can be externally interrupted while its conversation
+  and tool progress remain durably resumable
+- do NOT restart the translation from the original request
+- do NOT create a replacement session
+- do NOT fall back to stateless batching
+- the next live turn must resume the same session and explicitly continue from
+  the persisted work toward the single complete result artifact
+- the current `1200` second canary timeout is not approved as a production
+  timeout/lease value
+
+Safety remained intact:
+- no Stage11 production DB claim/write
+- no publication
+- no source deletion
+- no Stage9 change
+- no provider/model fallback
+- no credential/profile mutation during forensics
+- no raw dialogue in Git/canonical output
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-EXECUTION-RETRY — reuse the already-frozen JUR-750 166-cue package and the existing deterministic native Hermes session, rerun the exact stateful translator command now that the dedicated profile passes the first-run provider gate, retrieve the complete result, and validate it without publication`
+`R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-CONTINUATION — resume the exact existing session 9f6efe0a-f89f-574c-8136-87d5371973b3 with a continuation-only instruction that explicitly forbids restarting the title, asks the agent to use its persisted context/tool results to finish the already-started translation, write the single complete frozen result artifact, and then run deterministic validation without publication`
 
 ## 8. Stage11 implementation roadmap
 
