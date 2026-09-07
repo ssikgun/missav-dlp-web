@@ -1949,8 +1949,101 @@ Safety:
 - Stage9 change: NO
 - raw dialogue printed/committed: NO
 
+### R6-B-STATEFUL-TRANSLATOR-NATIVE-REWIND-RESUBMIT-CONTRACT-AUDIT — PASS
+
+Hermes v0.20.0 native SessionDB and CLI recovery source was inspected read-only.
+
+Current durable transcript before recovery:
+- active rows: `12`
+- all rows including inactive: `12`
+- active row IDs: `1..12`
+- row `12` role: `user`
+- row `12` content SHA256:
+  `1341cfd43878ec5e4c5ddc281d4cad5c0726620dd5b3cdf4b7df947e826b9739`
+- row `12` is the exact intended continuation-only prompt
+- rows `1..11` are the previously persisted semantic/tool work
+
+Native rewind contract:
+- `SessionDB.rewind_to_message(session_id, target_message_id)` requires the
+  target row to exist in the same session and have role `user`
+- it soft-deletes every currently active row with
+  `id >= target_message_id`
+- the target row itself becomes inactive
+- inactive rows remain on disk for audit/forensic inspection
+- the return value includes:
+  `rewound_count`, `target_message`, and `new_head_id`
+- rewind increments the session `rewind_count`
+- re-rewinding the same inactive target does not change row activity again,
+  although it still increments `rewind_count`
+
+For the exact current canary state:
+- target row is exactly `12`
+- there are no rows after `12`
+- therefore native rewind of row `12` must deactivate exactly one row
+- expected `rewound_count = 1`
+- expected `new_head_id = 11`
+- rows `1..11` must remain active and unchanged
+- row `12` must remain stored but inactive
+
+Important counter nuance:
+- `rewind_to_message()` does NOT decrement the session's cumulative
+  `message_count`
+- therefore recovery validation must NOT require the session-level
+  `message_count` to become `11`
+- the authoritative recovery checks are active row count, row IDs, row active
+  state, and exact content identity
+- the cumulative session counters remain telemetry/audit counters rather than
+  active-transcript cardinality
+
+Replay / duplicate contract:
+- `get_messages()` defaults to active rows only
+- `get_messages_as_conversation()` defaults to active rows only
+- native resume therefore excludes rewound row `12` from the model transcript
+- the duplicate-replayed-user guard examines the message list supplied to it;
+  the inactive continuation row is not part of the normal active resume replay
+- the intended continuation may therefore be submitted once again after the
+  native rewind without retaining two active copies of the same pending turn
+
+CLI persistence contract:
+- `chat(message)` stages a new user message in the live conversation before the
+  model turn
+- normal session persistence then writes that new turn through Hermes native
+  SessionDB machinery
+- no direct SQLite mutation is required or approved
+
+Frozen recovery decision:
+1. verify exact current state before mutation
+2. call native `SessionDB.rewind_to_message()` exactly once on row `12`
+3. require `rewound_count=1` and `new_head_id=11`
+4. require active transcript rows `1..11`
+5. require historical row `12` still present but inactive with the frozen
+   continuation SHA
+6. resume the same deterministic Hermes session
+7. submit the exact continuation prompt exactly once
+8. do not restart the title
+9. do not create a replacement session or package
+10. do not use stateless batching fallback
+11. validate the complete 166-cue result before any publication
+
+This is an exceptional canary recovery for a continuation prompt that was
+persisted before its model call. Production implementation must avoid relying
+on hard-coded message counts and must use native durable state semantics.
+
+Audit safety:
+- model invocation: NO
+- translation retry: NO
+- session rewind: NO
+- session mutation: NO
+- direct SQLite access: NO
+- profile/auth change: NO
+- Stage11 production DB write: NO
+- publication: NO
+- source deletion: NO
+- Stage9 change: NO
+- raw dialogue printed/committed: NO
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-NATIVE-REWIND-RESUBMIT-CONTRACT-AUDIT — inspect the exact native SessionDB rewind/undo/retry semantics needed to safely make only the already-unprocessed continuation user row inactive and then resubmit that exact continuation once, preserving the preceding 11-message state and audit history, with no model invocation or session mutation during the audit`
+`R6-B-STATEFUL-TRANSLATOR-NATIVE-REWIND-AND-CONTINUATION-EXECUTION — verify the exact 12-row pending state, native-rewind only row 12, verify rows 1..11 remain active and row 12 remains inactive for audit, then resume the same deterministic session and submit the exact continuation prompt once to complete and deterministically validate the frozen 166-cue result without publication`
 
 ## 8. Stage11 implementation roadmap
 
