@@ -2110,8 +2110,85 @@ Safety:
 - Stage9 change: NO
 - raw dialogue printed/committed: NO
 
+### R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-CONTINUATION-AFTER-NATIVE-REWIND — INCOMPLETE
+
+The exact frozen continuation was submitted once after the successful native
+rewind, using the same deterministic Hermes session.
+
+Precondition:
+- active transcript before continuation: rows `1..11`
+- all durable rows before continuation: `12`
+- historical continuation row `12`: inactive
+- row `12` SHA256:
+  `1341cfd43878ec5e4c5ddc281d4cad5c0726620dd5b3cdf4b7df947e826b9739`
+- active copies of that continuation before execution: `0`
+- session rewind_count: `1`
+- API calls before continuation: `5`
+- tool calls before continuation: `5`
+- result artifact before execution: absent
+
+Execution:
+- exact continuation chars/bytes: `1229`
+- exact continuation SHA256:
+  `1341cfd43878ec5e4c5ddc281d4cad5c0726620dd5b3cdf4b7df947e826b9739`
+- same deterministic session reused:
+  `9f6efe0a-f89f-574c-8136-87d5371973b3`
+- provider/model:
+  `openai-codex / gpt-5.6-luna`
+- reasoning: `xhigh`
+- model process rc: `124`
+- wall time: `1202` seconds
+- canary timeout bound: `1200` seconds
+- result artifact after timeout: absent
+
+Durable state after timeout:
+- active messages: `14`
+- all messages including inactive: `15`
+- cumulative session message_count: `15`
+- API calls: `6`
+- tool calls: `6`
+- input tokens: `51109`
+- output tokens: `30381`
+- reasoning tokens: `23067`
+- cache-read tokens: `102400`
+- rewind_count: `1`
+- end_reason: `None`
+- historical row `12`: still inactive
+- historical row `12` SHA: unchanged
+- active continuation copies: exactly `1`
+- active continuation row: `13`
+
+Compared with the state before this continuation:
+- API calls increased by `1`
+- tool calls increased by `1`
+- input tokens increased by `645`
+- output tokens increased by `4484`
+- reasoning tokens increased by `534`
+- cache-read tokens increased by `54784`
+
+Therefore the continuation did execute and additional model/tool work was
+durably persisted in the same session. The complete-result contract remains
+INCOMPLETE because no final `stage11-semantic-result.json` exists yet.
+
+Do not submit another continuation blindly. First inspect the newly persisted
+tail without printing dialogue to determine exactly what rows `13..15`
+represent and whether the last persisted tool action completed useful semantic
+work or stopped at another intermediate boundary.
+
+Safety:
+- replacement session: NO
+- replacement package: NO
+- direct SQLite access: NO
+- production Stage11 DB write: NO
+- publication: NO
+- source deletion: NO
+- Stage9 change: NO
+- provider/model fallback: NO
+- stateless batching fallback: NO
+- raw dialogue printed/committed: NO
+
 Next checkpoint:
-`R6-B-STATEFUL-TRANSLATOR-LIVE-CANARY-CONTINUATION-AFTER-NATIVE-REWIND — resume the same deterministic session whose active transcript now ends at row 11, submit the exact verified 1229-byte continuation prompt exactly once, allow the agent to reuse the persisted semantic/tool context rather than restart the title, retrieve the complete 166-cue result, and run deterministic validation without publication`
+`R6-B-STATEFUL-TRANSLATOR-POST-CONTINUATION-TIMEOUT-TAIL-AUDIT — read-only inspect durable rows 13..15, their roles/tool metadata/finish state and the current session counters without printing dialogue, confirm the result artifact remains absent, and determine whether another same-session continuation is justified or whether the stateful strategy has reached a different blocker`
 
 ## 8. Stage11 implementation roadmap
 
