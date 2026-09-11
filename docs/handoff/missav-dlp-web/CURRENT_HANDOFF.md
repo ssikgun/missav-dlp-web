@@ -11,7 +11,7 @@ one-title end-to-end canary preparation.
 - Stage11 ACTIVE
 - Stage12 NOT STARTED
 - R6 ACTIVE
-- STAGE11_DEPLOYMENT_WIRING_READY
+- STAGE11_SUBTITLECAT_PROXY_WIRING_FROZEN
 
 ## Completed
 
@@ -52,6 +52,10 @@ one-title end-to-end canary preparation.
 - standalone canary `claim_token=1` retained as STANDALONE_CANARY_ONLY
 - deployment + live adapters fake E2E: ASR_ONLY PASS / HYBRID PASS
 - deployment smoke: 17/17 PASS
+- explicit SubtitleCat-only Gluetun proxy wiring
+- search, detail, and payload use the same configured SubtitleCat proxy
+- proxy `http://127.0.0.1:58888` is not a global HTTP proxy
+- SubtitleCat proxy offline smoke: PASS
 - actual Hermes/VM122/Whisper calls: NO
 - first real generic one-title canary: NOT RUN
 
@@ -90,6 +94,8 @@ No automatic publication.
 - no Jellyfin DB write
 - publisher excluded from default controller
 - `/var/tmp` artifacts are calibration-only, not production defaults
+- SubtitleCat search/detail/payload may use only the explicit deployment proxy;
+  NAS, VM122, Hermes, and Discovery DB routing are unchanged
 
 ## Cross-title Calibration
 
@@ -174,6 +180,17 @@ Hermes state DB:
 - `claim_token=1`: STANDALONE_CANARY_ONLY, not a job allocator
 - actual remote Hermes/VM122/Whisper calls: NOT RUN
 - publication: NOT PERFORMED
+
+## SubtitleCat Network Route
+
+- CT108 direct egress `39.118.143.206`: HSODA-104 search returned HTTP 500
+- Gluetun VPN egress `169.150.197.108`: SubtitleCat search returned HTTP 200
+- canary proxy endpoint: `http://127.0.0.1:58888`
+- Gluetun compose mapping: `127.0.0.1:58888 -> 8888/tcp`
+- search, detail page, and subtitle payload share the explicit SubtitleCat-only
+  proxy configuration
+- global `HTTP_PROXY`, `HTTPS_PROXY`, and `ALL_PROXY` are not configured by
+  Stage11
 
 ## Unresolved / Not Yet Provisioned
 

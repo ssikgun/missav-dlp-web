@@ -77,7 +77,11 @@ from teddy_discovery_subtitle_external import (
 )
 from teddy_discovery_subtitle_text import MAX_SUBTITLE_BYTES
 from teddy_discovery_subtitle_source_quality import classify_source_document
-from teddy_discovery_subtitlecat_discovery import SubtitleCatDiscovery
+from teddy_discovery_subtitlecat_discovery import (
+    SubtitleCatDiscovery,
+    SubtitleCatSearchError,
+    validate_subtitlecat_proxy_url,
+)
 from teddy_discovery_subtitle_v2_orchestrator import (
     V2_READY_FOR_SEMANTIC,
     V2_ROUTE_HYBRID,
@@ -197,6 +201,7 @@ class Stage11DeploymentConfig:
     remote_task_root: str
     expected_profile_name: str = REMOTE_HERMES_PROFILE_NAME
     subtitlecat_timeout_seconds: int | float = 20.0
+    subtitlecat_proxy_url: str | None = None
 
     def __post_init__(self):
         for name in ("nas_host", "nas_user", "remote_host", "remote_user"):
@@ -238,6 +243,19 @@ class Stage11DeploymentConfig:
                 self.subtitlecat_timeout_seconds,
                 field_name="subtitlecat_timeout_seconds",
             ),
+        )
+        try:
+            subtitlecat_proxy_url = validate_subtitlecat_proxy_url(
+                self.subtitlecat_proxy_url
+            )
+        except SubtitleCatSearchError as error:
+            raise Stage11DeploymentValidationError(
+                "subtitlecat_proxy_url is invalid"
+            ) from error
+        object.__setattr__(
+            self,
+            "subtitlecat_proxy_url",
+            subtitlecat_proxy_url,
         )
         object.__setattr__(
             self,
@@ -287,6 +305,7 @@ def _http_bytes(
     *,
     timeout: int | float,
     max_bytes: int,
+    proxy_url: str | None = None,
 ) -> bytes:
     try:
         parsed = urlsplit(url)
@@ -306,7 +325,15 @@ def _http_bytes(
         },
         method="GET",
     )
-    opener = urllib_request.build_opener(_NoRedirectHandler())
+    handlers = []
+    if proxy_url is not None:
+        handlers.append(
+            urllib_request.ProxyHandler(
+                {"http": proxy_url, "https": proxy_url}
+            )
+        )
+    handlers.append(_NoRedirectHandler())
+    opener = urllib_request.build_opener(*handlers)
     try:
         with opener.open(request, timeout=timeout) as response:
             status = response.getcode()
@@ -338,12 +365,17 @@ def _http_bytes(
     return payload
 
 
-def _default_detail_fetcher(timeout: int | float) -> Callable[[str], SubtitleCatDetailPage]:
+def _default_detail_fetcher(
+    timeout: int | float,
+    *,
+    proxy_url: str | None = None,
+) -> Callable[[str], SubtitleCatDetailPage]:
     def fetch_detail(url: str) -> SubtitleCatDetailPage:
         raw = _http_bytes(
             url,
             timeout=timeout,
             max_bytes=MAX_SUBTITLECAT_DETAIL_HTML_BYTES,
+            proxy_url=proxy_url,
         )
         try:
             html = raw.decode("utf-8", errors="strict")
@@ -358,7 +390,11 @@ def _default_detail_fetcher(timeout: int | float) -> Callable[[str], SubtitleCat
     return fetch_detail
 
 
-def _default_payload_fetcher(timeout: int | float) -> Callable:
+def _default_payload_fetcher(
+    timeout: int | float,
+    *,
+    proxy_url: str | None = None,
+) -> Callable:
     def fetch_payload(candidate) -> bytes:
         url = getattr(candidate, "external_source_id", None)
         if type(url) is not str:
@@ -369,6 +405,7 @@ def _default_payload_fetcher(timeout: int | float) -> Callable:
             url,
             timeout=timeout,
             max_bytes=MAX_SUBTITLE_BYTES,
+            proxy_url=proxy_url,
         )
 
     return fetch_payload
@@ -379,12 +416,20 @@ def build_subtitlecat_provider(
     timeout: int | float = 20.0,
     fetch_detail: Callable[[str], object] | None = None,
     payload_fetcher: Callable | None = None,
+    proxy_url: str | None = None,
 ) -> SubtitleCatProvider:
     """Compose the existing provider with bounded GET-only transports."""
 
     timeout = _positive_number(timeout, field_name="SubtitleCat timeout")
-    detail = fetch_detail or _default_detail_fetcher(timeout)
-    payload = payload_fetcher or _default_payload_fetcher(timeout)
+    proxy_url = validate_subtitlecat_proxy_url(proxy_url)
+    detail = fetch_detail or _default_detail_fetcher(
+        timeout,
+        proxy_url=proxy_url,
+    )
+    payload = payload_fetcher or _default_payload_fetcher(
+        timeout,
+        proxy_url=proxy_url,
+    )
     return SubtitleCatProvider(
         fetch_detail=detail,
         payload_transport=ExternalSubtitleTransport(payload),
@@ -1312,11 +1357,13 @@ def build_stage11_deployment_dependencies(
     if live_discovery is None:
         live_discovery = SubtitleCatDiscovery(
             timeout=config.subtitlecat_timeout_seconds,
+            proxy_url=config.subtitlecat_proxy_url,
         )
     live_provider = provider
     if live_provider is None:
         live_provider = build_subtitlecat_provider(
             timeout=config.subtitlecat_timeout_seconds,
+            proxy_url=config.subtitlecat_proxy_url,
         )
 
     bridge = remote_bridge

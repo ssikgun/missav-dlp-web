@@ -59,6 +59,43 @@ def build_search_url(dvd_id: str) -> str:
     return SEARCH_ENDPOINT + "?" + urlencode({"search": _validate_dvd_id(dvd_id)})
 
 
+def validate_subtitlecat_proxy_url(value: object) -> str | None:
+    """Validate one optional explicit proxy used only by SubtitleCat HTTP."""
+
+    if value is None:
+        return None
+    if (
+        type(value) is not str
+        or not value
+        or value != value.strip()
+        or any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in value)
+        or any(c in value for c in "\\<>\"'")
+    ):
+        raise SubtitleCatSearchError("proxy URL is malformed or unsafe")
+    try:
+        parsed = urlsplit(value)
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError as error:
+        raise SubtitleCatSearchError("proxy URL is malformed or unsafe") from error
+    if (
+        parsed.scheme.lower() not in {"http", "https"}
+        or not parsed.netloc
+        or not hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise SubtitleCatSearchError(
+            "proxy URL must be an HTTP(S) endpoint without credentials or path"
+        )
+    if port is not None and not 1 <= port <= 65_535:
+        raise SubtitleCatSearchError("proxy URL has an invalid port")
+    return value
+
+
 def _safe_url(value: str):
     if (type(value) is not str or not value
             or any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in value)
@@ -84,8 +121,22 @@ class _NoRedirectHandler(urllib_request.HTTPRedirectHandler):
         raise SubtitleCatSearchTransportError("search redirect is not permitted")
 
 
-def _fetch(request: urllib_request.Request, timeout: float) -> SubtitleCatSearchResponse:
-    opener = urllib_request.build_opener(_NoRedirectHandler())
+def _fetch(
+    request: urllib_request.Request,
+    timeout: float,
+    *,
+    proxy_url: str | None = None,
+) -> SubtitleCatSearchResponse:
+    proxy_url = validate_subtitlecat_proxy_url(proxy_url)
+    handlers = []
+    if proxy_url is not None:
+        handlers.append(
+            urllib_request.ProxyHandler(
+                {"http": proxy_url, "https": proxy_url}
+            )
+        )
+    handlers.append(_NoRedirectHandler())
+    opener = urllib_request.build_opener(*handlers)
     with opener.open(request, timeout=timeout) as response:
         status, final_url = response.getcode(), response.geturl()
         if type(status) is not int or not 200 <= status < 300:
@@ -202,8 +253,13 @@ class SubtitleCatDiscovery:
     neither chooses among candidates nor fetches detail pages or payloads.
     """
 
-    def __init__(self, *, timeout: float = 20.0,
-                 fetch: Callable = _fetch):
+    def __init__(
+        self,
+        *,
+        timeout: float = 20.0,
+        fetch: Callable | None = None,
+        proxy_url: str | None = None,
+    ):
         try:
             valid = (not isinstance(timeout, bool) and isinstance(timeout, (int, float))
                      and math.isfinite(timeout) and timeout > 0)
@@ -211,9 +267,24 @@ class SubtitleCatDiscovery:
             valid = False
         if not valid:
             raise SubtitleCatSearchError("timeout must be positive and finite")
-        if not callable(fetch):
+        proxy_url = validate_subtitlecat_proxy_url(proxy_url)
+        if fetch is not None and not callable(fetch):
             raise SubtitleCatSearchError("fetch must be callable")
+        if fetch is not None and proxy_url is not None:
+            raise SubtitleCatSearchError(
+                "proxy URL cannot be combined with an injected fetch"
+            )
         self.timeout = float(timeout)
+        self.proxy_url = proxy_url
+        if fetch is None and proxy_url is None:
+            fetch = _fetch
+        elif fetch is None:
+            def fetch(request, request_timeout):
+                return _fetch(
+                    request,
+                    request_timeout,
+                    proxy_url=proxy_url,
+                )
         self.fetch = fetch
 
     def discover(self, *, dvd_id: str) -> SubtitleCatSearchResult:
