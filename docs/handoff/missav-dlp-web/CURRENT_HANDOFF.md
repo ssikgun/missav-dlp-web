@@ -2,19 +2,21 @@
 
 ## Current Goal
 
-Stage11/R6 generic Korean subtitle pipeline closure and Stage12 readiness.
+Stage11/R6 generic Korean subtitle pipeline closure and Stage12 holdings
+subtitle rollout readiness.
 
 ## Overall Status
 
 - Stage0–10 CLOSED / PASS
 - Stage11 CLOSED / PASS
-- Stage12 READY / NOT STARTED
+- Stage12 READY / NOT STARTED — Holdings Subtitle Rollout + Operations / Hardening
 - R6 CLOSED / PASS
 - STAGE11_SUBTITLECAT_PROXY_WIRING_FROZEN
 - STAGE11_CANARY_ALIGNMENT_CONTRACT_FROZEN
 - STAGE11_GENERIC_UNPROJECTABLE_TARGETED_FALLBACK_FIXED
 - STAGE11_FIRST_REAL_CONTROLLER_CANARY_PASS
 - STAGE11_R6_CLOSED_PASS
+- STAGE12_HOLDINGS_SUBTITLE_ROLLOUT_SCOPE_FROZEN
 - STAGE12_READY_NOT_STARTED
 
 ## Completed
@@ -86,6 +88,81 @@ TITLE
 → STOP
 
 No automatic publication.
+
+## Stage12 Holdings Subtitle Rollout Scope — FROZEN
+
+Marker:
+
+`STAGE12_HOLDINGS_SUBTITLE_ROLLOUT_SCOPE_FROZEN`
+
+Stage12 remains **READY / NOT STARTED**. Its primary goal is to apply the
+frozen Stage11 pipeline to every owned title that needs Korean subtitles,
+generate a validated CLEAN Korean SRT, and safely place it beside the NAS
+title so that Jellyfin can use it.
+
+### Holdings and eligibility
+
+- The existing Discovery holdings inventory and DB are the authoritative
+  source of owned titles.
+- Broad recursive NAS scans are forbidden.
+- A title with an existing normal Korean subtitle is deterministically
+  skipped and protected; existing KO subtitles must not be overwritten.
+- Only eligible titles requiring Korean subtitles enter Stage11 execution.
+
+### Stage11 handoff and durable state
+
+- Stage12 reuses the frozen generic Stage11 controller, route, alignment,
+  targeted-evidence, conservative fallback, CLEAN, and provenance contracts.
+- Stage11 functionality is not reimplemented, reopened, or retuned.
+- Each title must have durable, resumable, idempotent state covering at least:
+  `PENDING`, `SKIPPED_EXISTING_KO`, `RUNNING`, `GENERATED`, `PUBLISHED`, and
+  `FAILED_RETRYABLE` / `FAILED_FINAL` (or the exact equivalent of the
+  existing state contract).
+- A failed title is isolated from the remainder of a bounded batch, and
+  interrupted work can resume without reprocessing completed or skipped
+  titles.
+
+### Safe publication and Jellyfin
+
+- Only a valid Stage11 CLEAN SRT may be published.
+- Publication is atomic and fail-closed; NAS video files and existing KO
+  subtitles are never overwritten.
+- Publication outcome and provenance are recorded per title.
+- Jellyfin integration uses the normal external-SRT library refresh/rescan
+  path when needed; direct Jellyfin DB writes are forbidden.
+- Stage12 therefore includes safe NAS subtitle placement and Jellyfin use,
+  while Stage11's controller publication boundary remains
+  `publication_performed=false`.
+
+### Operations, quality, and rollout
+
+- The existing Operations / Hardening requirements remain Stage12 operating
+  requirements: recoverable, observable, backed-up, idempotent, fail-closed,
+  and resumable.
+- The user-approved quality bar is practical comprehension, not
+  commercial-grade translation. Some ASR hallucination or awkward wording is
+  acceptable; uncertain KEEP is preferred to false OMIT.
+- Rollout is strictly bounded: READ-ONLY holdings inventory/dry-run, then a
+  1-title publication canary, then a small bounded batch, and finally the
+  eligible holdings rollout.
+- Stage12 succeeds only when every eligible holding is accounted for as
+  `PUBLISHED` or an explicit `SKIP` / `FAIL`, existing KO subtitles are
+  preserved, generated-subtitle provenance is traceable, interrupted runs are
+  resumable, Jellyfin can use published subtitles, and unresolved titles are
+  visible rather than hidden.
+
+### Stage12 non-scope
+
+- Stage11 feature redesign or reimplementation
+- title, catalog-number, cue, or text-specific production hardcode
+- existing KO subtitle overwrite
+- broad NAS scanning
+- direct Jellyfin DB modification
+- automatic video modification
+- unrelated Downloader feature changes
+
+Stage12 execution has not started. No controller, provider, model, NAS, or
+Jellyfin call is implied by this scope freeze.
 
 ## Frozen Policies
 
@@ -560,15 +637,26 @@ Hermes state DB:
 - production staging root
 - external JA/alignment durable reuse store
 - accepted-alignment plus valid-targeted-unprojectable live canary validation
+- Stage12 holdings eligibility inventory, durable rollout state, safe NAS
+  publication, and Jellyfin refresh/rescan execution
 
 이 항목들은 필수 구현 결함으로 과장하지 않는다. 현재 다음 milestone에서
 필요한 것만 구분한다.
 
 ## Next Step
 
-Stage12 separate planning/authorization
-→ remain READY / NOT STARTED; observe the conservative fallback naturally in
-future production without reopening Stage11
+Stage12 scope is frozen, but execution remains **READY / NOT STARTED**.
+The next rollout sequence is:
+
+1. READ-ONLY holdings inventory/dry-run
+2. 1-title publication canary
+3. small bounded batch
+4. full eligible holdings rollout
+
+All steps must preserve Stage11's frozen contracts and must not reopen
+Stage11. The accepted-alignment + valid-targeted-unprojectable live path may
+be observed naturally during rollout; it remains a KNOWN / NON-BLOCKING gap
+and does not imply a dedicated retry.
 
 초기 canary는 QualityReviewError에서 fail-closed 되었고, 이후 첫 완료형
 real controller canary는 TRANSPORT_FAILURE 경유 ASR_ONLY로 PASS했다. accepted
