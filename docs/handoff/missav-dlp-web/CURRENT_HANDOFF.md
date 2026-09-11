@@ -12,6 +12,7 @@ one-title end-to-end canary preparation.
 - Stage12 NOT STARTED
 - R6 ACTIVE
 - STAGE11_SUBTITLECAT_PROXY_WIRING_FROZEN
+- STAGE11_CANARY_ALIGNMENT_CONTRACT_FROZEN
 
 ## Completed
 
@@ -56,6 +57,8 @@ one-title end-to-end canary preparation.
 - search, detail, and payload use the same configured SubtitleCat proxy
 - proxy `http://127.0.0.1:58888` is not a global HTTP proxy
 - SubtitleCat proxy offline smoke: PASS
+- real-title alignment evidence basis frozen: JUR-750 / HSODA-104
+- generic CANARY_ONLY alignment acceptance contract frozen
 - actual Hermes/VM122/Whisper calls: NO
 - first real generic one-title canary: NOT RUN
 
@@ -96,6 +99,166 @@ No automatic publication.
 - `/var/tmp` artifacts are calibration-only, not production defaults
 - SubtitleCat search/detail/payload may use only the explicit deployment proxy;
   NAS, VM122, Hermes, and Discovery DB routing are unchanged
+
+## Stage11 Canary Alignment Contract — FROZEN
+
+Marker:
+
+`STAGE11_CANARY_ALIGNMENT_CONTRACT_FROZEN`
+
+This is the first real Stage11 controller canary contract only.
+
+- scope: `CANARY_ONLY`
+- production global default: **NO**
+- title-specific policy: **NO**
+- no `JUR-750`/`HSODA-104` title branch or name-based policy split
+- ambiguity (`UNRESOLVED`) uses the controller's `ASR_ONLY` fallback
+- prefer false `ASR_ONLY` fallback over false Hybrid acceptance
+- when more real-title evidence accumulates, reassess a separate production
+  policy; do not promote this contract implicitly
+- first real `HSODA-104` controller canary: **NOT RUN**
+- Stage11: **ACTIVE / NOT CLOSED**
+- publication: **NO**
+
+### Frozen real evidence
+
+The following two real-title results are the cross-title basis. `selected
+anchors` maps to the source policy's `anchor_count`; `candidate anchors` is
+reported evidence and is not a separate `AlignmentAcceptancePolicy` field.
+
+| title | candidate anchors | selected anchors | external span ms | ASR span ms | scale | median absolute residual ms | inliers at threshold 1000 ms | ratio |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| JUR-750 | 156 | 75 | 7001618 | 7123178 | 1.017323284 | 214.915 | 71 / 75 | 0.946667 |
+| HSODA-104 | 99 | 65 | 3505250 | 3504430 | 1.000021754798 | 117.728246 | 61 / 65 | 0.938462 |
+
+### Frozen policy
+
+The source constructor/signature is the exact seven-field frozen dataclass:
+
+```python
+residual_threshold_ms = 1000
+
+policy = AlignmentAcceptancePolicy(
+    minimum_anchor_count=40,
+    minimum_inlier_count=40,
+    minimum_inlier_ratio=0.90,
+    maximum_median_absolute_residual_ms=250.0,
+    minimum_evidence_span_ms=1800000,
+    minimum_scale=0.95,
+    maximum_scale=1.05,
+)
+```
+
+`decide_alignment_acceptance` evaluates anchor count, inlier count, external
+evidence span, and ASR evidence span first. It then evaluates inlier ratio,
+median absolute residual, and scale. A quality failure is
+`REJECT_EXTERNAL` with `ASR_ONLY` recommended provenance; an insufficient or
+ambiguous evidence result is preserved as `UNRESOLVED` for reporting and the
+controller route falls back to `ASR_ONLY`.
+
+Arithmetic/static validation at `residual_threshold_ms=1000`:
+
+- JUR-750: anchor count PASS; inlier count PASS; inlier ratio PASS; median
+  residual PASS; external/ASR evidence span PASS; scale PASS.
+- HSODA-104: anchor count PASS; inlier count PASS; inlier ratio PASS; median
+  residual PASS; external/ASR evidence span PASS; scale PASS.
+
+This policy is a handoff contract, not a source-level production policy
+constant.
+
+### Next-run values and exact source API map
+
+The next checkpoint must use these explicit canary values. The two local roots
+below must remain absent until the real canary checkpoint:
+
+- SubtitleCat proxy: `http://127.0.0.1:58888`
+- `remote_task_root`:
+  `/home/teddy/.hermes/profiles/subtitle-translator/stage11-controller-canary-v1`
+- scope: `CANARY_ONLY`
+- Discovery DB explicit injection:
+  `/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3`
+- `request_timeout_seconds`: `1200` (`CANARY_ONLY`)
+- `claim_token`: `1` (`STANDALONE_CANARY_ONLY`)
+- `artifact_root`:
+  `/opt/missav-dlp-web/discovery/stage11-canary-artifacts`
+- `stateful_staging_root`:
+  `/opt/missav-dlp-web/discovery/stage11-canary-staging`
+- artifact root: **NOT CREATED**
+- stateful staging root: **NOT CREATED**
+
+The complete next-run constructor/call map, validated against the current
+source signatures, is:
+
+```python
+from teddy_discovery_alignment_acceptance import AlignmentAcceptancePolicy
+from teddy_discovery_stage11_controller import run_one_title_stage11
+from teddy_discovery_stage11_deployment import (
+    Stage11DeploymentConfig,
+    build_stage11_deployment_dependencies,
+)
+from teddy_discovery_stage11_live_adapters import build_holding_resolver
+
+config = Stage11DeploymentConfig(
+    nas_host="192.168.1.201",
+    nas_user="ssikgun",
+    nas_key="/opt/missav-dlp-web/teddy-nas-transfer/id_ed25519",
+    nas_known_hosts="/opt/missav-dlp-web/teddy-nas-transfer/known_hosts",
+    nas_library_root="/volume1/video/video2/JAV",
+    asr_base_url="http://192.168.1.134:8091",
+    request_timeout_seconds=1200,
+    remote_host="192.168.1.230",
+    remote_user="teddy",
+    ssh_key="/root/.ssh/id_ed25519_stage11_hermes",
+    known_hosts="/root/.ssh/known_hosts_stage11_hermes",
+    remote_task_root=(
+        "/home/teddy/.hermes/profiles/subtitle-translator/"
+        "stage11-controller-canary-v1"
+    ),
+    expected_profile_name="subtitle-translator",
+    subtitlecat_timeout_seconds=20.0,
+    subtitlecat_proxy_url="http://127.0.0.1:58888",
+)
+
+policy = AlignmentAcceptancePolicy(
+    minimum_anchor_count=40,
+    minimum_inlier_count=40,
+    minimum_inlier_ratio=0.90,
+    maximum_median_absolute_residual_ms=250.0,
+    minimum_evidence_span_ms=1800000,
+    minimum_scale=0.95,
+    maximum_scale=1.05,
+)
+
+deps = build_stage11_deployment_dependencies(
+    config,
+    acceptance_policy=policy,
+    residual_threshold_ms=1000,
+    holding_resolver=build_holding_resolver(
+        environ={
+            "TEDDY_DISCOVERY_DB":
+            "/opt/missav-dlp-web/discovery/"
+            "teddy-discovery.sqlite3"
+        }
+    ),
+)
+
+run_one_title_stage11(
+    "HSODA-104",
+    artifact_root=(
+        "/opt/missav-dlp-web/discovery/"
+        "stage11-canary-artifacts"
+    ),
+    stateful_staging_root=(
+        "/opt/missav-dlp-web/discovery/"
+        "stage11-canary-staging"
+    ),
+    claim_token=1,
+    **deps.controller_kwargs(),
+)
+```
+
+The map is recorded for the next checkpoint only and was not executed in this
+freeze.
 
 ## Cross-title Calibration
 
