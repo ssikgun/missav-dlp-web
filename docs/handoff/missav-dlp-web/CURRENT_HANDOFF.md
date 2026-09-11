@@ -2,19 +2,20 @@
 
 ## Current Goal
 
-Stage11 generic Korean subtitle generation pipeline completion and controlled
-one-title end-to-end canary acceptance.
+Stage11/R6 generic Korean subtitle pipeline closure and Stage12 readiness.
 
 ## Overall Status
 
 - Stage0–10 CLOSED / PASS
-- Stage11 ACTIVE
-- Stage12 NOT STARTED
-- R6 ACTIVE
+- Stage11 CLOSED / PASS
+- Stage12 READY / NOT STARTED
+- R6 CLOSED / PASS
 - STAGE11_SUBTITLECAT_PROXY_WIRING_FROZEN
 - STAGE11_CANARY_ALIGNMENT_CONTRACT_FROZEN
 - STAGE11_GENERIC_UNPROJECTABLE_TARGETED_FALLBACK_FIXED
 - STAGE11_FIRST_REAL_CONTROLLER_CANARY_PASS
+- STAGE11_R6_CLOSED_PASS
+- STAGE12_READY_NOT_STARTED
 
 ## Completed
 
@@ -65,6 +66,7 @@ one-title end-to-end canary acceptance.
   Hybrid quality review
 - first real controller E2E canary: PASS via ASR_ONLY transport-failure path
 - accepted-alignment plus unprojectable-targeted live path: NOT DIRECTLY EXERCISED
+- Stage11/R6 final functional closure audit: PASS
 
 ## Current Architecture
 
@@ -126,7 +128,7 @@ This is the first real Stage11 controller canary contract only.
   TRANSPORT_FAILURE**
 - accepted-alignment plus valid-targeted-unprojectable live path: **NOT DIRECTLY
   EXERCISED; KNOWN / NON-BLOCKING validation gap**
-- Stage11: **ACTIVE / NOT CLOSED**
+- Stage11: **CLOSED / PASS**
 - publication: **NO**
 
 ### Frozen real evidence
@@ -175,9 +177,9 @@ Arithmetic/static validation at `residual_threshold_ms=1000`:
 This policy is a handoff contract, not a source-level production policy
 constant.
 
-### Next-run values and exact source API map
+### Recorded canary values and exact source API map
 
-The next checkpoint must use these explicit canary values. The existing
+The first real canary used these explicit values. The existing
 artifact/staging roots below came from the initial canary and must be
 preserved for future explicitly authorized canary work:
 
@@ -268,8 +270,8 @@ run_one_title_stage11(
 )
 ```
 
-The map is recorded for the next checkpoint only and was not executed in this
-freeze.
+This map is retained as historical provenance for the completed first real
+canary. No additional Stage11 run is implied by this closure.
 
 ## Stage11 Generic HYBRID Targeted Evidence Wiring Fix — FROZEN
 
@@ -304,12 +306,11 @@ staging, and remote session state are preserved.
 - subsequent real `HSODA-104` controller E2E canary: **PASS via ASR_ONLY
   TRANSPORT_FAILURE**; accepted-alignment targeted-unprojectable live path was
   not exercised
-- Stage11/R6: **ACTIVE / NOT CLOSED**
+- Stage11/R6: **CLOSED / PASS**
 - publication: **NO**
 
-Next step: when explicitly authorized, use the frozen fixed commit for one
-targeted real controller run that reaches accepted external alignment while
-preserving existing canary artifacts/session.
+The subsequent real canary is recorded below; no Stage11 reopening or retry is
+implied by this historical section.
 
 ## Stage11 Generic Unprojectable Targeted Evidence Fallback — FROZEN
 
@@ -362,12 +363,11 @@ stateful Hybrid, and quality-review regression smokes PASS. `py_compile` and
   TRANSPORT_FAILURE**
 - accepted-alignment plus valid-targeted-unprojectable live path: **NOT DIRECTLY
   EXERCISED; KNOWN / NON-BLOCKING validation gap**
-- Stage11/R6: **ACTIVE / NOT CLOSED**
+- Stage11/R6: **CLOSED / PASS**
 - publication: **NO**
 
-Next step: when explicitly authorized, perform one real `HSODA-104` controller
-run reaching accepted external alignment while preserving existing canary
-artifacts, staging, and remote session state.
+This fallback contract remains closed; observe the live path naturally when it
+occurs without reopening Stage11 for a dedicated retry.
 
 ## First Real Controller E2E Canary — PASS
 
@@ -422,7 +422,35 @@ accepted-alignment + valid-targeted-unprojectable → ASR_ONLY fallback with a
 live provider. That remains a **KNOWN / NON-BLOCKING validation gap**. Offline
 smoke validation exists; no SubtitleCat retry is implied by this handoff.
 
-- Stage11/R6: **ACTIVE / NOT CLOSED**
+- Stage11/R6: **CLOSED / PASS**
+- publication: **NO**
+
+## Stage11/R6 Final Closure Audit — PASS
+
+Stage11's functional goal is satisfied: the generic controller completed a real
+end-to-end title run through ASR, targeted evidence reuse, stateful first-pass
+translation, second-pass review, canonical CLEAN SRT, and mechanical report.
+The user-approved practical quality threshold is met, and publication was not
+part of the Stage11 scope.
+
+No required Stage11 production contract remains incomplete. The generic
+ASR_ONLY/HYBRID routes, source-quality handling, targeted evidence validation,
+conservative unprojectable fallback, durable CLEAN/report boundaries, and
+publication prohibition are implemented and smoke/real-canary validated.
+
+The accepted-alignment + valid-targeted + unprojectable → ASR_ONLY path remains
+a `KNOWN / NON-BLOCKING validation gap` in live-provider coverage only. It may
+be observed when naturally encountered; it does not reopen Stage11. Production
+must continue to fail closed on invalid/detached/stale evidence and use the
+conservative ASR_ONLY fallback for valid unprojectable targeted evidence.
+
+The not-yet-provisioned production artifact root, jobs DB, staging root, and
+external alignment reuse store are follow-up operational provisioning, not
+Stage11 closure blockers.
+
+- Stage11: **CLOSED / PASS**
+- R6: **CLOSED / PASS**
+- Stage12: **READY / NOT STARTED**
 - publication: **NO**
 
 ## Cross-title Calibration
@@ -538,18 +566,19 @@ Hermes state DB:
 
 ## Next Step
 
-production connection values read-only preflight
-→ one explicitly authorized real generic controller run reaching accepted
-external alignment, preserving existing canary state
+Stage12 separate planning/authorization
+→ remain READY / NOT STARTED; observe the conservative fallback naturally in
+future production without reopening Stage11
 
 초기 canary는 QualityReviewError에서 fail-closed 되었고, 이후 첫 완료형
 real controller canary는 TRANSPORT_FAILURE 경유 ASR_ONLY로 PASS했다. accepted
-alignment + valid targeted unprojectable live path는 아직 직접 검증하지 않았다.
+alignment + valid targeted unprojectable live path는 아직 직접 검증하지
+않았으며, KNOWN / NON-BLOCKING gap으로 유지한다.
 
 ## New Conversation Warnings
 
-- Stage11 CLOSED 선언 금지
-- Stage12 시작 금지
+- Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
+- Stage12 READY / NOT STARTED; 별도 승인 없이 시작 금지
 - 작품별 튜닝으로 되돌아가지 않기
 - ADN/JUR/HSODA/DVDMS 특정 production logic 금지
 - old canonical KO subtitle overwrite 금지
