@@ -18,6 +18,7 @@ subtitle rollout readiness.
 - STAGE11_R6_CLOSED_PASS
 - STAGE12_HOLDINGS_SUBTITLE_ROLLOUT_SCOPE_FROZEN
 - STAGE12_CP2_DURABLE_ROLLOUT_STATE_PREFLIGHT_PASS
+- STAGE12_CP3_ONE_TITLE_ATOMIC_PUBLICATION_CANARY_PASS
 
 ## Completed
 
@@ -87,7 +88,8 @@ TITLE
 → local mechanical report
 → STOP
 
-No automatic publication.
+No automatic publication in the Stage11 controller; Stage12 owns the separate
+bounded NAS publication contract.
 
 ## Stage12 Holdings Subtitle Rollout Scope — FROZEN
 
@@ -160,9 +162,9 @@ Jellyfin can use it.
 - automatic video modification
 - unrelated Downloader feature changes
 
-Stage12 publication execution has not started. CP1/CP2 used only bounded
-inventory, artifact validation, state-store initialization, and exact-path
-NAS read/stat; no controller, provider, model, publication, or Jellyfin
+CP1/CP2 used only bounded inventory, artifact validation, state-store
+initialization, and exact-path NAS read/stat. CP3 then performed exactly one
+operator-selected HSODA-104 publication canary; no batch rollout or Jellyfin
 operation was performed.
 
 ## Stage12 CP1 Holdings Subtitle Inventory — PASS
@@ -300,8 +302,81 @@ Actual CP2 initial materialization:
 `JUR-750.R6B2-Clean.ko.srt` sidecar was not renamed, deleted, overwritten, or
 automatically promoted to canonical KO.
 
-The next checkpoint is one 1-title atomic publication canary. It must use the
-frozen state/preflight contract; CP2 did not publish anything.
+CP3 below used this frozen state/preflight contract and published only the
+selected HSODA-104 destination. The next checkpoint is Jellyfin recognition
+and safe library-refresh verification.
+
+## Stage12 CP3 One-title Atomic Publication Canary — PASS
+
+Marker:
+
+`STAGE12_CP3_ONE_TITLE_ATOMIC_PUBLICATION_CANARY_PASS`
+
+CP3 performed exactly one operator-selected `HSODA-104` publication canary.
+No Stage11 controller, provider, model, SubtitleCat, VM122, Hermes, batch, or
+Jellyfin call was made.
+
+### Publication and pre-write validation
+
+- Publication owner/API: existing
+  `SubtitleSSHMutator.publish_korean_srt(...)` in
+  `teddy_discovery_subtitle_publish.py`; the Stage11 controller was not
+  changed.
+- Pre-write validation: **PASS** — rollout state was `PENDING`, inventory was
+  `ELIGIBLE_NEEDS_KO` with `existing_ko=ABSENT`, source/artifact/report
+  identities were valid, strict canonical SRT parsing passed, the report
+  title and CLEAN binding matched, the authoritative source snapshot was
+  unchanged, the exact canonical destination was absent, no noncanonical KO
+  conflict blocked publication, and the path was bounded.
+- `CANARY_DVD_ID=HSODA-104`
+- source media: `HSODA/HSODA-104/HSODA-104.mp4`
+- NAS root: `/volume1/video/video2/JAV`
+- exact destination:
+  `/volume1/video/video2/JAV/HSODA/HSODA-104/HSODA-104.ko.srt`
+  (relative `HSODA/HSODA-104/HSODA-104.ko.srt`)
+- source CLEAN:
+  `/opt/missav-dlp-web/discovery/stage11-canary-artifacts/HSODA-104/clean-ko-v1.srt`
+- mechanical report:
+  `/opt/missav-dlp-web/discovery/stage11-canary-artifacts/HSODA-104/stage11-controller-report-v1.json`
+- source CLEAN SHA256:
+  `09ad0c4588a52f5eb4d4ef3f48050524cac4b9edad474755ae3a89b500dcfa76`
+- report SHA256:
+  `7fa9412aabd1c48167fe686df2f8ea92ede7d47c56a5b4d7037d2e6f034ebec3`
+
+The writer created a same-directory bounded temporary file, used exclusive
+creation, flushed and fsynced the bytes, strictly validated the temporary
+SRT, rechecked destination absence, and installed with a no-clobber atomic
+hard-link. Race collisions fail closed; existing destinations are never
+overwritten. The CLEAN artifact and video/source were not modified.
+
+### Publication result and durable state
+
+- `PUBLICATION_RESULT=PASS`
+- destination SHA256:
+  `09ad0c4588a52f5eb4d4ef3f48050524cac4b9edad474755ae3a89b500dcfa76`
+- source/destination SHA match: **YES**
+- destination regular-file and strict canonical SRT readback: **PASS**
+- exact HSODA subtitle-directory readback contained only
+  `HSODA-104.ko.srt`; source witness remained unchanged
+- state transition: `PENDING → RUNNING → GENERATED → PUBLISHED`
+- `PUBLISHED` records CLEAN/report/destination identity and atomic publication
+  provenance in `/opt/missav-dlp-web/discovery/stage12-rollout-state.sqlite3`
+- idempotent second check: **PASS** — state remained `PUBLISHED`, the exact
+  destination had the recorded provenance and SHA, no writer was called, and
+  no duplicate state/event row was created
+- actual NAS write scope: one exact canonical destination plus the writer's
+  same-directory temporary file; no other NAS write, video write, or broad NAS
+  operation
+- Jellyfin DB/write: **0**; Jellyfin recognition is **NOT YET VERIFIED**
+
+Existing KO overwrite protection, source/CLEAN immutability, exact destination
+derivation, path-escape rejection, conflict detection, and fail-closed write
+failure behavior remain in force. `JUR-750` remains `UNRESOLVED`; its
+noncanonical sidecar was not changed.
+
+The next checkpoint is a Jellyfin recognition canary and safe external-SRT
+library-refresh verification. Small-bounded and full eligible-holdings
+publication have not been run.
 
 ## Frozen Policies
 
@@ -639,7 +714,8 @@ live provider. That remains a **KNOWN / NON-BLOCKING validation gap**. Offline
 smoke validation exists; no SubtitleCat retry is implied by this handoff.
 
 - Stage11/R6: **CLOSED / PASS**
-- publication: **NO**
+- Stage11 controller publication: **NO**
+- Stage12 CP3 publication: **HSODA-104 PASS**; batch/full rollout: **NOT RUN**
 
 ## Stage11/R6 Final Closure Audit — PASS
 
@@ -666,8 +742,9 @@ Stage11 closure blockers.
 
 - Stage11: **CLOSED / PASS**
 - R6: **CLOSED / PASS**
-- Stage12: **READY / NOT STARTED**
-- publication: **NO**
+- Stage12: **ACTIVE / CP3 PASS**
+- Stage11 controller publication: **NO**
+- Stage12 CP3 publication: **HSODA-104 PASS**; batch/full rollout: **NOT RUN**
 
 ## Cross-title Calibration
 
@@ -756,7 +833,8 @@ Hermes state DB:
   ASR_ONLY transport-failure path
 - accepted-alignment plus unprojectable-targeted live provider path: NOT
   DIRECTLY EXERCISED
-- publication: NOT PERFORMED
+- Stage11 controller publication: NOT PERFORMED
+- Stage12 CP3 publication: `HSODA-104` PASS; batch/full rollout: NOT RUN
 
 ## SubtitleCat Network Route
 
@@ -776,22 +854,24 @@ Hermes state DB:
 - production staging root
 - external JA/alignment durable reuse store
 - accepted-alignment plus valid-targeted-unprojectable live canary validation
-- 1-title atomic NAS publication canary, bounded publication rollout, and
-  Jellyfin refresh/rescan execution
+- Jellyfin recognition canary and safe external-SRT refresh/rescan execution
+- bounded publication rollout and full eligible-holdings rollout
 
 이 항목들은 필수 구현 결함으로 과장하지 않는다. 현재 다음 milestone에서
 필요한 것만 구분한다.
 
 ## Next Step
 
-Stage12 scope is frozen and CP2 is **ACTIVE / PASS**; publication execution
-has not yet started.
+Stage12 scope is frozen and CP3 is **ACTIVE / PASS**. The single-title atomic
+publication canary passed; the next bounded step is Jellyfin recognition and
+safe external-SRT library-refresh verification.
 The next rollout sequence is:
 
-1. READ-ONLY holdings inventory/dry-run
-2. 1-title publication canary
-3. small bounded batch
-4. full eligible holdings rollout
+1. READ-ONLY holdings inventory/dry-run — CP1 PASS
+2. 1-title atomic publication canary — CP3 PASS for HSODA-104
+3. Jellyfin recognition / safe refresh canary
+4. small bounded batch
+5. full eligible holdings rollout
 
 All steps must preserve Stage11's frozen contracts and must not reopen
 Stage11. The accepted-alignment + valid-targeted-unprojectable live path may
@@ -806,7 +886,8 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 ## New Conversation Warnings
 
 - Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
-- Stage12 ACTIVE / CP2 PASS; publication canary is the next bounded step
+- Stage12 ACTIVE / CP3 PASS; Jellyfin recognition canary is the next bounded
+  step
 - 작품별 튜닝으로 되돌아가지 않기
 - ADN/JUR/HSODA/DVDMS 특정 production logic 금지
 - old canonical KO subtitle overwrite 금지
