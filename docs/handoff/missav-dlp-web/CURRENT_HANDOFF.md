@@ -164,6 +164,62 @@ title so that Jellyfin can use it.
 Stage12 execution has not started. No controller, provider, model, NAS, or
 Jellyfin call is implied by this scope freeze.
 
+## Stage12 CP1 Holdings Subtitle Inventory — PASS
+
+Marker:
+
+`STAGE12_CP1_HOLDINGS_SUBTITLE_INVENTORY_PASS`
+
+CP1 performed one read-only inventory dry-run against the authoritative
+Discovery holdings DB. No durable rollout state, controller execution,
+subtitle generation, publication, or Jellyfin operation was performed.
+
+### Authoritative source and identity
+
+- DB: `/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3`
+- Inventory owner/API: `Stage12HoldingsInventory.run()` in
+  `teddy_discovery_stage12_inventory.py`.
+- Existing `load_db_state(Path(db_path))` read-only loader was reused; this is
+  the same holdings source used by the Stage11 `build_holding_resolver`
+  contract.
+- Holdings scope is the DB's present `storage_root='jav'` inventory. The
+  canonical source identity is `holding_id` plus `jav:<relative_path>`; the
+  media identity is the DB `relative_path` under
+  `/volume1/video/video2/JAV`.
+- The DB contained 173 present canonical holdings, all `MATCHED`, with no
+  duplicate DVD-ID or holding path.
+
+### Existing KO and eligibility contract
+
+- Each exact DB holding directory was checked through the existing bounded,
+  read-only `SubtitleSSHReader` API; no recursive NAS scan was used.
+- Existing subtitle candidates were passed through the existing
+  `select_subtitle_source` / canonical target contract.
+- Only an exact `<DVD-ID>.ko.srt` candidate whose bytes were read and passed
+  strict SRT parsing is `SKIPPED_EXISTING_KO` / existing KO `VALID`.
+- No canonical KO sidecar is `ELIGIBLE_NEEDS_KO` / existing KO `ABSENT`.
+- Ambiguous, malformed, noncanonical Korean, unavailable, or otherwise
+  untrusted subtitle inventory is `UNRESOLVED`; it is never promoted to
+  eligible and never overwritten.
+
+### CP1 result
+
+- `TOTAL_HOLDINGS=173`
+- `EXISTING_KO=0`
+- `ELIGIBLE_NEEDS_KO=172`
+- `UNRESOLVED=1`
+- Bounded unresolved sample: `JUR-750`, due to the existing subtitle
+  contract rejecting the additional noncanonical
+  `JUR-750.R6B2-Clean.ko.srt`; the canonical KO state was not silently
+  guessed or overwritten.
+- Bounded eligible sample begins with `ADN-785`, `ADN-799`, `AKDL-312`,
+  `AT-099`, and `AVSA-455`.
+- DB writes, NAS writes, Jellyfin writes, publication, controller calls,
+  SubtitleCat calls, VM122 calls, and Hermes calls: `0`.
+
+The next Stage12 checkpoint is durable per-title rollout state followed by a
+1-title publication canary. CP1 intentionally created no rollout state DB.
+
 ## Frozen Policies
 
 - production title/cue/text hardcode 금지
