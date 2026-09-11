@@ -11,7 +11,7 @@ one-title end-to-end canary preparation.
 - Stage11 ACTIVE
 - Stage12 NOT STARTED
 - R6 ACTIVE
-- THIN_GENERIC_STAGE11_CONTROLLER_READY
+- STAGE11_LIVE_ADAPTERS_READY
 
 ## Completed
 
@@ -33,6 +33,17 @@ one-title end-to-end canary preparation.
 - thin generic `run_one_title_stage11(...)` controller
 - controller smoke 30/30 PASS
 - related regression 26 smoke groups PASS
+- `build_stage11_live_dependencies(...)` factory
+- Flask-free existing-config holding resolver adapter
+- first-pass native `run(Namespace)` adapter
+- ASR review fresh-session adapter
+- Hybrid review fresh-session adapter
+- targeted runner source-snapshot adapter
+- baseline transcriber composition adapter
+- external JA discovery/provider/alignment adapter
+- controller + live adapters fake E2E: ASR_ONLY PASS / HYBRID PASS
+- actual Hermes/VM122/Whisper calls: NO
+- first real generic one-title canary: NOT RUN
 
 ## Current Architecture
 
@@ -158,7 +169,7 @@ Hermes state DB:
 
 ## Next Step
 
-Remote Hermes/session preflight
+production connection values read-only preflight
 → first real generic `run_one_title_stage11` one-title canary
 
 아직 실제 canary 실행 전이다.
