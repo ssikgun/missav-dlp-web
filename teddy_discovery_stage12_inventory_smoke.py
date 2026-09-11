@@ -82,6 +82,8 @@ def main():
     require(
         report.records[0].eligibility == ELIGIBLE_NEEDS_KO
         and report.records[0].existing_ko == "ABSENT"
+        and report.records[0].source_size_bytes == 100
+        and report.records[0].source_mtime_ns == 200
         and report.records[0].reason == "NO_CANONICAL_KO_SRT",
         "NORMAL_HOLDING_WITHOUT_KO_ELIGIBLE",
     )

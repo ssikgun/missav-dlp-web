@@ -9,7 +9,7 @@ subtitle rollout readiness.
 
 - Stage0–10 CLOSED / PASS
 - Stage11 CLOSED / PASS
-- Stage12 READY / NOT STARTED — Holdings Subtitle Rollout + Operations / Hardening
+- Stage12 ACTIVE — Holdings Subtitle Rollout + Operations / Hardening
 - R6 CLOSED / PASS
 - STAGE11_SUBTITLECAT_PROXY_WIRING_FROZEN
 - STAGE11_CANARY_ALIGNMENT_CONTRACT_FROZEN
@@ -17,7 +17,7 @@ subtitle rollout readiness.
 - STAGE11_FIRST_REAL_CONTROLLER_CANARY_PASS
 - STAGE11_R6_CLOSED_PASS
 - STAGE12_HOLDINGS_SUBTITLE_ROLLOUT_SCOPE_FROZEN
-- STAGE12_READY_NOT_STARTED
+- STAGE12_CP2_DURABLE_ROLLOUT_STATE_PREFLIGHT_PASS
 
 ## Completed
 
@@ -95,10 +95,10 @@ Marker:
 
 `STAGE12_HOLDINGS_SUBTITLE_ROLLOUT_SCOPE_FROZEN`
 
-Stage12 remains **READY / NOT STARTED**. Its primary goal is to apply the
-frozen Stage11 pipeline to every owned title that needs Korean subtitles,
-generate a validated CLEAN Korean SRT, and safely place it beside the NAS
-title so that Jellyfin can use it.
+Stage12 is **ACTIVE**. Its primary goal is to apply the frozen Stage11
+pipeline to every owned title that needs Korean subtitles, generate a
+validated CLEAN Korean SRT, and safely place it beside the NAS title so that
+Jellyfin can use it.
 
 ### Holdings and eligibility
 
@@ -116,8 +116,7 @@ title so that Jellyfin can use it.
 - Stage11 functionality is not reimplemented, reopened, or retuned.
 - Each title must have durable, resumable, idempotent state covering at least:
   `PENDING`, `SKIPPED_EXISTING_KO`, `RUNNING`, `GENERATED`, `PUBLISHED`, and
-  `FAILED_RETRYABLE` / `FAILED_FINAL` (or the exact equivalent of the
-  existing state contract).
+  `FAILED_RETRYABLE` / `FAILED_TERMINAL`.
 - A failed title is isolated from the remainder of a bounded batch, and
   interrupted work can resume without reprocessing completed or skipped
   titles.
@@ -161,8 +160,10 @@ title so that Jellyfin can use it.
 - automatic video modification
 - unrelated Downloader feature changes
 
-Stage12 execution has not started. No controller, provider, model, NAS, or
-Jellyfin call is implied by this scope freeze.
+Stage12 publication execution has not started. CP1/CP2 used only bounded
+inventory, artifact validation, state-store initialization, and exact-path
+NAS read/stat; no controller, provider, model, publication, or Jellyfin
+operation was performed.
 
 ## Stage12 CP1 Holdings Subtitle Inventory — PASS
 
@@ -217,8 +218,90 @@ subtitle generation, publication, or Jellyfin operation was performed.
 - DB writes, NAS writes, Jellyfin writes, publication, controller calls,
   SubtitleCat calls, VM122 calls, and Hermes calls: `0`.
 
-The next Stage12 checkpoint is durable per-title rollout state followed by a
-1-title publication canary. CP1 intentionally created no rollout state DB.
+CP1 intentionally created no rollout state DB. CP2 materialized the durable
+state and completed the read-only publication preflight described below.
+
+## Stage12 CP2 Durable Rollout State + 1-title Publication Preflight — PASS
+
+Marker:
+
+`STAGE12_CP2_DURABLE_ROLLOUT_STATE_PREFLIGHT_PASS`
+
+CP2 used the CP1 inventory contract and performed no Stage11 controller,
+provider, model, publication, Jellyfin, or NAS subtitle write. The only
+durable write was the dedicated local Stage12 state store initialization.
+
+### Durable rollout state
+
+- Owner/API: `Stage12RolloutStateStore` in
+  `teddy_discovery_stage12_rollout.py`.
+- State store: `/opt/missav-dlp-web/discovery/stage12-rollout-state.sqlite3`.
+- Writer lock: `/opt/missav-dlp-web/discovery/stage12-rollout-state.sqlite3.lock`.
+- Schema: `stage12_rollout_titles` has one canonical `dvd_id` primary key,
+  inventory/source snapshot identity, artifact/report/destination provenance,
+  timestamps, and transition sequence; `stage12_rollout_events` stores every
+  initial state and transition with canonical provenance JSON.
+- Supported states: `PENDING`, `RUNNING`, `GENERATED`, `PUBLISHED`,
+  `SKIPPED_EXISTING_KO`, `UNRESOLVED`, `FAILED_RETRYABLE`, and
+  `FAILED_TERMINAL`.
+- Transitions are deterministic and fail-closed. `RUNNING` has explicit crash
+  recovery, `PUBLISHED` and `SKIPPED_EXISTING_KO` are terminal, and
+  `UNRESOLVED` is never auto-promoted to eligible.
+- Re-running CP1 inventory is idempotent: no duplicate title rows or initial
+  events are created, and stored holding/source identity drift is rejected.
+
+Actual CP2 initial materialization:
+
+- `TOTAL_STATE_RECORDS=173`
+- CP1 `EXISTING_KO=0`, `ELIGIBLE_NEEDS_KO=172`
+- `PENDING=172`
+- `UNRESOLVED=1`
+- `SKIPPED_EXISTING_KO=0`
+- all other rollout states: `0`
+- Discovery DB writes: `0`; local Stage12 state-store initialization:
+  `173` title rows and `173` initial audit events.
+
+### Generic publication canary preflight
+
+- Selector: deterministic artifact-backed selection from eligible inventory;
+  no title-specific branch or special treatment exists.
+- Selected candidate: `HSODA-104` because its complete existing Stage11
+  baseline/CLEAN/report bundle satisfied the generic selector.
+- `SOURCE_MEDIA_PATH`:
+  `HSODA/HSODA-104/HSODA-104.mp4`
+- `DESTINATION_KO_PATH`:
+  `HSODA/HSODA-104/HSODA-104.ko.srt`
+- `DESTINATION_EXISTS=0`
+- CLEAN SHA256:
+  `09ad0c4588a52f5eb4d4ef3f48050524cac4b9edad474755ae3a89b500dcfa76`
+- report SHA256:
+  `7fa9412aabd1c48167fe686df2f8ea92ede7d47c56a5b4d7037d2e6f034ebec3`
+- `PUBLICATION_PREFLIGHT=READY`:
+  exact source `lstat`, source size/mtime snapshot equality, report-to-CLEAN
+  and report-to-baseline binding, strict canonical SRT parse/readback, and
+  exact canonical destination absence all passed.
+
+### Publication safety contract frozen for the next checkpoint
+
+- Only a validated Stage11 CLEAN/report/baseline bundle can proceed.
+- The CLEAN source artifact is immutable; the NAS video is never modified.
+- Only the exact derived `<DVD-ID>.ko.srt` relative destination is allowed;
+  path escape and source/report identity mismatch fail closed.
+- An existing destination blocks publication; no overwrite is permitted.
+- The next publication owner must write a validated temporary file and use
+  atomic no-overwrite installation. `PUBLISHED` is recorded only after
+  successful atomic installation, destination verification, and equal
+  destination/artifact SHA provenance; failed writes never become PUBLISHED.
+- Reruns must verify the same provenance and block conflicting content.
+- Jellyfin DB direct modification remains forbidden; normal library
+  refresh/rescan is the only later Jellyfin operation.
+
+`JUR-750` remains `UNRESOLVED` because the noncanonical
+`JUR-750.R6B2-Clean.ko.srt` sidecar was not renamed, deleted, overwritten, or
+automatically promoted to canonical KO.
+
+The next checkpoint is one 1-title atomic publication canary. It must use the
+frozen state/preflight contract; CP2 did not publish anything.
 
 ## Frozen Policies
 
@@ -693,15 +776,16 @@ Hermes state DB:
 - production staging root
 - external JA/alignment durable reuse store
 - accepted-alignment plus valid-targeted-unprojectable live canary validation
-- Stage12 holdings eligibility inventory, durable rollout state, safe NAS
-  publication, and Jellyfin refresh/rescan execution
+- 1-title atomic NAS publication canary, bounded publication rollout, and
+  Jellyfin refresh/rescan execution
 
 이 항목들은 필수 구현 결함으로 과장하지 않는다. 현재 다음 milestone에서
 필요한 것만 구분한다.
 
 ## Next Step
 
-Stage12 scope is frozen, but execution remains **READY / NOT STARTED**.
+Stage12 scope is frozen and CP2 is **ACTIVE / PASS**; publication execution
+has not yet started.
 The next rollout sequence is:
 
 1. READ-ONLY holdings inventory/dry-run
@@ -722,7 +806,7 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 ## New Conversation Warnings
 
 - Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
-- Stage12 READY / NOT STARTED; 별도 승인 없이 시작 금지
+- Stage12 ACTIVE / CP2 PASS; publication canary is the next bounded step
 - 작품별 튜닝으로 되돌아가지 않기
 - ADN/JUR/HSODA/DVDMS 특정 production logic 금지
 - old canonical KO subtitle overwrite 금지

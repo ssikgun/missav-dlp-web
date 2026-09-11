@@ -81,6 +81,8 @@ class Stage12HoldingInventoryRecord:
     holding_id: int | None
     holding_identity: str | None
     media_path_identity: str | None
+    source_size_bytes: int | None
+    source_mtime_ns: int | None
     existing_ko: str
     eligibility: str
     reason: str
@@ -97,6 +99,20 @@ class Stage12HoldingInventoryRecord:
         ):
             raise Stage12InventoryValidationError(
                 "record holding_id must be a positive integer or None"
+            )
+        if self.source_size_bytes is not None and (
+            type(self.source_size_bytes) is not int
+            or self.source_size_bytes <= 0
+        ):
+            raise Stage12InventoryValidationError(
+                "record source_size_bytes must be positive or None"
+            )
+        if self.source_mtime_ns is not None and (
+            type(self.source_mtime_ns) is not int
+            or self.source_mtime_ns < 0
+        ):
+            raise Stage12InventoryValidationError(
+                "record source_mtime_ns must be nonnegative or None"
             )
         for field_name in (
             "holding_identity",
@@ -221,6 +237,20 @@ def _holding_identity(row: Mapping[str, object]) -> str | None:
     return storage_root + ":" + relative_path
 
 
+def _source_size(row: Mapping[str, object]) -> int | None:
+    value = row.get("size_bytes")
+    if type(value) is int and value > 0:
+        return value
+    return None
+
+
+def _source_mtime_ns(row: Mapping[str, object]) -> int | None:
+    value = row.get("mtime_ns")
+    if type(value) is int and value >= 0:
+        return value
+    return None
+
+
 def _record(
     row: Mapping[str, object],
     *,
@@ -233,6 +263,8 @@ def _record(
         holding_id=_holding_id(row),
         holding_identity=_holding_identity(row),
         media_path_identity=_safe_text(row, "relative_path"),
+        source_size_bytes=_source_size(row),
+        source_mtime_ns=_source_mtime_ns(row),
         existing_ko=existing_ko,
         eligibility=eligibility,
         reason=reason,
