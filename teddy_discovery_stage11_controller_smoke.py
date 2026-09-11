@@ -122,6 +122,26 @@ def _nonresidual_require_asr():
     )
 
 
+def _unprojectable_require_asr():
+    base = _nonresidual_require_asr()
+    return replace(
+        base,
+        segments=base.segments[:-1] + (
+            ASRSegment(20_000, 20_500, "一旦、一旦、一旦、一旦"),
+        ),
+    )
+
+
+def _partially_projectable_require_asr():
+    base = _nonresidual_require_asr()
+    return replace(
+        base,
+        segments=base.segments + (
+            ASRSegment(30_000, 30_500, "一旦、一旦、一旦、一旦"),
+        ),
+    )
+
+
 def _nonresidual_hybrid_application(asr_result):
     ja_payload = fixture.external_payload(
         "https://source.example.test/ja-nonresidual.srt",
@@ -228,10 +248,12 @@ class FakeRuntime:
         self.external_calls = 0
         self.targeted_calls = 0
         self.first_pass_calls = 0
+        self.first_pass_routes = []
         self.asr_review_calls = 0
         self.hybrid_review_calls = 0
         self.staging_roots = []
         self.last_packages = {}
+        self.last_asr_request = None
         self.last_hybrid_request = None
 
     def holding(self, title):
@@ -259,6 +281,7 @@ class FakeRuntime:
 
     def first_pass(self, package, *, route, staging_root):
         self.first_pass_calls += 1
+        self.first_pass_routes.append(route)
         self.staging_roots.append(staging_root)
         assert route in {V2_ROUTE_ASR_ONLY, V2_ROUTE_HYBRID}
         self.last_packages[route] = package
@@ -296,6 +319,7 @@ class FakeRuntime:
         self.asr_review_calls += 1
         self.staging_roots.append(staging_root)
         assert type(request) is ASRQualityReviewRequest
+        self.last_asr_request = request
         return self._review_result(
             request,
             asr_quality_review_request_sha256(request),
@@ -604,6 +628,88 @@ def main():
             == len(expected_binding.targeted_segments)
             and expected_projection.provenance_digest
             == expected_binding.result.plan_binding_sha256,
+        )
+
+    # A valid targeted artifact whose window has no safely associated external
+    # cue falls back before either Hybrid semantic runner.  The accepted
+    # alignment verdict remains immutable, and ASR-only review still receives
+    # the complete targeted artifact projection.
+    with tempfile.TemporaryDirectory(prefix="stage11-controller-hybrid-unprojectable-") as raw:
+        artifact_root, staging_root = _roots(Path(raw))
+        asr_result = _unprojectable_require_asr()
+        _prepopulate_baseline(artifact_root, asr_result)
+        targeted_path = _prepopulate_targeted(artifact_root, asr_result)
+        runtime = FakeRuntime(asr_result)
+
+        def exact_application(_canonical, asr, owner=runtime):
+            owner.external_calls += 1
+            return _nonresidual_hybrid_application(asr)
+
+        runtime.external_attempt = exact_application
+        result = _run(artifact_root, staging_root, runtime)
+        artifact = parse_targeted_second_evidence_artifact_bytes(
+            targeted_path.read_bytes()
+        )
+        projected = tuple(
+            cue.targeted_second_evidence
+            for cue in runtime.last_asr_request.cues
+            if cue.targeted_second_evidence is not None
+        )
+        check(
+            "valid unprojectable targeted evidence selects ASR-only",
+            lambda: result.route == V2_ROUTE_ASR_ONLY
+            and result.external_ja_outcome == "ACCEPTED"
+            and result.alignment_outcome == ACCEPT_HYBRID,
+        )
+        check(
+            "unprojectable targeted evidence skips Hybrid runners",
+            lambda: V2_ROUTE_HYBRID not in runtime.first_pass_routes
+            and runtime.hybrid_review_calls == 0
+            and runtime.asr_review_calls == 1,
+        )
+        check(
+            "unprojectable targeted evidence is not dropped on ASR-only review",
+            lambda: len(projected) == len(artifact.bindings) == 1
+            and projected[0].status == artifact.bindings[0].status
+            and projected[0].text_evidence
+            == artifact.bindings[0].targeted_text_evidence
+            and projected[0].segment_count
+            == len(artifact.bindings[0].targeted_segments),
+        )
+
+    # When only part of a valid multi-source artifact is projectable, the
+    # controller still takes the all-or-nothing ASR-only fallback.
+    with tempfile.TemporaryDirectory(prefix="stage11-controller-hybrid-partial-") as raw:
+        artifact_root, staging_root = _roots(Path(raw))
+        asr_result = _partially_projectable_require_asr()
+        _prepopulate_baseline(artifact_root, asr_result)
+        targeted_path = _prepopulate_targeted(artifact_root, asr_result)
+        runtime = FakeRuntime(asr_result)
+
+        def exact_application(_canonical, asr, owner=runtime):
+            owner.external_calls += 1
+            return _nonresidual_hybrid_application(asr)
+
+        runtime.external_attempt = exact_application
+        result = _run(artifact_root, staging_root, runtime)
+        artifact = parse_targeted_second_evidence_artifact_bytes(
+            targeted_path.read_bytes()
+        )
+        projected = tuple(
+            cue.targeted_second_evidence
+            for cue in runtime.last_asr_request.cues
+            if cue.targeted_second_evidence is not None
+        )
+        check(
+            "partially projectable targeted evidence selects ASR-only",
+            lambda: result.route == V2_ROUTE_ASR_ONLY
+            and V2_ROUTE_HYBRID not in runtime.first_pass_routes
+            and runtime.hybrid_review_calls == 0
+            and runtime.asr_review_calls == 1,
+        )
+        check(
+            "partial Hybrid projection does not drop any targeted source",
+            lambda: len(projected) == len(artifact.bindings) == 2,
         )
 
     # HYBRID without a targeted artifact retains the existing empty-binding

@@ -13,6 +13,7 @@ one-title end-to-end canary preparation.
 - R6 ACTIVE
 - STAGE11_SUBTITLECAT_PROXY_WIRING_FROZEN
 - STAGE11_CANARY_ALIGNMENT_CONTRACT_FROZEN
+- STAGE11_GENERIC_UNPROJECTABLE_TARGETED_FALLBACK_FIXED
 
 ## Completed
 
@@ -32,8 +33,8 @@ one-title end-to-end canary preparation.
 - deterministic CLEAN materialization
 - generic empty Whisper word normalization
 - thin generic `run_one_title_stage11(...)` controller
-- controller smoke 36/36 PASS
-- related regression 26 smoke groups PASS
+- controller smoke 41/41 PASS
+- related targeted/Hybrid/ASR/quality-review regression smoke: PASS
 - `build_stage11_live_dependencies(...)` factory
 - Flask-free existing-config holding resolver adapter
 - first-pass native `run(Namespace)` adapter
@@ -300,6 +301,61 @@ staging, and remote session state are preserved.
 
 Next step: using the frozen fixed commit, perform one real controller resume
 while preserving the existing failed-canary artifacts/session.
+
+## Stage11 Generic Unprojectable Targeted Evidence Fallback — FROZEN
+
+Marker:
+
+`STAGE11_GENERIC_UNPROJECTABLE_TARGETED_FALLBACK_FIXED`
+
+### First real canary history and forensic root cause
+
+The first real `HSODA-104` canary generated and durably reused the baseline
+and targeted evidence artifacts. Its Hybrid first pass completed 204 cues over
+13/13 parts. Quality review then failed closed because the targeted evidence
+was unmapped to the Hybrid review cues:
+
+`QualityReviewError: targeted second-evidence binding is detached from Hybrid review cues`
+
+Forensic conclusion: the valid targeted ASR source evidence did not have a
+deterministic association to an accepted external-JA cue in its window. The
+existing quality-review detached-evidence guard correctly rejected the
+unprojectable evidence. This was an identity-domain/projectability condition,
+not a title-specific failure.
+
+The `f91a1f7` generic targeted wiring remains in place:
+
+`validated targeted windows → build_targeted_asr_bindings(...) → deterministic tuple → prepare_stateful_hybrid(targeted_bindings=...)`
+
+### Frozen controller contract
+
+- `VALID + all targeted sources projectable → HYBRID`
+- `VALID + any targeted source unprojectable or partial → ASR_ONLY`
+- `INVALID / DETACHED / STALE → fail-closed`
+- no partial targeted projection and no silent targeted-evidence drop
+- accepted external alignment verdict/evidence remains immutable on fallback
+- quality-review detached-targeted-evidence guard remains unchanged
+- `build_targeted_asr_bindings()` remains unchanged and is the association authority
+- no title-, cue-, or text-specific production logic
+- existing ASR_ONLY path remains the fallback execution path
+
+The controller completeness check compares every validated targeted artifact
+binding with the resulting Hybrid semantic targeted binding using exact window,
+source-snapshot, and segment identity, requiring a complete one-to-one source
+set. It performs no ordinal, nearest-cue, or arbitrary association.
+
+Offline validation: controller smoke 41/41 PASS; targeted Hybrid, targeted
+projection, targeted artifact/runner, ASR source-quality, ASR-only review,
+stateful Hybrid, and quality-review regression smokes PASS. `py_compile` and
+`git diff --check` PASS.
+
+- real `HSODA-104` controller resume after this fix: **NOT RUN**
+- Stage11/R6: **ACTIVE / NOT CLOSED**
+- publication: **NO**
+
+Next step: using the frozen fixed commit, perform one real `HSODA-104`
+controller resume while preserving the existing canary artifacts, staging, and
+remote session state.
 
 ## Cross-title Calibration
 

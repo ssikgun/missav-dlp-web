@@ -203,6 +203,10 @@ class Stage11ControllerArtifactError(Stage11ControllerError):
     """A durable artifact is malformed, detached, or unsafe."""
 
 
+class Stage11ControllerTargetedEvidenceUnprojectable(Stage11ControllerError):
+    """Validated targeted evidence cannot be projected completely into HYBRID."""
+
+
 @dataclass(frozen=True)
 class Stage11ControllerResult:
     """Small completion result; it intentionally contains no publish state."""
@@ -257,6 +261,14 @@ class Stage11ControllerResult:
         }:
             raise Stage11ControllerValidationError(
                 "alignment outcome is invalid"
+            )
+        if (
+            self.route == V2_ROUTE_ASR_ONLY
+            and self.alignment_outcome == ACCEPT_HYBRID
+            and self.external_ja_outcome != EXTERNAL_JA_ACCEPTED
+        ):
+            raise Stage11ControllerValidationError(
+                "ASR-only accepted-alignment result lacks accepted external evidence"
             )
 
 
@@ -691,6 +703,62 @@ def _build_hybrid_targeted_bindings(
         ) from error
 
 
+def _validate_complete_hybrid_targeted_projection(
+    targeted_artifact: TargetedSecondEvidenceArtifact | None,
+    preparation,
+) -> None:
+    """Require every validated target source to survive Hybrid semantic binding.
+
+    ``build_targeted_asr_bindings`` remains the only timing association
+    authority.  This check only compares its resulting semantic evidence with
+    the already validated artifact bindings using the same immutable window,
+    source-snapshot, and segment identity that the review boundary consumes.
+    It therefore rejects an incomplete or ambiguous projection without
+    inventing an association or weakening the review guard.
+    """
+
+    if targeted_artifact is None:
+        return
+
+    artifact_bindings = tuple(targeted_artifact.bindings)
+    targeted_semantic_bindings = tuple(
+        binding
+        for binding in preparation.semantic_bindings
+        if binding.targeted_asr_evidence is not None
+    )
+    mapped_source_ids = []
+    for semantic_binding in targeted_semantic_bindings:
+        evidence = semantic_binding.targeted_asr_evidence.evidence
+        candidates = tuple(
+            artifact_binding
+            for artifact_binding in artifact_bindings
+            if (
+                artifact_binding.window.start_ms == evidence.window_start_ms
+                and artifact_binding.window.end_ms == evidence.window_end_ms
+                and artifact_binding.result.source_snapshot
+                == evidence.source_snapshot
+                and artifact_binding.result.segments == evidence.segments
+            )
+        )
+        if len(candidates) != 1:
+            raise Stage11ControllerTargetedEvidenceUnprojectable(
+                "validated targeted evidence is not uniquely projectable into Hybrid"
+            )
+        mapped_source_ids.append(candidates[0].source_id)
+
+    artifact_source_ids = tuple(
+        artifact_binding.source_id for artifact_binding in artifact_bindings
+    )
+    if (
+        len(mapped_source_ids) != len(artifact_source_ids)
+        or len(set(mapped_source_ids)) != len(mapped_source_ids)
+        or set(mapped_source_ids) != set(artifact_source_ids)
+    ):
+        raise Stage11ControllerTargetedEvidenceUnprojectable(
+            "validated targeted evidence is not completely projectable into Hybrid"
+        )
+
+
 def _dispatch_targeted(
     path: Path,
     *,
@@ -1042,11 +1110,19 @@ def _validate_existing_completion(
             )
     elif alignment_outcome not in {
         ALIGNMENT_NOT_ATTEMPTED,
+        ACCEPT_HYBRID,
         REJECT_EXTERNAL,
         UNRESOLVED,
     }:
         raise Stage11ControllerArtifactError(
             "ASR-only report alignment outcome is invalid"
+        )
+    if (
+        alignment_outcome == ACCEPT_HYBRID
+        and external_outcome != EXTERNAL_JA_ACCEPTED
+    ):
+        raise Stage11ControllerArtifactError(
+            "ASR-only accepted-alignment report lacks accepted external evidence"
         )
     _validate_identity(report["translation_result_identity"], review=False)
     _validate_identity(report["review_result_identity"], review=True)
@@ -1198,6 +1274,36 @@ def run_one_title_stage11(
     )
     generation_suffix = baseline_sha256
 
+    hybrid_preparation = None
+    if route.route == V2_ROUTE_HYBRID:
+        targeted_bindings = _build_hybrid_targeted_bindings(
+            route,
+            targeted_artifact,
+        )
+        hybrid_preparation = prepare_stateful_hybrid(
+            route,
+            targeted_bindings=targeted_bindings,
+            generation_key="stage11-hybrid-" + generation_suffix,
+            claim_token=claim_token,
+        )
+        try:
+            _validate_complete_hybrid_targeted_projection(
+                targeted_artifact,
+                hybrid_preparation,
+            )
+        except Stage11ControllerTargetedEvidenceUnprojectable:
+            application = route.alignment_application
+            if application is None:
+                raise Stage11ControllerArtifactError(
+                    "HYBRID fallback has no accepted alignment application"
+                )
+            route = _direct_asr_route(
+                canonical_video,
+                asr_result,
+                method="accepted-external-unprojectable-targeted-evidence",
+                confidence=application.bundle.alignment.confidence,
+            )
+
     if route.route == V2_ROUTE_ASR_ONLY:
         source_package = build_stateful_asr_package(
             build_asr_only_cue_sequence(route),
@@ -1255,16 +1361,11 @@ def run_one_title_stage11(
             review_request,
         )
     elif route.route == V2_ROUTE_HYBRID:
-        targeted_bindings = _build_hybrid_targeted_bindings(
-            route,
-            targeted_artifact,
-        )
-        preparation = prepare_stateful_hybrid(
-            route,
-            targeted_bindings=targeted_bindings,
-            generation_key="stage11-hybrid-" + generation_suffix,
-            claim_token=claim_token,
-        )
+        if hybrid_preparation is None:
+            raise Stage11ControllerValidationError(
+                "HYBRID route has no prepared semantic evidence"
+            )
+        preparation = hybrid_preparation
         package = preparation.package
         first_pass = _run_first_pass(
             first_pass_runner,
@@ -1387,6 +1488,7 @@ __all__ = [
     "Stage11ControllerArtifactError",
     "Stage11ControllerError",
     "Stage11ControllerResult",
+    "Stage11ControllerTargetedEvidenceUnprojectable",
     "Stage11ControllerValidationError",
     "TARGETED_SECOND_EVIDENCE_FILENAME",
     "run_one_title_stage11",
