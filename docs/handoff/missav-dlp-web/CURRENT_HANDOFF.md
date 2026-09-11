@@ -19,6 +19,7 @@ subtitle rollout readiness.
 - STAGE12_HOLDINGS_SUBTITLE_ROLLOUT_SCOPE_FROZEN
 - STAGE12_CP2_DURABLE_ROLLOUT_STATE_PREFLIGHT_PASS
 - STAGE12_CP3_ONE_TITLE_ATOMIC_PUBLICATION_CANARY_PASS
+- STAGE12_CP4_JELLYFIN_SUBTITLE_RECOGNITION_PASS
 
 ## Completed
 
@@ -374,9 +375,63 @@ derivation, path-escape rejection, conflict detection, and fail-closed write
 failure behavior remain in force. `JUR-750` remains `UNRESOLVED`; its
 noncanonical sidecar was not changed.
 
-The next checkpoint is a Jellyfin recognition canary and safe external-SRT
-library-refresh verification. Small-bounded and full eligible-holdings
-publication have not been run.
+CP4 below verified Jellyfin recognition for this single title. Small-bounded
+and full eligible-holdings publication have not been run.
+
+## Stage12 CP4 Jellyfin Subtitle Recognition Canary — PASS
+
+Marker:
+
+`STAGE12_CP4_JELLYFIN_SUBTITLE_RECOGNITION_PASS`
+
+CP4 verified only the operator-selected `HSODA-104` item. No other title was
+refreshed, no NAS file was written, and no Stage11/controller/provider/model
+operation was run.
+
+### Exact media and item resolution
+
+- Running Jellyfin Adult library location: `/media/adult`, confirmed through
+  the live Jellyfin virtual-folder API and the existing container path
+  contract.
+- `JELLYFIN_ITEM_ID=20cef6ea376b5323c0eab36342f522c9`
+- `JELLYFIN_ITEM_PATH=/media/adult/HSODA/HSODA-104/HSODA-104.mp4`
+- `SUBTITLE_FILENAME=HSODA-104.ko.srt`
+- `FILESYSTEM_VISIBLE=YES`
+- Exact item path matched the authoritative HSODA-104 media identity; the
+  exact-path library query returned one item.
+- NAS exact readback of `HSODA/HSODA-104/HSODA-104.ko.srt` passed strict SRT
+  validation and regular-file checks before and after refresh.
+- `FILESYSTEM_SHA256` and CLEAN SHA256 both equal
+  `09ad0c4588a52f5eb4d4ef3f48050524cac4b9edad474755ae3a89b500dcfa76`.
+- `SHA_MATCH=YES`
+
+### Recognition and bounded refresh
+
+Before refresh, the exact item's `PlaybackInfo` contained no subtitle stream,
+so `REFRESH_REQUIRED=YES` and `REFRESH_METHOD=official item-specific API`.
+The official item-specific endpoint was used once:
+
+`POST /Items/20cef6ea376b5323c0eab36342f522c9/Refresh`
+
+with non-replacing metadata/image refresh parameters. No library-wide scan or
+Jellyfin database SQL operation was used. Bounded polling then found exactly
+one matching external subtitle stream:
+
+- `EXTERNAL_SUBTITLE_VISIBLE=YES`
+- source path: `/media/adult/HSODA/HSODA-104/HSODA-104.ko.srt`
+- `IsExternal=true`
+- language: `kor`
+- codec: `subrip`
+- display title: `Korean - SUBRIP - 외부`
+- `RECOGNITION_RESULT=PASS`
+
+The authoritative NAS/video witnesses remained unchanged. `NAS_WRITE=0`,
+`JELLYFIN_DB_DIRECT_WRITE=0`, SubtitleCat/VM122/Hermes/controller/provider
+calls were `0`, and `JUR-750` was untouched.
+
+The next checkpoint is the first small bounded Stage12 rollout batch. Existing
+Stage11 contracts, conservative fallback policy, canonical KO protection, and
+fail-closed publication rules remain unchanged.
 
 ## Frozen Policies
 
@@ -742,7 +797,7 @@ Stage11 closure blockers.
 
 - Stage11: **CLOSED / PASS**
 - R6: **CLOSED / PASS**
-- Stage12: **ACTIVE / CP3 PASS**
+- Stage12: **ACTIVE / CP4 PASS**
 - Stage11 controller publication: **NO**
 - Stage12 CP3 publication: **HSODA-104 PASS**; batch/full rollout: **NOT RUN**
 
@@ -854,7 +909,6 @@ Hermes state DB:
 - production staging root
 - external JA/alignment durable reuse store
 - accepted-alignment plus valid-targeted-unprojectable live canary validation
-- Jellyfin recognition canary and safe external-SRT refresh/rescan execution
 - bounded publication rollout and full eligible-holdings rollout
 
 이 항목들은 필수 구현 결함으로 과장하지 않는다. 현재 다음 milestone에서
@@ -862,14 +916,14 @@ Hermes state DB:
 
 ## Next Step
 
-Stage12 scope is frozen and CP3 is **ACTIVE / PASS**. The single-title atomic
-publication canary passed; the next bounded step is Jellyfin recognition and
-safe external-SRT library-refresh verification.
+Stage12 scope is frozen and CP4 is **ACTIVE / PASS**. The single-title atomic
+publication and Jellyfin recognition canaries passed; the next bounded step is
+the first small rollout batch.
 The next rollout sequence is:
 
 1. READ-ONLY holdings inventory/dry-run — CP1 PASS
 2. 1-title atomic publication canary — CP3 PASS for HSODA-104
-3. Jellyfin recognition / safe refresh canary
+3. Jellyfin recognition / safe refresh canary — CP4 PASS for HSODA-104
 4. small bounded batch
 5. full eligible holdings rollout
 
@@ -886,8 +940,7 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 ## New Conversation Warnings
 
 - Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
-- Stage12 ACTIVE / CP3 PASS; Jellyfin recognition canary is the next bounded
-  step
+- Stage12 ACTIVE / CP4 PASS; small bounded rollout batch is the next step
 - 작품별 튜닝으로 되돌아가지 않기
 - ADN/JUR/HSODA/DVDMS 특정 production logic 금지
 - old canonical KO subtitle overwrite 금지
