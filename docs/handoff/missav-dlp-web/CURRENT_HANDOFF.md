@@ -11,7 +11,7 @@ one-title end-to-end canary preparation.
 - Stage11 ACTIVE
 - Stage12 NOT STARTED
 - R6 ACTIVE
-- STAGE11_LIVE_ADAPTERS_READY
+- STAGE11_DEPLOYMENT_WIRING_READY
 
 ## Completed
 
@@ -42,6 +42,16 @@ one-title end-to-end canary preparation.
 - baseline transcriber composition adapter
 - external JA discovery/provider/alignment adapter
 - controller + live adapters fake E2E: ASR_ONLY PASS / HYBRID PASS
+- `build_stage11_deployment_dependencies(...)` deployment factory
+- Flask-free holding resolver using the existing discovery DB contract
+- deployment-owned deterministic remote task/session wiring
+- CT120 native first-pass preparation and review launcher bridges
+- Hybrid originals projection from retained native evidence
+- bounded SubtitleCat detail/payload transport composition
+- VM122 request timeout `1200` accepted as CANARY_ONLY explicit input
+- standalone canary `claim_token=1` retained as STANDALONE_CANARY_ONLY
+- deployment + live adapters fake E2E: ASR_ONLY PASS / HYBRID PASS
+- deployment smoke: 17/17 PASS
 - actual Hermes/VM122/Whisper calls: NO
 - first real generic one-title canary: NOT RUN
 
@@ -155,6 +165,15 @@ Hermes profile:
 Hermes state DB:
 
 `/home/teddy/.hermes/profiles/subtitle-translator/state.db`
+
+## Deployment Wiring Status
+
+- production connection values read-only preflight: mostly PASS
+- deployment-owned callbacks/config are implemented and offline-smoke validated
+- canary timeout `1200`: CANARY_ONLY, not a production module default
+- `claim_token=1`: STANDALONE_CANARY_ONLY, not a job allocator
+- actual remote Hermes/VM122/Whisper calls: NOT RUN
+- publication: NOT PERFORMED
 
 ## Unresolved / Not Yet Provisioned
 

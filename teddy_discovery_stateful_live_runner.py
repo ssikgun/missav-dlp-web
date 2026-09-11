@@ -49,6 +49,12 @@ def _require_absolute_remote_task(value: str) -> str:
     return value
 
 
+def validate_stateful_remote_task_path(value: str) -> str:
+    """Expose the native remote-task path validator to deployment adapters."""
+
+    return _require_absolute_remote_task(value)
+
+
 def _ssh_base(
     remote: str,
     ssh_key: str,
@@ -63,6 +69,16 @@ def _ssh_base(
         "-o", "UserKnownHostsFile=" + known_hosts,
         remote,
     ]
+
+
+def build_stateful_ssh_argv(
+    remote: str,
+    ssh_key: str,
+    known_hosts: str,
+) -> list[str]:
+    """Expose the native SSH argument construction without changing it."""
+
+    return _ssh_base(remote, ssh_key, known_hosts)
 
 
 def _remote_input_sha256(
