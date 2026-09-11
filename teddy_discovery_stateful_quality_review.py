@@ -461,6 +461,34 @@ def build_review_proximity_asr_evidence(
         raise QualityReviewError('invalid or detached proximity evidence') from error
 
 
+def _targeted_artifact_binding_for_semantic_binding(
+    semantic_binding,
+    targeted_artifact: TargetedSecondEvidenceArtifact,
+):
+    """Resolve one target-only semantic binding by exact window/result identity."""
+
+    targeted = semantic_binding.targeted_asr_evidence
+    if targeted is None:
+        raise QualityReviewError("targeted semantic binding is missing")
+    evidence = targeted.evidence
+    candidates = tuple(
+        artifact_binding
+        for artifact_binding in targeted_artifact.bindings
+        if (
+            artifact_binding.window.start_ms == evidence.window_start_ms
+            and artifact_binding.window.end_ms == evidence.window_end_ms
+            and artifact_binding.result.source_snapshot
+            == evidence.source_snapshot
+            and artifact_binding.result.segments == evidence.segments
+        )
+    )
+    if len(candidates) != 1:
+        raise QualityReviewError(
+            "targeted semantic binding does not identify one artifact source"
+        )
+    return candidates[0]
+
+
 def build_review_request(*, preparation: StatefulHybridPreparation,
                          package: StatefulSubtitlePackage, result: StatefulSubtitleResult,
                          source_quality: tuple[SourceQualityDecision, ...],
@@ -510,6 +538,10 @@ def build_review_request(*, preparation: StatefulHybridPreparation,
             asr_result=asr_result,
             require_source_indexes=require_source_indexes,
         )
+        asr_decision_by_index = {
+            decision.source_index: decision
+            for decision in preparation.asr_source_quality_decisions
+        }
         mapped_targeted_source_ids = set()
         seen_asr_source_ids = set()
         cues = []
@@ -536,6 +568,36 @@ def build_review_request(*, preparation: StatefulHybridPreparation,
                 targeted_second_evidence = targeted_by_source_id.get(asr_source_id)
                 if targeted_second_evidence is not None:
                     mapped_targeted_source_ids.add(asr_source_id)
+            elif binding.targeted_asr_evidence is not None:
+                if targeted_second_evidence_artifact is None:
+                    raise QualityReviewError(
+                        "targeted semantic binding has no artifact"
+                    )
+                artifact_binding = _targeted_artifact_binding_for_semantic_binding(
+                    binding,
+                    targeted_second_evidence_artifact,
+                )
+                asr_source_id = artifact_binding.source_id
+                if asr_source_id in seen_asr_source_ids:
+                    raise QualityReviewError("duplicate ASR semantic binding")
+                seen_asr_source_ids.add(asr_source_id)
+                decision = asr_decision_by_index.get(
+                    artifact_binding.source.source_index
+                )
+                if (
+                    decision is None
+                    or decision.action != ASR_SOURCE_REQUIRE_SECOND_EVIDENCE
+                ):
+                    raise QualityReviewError(
+                        "targeted semantic binding is not a REQUIRE source"
+                    )
+                asr_source_quality = ASRSourceQualityHint.from_decision(decision)
+                targeted_second_evidence = targeted_by_source_id.get(asr_source_id)
+                if targeted_second_evidence is None:
+                    raise QualityReviewError(
+                        "targeted semantic binding is detached from artifact projection"
+                    )
+                mapped_targeted_source_ids.add(asr_source_id)
             cues.append(QualityReviewInputCue(
                 source.cue_id, binding.source_index, source.external_ja, source.stt_ja,
                 first.repaired_ja, first.ko, hint.action, hint.reason,

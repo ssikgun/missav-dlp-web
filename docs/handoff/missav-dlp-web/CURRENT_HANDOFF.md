@@ -32,7 +32,7 @@ one-title end-to-end canary preparation.
 - deterministic CLEAN materialization
 - generic empty Whisper word normalization
 - thin generic `run_one_title_stage11(...)` controller
-- controller smoke 30/30 PASS
+- controller smoke 36/36 PASS
 - related regression 26 smoke groups PASS
 - `build_stage11_live_dependencies(...)` factory
 - Flask-free existing-config holding resolver adapter
@@ -59,8 +59,9 @@ one-title end-to-end canary preparation.
 - SubtitleCat proxy offline smoke: PASS
 - real-title alignment evidence basis frozen: JUR-750 / HSODA-104
 - generic CANARY_ONLY alignment acceptance contract frozen
-- actual Hermes/VM122/Whisper calls: NO
-- first real generic one-title canary: NOT RUN
+- initial real generic one-title canary: RAN ONCE and stopped fail-closed at
+  Hybrid quality review
+- fixed-commit real canary resume: NOT RUN
 
 ## Current Architecture
 
@@ -116,7 +117,9 @@ This is the first real Stage11 controller canary contract only.
 - prefer false `ASR_ONLY` fallback over false Hybrid acceptance
 - when more real-title evidence accumulates, reassess a separate production
   policy; do not promote this contract implicitly
-- first real `HSODA-104` controller canary: **NOT RUN**
+- first real `HSODA-104` controller canary: **RAN ONCE; stopped fail-closed at
+  Hybrid quality review**
+- fixed-commit `HSODA-104` controller resume: **NOT RUN**
 - Stage11: **ACTIVE / NOT CLOSED**
 - publication: **NO**
 
@@ -168,8 +171,9 @@ constant.
 
 ### Next-run values and exact source API map
 
-The next checkpoint must use these explicit canary values. The two local roots
-below must remain absent until the real canary checkpoint:
+The next checkpoint must use these explicit canary values. The existing
+artifact/staging roots below came from the initial failed canary and must be
+preserved for the fixed-commit resume:
 
 - SubtitleCat proxy: `http://127.0.0.1:58888`
 - `remote_task_root`:
@@ -183,8 +187,8 @@ below must remain absent until the real canary checkpoint:
   `/opt/missav-dlp-web/discovery/stage11-canary-artifacts`
 - `stateful_staging_root`:
   `/opt/missav-dlp-web/discovery/stage11-canary-staging`
-- artifact root: **NOT CREATED**
-- stateful staging root: **NOT CREATED**
+- initial failed-canary artifact/staging state: **EXISTING; PRESERVE**
+- fixed-commit resume must not delete or overwrite the existing canary state
 
 The complete next-run constructor/call map, validated against the current
 source signatures, is:
@@ -259,6 +263,43 @@ run_one_title_stage11(
 
 The map is recorded for the next checkpoint only and was not executed in this
 freeze.
+
+## Stage11 Generic HYBRID Targeted Evidence Wiring Fix — FROZEN
+
+Marker:
+
+`STAGE11_GENERIC_HYBRID_TARGETED_EVIDENCE_WIRING_FIXED`
+
+The first real `HSODA-104` controller canary reached baseline ASR, targeted
+second evidence, and the HYBRID first pass: 204 cues across 13/13 completed
+parts. It then stopped fail-closed while building the quality review request
+with:
+
+`QualityReviewError: targeted second-evidence binding is detached from Hybrid review cues`
+
+Root cause: the controller HYBRID branch passed the validated targeted
+artifact to quality review but did not pass `targeted_bindings` to
+`prepare_stateful_hybrid(...)`. The preparation therefore used its default
+empty targeted binding tuple even though the review projection had targeted
+evidence.
+
+The generic fix is:
+
+`validated targeted windows → existing build_targeted_asr_bindings(...) → deterministic tuple → prepare_stateful_hybrid(targeted_bindings=...)`
+
+No title-, cue-, or text-specific production logic was added. The existing
+detached/stale targeted-evidence checks, duplicate semantic ownership rejection,
+source identity and plan-binding validation, and the quality-review detached
+evidence guard remain fail-closed. ASR_ONLY behavior, alignment acceptance
+policy, and residual threshold are unchanged. Existing canary artifacts,
+staging, and remote session state are preserved.
+
+- fixed-commit real `HSODA-104` controller resume: **NOT RUN**
+- Stage11/R6: **ACTIVE / NOT CLOSED**
+- publication: **NO**
+
+Next step: using the frozen fixed commit, perform one real controller resume
+while preserving the existing failed-canary artifacts/session.
 
 ## Cross-title Calibration
 
@@ -341,7 +382,9 @@ Hermes state DB:
 - deployment-owned callbacks/config are implemented and offline-smoke validated
 - canary timeout `1200`: CANARY_ONLY, not a production module default
 - `claim_token=1`: STANDALONE_CANARY_ONLY, not a job allocator
-- actual remote Hermes/VM122/Whisper calls: NOT RUN
+- initial failed canary remote Hermes/VM122/Whisper calls: completed before the
+  quality-review stop
+- fixed-commit resume remote Hermes/VM122/Whisper calls: NOT RUN
 - publication: NOT PERFORMED
 
 ## SubtitleCat Network Route
@@ -361,7 +404,7 @@ Hermes state DB:
 - Stage11 jobs DB
 - production staging root
 - external JA/alignment durable reuse store
-- first real `run_one_title_stage11` real canary
+- fixed-commit `run_one_title_stage11` real-canary resume
 
 이 항목들은 필수 구현 결함으로 과장하지 않는다. 현재 다음 milestone에서
 필요한 것만 구분한다.
@@ -369,9 +412,10 @@ Hermes state DB:
 ## Next Step
 
 production connection values read-only preflight
-→ first real generic `run_one_title_stage11` one-title canary
+→ one fixed-commit real generic `run_one_title_stage11` canary resume
 
-아직 실제 canary 실행 전이다.
+첫 canary는 QualityReviewError에서 fail-closed 되었고, fixed-commit resume는
+아직 실행하지 않았다.
 
 ## New Conversation Warnings
 

@@ -44,6 +44,7 @@ from teddy_discovery_asr_source_quality import (
 from teddy_discovery_availability import canonical_dvd_id
 from teddy_discovery_hybrid_evidence import (
     ALIGNMENT_PROVENANCE_ASR_ONLY,
+    HybridCueIdentity,
     HybridAlignmentProvenance,
     HybridEvidenceBundle,
 )
@@ -101,6 +102,7 @@ from teddy_discovery_subtitle_v2_orchestrator import (
     V2_ROUTE_ASR_ONLY,
     V2_ROUTE_HYBRID,
     SubtitleV2RouteDecision,
+    project_affine_timestamp_ms,
 )
 from teddy_discovery_subtitle_v2_pipeline import build_asr_only_cue_sequence
 from teddy_discovery_subtitlecat_discovery import (
@@ -109,6 +111,11 @@ from teddy_discovery_subtitlecat_discovery import (
 )
 from teddy_discovery_targeted_asr_window import (
     STAGE11_TARGETED_SECOND_EVIDENCE_WINDOW_POLICY_V1,
+)
+from teddy_discovery_targeted_hybrid_evidence import (
+    TargetedASRBinding,
+    TargetedASRWindowEvidence,
+    build_targeted_asr_bindings,
 )
 from teddy_discovery_targeted_second_evidence import (
     build_targeted_second_evidence_plan_with_policy,
@@ -586,6 +593,102 @@ def _validate_targeted_artifact(
         require_source_indexes=require_indexes,
     )
     return artifact
+
+
+def _build_hybrid_targeted_bindings(
+    route: SubtitleV2RouteDecision,
+    targeted_artifact: TargetedSecondEvidenceArtifact | None,
+) -> tuple[TargetedASRBinding, ...]:
+    """Attach validated ASR-first windows to generic HYBRID semantics.
+
+    The durable Stage11 artifact is ASR-source-first, while the existing
+    Hybrid binding builder consumes external-JA window identities.  This
+    adapter only supplies the external cue IDs whose accepted affine intervals
+    are fully contained by each already-validated ASR window.  Candidate
+    selection, residual ownership, ambiguity, and one-to-one matching remain
+    exclusively in ``build_targeted_asr_bindings``.
+    """
+
+    if targeted_artifact is None:
+        return ()
+    if type(targeted_artifact) is not TargetedSecondEvidenceArtifact:
+        raise Stage11ControllerArtifactError(
+            "HYBRID targeted artifact has an invalid exact type"
+        )
+
+    application = route.alignment_application
+    if application is None:
+        raise Stage11ControllerArtifactError(
+            "HYBRID route has no accepted alignment application"
+        )
+    bundle = application.bundle
+    document = bundle.external_ja_document
+    if document is None:
+        raise Stage11ControllerArtifactError(
+            "HYBRID route has no external JA document for targeted evidence"
+        )
+    if targeted_artifact.source_snapshot != bundle.asr_result.source_snapshot:
+        raise Stage11ControllerArtifactError(
+            "HYBRID targeted artifact source snapshot is detached"
+        )
+
+    try:
+        results_by_window_id = {
+            result.window_id: result
+            for result in targeted_artifact.results
+        }
+        if len(results_by_window_id) != len(targeted_artifact.results):
+            raise Stage11ControllerArtifactError(
+                "HYBRID targeted artifact has duplicate window results"
+            )
+
+        bindings = []
+        external_cues = tuple(document.cues)
+        for window in targeted_artifact.windows:
+            result = results_by_window_id.get(window.window_id)
+            if result is None:
+                raise Stage11ControllerArtifactError(
+                    "HYBRID targeted artifact is missing a window result"
+                )
+            external_cue_ids = tuple(
+                HybridCueIdentity.for_external_ja(external_index).cue_id
+                for external_index, cue in enumerate(external_cues)
+                if (
+                    window.start_ms
+                    <= project_affine_timestamp_ms(
+                        application.alignment,
+                        cue.start_ms,
+                    )
+                    and project_affine_timestamp_ms(
+                        application.alignment,
+                        cue.end_ms,
+                    )
+                    <= window.end_ms
+                )
+            )
+            if not external_cue_ids:
+                continue
+            evidence = TargetedASRWindowEvidence(
+                source_snapshot=targeted_artifact.source_snapshot,
+                window_start_ms=window.start_ms,
+                window_end_ms=window.end_ms,
+                external_cue_ids=external_cue_ids,
+                segments=result.segments,
+            )
+            bindings.extend(
+                build_targeted_asr_bindings(
+                    external_cues,
+                    application.alignment,
+                    evidence,
+                )
+            )
+        return tuple(bindings)
+    except Stage11ControllerArtifactError:
+        raise
+    except Exception as error:
+        raise Stage11ControllerArtifactError(
+            "HYBRID targeted artifact binding construction failed"
+        ) from error
 
 
 def _dispatch_targeted(
@@ -1152,8 +1255,13 @@ def run_one_title_stage11(
             review_request,
         )
     elif route.route == V2_ROUTE_HYBRID:
+        targeted_bindings = _build_hybrid_targeted_bindings(
+            route,
+            targeted_artifact,
+        )
         preparation = prepare_stateful_hybrid(
             route,
+            targeted_bindings=targeted_bindings,
             generation_key="stage11-hybrid-" + generation_suffix,
             claim_token=claim_token,
         )

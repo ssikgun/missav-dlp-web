@@ -12,6 +12,7 @@ import inspect
 import json
 from pathlib import Path
 import tempfile
+from unittest.mock import patch
 
 from teddy_discovery_alignment_acceptance import (
     ACCEPT_HYBRID,
@@ -24,6 +25,13 @@ from teddy_discovery_asr import ASRSegment
 from teddy_discovery_asr_artifact import persist_asr_result, serialize_asr_result
 from teddy_discovery_asr_source_quality import classify_asr_result_source_quality
 from teddy_discovery_hermes_v2 import HermesV2CueOutput
+from teddy_discovery_hybrid_evidence import (
+    ALIGNMENT_PROVENANCE_EXTERNAL_ASR_HYBRID,
+    HybridAlignmentProvenance,
+    HybridEvidenceBundle,
+    NEIGHBOR_SOURCE_ASR_SEGMENT,
+    NEIGHBOR_SOURCE_EXTERNAL_EN,
+)
 from teddy_discovery_stateful_asr_quality_review import (
     ASRQualityReviewRequest,
     asr_quality_review_request_sha256,
@@ -49,6 +57,7 @@ from teddy_discovery_subtitle_v2_orchestrator import (
     V2_ROUTE_ASR_ONLY,
     V2_ROUTE_HYBRID,
 )
+from teddy_discovery_subtitle_v2_pipeline import SubtitleV2PipelineError
 from teddy_discovery_subtitlecat_discovery import (
     SubtitleCatSearchError,
     SubtitleCatSearchTransportError,
@@ -63,6 +72,7 @@ from teddy_discovery_targeted_second_evidence import (
 )
 from teddy_discovery_targeted_second_evidence_artifact import (
     TargetedSecondEvidenceArtifactValidationError,
+    parse_targeted_second_evidence_artifact_bytes,
     persist_targeted_second_evidence,
 )
 from teddy_discovery_targeted_second_evidence_runner import (
@@ -102,7 +112,62 @@ def _require_asr():
     )
 
 
-def _application(verdict: str, asr_result):
+def _nonresidual_require_asr():
+    base = fixture.asr_result()
+    return replace(
+        base,
+        segments=base.segments + (
+            ASRSegment(4_000, 4_500, "一旦、一旦、一旦、一旦"),
+        ),
+    )
+
+
+def _nonresidual_hybrid_application(asr_result):
+    ja_payload = fixture.external_payload(
+        "https://source.example.test/ja-nonresidual.srt",
+        "ja",
+        (
+            (900, 1_400, "日本語一"),
+            (1_500, 2_400, "日本語二"),
+            (1_900, 2_400, "日本語三"),
+            (2_900, 3_400, "日本語四"),
+            (3_900, 4_400, "日本語五"),
+        ),
+    )
+    en_payload = fixture.external_payload(
+        "https://source.example.test/en-nonresidual.srt",
+        "en",
+        (
+            (900, 1_400, "support one"),
+            (1_500, 2_400, "support two"),
+            (1_900, 2_400, "support three"),
+            (2_900, 3_400, "support four"),
+            (3_900, 4_400, "support five"),
+        ),
+    )
+    bundle = HybridEvidenceBundle.from_external_ja_and_asr(
+        dvd_id=TITLE,
+        external_ja_payload=ja_payload,
+        external_ja_document=ja_payload.parse(),
+        asr_result=asr_result,
+        alignment=HybridAlignmentProvenance(
+            ALIGNMENT_PROVENANCE_EXTERNAL_ASR_HYBRID,
+            "stage11_controller_smoke_nonresidual",
+            0.8,
+        ),
+        external_en_payload=en_payload,
+        external_en_document=en_payload.parse(),
+        before_context=(
+            fixture.HybridNeighborReference(NEIGHBOR_SOURCE_ASR_SEGMENT, 0),
+        ),
+        after_context=(
+            fixture.HybridNeighborReference(NEIGHBOR_SOURCE_EXTERNAL_EN, 0),
+        ),
+    )
+    return _application(ACCEPT_HYBRID, asr_result, bundle=bundle)
+
+
+def _application(verdict: str, asr_result, *, bundle=None):
     if verdict == ACCEPT_HYBRID:
         original = fixture.accepted_hybrid_route().alignment_application
     elif verdict == REJECT_EXTERNAL:
@@ -111,7 +176,10 @@ def _application(verdict: str, asr_result):
         original = fixture.unresolved_route().alignment_application
     else:
         raise AssertionError("unsupported smoke verdict")
-    bundle = replace(original.bundle, asr_result=asr_result)
+    bundle = replace(
+        original.bundle if bundle is None else bundle,
+        asr_result=asr_result,
+    )
     return apply_alignment_acceptance(
         bundle,
         original.decision,
@@ -127,8 +195,9 @@ def _targeted_execution(asr_result, decisions):
     )
     results = []
     for window in plan.windows:
-        start_ms = window.start_ms
-        end_ms = min(window.end_ms, start_ms + 100)
+        source = asr_result.segments[window.source_indices[0]]
+        start_ms = source.start_ms
+        end_ms = min(source.end_ms, start_ms + 100)
         if end_ms <= start_ms:
             raise AssertionError("synthetic targeted window has no duration")
         results.append(
@@ -162,6 +231,8 @@ class FakeRuntime:
         self.asr_review_calls = 0
         self.hybrid_review_calls = 0
         self.staging_roots = []
+        self.last_packages = {}
+        self.last_hybrid_request = None
 
     def holding(self, title):
         assert title == TITLE
@@ -190,6 +261,7 @@ class FakeRuntime:
         self.first_pass_calls += 1
         self.staging_roots.append(staging_root)
         assert route in {V2_ROUTE_ASR_ONLY, V2_ROUTE_HYBRID}
+        self.last_packages[route] = package
         return StatefulSubtitleResult(
             schema_version=package.schema_version,
             dvd_id=package.dvd_id,
@@ -233,6 +305,7 @@ class FakeRuntime:
         self.hybrid_review_calls += 1
         self.staging_roots.append(staging_root)
         assert type(request) is QualityReviewRequest
+        self.last_hybrid_request = request
         return self._review_result(request, review_request_sha256(request))
 
 
@@ -456,6 +529,145 @@ def main():
                         and result.clean_path.is_file()
                     ),
                 )
+
+    # Generic HYBRID targeted evidence wiring: the REQUIRE source is not an
+    # alignment residual, so the review request must be attached through the
+    # targeted semantic binding rather than a baseline ASR binding.
+    with tempfile.TemporaryDirectory(prefix="stage11-controller-hybrid-targeted-") as raw:
+        artifact_root, staging_root = _roots(Path(raw))
+        asr_result = _nonresidual_require_asr()
+        _prepopulate_baseline(artifact_root, asr_result)
+        targeted_path = _prepopulate_targeted(artifact_root, asr_result)
+        runtime = FakeRuntime(asr_result)
+
+        def exact_application(_canonical, asr, owner=runtime):
+            owner.external_calls += 1
+            return _nonresidual_hybrid_application(asr)
+
+        runtime.external_attempt = exact_application
+        captured = {}
+        native_prepare = controller.prepare_stateful_hybrid
+
+        def capture_prepare(route, **kwargs):
+            preparation = native_prepare(route, **kwargs)
+            captured["preparation"] = preparation
+            captured["kwargs"] = kwargs
+            return preparation
+
+        with patch.object(
+            controller,
+            "prepare_stateful_hybrid",
+            side_effect=capture_prepare,
+        ):
+            result = _run(artifact_root, staging_root, runtime)
+
+        artifact = parse_targeted_second_evidence_artifact_bytes(
+            targeted_path.read_bytes()
+        )
+        preparation = captured["preparation"]
+        targeted_semantic = tuple(
+            binding
+            for binding in preparation.semantic_bindings
+            if binding.targeted_asr_evidence is not None
+        )
+        projected = tuple(
+            cue.targeted_second_evidence
+            for cue in runtime.last_hybrid_request.cues
+            if cue.targeted_second_evidence is not None
+        )
+        expected_projection = projected[0]
+        expected_binding = artifact.bindings[0]
+        check(
+            "HYBRID REQUIRE target binding reaches prepare_stateful_hybrid",
+            lambda: len(captured["kwargs"]["targeted_bindings"]) == 1
+            and captured["kwargs"]["targeted_bindings"][0].external_identity.cue_id
+            == targeted_semantic[0].targeted_asr_evidence.external_identity.cue_id,
+        )
+        check(
+            "HYBRID targeted source identity reaches semantic binding",
+            lambda: len(targeted_semantic) == 1
+            and preparation.package.cues[targeted_semantic[0].source_index].stt_ja
+            == "補助証拠",
+        )
+        check(
+            "HYBRID targeted review projection is attached exactly once",
+            lambda: result.route == V2_ROUTE_HYBRID
+            and runtime.hybrid_review_calls == 1
+            and len(projected) == 1,
+        )
+        check(
+            "HYBRID targeted review projection preserves artifact identity",
+            lambda: expected_projection.status == expected_binding.status
+            and expected_projection.text_evidence
+            == expected_binding.targeted_text_evidence
+            and expected_projection.segment_count
+            == len(expected_binding.targeted_segments)
+            and expected_projection.provenance_digest
+            == expected_binding.result.plan_binding_sha256,
+        )
+
+    # HYBRID without a targeted artifact retains the existing empty-binding
+    # path and does not require the targeted runner.
+    with tempfile.TemporaryDirectory(prefix="stage11-controller-hybrid-empty-") as raw:
+        artifact_root, staging_root = _roots(Path(raw))
+        runtime = FakeRuntime(fixture.asr_result(), ACCEPT_HYBRID)
+        captured = {}
+        native_prepare = controller.prepare_stateful_hybrid
+
+        def capture_empty_prepare(route, **kwargs):
+            captured["kwargs"] = kwargs
+            return native_prepare(route, **kwargs)
+
+        with patch.object(
+            controller,
+            "prepare_stateful_hybrid",
+            side_effect=capture_empty_prepare,
+        ):
+            result = _run(
+                artifact_root,
+                staging_root,
+                runtime,
+                targeted_runner=False,
+            )
+        check(
+            "HYBRID without targeted evidence preserves empty bindings",
+            lambda: result.route == V2_ROUTE_HYBRID
+            and captured["kwargs"]["targeted_bindings"] == ()
+            and runtime.targeted_calls == 0
+            and runtime.hybrid_review_calls == 1,
+        )
+
+    # Duplicate semantic ownership remains fail-closed at the existing
+    # stateful preparation boundary.
+    with tempfile.TemporaryDirectory(prefix="stage11-controller-hybrid-duplicate-") as raw:
+        artifact_root, staging_root = _roots(Path(raw))
+        asr_result = _nonresidual_require_asr()
+        _prepopulate_baseline(artifact_root, asr_result)
+        targeted_path = _prepopulate_targeted(artifact_root, asr_result)
+        route_application = _nonresidual_hybrid_application(asr_result)
+        artifact = parse_targeted_second_evidence_artifact_bytes(
+            targeted_path.read_bytes()
+        )
+        custom_route = fixture.SubtitleV2RouteDecision(
+            canonical_video=fixture.holding(),
+            route=V2_ROUTE_HYBRID,
+            state=fixture.V2_READY_FOR_SEMANTIC,
+            alignment_application=route_application,
+        )
+        bindings = controller._build_hybrid_targeted_bindings(
+            custom_route,
+            artifact,
+        )
+        reject(
+            "duplicate Hybrid semantic ownership remains rejected",
+            (SubtitleV2PipelineError, ValueError),
+            lambda: controller.prepare_stateful_hybrid(
+                custom_route,
+                targeted_bindings=bindings + bindings,
+                generation_key="duplicate-smoke",
+                claim_token=7,
+            ),
+        )
 
     # Unexpected/programmer and alignment contract failures never fallback.
     for error in (
