@@ -12,6 +12,12 @@ from collections.abc import Callable
 
 from teddy_discovery_alignment import RobustAffineAlignment
 from teddy_discovery_asr import ASRSegment
+from teddy_discovery_asr_source_quality import (
+    ASR_SOURCE_OMIT,
+    ASRSourceQualityDecision,
+    classify_asr_result_source_quality,
+    validate_asr_source_quality_decisions,
+)
 from teddy_discovery_hermes_v2 import (
     HermesV2CueInput,
     HermesV2Request,
@@ -56,6 +62,12 @@ from teddy_discovery_subtitle_v2_orchestrator import (
     SubtitleV2SemanticResult,
     project_affine_timestamp_ms,
     validate_subtitle_v2_route_decision,
+)
+from teddy_discovery_stateful_parts import has_runaway_repetition
+from teddy_discovery_targeted_hybrid_evidence import (
+    TargetedASRBinding,
+    build_targeted_asr_bindings,
+    validate_targeted_asr_binding,
 )
 
 
@@ -203,6 +215,91 @@ def _validated_alignment(value: object) -> RobustAffineAlignment:
         ) from error
 
 
+def _validated_targeted_bindings(
+    value: object,
+    bundle: HybridEvidenceBundle,
+    document,
+    alignment: RobustAffineAlignment,
+) -> dict[int, TargetedASRBinding]:
+    if type(value) is not tuple:
+        raise SubtitleV2PipelineValidationError(
+            "targeted_bindings must be an immutable tuple"
+        )
+
+    external_cue_ids = tuple(
+        evidence.identity.cue_id
+        for evidence in bundle.cue_evidence
+    )
+    external_cue_id_set = set(external_cue_ids)
+    baseline_external_indexes = {
+        residual.external_identity.source_index
+        for residual in alignment.residuals
+    }
+    seen_external_indexes = set()
+    validated: dict[int, TargetedASRBinding] = {}
+    for binding in value:
+        try:
+            targeted = validate_targeted_asr_binding(binding)
+        except Exception as error:
+            raise SubtitleV2PipelineValidationError(
+                "targeted ASR binding is invalid or detached"
+            ) from error
+
+        external_index = targeted.external_identity.source_index
+        if external_index >= len(document.cues):
+            raise SubtitleV2PipelineValidationError(
+                "targeted external identity is outside source evidence"
+            )
+        if external_index in seen_external_indexes:
+            raise SubtitleV2PipelineValidationError(
+                "targeted external cue has duplicate evidence"
+            )
+        seen_external_indexes.add(external_index)
+        if (
+            bundle.cue_evidence[external_index].identity
+            != targeted.external_identity
+        ):
+            raise SubtitleV2PipelineValidationError(
+                "targeted external identity is detached"
+            )
+        if (
+            targeted.evidence.source_snapshot
+            != bundle.asr_result.source_snapshot
+        ):
+            raise SubtitleV2PipelineValidationError(
+                "targeted source snapshot is detached"
+            )
+        if not set(targeted.evidence.external_cue_ids).issubset(
+            external_cue_id_set
+        ):
+            raise SubtitleV2PipelineValidationError(
+                "targeted cue association is outside source evidence"
+            )
+        if external_index in baseline_external_indexes:
+            continue
+
+        try:
+            canonical_bindings = build_targeted_asr_bindings(
+                document.cues,
+                alignment,
+                targeted.evidence,
+            )
+        except Exception as error:
+            raise SubtitleV2PipelineValidationError(
+                "targeted ASR timing evidence is invalid or detached"
+            ) from error
+
+        canonical_by_external_index = {
+            item.external_identity.source_index: item
+            for item in canonical_bindings
+        }
+        canonical = canonical_by_external_index.get(external_index)
+        if canonical is not None:
+            validated[external_index] = canonical
+
+    return validated
+
+
 def _build_local_plan(
     route_decision: SubtitleV2RouteDecision,
 ) -> SubtitleV2SemanticPlan:
@@ -251,26 +348,11 @@ def _build_asr_plan(
     route_decision: SubtitleV2RouteDecision,
 ) -> SubtitleV2SemanticPlan:
     bundle = _asr_bundle(route_decision)
-    request_cues: list[HermesV2CueInput] = []
+    request_cues = build_asr_only_cue_sequence(route_decision)
     bindings: list[SubtitleV2SemanticBinding] = []
 
     for evidence in bundle.cue_evidence:
-        if evidence.identity.source != EVIDENCE_SOURCE_ASR_SEGMENT:
-            raise SubtitleV2PipelineValidationError(
-                "ASR-only evidence does not contain ASR identities"
-            )
         index = evidence.identity.source_index
-        segment = bundle.asr_result.segments[index]
-        request_cues.append(
-            HermesV2CueInput(
-                cue_id=evidence.identity.cue_id,
-                external_ja=None,
-                stt_ja=segment.text,
-                en=_supporting_en(bundle, evidence),
-                before_context=_context_values(bundle, evidence.before_context),
-                after_context=_context_values(bundle, evidence.after_context),
-            )
-        )
         bindings.append(
             SubtitleV2SemanticBinding(
                 request_cue_id=evidence.identity.cue_id,
@@ -292,9 +374,60 @@ def _build_asr_plan(
         ) from error
 
 
-def _build_hybrid_plan(
+def build_asr_only_cue_sequence(
     route_decision: SubtitleV2RouteDecision,
-) -> SubtitleV2SemanticPlan:
+) -> tuple[HermesV2CueInput, ...]:
+    """Build the validated ASR-only semantic cues without a request limit."""
+
+    route = _validated_route(route_decision)
+    if route.route != V2_ROUTE_ASR_ONLY:
+        raise SubtitleV2PipelineValidationError(
+            "ASR-only cue sequence requires the ASR-only route"
+        )
+
+    bundle = _asr_bundle(route)
+    request_cues: list[HermesV2CueInput] = []
+
+    for index, evidence in enumerate(bundle.cue_evidence):
+        if (
+            evidence.identity.source != EVIDENCE_SOURCE_ASR_SEGMENT
+            or evidence.identity.source_index != index
+            or evidence.identity.cue_id != stable_cue_id(
+                EVIDENCE_SOURCE_ASR_SEGMENT,
+                index,
+            )
+        ):
+            raise SubtitleV2PipelineValidationError(
+                "ASR-only evidence identity is not contiguous"
+            )
+
+        segment = bundle.asr_result.segments[index]
+        request_cues.append(
+            HermesV2CueInput(
+                cue_id=evidence.identity.cue_id,
+                external_ja=None,
+                stt_ja=segment.text,
+                en=_supporting_en(bundle, evidence),
+                before_context=_context_values(bundle, evidence.before_context),
+                after_context=_context_values(bundle, evidence.after_context),
+            )
+        )
+
+    if not request_cues:
+        raise SubtitleV2PipelineValidationError(
+            "ASR-only evidence contains no semantic cues"
+        )
+
+    return tuple(request_cues)
+
+
+def _build_hybrid_cues(
+    route_decision: SubtitleV2RouteDecision,
+    *,
+    targeted_bindings: tuple[TargetedASRBinding, ...],
+    asr_source_quality_decisions: tuple[ASRSourceQualityDecision, ...] | None = None,
+) -> tuple[tuple[HermesV2CueInput, ...], tuple[SubtitleV2SemanticBinding, ...]]:
+    """Build shared HYBRID semantics without imposing a transport cue limit."""
     bundle = _asr_bundle(route_decision)
     application = route_decision.alignment_application
     if application is None:
@@ -307,6 +440,28 @@ def _build_hybrid_plan(
         raise SubtitleV2PipelineValidationError(
             "hybrid route has no parsed external JA evidence"
         )
+    try:
+        if asr_source_quality_decisions is None:
+            source_quality = classify_asr_result_source_quality(bundle.asr_result)
+        else:
+            source_quality = validate_asr_source_quality_decisions(
+                bundle.asr_result.segments,
+                asr_source_quality_decisions,
+            )
+    except Exception as error:
+        raise SubtitleV2PipelineValidationError(
+            "HYBRID ASR source-quality evidence is invalid or detached"
+        ) from error
+    source_quality_by_index = {
+        decision.source_index: decision
+        for decision in source_quality
+    }
+    targeted_by_external_index = _validated_targeted_bindings(
+        targeted_bindings,
+        bundle,
+        document,
+        alignment,
+    )
 
     request_cues: list[HermesV2CueInput] = []
     bindings: list[SubtitleV2SemanticBinding] = []
@@ -346,25 +501,35 @@ def _build_hybrid_plan(
                 "hybrid external JA identity is detached from source order"
             )
         residual = residuals_by_external_index.get(external_index)
+        targeted = targeted_by_external_index.get(external_index)
         asr_identity = None
         stt_ja = None
+        semantic_targeted = None
         if residual is not None:
             if residual.external_identity != evidence.identity:
                 raise SubtitleV2PipelineValidationError(
                     "hybrid residual external identity is detached"
                 )
-            asr_identity = residual.asr_identity
-            if asr_identity.source_index >= len(bundle.asr_result.segments):
+            candidate_asr_identity = residual.asr_identity
+            if candidate_asr_identity.source_index >= len(bundle.asr_result.segments):
                 raise SubtitleV2PipelineValidationError(
                     "hybrid residual ASR identity is outside the ASR result"
                 )
-            if asr_identity != HybridCueIdentity.for_asr_segment(
-                asr_identity.source_index
+            if candidate_asr_identity != HybridCueIdentity.for_asr_segment(
+                candidate_asr_identity.source_index
             ):
                 raise SubtitleV2PipelineValidationError(
                     "hybrid residual ASR identity is not source-stable"
                 )
-            stt_ja = bundle.asr_result.segments[asr_identity.source_index].text
+            quality = source_quality_by_index[candidate_asr_identity.source_index]
+            if quality.action != ASR_SOURCE_OMIT:
+                asr_identity = candidate_asr_identity
+                stt_ja = bundle.asr_result.segments[asr_identity.source_index].text
+        elif targeted is not None and not has_runaway_repetition(
+            targeted.segment.text
+        ):
+            stt_ja = targeted.segment.text
+            semantic_targeted = targeted
         request_cues.append(
             HermesV2CueInput(
                 cue_id=evidence.identity.cue_id,
@@ -381,11 +546,23 @@ def _build_hybrid_plan(
                 source_index=external_index,
                 external_ja_identity=evidence.identity,
                 asr_identity=asr_identity,
+                targeted_asr_evidence=semantic_targeted,
             )
         )
 
+    return tuple(request_cues), tuple(bindings)
+
+
+def _build_hybrid_plan(
+    route_decision: SubtitleV2RouteDecision,
+    *,
+    targeted_bindings: tuple[TargetedASRBinding, ...],
+) -> SubtitleV2SemanticPlan:
+    request_cues, bindings = _build_hybrid_cues(
+        route_decision, targeted_bindings=targeted_bindings,
+    )
     try:
-        request = HermesV2Request(cues=tuple(request_cues))
+        request = HermesV2Request(cues=request_cues)
         return SubtitleV2SemanticPlan(
             route_decision=route_decision,
             hermes_request=request,
@@ -399,6 +576,8 @@ def _build_hybrid_plan(
 
 def _build_semantic_plan(
     route_decision: SubtitleV2RouteDecision,
+    *,
+    targeted_bindings: tuple[TargetedASRBinding, ...],
 ) -> SubtitleV2SemanticPlan:
     if route_decision.route == V2_ROUTE_LOCAL_JA:
         return _build_local_plan(route_decision)
@@ -407,7 +586,15 @@ def _build_semantic_plan(
         return _build_asr_plan(route_decision)
 
     if route_decision.route == V2_ROUTE_HYBRID:
-        return _build_hybrid_plan(route_decision)
+        return _build_hybrid_plan(
+            route_decision,
+            targeted_bindings=targeted_bindings,
+        )
+
+    if targeted_bindings:
+        raise SubtitleV2PipelineValidationError(
+            "targeted ASR evidence is only valid for HYBRID routes"
+        )
 
     raise SubtitleV2PipelineValidationError(
         "route does not require semantic work"
@@ -600,10 +787,16 @@ def run_subtitle_v2_pipeline(
     route_decision: SubtitleV2RouteDecision,
     *,
     semantic_boundary: Callable[[HermesV2Request], HermesV2Result] | None = None,
+    targeted_bindings: tuple[TargetedASRBinding, ...] = (),
 ) -> SubtitleV2PrePublishResult:
     """Execute one already-decided v2 route using injected semantic work."""
 
     route = _validated_route(route_decision)
+
+    if route.route != V2_ROUTE_HYBRID and targeted_bindings:
+        raise SubtitleV2PipelineValidationError(
+            "targeted ASR evidence is only valid for HYBRID routes"
+        )
 
     if route.route == V2_ROUTE_EXISTING_KO:
         return SubtitleV2PrePublishResult(
@@ -617,7 +810,10 @@ def run_subtitle_v2_pipeline(
             state=V2_FAILED_CLOSED,
         )
 
-    plan = _build_semantic_plan(route)
+    plan = _build_semantic_plan(
+        route,
+        targeted_bindings=targeted_bindings,
+    )
     result = _call_semantic_boundary(
         semantic_boundary,
         plan.hermes_request,
@@ -630,6 +826,7 @@ __all__ = [
     "SubtitleV2PipelineBoundaryError",
     "SubtitleV2PipelineError",
     "SubtitleV2PipelineValidationError",
+    "build_asr_only_cue_sequence",
     "project_affine_timestamp_ms",
     "run_subtitle_v2_pipeline",
 ]

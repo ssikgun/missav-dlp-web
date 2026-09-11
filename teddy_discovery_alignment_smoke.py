@@ -415,15 +415,15 @@ def main():
 
     # The known real cardinality remains under the generic resource bound.
     require(
-        MAX_LEXICAL_PAIR_COMPARISONS == 256_000
+        MAX_LEXICAL_PAIR_COMPARISONS == 1_048_576
         and
         661 * 166 <= MAX_LEXICAL_PAIR_COMPARISONS,
-        "V2_3B_PAIR_BOUND_UNCHANGED_AND_KNOWN_CARDINALITY_SAFE",
+        "PAIR_BOUND_GENERIC_POWER_OF_TWO_AND_KNOWN_CARDINALITY_SAFE",
     )
 
     # Exact product boundary: pair evaluation is allowed at the cap, while
     # one additional ASR segment crosses it and fails before any sampling.
-    boundary_external_count = 8
+    boundary_external_count = 1_024
     boundary_asr_count = MAX_LEXICAL_PAIR_COMPARISONS // boundary_external_count
     require(
         boundary_external_count * boundary_asr_count

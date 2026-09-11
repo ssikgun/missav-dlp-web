@@ -24,6 +24,7 @@ from teddy_discovery_asr import (
     ASRWord,
     REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY,
     MAX_ASR_SEGMENTS,
+    _normalize_transcript_text,
 )
 from teddy_discovery_asr_audio import (
     ASR_AUDIO_SAMPLE_RATE,
@@ -37,6 +38,7 @@ from teddy_discovery_asr_remote import (
     REMOTE_ASR_MAX_REQUEST_BYTES,
     REMOTE_ASR_MAX_RESPONSE_BYTES,
     REMOTE_ASR_PATH,
+    REMOTE_ASR_TARGETED_PATH,
     REMOTE_ASR_SCHEMA_VERSION,
 )
 from teddy_discovery_asr_whisper import seconds_to_milliseconds
@@ -214,6 +216,26 @@ def _decode_npy(payload: object):
     return samples
 
 
+def _validated_request_samples(
+    payload: bytes,
+    *,
+    schema_version: int,
+    sample_rate: int,
+):
+    if type(schema_version) is not int or schema_version != REMOTE_ASR_SCHEMA_VERSION:
+        raise GPUASRProtocolError("unsupported ASR schema_version")
+    if type(sample_rate) is not int or sample_rate != ASR_AUDIO_SAMPLE_RATE:
+        raise GPUASRProtocolError("unsupported ASR sample_rate")
+    if type(payload) is not bytes:
+        raise GPUASRProtocolError("ASR request body must be bytes")
+    if len(payload) > REMOTE_ASR_MAX_REQUEST_BYTES:
+        raise ASRLimitError("ASR request body exceeds its byte bound")
+
+    input_sha256 = hashlib.sha256(payload).hexdigest()
+    samples = _decode_npy(payload)
+    return input_sha256, samples
+
+
 def _validate_vad_regions(raw_regions: object, *, sample_count: int):
     if not isinstance(raw_regions, list):
         raise GPUASRProtocolError("VAD result must be a list")
@@ -243,6 +265,17 @@ def _validate_vad_regions(raw_regions: object, *, sample_count: int):
     if len(regions) > sample_count:
         raise ASRLimitError("VAD region count exceeds its bound")
     return tuple(regions)
+
+
+def _normalize_whisper_word_text(raw_text: object) -> str | None:
+    """Validate a raw word using ASR text rules, omitting only empty text."""
+
+    if isinstance(raw_text, str):
+        normalized = raw_text.replace("\r\n", "\n").replace("\r", "\n").strip()
+        if not normalized:
+            return None
+
+    return _normalize_transcript_text(raw_text, field_name="word text")
 
 
 def _convert_region_words(
@@ -284,6 +317,7 @@ def _convert_region_words(
             field_name="Whisper word start",
         )
         if raw_end_seconds == raw_start_seconds:
+            _normalize_whisper_word_text(raw_text)
             continue
 
         relative_end_ms = seconds_to_milliseconds(
@@ -294,6 +328,9 @@ def _convert_region_words(
             raise ASRValidationError(
                 "positive Whisper word duration collapsed to milliseconds"
             )
+        normalized_text = _normalize_whisper_word_text(raw_text)
+        if normalized_text is None:
+            continue
         if (
             relative_start_ms < segment_start_ms
             or relative_end_ms > segment_end_ms
@@ -303,7 +340,7 @@ def _convert_region_words(
         word = ASRWord(
             start_ms=region_offset_ms + relative_start_ms,
             end_ms=region_offset_ms + relative_end_ms,
-            text=raw_text,
+            text=normalized_text,
         )
         if (
             previous_start_ms is not None
@@ -542,17 +579,11 @@ class FasterWhisperGPUWorker:
     ) -> bytes:
         """Process one validated wire request and return deterministic JSON."""
 
-        if type(schema_version) is not int or schema_version != REMOTE_ASR_SCHEMA_VERSION:
-            raise GPUASRProtocolError("unsupported ASR schema_version")
-        if type(sample_rate) is not int or sample_rate != ASR_AUDIO_SAMPLE_RATE:
-            raise GPUASRProtocolError("unsupported ASR sample_rate")
-        if type(payload) is not bytes:
-            raise GPUASRProtocolError("ASR request body must be bytes")
-        if len(payload) > REMOTE_ASR_MAX_REQUEST_BYTES:
-            raise ASRLimitError("ASR request body exceeds its byte bound")
-
-        input_sha256 = hashlib.sha256(payload).hexdigest()
-        samples = _decode_npy(payload)
+        input_sha256, samples = _validated_request_samples(
+            payload,
+            schema_version=schema_version,
+            sample_rate=sample_rate,
+        )
         sample_count = int(samples.size)
         regions = self._speech_regions(samples)
         aggregated: list[ASRSegment] = []
@@ -593,43 +624,95 @@ class FasterWhisperGPUWorker:
                     previous_start_ms = segment.start_ms
                     previous_end_ms = segment.end_ms
 
-        response = {
-            "schema_version": REMOTE_ASR_SCHEMA_VERSION,
-            "engine_version": self.engine_version,
-            "input_sha256": input_sha256,
-            "sample_rate": ASR_AUDIO_SAMPLE_RATE,
-            "sample_count": sample_count,
-            "vad_region_count": len(regions),
-            "segments": [
-                {
-                    "start_ms": segment.start_ms,
-                    "end_ms": segment.end_ms,
-                    "text": segment.text,
-                    "words": [
-                        {
-                            "start_ms": word.start_ms,
-                            "end_ms": word.end_ms,
-                            "text": word.text,
-                        }
-                        for word in segment.words
-                    ],
-                }
-                for segment in aggregated
-            ],
-        }
-        try:
-            response_body = json.dumps(
-                response,
-                ensure_ascii=False,
-                separators=(",", ":"),
-            ).encode("utf-8")
-        except (TypeError, ValueError) as error:
-            raise GPUASRProtocolError(
-                "ASR response could not be serialized"
-            ) from error
-        if len(response_body) > self.max_response_bytes:
-            raise ASRLimitError("ASR response exceeds its byte bound")
-        return response_body
+        return _serialize_response_body(
+            input_sha256=input_sha256,
+            engine_version=self.engine_version,
+            sample_count=sample_count,
+            vad_region_count=len(regions),
+            segments=tuple(aggregated),
+            max_response_bytes=self.max_response_bytes,
+        )
+
+    def process_targeted_request(
+        self,
+        payload: bytes,
+        *,
+        schema_version: int,
+        sample_rate: int,
+    ) -> bytes:
+        """Transcribe one whole bounded window without running Silero VAD."""
+
+        input_sha256, samples = _validated_request_samples(
+            payload,
+            schema_version=schema_version,
+            sample_rate=sample_rate,
+        )
+        sample_count = int(samples.size)
+        model = self._get_model()
+        segments = self._transcribe_region(
+            model,
+            samples,
+            region_start_sample=0,
+            region_end_sample=sample_count,
+            sample_count=sample_count,
+            aggregate_count=0,
+        )
+        return _serialize_response_body(
+            input_sha256=input_sha256,
+            engine_version=self.engine_version,
+            sample_count=sample_count,
+            vad_region_count=0,
+            segments=segments,
+            max_response_bytes=self.max_response_bytes,
+        )
+
+
+def _serialize_response_body(
+    *,
+    input_sha256: str,
+    engine_version: str,
+    sample_count: int,
+    vad_region_count: int,
+    segments: tuple[ASRSegment, ...],
+    max_response_bytes: int,
+) -> bytes:
+    response = {
+        "schema_version": REMOTE_ASR_SCHEMA_VERSION,
+        "engine_version": engine_version,
+        "input_sha256": input_sha256,
+        "sample_rate": ASR_AUDIO_SAMPLE_RATE,
+        "sample_count": sample_count,
+        "vad_region_count": vad_region_count,
+        "segments": [
+            {
+                "start_ms": segment.start_ms,
+                "end_ms": segment.end_ms,
+                "text": segment.text,
+                "words": [
+                    {
+                        "start_ms": word.start_ms,
+                        "end_ms": word.end_ms,
+                        "text": word.text,
+                    }
+                    for word in segment.words
+                ],
+            }
+            for segment in segments
+        ],
+    }
+    try:
+        response_body = json.dumps(
+            response,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except (TypeError, ValueError) as error:
+        raise GPUASRProtocolError(
+            "ASR response could not be serialized"
+        ) from error
+    if len(response_body) > max_response_bytes:
+        raise ASRLimitError("ASR response exceeds its byte bound")
+    return response_body
 
 
 def _error_response(handler: BaseHTTPRequestHandler, *, status: int):
@@ -641,6 +724,33 @@ def _error_response(handler: BaseHTTPRequestHandler, *, status: int):
     handler.wfile.write(body)
 
 
+def _safe_exception_reason(error: BaseException) -> str:
+    reason = str(error)
+    safe_reason = "".join(
+        character
+        if character.isprintable() and character not in {"\r", "\n"}
+        else "?"
+        for character in reason
+    )
+    return safe_reason[:256] or "<empty>"
+
+
+def _log_request_error(
+    *,
+    path: str,
+    status: int,
+    error: BaseException,
+) -> None:
+    print(
+        "ASR_REQUEST_ERROR "
+        f"path={path} "
+        f"status={status} "
+        f"error_type={type(error).__name__} "
+        f"reason={_safe_exception_reason(error)}",
+        flush=True,
+    )
+
+
 class Stage11ASRRequestHandler(BaseHTTPRequestHandler):
     """Minimal HTTP boundary with bounded body reads and no transcript logs."""
 
@@ -650,7 +760,7 @@ class Stage11ASRRequestHandler(BaseHTTPRequestHandler):
         return
 
     def do_POST(self):
-        if self.path != REMOTE_ASR_PATH:
+        if self.path not in {REMOTE_ASR_PATH, REMOTE_ASR_TARGETED_PATH}:
             _error_response(self, status=404)
             return
         if self.headers.get("Content-Type") != REMOTE_ASR_CONTENT_TYPE:
@@ -680,18 +790,26 @@ class Stage11ASRRequestHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            response_body = self.server.worker.process_request(
+            processor = (
+                self.server.worker.process_targeted_request
+                if self.path == REMOTE_ASR_TARGETED_PATH
+                else self.server.worker.process_request
+            )
+            response_body = processor(
                 body,
                 schema_version=REMOTE_ASR_SCHEMA_VERSION,
                 sample_rate=ASR_AUDIO_SAMPLE_RATE,
             )
-        except ASRLimitError:
+        except ASRLimitError as error:
+            _log_request_error(path=self.path, status=413, error=error)
             _error_response(self, status=413)
             return
-        except (ASRValidationError, GPUASRProtocolError):
+        except (ASRValidationError, GPUASRProtocolError) as error:
+            _log_request_error(path=self.path, status=400, error=error)
             _error_response(self, status=400)
             return
-        except GPUASRRuntimeError:
+        except GPUASRRuntimeError as error:
+            _log_request_error(path=self.path, status=503, error=error)
             _error_response(self, status=503)
             return
 

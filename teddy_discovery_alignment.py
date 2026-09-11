@@ -41,9 +41,9 @@ MAX_ALIGNMENT_TEXT_CHARS: Final = min(
 )
 DEFAULT_MINIMUM_LEXICAL_SCORE: Final[float] = 0.80
 MAX_ANCHOR_CANDIDATES: Final[int] = 4_096
-# This fixed CPU-safety cap is deliberately above the known 661 * 166
-# comparison workload (109,726), but it is not a matching-quality threshold.
-MAX_LEXICAL_PAIR_COMPARISONS: Final[int] = 256_000
+# This fixed CPU-safety cap is a generic power-of-two bound, not a
+# matching-quality threshold.
+MAX_LEXICAL_PAIR_COMPARISONS: Final[int] = 1_048_576
 MIN_AFFINE_ANCHORS: Final[int] = 3
 # Pairwise slope generation is quadratic; this fixed bound protects CPU and
 # memory while still covering ordinary selected-anchor evidence sets.

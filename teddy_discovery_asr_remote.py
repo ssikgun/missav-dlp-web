@@ -38,6 +38,7 @@ from teddy_discovery_asr_audio import (
 
 REMOTE_ASR_SCHEMA_VERSION = 1
 REMOTE_ASR_PATH = "/v1/asr/transcribe"
+REMOTE_ASR_TARGETED_PATH = "/v1/asr/transcribe-targeted"
 REMOTE_ASR_CONTENT_TYPE = "application/x-npy"
 REMOTE_ASR_MAX_NPY_HEADER_BYTES = 4_096
 REMOTE_ASR_MAX_REQUEST_BYTES = (
@@ -97,7 +98,11 @@ def _validate_timeout(value: object) -> float:
     return timeout
 
 
-def _endpoint_from_base_url(value: object) -> str:
+def _endpoint_from_base_url(
+    value: object,
+    *,
+    endpoint_path: str = REMOTE_ASR_PATH,
+) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ASRValidationError("base_url must be a nonempty URL")
     if _has_control_characters(value):
@@ -114,8 +119,14 @@ def _endpoint_from_base_url(value: object) -> str:
         raise ASRValidationError("base_url must not contain a query or fragment")
 
     path = parsed.path.rstrip("/")
-    if not path.endswith(REMOTE_ASR_PATH):
-        path += REMOTE_ASR_PATH
+    for known_endpoint_path in (
+        REMOTE_ASR_TARGETED_PATH,
+        REMOTE_ASR_PATH,
+    ):
+        if path.endswith(known_endpoint_path):
+            path = path[: -len(known_endpoint_path)].rstrip("/")
+            break
+    path += endpoint_path
     return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
 
 
@@ -141,6 +152,39 @@ def _validate_max_response_bytes(value: object) -> int:
             "max_response_bytes exceeds the remote response bound"
         )
     return value
+
+
+_REMOTE_ASR_ERROR_CODE = "stage11_asr_request_failed"
+
+
+def _safe_http_error_code(body: object) -> str | None:
+    """Return only the frozen generic worker error code, never raw body text."""
+
+    if type(body) is not bytes or len(body) > REMOTE_ASR_MAX_RESPONSE_BYTES:
+        return None
+    try:
+        decoded = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+    if (
+        type(decoded) is dict
+        and set(decoded) == {"error"}
+        and decoded.get("error") == _REMOTE_ASR_ERROR_CODE
+    ):
+        return _REMOTE_ASR_ERROR_CODE
+    return None
+
+
+def _http_error_message(status_code: object, body: object) -> str:
+    message = f"remote ASR HTTP request failed with status {status_code}"
+    error_code = _safe_http_error_code(body)
+    if error_code is not None:
+        return message + " error=" + error_code
+    return message
+
+
+def _transport_error_message(error: BaseException) -> str:
+    return "remote ASR HTTP transport failed: " + type(error).__name__
 
 
 def _default_transport(
@@ -173,6 +217,14 @@ def _default_transport(
             body_bytes = response.read(REMOTE_ASR_MAX_RESPONSE_BYTES + 1)
     except RemoteASRError:
         raise
+    except urllib_error.HTTPError as error:
+        try:
+            error_body = error.read(REMOTE_ASR_MAX_RESPONSE_BYTES + 1)
+        except Exception:
+            error_body = b""
+        raise RemoteASRTransportError(
+            _http_error_message(error.code, error_body)
+        ) from error
     except (
         OSError,
         ValueError,
@@ -180,7 +232,7 @@ def _default_transport(
         socket.timeout,
         urllib_error.URLError,
     ) as error:
-        raise RemoteASRTransportError("remote ASR HTTP request failed") from error
+        raise RemoteASRTransportError(_transport_error_message(error)) from error
 
     if not isinstance(body_bytes, bytes):
         raise RemoteASRTransportError(
@@ -360,6 +412,10 @@ class RemoteFasterWhisperASR:
             raise ASRValidationError("transport must be callable")
 
         self.endpoint_url = _endpoint_from_base_url(base_url)
+        self.targeted_endpoint_url = _endpoint_from_base_url(
+            base_url,
+            endpoint_path=REMOTE_ASR_TARGETED_PATH,
+        )
         self.request_timeout_seconds = _validate_timeout(
             request_timeout_seconds
         )
@@ -393,6 +449,7 @@ class RemoteFasterWhisperASR:
         *,
         chunk: ASRAudioChunk,
         request_body: bytes,
+        expected_vad_region_count: int | None = None,
     ) -> tuple[ASRSegment, ...]:
         if type(response.status_code) is not int:
             raise RemoteASRTransportError("remote ASR HTTP status is invalid")
@@ -478,6 +535,13 @@ class RemoteFasterWhisperASR:
             raise RemoteASRProtocolError(
                 "remote ASR vad_region_count is outside its bound"
             )
+        if (
+            expected_vad_region_count is not None
+            and vad_region_count != expected_vad_region_count
+        ):
+            raise RemoteASRProtocolError(
+                "remote ASR vad_region_count is inconsistent with the endpoint"
+            )
 
         raw_segments = decoded["segments"]
         if not isinstance(raw_segments, list):
@@ -508,11 +572,14 @@ class RemoteFasterWhisperASR:
 
         return tuple(converted)
 
-    def transcribe_chunk(
+    def _transcribe_at_endpoint(
         self,
         chunk: ASRAudioChunk,
+        *,
+        endpoint_url: str,
+        expected_vad_region_count: int | None = None,
     ) -> tuple[ASRSegment, ...]:
-        """Send one bounded chunk and return absolute Stage11 ASR segments."""
+        """Send one bounded chunk through one explicit ASR endpoint."""
 
         if not isinstance(chunk, ASRAudioChunk):
             raise ASRValidationError("chunk must be an ASRAudioChunk")
@@ -527,7 +594,7 @@ class RemoteFasterWhisperASR:
         }
         try:
             response = self._transport(
-                self.endpoint_url,
+                endpoint_url,
                 request_body,
                 headers,
                 self.request_timeout_seconds,
@@ -545,6 +612,30 @@ class RemoteFasterWhisperASR:
             response,
             chunk=chunk,
             request_body=request_body,
+            expected_vad_region_count=expected_vad_region_count,
+        )
+
+    def transcribe_chunk(
+        self,
+        chunk: ASRAudioChunk,
+    ) -> tuple[ASRSegment, ...]:
+        """Send one bounded baseline chunk through the VAD endpoint."""
+
+        return self._transcribe_at_endpoint(
+            chunk,
+            endpoint_url=self.endpoint_url,
+        )
+
+    def transcribe_targeted_chunk(
+        self,
+        chunk: ASRAudioChunk,
+    ) -> tuple[ASRSegment, ...]:
+        """Send one bounded targeted window through the no-VAD endpoint."""
+
+        return self._transcribe_at_endpoint(
+            chunk,
+            endpoint_url=self.targeted_endpoint_url,
+            expected_vad_region_count=0,
         )
 
 
@@ -555,6 +646,7 @@ __all__ = [
     "REMOTE_ASR_MAX_REQUEST_BYTES",
     "REMOTE_ASR_MAX_RESPONSE_BYTES",
     "REMOTE_ASR_PATH",
+    "REMOTE_ASR_TARGETED_PATH",
     "REMOTE_ASR_SCHEMA_VERSION",
     "RemoteASRError",
     "RemoteASRHTTPResponse",

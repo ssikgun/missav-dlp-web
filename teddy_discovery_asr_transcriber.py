@@ -86,6 +86,18 @@ def _validate_max_media_bytes(value: object) -> int:
     return value
 
 
+def _validate_expected_source_snapshot(
+    value: object,
+) -> ASRSourceSnapshot | None:
+    if value is None:
+        return None
+    if type(value) is not ASRSourceSnapshot:
+        raise FullTitleASRValidationError(
+            "expected_source_snapshot must be an ASRSourceSnapshot or None"
+        )
+    return value
+
+
 def _validate_positive_finite(
     value: object,
     *,
@@ -171,6 +183,8 @@ def _source_snapshot(local_source: ASRLocalMediaSource) -> ASRSourceSnapshot:
 def _validate_local_source_identity(
     local_source: ASRLocalMediaSource,
     canonical_video: CanonicalVideoHolding,
+    *,
+    expected_source_snapshot: ASRSourceSnapshot | None = None,
 ) -> ASRSourceSnapshot:
     snapshot = _source_snapshot(local_source)
     if (
@@ -180,6 +194,13 @@ def _validate_local_source_identity(
     ):
         raise FullTitleASRContractError(
             "local ASR source identity does not match canonical video"
+        )
+    if (
+        expected_source_snapshot is not None
+        and snapshot != expected_source_snapshot
+    ):
+        raise FullTitleASRContractError(
+            "local ASR source snapshot does not match expected source snapshot"
         )
     return snapshot
 
@@ -300,11 +321,23 @@ class FullTitleASRTranscriber:
         max_media_bytes: int,
         source_timeout: int | float | None = None,
         chunk_seconds: int | float = MAX_ASR_AUDIO_CHUNK_SECONDS,
+        expected_source_snapshot: ASRSourceSnapshot | None = None,
         whisper: object | None = None,
         audio_chunk_iterator: Callable = iter_audio_chunks,
     ):
         self._copy_to_temp = _require_copy_to_temp(source_provider)
         self.max_media_bytes = _validate_max_media_bytes(max_media_bytes)
+        self.expected_source_snapshot = _validate_expected_source_snapshot(
+            expected_source_snapshot
+        )
+        if (
+            self.expected_source_snapshot is not None
+            and self.max_media_bytes
+            != self.expected_source_snapshot.source_size
+        ):
+            raise FullTitleASRValidationError(
+                "max_media_bytes must equal expected_source_snapshot.source_size"
+            )
         self.source_timeout = _validate_source_timeout(source_timeout)
         self.chunk_seconds = _validate_chunk_seconds(chunk_seconds)
 
@@ -328,6 +361,7 @@ class FullTitleASRTranscriber:
             snapshot = _validate_local_source_identity(
                 local_source,
                 canonical_video,
+                expected_source_snapshot=self.expected_source_snapshot,
             )
 
             chunks = self.audio_chunk_iterator(

@@ -474,7 +474,92 @@ def main():
     require(not whisper.calls and one_pass.iterations == 0, "SOURCE_MISMATCH_NO_AUDIO")
     require(not wrong_path.exists() and not wrong_directory.exists(), "SOURCE_MISMATCH_CLEANUP")
 
-    # N. Invalid configuration is rejected before source access.
+    # N. An expected source snapshot binds the media-size limit and is checked
+    # before the first audio chunk reaches the ASR backend.
+    expected_snapshot = snapshot_for(title, source_size=123, source_mtime_ns=456)
+    matching_source, matching_path, matching_directory = local_source(
+        title,
+        source_snapshot=expected_snapshot,
+    )
+    matching_provider = FakeSourceProvider(matching_source)
+    matching_whisper = FakeWhisper([(ASRSegment(100, 200, "日本語"),)])
+    matching_chunks = OnePassChunks([forced_chunk(expected_snapshot, 0, 1_000)])
+    matching_adapter = transcriber_module.FullTitleASRTranscriber(
+        source_provider=matching_provider,
+        max_media_bytes=expected_snapshot.source_size,
+        expected_source_snapshot=expected_snapshot,
+        whisper=matching_whisper,
+        audio_chunk_iterator=lambda *_args, **_kwargs: matching_chunks,
+    )
+    matching_result = matching_adapter(title)
+    require(
+        matching_result.source_snapshot == expected_snapshot,
+        "EXPECTED_SNAPSHOT_MATCH",
+    )
+    require(
+        matching_provider.calls[0][1] == expected_snapshot.source_size,
+        "MAX_MEDIA_FROM_SNAPSHOT",
+    )
+    require(
+        not matching_path.exists() and not matching_directory.exists(),
+        "EXPECTED_SNAPSHOT_CLEANUP",
+    )
+
+    mismatched_snapshot = snapshot_for(
+        title,
+        source_size=124,
+        source_mtime_ns=456,
+    )
+    mismatched_source, mismatched_path, mismatched_directory = local_source(
+        title,
+        source_snapshot=mismatched_snapshot,
+    )
+    mismatched_provider = FakeSourceProvider(mismatched_source)
+    mismatched_whisper = FakeWhisper([(ASRSegment(100, 200, "日本語"),)])
+    mismatched_adapter = transcriber_module.FullTitleASRTranscriber(
+        source_provider=mismatched_provider,
+        max_media_bytes=expected_snapshot.source_size,
+        expected_source_snapshot=expected_snapshot,
+        whisper=mismatched_whisper,
+        audio_chunk_iterator=lambda *_args, **_kwargs: OnePassChunks(
+            [forced_chunk(mismatched_snapshot, 0, 1_000)]
+        ),
+    )
+    expect(
+        transcriber_module.FullTitleASRContractError,
+        lambda: mismatched_adapter(title),
+        "EXPECTED_SNAPSHOT_MISMATCH",
+    )
+    require(not mismatched_whisper.calls, "EXPECTED_MISMATCH_NO_ASR")
+    require(
+        not mismatched_path.exists() and not mismatched_directory.exists(),
+        "EXPECTED_MISMATCH_CLEANUP",
+    )
+
+    wrong_limit_source, wrong_limit_path, wrong_limit_directory = local_source(
+        title,
+        source_snapshot=expected_snapshot,
+    )
+    wrong_limit_provider = FakeSourceProvider(wrong_limit_source)
+    expect(
+        transcriber_module.FullTitleASRValidationError,
+        lambda: transcriber_module.FullTitleASRTranscriber(
+            source_provider=wrong_limit_provider,
+            max_media_bytes=expected_snapshot.source_size + 1,
+            expected_source_snapshot=expected_snapshot,
+            whisper=FakeWhisper([(ASRSegment(100, 200, "日本語"),)]),
+            audio_chunk_iterator=lambda *_args, **_kwargs: (),
+        ),
+        "MAX_MEDIA_SNAPSHOT_MISMATCH",
+    )
+    require(not wrong_limit_provider.calls, "MAX_MEDIA_MISMATCH_NO_SOURCE")
+    wrong_limit_source.cleanup()
+    require(
+        not wrong_limit_path.exists() and not wrong_limit_directory.exists(),
+        "MAX_MEDIA_MISMATCH_CLEANUP",
+    )
+
+    # O. Invalid configuration is rejected before source access.
     for kwargs, label in (
         ({"max_media_bytes": 0}, "MAX_MEDIA_ZERO"),
         ({"chunk_seconds": 0}, "CHUNK_ZERO"),
@@ -500,7 +585,7 @@ def main():
         source.cleanup()
         require(not path.exists() and not directory.exists(), label + "_CLEANUP")
 
-    # O. Reusing one transcriber for different titles does not leak aggregate
+    # P. Reusing one transcriber for different titles does not leak aggregate
     # segments, chunk boundaries, or source snapshots between calls.
     title_a = video("JUR-750")
     title_b = video("ABC-123")
@@ -575,7 +660,7 @@ def main():
         "CROSS_TITLE_CLEANUP_B",
     )
 
-    # P. The constructor keeps the default iterator one-pass boundary and
+    # Q. The constructor keeps the default iterator one-pass boundary and
     # passes the configured source arguments unchanged.
     source, path, directory = local_source(title)
     provider = FakeSourceProvider(source)
@@ -680,7 +765,7 @@ def main():
     source.cleanup()
     require(not path.exists() and not directory.exists(), "DEFAULT_WHISPER_CLEANUP")
 
-    # Q. The callable returns the exact ASRResult shape accepted by the frozen
+    # R. The callable returns the exact ASRResult shape accepted by the frozen
     # per-title pipeline; a minimal fake integration avoids real downstream IO.
     source, path, directory = local_source(title)
     provider = FakeSourceProvider(source)

@@ -1,12 +1,19 @@
-"""Deterministic bytes serialization for validated Stage11 ASR results.
+"""Deterministic serialization and explicit persistence for Stage11 ASR results.
 
-This module owns only the JSON bytes boundary for one immutable ``ASRResult``.
-It performs no file, network, media, model, database, or workflow I/O.
+Serialization and parsing remain pure JSON-bytes operations.  The explicit
+``persist_asr_result`` boundary owns only private, no-overwrite artifact
+installation; this module performs no network, media, model, database, or
+workflow I/O.
 """
 
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
+import stat
+import tempfile
+from typing import Final
 
 from teddy_discovery_asr import (
     ASRError,
@@ -21,8 +28,9 @@ from teddy_discovery_asr import (
 )
 
 
-ASR_ARTIFACT_SCHEMA_VERSION = 1
-MAX_ASR_ARTIFACT_BYTES = 64 * 1024 * 1024
+ASR_ARTIFACT_SCHEMA_VERSION: Final[int] = 1
+MAX_ASR_ARTIFACT_BYTES: int = 64 * 1024 * 1024
+ASR_ARTIFACT_FILE_MODE: Final[int] = 0o600
 
 _TOP_LEVEL_KEYS = (
     "schema_version",
@@ -69,6 +77,10 @@ class ASRArtifactValidationError(ASRArtifactError):
 
 class ASRArtifactLimitError(ASRArtifactError, ASRLimitError):
     """Raised when an ASR artifact exceeds its fixed byte or count bound."""
+
+
+class ASRArtifactPersistenceError(ASRArtifactError):
+    """Raised when an ASR artifact cannot be privately installed."""
 
 
 class _DuplicateArtifactKey(ValueError):
@@ -410,13 +422,167 @@ def require_matching_asr_source(
     return artifact_result
 
 
+def _validate_output_parent(path: Path) -> None:
+    if not path.is_absolute() or path.name in {"", ".", ".."}:
+        raise ASRArtifactPersistenceError(
+            "ASR artifact output path must be an absolute file path"
+        )
+
+    current = Path(path.anchor)
+    for component in path.parent.parts[1:]:
+        if component in {"", ".", ".."}:
+            raise ASRArtifactPersistenceError(
+                "ASR artifact output path contains unsafe components"
+            )
+        current /= component
+        try:
+            info = os.lstat(current)
+        except OSError as error:
+            raise ASRArtifactPersistenceError(
+                "ASR artifact output parent cannot be inspected"
+            ) from error
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+            raise ASRArtifactPersistenceError(
+                "ASR artifact output parent contains an unsafe path component"
+            )
+
+    try:
+        parent_info = os.lstat(path.parent)
+    except OSError as error:
+        raise ASRArtifactPersistenceError(
+            "ASR artifact output parent cannot be inspected"
+        ) from error
+    if not stat.S_ISDIR(parent_info.st_mode):
+        raise ASRArtifactPersistenceError(
+            "ASR artifact output parent is not a directory"
+        )
+    if parent_info.st_uid != os.geteuid():
+        raise ASRArtifactPersistenceError(
+            "ASR artifact output parent is not owned by the caller"
+        )
+    parent_mode = stat.S_IMODE(parent_info.st_mode)
+    if parent_mode & 0o022 and not (parent_mode & stat.S_ISVTX):
+        raise ASRArtifactPersistenceError(
+            "ASR artifact output parent is broadly writable without sticky protection"
+        )
+
+    try:
+        os.lstat(path)
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise ASRArtifactPersistenceError(
+            "ASR artifact output destination cannot be inspected"
+        ) from error
+    raise ASRArtifactPersistenceError(
+        "ASR artifact output destination already exists"
+    )
+
+
+def _fsync_directory(directory: Path) -> None:
+    try:
+        directory_fd = os.open(
+            directory,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+        )
+    except OSError as error:
+        raise ASRArtifactPersistenceError(
+            "ASR artifact parent could not be opened for durability"
+        ) from error
+    try:
+        os.fsync(directory_fd)
+    except OSError as error:
+        raise ASRArtifactPersistenceError(
+            "ASR artifact parent could not be synchronized"
+        ) from error
+    finally:
+        os.close(directory_fd)
+
+
+def persist_asr_result(
+    path: str | Path,
+    result: ASRResult,
+) -> Path:
+    """Install one validated ASR result as a new private artifact.
+
+    The destination must not exist.  A temporary private file is linked into
+    place, rather than replaced, so a concurrent destination cannot be
+    overwritten and no partial final artifact is exposed.
+    """
+
+    raw = serialize_asr_result(result)
+    try:
+        output = Path(path)
+    except (TypeError, ValueError) as error:
+        raise ASRArtifactPersistenceError(
+            "ASR artifact output path is invalid"
+        ) from error
+    _validate_output_parent(output)
+
+    temporary_path: str | None = None
+    file_descriptor: int | None = None
+    try:
+        file_descriptor, temporary_path = tempfile.mkstemp(
+            prefix=".stage11-asr-artifact-",
+            dir=str(output.parent),
+        )
+        os.fchmod(file_descriptor, ASR_ARTIFACT_FILE_MODE)
+        with os.fdopen(file_descriptor, "wb") as stream:
+            file_descriptor = None
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+
+        try:
+            os.link(temporary_path, output, follow_symlinks=False)
+        except FileExistsError as error:
+            raise ASRArtifactPersistenceError(
+                "ASR artifact output destination appeared and cannot be overwritten"
+            ) from error
+        _fsync_directory(output.parent)
+        os.unlink(temporary_path)
+        temporary_path = None
+        _fsync_directory(output.parent)
+
+        final_info = os.lstat(output)
+        if (
+            not stat.S_ISREG(final_info.st_mode)
+            or final_info.st_uid != os.geteuid()
+            or stat.S_IMODE(final_info.st_mode) != ASR_ARTIFACT_FILE_MODE
+            or final_info.st_nlink != 1
+        ):
+            raise ASRArtifactPersistenceError(
+                "installed ASR artifact is not a private owned regular file"
+            )
+        return output
+    except ASRArtifactError:
+        raise
+    except (OSError, TypeError, ValueError) as error:
+        raise ASRArtifactPersistenceError(
+            "ASR artifact persistence failed"
+        ) from error
+    finally:
+        if file_descriptor is not None:
+            os.close(file_descriptor)
+        if temporary_path is not None:
+            try:
+                os.unlink(temporary_path)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                pass
+
+
 __all__ = [
     "ASR_ARTIFACT_SCHEMA_VERSION",
+    "ASR_ARTIFACT_FILE_MODE",
     "ASRArtifactError",
     "ASRArtifactLimitError",
+    "ASRArtifactPersistenceError",
     "ASRArtifactValidationError",
     "MAX_ASR_ARTIFACT_BYTES",
     "parse_asr_result_bytes",
+    "persist_asr_result",
     "require_matching_asr_source",
     "serialize_asr_result",
 ]

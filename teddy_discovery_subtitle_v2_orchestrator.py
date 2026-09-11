@@ -32,6 +32,11 @@ from teddy_discovery_alignment_application import (
     AlignmentAcceptanceApplicationResult,
 )
 from teddy_discovery_asr import ASRResult, ASRSegment
+from teddy_discovery_asr_source_quality import (
+    ASRSourceQualityDecision,
+    classify_asr_result_source_quality,
+    validate_asr_source_quality_decisions,
+)
 from teddy_discovery_ids import parse_dvd_id
 from teddy_discovery_hermes_v2 import (
     HermesV2Request,
@@ -66,6 +71,10 @@ from teddy_discovery_subtitle_text import (
     SubtitleDocument,
     parse_subtitle_bytes,
     serialize_srt,
+)
+from teddy_discovery_targeted_hybrid_evidence import (
+    TargetedASRBinding,
+    validate_targeted_asr_binding,
 )
 
 
@@ -485,16 +494,18 @@ def _validated_identity(
 class SubtitleV2SemanticBinding:
     """Index-only binding from one Hermes cue to existing source evidence.
 
-    The binding carries no dialogue or timing copy.  ``source_index`` refers
-    to the local document ordinal, or to the selected R2 external-JA ordinal
-    for ASR-backed routes.  Existing ``HybridCueIdentity`` values identify R2
-    sources when the route has them.
+    ``source_index`` refers to the local document ordinal, or to the selected
+    R2 external-JA ordinal for ASR-backed routes.  Existing
+    ``HybridCueIdentity`` values identify R2 sources when the route has them.
+    Targeted second evidence is carried separately and never changes the
+    meaning of ``asr_identity``.
     """
 
     request_cue_id: str
     source_index: int
     external_ja_identity: HybridCueIdentity | None = None
     asr_identity: HybridCueIdentity | None = None
+    targeted_asr_evidence: TargetedASRBinding | None = None
 
     def __post_init__(self):
         _validate_cue_id(self.request_cue_id, field_name="request_cue_id")
@@ -512,6 +523,13 @@ class SubtitleV2SemanticBinding:
                 self.asr_identity,
                 field_name="asr_identity",
             )
+        if self.targeted_asr_evidence is not None:
+            try:
+                validate_targeted_asr_binding(self.targeted_asr_evidence)
+            except Exception as error:
+                raise SubtitleV2OrchestratorValidationError(
+                    "targeted_asr_evidence is invalid or detached"
+                ) from error
 
 
 def _validated_binding(value: object) -> SubtitleV2SemanticBinding:
@@ -525,6 +543,7 @@ def _validated_binding(value: object) -> SubtitleV2SemanticBinding:
             source_index=value.source_index,
             external_ja_identity=value.external_ja_identity,
             asr_identity=value.asr_identity,
+            targeted_asr_evidence=value.targeted_asr_evidence,
         )
     except Exception as error:
         raise SubtitleV2OrchestratorValidationError(
@@ -598,6 +617,7 @@ def _validate_semantic_bindings(
                 binding.source_index != index
                 or binding.external_ja_identity is not None
                 or binding.asr_identity is not None
+                or binding.targeted_asr_evidence is not None
             ):
                 raise SubtitleV2OrchestratorValidationError(
                     "local JA binding is not a direct source ordinal"
@@ -659,6 +679,10 @@ def _validate_semantic_bindings(
                 raise SubtitleV2OrchestratorValidationError(
                     "ASR-only semantic binding cannot identify external JA"
                 )
+            if binding.targeted_asr_evidence is not None:
+                raise SubtitleV2OrchestratorValidationError(
+                    "ASR-only semantic binding cannot carry targeted evidence"
+                )
         return validated
 
     external_document = bundle.external_ja_document
@@ -687,15 +711,19 @@ def _validate_semantic_bindings(
                 "hybrid external JA evidence is detached"
             )
         asr_identity = binding.asr_identity
+        targeted_evidence = binding.targeted_asr_evidence
         if request_cue.stt_ja is None:
-            if asr_identity is not None:
+            if asr_identity is not None or targeted_evidence is not None:
                 raise SubtitleV2OrchestratorValidationError(
-                    "hybrid ASR binding exists without STT evidence"
+                    "hybrid ASR evidence binding exists without STT evidence"
                 )
-        else:
+        elif asr_identity is not None:
+            if targeted_evidence is not None:
+                raise SubtitleV2OrchestratorValidationError(
+                    "hybrid baseline and targeted bindings cannot both own one cue"
+                )
             if (
-                asr_identity is None
-                or asr_identity.source != EVIDENCE_SOURCE_ASR_SEGMENT
+                asr_identity.source != EVIDENCE_SOURCE_ASR_SEGMENT
                 or asr_identity.source_index >= len(asr_result.segments)
                 or asr_identity != HybridCueIdentity.for_asr_segment(
                     asr_identity.source_index
@@ -704,13 +732,34 @@ def _validate_semantic_bindings(
                 != asr_result.segments[asr_identity.source_index].text
             ):
                 raise SubtitleV2OrchestratorValidationError(
-                    "hybrid STT evidence is detached"
+                    "hybrid baseline STT evidence is detached"
                 )
             if asr_identity.cue_id in seen_asr_ids:
                 raise SubtitleV2OrchestratorValidationError(
                     "hybrid semantic bindings reuse an ASR identity"
                 )
             seen_asr_ids.add(asr_identity.cue_id)
+        else:
+            if targeted_evidence is None:
+                raise SubtitleV2OrchestratorValidationError(
+                    "hybrid STT evidence has no authoritative binding"
+                )
+            bundle_external_ids = {
+                item.identity.cue_id
+                for item in bundle.cue_evidence
+            }
+            if (
+                targeted_evidence.external_identity != external_identity
+                or targeted_evidence.evidence.source_snapshot
+                != asr_result.source_snapshot
+                or request_cue.stt_ja != targeted_evidence.segment.text
+                or not set(
+                    targeted_evidence.evidence.external_cue_ids
+                ).issubset(bundle_external_ids)
+            ):
+                raise SubtitleV2OrchestratorValidationError(
+                    "hybrid targeted STT evidence is detached"
+                )
     return validated
 
 
@@ -933,6 +982,7 @@ class SubtitleV2SemanticPlan:
     route_decision: SubtitleV2RouteDecision
     hermes_request: HermesV2Request
     semantic_bindings: tuple[SubtitleV2SemanticBinding, ...] = ()
+    asr_source_quality_decisions: tuple[ASRSourceQualityDecision, ...] = ()
 
     def __post_init__(self):
         if not isinstance(self.route_decision, SubtitleV2RouteDecision):
@@ -958,9 +1008,30 @@ class SubtitleV2SemanticPlan:
             route_decision,
             hermes_request,
         )
+        if route_decision.route in {V2_ROUTE_HYBRID, V2_ROUTE_ASR_ONLY}:
+            try:
+                asr_result = _asr_bundle(route_decision).asr_result
+                if self.asr_source_quality_decisions:
+                    source_quality = validate_asr_source_quality_decisions(
+                        asr_result.segments,
+                        self.asr_source_quality_decisions,
+                    )
+                else:
+                    source_quality = classify_asr_result_source_quality(asr_result)
+            except Exception as error:
+                raise SubtitleV2OrchestratorValidationError(
+                    "ASR source-quality decisions are invalid or detached"
+                ) from error
+        else:
+            if self.asr_source_quality_decisions:
+                raise SubtitleV2OrchestratorValidationError(
+                    "non-ASR semantic plan cannot carry ASR source quality"
+                )
+            source_quality = ()
         object.__setattr__(self, "route_decision", route_decision)
         object.__setattr__(self, "hermes_request", hermes_request)
         object.__setattr__(self, "semantic_bindings", semantic_bindings)
+        object.__setattr__(self, "asr_source_quality_decisions", source_quality)
 
 
 @dataclass(frozen=True)
@@ -979,6 +1050,7 @@ class SubtitleV2SemanticResult:
             route_decision=self.semantic_plan.route_decision,
             hermes_request=self.semantic_plan.hermes_request,
             semantic_bindings=self.semantic_plan.semantic_bindings,
+            asr_source_quality_decisions=self.semantic_plan.asr_source_quality_decisions,
         )
         hermes_result = _validated_result(
             self.hermes_result,
@@ -1375,6 +1447,7 @@ def validate_subtitle_v2_semantic_plan(
         route_decision=value.route_decision,
         hermes_request=value.hermes_request,
         semantic_bindings=value.semantic_bindings,
+        asr_source_quality_decisions=value.asr_source_quality_decisions,
     )
 
 

@@ -436,7 +436,12 @@ def main():
             "evidence_bundle",
         )
         and tuple(field.name for field in fields(SubtitleV2SemanticPlan))
-        == ("route_decision", "hermes_request", "semantic_bindings")
+        == (
+            "route_decision",
+            "hermes_request",
+            "semantic_bindings",
+            "asr_source_quality_decisions",
+        )
         and tuple(field.name for field in fields(SubtitleV2SemanticResult))
         == ("semantic_plan", "hermes_result")
         and tuple(field.name for field in fields(SubtitleV2OutputCue))

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import stat
+import tempfile
 
 import teddy_discovery_asr_artifact as artifact_module
 from teddy_discovery_asr import (
@@ -118,6 +121,48 @@ def main():
     assert parsed_cpu.compute_type == "int8"
     assert parsed_cpu.cpu_threads == 8
     assert parsed_cpu.num_workers == 1
+
+    # B. Explicit persistence is a deterministic, private, no-overwrite
+    # boundary around the unchanged schema and serializer.
+    with tempfile.TemporaryDirectory(prefix="stage11-asr-artifact-smoke-") as directory:
+        output = Path(directory) / "result.json"
+        installed = artifact_module.persist_asr_result(output, gpu_result)
+        assert installed == output
+        assert stat.S_IMODE(os.lstat(output).st_mode) == 0o600
+        persisted_raw = output.read_bytes()
+        assert persisted_raw == gpu_raw
+        assert artifact_module.parse_asr_result_bytes(persisted_raw) == gpu_result
+        assert artifact_module.serialize_asr_result(
+            artifact_module.parse_asr_result_bytes(persisted_raw)
+        ) == persisted_raw
+        assert artifact_module.ASR_ARTIFACT_SCHEMA_VERSION == 1
+        expect(
+            artifact_module.ASRArtifactPersistenceError,
+            lambda: artifact_module.persist_asr_result(output, gpu_result),
+            "OVERWRITE_REJECT",
+        )
+
+        symlink_target = Path(directory) / "symlink-target"
+        symlink_target.write_bytes(b"not-an-artifact")
+        symlink_output = Path(directory) / "symlink-result.json"
+        symlink_output.symlink_to(symlink_target)
+        expect(
+            artifact_module.ASRArtifactPersistenceError,
+            lambda: artifact_module.persist_asr_result(
+                symlink_output,
+                gpu_result,
+            ),
+            "SYMLINK_DESTINATION_REJECT",
+        )
+
+        expect(
+            artifact_module.ASRArtifactValidationError,
+            lambda: artifact_module.persist_asr_result(
+                Path(directory) / "malformed.json",
+                object(),
+            ),
+            "MALFORMED_RESULT_REJECT",
+        )
 
     # C/D. Serialization is byte deterministic, UTF-8, compact, and has no
     # wall-clock or host-specific metadata.
@@ -344,12 +389,10 @@ def main():
         "ZERO_SEGMENTS",
     )
 
-    # I. The parser is pure: no filesystem/network/model ownership appears in
-    # its production source, and the source snapshot helper performs equality
-    # only.
+    # J. No network/model/database/workflow ownership appears in the artifact
+    # module; persistence is deliberately limited to its explicit file API.
     production_source = Path(artifact_module.__file__).read_text(encoding="utf-8")
     for forbidden in (
-        "open(",
         "urllib",
         "socket",
         "faster_whisper",
