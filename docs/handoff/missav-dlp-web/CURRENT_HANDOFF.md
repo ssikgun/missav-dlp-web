@@ -2,8 +2,8 @@
 
 ## Current Goal
 
-Stage11 generic Korean subtitle generation pipeline completion and first real
-one-title end-to-end canary preparation.
+Stage11 generic Korean subtitle generation pipeline completion and controlled
+one-title end-to-end canary acceptance.
 
 ## Overall Status
 
@@ -14,6 +14,7 @@ one-title end-to-end canary preparation.
 - STAGE11_SUBTITLECAT_PROXY_WIRING_FROZEN
 - STAGE11_CANARY_ALIGNMENT_CONTRACT_FROZEN
 - STAGE11_GENERIC_UNPROJECTABLE_TARGETED_FALLBACK_FIXED
+- STAGE11_FIRST_REAL_CONTROLLER_CANARY_PASS
 
 ## Completed
 
@@ -62,7 +63,8 @@ one-title end-to-end canary preparation.
 - generic CANARY_ONLY alignment acceptance contract frozen
 - initial real generic one-title canary: RAN ONCE and stopped fail-closed at
   Hybrid quality review
-- fixed-commit real canary resume: NOT RUN
+- first real controller E2E canary: PASS via ASR_ONLY transport-failure path
+- accepted-alignment plus unprojectable-targeted live path: NOT DIRECTLY EXERCISED
 
 ## Current Architecture
 
@@ -118,9 +120,12 @@ This is the first real Stage11 controller canary contract only.
 - prefer false `ASR_ONLY` fallback over false Hybrid acceptance
 - when more real-title evidence accumulates, reassess a separate production
   policy; do not promote this contract implicitly
-- first real `HSODA-104` controller canary: **RAN ONCE; stopped fail-closed at
+- initial real `HSODA-104` controller canary: **RAN ONCE; stopped fail-closed at
   Hybrid quality review**
-- fixed-commit `HSODA-104` controller resume: **NOT RUN**
+- first completed real `HSODA-104` controller E2E canary: **PASS; ASR_ONLY via
+  TRANSPORT_FAILURE**
+- accepted-alignment plus valid-targeted-unprojectable live path: **NOT DIRECTLY
+  EXERCISED; KNOWN / NON-BLOCKING validation gap**
 - Stage11: **ACTIVE / NOT CLOSED**
 - publication: **NO**
 
@@ -173,8 +178,8 @@ constant.
 ### Next-run values and exact source API map
 
 The next checkpoint must use these explicit canary values. The existing
-artifact/staging roots below came from the initial failed canary and must be
-preserved for the fixed-commit resume:
+artifact/staging roots below came from the initial canary and must be
+preserved for future explicitly authorized canary work:
 
 - SubtitleCat proxy: `http://127.0.0.1:58888`
 - `remote_task_root`:
@@ -189,7 +194,8 @@ preserved for the fixed-commit resume:
 - `stateful_staging_root`:
   `/opt/missav-dlp-web/discovery/stage11-canary-staging`
 - initial failed-canary artifact/staging state: **EXISTING; PRESERVE**
-- fixed-commit resume must not delete or overwrite the existing canary state
+- no canary retry in this handoff checkpoint; existing canary state must not be
+  deleted or overwritten
 
 The complete next-run constructor/call map, validated against the current
 source signatures, is:
@@ -295,12 +301,15 @@ evidence guard remain fail-closed. ASR_ONLY behavior, alignment acceptance
 policy, and residual threshold are unchanged. Existing canary artifacts,
 staging, and remote session state are preserved.
 
-- fixed-commit real `HSODA-104` controller resume: **NOT RUN**
+- subsequent real `HSODA-104` controller E2E canary: **PASS via ASR_ONLY
+  TRANSPORT_FAILURE**; accepted-alignment targeted-unprojectable live path was
+  not exercised
 - Stage11/R6: **ACTIVE / NOT CLOSED**
 - publication: **NO**
 
-Next step: using the frozen fixed commit, perform one real controller resume
-while preserving the existing failed-canary artifacts/session.
+Next step: when explicitly authorized, use the frozen fixed commit for one
+targeted real controller run that reaches accepted external alignment while
+preserving existing canary artifacts/session.
 
 ## Stage11 Generic Unprojectable Targeted Evidence Fallback — FROZEN
 
@@ -349,13 +358,72 @@ projection, targeted artifact/runner, ASR source-quality, ASR-only review,
 stateful Hybrid, and quality-review regression smokes PASS. `py_compile` and
 `git diff --check` PASS.
 
-- real `HSODA-104` controller resume after this fix: **NOT RUN**
+- real `HSODA-104` controller E2E after this fix: **PASS via ASR_ONLY
+  TRANSPORT_FAILURE**
+- accepted-alignment plus valid-targeted-unprojectable live path: **NOT DIRECTLY
+  EXERCISED; KNOWN / NON-BLOCKING validation gap**
 - Stage11/R6: **ACTIVE / NOT CLOSED**
 - publication: **NO**
 
-Next step: using the frozen fixed commit, perform one real `HSODA-104`
-controller resume while preserving the existing canary artifacts, staging, and
-remote session state.
+Next step: when explicitly authorized, perform one real `HSODA-104` controller
+run reaching accepted external alignment while preserving existing canary
+artifacts, staging, and remote session state.
+
+## First Real Controller E2E Canary — PASS
+
+The first completed real controller end-to-end canary was `HSODA-104`.
+
+- controller completion: **PASS**
+- final route: `ASR_ONLY`
+- `baseline_reused`: `true`
+- `targeted_reused`: `true`
+- `external_ja_outcome`: `TRANSPORT_FAILURE`
+- `alignment_outcome`: `NOT_ATTEMPTED`
+- CLEAN:
+  `/opt/missav-dlp-web/discovery/stage11-canary-artifacts/HSODA-104/clean-ko-v1.srt`
+- CLEAN SHA256:
+  `09ad0c4588a52f5eb4d4ef3f48050524cac4b9edad474755ae3a89b500dcfa76`
+- mechanical report:
+  `/opt/missav-dlp-web/discovery/stage11-canary-artifacts/HSODA-104/stage11-controller-report-v1.json`
+- report SHA256:
+  `7fa9412aabd1c48167fe686df2f8ea92ede7d47c56a5b4d7037d2e6f034ebec3`
+- `publication_performed`: `false`
+- CLEAN cue count: `265`
+- SRT structural errors: `0`
+- source quality: `KEEP=264`, `REQUIRE_SECOND_EVIDENCE=1`, `OMIT=0`
+
+The ASR_ONLY stateful first pass completed 265 cues across 17 parts. The
+translation session was
+`e1a35910-b59d-59b8-87c7-800cb8787c9a`; the second-pass review session was
+`5174be4b-a0d3-4f40-97e7-ef573db99221`. Both first pass and review completed.
+
+### User quality acceptance
+
+The user acceptance bar is practical subtitle usability, not commercial-grade
+translation: the viewer should understand the work; some ASR hallucination or
+awkward wording is acceptable; uncertain KEEP is preferred to false OMIT.
+
+The CLEAN retains some suspected Whisper hallucination, including:
+
+- `시청해 주셔서 감사합니다`
+- `다음 영상에서 만나요`
+- repeated `안녕히 주무세요`
+
+Trace review shows source-quality classification and second-pass Hermes both
+selected KEEP for those cues. This is not a CLEAN materialization bug, and no
+aggressive deterministic deletion was applied. Under the stated user bar,
+the `HSODA-104` CLEAN is accepted for practical use.
+
+### Live validation boundary
+
+This canary succeeded through `external_ja_outcome=TRANSPORT_FAILURE` and the
+existing ASR_ONLY path. It did not directly exercise the new
+accepted-alignment + valid-targeted-unprojectable → ASR_ONLY fallback with a
+live provider. That remains a **KNOWN / NON-BLOCKING validation gap**. Offline
+smoke validation exists; no SubtitleCat retry is implied by this handoff.
+
+- Stage11/R6: **ACTIVE / NOT CLOSED**
+- publication: **NO**
 
 ## Cross-title Calibration
 
@@ -440,7 +508,10 @@ Hermes state DB:
 - `claim_token=1`: STANDALONE_CANARY_ONLY, not a job allocator
 - initial failed canary remote Hermes/VM122/Whisper calls: completed before the
   quality-review stop
-- fixed-commit resume remote Hermes/VM122/Whisper calls: NOT RUN
+- first real controller E2E remote ASR/Hermes calls: completed on the
+  ASR_ONLY transport-failure path
+- accepted-alignment plus unprojectable-targeted live provider path: NOT
+  DIRECTLY EXERCISED
 - publication: NOT PERFORMED
 
 ## SubtitleCat Network Route
@@ -460,7 +531,7 @@ Hermes state DB:
 - Stage11 jobs DB
 - production staging root
 - external JA/alignment durable reuse store
-- fixed-commit `run_one_title_stage11` real-canary resume
+- accepted-alignment plus valid-targeted-unprojectable live canary validation
 
 이 항목들은 필수 구현 결함으로 과장하지 않는다. 현재 다음 milestone에서
 필요한 것만 구분한다.
@@ -468,10 +539,12 @@ Hermes state DB:
 ## Next Step
 
 production connection values read-only preflight
-→ one fixed-commit real generic `run_one_title_stage11` canary resume
+→ one explicitly authorized real generic controller run reaching accepted
+external alignment, preserving existing canary state
 
-첫 canary는 QualityReviewError에서 fail-closed 되었고, fixed-commit resume는
-아직 실행하지 않았다.
+초기 canary는 QualityReviewError에서 fail-closed 되었고, 이후 첫 완료형
+real controller canary는 TRANSPORT_FAILURE 경유 ASR_ONLY로 PASS했다. accepted
+alignment + valid targeted unprojectable live path는 아직 직접 검증하지 않았다.
 
 ## New Conversation Warnings
 
