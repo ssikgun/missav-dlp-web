@@ -29,6 +29,9 @@ from teddy_discovery_stage11_controller import (
 from teddy_discovery_stage11_deployment import (
     Stage11DeploymentError,
 )
+from teddy_discovery_stateful_live_runner import (
+    StatefulSemanticOutputValidationRetryExhausted,
+)
 from teddy_discovery_stage12_inventory import (
     ELIGIBLE_NEEDS_KO,
     EXISTING_KO_ABSENT,
@@ -632,6 +635,12 @@ class Stage12BatchRunner:
         publication_result: str,
         jellyfin_recognition: str,
     ) -> Stage12BatchTitleResult:
+        semantic_retry_exhausted = isinstance(
+            error,
+            StatefulSemanticOutputValidationRetryExhausted,
+        )
+        if semantic_retry_exhausted:
+            terminal = False
         to_status = STATE_FAILED_TERMINAL if terminal else STATE_FAILED_RETRYABLE
         if state.status == STATE_PENDING and terminal:
             # The frozen state machine deliberately has no direct
@@ -643,9 +652,25 @@ class Stage12BatchRunner:
             "operation": "STAGE12_SERIAL_BATCH",
             "error_type": type(error).__name__,
             "error": str(error),
-            "retry_performed": False,
+            "retry_performed": (
+                error.attempts > 1
+                if semantic_retry_exhausted
+                else False
+            ),
             "destination": destination,
         }
+        transition_reason = "STAGE12_TITLE_FAILURE"
+        if semantic_retry_exhausted:
+            transition_reason = (
+                "STAGE12_SEMANTIC_OUTPUT_VALIDATION_RETRY_EXHAUSTED"
+            )
+            failure_provenance[
+                "semantic_output_validation_retry"
+            ] = {
+                "part_index": error.part_index,
+                "attempts": error.attempts,
+                "max_attempts": error.max_attempts,
+            }
         if publication_result == "PASS":
             if clean_sha256 is None or destination is None:
                 raise Stage12BatchSystemicError(
@@ -662,7 +687,7 @@ class Stage12BatchRunner:
             state.dvd_id,
             to_status,
             expected_from=state.status,
-            reason="STAGE12_TITLE_FAILURE",
+            reason=transition_reason,
             provenance=failure_provenance,
             destination_relative=destination,
         )
@@ -685,6 +710,7 @@ class Stage12BatchRunner:
             (
                 Stage12BatchTitleError,
                 Stage11ControllerError,
+                StatefulSemanticOutputValidationRetryExhausted,
             ),
         )
 

@@ -10,6 +10,7 @@ from pathlib import Path
 import shlex
 import subprocess
 import tempfile
+from typing import Final
 
 from teddy_discovery_stateful_controller import (
     COMPLETE,
@@ -23,6 +24,7 @@ from teddy_discovery_stateful_parts import (
     parse_stateful_part,
     promote_pending_part,
     assemble_stateful_result,
+    StatefulPartsValidationError,
 )
 from teddy_discovery_stateful_translator import (
     parse_stateful_package,
@@ -33,6 +35,29 @@ from teddy_discovery_stateful_translator import (
 
 class StatefulLiveRunnerError(RuntimeError):
     pass
+
+
+STATEFUL_PART_MODEL_MAX_ATTEMPTS: Final[int] = 2
+
+
+class StatefulSemanticOutputValidationRetryExhausted(
+    StatefulLiveRunnerError
+):
+    """A model part remained invalid after the bounded same-part retry."""
+
+    def __init__(
+        self,
+        *,
+        part_index: int,
+        attempts: int,
+        max_attempts: int,
+    ) -> None:
+        self.part_index = part_index
+        self.attempts = attempts
+        self.max_attempts = max_attempts
+        super().__init__(
+            "semantic output validation retry exhausted"
+        )
 
 
 def _require_absolute_remote_task(value: str) -> str:
@@ -193,6 +218,80 @@ else:
     raise StatefulLiveRunnerError(
         "unexpected remote pending status"
     )
+
+
+def _remove_remote_pending(
+    *,
+    remote: str,
+    ssh_key: str,
+    known_hosts: str,
+    path: str,
+) -> None:
+    """Remove one exact invalid regular pending file, fail closed otherwise."""
+
+    script = """
+import os
+import stat
+import sys
+
+path = sys.argv[1]
+
+try:
+    value = os.lstat(path)
+except FileNotFoundError:
+    print("MISSING")
+    raise SystemExit(0)
+
+if stat.S_ISLNK(value.st_mode):
+    raise SystemExit("REMOTE_PENDING_IS_SYMLINK")
+
+if not stat.S_ISREG(value.st_mode):
+    raise SystemExit("REMOTE_PENDING_NOT_REGULAR")
+
+try:
+    os.unlink(path)
+except FileNotFoundError:
+    print("MISSING")
+    raise SystemExit(0)
+
+directory_fd = os.open(os.path.dirname(path), os.O_RDONLY)
+try:
+    os.fsync(directory_fd)
+finally:
+    os.close(directory_fd)
+
+print("REMOVED")
+"""
+
+    command = (
+        "python3 -c "
+        + shlex.quote(script)
+        + " "
+        + shlex.quote(path)
+    )
+
+    result = subprocess.run(
+        _ssh_base(
+            remote,
+            ssh_key,
+            known_hosts,
+        ) + [command],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    if result.returncode != 0:
+        raise StatefulLiveRunnerError(
+            "remote invalid pending cleanup failed: "
+            + result.stderr.strip()
+        )
+
+    if result.stdout.strip() not in {"REMOVED", "MISSING"}:
+        raise StatefulLiveRunnerError(
+            "unexpected remote invalid pending cleanup result"
+        )
 
 
 def _read_remote_regular_file(
@@ -422,6 +521,124 @@ def _install_validated_pending(
             pass
 
 
+def _request_and_install_part(
+    *,
+    args: argparse.Namespace,
+    package,
+    semantic_input_bytes: bytes,
+    task_directory: Path,
+    remote_task: str,
+    plan,
+    expected,
+) -> None:
+    """Request one deterministic part with a bounded validation retry."""
+
+    for attempt in range(1, STATEFUL_PART_MODEL_MAX_ATTEMPTS + 1):
+        print(
+            "MODEL_PART_ATTEMPT="
+            + str(expected.part_index)
+            + "|"
+            + str(attempt)
+            + "/"
+            + str(STATEFUL_PART_MODEL_MAX_ATTEMPTS)
+        )
+
+        remote_pending = (
+            remote_task
+            + "/"
+            + expected.pending_filename
+        )
+
+        remote_has_pending = _remote_pending_status(
+            remote=args.remote,
+            ssh_key=args.ssh_key,
+            known_hosts=args.known_hosts,
+            path=remote_pending,
+        )
+
+        if remote_has_pending:
+            print(
+                "REMOTE_PENDING_RECOVERY="
+                + str(expected.part_index)
+            )
+        else:
+            query = build_stateful_part_query(
+                package,
+                semantic_input_bytes,
+                expected.part_index,
+            )
+
+            print(
+                "REQUESTING_PART="
+                + str(expected.part_index)
+                + "/"
+                + str(plan.part_count)
+                + "|FIRST="
+                + expected.first_cue_id
+                + "|LAST="
+                + expected.last_cue_id
+            )
+
+            _invoke_hermes_part(
+                remote=args.remote,
+                ssh_key=args.ssh_key,
+                known_hosts=args.known_hosts,
+                remote_task=remote_task,
+                session_id=plan.session_id,
+                query=query,
+                turn_timeout=args.turn_timeout,
+            )
+
+        payload = _read_remote_regular_file(
+            remote=args.remote,
+            ssh_key=args.ssh_key,
+            known_hosts=args.known_hosts,
+            path=remote_pending,
+        )
+
+        try:
+            _install_validated_pending(
+                task_directory=task_directory,
+                payload=payload,
+                plan=plan,
+                expected=expected,
+            )
+        except StatefulPartsValidationError as error:
+            _remove_remote_pending(
+                remote=args.remote,
+                ssh_key=args.ssh_key,
+                known_hosts=args.known_hosts,
+                path=remote_pending,
+            )
+            print(
+                "INVALID_PENDING_REJECTED="
+                + str(expected.part_index)
+                + "|ATTEMPT="
+                + str(attempt)
+            )
+            if attempt == STATEFUL_PART_MODEL_MAX_ATTEMPTS:
+                print(
+                    "SEMANTIC_OUTPUT_VALIDATION_RETRY_EXHAUSTED="
+                    + str(expected.part_index)
+                )
+                raise StatefulSemanticOutputValidationRetryExhausted(
+                    part_index=expected.part_index,
+                    attempts=attempt,
+                    max_attempts=STATEFUL_PART_MODEL_MAX_ATTEMPTS,
+                ) from error
+            print(
+                "RETRYING_PART="
+                + str(expected.part_index)
+            )
+            continue
+
+        return
+
+    raise StatefulLiveRunnerError(
+        "stateful part retry loop exited unexpectedly"
+    )
+
+
 def _write_final_result(
     *,
     final_path: Path,
@@ -634,65 +851,12 @@ def run(args: argparse.Namespace) -> int:
                 "unknown controller action"
             )
 
-        remote_pending = (
-            remote_task
-            + "/"
-            + expected.pending_filename
-        )
-
-        remote_has_pending = (
-            _remote_pending_status(
-                remote=args.remote,
-                ssh_key=args.ssh_key,
-                known_hosts=args.known_hosts,
-                path=remote_pending,
-            )
-        )
-
-        if remote_has_pending:
-            print(
-                "REMOTE_PENDING_RECOVERY="
-                + str(expected.part_index)
-            )
-
-        else:
-            query = build_stateful_part_query(
-                package,
-                semantic_input_bytes,
-                expected.part_index,
-            )
-
-            print(
-                "REQUESTING_PART="
-                + str(expected.part_index)
-                + "/"
-                + str(plan.part_count)
-                + "|FIRST="
-                + expected.first_cue_id
-                + "|LAST="
-                + expected.last_cue_id
-            )
-
-            _invoke_hermes_part(
-                remote=args.remote,
-                ssh_key=args.ssh_key,
-                known_hosts=args.known_hosts,
-                remote_task=remote_task,
-                session_id=plan.session_id,
-                query=query,
-                turn_timeout=args.turn_timeout,
-            )
-
-        payload = _read_remote_regular_file(
-            remote=args.remote,
-            ssh_key=args.ssh_key,
-            known_hosts=args.known_hosts,
-            path=remote_pending,
-        )
-
-        _install_validated_pending(
+        _request_and_install_part(
+            args=args,
+            package=package,
+            semantic_input_bytes=semantic_input_bytes,
             task_directory=task_directory,
-            payload=payload,
+            remote_task=remote_task,
             plan=plan,
             expected=expected,
         )

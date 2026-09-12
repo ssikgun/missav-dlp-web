@@ -23,6 +23,9 @@ from teddy_discovery_stage12_batch import (
     recognize_jellyfin_external_subtitle,
     select_pending_batch,
 )
+from teddy_discovery_stateful_live_runner import (
+    StatefulSemanticOutputValidationRetryExhausted,
+)
 from teddy_discovery_stage12_inventory import (
     ELIGIBLE_NEEDS_KO,
     EXISTING_KO_ABSENT,
@@ -184,7 +187,16 @@ def recognition_for(_dvd_id, video, destination):
     )
 
 
-def controller_for(root: Path, records, calls, *, fail_ids=(), systemic_ids=()):
+def controller_for(
+    root: Path,
+    records,
+    calls,
+    *,
+    fail_ids=(),
+    systemic_ids=(),
+    validation_retry_exhausted_ids=(),
+    unexpected_ids=(),
+):
     bundles = {}
     for record in records:
         bundles[record.dvd_id] = write_valid_bundle(root, record)
@@ -193,6 +205,14 @@ def controller_for(root: Path, records, calls, *, fail_ids=(), systemic_ids=()):
         calls.append(dvd_id)
         if dvd_id in systemic_ids:
             raise Stage12BatchSystemicError("shared contract failure")
+        if dvd_id in unexpected_ids:
+            raise RuntimeError("unexpected programmer failure")
+        if dvd_id in validation_retry_exhausted_ids:
+            raise StatefulSemanticOutputValidationRetryExhausted(
+                part_index=2,
+                attempts=2,
+                max_attempts=2,
+            )
         if dvd_id in fail_ids:
             raise Stage12BatchTitleError("title execution failure")
         _, clean_path, report_path, report = bundles[dvd_id]
@@ -215,7 +235,9 @@ def controller_for(root: Path, records, calls, *, fail_ids=(), systemic_ids=()):
 
 
 def make_runner(root, records, store, *, controller_calls, nas, publisher,
-                fail_ids=(), systemic_ids=(), jellyfin=recognition_for):
+                fail_ids=(), systemic_ids=(),
+                validation_retry_exhausted_ids=(), unexpected_ids=(),
+                jellyfin=recognition_for):
     return Stage12BatchRunner(
         store=store,
         inventory=Stage12HoldingsInventoryReport(tuple(records)),
@@ -229,6 +251,8 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
             controller_calls,
             fail_ids=fail_ids,
             systemic_ids=systemic_ids,
+            validation_retry_exhausted_ids=validation_retry_exhausted_ids,
+            unexpected_ids=unexpected_ids,
         ),
         jellyfin_recognizer=jellyfin,
     )
@@ -402,6 +426,82 @@ def main():
             and isolated_result.titles[0].final_state == STATE_PUBLISHED
             and isolated_result.titles[2].final_state == STATE_PUBLISHED,
             "TITLE_FAILURE_ISOLATION",
+        )
+
+        # Bounded semantic-output retry exhaustion is a title-level retryable
+        # result, and the next immutable selection member still runs.
+        retry_root = Path(temp) / "semantic-retry-artifacts"
+        retry_root.mkdir()
+        retry_store = Stage12RolloutStateStore(Path(temp) / "semantic-retry.sqlite3")
+        retry_store.initialize_from_inventory(
+            Stage12HoldingsInventoryReport(records[:3])
+        )
+        retry_nas = FakeNAS(records[:3])
+        retry_publisher = FakePublisher(retry_nas)
+        retry_calls: list[str] = []
+        retry_runner = make_runner(
+            retry_root,
+            records[:3],
+            retry_store,
+            controller_calls=retry_calls,
+            nas=retry_nas,
+            publisher=retry_publisher,
+            validation_retry_exhausted_ids={"AAA-002"},
+        )
+        retry_result = retry_runner.run(
+            Stage12BatchSelection(3, ("AAA-001", "AAA-002", "AAA-003"))
+        )
+        retry_state = retry_store.get("AAA-002")
+        retry_provenance = json.loads(
+            retry_state.last_transition_provenance_json
+        )
+        require(
+            retry_calls == ["AAA-001", "AAA-002", "AAA-003"]
+            and retry_result.titles[1].final_state == STATE_FAILED_RETRYABLE
+            and retry_state.last_transition_reason
+            == "STAGE12_SEMANTIC_OUTPUT_VALIDATION_RETRY_EXHAUSTED"
+            and retry_provenance["retry_performed"] is True
+            and retry_provenance["semantic_output_validation_retry"]
+            == {"attempts": 2, "max_attempts": 2, "part_index": 2}
+            and retry_result.titles[0].final_state == STATE_PUBLISHED
+            and retry_result.titles[2].final_state == STATE_PUBLISHED,
+            "SEMANTIC_RETRY_EXHAUSTION_TITLE_ISOLATION",
+        )
+
+        # An unrelated programmer exception remains systemic and stops the
+        # immutable serial batch.
+        unexpected_root = Path(temp) / "unexpected-artifacts"
+        unexpected_root.mkdir()
+        unexpected_store = Stage12RolloutStateStore(
+            Path(temp) / "unexpected.sqlite3"
+        )
+        unexpected_store.initialize_from_inventory(
+            Stage12HoldingsInventoryReport(records[:3])
+        )
+        unexpected_nas = FakeNAS(records[:3])
+        unexpected_publisher = FakePublisher(unexpected_nas)
+        unexpected_calls: list[str] = []
+        unexpected_runner = make_runner(
+            unexpected_root,
+            records[:3],
+            unexpected_store,
+            controller_calls=unexpected_calls,
+            nas=unexpected_nas,
+            publisher=unexpected_publisher,
+            unexpected_ids={"AAA-002"},
+        )
+        expect_raises(
+            Stage12BatchSystemicError,
+            lambda: unexpected_runner.run(
+                Stage12BatchSelection(3, ("AAA-001", "AAA-002", "AAA-003"))
+            ),
+            "UNEXPECTED_PROGRAMMER_ERROR_REMAINS_SYSTEMIC",
+        )
+        require(
+            unexpected_calls == ["AAA-001", "AAA-002"]
+            and unexpected_store.get("AAA-002").status == "RUNNING"
+            and unexpected_store.get("AAA-003").status == STATE_PENDING,
+            "UNEXPECTED_ERROR_DOES_NOT_CONTINUE_BATCH",
         )
 
         # A systemic error stops the immutable serial batch immediately.

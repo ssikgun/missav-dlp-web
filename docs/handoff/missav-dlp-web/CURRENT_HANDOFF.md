@@ -22,6 +22,7 @@ subtitle rollout readiness.
 - STAGE12_CP4_JELLYFIN_SUBTITLE_RECOGNITION_PASS
 - STAGE12_CP5_FIRST_SMALL_BOUNDED_ROLLOUT_BATCH_PASS
 - STAGE12_CP6F1_BOUNDED_ALIGNMENT_ASR_ONLY_FALLBACK_PASS
+- STAGE12_CP6F4_INVALID_SEMANTIC_PART_RETRY_ISOLATION_PASS
 
 ## Completed
 
@@ -62,6 +63,7 @@ subtitle rollout readiness.
 - standalone canary `claim_token=1` retained as STANDALONE_CANARY_ONLY
 - deployment + live adapters fake E2E: ASR_ONLY PASS / HYBRID PASS
 - deployment smoke: 17/17 PASS
+- invalid semantic-part bounded retry and per-title isolation
 - explicit SubtitleCat-only Gluetun proxy wiring
 - search, detail, and payload use the same configured SubtitleCat proxy
 - proxy `http://127.0.0.1:58888` is not a global HTTP proxy
@@ -599,6 +601,57 @@ controller run `0`, STT `0`, VM122 `0`, Hermes `0`, SubtitleCat `0`, NAS write
 `0`, Jellyfin write/refresh `0`, and CP6 restart `0`. The CT108 memory incident
 and this `AlignmentLimitError` are separate causes.
 
+## Stage12 CP6F4 Invalid Semantic Part Bounded Retry + Per-title Isolation — PASS
+
+Marker:
+
+`STAGE12_CP6F4_INVALID_SEMANTIC_PART_RETRY_ISOLATION_PASS`
+
+The CP6 retry completed `AT-099` as `PUBLISHED` before the forensic finding on
+`AVSA-455`. `AVSA-455` part 9 exposed a generic source-ASR repeated short-unit
+hallucination; Hermes produced a repeated Korean output, and the existing
+StatefulParts validator correctly rejected it. The validator and all frozen
+quality/alignment policies remain unchanged.
+
+The generic resilience owner is
+`teddy_discovery_stateful_live_runner.py`. A model-generated semantic part is
+now given exactly two maximum attempts: the initial request plus one same-part
+retry. An invalid payload is never installed or promoted; the exact remote
+regular pending file is rejected and removed before the deterministic same
+part query is issued again. Part index, cue range, input SHA, and previously
+promoted canonical parts remain unchanged.
+
+After two invalid payloads, the runner raises the typed
+`StatefulSemanticOutputValidationRetryExhausted` error. Stage12 reuses its
+existing title-failure path, records
+`STAGE12_SEMANTIC_OUTPUT_VALIDATION_RETRY_EXHAUSTED` with retry provenance,
+transitions only that title to `FAILED_RETRYABLE`, and continues the immutable
+serial selection. Unexpected programmer/systemic errors remain
+`Stage12BatchSystemicError` and still stop the batch.
+
+Offline validation passed:
+
+- bounded retry smoke: PASS
+- invalid first → valid second: PASS; same part/query/input SHA; promote once
+- repeated invalid output: PASS; no promote; typed retry exhaustion
+- previous promoted parts/resume semantics: PASS
+- validator thresholds and production hardcode scan: PASS
+- stateful parts smoke: PASS (32/32)
+- stateful live runner smoke: PASS (16/16)
+- Stage11 controller smoke: PASS (41/41)
+- live-adapter smoke: PASS
+- deployment smoke: PASS (17/17)
+- Stage12 batch smoke: PASS
+- Stage12 rollout smoke: PASS
+- `py_compile`: PASS
+- `git diff --check`: PASS
+
+`AVSA-455` durable rollout state remains `RUNNING`; this checkpoint performed
+no recovery or real retry. The actual `recover_running()` and production retry
+are reserved for the next separately authorized checkpoint. CP6F4 performed no
+controller, STT, VM122, Hermes, SubtitleCat, NAS, or Jellyfin call/write, and
+did not restart CP6.
+
 ## Frozen Policies
 
 - production title/cue/text hardcode 금지
@@ -964,7 +1017,7 @@ Stage11 closure blockers.
 
 - Stage11: **CLOSED / PASS**
 - R6: **CLOSED / PASS**
-- Stage12: **ACTIVE / CP6F1 PASS** — AT-099 remains `RUNNING`; no real retry
+- Stage12: **ACTIVE / CP6F4 PASS** — AT-099 `PUBLISHED`; AVSA-455 remains `RUNNING`; no CP6F4 production retry
 - Stage11 controller publication: **NO**
 - Stage12 CP3 publication: **HSODA-104 PASS**; CP5: **3/3 PUBLISHED**
 
@@ -1084,17 +1137,17 @@ Hermes state DB:
 
 ## Next Step
 
-Stage12 scope is frozen and CP6F1 is **PASS** as an offline safety-fallback
-checkpoint. The single-title
-canaries passed, and the first three-title serial batch completed with three
-PUBLISHED/Jellyfin-recognized titles after the generic AKDL-312 legacy proof
-backfill and reconciliation. A larger bounded rollout is ready for separate
-authorization.
+Stage12 scope is frozen and CP6F4 is **PASS** as an offline invalid-output
+recovery/isolation checkpoint. The single-title canaries passed, and the first
+three-title serial batch completed with three PUBLISHED/Jellyfin-recognized
+titles after the generic AKDL-312 legacy proof backfill and reconciliation.
+A larger bounded rollout is ready for separate authorization.
 
-AT-099 remains `RUNNING` by design for this checkpoint. The next checkpoint
-must apply `recover_running()` and record `RUNNING → PENDING /
-CRASH_RECOVERY` before any separately authorized retry. CP6F1 itself performed
-no retry.
+AT-099 is `PUBLISHED`. `AVSA-455` remains `RUNNING` from the interrupted CP6
+retry. The next checkpoint must apply `recover_running()` and record
+`RUNNING → PENDING / CRASH_RECOVERY` for the affected title before any
+separately authorized production retry. CP6F4 itself performed no recovery or
+real retry.
 The next rollout sequence is:
 
 1. READ-ONLY holdings inventory/dry-run — CP1 PASS
@@ -1117,11 +1170,11 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 ## New Conversation Warnings
 
 - Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
-- Stage12 ACTIVE / CP5 PASS; larger bounded rollout requires separate authorization
+- Stage12 ACTIVE / CP6F4 PASS; AVSA-455 remains RUNNING; larger rollout requires separate authorization
 - 작품별 튜닝으로 되돌아가지 않기
 - ADN/JUR/HSODA/DVDMS 특정 production logic 금지
 - old canonical KO subtitle overwrite 금지
-- no blind retries
+- no unbounded or blind retries; only the frozen generic bounded retry
 - no broad NAS scan
 - no automatic publication
 - controller/result가 timing authority를 Hermes에 넘기지 않도록 유지
