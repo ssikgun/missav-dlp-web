@@ -20,6 +20,7 @@ subtitle rollout readiness.
 - STAGE12_CP2_DURABLE_ROLLOUT_STATE_PREFLIGHT_PASS
 - STAGE12_CP3_ONE_TITLE_ATOMIC_PUBLICATION_CANARY_PASS
 - STAGE12_CP4_JELLYFIN_SUBTITLE_RECOGNITION_PASS
+- STAGE12_CP5_FIRST_SMALL_BOUNDED_ROLLOUT_BATCH_PASS
 
 ## Completed
 
@@ -165,8 +166,8 @@ Jellyfin can use it.
 
 CP1/CP2 used only bounded inventory, artifact validation, state-store
 initialization, and exact-path NAS read/stat. CP3 then performed exactly one
-operator-selected HSODA-104 publication canary; no batch rollout or Jellyfin
-operation was performed.
+operator-selected HSODA-104 publication canary, and CP4 verified its Jellyfin
+recognition. CP5 below records the first serial three-title rollout batch.
 
 ## Stage12 CP1 Holdings Subtitle Inventory — PASS
 
@@ -429,9 +430,125 @@ The authoritative NAS/video witnesses remained unchanged. `NAS_WRITE=0`,
 `JELLYFIN_DB_DIRECT_WRITE=0`, SubtitleCat/VM122/Hermes/controller/provider
 calls were `0`, and `JUR-750` was untouched.
 
-The next checkpoint is the first small bounded Stage12 rollout batch. Existing
+CP5 below records the first small bounded Stage12 rollout batch. Existing
 Stage11 contracts, conservative fallback policy, canonical KO protection, and
 fail-closed publication rules remain unchanged.
+
+## Stage12 CP5 First Small Bounded Rollout Batch — PASS
+
+Marker:
+
+`STAGE12_CP5_FIRST_SMALL_BOUNDED_ROLLOUT_BATCH_PASS`
+
+CP5 selected exactly three titles from the deterministic frozen selector and
+processed them serially. The selector required durable state `PENDING`, CP1
+eligibility `ELIGIBLE_NEEDS_KO`, `existing_ko=ABSENT`, a valid authoritative
+holding/source identity, and excluded `PUBLISHED` and `UNRESOLVED` titles.
+The immutable selection was:
+
+- `BATCH_SIZE=3`
+- `SELECTED_COUNT=3`
+- `SELECTED_DVD_IDS=['ADN-785', 'ADN-799', 'AKDL-312']`
+- ordering: canonical `dvd_id` ascending
+
+The generic Stage12 owner was `Stage12BatchRunner` with
+`select_pending_batch(...)` in `teddy_discovery_stage12_batch.py`. It reused
+the frozen Stage11 controller and owned only bounded selection, per-title
+state transitions, artifact validation, exact canonical publication, and
+item-specific Jellyfin recognition. No title/cue/text-specific production
+logic was added. No automatic retry or concurrency was used.
+
+### Per-title outcomes
+
+- `ADN-785`: Stage11 `PASS`, route `ASR_ONLY`, CLEAN 914 cues, CLEAN SHA256
+  `217f10bbc51fc0a712dac0a213d8a79c025e949674833f338d0f6b45438337c1`,
+  publication `PASS` to `ADN/ADN-785/ADN-785.ko.srt`, Jellyfin recognition
+  `PASS`, final state `PUBLISHED`. Report SHA256:
+  `f954c13047057cf2cbd0bef189f065e7605f9db32f6a31bad79f788f411f2293`.
+- `ADN-799`: Stage11 `PASS`, route `ASR_ONLY`, CLEAN 422 cues, CLEAN SHA256
+  `14cea130f1adc30fc591a4a8a6d3f06e4019dba9cf0740efead5f63e33e9d934`,
+  publication `PASS` to `ADN/ADN-799/ADN-799.ko.srt`, Jellyfin recognition
+  `PASS`, final state `PUBLISHED`. Report SHA256:
+  `7e5633b68457912e8682556f8344ca65a6c9d3280757da3b0969dc98d4b1daea`.
+- `AKDL-312`: Stage11 `PASS`, route `ASR_ONLY`, CLEAN 752 cues, CLEAN SHA256
+  `d8a02a4747d7d285605243252abdf72573152b98af71fcb78b4af659aa006f30`,
+  publication `PASS` to `AKDL/AKDL-312/AKDL-312.ko.srt`; exact destination
+  readback and strict SRT validation passed. Initial Jellyfin recognition
+  timed out before the bounded polling window, so the title first entered
+  `FAILED_RETRYABLE` with the recorded error `Jellyfin external Korean
+  subtitle not recognized`. Later read-only verification found the exact
+  external Korean stream. Report SHA256:
+  `76dcb5bc52384574cff85c66039865469483b71b3582d635b38e80f3b4ea4bfa`.
+  The generated CLEAN, destination, source snapshot, and original failure
+  history were preserved; no controller, publication, or Jellyfin refresh
+  retry was performed.
+
+All three routes were `ASR_ONLY`; external JA outcomes were
+`VALIDATION_FAILURE`, `VALIDATION_FAILURE`, and `NO_CANDIDATE`, respectively,
+with alignment `NOT_ATTEMPTED`. The three Stage11 controller invocations,
+three baseline calls, three external-attempt callbacks, two targeted calls,
+three first-pass calls, and three ASR review calls completed within this
+single batch; no Hybrid review runner was invoked. Jellyfin used three
+item-specific refresh attempts. No other title was processed.
+
+Batch summary:
+
+- `SELECTED=3`
+- `PUBLISHED=3`
+- `FAILED_RETRYABLE=0`
+- `FAILED_TERMINAL=0`
+- `SKIPPED=0`
+- `UNRESOLVED=0` within the selected batch
+- `CONTROLLER_SUCCESS=3`
+- `JELLYFIN_RECOGNIZED=3`
+
+Current durable rollout counts are `PENDING=168`, `RUNNING=0`,
+`GENERATED=0`, `PUBLISHED=4`, `UNRESOLVED=1`, `FAILED_RETRYABLE=0`,
+`FAILED_TERMINAL=0`, and `SKIPPED_EXISTING_KO=0`, across 173 title records.
+The local state store has one audited initial state plus three audited
+transitions for each selected title, with AKDL-312 additionally retaining one
+`PUBLICATION_PROOF_BACKFILLED` audit event and one
+`PUBLICATION_RECONCILED` event. No duplicate title state or publication event
+was created. A read-only selector dry-run did not reselect the four published
+titles or `JUR-750` and returned the next deterministic pending candidates
+`AT-099`, `AVSA-455`, and `AVSA-456`.
+
+The publication safety contract remained active: only the three selected
+canonical destinations were addressed, existing KO files were not
+overwritten, source videos and CLEAN artifacts remained immutable, exact
+destination readback matched each CLEAN SHA, and Jellyfin direct database
+writes were zero. `JUR-750` remains `UNRESOLVED` and untouched.
+
+The accepted practical quality bar remains content understanding rather than
+commercial translation quality. Mixed music/water/noise may cause speech
+omissions, and occasional Whisper hallucinations may remain; the user
+accepts this quality and prefers uncertain KEEP to false OMIT. This quality
+limitation is known and non-blocking for the three completed titles. CP5 is a
+full bounded-batch PASS and a larger bounded rollout is ready for separate
+authorization.
+
+### CP5R3 AKDL-312 legacy publication-proof backfill and reconciliation
+
+The original `FAILED_RETRYABLE` event was retained unchanged. After offline
+smoke validation, the generic `Stage12RolloutStateStore` API recorded one
+audited `PUBLICATION_PROOF_BACKFILLED` event using the existing artifact,
+report, canonical destination/SHA, exact Jellyfin item/media/subtitle paths,
+`external=true`, `language=kor`, `codec=subrip`, and explicit verification
+PASS. The state then moved through the existing
+`reconcile_published(...)` API to `PUBLISHED` without rerunning the writer,
+controller, or Jellyfin refresh. A second reconciliation check was an
+`ALREADY_PUBLISHED` no-op with no additional event.
+
+The AKDL-312 final evidence was:
+
+- destination SHA256 equals CLEAN SHA256:
+  `d8a02a4747d7d285605243252abdf72573152b98af71fcb78b4af659aa006f30`
+- Jellyfin item:
+  `b4ae125471a5d7cf704bc1cccac20601`
+- Jellyfin media path: `/media/adult/AKDL/AKDL-312/AKDL-312.mp4`
+- external subtitle path: `/media/adult/AKDL/AKDL-312/AKDL-312.ko.srt`
+- `kor / subrip / external`: PASS
+- NAS writes and Jellyfin refreshes during CP5R3: `0`
 
 ## Frozen Policies
 
@@ -770,7 +887,8 @@ smoke validation exists; no SubtitleCat retry is implied by this handoff.
 
 - Stage11/R6: **CLOSED / PASS**
 - Stage11 controller publication: **NO**
-- Stage12 CP3 publication: **HSODA-104 PASS**; batch/full rollout: **NOT RUN**
+- Stage12 CP3 publication: **HSODA-104 PASS**
+- Stage12 CP5: **PASS** — 3 of 3 titles PUBLISHED and Jellyfin-recognized
 
 ## Stage11/R6 Final Closure Audit — PASS
 
@@ -797,9 +915,9 @@ Stage11 closure blockers.
 
 - Stage11: **CLOSED / PASS**
 - R6: **CLOSED / PASS**
-- Stage12: **ACTIVE / CP4 PASS**
+- Stage12: **ACTIVE / CP5 PASS**
 - Stage11 controller publication: **NO**
-- Stage12 CP3 publication: **HSODA-104 PASS**; batch/full rollout: **NOT RUN**
+- Stage12 CP3 publication: **HSODA-104 PASS**; CP5: **3/3 PUBLISHED**
 
 ## Cross-title Calibration
 
@@ -889,7 +1007,8 @@ Hermes state DB:
 - accepted-alignment plus unprojectable-targeted live provider path: NOT
   DIRECTLY EXERCISED
 - Stage11 controller publication: NOT PERFORMED
-- Stage12 CP3 publication: `HSODA-104` PASS; batch/full rollout: NOT RUN
+- Stage12 CP3 publication: `HSODA-104` PASS; CP5: `3/3` PUBLISHED; full
+  eligible-holdings rollout: NOT RUN
 
 ## SubtitleCat Network Route
 
@@ -909,28 +1028,31 @@ Hermes state DB:
 - production staging root
 - external JA/alignment durable reuse store
 - accepted-alignment plus valid-targeted-unprojectable live canary validation
-- bounded publication rollout and full eligible-holdings rollout
+- bounded publication rollout completion and full eligible-holdings rollout
 
 이 항목들은 필수 구현 결함으로 과장하지 않는다. 현재 다음 milestone에서
 필요한 것만 구분한다.
 
 ## Next Step
 
-Stage12 scope is frozen and CP4 is **ACTIVE / PASS**. The single-title atomic
-publication and Jellyfin recognition canaries passed; the next bounded step is
-the first small rollout batch.
+Stage12 scope is frozen and CP5 is **ACTIVE / PASS**. The single-title
+canaries passed, and the first three-title serial batch completed with three
+PUBLISHED/Jellyfin-recognized titles after the generic AKDL-312 legacy proof
+backfill and reconciliation. A larger bounded rollout is ready for separate
+authorization.
 The next rollout sequence is:
 
 1. READ-ONLY holdings inventory/dry-run — CP1 PASS
 2. 1-title atomic publication canary — CP3 PASS for HSODA-104
 3. Jellyfin recognition / safe refresh canary — CP4 PASS for HSODA-104
-4. small bounded batch
+4. small bounded batch — CP5 PASS (`3/3` PUBLISHED)
 5. full eligible holdings rollout
 
-All steps must preserve Stage11's frozen contracts and must not reopen
-Stage11. The accepted-alignment + valid-targeted-unprojectable live path may
-be observed naturally during rollout; it remains a KNOWN / NON-BLOCKING gap
-and does not imply a dedicated retry.
+The next action is a separately authorized larger bounded rollout batch. All
+steps must preserve Stage11's frozen contracts and must not reopen Stage11.
+The accepted-alignment + valid-targeted-unprojectable live path may be observed
+naturally during rollout; it remains a KNOWN / NON-BLOCKING gap and does not
+imply a dedicated retry.
 
 초기 canary는 QualityReviewError에서 fail-closed 되었고, 이후 첫 완료형
 real controller canary는 TRANSPORT_FAILURE 경유 ASR_ONLY로 PASS했다. accepted
@@ -940,7 +1062,7 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 ## New Conversation Warnings
 
 - Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
-- Stage12 ACTIVE / CP4 PASS; small bounded rollout batch is the next step
+- Stage12 ACTIVE / CP5 PASS; larger bounded rollout requires separate authorization
 - 작품별 튜닝으로 되돌아가지 않기
 - ADN/JUR/HSODA/DVDMS 특정 production logic 금지
 - old canonical KO subtitle overwrite 금지

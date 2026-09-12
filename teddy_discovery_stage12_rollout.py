@@ -1,10 +1,12 @@
-"""Durable Stage12 rollout state and read-only publication preflight.
+"""Durable Stage12 rollout state and publication preflight/reconciliation.
 
 The rollout state is intentionally separate from the Discovery holdings DB.
 The preflight consumes the CP1 inventory, validates an existing Stage11
 artifact bundle and source snapshot, and checks one exact NAS destination.  It
 never publishes, writes NAS media, edits Jellyfin, or runs a Stage11 provider
-or model.
+or model.  Publication reconciliation only records an audited state event
+after independently supplied publication and Jellyfin evidence matches the
+durable state.
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ import argparse
 import fcntl
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import sqlite3
 import stat
@@ -88,6 +90,10 @@ PUBLICATION_BLOCKED_EXISTING_KO = "BLOCKED_EXISTING_KO"
 PUBLICATION_BLOCKED_INVALID_ARTIFACT = "BLOCKED_INVALID_ARTIFACT"
 PUBLICATION_BLOCKED_SOURCE_DRIFT = "BLOCKED_SOURCE_DRIFT"
 PUBLICATION_UNRESOLVED = "UNRESOLVED"
+PUBLICATION_PROOF_BACKFILLED = "PUBLICATION_PROOF_BACKFILLED"
+PUBLICATION_RECONCILED = "PUBLICATION_RECONCILED"
+
+_JELLYFIN_MEDIA_ROOT = PurePosixPath("/media/adult")
 
 _ALLOWED_TRANSITIONS = {
     STATE_PENDING: frozenset(
@@ -218,6 +224,34 @@ class Stage12RolloutState:
 
 
 @dataclass(frozen=True)
+class Stage12PublicationReconciliationEvidence:
+    """Exact current witnesses required for publication reconciliation."""
+
+    destination_relative: str
+    destination_sha256: str
+    jellyfin_item_id: str
+    jellyfin_item_path: str
+    jellyfin_subtitle_path: str
+    subtitle_language: str
+    subtitle_codec: str
+    external_visible: bool
+    verification_passed: bool
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "destination_relative": self.destination_relative,
+            "destination_sha256": self.destination_sha256,
+            "jellyfin_item_id": self.jellyfin_item_id,
+            "jellyfin_item_path": self.jellyfin_item_path,
+            "jellyfin_subtitle_path": self.jellyfin_subtitle_path,
+            "subtitle_language": self.subtitle_language,
+            "subtitle_codec": self.subtitle_codec,
+            "external_visible": self.external_visible,
+            "verification_passed": self.verification_passed,
+        }
+
+
+@dataclass(frozen=True)
 class Stage12PublicationPreflight:
     """Read-only result for one generic publication canary candidate."""
 
@@ -341,6 +375,39 @@ def _validated_destination_relative(value: object) -> str:
     return path.as_posix()
 
 
+def _validated_identity_string(
+    value: object,
+    *,
+    field_name: str,
+) -> str:
+    if type(value) is not str or not value:
+        raise Stage12RolloutValidationError(
+            field_name + " must be a non-empty string"
+        )
+    if any(
+        ord(character) < 32 or ord(character) == 127
+        for character in value
+    ):
+        raise Stage12RolloutValidationError(
+            field_name + " contains a control character"
+        )
+    return value
+
+
+def _jellyfin_media_path(relative_path: str) -> str:
+    path = PurePosixPath(relative_path)
+    if (
+        path.is_absolute()
+        or not path.parts
+        or ".." in path.parts
+        or "\\" in relative_path
+    ):
+        raise Stage12RolloutValidationError(
+            "relative path is invalid for Jellyfin identity"
+        )
+    return (_JELLYFIN_MEDIA_ROOT / path).as_posix()
+
+
 def _canonical_video_for_state(
     dvd_id: str,
     media_path_identity: str,
@@ -406,6 +473,272 @@ def _initial_status_for(record: Stage12HoldingInventoryRecord) -> str:
 def _state_from_row(row: sqlite3.Row) -> Stage12RolloutState:
     values = dict(row)
     return Stage12RolloutState(**values)
+
+
+def _event_value_from_row(row: sqlite3.Row) -> dict[str, object]:
+    try:
+        value = json.loads(row["provenance_json"])
+    except (TypeError, ValueError, UnicodeError) as error:
+        raise Stage12RolloutValidationError(
+            "rollout event provenance is invalid JSON"
+        ) from error
+    if not isinstance(value, Mapping):
+        raise Stage12RolloutValidationError(
+            "rollout event provenance is not an object"
+        )
+    return dict(value)
+
+
+def _publication_candidate_from_event(
+    provenance_json: object,
+) -> dict[str, object] | None:
+    if type(provenance_json) is not str:
+        raise Stage12RolloutValidationError(
+            "rollout event provenance is not JSON text"
+        )
+    try:
+        value = json.loads(provenance_json)
+    except (TypeError, ValueError, UnicodeError) as error:
+        raise Stage12RolloutValidationError(
+            "rollout event provenance is invalid JSON"
+        ) from error
+    if not isinstance(value, Mapping):
+        raise Stage12RolloutValidationError(
+            "rollout event provenance is not an object"
+        )
+    nested = value.get("publication_provenance")
+    if nested is not None:
+        if not isinstance(nested, Mapping):
+            raise Stage12RolloutValidationError(
+                "publication provenance is not an object"
+            )
+        return dict(nested)
+    if value.get("publication_performed") is True:
+        return dict(value)
+    return None
+
+
+def _publication_provenance_from_events(
+    event_rows: tuple[sqlite3.Row, ...],
+) -> dict[str, object]:
+    candidates: list[dict[str, object]] = []
+    for row in event_rows:
+        candidate = _publication_candidate_from_event(
+            row["provenance_json"]
+        )
+        if candidate is not None:
+            candidates.append(candidate)
+    if not candidates:
+        raise Stage12RolloutValidationError(
+            "successful publication provenance is missing"
+        )
+    canonical = _canonical_provenance(candidates[0])
+    for candidate in candidates[1:]:
+        if _canonical_provenance(candidate) != canonical:
+            raise Stage12RolloutIdentityError(
+                "conflicting publication provenance"
+            )
+    return candidates[0]
+
+
+def _validate_publication_provenance(
+    state: Stage12RolloutState,
+    provenance: Mapping[str, object],
+    *,
+    require_artifact_report_identity: bool = False,
+) -> dict[str, object]:
+    if not isinstance(provenance, Mapping):
+        raise Stage12RolloutValidationError(
+            "successful publication provenance is not an object"
+        )
+    candidate = dict(provenance)
+    if (
+        candidate.get("publication_performed") is not True
+        or candidate.get("atomic_install") is not True
+        or candidate.get("destination_verified") is not True
+    ):
+        raise Stage12RolloutValidationError(
+            "publication provenance is not a verified successful install"
+        )
+    if state.artifact_path is None or state.report_path is None:
+        raise Stage12RolloutValidationError(
+            "publication reconciliation requires artifact/report identity"
+        )
+    _validated_metadata_path(
+        state.artifact_path,
+        field_name="artifact_path",
+    )
+    _validated_metadata_path(
+        state.report_path,
+        field_name="report_path",
+    )
+    artifact_sha = _validated_sha(
+        state.artifact_sha256,
+        field_name="artifact_sha256",
+    )
+    _validated_sha(
+        state.report_sha256,
+        field_name="report_sha256",
+    )
+    destination = _validated_destination_relative(
+        state.destination_relative
+    )
+    canonical_destination = derive_target_ko_relative(
+        _canonical_video_for_state(
+            state.dvd_id,
+            state.media_path_identity,
+        )
+    )
+    if destination != canonical_destination:
+        raise Stage12RolloutIdentityError(
+            "publication provenance destination is not canonical"
+        )
+    if (
+        _validated_destination_relative(
+            candidate.get("destination_relative")
+        )
+        != destination
+    ):
+        raise Stage12RolloutIdentityError(
+            "publication provenance destination differs from state"
+        )
+    if (
+        _validated_sha(
+            candidate.get("destination_sha256"),
+            field_name="destination_sha256",
+        )
+        != artifact_sha
+    ):
+        raise Stage12RolloutIdentityError(
+            "publication provenance SHA differs from CLEAN"
+        )
+    identity_fields = {
+        "dvd_id": state.dvd_id,
+        "artifact_path": state.artifact_path,
+        "artifact_sha256": artifact_sha,
+        "report_path": state.report_path,
+        "report_sha256": state.report_sha256,
+    }
+    for field_name, expected in identity_fields.items():
+        if field_name not in candidate:
+            if require_artifact_report_identity and field_name != "dvd_id":
+                raise Stage12RolloutValidationError(
+                    "legacy publication proof lacks " + field_name
+                )
+            if require_artifact_report_identity and field_name == "dvd_id":
+                raise Stage12RolloutValidationError(
+                    "legacy publication proof lacks dvd_id"
+                )
+            continue
+        if field_name.endswith("_path"):
+            actual = _validated_metadata_path(
+                candidate[field_name],
+                field_name=field_name,
+            )
+        elif field_name.endswith("_sha256"):
+            actual = _validated_sha(
+                candidate[field_name],
+                field_name=field_name,
+            )
+        else:
+            actual = _validated_dvd_id(candidate[field_name])
+        if actual != expected:
+            raise Stage12RolloutIdentityError(
+                "publication proof differs from stored " + field_name
+            )
+    return candidate
+
+
+def _validate_reconciliation_evidence(
+    state: Stage12RolloutState,
+    evidence: Stage12PublicationReconciliationEvidence,
+) -> dict[str, object]:
+    if not isinstance(
+        evidence,
+        Stage12PublicationReconciliationEvidence,
+    ):
+        raise Stage12RolloutValidationError(
+            "publication reconciliation evidence has an invalid type"
+        )
+    destination = _validated_destination_relative(
+        evidence.destination_relative
+    )
+    state_destination = _validated_destination_relative(
+        state.destination_relative
+    )
+    if destination != state_destination:
+        raise Stage12RolloutIdentityError(
+            "current destination differs from durable state"
+        )
+    current_sha = _validated_sha(
+        evidence.destination_sha256,
+        field_name="destination_sha256",
+    )
+    artifact_sha = _validated_sha(
+        state.artifact_sha256,
+        field_name="artifact_sha256",
+    )
+    if current_sha != artifact_sha:
+        raise Stage12RolloutIdentityError(
+            "current destination SHA differs from CLEAN"
+        )
+    item_id = _validated_identity_string(
+        evidence.jellyfin_item_id,
+        field_name="jellyfin_item_id",
+    )
+    item_path = _validated_metadata_path(
+        evidence.jellyfin_item_path,
+        field_name="jellyfin_item_path",
+    )
+    subtitle_path = _validated_metadata_path(
+        evidence.jellyfin_subtitle_path,
+        field_name="jellyfin_subtitle_path",
+    )
+    expected_item_path = _jellyfin_media_path(
+        state.media_path_identity
+    )
+    expected_subtitle_path = _jellyfin_media_path(destination)
+    if item_path != expected_item_path:
+        raise Stage12RolloutIdentityError(
+            "Jellyfin item path is detached from media identity"
+        )
+    if subtitle_path != expected_subtitle_path:
+        raise Stage12RolloutIdentityError(
+            "Jellyfin subtitle path is detached from destination"
+        )
+    if type(evidence.external_visible) is not bool or not evidence.external_visible:
+        raise Stage12RolloutValidationError(
+            "Jellyfin subtitle is not verified external"
+        )
+    if type(evidence.verification_passed) is not bool or not evidence.verification_passed:
+        raise Stage12RolloutValidationError(
+            "Jellyfin verification is not an explicit PASS"
+        )
+    language = _validated_identity_string(
+        evidence.subtitle_language,
+        field_name="subtitle_language",
+    ).casefold()
+    if language not in {"ko", "kor", "korean"}:
+        raise Stage12RolloutValidationError(
+            "Jellyfin subtitle language is not Korean"
+        )
+    codec = _validated_identity_string(
+        evidence.subtitle_codec,
+        field_name="subtitle_codec",
+    ).casefold()
+    if codec != "subrip":
+        raise Stage12RolloutValidationError(
+            "Jellyfin subtitle codec is not subrip"
+        )
+    result = evidence.to_dict()
+    result["destination_relative"] = destination
+    result["destination_sha256"] = current_sha
+    result["jellyfin_item_id"] = item_id
+    result["jellyfin_item_path"] = item_path
+    result["jellyfin_subtitle_path"] = subtitle_path
+    result["subtitle_language"] = language
+    result["subtitle_codec"] = codec
+    return result
 
 
 class Stage12RolloutStateStore:
@@ -827,6 +1160,431 @@ class Stage12RolloutStateStore:
                     now,
                     reason,
                     provenance_json,
+                ),
+            )
+            updated = self._get_in_transaction(connection, dvd_id)
+            return _state_from_row(updated)
+
+    def record_verified_publication_proof(
+        self,
+        dvd_id: str,
+        *,
+        publication_provenance: Mapping[str, object],
+        evidence: Stage12PublicationReconciliationEvidence,
+    ) -> Stage12RolloutState:
+        """Backfill an audited proof for a legacy post-publication failure.
+
+        The historical failure event is immutable.  This method only accepts
+        a retryable failure whose event history has a GENERATED ->
+        FAILED_RETRYABLE witness with the exact canonical destination, plus a
+        caller-supplied publication proof and current Jellyfin verification.
+        It records a same-status audit event so the normal reconciliation API
+        can consume the proof without rerunning publication or generation.
+        """
+
+        dvd_id = _validated_dvd_id(dvd_id)
+        with self._transaction() as connection:
+            row = self._get_in_transaction(connection, dvd_id)
+            if row is None:
+                raise Stage12RolloutValidationError(
+                    "cannot backfill proof for a missing rollout state"
+                )
+            if row["status"] != STATE_FAILED_RETRYABLE:
+                raise Stage12InvalidTransitionError(
+                    row["status"]
+                    + " cannot receive a legacy publication proof"
+                )
+            state = _state_from_row(row)
+            event_rows = tuple(
+                connection.execute(
+                    """
+                    SELECT * FROM stage12_rollout_events
+                    WHERE dvd_id = ?
+                    ORDER BY event_id
+                    """,
+                    (dvd_id,),
+                ).fetchall()
+            )
+            validated_provenance = _validate_publication_provenance(
+                state,
+                publication_provenance,
+                require_artifact_report_identity=True,
+            )
+            verification = _validate_reconciliation_evidence(
+                state,
+                evidence,
+            )
+
+            backfill_seen = False
+            for event_row in event_rows:
+                if event_row["reason"] != PUBLICATION_PROOF_BACKFILLED:
+                    continue
+                event_value = _event_value_from_row(event_row)
+                stored_provenance = event_value.get(
+                    "publication_provenance"
+                )
+                stored_verification = event_value.get(
+                    "jellyfin_verification"
+                )
+                if not isinstance(stored_provenance, Mapping):
+                    raise Stage12RolloutValidationError(
+                        "stored backfilled publication proof is not an object"
+                    )
+                if not isinstance(stored_verification, Mapping):
+                    raise Stage12RolloutValidationError(
+                        "stored backfilled Jellyfin verification is not an object"
+                    )
+                stored_provenance = _validate_publication_provenance(
+                    state,
+                    stored_provenance,
+                    require_artifact_report_identity=True,
+                )
+                if (
+                    _canonical_provenance(stored_provenance)
+                    == _canonical_provenance(validated_provenance)
+                    and _canonical_provenance(dict(stored_verification))
+                    == _canonical_provenance(verification)
+                ):
+                    backfill_seen = True
+                    continue
+                raise Stage12RolloutIdentityError(
+                    "conflicting legacy publication proof backfill"
+                )
+            if backfill_seen:
+                return state
+
+            existing_candidates = [
+                candidate
+                for event_row in event_rows
+                if (candidate := _publication_candidate_from_event(
+                    event_row["provenance_json"]
+                ))
+                is not None
+            ]
+            if existing_candidates:
+                existing_provenance = _publication_provenance_from_events(
+                    event_rows
+                )
+                existing_provenance = _validate_publication_provenance(
+                    state,
+                    existing_provenance,
+                )
+                if _canonical_provenance(existing_provenance) == _canonical_provenance(
+                    validated_provenance
+                ):
+                    raise Stage12RolloutIdentityError(
+                        "publication proof already exists; backfill is not required"
+                    )
+                raise Stage12RolloutIdentityError(
+                    "conflicting publication provenance"
+                )
+
+            legacy_publication_witness = False
+            for event_row in event_rows:
+                if (
+                    event_row["from_status"] != STATE_GENERATED
+                    or event_row["to_status"] != STATE_FAILED_RETRYABLE
+                ):
+                    continue
+                event_value = _event_value_from_row(event_row)
+                try:
+                    _validated_identity_string(
+                        event_value.get("operation"),
+                        field_name="legacy failure operation",
+                    )
+                    _validated_identity_string(
+                        event_value.get("error_type"),
+                        field_name="legacy failure error_type",
+                    )
+                except Stage12RolloutValidationError:
+                    continue
+                if event_value.get("retry_performed") is not False:
+                    continue
+                legacy_destination = event_value.get(
+                    "destination_relative",
+                    event_value.get("destination"),
+                )
+                if legacy_destination is None:
+                    continue
+                if (
+                    _validated_destination_relative(legacy_destination)
+                    == _validated_destination_relative(
+                        state.destination_relative
+                    )
+                ):
+                    legacy_publication_witness = True
+                    break
+            if not legacy_publication_witness:
+                raise Stage12RolloutValidationError(
+                    "legacy publication witness is missing"
+                )
+
+            for event_row in event_rows:
+                event_value = _event_value_from_row(event_row)
+                prior_verification = event_value.get(
+                    "jellyfin_verification"
+                )
+                if prior_verification is None:
+                    continue
+                if not isinstance(prior_verification, Mapping):
+                    raise Stage12RolloutValidationError(
+                        "stored Jellyfin verification is not an object"
+                    )
+                if (
+                    _canonical_provenance(dict(prior_verification))
+                    != _canonical_provenance(verification)
+                ):
+                    raise Stage12RolloutIdentityError(
+                        "conflicting Jellyfin reconciliation evidence"
+                    )
+
+            now = _utc_now()
+            sequence = int(row["transition_sequence"]) + 1
+            provenance = _canonical_provenance(
+                {
+                    "operation": "STAGE12_PUBLICATION_PROOF_BACKFILL",
+                    "event": PUBLICATION_PROOF_BACKFILLED,
+                    "legacy": True,
+                    "publication_provenance": validated_provenance,
+                    "jellyfin_verification": verification,
+                    "nas_write_performed": False,
+                    "controller_call_performed": False,
+                }
+            )
+            cursor = connection.execute(
+                """
+                UPDATE stage12_rollout_titles
+                SET updated_at = ?, transition_sequence = ?,
+                    last_transition_reason = ?,
+                    last_transition_provenance_json = ?
+                WHERE dvd_id = ? AND status = ?
+                """,
+                (
+                    now,
+                    sequence,
+                    PUBLICATION_PROOF_BACKFILLED,
+                    provenance,
+                    dvd_id,
+                    STATE_FAILED_RETRYABLE,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise Stage12InvalidTransitionError(
+                    "rollout state changed during proof backfill"
+                )
+            connection.execute(
+                """
+                INSERT INTO stage12_rollout_events(
+                    dvd_id, from_status, to_status,
+                    transition_sequence, transitioned_at,
+                    reason, provenance_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    dvd_id,
+                    STATE_FAILED_RETRYABLE,
+                    STATE_FAILED_RETRYABLE,
+                    sequence,
+                    now,
+                    PUBLICATION_PROOF_BACKFILLED,
+                    provenance,
+                ),
+            )
+            updated = self._get_in_transaction(connection, dvd_id)
+            return _state_from_row(updated)
+
+    def reconcile_published(
+        self,
+        dvd_id: str,
+        *,
+        evidence: Stage12PublicationReconciliationEvidence,
+    ) -> Stage12RolloutState:
+        """Reconcile a verified publication without rerunning or rewriting it.
+
+        This is deliberately not part of the general transition table.  It
+        accepts only a retryable post-publication failure with an explicit
+        successful publication witness in the durable event history and an
+        independently supplied exact destination/Jellyfin verification.
+        """
+
+        dvd_id = _validated_dvd_id(dvd_id)
+        with self._transaction() as connection:
+            row = self._get_in_transaction(connection, dvd_id)
+            if row is None:
+                raise Stage12RolloutValidationError(
+                    "cannot reconcile a missing rollout state"
+                )
+            current_status = row["status"]
+            if current_status not in {
+                STATE_FAILED_RETRYABLE,
+                STATE_PUBLISHED,
+            }:
+                raise Stage12InvalidTransitionError(
+                    current_status
+                    + " cannot be reconciled to "
+                    + STATE_PUBLISHED
+                )
+            state = _state_from_row(row)
+            event_rows = tuple(
+                connection.execute(
+                    """
+                    SELECT * FROM stage12_rollout_events
+                    WHERE dvd_id = ?
+                    ORDER BY event_id
+                    """,
+                    (dvd_id,),
+                ).fetchall()
+            )
+            publication_provenance = (
+                _publication_provenance_from_events(event_rows)
+            )
+            publication_provenance = _validate_publication_provenance(
+                state,
+                publication_provenance,
+            )
+            verification = _validate_reconciliation_evidence(
+                state,
+                evidence,
+            )
+
+            for event_row in event_rows:
+                try:
+                    event_value = json.loads(
+                        event_row["provenance_json"]
+                    )
+                except (TypeError, ValueError, UnicodeError) as error:
+                    raise Stage12RolloutValidationError(
+                        "rollout event provenance is invalid JSON"
+                    ) from error
+                if not isinstance(event_value, Mapping):
+                    raise Stage12RolloutValidationError(
+                        "rollout event provenance is not an object"
+                    )
+                prior_verification = event_value.get(
+                    "jellyfin_verification"
+                )
+                if prior_verification is not None:
+                    if not isinstance(prior_verification, Mapping):
+                        raise Stage12RolloutValidationError(
+                            "stored Jellyfin verification is not an object"
+                        )
+                    if (
+                        _canonical_provenance(dict(prior_verification))
+                        != _canonical_provenance(verification)
+                    ):
+                        raise Stage12RolloutIdentityError(
+                            "conflicting Jellyfin reconciliation evidence"
+                        )
+
+                for known_key in (
+                    "jellyfin_recognition",
+                    "jellyfin_verification",
+                ):
+                    known = event_value.get(known_key)
+                    if not isinstance(known, Mapping):
+                        continue
+                    known_values = {
+                        "item_id": known.get(
+                            "item_id",
+                            known.get("jellyfin_item_id"),
+                        ),
+                        "item_path": known.get(
+                            "item_path",
+                            known.get("jellyfin_item_path"),
+                        ),
+                        "subtitle_path": known.get(
+                            "subtitle_path",
+                            known.get("jellyfin_subtitle_path"),
+                        ),
+                        "subtitle_language": known.get(
+                            "subtitle_language",
+                            known.get("language"),
+                        ),
+                        "external_visible": known.get(
+                            "external_visible"
+                        ),
+                    }
+                    expected_values = {
+                        "item_id": verification[
+                            "jellyfin_item_id"
+                        ],
+                        "item_path": verification[
+                            "jellyfin_item_path"
+                        ],
+                        "subtitle_path": verification[
+                            "jellyfin_subtitle_path"
+                        ],
+                        "subtitle_language": verification[
+                            "subtitle_language"
+                        ],
+                        "external_visible": verification[
+                            "external_visible"
+                        ],
+                    }
+                    for field_name, known_value in known_values.items():
+                        if known_value is None:
+                            continue
+                        if field_name == "subtitle_language":
+                            known_value = str(known_value).casefold()
+                        if known_value != expected_values[field_name]:
+                            raise Stage12RolloutIdentityError(
+                                "stored Jellyfin identity conflicts with "
+                                + field_name
+                            )
+
+            if current_status == STATE_PUBLISHED:
+                return state
+
+            now = _utc_now()
+            sequence = int(row["transition_sequence"]) + 1
+            provenance = _canonical_provenance(
+                {
+                    "operation": "STAGE12_PUBLICATION_RECONCILIATION",
+                    "event": PUBLICATION_RECONCILED,
+                    "publication_provenance": publication_provenance,
+                    "jellyfin_verification": verification,
+                    "nas_write_performed": False,
+                    "controller_call_performed": False,
+                }
+            )
+            cursor = connection.execute(
+                """
+                UPDATE stage12_rollout_titles
+                SET status = ?, updated_at = ?, transition_sequence = ?,
+                    last_transition_reason = ?,
+                    last_transition_provenance_json = ?
+                WHERE dvd_id = ? AND status = ?
+                """,
+                (
+                    STATE_PUBLISHED,
+                    now,
+                    sequence,
+                    PUBLICATION_RECONCILED,
+                    provenance,
+                    dvd_id,
+                    STATE_FAILED_RETRYABLE,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise Stage12InvalidTransitionError(
+                    "rollout state changed during reconciliation"
+                )
+            connection.execute(
+                """
+                INSERT INTO stage12_rollout_events(
+                    dvd_id, from_status, to_status,
+                    transition_sequence, transitioned_at,
+                    reason, provenance_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    dvd_id,
+                    STATE_FAILED_RETRYABLE,
+                    STATE_PUBLISHED,
+                    sequence,
+                    now,
+                    PUBLICATION_RECONCILED,
+                    provenance,
                 ),
             )
             updated = self._get_in_transaction(connection, dvd_id)
@@ -1350,6 +2108,8 @@ __all__ = [
     "PUBLICATION_BLOCKED_EXISTING_KO",
     "PUBLICATION_BLOCKED_INVALID_ARTIFACT",
     "PUBLICATION_BLOCKED_SOURCE_DRIFT",
+    "PUBLICATION_PROOF_BACKFILLED",
+    "PUBLICATION_RECONCILED",
     "PUBLICATION_READY",
     "PUBLICATION_UNRESOLVED",
     "STATE_FAILED_RETRYABLE",
@@ -1364,6 +2124,7 @@ __all__ = [
     "Stage12InvalidTransitionError",
     "Stage12PublicationPreflight",
     "Stage12PublicationPreflightError",
+    "Stage12PublicationReconciliationEvidence",
     "Stage12RolloutError",
     "Stage12RolloutIdentityError",
     "Stage12RolloutState",

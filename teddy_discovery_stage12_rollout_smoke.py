@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import replace
 import hashlib
 import json
 import sqlite3
@@ -38,8 +39,11 @@ from teddy_discovery_stage12_rollout import (
     PUBLICATION_BLOCKED_EXISTING_KO,
     PUBLICATION_BLOCKED_INVALID_ARTIFACT,
     PUBLICATION_BLOCKED_SOURCE_DRIFT,
+    PUBLICATION_PROOF_BACKFILLED,
     PUBLICATION_READY,
     STATE_GENERATED,
+    STATE_FAILED_RETRYABLE,
+    STATE_FAILED_TERMINAL,
     STATE_PENDING,
     STATE_PUBLISHED,
     STATE_RUNNING,
@@ -47,6 +51,7 @@ from teddy_discovery_stage12_rollout import (
     STATE_STATUSES,
     STATE_UNRESOLVED,
     Stage12InvalidTransitionError,
+    Stage12PublicationReconciliationEvidence,
     Stage12RolloutStateStore,
     Stage12RolloutValidationError,
     select_publication_canary,
@@ -221,6 +226,124 @@ def preflight_fixture(root: Path, record, *, destination_exists=False, drift=Fal
     )
 
 
+def reconciliation_evidence(
+    record: Stage12HoldingInventoryRecord,
+    digest: str,
+    destination: str,
+) -> Stage12PublicationReconciliationEvidence:
+    return Stage12PublicationReconciliationEvidence(
+        destination_relative=destination,
+        destination_sha256=digest,
+        jellyfin_item_id="item-" + record.dvd_id,
+        jellyfin_item_path="/media/adult/" + record.media_path_identity,
+        jellyfin_subtitle_path="/media/adult/" + destination,
+        subtitle_language="kor",
+        subtitle_codec="subrip",
+        external_visible=True,
+        verification_passed=True,
+    )
+
+
+def publication_proof_for(state):
+    return {
+        "dvd_id": state.dvd_id,
+        "artifact_path": state.artifact_path,
+        "artifact_sha256": state.artifact_sha256,
+        "report_path": state.report_path,
+        "report_sha256": state.report_sha256,
+        "publication_performed": True,
+        "atomic_install": True,
+        "destination_verified": True,
+        "destination_relative": state.destination_relative,
+        "destination_sha256": state.artifact_sha256,
+        "publication_event_identity": "legacy-publication-smoke-1",
+    }
+
+
+def failed_reconciliation_fixture(
+    root: Path,
+    *,
+    publication_provenance: bool = True,
+    terminal: bool = False,
+):
+    record = inventory_record("REC-001", holding_id=900)
+    artifact_root = root / "artifacts"
+    _, clean_path, report_path, report = write_valid_bundle(
+        artifact_root,
+        record,
+    )
+    store = Stage12RolloutStateStore(root / "state.sqlite3")
+    store.initialize_from_inventory(
+        Stage12HoldingsInventoryReport((record,))
+    )
+    store.transition(
+        record.dvd_id,
+        STATE_RUNNING,
+        reason="START_RECONCILIATION_FIXTURE",
+        provenance={"operation": "SMOKE"},
+    )
+    digest = report["clean_sha256"]
+    store.transition(
+        record.dvd_id,
+        STATE_GENERATED,
+        reason="GENERATED_RECONCILIATION_FIXTURE",
+        provenance={"operation": "SMOKE"},
+        artifact_path=str(clean_path),
+        artifact_sha256=digest,
+        report_path=str(report_path),
+        report_sha256=hashlib.sha256(
+            report_path.read_bytes()
+        ).hexdigest(),
+    )
+    video = validate_canonical_holding(
+        {
+            "dvd_id": record.dvd_id,
+            "storage_root": "jav",
+            "relative_path": record.media_path_identity,
+            "parse_status": "MATCHED",
+            "present": 1,
+        },
+        record.dvd_id,
+    )
+    destination = derive_target_ko_relative(video)
+    provenance = {
+        "operation": "SMOKE_PUBLICATION",
+        "publication_performed": True,
+        "atomic_install": True,
+        "destination_verified": True,
+        "destination_relative": destination,
+        "destination_sha256": digest,
+        "publication_event_identity": "smoke-publication-1",
+    }
+    failure_provenance = {
+        "operation": "SMOKE_RECOGNITION_FAILURE",
+        "error": "Jellyfin external Korean subtitle not recognized",
+        "error_type": "Stage12BatchTitleError",
+        "retry_performed": False,
+        "destination": destination,
+    }
+    if publication_provenance:
+        failure_provenance["publication_provenance"] = provenance
+    failed_status = (
+        STATE_FAILED_TERMINAL if terminal else STATE_FAILED_RETRYABLE
+    )
+    store.transition(
+        record.dvd_id,
+        failed_status,
+        expected_from=STATE_GENERATED,
+        reason="SMOKE_TITLE_FAILURE",
+        provenance=failure_provenance,
+        destination_relative=destination,
+    )
+    return (
+        store,
+        record,
+        digest,
+        destination,
+        reconciliation_evidence(record, digest, destination),
+    )
+
+
 def main():
     # H. CP1 materialization: exactly 172 eligible records plus one unresolved.
     records = tuple(
@@ -366,6 +489,493 @@ def main():
                 provenance={"test": "rerun"},
             ),
             "PUBLISHED_NOT_RERUN",
+        )
+
+        # CP5R2: audited post-publication Jellyfin reconciliation.  The
+        # fixture contains an explicit successful publication witness in the
+        # durable failure event; no NAS, controller, or Jellyfin dependency is
+        # provided to this state-only API.
+        (
+            reconcile_store,
+            reconcile_record,
+            _reconcile_digest,
+            _reconcile_destination,
+            reconcile_evidence,
+        ) = failed_reconciliation_fixture(
+            root / "reconciliation-valid"
+        )
+        with sqlite3.connect(
+            root / "reconciliation-valid" / "state.sqlite3"
+        ) as connection:
+            before_reconcile_events = connection.execute(
+                "SELECT * FROM stage12_rollout_events"
+            ).fetchall()
+        before_reconcile_events = len(before_reconcile_events)
+        reconciled = reconcile_store.reconcile_published(
+            reconcile_record.dvd_id,
+            evidence=reconcile_evidence,
+        )
+        require(
+            reconciled.status == STATE_PUBLISHED,
+            "RECONCILIATION_PUBLISHED",
+        )
+        with sqlite3.connect(
+            root / "reconciliation-valid" / "state.sqlite3"
+        ) as connection:
+            reconciliation_events = connection.execute(
+                """
+                SELECT reason, provenance_json
+                FROM stage12_rollout_events
+                WHERE dvd_id = ?
+                ORDER BY event_id
+                """,
+                (reconcile_record.dvd_id,),
+            ).fetchall()
+        require(
+            len(reconciliation_events) == before_reconcile_events + 1,
+            "RECONCILIATION_ONE_EVENT",
+        )
+        require(
+            reconciliation_events[-1][0] == "PUBLICATION_RECONCILED",
+            "RECONCILIATION_EVENT_REASON",
+        )
+        require(
+            any(
+                row[0] == "SMOKE_TITLE_FAILURE"
+                for row in reconciliation_events
+            ),
+            "ORIGINAL_FAILURE_HISTORY_PRESERVED",
+        )
+        first_reconcile_sequence = reconciled.transition_sequence
+        second_reconciled = reconcile_store.reconcile_published(
+            reconcile_record.dvd_id,
+            evidence=reconcile_evidence,
+        )
+        require(
+            second_reconciled.status == STATE_PUBLISHED
+            and second_reconciled.transition_sequence
+            == first_reconcile_sequence,
+            "RECONCILIATION_IDEMPOTENT_NOOP",
+        )
+        with sqlite3.connect(
+            root / "reconciliation-valid" / "state.sqlite3"
+        ) as connection:
+            require(
+                connection.execute(
+                    "SELECT COUNT(*) FROM stage12_rollout_events"
+                ).fetchone()[0]
+                == before_reconcile_events + 1,
+                "RECONCILIATION_NO_DUPLICATE_EVENT",
+            )
+
+        (
+            legacy_store,
+            legacy_record,
+            legacy_digest,
+            legacy_destination,
+            legacy_evidence,
+        ) = failed_reconciliation_fixture(
+            root / "legacy-proof-backfill-valid",
+            publication_provenance=False,
+        )
+        legacy_state_before = legacy_store.get(legacy_record.dvd_id)
+        legacy_proof = publication_proof_for(legacy_state_before)
+        with sqlite3.connect(
+            root / "legacy-proof-backfill-valid" / "state.sqlite3"
+        ) as connection:
+            legacy_event_count_before = connection.execute(
+                "SELECT COUNT(*) FROM stage12_rollout_events"
+            ).fetchone()[0]
+        backfilled = legacy_store.record_verified_publication_proof(
+            legacy_record.dvd_id,
+            publication_provenance=legacy_proof,
+            evidence=legacy_evidence,
+        )
+        require(
+            backfilled.status == STATE_FAILED_RETRYABLE
+            and backfilled.transition_sequence
+            == legacy_state_before.transition_sequence + 1,
+            "LEGACY_BACKFILL_REMAINS_RETRYABLE",
+        )
+        with sqlite3.connect(
+            root / "legacy-proof-backfill-valid" / "state.sqlite3"
+        ) as connection:
+            legacy_events = connection.execute(
+                """
+                SELECT from_status, to_status, reason, provenance_json
+                FROM stage12_rollout_events
+                WHERE dvd_id = ?
+                ORDER BY event_id
+                """,
+                (legacy_record.dvd_id,),
+            ).fetchall()
+        require(
+            len(legacy_events) == legacy_event_count_before + 1,
+            "LEGACY_BACKFILL_ONE_EVENT",
+        )
+        require(
+            legacy_events[-1][0] == STATE_FAILED_RETRYABLE
+            and legacy_events[-1][1] == STATE_FAILED_RETRYABLE
+            and legacy_events[-1][2] == PUBLICATION_PROOF_BACKFILLED,
+            "LEGACY_BACKFILL_EVENT_IDENTITY",
+        )
+        require(
+            any(row[2] == "SMOKE_TITLE_FAILURE" for row in legacy_events),
+            "LEGACY_FAILURE_HISTORY_PRESERVED",
+        )
+        backfill_event = json.loads(legacy_events[-1][3])
+        require(
+            backfill_event["legacy"] is True
+            and backfill_event["nas_write_performed"] is False
+            and backfill_event["controller_call_performed"] is False,
+            "LEGACY_BACKFILL_NO_EXTERNAL_MUTATION",
+        )
+        second_backfilled = legacy_store.record_verified_publication_proof(
+            legacy_record.dvd_id,
+            publication_provenance=legacy_proof,
+            evidence=legacy_evidence,
+        )
+        require(
+            second_backfilled.status == STATE_FAILED_RETRYABLE
+            and second_backfilled.transition_sequence
+            == backfilled.transition_sequence,
+            "LEGACY_BACKFILL_IDEMPOTENT_NOOP",
+        )
+        with sqlite3.connect(
+            root / "legacy-proof-backfill-valid" / "state.sqlite3"
+        ) as connection:
+            require(
+                connection.execute(
+                    "SELECT COUNT(*) FROM stage12_rollout_events"
+                ).fetchone()[0]
+                == legacy_event_count_before + 1,
+                "LEGACY_BACKFILL_NO_DUPLICATE_EVENT",
+            )
+        reconciled_legacy = legacy_store.reconcile_published(
+            legacy_record.dvd_id,
+            evidence=legacy_evidence,
+        )
+        require(
+            reconciled_legacy.status == STATE_PUBLISHED,
+            "LEGACY_BACKFILL_RECONCILES_TO_PUBLISHED",
+        )
+        with sqlite3.connect(
+            root / "legacy-proof-backfill-valid" / "state.sqlite3"
+        ) as connection:
+            legacy_reconciled_events = connection.execute(
+                """
+                SELECT reason
+                FROM stage12_rollout_events
+                WHERE dvd_id = ?
+                ORDER BY event_id
+                """,
+                (legacy_record.dvd_id,),
+            ).fetchall()
+        require(
+            sum(
+                row[0] == PUBLICATION_PROOF_BACKFILLED
+                for row in legacy_reconciled_events
+            )
+            == 1
+            and sum(
+                row[0] == "PUBLICATION_RECONCILED"
+                for row in legacy_reconciled_events
+            )
+            == 1
+            and sum(row[0] == "PUBLISH" for row in legacy_reconciled_events)
+            == 0,
+            "LEGACY_BACKFILL_NO_DUPLICATE_PUBLICATION_EVENT",
+        )
+
+        def rejected_backfill(
+            fixture_root: Path,
+            *,
+            mutate_proof=None,
+            mutate_evidence=None,
+            publication_provenance=True,
+            terminal=False,
+        ):
+            (
+                rejected_store,
+                rejected_record,
+                _rejected_digest,
+                _rejected_destination,
+                rejected_evidence,
+            ) = failed_reconciliation_fixture(
+                fixture_root,
+                publication_provenance=publication_provenance,
+                terminal=terminal,
+            )
+            rejected_state = rejected_store.get(rejected_record.dvd_id)
+            rejected_proof = publication_proof_for(rejected_state)
+            if mutate_proof is not None:
+                mutate_proof(rejected_proof)
+            if mutate_evidence is not None:
+                rejected_evidence = mutate_evidence(rejected_evidence)
+            expect_raises(
+                Stage12RolloutValidationError,
+                lambda: rejected_store.record_verified_publication_proof(
+                    rejected_record.dvd_id,
+                    publication_provenance=rejected_proof,
+                    evidence=rejected_evidence,
+                ),
+                fixture_root.name + "_FAIL_CLOSED",
+            )
+            require(
+                rejected_store.get(rejected_record.dvd_id).status
+                == (
+                    STATE_FAILED_TERMINAL
+                    if terminal
+                    else STATE_FAILED_RETRYABLE
+                ),
+                fixture_root.name + "_STATE_PRESERVED",
+            )
+
+        rejected_backfill(
+            root / "legacy-backfill-sha-mismatch",
+            mutate_proof=lambda value: value.update(
+                destination_sha256="0" * 64
+            ),
+            publication_provenance=False,
+        )
+        rejected_backfill(
+            root / "legacy-backfill-destination-mismatch",
+            mutate_proof=lambda value: value.update(
+                destination_relative="OTHER/OTHER-001/OTHER-001.ko.srt"
+            ),
+            publication_provenance=False,
+        )
+        rejected_backfill(
+            root / "legacy-backfill-artifact-mismatch",
+            mutate_proof=lambda value: value.update(
+                artifact_sha256="0" * 64
+            ),
+            publication_provenance=False,
+        )
+        rejected_backfill(
+            root / "legacy-backfill-report-mismatch",
+            mutate_proof=lambda value: value.update(
+                report_sha256="0" * 64
+            ),
+            publication_provenance=False,
+        )
+        rejected_backfill(
+            root / "legacy-backfill-item-mismatch",
+            mutate_evidence=lambda value: replace(
+                value,
+                jellyfin_item_path="/media/adult/OTHER/OTHER-001/OTHER-001.mp4",
+            ),
+            publication_provenance=False,
+        )
+        rejected_backfill(
+            root / "legacy-backfill-not-external",
+            mutate_evidence=lambda value: replace(
+                value,
+                external_visible=False,
+            ),
+            publication_provenance=False,
+        )
+        rejected_backfill(
+            root / "legacy-backfill-non-korean",
+            mutate_evidence=lambda value: replace(
+                value,
+                subtitle_language="eng",
+            ),
+            publication_provenance=False,
+        )
+        rejected_backfill(
+            root / "legacy-backfill-wrong-codec",
+            mutate_evidence=lambda value: replace(
+                value,
+                subtitle_codec="webvtt",
+            ),
+            publication_provenance=False,
+        )
+        rejected_backfill(
+            root / "legacy-backfill-missing-proof-field",
+            mutate_proof=lambda value: value.pop("publication_performed"),
+            publication_provenance=False,
+        )
+        rejected_backfill(
+            root / "legacy-backfill-conflicting-proof",
+            mutate_proof=lambda value: value.update(
+                publication_event_identity="conflict"
+            ),
+            publication_provenance=True,
+        )
+        rejected_backfill(
+            root / "legacy-backfill-terminal",
+            publication_provenance=False,
+            terminal=True,
+        )
+
+        def rejected_reconciliation(
+            fixture_root: Path,
+            *,
+            mutate=None,
+            publication_provenance=True,
+            terminal=False,
+        ):
+            (
+                rejected_store,
+                rejected_record,
+                rejected_digest,
+                rejected_destination,
+                rejected_evidence,
+            ) = failed_reconciliation_fixture(
+                fixture_root,
+                publication_provenance=publication_provenance,
+                terminal=terminal,
+            )
+            if mutate is not None:
+                rejected_evidence = mutate(rejected_evidence)
+            expect_raises(
+                Stage12RolloutValidationError,
+                lambda: rejected_store.reconcile_published(
+                    rejected_record.dvd_id,
+                    evidence=rejected_evidence,
+                ),
+                fixture_root.name + "_FAIL_CLOSED",
+            )
+            require(
+                rejected_store.get(rejected_record.dvd_id).status
+                == (STATE_FAILED_TERMINAL if terminal else STATE_FAILED_RETRYABLE),
+                fixture_root.name + "_STATE_PRESERVED",
+            )
+
+        rejected_reconciliation(
+            root / "reconciliation-sha-mismatch",
+            mutate=lambda value: replace(
+                value,
+                destination_sha256="0" * 64,
+            ),
+        )
+        rejected_reconciliation(
+            root / "reconciliation-destination-mismatch",
+            mutate=lambda value: replace(
+                value,
+                destination_relative="OTHER/OTHER-001/OTHER-001.ko.srt",
+            ),
+        )
+        rejected_reconciliation(
+            root / "reconciliation-item-mismatch",
+            mutate=lambda value: replace(
+                value,
+                jellyfin_item_path="/media/adult/OTHER/OTHER-001/OTHER-001.mp4",
+            ),
+        )
+        rejected_reconciliation(
+            root / "reconciliation-not-external",
+            mutate=lambda value: replace(
+                value,
+                external_visible=False,
+            ),
+        )
+        rejected_reconciliation(
+            root / "reconciliation-non-korean",
+            mutate=lambda value: replace(
+                value,
+                subtitle_language="eng",
+            ),
+        )
+        rejected_reconciliation(
+            root / "reconciliation-wrong-codec",
+            mutate=lambda value: replace(
+                value,
+                subtitle_codec="webvtt",
+            ),
+        )
+        rejected_reconciliation(
+            root / "reconciliation-unverified",
+            mutate=lambda value: replace(
+                value,
+                verification_passed=False,
+            ),
+        )
+        rejected_reconciliation(
+            root / "reconciliation-missing-publication",
+            publication_provenance=False,
+        )
+        rejected_reconciliation(
+            root / "reconciliation-terminal",
+            terminal=True,
+        )
+
+        pending_reconcile_store = Stage12RolloutStateStore(
+            root / "reconciliation-pending.sqlite3"
+        )
+        pending_record = inventory_record("REC-002", holding_id=901)
+        pending_reconcile_store.initialize_from_inventory(
+            Stage12HoldingsInventoryReport((pending_record,))
+        )
+        expect_raises(
+            Stage12InvalidTransitionError,
+            lambda: pending_reconcile_store.reconcile_published(
+                pending_record.dvd_id,
+                evidence=reconcile_evidence,
+            ),
+            "RECONCILIATION_PENDING_REJECTED",
+        )
+
+        running_reconcile_store = Stage12RolloutStateStore(
+            root / "reconciliation-running.sqlite3"
+        )
+        running_record = inventory_record("REC-003", holding_id=902)
+        running_reconcile_store.initialize_from_inventory(
+            Stage12HoldingsInventoryReport((running_record,))
+        )
+        running_reconcile_store.transition(
+            running_record.dvd_id,
+            STATE_RUNNING,
+            reason="START_RECONCILIATION_RUNNING",
+            provenance={"operation": "SMOKE"},
+        )
+        expect_raises(
+            Stage12InvalidTransitionError,
+            lambda: running_reconcile_store.reconcile_published(
+                running_record.dvd_id,
+                evidence=reconcile_evidence,
+            ),
+            "RECONCILIATION_RUNNING_REJECTED",
+        )
+
+        unresolved_reconcile_store = Stage12RolloutStateStore(
+            root / "reconciliation-unresolved.sqlite3"
+        )
+        unresolved_record = inventory_record(
+            "REC-004",
+            holding_id=903,
+            eligibility=UNRESOLVED,
+            existing_ko=EXISTING_KO_UNRESOLVED,
+            reason="SUBTITLE_INVENTORY_INVALID",
+        )
+        unresolved_reconcile_store.initialize_from_inventory(
+            Stage12HoldingsInventoryReport((unresolved_record,))
+        )
+        expect_raises(
+            Stage12InvalidTransitionError,
+            lambda: unresolved_reconcile_store.reconcile_published(
+                unresolved_record.dvd_id,
+                evidence=reconcile_evidence,
+            ),
+            "RECONCILIATION_UNRESOLVED_REJECTED",
+        )
+
+        expect_raises(
+            Stage12RolloutValidationError,
+            lambda: reconcile_store.reconcile_published(
+                reconcile_record.dvd_id,
+                evidence=replace(
+                    reconcile_evidence,
+                    jellyfin_item_id="conflicting-item",
+                ),
+            ),
+            "PUBLISHED_CONFLICTING_EVIDENCE_REJECTED",
+        )
+        require(
+            reconcile_store.get(reconcile_record.dvd_id).status
+            == STATE_PUBLISHED,
+            "PUBLISHED_CONFLICT_DOES_NOT_MUTATE",
         )
 
         skipped = inventory_record(
