@@ -19,6 +19,7 @@ from teddy_discovery_asr import ASRSourceSnapshot
 from teddy_discovery_asr_transcriber import FullTitleASRTranscriber
 from teddy_discovery_asr_audio import iter_audio_chunks
 from teddy_discovery_alignment import (
+    AlignmentLimitError,
     generate_monotonic_anchor_candidates, select_monotonic_anchors,
     infer_robust_affine_alignment,
 )
@@ -29,6 +30,7 @@ from teddy_discovery_hybrid_evidence import (
     ALIGNMENT_PROVENANCE_UNRESOLVED,
 )
 from teddy_discovery_subtitlecat_discovery import SubtitleCatSearchError
+from teddy_discovery_subtitle_external import ExternalSubtitleValidationError
 from teddy_discovery_targeted_second_evidence_runner import (
     run_targeted_second_evidence_v1_from_local_source,
 )
@@ -154,10 +156,17 @@ def build_external_ja_adapter(*, discovery, provider, acceptance_policy,
                 ALIGNMENT_PROVENANCE_UNRESOLVED, "lexical-affine",
             ),
         )
-        alignment = infer_robust_affine_alignment(
-            select_monotonic_anchors(generate_monotonic_anchor_candidates(bundle)),
-            residual_threshold_ms=residual_threshold_ms,
-        )
+        try:
+            alignment = infer_robust_affine_alignment(
+                select_monotonic_anchors(
+                    generate_monotonic_anchor_candidates(bundle)
+                ),
+                residual_threshold_ms=residual_threshold_ms,
+            )
+        except AlignmentLimitError as error:
+            raise ExternalSubtitleValidationError(
+                "external subtitle alignment exceeded bounded lexical comparison limit"
+            ) from error
         decision = decide_alignment_acceptance(alignment, acceptance_policy)
         return apply_alignment_acceptance(
             bundle, decision,

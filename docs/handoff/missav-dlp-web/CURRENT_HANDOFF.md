@@ -21,6 +21,7 @@ subtitle rollout readiness.
 - STAGE12_CP3_ONE_TITLE_ATOMIC_PUBLICATION_CANARY_PASS
 - STAGE12_CP4_JELLYFIN_SUBTITLE_RECOGNITION_PASS
 - STAGE12_CP5_FIRST_SMALL_BOUNDED_ROLLOUT_BATCH_PASS
+- STAGE12_CP6F1_BOUNDED_ALIGNMENT_ASR_ONLY_FALLBACK_PASS
 
 ## Completed
 
@@ -502,7 +503,7 @@ Batch summary:
 - `CONTROLLER_SUCCESS=3`
 - `JELLYFIN_RECOGNIZED=3`
 
-Current durable rollout counts are `PENDING=168`, `RUNNING=0`,
+At the CP5 evidence snapshot, durable rollout counts were `PENDING=168`, `RUNNING=0`,
 `GENERATED=0`, `PUBLISHED=4`, `UNRESOLVED=1`, `FAILED_RETRYABLE=0`,
 `FAILED_TERMINAL=0`, and `SKIPPED_EXISTING_KO=0`, across 173 title records.
 The local state store has one audited initial state plus three audited
@@ -549,6 +550,54 @@ The AKDL-312 final evidence was:
 - external subtitle path: `/media/adult/AKDL/AKDL-312/AKDL-312.ko.srt`
 - `kor / subrip / external`: PASS
 - NAS writes and Jellyfin refreshes during CP5R3: `0`
+
+## Stage12 CP6F1 Bounded Alignment Limit → ASR_ONLY Fallback — PASS
+
+Marker:
+
+`STAGE12_CP6F1_BOUNDED_ALIGNMENT_ASR_ONLY_FALLBACK_PASS`
+
+CP6F1 began after the first CP6 title, `AT-099`, encountered
+`teddy_discovery_alignment.AlignmentLimitError` during external-JA alignment.
+The cause is the lexical-pair bounded safety limit being exceeded:
+`MAX_LEXICAL_PAIR_COMPARISONS=1_048_576`. The cap, alignment algorithm, anchor
+selection, acceptance thresholds, Hybrid policy, targeted-ASR policy, and
+Stage11 quality tuning were left unchanged.
+
+The smallest safe boundary was `build_external_ja_adapter(...)` in
+`teddy_discovery_stage11_live_adapters.py`. Only `AlignmentLimitError` from the
+external alignment pipeline is converted to the existing
+`ExternalSubtitleValidationError` contract with a generic message. The
+controller therefore records external alignment as unavailable and takes the
+existing `VALIDATION_FAILURE` / `NOT_ATTEMPTED` / `ASR_ONLY` path. The
+`Stage12BatchRunner` generic-exception behavior was not changed.
+
+The AT-099 baseline artifact already exists and is reusable. AT-099 rollout
+state is still `RUNNING`; `Stage12RolloutStateStore.recover_running()` was not
+applied in CP6F1 and is reserved for the next checkpoint. No CP6 real retry was
+performed.
+
+Offline validation passed:
+
+- dedicated `AlignmentLimitError` fallback smoke: PASS
+- normal alignment behavior: PASS
+- alignment smoke: PASS
+- live-adapter smoke: PASS
+- deployment smoke: PASS (17/17)
+- Stage11 controller smoke: PASS (41/41)
+- Stage12 batch smoke: PASS
+- Stage12 rollout smoke: PASS
+- `py_compile`: PASS
+- `git diff --check`: PASS
+- Hybrid review calls for the limit fallback: `0`
+- existing `AlignmentAcceptanceValidationError` and unrelated unexpected
+  programmer exceptions remain fail-closed: PASS
+- production title-specific logic: `0`
+
+This checkpoint performed no runtime mutation: AT-099 state mutation `0`, real
+controller run `0`, STT `0`, VM122 `0`, Hermes `0`, SubtitleCat `0`, NAS write
+`0`, Jellyfin write/refresh `0`, and CP6 restart `0`. The CT108 memory incident
+and this `AlignmentLimitError` are separate causes.
 
 ## Frozen Policies
 
@@ -915,7 +964,7 @@ Stage11 closure blockers.
 
 - Stage11: **CLOSED / PASS**
 - R6: **CLOSED / PASS**
-- Stage12: **ACTIVE / CP5 PASS**
+- Stage12: **ACTIVE / CP6F1 PASS** — AT-099 remains `RUNNING`; no real retry
 - Stage11 controller publication: **NO**
 - Stage12 CP3 publication: **HSODA-104 PASS**; CP5: **3/3 PUBLISHED**
 
@@ -1035,11 +1084,17 @@ Hermes state DB:
 
 ## Next Step
 
-Stage12 scope is frozen and CP5 is **ACTIVE / PASS**. The single-title
+Stage12 scope is frozen and CP6F1 is **PASS** as an offline safety-fallback
+checkpoint. The single-title
 canaries passed, and the first three-title serial batch completed with three
 PUBLISHED/Jellyfin-recognized titles after the generic AKDL-312 legacy proof
 backfill and reconciliation. A larger bounded rollout is ready for separate
 authorization.
+
+AT-099 remains `RUNNING` by design for this checkpoint. The next checkpoint
+must apply `recover_running()` and record `RUNNING → PENDING /
+CRASH_RECOVERY` before any separately authorized retry. CP6F1 itself performed
+no retry.
 The next rollout sequence is:
 
 1. READ-ONLY holdings inventory/dry-run — CP1 PASS
