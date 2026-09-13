@@ -23,6 +23,7 @@ subtitle rollout readiness.
 - STAGE12_CP5_FIRST_SMALL_BOUNDED_ROLLOUT_BATCH_PASS
 - STAGE12_CP6F1_BOUNDED_ALIGNMENT_ASR_ONLY_FALLBACK_PASS
 - STAGE12_CP6F4_INVALID_SEMANTIC_PART_RETRY_ISOLATION_PASS
+- STAGE12_CP6F6_HERMES_TIMEOUT_TITLE_ISOLATION_PASS
 
 ## Completed
 
@@ -64,6 +65,7 @@ subtitle rollout readiness.
 - deployment + live adapters fake E2E: ASR_ONLY PASS / HYBRID PASS
 - deployment smoke: 17/17 PASS
 - invalid semantic-part bounded retry and per-title isolation
+- Hermes part timeout typed per-title isolation without immediate retry
 - explicit SubtitleCat-only Gluetun proxy wiring
 - search, detail, and payload use the same configured SubtitleCat proxy
 - proxy `http://127.0.0.1:58888` is not a global HTTP proxy
@@ -652,6 +654,56 @@ are reserved for the next separately authorized checkpoint. CP6F4 performed no
 controller, STT, VM122, Hermes, SubtitleCat, NAS, or Jellyfin call/write, and
 did not restart CP6.
 
+## Stage12 CP6F6 Hermes Part Timeout Per-title Isolation — PASS
+
+Marker:
+
+`STAGE12_CP6F6_HERMES_TIMEOUT_TITLE_ISOLATION_PASS`
+
+The prior production isolation results are durable: `AVSA-455` and `AVSA-456`
+are `FAILED_RETRYABLE`, while `BAGR-093` and `BLOR-289` are `PUBLISHED`.
+`DASS-884` then reached stateful part `92/117`; its Hermes SSH invocation
+exceeded the unchanged `600` second controller timeout.
+
+The narrow owner is
+`teddy_discovery_stateful_live_runner.py`. Only
+`subprocess.TimeoutExpired` from `_invoke_hermes_part(...)` is converted to
+`StatefulLiveRunnerTimeoutError`. Stage12 recognizes that typed error as a
+title-level retryable failure and records
+`STAGE12_HERMES_PART_TIMEOUT` plus `hermes_timeout.timeout_seconds=600`.
+Unrelated `StatefulLiveRunnerError`, unexpected programmer exceptions, state
+corruption, malformed commands, and filesystem failures remain systemic and
+fail closed.
+
+No same-part retry is performed after timeout. This avoids duplicate remote
+Hermes work while the timed-out SSH child may still be running. The existing
+`REMOTE_PENDING_RECOVERY` path is unchanged and is used first by the next
+operator resume. Previously promoted parts remain preserved.
+
+Offline validation passed:
+
+- Hermes timeout isolation smoke: PASS
+- `subprocess.TimeoutExpired` → typed timeout: PASS
+- immediate same-part retry count: `0`
+- remote pending recovery contract: PASS
+- timeout title → `FAILED_RETRYABLE`: PASS
+- next title continuation: PASS
+- timeout reason/provenance: PASS
+- generic runner/programmer errors remain systemic: PASS
+- stateful live runner smoke: PASS (16/16)
+- bounded semantic retry smoke: PASS
+- Stage11 controller smoke: PASS (41/41)
+- live-adapter/deployment smoke: PASS (deployment 17/17)
+- Stage12 batch smoke: PASS
+- Stage12 rollout smoke: PASS
+- timeout remains `600` seconds: PASS
+- `py_compile`: PASS
+- `git diff --check`: PASS
+
+`DASS-884` remains `RUNNING`; no `recover_running()` or actual retry was
+performed. CP6F6 made no controller, Hermes, STT, NAS, Jellyfin, or CP6
+restart call/write.
+
 ## Frozen Policies
 
 - production title/cue/text hardcode 금지
@@ -1017,7 +1069,7 @@ Stage11 closure blockers.
 
 - Stage11: **CLOSED / PASS**
 - R6: **CLOSED / PASS**
-- Stage12: **ACTIVE / CP6F4 PASS** — AT-099 `PUBLISHED`; AVSA-455 remains `RUNNING`; no CP6F4 production retry
+- Stage12: **ACTIVE / CP6F6 PASS** — DASS-884 remains `RUNNING`; no CP6F6 production retry
 - Stage11 controller publication: **NO**
 - Stage12 CP3 publication: **HSODA-104 PASS**; CP5: **3/3 PUBLISHED**
 
@@ -1137,17 +1189,15 @@ Hermes state DB:
 
 ## Next Step
 
-Stage12 scope is frozen and CP6F4 is **PASS** as an offline invalid-output
-recovery/isolation checkpoint. The single-title canaries passed, and the first
-three-title serial batch completed with three PUBLISHED/Jellyfin-recognized
-titles after the generic AKDL-312 legacy proof backfill and reconciliation.
-A larger bounded rollout is ready for separate authorization.
+Stage12 scope is frozen and CP6F6 is **PASS** as an offline Hermes-timeout
+isolation checkpoint. The prior bounded publication results remain durable:
+`PUBLISHED=7`, `FAILED_RETRYABLE=2`, `RUNNING=1`, `PENDING=162`, and
+`UNRESOLVED=1` across 173 titles.
 
-AT-099 is `PUBLISHED`. `AVSA-455` remains `RUNNING` from the interrupted CP6
-retry. The next checkpoint must apply `recover_running()` and record
-`RUNNING → PENDING / CRASH_RECOVERY` for the affected title before any
-separately authorized production retry. CP6F4 itself performed no recovery or
-real retry.
+`DASS-884` remains `RUNNING` at part `92/117`. The next checkpoint must apply
+`recover_running()` and record `RUNNING → PENDING / CRASH_RECOVERY` for DASS-884
+before any separately authorized production retry. CP6F6 itself performed no
+recovery or real retry.
 The next rollout sequence is:
 
 1. READ-ONLY holdings inventory/dry-run — CP1 PASS
@@ -1170,11 +1220,12 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 ## New Conversation Warnings
 
 - Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
-- Stage12 ACTIVE / CP6F4 PASS; AVSA-455 remains RUNNING; larger rollout requires separate authorization
+- Stage12 ACTIVE / CP6F6 PASS; DASS-884 remains RUNNING; larger rollout requires separate authorization
 - 작품별 튜닝으로 되돌아가지 않기
 - ADN/JUR/HSODA/DVDMS 특정 production logic 금지
 - old canonical KO subtitle overwrite 금지
 - no unbounded or blind retries; only the frozen generic bounded retry
+- Hermes timeout does not trigger immediate same-part retry; resume uses remote pending recovery
 - no broad NAS scan
 - no automatic publication
 - controller/result가 timing authority를 Hermes에 넘기지 않도록 유지

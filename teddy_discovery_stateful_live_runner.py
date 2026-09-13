@@ -37,6 +37,16 @@ class StatefulLiveRunnerError(RuntimeError):
     pass
 
 
+class StatefulLiveRunnerTimeoutError(StatefulLiveRunnerError):
+    """Hermes part invocation exceeded its explicit controller timeout."""
+
+    def __init__(self, *, timeout_seconds: int) -> None:
+        self.timeout_seconds = timeout_seconds
+        super().__init__(
+            "Hermes part invocation exceeded controller timeout"
+        )
+
+
 STATEFUL_PART_MODEL_MAX_ATTEMPTS: Final[int] = 2
 
 
@@ -445,8 +455,8 @@ test "$rok" -eq 1
             timeout=turn_timeout,
         )
     except subprocess.TimeoutExpired as error:
-        raise StatefulLiveRunnerError(
-            "Hermes part invocation exceeded controller timeout"
+        raise StatefulLiveRunnerTimeoutError(
+            timeout_seconds=turn_timeout,
         ) from error
 
     if result.returncode != 0:

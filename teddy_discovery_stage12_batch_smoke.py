@@ -24,7 +24,9 @@ from teddy_discovery_stage12_batch import (
     select_pending_batch,
 )
 from teddy_discovery_stateful_live_runner import (
+    StatefulLiveRunnerError,
     StatefulSemanticOutputValidationRetryExhausted,
+    StatefulLiveRunnerTimeoutError,
 )
 from teddy_discovery_stage12_inventory import (
     ELIGIBLE_NEEDS_KO,
@@ -195,6 +197,8 @@ def controller_for(
     fail_ids=(),
     systemic_ids=(),
     validation_retry_exhausted_ids=(),
+    timeout_ids=(),
+    runner_error_ids=(),
     unexpected_ids=(),
 ):
     bundles = {}
@@ -205,6 +209,10 @@ def controller_for(
         calls.append(dvd_id)
         if dvd_id in systemic_ids:
             raise Stage12BatchSystemicError("shared contract failure")
+        if dvd_id in runner_error_ids:
+            raise StatefulLiveRunnerError("generic live runner failure")
+        if dvd_id in timeout_ids:
+            raise StatefulLiveRunnerTimeoutError(timeout_seconds=600)
         if dvd_id in unexpected_ids:
             raise RuntimeError("unexpected programmer failure")
         if dvd_id in validation_retry_exhausted_ids:
@@ -237,6 +245,7 @@ def controller_for(
 def make_runner(root, records, store, *, controller_calls, nas, publisher,
                 fail_ids=(), systemic_ids=(),
                 validation_retry_exhausted_ids=(), unexpected_ids=(),
+                timeout_ids=(), runner_error_ids=(),
                 jellyfin=recognition_for):
     return Stage12BatchRunner(
         store=store,
@@ -252,6 +261,8 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
             fail_ids=fail_ids,
             systemic_ids=systemic_ids,
             validation_retry_exhausted_ids=validation_retry_exhausted_ids,
+            timeout_ids=timeout_ids,
+            runner_error_ids=runner_error_ids,
             unexpected_ids=unexpected_ids,
         ),
         jellyfin_recognizer=jellyfin,
@@ -468,6 +479,48 @@ def main():
             "SEMANTIC_RETRY_EXHAUSTION_TITLE_ISOLATION",
         )
 
+        # A Hermes timeout is isolated as a retryable title failure without
+        # retrying the timed-out part in the same serial batch.
+        timeout_root = Path(temp) / "timeout-artifacts"
+        timeout_root.mkdir()
+        timeout_store = Stage12RolloutStateStore(Path(temp) / "timeout.sqlite3")
+        timeout_store.initialize_from_inventory(
+            Stage12HoldingsInventoryReport(records[:3])
+        )
+        timeout_nas = FakeNAS(records[:3])
+        timeout_publisher = FakePublisher(timeout_nas)
+        timeout_calls: list[str] = []
+        timeout_runner = make_runner(
+            timeout_root,
+            records[:3],
+            timeout_store,
+            controller_calls=timeout_calls,
+            nas=timeout_nas,
+            publisher=timeout_publisher,
+            timeout_ids={"AAA-002"},
+        )
+        timeout_result = timeout_runner.run(
+            Stage12BatchSelection(3, ("AAA-001", "AAA-002", "AAA-003"))
+        )
+        timeout_state = timeout_store.get("AAA-002")
+        timeout_provenance = json.loads(
+            timeout_state.last_transition_provenance_json
+        )
+        require(
+            timeout_calls == ["AAA-001", "AAA-002", "AAA-003"]
+            and timeout_result.titles[1].final_state == STATE_FAILED_RETRYABLE
+            and timeout_state.last_transition_reason
+            == "STAGE12_HERMES_PART_TIMEOUT"
+            and timeout_provenance["error_type"]
+            == "StatefulLiveRunnerTimeoutError"
+            and timeout_provenance["retry_performed"] is False
+            and timeout_provenance["hermes_timeout"]
+            == {"timeout_seconds": 600}
+            and timeout_result.titles[0].final_state == STATE_PUBLISHED
+            and timeout_result.titles[2].final_state == STATE_PUBLISHED,
+            "HERMES_TIMEOUT_TITLE_ISOLATION_AND_PROVENANCE",
+        )
+
         # An unrelated programmer exception remains systemic and stops the
         # immutable serial batch.
         unexpected_root = Path(temp) / "unexpected-artifacts"
@@ -502,6 +555,40 @@ def main():
             and unexpected_store.get("AAA-002").status == "RUNNING"
             and unexpected_store.get("AAA-003").status == STATE_PENDING,
             "UNEXPECTED_ERROR_DOES_NOT_CONTINUE_BATCH",
+        )
+
+        runner_error_root = Path(temp) / "runner-error-artifacts"
+        runner_error_root.mkdir()
+        runner_error_store = Stage12RolloutStateStore(
+            Path(temp) / "runner-error.sqlite3"
+        )
+        runner_error_store.initialize_from_inventory(
+            Stage12HoldingsInventoryReport(records[:3])
+        )
+        runner_error_nas = FakeNAS(records[:3])
+        runner_error_publisher = FakePublisher(runner_error_nas)
+        runner_error_calls: list[str] = []
+        runner_error_runner = make_runner(
+            runner_error_root,
+            records[:3],
+            runner_error_store,
+            controller_calls=runner_error_calls,
+            nas=runner_error_nas,
+            publisher=runner_error_publisher,
+            runner_error_ids={"AAA-002"},
+        )
+        expect_raises(
+            Stage12BatchSystemicError,
+            lambda: runner_error_runner.run(
+                Stage12BatchSelection(3, ("AAA-001", "AAA-002", "AAA-003"))
+            ),
+            "GENERIC_LIVE_RUNNER_ERROR_REMAINS_SYSTEMIC",
+        )
+        require(
+            runner_error_calls == ["AAA-001", "AAA-002"]
+            and runner_error_store.get("AAA-002").status == "RUNNING"
+            and runner_error_store.get("AAA-003").status == STATE_PENDING,
+            "GENERIC_LIVE_RUNNER_ERROR_DOES_NOT_CONTINUE_BATCH",
         )
 
         # A systemic error stops the immutable serial batch immediately.

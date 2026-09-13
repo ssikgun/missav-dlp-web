@@ -31,6 +31,7 @@ from teddy_discovery_stage11_deployment import (
 )
 from teddy_discovery_stateful_live_runner import (
     StatefulSemanticOutputValidationRetryExhausted,
+    StatefulLiveRunnerTimeoutError,
 )
 from teddy_discovery_stage12_inventory import (
     ELIGIBLE_NEEDS_KO,
@@ -639,7 +640,11 @@ class Stage12BatchRunner:
             error,
             StatefulSemanticOutputValidationRetryExhausted,
         )
-        if semantic_retry_exhausted:
+        hermes_timeout = isinstance(
+            error,
+            StatefulLiveRunnerTimeoutError,
+        )
+        if semantic_retry_exhausted or hermes_timeout:
             terminal = False
         to_status = STATE_FAILED_TERMINAL if terminal else STATE_FAILED_RETRYABLE
         if state.status == STATE_PENDING and terminal:
@@ -670,6 +675,11 @@ class Stage12BatchRunner:
                 "part_index": error.part_index,
                 "attempts": error.attempts,
                 "max_attempts": error.max_attempts,
+            }
+        elif hermes_timeout:
+            transition_reason = "STAGE12_HERMES_PART_TIMEOUT"
+            failure_provenance["hermes_timeout"] = {
+                "timeout_seconds": error.timeout_seconds,
             }
         if publication_result == "PASS":
             if clean_sha256 is None or destination is None:
@@ -711,6 +721,7 @@ class Stage12BatchRunner:
                 Stage12BatchTitleError,
                 Stage11ControllerError,
                 StatefulSemanticOutputValidationRetryExhausted,
+                StatefulLiveRunnerTimeoutError,
             ),
         )
 
