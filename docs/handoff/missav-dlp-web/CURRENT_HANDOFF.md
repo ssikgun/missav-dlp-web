@@ -24,6 +24,7 @@ subtitle rollout readiness.
 - STAGE12_CP6F1_BOUNDED_ALIGNMENT_ASR_ONLY_FALLBACK_PASS
 - STAGE12_CP6F4_INVALID_SEMANTIC_PART_RETRY_ISOLATION_PASS
 - STAGE12_CP6F6_HERMES_TIMEOUT_TITLE_ISOLATION_PASS
+- STAGE12_CP6_FINAL_CLOSURE_PASS
 
 ## Completed
 
@@ -66,6 +67,7 @@ subtitle rollout readiness.
 - deployment smoke: 17/17 PASS
 - invalid semantic-part bounded retry and per-title isolation
 - Hermes part timeout typed per-title isolation without immediate retry
+- Stage12 CP6 final closure: 7/10 PUBLISHED and 3/10 FAILED_RETRYABLE
 - explicit SubtitleCat-only Gluetun proxy wiring
 - search, detail, and payload use the same configured SubtitleCat proxy
 - proxy `http://127.0.0.1:58888` is not a global HTTP proxy
@@ -704,6 +706,62 @@ Offline validation passed:
 performed. CP6F6 made no controller, Hermes, STT, NAS, Jellyfin, or CP6
 restart call/write.
 
+## Stage12 CP6 Final Closure — PASS
+
+Marker:
+
+`STAGE12_CP6_FINAL_CLOSURE_PASS`
+
+CP6 is closed without another production retry. The ten selected titles and
+final outcomes are:
+
+- `PUBLISHED` (7): `AT-099`, `BAGR-093`, `BLOR-289`, `DLDSS-543`,
+  `DOKI-037`, `DOKS-689`, `DROP-141`
+- `FAILED_RETRYABLE` (3): `AVSA-455`, `AVSA-456`, `DASS-884`
+
+The final durable Stage12 state across 173 titles is:
+
+`TOTAL=173`, `PUBLISHED=11`, `FAILED_RETRYABLE=3`, `PENDING=158`,
+`RUNNING=0`, `UNRESOLVED=1`, `FAILED_TERMINAL=0`, `GENERATED=0`,
+`SKIPPED_EXISTING_KO=0`.
+
+The CP6 operating policies are frozen as follows:
+
+1. `AlignmentLimitError` means the lexical-pair safety cap was exceeded. The
+   cap and alignment algorithm were unchanged; the existing validation-failure
+   contract maps unavailable external alignment to `ASR_ONLY`.
+   Implementation commit: `ac39754b95b03a2c7d0b87078d93415a509f902d`.
+2. Invalid semantic model output keeps the extreme-repetition validator. The
+   same part receives only the initial attempt plus one bounded retry; retry
+   exhaustion becomes title-level `FAILED_RETRYABLE`, and the next title
+   continues. Implementation commit:
+   `cecefa11b30019e579089a1d545f086f1bb2655d`.
+3. Hermes part timeout keeps the 600-second limit and never triggers an
+   immediate same-part retry. It becomes title-level `FAILED_RETRYABLE`; the
+   next resume uses existing remote-pending recovery semantics. Implementation
+   commit: `9e9fde3f2777d9386d34ea5ab75219bbf32fe259`.
+
+Per-title isolation was verified operationally: one failed title did not stop
+subsequent titles. `AVSA-455` failed after source-ASR extreme repetition and
+semantic validation retry exhaustion. `AVSA-456` failed after semantic
+validation retry exhaustion. `DASS-884` first timed out at Hermes part `92/117`,
+then, after crash recovery and resume, exhausted semantic validation retry and
+was preserved as `FAILED_RETRYABLE`. None is retried in this closure.
+
+### CT108 operations incident
+
+Early CP6 encountered CT108 memory/swap pressure and I/O thrashing. The live
+expansion was memory `8192 MB → 10240 MB` and swap `512 MB → 1024 MB`.
+SSH/pct exec then recovered and I/O/memory pressure dropped while the CP6
+process was preserved. The incident was not caused by Stage11 STT CPU load;
+STT used VM122 RTX3060 GPU. The 10 GB memory / 1 GB swap configuration remains
+the current mixed browser/Selkies/Docker/Downloader baseline and should be
+reassessed only in separate operations hardening.
+
+This closure made no source or smoke changes and no production mutation:
+Stage11 controller, Hermes, STT, SubtitleCat, NAS, Jellyfin, and recovery or
+retry calls were all `0`; production DB mutation was `0`.
+
 ## Frozen Policies
 
 - production title/cue/text hardcode 금지
@@ -1069,7 +1127,7 @@ Stage11 closure blockers.
 
 - Stage11: **CLOSED / PASS**
 - R6: **CLOSED / PASS**
-- Stage12: **ACTIVE / CP6F6 PASS** — DASS-884 remains `RUNNING`; no CP6F6 production retry
+- Stage12: **ACTIVE / CP6 CLOSED / PASS** — CP6 selected 10; 7 `PUBLISHED`, 3 `FAILED_RETRYABLE`
 - Stage11 controller publication: **NO**
 - Stage12 CP3 publication: **HSODA-104 PASS**; CP5: **3/3 PUBLISHED**
 
@@ -1189,27 +1247,28 @@ Hermes state DB:
 
 ## Next Step
 
-Stage12 scope is frozen and CP6F6 is **PASS** as an offline Hermes-timeout
-isolation checkpoint. The prior bounded publication results remain durable:
-`PUBLISHED=7`, `FAILED_RETRYABLE=2`, `RUNNING=1`, `PENDING=162`, and
-`UNRESOLVED=1` across 173 titles.
+Stage12 scope is frozen and CP6 final closure is **PASS**. The final durable
+state across 173 titles is:
+`PUBLISHED=11`, `FAILED_RETRYABLE=3`, `PENDING=158`, `RUNNING=0`, and
+`UNRESOLVED=1` (`FAILED_TERMINAL=0`, `GENERATED=0`,
+`SKIPPED_EXISTING_KO=0`). The three retryable failures remain preserved and
+are not retried in this closure.
 
-`DASS-884` remains `RUNNING` at part `92/117`. The next checkpoint must apply
-`recover_running()` and record `RUNNING → PENDING / CRASH_RECOVERY` for DASS-884
-before any separately authorized production retry. CP6F6 itself performed no
-recovery or real retry.
-The next rollout sequence is:
+The next Stage12 checkpoint is a performance/token benchmark, not a full
+rollout. Compare the current 16-cue chunk baseline with 64-cue, 128-cue, and
+token-budget adaptive chunking. Measure per-title total time, model/Hermes
+call count, input/output tokens, validation-failure and timeout rates,
+cue omission/order errors, and resume/recovery safety. No design choice is
+final until the benchmark is complete.
 
-1. READ-ONLY holdings inventory/dry-run — CP1 PASS
-2. 1-title atomic publication canary — CP3 PASS for HSODA-104
-3. Jellyfin recognition / safe refresh canary — CP4 PASS for HSODA-104
-4. small bounded batch — CP5 PASS (`3/3` PUBLISHED)
-5. full eligible holdings rollout
+Separately evaluate whether existing holdings can use timestamp-aligned
+canonical Japanese SRT plus large-chunk ChatGPT KO conversion, while new
+downloads continue through the existing automated pipeline. This is a design
+option only; it is not a production fallback decision.
 
-The next action is a separately authorized larger bounded rollout batch. All
-steps must preserve Stage11's frozen contracts and must not reopen Stage11.
-The accepted-alignment + valid-targeted-unprojectable live path may be observed
-naturally during rollout; it remains a KNOWN / NON-BLOCKING gap and does not
+All next steps must preserve Stage11's frozen contracts and must not reopen
+Stage11. The accepted-alignment + valid-targeted-unprojectable live path may
+be observed naturally; it remains a KNOWN / NON-BLOCKING gap and does not
 imply a dedicated retry.
 
 초기 canary는 QualityReviewError에서 fail-closed 되었고, 이후 첫 완료형
@@ -1220,7 +1279,7 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 ## New Conversation Warnings
 
 - Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
-- Stage12 ACTIVE / CP6F6 PASS; DASS-884 remains RUNNING; larger rollout requires separate authorization
+- Stage12 ACTIVE / CP6 CLOSED / PASS; benchmark required before full rollout
 - 작품별 튜닝으로 되돌아가지 않기
 - ADN/JUR/HSODA/DVDMS 특정 production logic 금지
 - old canonical KO subtitle overwrite 금지
