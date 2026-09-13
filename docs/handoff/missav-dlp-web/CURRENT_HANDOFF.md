@@ -1245,6 +1245,48 @@ Hermes state DB:
 이 항목들은 필수 구현 결함으로 과장하지 않는다. 현재 다음 milestone에서
 필요한 것만 구분한다.
 
+## Stage12 CP7A Isolated 64-Cue Performance Benchmark Harness — PASS
+
+Marker:
+
+`STAGE12_CP7A_ISOLATED_64_CUE_BENCHMARK_HARNESS_PASS`
+
+CP7A prepared an offline-only, benchmark-specific 64-cue partition harness.
+Production behavior remains unchanged:
+
+- production `STATEFUL_PART_BATCH_SIZE=16` is unchanged
+- production `plan_stateful_parts()`, controller routing, validators,
+  resume/session/artifact paths, Stage12 publication, and the 600-second
+  Hermes timeout are unchanged
+- benchmark policy ID: `benchmark-stateful-cue64-v1`
+- benchmark maximum: 64 cues per part
+- benchmark input is the exact production semantic package / filtered cue set,
+  not a newly reconstructed full ASR cue set
+- benchmark root is isolated at
+  `/opt/missav-dlp-web/discovery/stage12-performance-benchmark/`
+- benchmark layout separates `manifests`, `inputs`, `pending`, `promoted`,
+  `reports`, and `logs` by title and policy
+- benchmark session identity and remote task identity use a benchmark-only
+  namespace/root and cannot reuse the production stateful session identity
+
+The deterministic manifest records policy, input SHA, semantic cue count, part
+count, and every ordered part range.  It fails closed on changed input SHA or
+policy identity, and it preserves exact cue identity/order with no duplicate
+or missing cue acceptance.
+
+The telemetry contract records per-part and total monotonic elapsed time,
+Hermes invocations, retries, timeouts, validation failures, resume/recovery
+events, cue coverage/order, and raw machine-readable token usage when supplied.
+If runtime usage is unavailable, the report records `token_usage: null` and
+`TOKEN_USAGE_UNAVAILABLE`; no token estimate is generated.
+
+Offline harness smoke: `42` checks PASS.  Related stateful parts/translator/
+controller/live-runner/retry/timeout, Stage11 controller/live-adapter/
+deployment, Stage12 batch, and Stage12 rollout smokes PASS.  No live Hermes,
+STT, SubtitleCat, NAS, Jellyfin, or production rollout-state operation was
+performed.  AT-099 / BLOR-289 / DROP-141 live 64-cue execution remains the
+next checkpoint.
+
 ## Next Step
 
 Stage12 scope is frozen and CP6 final closure is **PASS**. The final durable
@@ -1254,12 +1296,14 @@ state across 173 titles is:
 `SKIPPED_EXISTING_KO=0`). The three retryable failures remain preserved and
 are not retried in this closure.
 
-The next Stage12 checkpoint is a performance/token benchmark, not a full
-rollout. Compare the current 16-cue chunk baseline with 64-cue, 128-cue, and
-token-budget adaptive chunking. Measure per-title total time, model/Hermes
-call count, input/output tokens, validation-failure and timeout rates,
-cue omission/order errors, and resume/recovery safety. No design choice is
-final until the benchmark is complete.
+The next Stage12 checkpoint is the isolated live 64-cue benchmark, not a full
+rollout. Run it only for AT-099, BLOR-289, and DROP-141 using the production
+semantic packages already staged into the benchmark root. Compare against the
+existing 16-cue logs without rerunning the production baseline. Measure
+per-title total time, model/Hermes call count, input/output tokens when
+machine-readable, validation-failure and timeout rates, cue omission/order
+errors, and resume/recovery safety. Do not implement 128-cue or adaptive
+partitioning until the fixed 64-cue result is reviewed.
 
 Separately evaluate whether existing holdings can use timestamp-aligned
 canonical Japanese SRT plus large-chunk ChatGPT KO conversion, while new
