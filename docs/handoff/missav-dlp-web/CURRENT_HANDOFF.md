@@ -31,6 +31,7 @@ subtitle rollout readiness.
 - STAGE12_CP7E_64_VS_128_DECISION_FREEZE_PASS
 - STAGE12_CP7F_PRODUCTION_128_CANDIDATE_IMPLEMENTATION_PASS
 - STAGE12_CP7G_PRODUCTION_128_ONE_TITLE_LIVE_CANARY_PASS
+- STAGE12_CP7I_FIXED128_BOUNDED_ROLLOUT_COMPLETE_FORENSIC
 
 ## Completed
 
@@ -1719,20 +1720,15 @@ the unchanged 16-cue default, and token telemetry remains
 
 ## Next Step
 
-Stage12 scope is frozen and CP6 final closure is **PASS**. The final durable
-state across 173 titles is:
-`PUBLISHED=11`, `FAILED_RETRYABLE=3`, `PENDING=158`, `RUNNING=0`, and
-`UNRESOLVED=1` (`FAILED_TERMINAL=0`, `GENERATED=0`,
-`SKIPPED_EXISTING_KO=0`). The three retryable failures remain preserved and
-are not retried in this closure.
+CP7I is **COMPLETE**, but its fixed-128 bounded rollout result is only
+`1/3 PUBLISHED`. The two retryable failures remain preserved and were not
+blindly retried during forensic review. Fixed 128 is **NOT YET APPROVED** for
+general promotion; production remains on the unchanged 16-cue default.
 
-The one next checkpoint is **bounded production rollout using fixed 128
-candidate**.  It is not executed in CP7H.  Any such rollout must preserve
-production `STATEFUL_PART_BATCH_SIZE=16` as the legacy default, remain
-bounded and separately authorized, monitor per-part timeout/validation/cue
-coverage telemetry, and retain an immediate rollback/stop path.  Until that
-checkpoint is separately completed, production remains on the 16-cue path;
-CP7G does not authorize a full rollout.
+The one next checkpoint is **CT108 read-only remote artifact forensics** for
+the two unresolved evidence boundaries. It must not retry or re-execute a
+title. Until that checkpoint is separately completed, no new rollout is
+authorized.
 
 All next steps must preserve Stage11's frozen contracts and must not reopen
 Stage11. The accepted-alignment + valid-targeted-unprojectable live path may
@@ -1748,13 +1744,13 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 
 - Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
 - Stage12 ACTIVE / CP7B CLOSED / CP7C PREPARED / CP7D CLOSED / CP7E DECISION
-  FREEZE PASS / CP7F CANDIDATE IMPLEMENTATION PASS / CP7G CLOSED / PASS;
-  fixed 128 has passed the AT-099 one-title live canary but is not the global
-  production default
+  FREEZE PASS / CP7F CANDIDATE IMPLEMENTATION PASS / CP7G CLOSED / PASS /
+  CP7I COMPLETE with `1/3 PUBLISHED`; fixed 128 is not the global production
+  default
 - production `STATEFUL_PART_BATCH_SIZE=16` unchanged; no production policy
   change has been applied
-- the only next checkpoint is bounded production rollout using fixed 128
-  candidate; do not execute that rollout in CP7H
+- the only next checkpoint is CT108 read-only remote artifact forensics; do
+  not blind-retry or re-execute CP7I failures
 - 작품별 튜닝으로 되돌아가지 않기
 - ADN/JUR/HSODA/DVDMS 특정 production logic 금지
 - old canonical KO subtitle overwrite 금지
@@ -1763,3 +1759,119 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 - no broad NAS scan
 - no automatic publication
 - controller/result가 timing authority를 Hermes에 넘기지 않도록 유지
+
+## CP7I Fixed-128 Bounded Rollout — COMPLETE / 1 of 3 PUBLISHED
+
+`STAGE12_CP7I_FIXED128_BOUNDED_ROLLOUT_COMPLETE_FORENSIC`
+
+CP7I is **COMPLETE** as an execution checkpoint, but the rollout outcome is
+only **1/3 PUBLISHED**. This records the bounded result and does not approve
+general fixed-128 promotion.
+
+### Frozen execution contract and result
+
+- Selected titles: `DVAJ-754`, `DVAJ-757`, `DVDES-795`; sessions were
+  `0b7b50f8-7ba0-5d2a-84ce-217a40250547`,
+  `05c97ddf-6587-5041-b5c0-5265862fe35a`, and
+  `bef988b4-5878-51c9-a1cc-24c03311fbbd` respectively.
+- Policy: fixed-128 (`stage11-stateful-cue128-v1`); production default
+  `STATEFUL_PART_BATCH_SIZE=16` remained unchanged.
+- `HERMES_TURN_TIMEOUT_SECONDS=600` and
+  `STATEFUL_PART_MODEL_MAX_ATTEMPTS=2` remained unchanged. Validator, retry,
+  timeout, and publication contracts were not modified.
+- CP7I summary: `selected=3`, `published=1`, `failed_retryable=2`,
+  `failed_terminal=0`.
+- No 64-cue fallback, timeout increase, validator relaxation, retry increase,
+  blind retry, or re-execution was performed during forensic review.
+
+### DVAJ-754 — FAILED_RETRYABLE
+
+- Session `0b7b50f8-7ba0-5d2a-84ce-217a40250547`; input had 235 cues and the
+  deterministic plan had 2 parts. Part 1 was
+  `asr-000001..asr-000128`.
+- Both attempts reached the model boundary: the live log records
+  `MODEL_RC=0`, `REMOTE_MODEL_STEP_RESULT=1`, and the same remote pending
+  path, followed by `INVALID_PENDING_REJECTED=1`. The controller then raised
+  `StatefulSemanticOutputValidationRetryExhausted` after 2 attempts.
+- The exact validator rejection available in durable evidence is:
+  `StatefulPartsValidationError` while installing the pending semantic part
+  for part 1. The live log and rollout DB retain only the typed exhaustion
+  error and do not retain the inner `StatefulPartsValidationError` message.
+  The remote pending payload was removed after each rejection, and no invalid
+  payload is present in the local staging directory.
+- The local input artifact
+  `/tmp/stage12-cp7i-fixed128-rollout/staging/0b7b50f8-7ba0-5d2a-84ce-217a40250547/stage11-semantic-input.json`
+  has the expected input SHA
+  `2a74fee94009febef0f761ac3bc07d5470cb9db229fe2b18b25aa8301b8a292d`,
+  235 ordered unique cue IDs, and the expected part-1 range. This confirms
+  the input plan only; it does not validate the model output.
+- Model output existence: **YES at the controller read/reject boundary**.
+  JSON parse success/failure: **UNPROVEN**. Cue count, cue IDs, missing,
+  duplicate, order, unexpected cue, malformed field, `repaired_ja`, `ko`,
+  part/session/input SHA, and other inner validator predicates:
+  **UNPROVEN**. Reasoning text was not used.
+- Both attempts had the same observable rejection category, part, and range.
+  Whether their hidden inner validator reason was identical or different is
+  **UNPROVEN**. Publication and Jellyfin were not run.
+
+### DVDES-795 — FAILED_RETRYABLE
+
+- Session `bef988b4-5878-51c9-a1cc-24c03311fbbd`; input had 1,594 cues and the
+  deterministic plan had 13 parts. The first requested range was
+  `asr-000001..asr-000130`.
+- Invocation start timestamp: **NOT RECORDED** in the live log, DB, or local
+  artifacts. The last local input persistence was
+  `2026-09-14 19:11:27.485054644 KST`; the DB failure event was
+  `2026-09-14 19:21:28.886951 KST`, a delta of `601.401897` seconds. This is
+  input-persistence-to-failure, not a claimed invocation elapsed time.
+- Controller timeout remained exactly `600` seconds. The source uses
+  `subprocess.run(..., timeout=600)` and raises
+  `StatefulLiveRunnerTimeoutError: Hermes part invocation exceeded controller
+  timeout`; the DB provenance also records `timeout_seconds=600`.
+- The live log shows the remote Hermes session was reached and started, but
+  there is no `MODEL_RC`, `REMOTE_MODEL_STEP_RESULT`, validated pending part,
+  canonical part, or final result for this title. Validation was therefore
+  **NOT REACHED**; publication and Jellyfin were not run.
+- Local post-run session state contains only `stage11-semantic-input.json`;
+  no pending, canonical, result, or resume artifact exists locally. Remote
+  task/session state at and after timeout, pending output at timeout, later
+  Hermes output/process state, and remote resumeability are **UNPROVEN**.
+  The read-only network probe could not connect to CT120 (`Operation not
+  permitted`), so this boundary is explicitly:
+  `NETWORK_FORENSIC_DEFERRED_TO_CT108`.
+
+### DVAJ-757 — PUBLISHED baseline
+
+- Session `05c97ddf-6587-5041-b5c0-5265862fe35a`; 757 cues; all 6/6 fixed-128
+  parts were validated and promoted, and the final semantic result was
+  complete with 757 cues.
+- Route was `ASR_ONLY`; publication PASS; Jellyfin recognition PASS with
+  subtitle language `kor`. The clean artifact SHA256 was
+  `07104e874371acc10ea2c495712e421ec728b6a4d29bd81eb0f9c98f783c448f`.
+- This is a success baseline only. It confirms the fixed-128 path and the
+  unchanged validator/retry/timeout contract on this title; it does not
+  establish a general 128-cue production default.
+
+### Forensic decisions
+
+- 128-specific failure evidence: **UNPROVEN**.
+- Generic semantic validation failure: **YES** (`DVAJ-754`).
+- Generic timeout failure: **YES** (`DVDES-795`).
+- Publication path failure: **NO**. The failed titles stopped before
+  publication, while DVAJ-757 passed publication and Jellyfin verification.
+- Title-level isolation: **PASS**. One title published successfully and the
+  two failures were isolated with publication/Jellyfin not run.
+- Fixed-128 general promotion: **NOT YET APPROVED**.
+- Production default 16: **UNCHANGED / YES**.
+
+Forensic-review counters were all zero: `LIVE_HERMES_CALLS=0`, `NAS_WRITES=0`,
+`JELLYFIN_CALLS=0`, `ROLLOUT_DB_WRITES=0`. These counters describe this
+read-only forensic pass; no new rollout action was taken.
+
+### Next checkpoint (one)
+
+**CT108 read-only remote artifact forensics:** recover the CT120 task/session
+metadata and retained validator/pending-output evidence needed to resolve the
+DVAJ-754 inner rejection and DVDES-795 post-timeout state. No retry,
+re-execution, fallback, timeout change, validator change, or publication is
+authorized by this checkpoint.
