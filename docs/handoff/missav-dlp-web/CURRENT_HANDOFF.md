@@ -27,6 +27,8 @@ subtitle rollout readiness.
 - STAGE12_CP6_FINAL_CLOSURE_PASS
 - STAGE12_CP7B_LIVE_64_CUE_BENCHMARK_PASS
 - STAGE12_CP7C_ISOLATED_128_CUE_BENCHMARK_PREPARATION_PASS
+- STAGE12_CP7D_LIVE_128_CUE_BENCHMARK_PASS
+- STAGE12_CP7E_64_VS_128_DECISION_FREEZE_PASS
 
 ## Completed
 
@@ -1307,7 +1309,7 @@ CP7A.  This closure checkpoint itself performed no new benchmark execution.
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
 | AT-099 | 1471 | 23 / 23 | 4255.821413463913 | 0 | 0 | 0 | PASS / PASS | PASS |
 | BLOR-289 | 830 | 13 / 13 | 1802.081057872856 | 0 | 0 | 0 | PASS / PASS | PASS |
-| DROP-141 | 173 | 3 / 3 | 929.3987664356828 | 0 | 0 | 0 | PASS / PASS | PASS |
+| DROP-141 | 173 | 3 / 3 | 929.3162470769603 | 0 | 0 | 0 | PASS / PASS | PASS |
 
 Elapsed-time reference: AT-099 was approximately 70 minutes 56 seconds,
 BLOR-289 approximately 30 minutes 02 seconds, and DROP-141 approximately
@@ -1398,10 +1400,145 @@ Validation completed:
 - token usage remains raw mapping only when supplied; synthetic reports record
   `token_usage=null` / `TOKEN_USAGE_UNAVAILABLE`
 
-The CP7C changes are benchmark-only and do not alter the production
+The CP7C changes were benchmark-only and did not alter the production
 controller, live runner, timeout, validator, NAS, Jellyfin, or production DB
-behavior. The next separately authorized action is the isolated 128-cue live
-benchmark; it has not been executed.
+behavior.  CP7D below subsequently completed the separately authorized
+isolated 128-cue live benchmark.
+
+## Stage12 CP7D Isolated 128-Cue Live Performance Benchmark — PASS
+
+Marker:
+
+`STAGE12_CP7D_LIVE_128_CUE_BENCHMARK_PASS`
+
+CP7D completed the isolated live run for the benchmark-only
+`benchmark-stateful-cue128-v1` policy against the same three fixed titles.
+The successful run is recorded in
+`/opt/missav-dlp-web/discovery/stage12-cp7d-cue128-20260914-123621-live.log`,
+with the per-title reports under
+`/opt/missav-dlp-web/discovery/stage12-performance-benchmark/`.  The run
+verified the expected repository HEAD and branch before execution.
+
+Production and isolation invariants observed during CP7D:
+
+- production `STATEFUL_PART_BATCH_SIZE=16`: unchanged
+- frozen 64-cue policy `benchmark-stateful-cue64-v1`: unchanged
+- benchmark policy: `benchmark-stateful-cue128-v1`
+- Hermes turn timeout: `600` seconds
+- `LIVE_HERMES_CALLS=21`
+- production calls: `0`
+- production writes: `0`
+- benchmark-only local/remote roots and policy-derived session identities were
+  used
+
+### Actual 128-cue live telemetry
+
+| title | semantic cues | planned parts / Hermes invocations | elapsed seconds | retry | timeout | validation failure | cue coverage / order | token usage | result |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |
+| AT-099 | 1471 | 12 / 12 | 3239.958912061993 | 0 | 0 | 0 | PASS / PASS | `TOKEN_USAGE_UNAVAILABLE` | PASS |
+| BLOR-289 | 830 | 7 / 7 | 2570.28323274618 | 0 | 0 | 0 | PASS / PASS | `TOKEN_USAGE_UNAVAILABLE` | PASS |
+| DROP-141 | 173 | 2 / 2 | 792.2427514139563 | 0 | 0 | 0 | PASS / PASS | `TOKEN_USAGE_UNAVAILABLE` | PASS |
+
+All three `TITLE_RESULT` records and the corresponding report files agree on
+the fields above.  CP7D therefore closed `3/3 PASS` with `21` actual Hermes
+invocations, `0` retries, `0` timeouts, `0` validation failures, and exact cue
+coverage/order for all three titles.  Total elapsed across the three title
+reports is `6602.4848962221293` seconds.  The longest observed 128-cue part
+was `574.3666827408597` seconds, below the `600`-second timeout but with
+limited headroom.
+
+Hermes/model responses did not expose machine-readable token usage.  Every
+CP7D report records `token_usage=null` and
+`token_usage_status=TOKEN_USAGE_UNAVAILABLE`; no token amount or token
+reduction is estimated.
+
+## Stage12 CP7E 64-vs-128 Decision Freeze — PASS
+
+Marker:
+
+`STAGE12_CP7E_64_VS_128_DECISION_FREEZE_PASS`
+
+CP7E read the CP7B/64 and CP7D/128 live `TITLE_RESULT` records and the six
+corresponding benchmark reports.  No benchmark source, production source,
+production state, NAS, Jellyfin, or rollout state was changed.
+
+### 64-cue source-of-truth audit
+
+The successful CP7B live log and its immutable report both record DROP-141
+64-cue elapsed as `929.3162470769603` seconds.  The prior handoff/input value
+`929.3987664356828` is not present in the CP7B live `TITLE_RESULT`, final
+summary, or benchmark report.  The comparison below therefore uses the actual
+log/report value `929.3162470769603`, while the AT-099 and BLOR-289 64-cue
+values remain unchanged.
+
+### Per-title comparison
+
+`elapsed delta` is defined as `128 - 64`; a negative value means 128 cues was
+faster.  `elapsed % change` uses the same signed direction.  Call reduction is
+`64 calls - 128 calls`.
+
+| title | 64 elapsed seconds | 128 elapsed seconds | elapsed delta seconds | elapsed % change | faster policy | 64 → 128 Hermes calls | call reduction | call reduction % |
+| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: |
+| AT-099 | 4255.821413463913 | 3239.958912061993 | -1015.862501401920 | -23.86995136093095% | 128 | 23 → 12 | 11 | 47.82608695652174% |
+| BLOR-289 | 1802.081057872856 | 2570.28323274618 | +768.202174873324 | +42.62861381940810% | 64 | 13 → 7 | 6 | 46.15384615384615% |
+| DROP-141 | 929.3162470769603 | 792.2427514139563 | -137.0734956630040 | -14.74992997207897% | 128 | 3 → 2 | 1 | 33.33333333333333% |
+
+128 cues was faster for AT-099 and DROP-141, while BLOR-289 was slower by
+`768.202174873324` seconds (`42.62861381940810%`).  The title-level variance
+is material and is retained in the decision rather than averaged away.
+
+### Aggregate comparison
+
+| metric | fixed 64 | fixed 128 | 128 versus 64 |
+| --- | ---: | ---: | ---: |
+| total elapsed seconds | 6987.2187184137293 | 6602.4848962221293 | -384.7338221916000 |
+| elapsed % change | — | — | -5.50625130966194% |
+| elapsed improvement | — | — | 5.50625130966194% |
+| total Hermes calls | 39 | 21 | 18 fewer / 46.15384615384615% |
+
+### Stability comparison
+
+| telemetry | fixed 64 | fixed 128 |
+| --- | ---: | ---: |
+| PASS titles | 3/3 | 3/3 |
+| retry count | 0 | 0 |
+| timeout count | 0 | 0 |
+| validation failure count | 0 | 0 |
+| cue coverage | 3/3 PASS | 3/3 PASS |
+| cue order | 3/3 PASS | 3/3 PASS |
+| semantic cue counts | 1471 / 830 / 173 | 1471 / 830 / 173 |
+| token telemetry | `TOKEN_USAGE_UNAVAILABLE` | `TOKEN_USAGE_UNAVAILABLE` |
+
+All actual invocations equaled planned parts for both policies.  The equal
+`3/3 PASS` result demonstrates no observed stability regression in this
+sample, but it does not establish production safety for either policy.
+
+### Candidate decision
+
+| candidate | evidence | complexity / rollout safety | freeze decision |
+| --- | --- | --- | --- |
+| fixed 64 | All 3 titles PASS; lower elapsed for BLOR-289; 39 calls total | Simplest conservative benchmark candidate and more per-part timeout headroom | Retain as validated baseline; not selected as the next optimization candidate |
+| fixed 128 | 5.50625130966194% lower aggregate elapsed and 46.15384615384615% fewer calls; all 3 titles PASS; BLOR-289 is 42.62861381940810% slower | Simple fixed policy, but larger parts observed near the 600-second timeout; requires a separately authorized canary | **RECOMMENDED next production-optimization candidate** |
+| future adaptive 64/128 | An ex-post faster-policy-per-title selection would be 5834.2827213488053 seconds and 27 calls, but no adaptive run or selector was measured | Highest implementation and rollout complexity; only three titles provide no general decision rule | Defer until broader telemetry and an explicit adaptive design exist |
+
+### Recommendation and scope
+
+Recommendation: freeze **fixed 128** as the next production-optimization
+candidate, because it is faster in aggregate and cuts Hermes calls nearly in
+half while matching fixed 64 on every observed stability metric.  This is a
+candidate recommendation, not a production approval: the BLOR-289 regression,
+the limited timeout headroom on the largest observed 128-cue part, and the
+absence of token telemetry require a controlled canary and further evidence.
+The adaptive option is not selected because its apparent best-of-two result is
+an ex-post calculation, not measured adaptive behavior, and its added
+complexity reduces rollout safety.
+
+Token result is explicitly `TOKEN_USAGE_UNAVAILABLE`.  Call reduction must not
+be represented as token reduction, and no token estimate is permitted.
+
+CP7E changed only this canonical handoff.  Production
+`STATEFUL_PART_BATCH_SIZE=16` remains unchanged, and no production policy
+value has been changed or applied.
 
 ## Next Step
 
@@ -1412,24 +1549,13 @@ state across 173 titles is:
 `SKIPPED_EXISTING_KO=0`). The three retryable failures remain preserved and
 are not retried in this closure.
 
-The next candidate checkpoint after CP7C is an isolated 128-cue live
-benchmark, not a full rollout and not a production change.  When separately
-authorized, the order is:
-
-1. preserve production `STATEFUL_PART_BATCH_SIZE=16` unchanged;
-2. use the CP7B 64-cue results as the baseline;
-3. use the same three titles: AT-099, BLOR-289, and DROP-141;
-4. run the completed synthetic validation and dependency preflight before any
-   live attempt;
-5. compare the 64-cue and 128-cue results only after a successful isolated run.
-
-Expected 128-cue planned parts are AT-099: `12`, BLOR-289: `7`, and
-DROP-141: `2`.  No 128-cue live benchmark has been executed.
-
-Separately evaluate whether existing holdings can use timestamp-aligned
-canonical Japanese SRT plus large-chunk ChatGPT KO conversion, while new
-downloads continue through the existing automated pipeline. This is a design
-option only; it is not a production fallback decision.
+The one next checkpoint is a separately authorized **CP7F fixed-128
+single-title production canary**.  It must preserve production
+`STATEFUL_PART_BATCH_SIZE=16` until the canary starts, run the completed
+preflight and dependency checks, monitor per-part timeout/validation/cue
+coverage telemetry, and retain an immediate rollback/stop path.  It is not a
+batch or full rollout.  Until CP7F passes, no production policy value changes
+and production remains on the 16-cue path.
 
 All next steps must preserve Stage11's frozen contracts and must not reopen
 Stage11. The accepted-alignment + valid-targeted-unprojectable live path may
@@ -1444,8 +1570,10 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 ## New Conversation Warnings
 
 - Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
-- Stage12 ACTIVE / CP7B CLOSED / CP7C PREPARED / PASS; 128-cue isolated live
-  benchmark remains future work before any production change
+- Stage12 ACTIVE / CP7B CLOSED / CP7C PREPARED / CP7D CLOSED / CP7E DECISION
+  FREEZE PASS; fixed 128 is only a recommendation for the next canary
+- production `STATEFUL_PART_BATCH_SIZE=16` unchanged; no production policy
+  change has been applied
 - 작품별 튜닝으로 되돌아가지 않기
 - ADN/JUR/HSODA/DVDMS 특정 production logic 금지
 - old canonical KO subtitle overwrite 금지
