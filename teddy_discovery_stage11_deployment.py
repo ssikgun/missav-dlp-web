@@ -1114,8 +1114,20 @@ class _HybridOriginalRegistry:
         return wrapped
 
     def capture_first_pass(self, callback: Callable) -> Callable:
-        def wrapped(package, *, route, staging_root):
-            result = callback(package, route=route, staging_root=staging_root)
+        def wrapped(
+            package,
+            *,
+            route,
+            staging_root,
+            semantic_policy=None,
+        ):
+            callback_kwargs = {
+                "route": route,
+                "staging_root": staging_root,
+            }
+            if semantic_policy is not None:
+                callback_kwargs["semantic_policy"] = semantic_policy
+            result = callback(package, **callback_kwargs)
             if route == V2_ROUTE_HYBRID:
                 try:
                     session_id = stateful_session_id_for_package(package)

@@ -29,6 +29,7 @@ subtitle rollout readiness.
 - STAGE12_CP7C_ISOLATED_128_CUE_BENCHMARK_PREPARATION_PASS
 - STAGE12_CP7D_LIVE_128_CUE_BENCHMARK_PASS
 - STAGE12_CP7E_64_VS_128_DECISION_FREEZE_PASS
+- STAGE12_CP7F_PRODUCTION_128_CANDIDATE_IMPLEMENTATION_PASS
 
 ## Completed
 
@@ -48,7 +49,7 @@ subtitle rollout readiness.
 - deterministic CLEAN materialization
 - generic empty Whisper word normalization
 - thin generic `run_one_title_stage11(...)` controller
-- controller smoke 41/41 PASS
+- controller smoke 44/44 PASS
 - related targeted/Hybrid/ASR/quality-review regression smoke: PASS
 - `build_stage11_live_dependencies(...)` factory
 - Flask-free existing-config holding resolver adapter
@@ -69,6 +70,11 @@ subtitle rollout readiness.
 - standalone canary `claim_token=1` retained as STANDALONE_CANARY_ONLY
 - deployment + live adapters fake E2E: ASR_ONLY PASS / HYBRID PASS
 - deployment smoke: 17/17 PASS
+- explicit production semantic policy boundary: legacy 16-cue default plus
+  opt-in 128-cue candidate
+- policy-bound package generation identity isolates candidate session, local
+  staging, remote task, and stateful-part resume keys
+- production 128-cue candidate controller smoke: ASR_ONLY PASS / HYBRID PASS
 - invalid semantic-part bounded retry and per-title isolation
 - Hermes part timeout typed per-title isolation without immediate retry
 - Stage12 CP6 final closure: 7/10 PUBLISHED and 3/10 FAILED_RETRYABLE
@@ -1540,6 +1546,108 @@ CP7E changed only this canonical handoff.  Production
 `STATEFUL_PART_BATCH_SIZE=16` remains unchanged, and no production policy
 value has been changed or applied.
 
+## Stage12 CP7F Production 128-Cue Candidate Implementation — PASS
+
+Marker:
+
+`STAGE12_CP7F_PRODUCTION_128_CANDIDATE_IMPLEMENTATION_PASS`
+
+CP7E is CLOSED / PASS at source `HEAD`
+`8cde74598d716bb3dca2e1b61f6b7aefa0353d68` on branch
+`teddy-subtitle-stage11`.  CP7F implemented and offline-verified the
+production candidate boundary only.  It did not execute a production title,
+rollout, Hermes live call, or publication.
+
+### Candidate policy structure
+
+- legacy/default policy: `stage11-stateful-cue16-v1`
+- production candidate policy: `stage11-stateful-cue128-v1`
+- legacy ownership remains `STATEFUL_PART_BATCH_SIZE=16`; the global default
+  was not overwritten
+- the part planner now receives an explicit policy/config identity and uses
+  that policy's maximum cue count; the default path still plans at 16 cues
+  per part
+- the candidate is selected explicitly through
+  `run_one_title_stage11(..., semantic_policy=...)` and the native runner's
+  `--semantic-policy` argument
+- benchmark-only policies remain separate from production policy IDs
+- package, semantic-part, and result JSON envelopes are unchanged; policy
+  metadata is internal/configuration identity, not a new semantic field
+- timeout remains `600` seconds, validators remain unchanged, and retry
+  behavior remains the frozen bounded policy
+
+### Candidate planner and identity verification
+
+The offline candidate smoke verified the expected deterministic plans:
+
+| semantic cues | expected 128-cue parts | result |
+| ---: | ---: | --- |
+| 1471 | 12 | PASS |
+| 830 | 7 | PASS |
+| 173 | 2 | PASS |
+
+The 128 policy is bound before the existing stateful machinery runs by
+appending the deterministic policy identity to the package `generation_key`.
+The existing UUID5 session derivation then produces a different
+`session_id` and input SHA from the unbound legacy package.  The existing
+machinery consequently uses distinct:
+
+- local staging directories (`staging_root/session_id`)
+- remote task paths (`remote_task_for_session(session_id)`)
+- stateful-part resume keys (`session_id`, `input_sha256`, and part index)
+- deterministic partition ranges and cue-order validation
+
+The adapter rejects an unbound package when the 128 policy is requested, and
+cross-policy plan reuse fails closed.  ASR-only and HYBRID controller smokes
+also verified that the policy-bound package remains consistent with existing
+review and CLEAN preparation identity.  The default legacy path retains its
+unbound package/session identity and its 16-cue behavior.
+
+### CP7F verification and live boundary
+
+- policy smoke: PASS; malformed/missing policy fails closed
+- legacy stateful parts smoke: 32/32 PASS
+- Stage11 controller smoke: 44/44 PASS
+- stateful translator/controller/live-runner/retry/timeout/ASR/HYBRID
+  regressions: PASS
+- Stage11 live-adapter smoke: PASS
+- Stage11 deployment smoke: 17/17 PASS
+- Stage12 benchmark/128-policy/batch/rollout regression smokes: PASS
+- `py_compile`: PASS
+- `git diff --check`: PASS
+- benchmark source changes: `0`
+- `LIVE_HERMES_CALLS=0`
+- `PRODUCTION_WRITES=0`
+- `NAS_WRITES=0`
+- `JELLYFIN_CALLS=0`
+- `ROLLOUT_DB_WRITES=0`
+- production policy/state rollout: not performed
+- CP7D token telemetry remains `TOKEN_USAGE_UNAVAILABLE`; no token amount or
+  token reduction is estimated
+
+The fixed-128 recommendation from CP7E remains a candidate recommendation
+for a separately authorized canary.  This CP7F implementation does not
+change production policy values or invoke the candidate in production.
+
+## CP7F Changed Files
+
+Only production source, offline smoke, and this existing canonical handoff
+were modified.  No new handoff document was created.  The checkpoint source
+HEAD remains `8cde74598d716bb3dca2e1b61f6b7aefa0353d68`; no commit or push was
+performed.
+
+- policy/planner/controller/adapter source: `teddy_discovery_stateful_policy.py`,
+  `teddy_discovery_stateful_translator.py`,
+  `teddy_discovery_stateful_parts.py`,
+  `teddy_discovery_stateful_controller.py`,
+  `teddy_discovery_stateful_live_runner.py`,
+  `teddy_discovery_stage11_controller.py`,
+  `teddy_discovery_stage11_live_adapters.py`,
+  `teddy_discovery_stage11_deployment.py`
+- offline smoke coverage: `teddy_discovery_stateful_policy_smoke.py`,
+  `teddy_discovery_stage11_controller_smoke.py`
+- canonical handoff: `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md`
+
 ## Next Step
 
 Stage12 scope is frozen and CP6 final closure is **PASS**. The final durable
@@ -1549,13 +1657,13 @@ state across 173 titles is:
 `SKIPPED_EXISTING_KO=0`). The three retryable failures remain preserved and
 are not retried in this closure.
 
-The one next checkpoint is a separately authorized **CP7F fixed-128
+The one next checkpoint is a separately authorized **CP7G fixed-128
 single-title production canary**.  It must preserve production
 `STATEFUL_PART_BATCH_SIZE=16` until the canary starts, run the completed
 preflight and dependency checks, monitor per-part timeout/validation/cue
 coverage telemetry, and retain an immediate rollback/stop path.  It is not a
-batch or full rollout.  Until CP7F passes, no production policy value changes
-and production remains on the 16-cue path.
+batch or full rollout.  Until that canary passes, no production policy value
+changes and production remains on the 16-cue path.
 
 All next steps must preserve Stage11's frozen contracts and must not reopen
 Stage11. The accepted-alignment + valid-targeted-unprojectable live path may
@@ -1571,7 +1679,8 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 
 - Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
 - Stage12 ACTIVE / CP7B CLOSED / CP7C PREPARED / CP7D CLOSED / CP7E DECISION
-  FREEZE PASS; fixed 128 is only a recommendation for the next canary
+  FREEZE PASS / CP7F CANDIDATE IMPLEMENTATION PASS; fixed 128 is only a
+  recommendation for the next canary
 - production `STATEFUL_PART_BATCH_SIZE=16` unchanged; no production policy
   change has been applied
 - 작품별 튜닝으로 되돌아가지 않기

@@ -35,9 +35,16 @@ from teddy_discovery_targeted_second_evidence_runner import (
     run_targeted_second_evidence_v1_from_local_source,
 )
 from teddy_discovery_stateful_translator import (
-    create_stateful_staging_directory, stateful_session_id_for_package,
+    bind_stateful_semantic_policy, create_stateful_staging_directory,
+    stateful_session_id_for_package,
     stateful_staging_paths, write_stateful_input, serialize_stateful_package,
     read_stateful_result, _atomic_private_write, _read_private_result_bytes,
+)
+from teddy_discovery_stateful_policy import (
+    DEFAULT_STATEFUL_SEMANTIC_POLICY,
+    StatefulSemanticPolicy,
+    StatefulSemanticPolicyError,
+    resolve_stateful_semantic_policy,
 )
 from teddy_discovery_stateful_live_runner import build_parser, run
 from teddy_discovery_quality_review_session import new_review_execution_session_id
@@ -182,9 +189,29 @@ def build_first_pass_adapter(*, remote, ssh_key, known_hosts,
     This explicit native-owner hook must be idempotent on resume. Connection
     setup is not inferred from a local path or a native SessionDB filename.
     """
-    def first_pass(package, *, route, staging_root):
+    def first_pass(
+        package,
+        *,
+        route,
+        staging_root,
+        semantic_policy: StatefulSemanticPolicy | str = (
+            DEFAULT_STATEFUL_SEMANTIC_POLICY
+        ),
+    ):
         if route not in {"ASR_ONLY", "HYBRID"}:
             raise Stage11LiveAdapterError("unsupported first-pass route")
+        try:
+            policy = resolve_stateful_semantic_policy(semantic_policy)
+            bound_package = bind_stateful_semantic_policy(package, policy)
+        except (StatefulSemanticPolicyError, ValueError) as error:
+            raise Stage11LiveAdapterError(
+                "first-pass package policy identity is invalid"
+            ) from error
+        if bound_package != package:
+            raise Stage11LiveAdapterError(
+                "first-pass package must already be bound to its semantic policy"
+            )
+        package = bound_package
         session = stateful_session_id_for_package(package)
         directory = Path(staging_root) / session
         if not directory.exists() and not directory.is_symlink():
@@ -198,12 +225,17 @@ def build_first_pass_adapter(*, remote, ssh_key, known_hosts,
         if paths.result_path.exists() or paths.result_path.is_symlink():
             return read_stateful_result(directory, package, process_finished=True)
         remote_task = prepare_remote(package, paths, route=route)
-        args = build_parser().parse_args([
+        parser_args = [
             "--package", str(paths.input_path), "--task-directory", str(directory),
             "--final-result", str(paths.result_path), "--remote", remote,
             "--remote-task", remote_task, "--ssh-key", ssh_key,
             "--known-hosts", known_hosts,
-        ])
+        ]
+        if policy != DEFAULT_STATEFUL_SEMANTIC_POLICY:
+            parser_args.extend(
+                ["--semantic-policy", policy.policy_id]
+            )
+        args = build_parser().parse_args(parser_args)
         code = native_run(args)
         if type(code) is not int or code != 0:
             raise Stage11LiveAdapterError("native first-pass runner failed")

@@ -26,6 +26,12 @@ from teddy_discovery_stateful_parts import (
     assemble_stateful_result,
     StatefulPartsValidationError,
 )
+from teddy_discovery_stateful_policy import (
+    DEFAULT_STATEFUL_SEMANTIC_POLICY,
+    STATEFUL_SEMANTIC_POLICIES,
+    StatefulSemanticPolicy,
+    resolve_stateful_semantic_policy,
+)
 from teddy_discovery_stateful_translator import (
     parse_stateful_package,
     parse_stateful_result,
@@ -540,6 +546,9 @@ def _request_and_install_part(
     remote_task: str,
     plan,
     expected,
+    semantic_policy: StatefulSemanticPolicy | str = (
+        DEFAULT_STATEFUL_SEMANTIC_POLICY
+    ),
 ) -> None:
     """Request one deterministic part with a bounded validation retry."""
 
@@ -576,6 +585,7 @@ def _request_and_install_part(
                 package,
                 semantic_input_bytes,
                 expected.part_index,
+                semantic_policy=semantic_policy,
             )
 
             print(
@@ -705,6 +715,9 @@ def run(args: argparse.Namespace) -> int:
     remote_task = _require_absolute_remote_task(
         args.remote_task
     )
+    semantic_policy = resolve_stateful_semantic_policy(
+        getattr(args, "semantic_policy", DEFAULT_STATEFUL_SEMANTIC_POLICY)
+    )
 
     semantic_input_bytes = package_path.read_bytes()
 
@@ -715,6 +728,7 @@ def run(args: argparse.Namespace) -> int:
     plan = build_stateful_part_plan(
         package,
         semantic_input_bytes,
+        semantic_policy=semantic_policy,
     )
 
     if not task_directory.exists():
@@ -757,6 +771,7 @@ def run(args: argparse.Namespace) -> int:
             task_directory,
             package,
             semantic_input_bytes,
+            semantic_policy=semantic_policy,
         )
 
         print(
@@ -869,6 +884,7 @@ def run(args: argparse.Namespace) -> int:
             remote_task=remote_task,
             plan=plan,
             expected=expected,
+            semantic_policy=semantic_policy,
         )
 
         print(
@@ -932,6 +948,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--turn-timeout",
         type=int,
         default=600,
+    )
+
+    parser.add_argument(
+        "--semantic-policy",
+        choices=tuple(policy.policy_id for policy in STATEFUL_SEMANTIC_POLICIES),
+        default=DEFAULT_STATEFUL_SEMANTIC_POLICY.policy_id,
     )
 
     return parser

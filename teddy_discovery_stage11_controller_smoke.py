@@ -47,6 +47,7 @@ from teddy_discovery_stateful_translator import (
     StatefulSubtitleResult,
     stateful_session_id_for_package,
 )
+from teddy_discovery_stateful_policy import STATEFUL_SEMANTIC_POLICY_ID_128
 from teddy_discovery_subtitle_external import (
     ExternalSubtitleTransportError,
     ExternalSubtitleValidationError,
@@ -279,10 +280,20 @@ class FakeRuntime:
         self.targeted_calls += 1
         return _targeted_execution(asr_result, decisions)
 
-    def first_pass(self, package, *, route, staging_root):
+    def first_pass(
+        self,
+        package,
+        *,
+        route,
+        staging_root,
+        semantic_policy=None,
+    ):
         self.first_pass_calls += 1
         self.first_pass_routes.append(route)
         self.staging_roots.append(staging_root)
+        if semantic_policy is not None:
+            self.first_pass_policies = getattr(self, "first_pass_policies", [])
+            self.first_pass_policies.append(semantic_policy.policy_id)
         assert route in {V2_ROUTE_ASR_ONLY, V2_ROUTE_HYBRID}
         self.last_packages[route] = package
         return StatefulSubtitleResult(
@@ -341,9 +352,15 @@ def _roots(base: Path):
     return artifact_root, staging_root
 
 
-def _run(artifact_root, staging_root, runtime, *, targeted_runner=True):
-    return controller.run_one_title_stage11(
-        TITLE,
+def _run(
+    artifact_root,
+    staging_root,
+    runtime,
+    *,
+    targeted_runner=True,
+    semantic_policy=None,
+):
+    kwargs = dict(
         artifact_root=artifact_root,
         stateful_staging_root=staging_root,
         claim_token=7,
@@ -355,6 +372,9 @@ def _run(artifact_root, staging_root, runtime, *, targeted_runner=True):
         targeted_runner=runtime.targeted if targeted_runner else None,
         holding_resolver=runtime.holding,
     )
+    if semantic_policy is not None:
+        kwargs["semantic_policy"] = semantic_policy
+    return controller.run_one_title_stage11(TITLE, **kwargs)
 
 
 def _prepopulate_baseline(artifact_root: Path, asr_result):
@@ -470,6 +490,17 @@ def main():
             lambda: runtime.staging_roots
             and all(path == staging_root for path in runtime.staging_roots),
         )
+        reject(
+            "non-default policy cannot reuse title completion",
+            controller.Stage11ControllerArtifactError,
+            lambda: _run(
+                artifact_root,
+                staging_root,
+                runtime,
+                targeted_runner=False,
+                semantic_policy=STATEFUL_SEMANTIC_POLICY_ID_128,
+            ),
+        )
 
     # Absent baseline is generated and persisted.
     with tempfile.TemporaryDirectory(prefix="stage11-controller-generate-") as raw:
@@ -482,7 +513,50 @@ def main():
             and runtime.baseline_calls == 1
             and (
                 artifact_root / TITLE / controller.BASELINE_ASR_FILENAME
-            ).is_file(),
+                ).is_file(),
+        )
+
+    # The production 128 candidate is opt-in and must bind its package before
+    # the existing ASR/HYBRID review and CLEAN machinery sees it.
+    with tempfile.TemporaryDirectory(prefix="stage11-controller-candidate-asr-") as raw:
+        artifact_root, staging_root = _roots(Path(raw))
+        runtime = FakeRuntime(fixture.asr_result())
+        result = _run(
+            artifact_root,
+            staging_root,
+            runtime,
+            targeted_runner=False,
+            semantic_policy=STATEFUL_SEMANTIC_POLICY_ID_128,
+        )
+        package = runtime.last_packages[V2_ROUTE_ASR_ONLY]
+        check(
+            "opt-in 128 ASR candidate binds identity before first pass",
+            lambda: result.route == V2_ROUTE_ASR_ONLY
+            and package.generation_key.endswith(
+                "::stage11-policy=" + STATEFUL_SEMANTIC_POLICY_ID_128
+            )
+            and runtime.first_pass_policies == [STATEFUL_SEMANTIC_POLICY_ID_128],
+        )
+
+    with tempfile.TemporaryDirectory(prefix="stage11-controller-candidate-hybrid-") as raw:
+        artifact_root, staging_root = _roots(Path(raw))
+        runtime = FakeRuntime(fixture.asr_result(), ACCEPT_HYBRID)
+        result = _run(
+            artifact_root,
+            staging_root,
+            runtime,
+            targeted_runner=False,
+            semantic_policy=STATEFUL_SEMANTIC_POLICY_ID_128,
+        )
+        package = runtime.last_packages[V2_ROUTE_HYBRID]
+        check(
+            "opt-in 128 HYBRID candidate retains preparation identity",
+            lambda: result.route == V2_ROUTE_HYBRID
+            and package.generation_key.endswith(
+                "::stage11-policy=" + STATEFUL_SEMANTIC_POLICY_ID_128
+            )
+            and runtime.first_pass_policies == [STATEFUL_SEMANTIC_POLICY_ID_128]
+            and runtime.hybrid_review_calls == 1,
         )
 
     # Every explicitly permitted external boundary failure falls back narrowly.

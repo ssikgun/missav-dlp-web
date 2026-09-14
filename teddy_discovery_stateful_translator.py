@@ -25,6 +25,12 @@ from teddy_discovery_hermes_v2 import (
     HermesV2CueInput,
     HermesV2CueOutput,
 )
+from teddy_discovery_stateful_policy import (
+    DEFAULT_STATEFUL_SEMANTIC_POLICY,
+    StatefulSemanticPolicy,
+    bind_stateful_policy_generation_key,
+    resolve_stateful_semantic_policy,
+)
 
 
 STATEFUL_TRANSLATOR_SCHEMA_VERSION: Final[int] = 1
@@ -687,6 +693,37 @@ def stateful_session_id_for_package(
     )
 
 
+def bind_stateful_semantic_policy(
+    package: StatefulSubtitlePackage,
+    semantic_policy: StatefulSemanticPolicy | str = (
+        DEFAULT_STATEFUL_SEMANTIC_POLICY
+    ),
+) -> StatefulSubtitlePackage:
+    """Return a package whose generation identity names its semantic policy.
+
+    The default 16-cue policy is intentionally a no-op so existing package,
+    session, and resume identities remain unchanged.  Candidate policies are
+    encoded only in the existing generation identity; no package/result wire
+    fields are added.
+    """
+
+    validated = _validated_package(package)
+    policy = resolve_stateful_semantic_policy(semantic_policy)
+    generation_key = bind_stateful_policy_generation_key(
+        validated.generation_key,
+        policy,
+    )
+    if generation_key == validated.generation_key:
+        return validated
+    return StatefulSubtitlePackage(
+        schema_version=validated.schema_version,
+        dvd_id=validated.dvd_id,
+        generation_key=generation_key,
+        claim_token=validated.claim_token,
+        cues=validated.cues,
+    )
+
+
 def premint_stateful_session(
     session_db: object,
     package: StatefulSubtitlePackage,
@@ -1075,6 +1112,7 @@ __all__ = [
     "StatefulTranslatorStagingPaths",
     "StatefulTranslatorValidationError",
     "build_stateful_translator_command",
+    "bind_stateful_semantic_policy",
     "consume_stateful_result",
     "create_stateful_staging_directory",
     "derive_stateful_session_id",

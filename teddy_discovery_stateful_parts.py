@@ -35,10 +35,20 @@ from teddy_discovery_stateful_translator import (
     stateful_staging_paths,
     validate_stateful_result,
 )
+from teddy_discovery_stateful_policy import (
+    DEFAULT_STATEFUL_SEMANTIC_POLICY,
+    STATEFUL_SEMANTIC_POLICIES,
+    STATEFUL_SEMANTIC_POLICY_ID_16,
+    StatefulSemanticPolicy,
+    StatefulSemanticPolicyError,
+    resolve_stateful_semantic_policy,
+    stateful_policy_id_from_generation_key,
+)
 
 
 STATEFUL_PART_SCHEMA_VERSION: Final[int] = 1
 STATEFUL_PART_BATCH_SIZE: Final[int] = 16
+STATEFUL_PART_POLICY_ID: Final[str] = STATEFUL_SEMANTIC_POLICY_ID_16
 STATEFUL_PART_MAX_BYTES: Final[int] = 16 * 1024 * 1024
 STATEFUL_PART_FILE_MODE: Final[int] = 0o600
 STATEFUL_PART_FILENAME_PREFIX: Final[str] = "semantic-part-"
@@ -75,6 +85,56 @@ class StatefulPartsPromotionError(StatefulPartsError):
 
 class StatefulPartsAssemblyError(StatefulPartsError):
     """Raised when a complete final result cannot be materialized."""
+
+
+_SUPPORTED_PART_BATCH_SIZES: Final[frozenset[int]] = frozenset(
+    policy.max_cues_per_part for policy in STATEFUL_SEMANTIC_POLICIES
+)
+
+
+def _resolve_semantic_policy(
+    value: StatefulSemanticPolicy | str,
+) -> StatefulSemanticPolicy:
+    try:
+        return resolve_stateful_semantic_policy(value)
+    except StatefulSemanticPolicyError as error:
+        raise StatefulPartsValidationError(
+            "semantic policy is unsupported or inconsistent"
+        ) from error
+
+
+def _require_policy_batch_size(value: object) -> int:
+    if type(value) is not int or value not in _SUPPORTED_PART_BATCH_SIZES:
+        raise StatefulPartsValidationError(
+            "semantic policy batch size is unsupported"
+        )
+    return value
+
+
+def _require_package_policy_binding(
+    package: StatefulSubtitlePackage,
+    policy: StatefulSemanticPolicy,
+) -> None:
+    try:
+        bound_policy_id = stateful_policy_id_from_generation_key(
+            package.generation_key
+        )
+    except StatefulSemanticPolicyError as error:
+        raise StatefulPartsValidationError(
+            "package generation identity has an invalid semantic policy"
+        ) from error
+
+    if policy == DEFAULT_STATEFUL_SEMANTIC_POLICY:
+        if bound_policy_id not in {None, policy.policy_id}:
+            raise StatefulPartsValidationError(
+                "package is bound to a different semantic policy"
+            )
+        return
+
+    if bound_policy_id != policy.policy_id:
+        raise StatefulPartsValidationError(
+            "candidate package is not bound to its semantic policy"
+        )
 
 
 def _require_exact_string(value: object, field_name: str) -> str:
@@ -230,9 +290,11 @@ class ExpectedStatefulPart:
     first_cue_id: str
     last_cue_id: str
     cue_ids: tuple[str, ...]
+    max_cues_per_part: int = STATEFUL_PART_BATCH_SIZE
 
     def __post_init__(self):
         _require_part_index(self.part_index)
+        _require_policy_batch_size(self.max_cues_per_part)
         _require_exact_string(self.first_cue_id, "first_cue_id")
         _require_exact_string(self.last_cue_id, "last_cue_id")
         if type(self.cue_ids) is not tuple or not self.cue_ids:
@@ -258,7 +320,7 @@ class ExpectedStatefulPart:
             raise StatefulPartsValidationError(
                 "expected part cue IDs must be unique"
             )
-        if len(self.cue_ids) > STATEFUL_PART_BATCH_SIZE:
+        if len(self.cue_ids) > self.max_cues_per_part:
             raise StatefulPartsLimitError(
                 "expected part exceeds the stateful part batch size"
             )
@@ -286,8 +348,20 @@ class StatefulPartPlan:
     session_id: str
     input_sha256: str
     parts: tuple[ExpectedStatefulPart, ...]
+    policy_id: str = STATEFUL_PART_POLICY_ID
+    max_cues_per_part: int = STATEFUL_PART_BATCH_SIZE
 
     def __post_init__(self):
+        if type(self.policy_id) is not str:
+            raise StatefulPartsValidationError(
+                "part plan policy ID must be an exact string"
+            )
+        policy = _resolve_semantic_policy(self.policy_id)
+        if self.max_cues_per_part != policy.max_cues_per_part:
+            raise StatefulPartsValidationError(
+                "part plan policy and batch size do not match"
+            )
+        _require_policy_batch_size(self.max_cues_per_part)
         _require_exact_string(self.dvd_id, "dvd_id")
         _require_exact_string(self.generation_key, "generation_key")
         if type(self.claim_token) is not int or self.claim_token < 0:
@@ -303,6 +377,13 @@ class StatefulPartPlan:
         if any(type(part) is not ExpectedStatefulPart for part in self.parts):
             raise StatefulPartsValidationError(
                 "part plan contains a detached expected part"
+            )
+        if any(
+            part.max_cues_per_part != self.max_cues_per_part
+            for part in self.parts
+        ):
+            raise StatefulPartsValidationError(
+                "part plan contains a range with a different batch size"
             )
         expected_indices = tuple(range(1, len(self.parts) + 1))
         actual_indices = tuple(part.part_index for part in self.parts)
@@ -327,12 +408,14 @@ class StatefulSemanticPart:
     first_cue_id: str
     last_cue_id: str
     cues: tuple[HermesV2CueOutput, ...]
+    max_cues_per_part: int = STATEFUL_PART_BATCH_SIZE
 
     def __post_init__(self):
         if type(self.part_schema_version) is not int or self.part_schema_version != STATEFUL_PART_SCHEMA_VERSION:
             raise StatefulPartsValidationError(
                 "unsupported stateful part schema version"
             )
+        _require_policy_batch_size(self.max_cues_per_part)
         _require_session_id(self.session_id)
         _require_sha256(self.input_sha256)
         _require_part_index(self.part_index)
@@ -342,7 +425,7 @@ class StatefulSemanticPart:
             raise StatefulPartsValidationError(
                 "part cues must be an immutable nonempty tuple"
             )
-        if len(self.cues) > STATEFUL_PART_BATCH_SIZE:
+        if len(self.cues) > self.max_cues_per_part:
             raise StatefulPartsLimitError(
                 "part exceeds the stateful part batch size"
             )
@@ -489,23 +572,34 @@ def _validate_package_for_plan(
 def plan_stateful_parts(
     package: StatefulSubtitlePackage,
     semantic_input_bytes: bytes,
+    *,
+    semantic_policy: StatefulSemanticPolicy | str = (
+        DEFAULT_STATEFUL_SEMANTIC_POLICY
+    ),
 ) -> StatefulPartPlan:
     """Derive immutable ranges and the exact input hash from frozen bytes."""
 
+    policy = _resolve_semantic_policy(semantic_policy)
     validated_package = _validate_package_for_plan(
         package,
         semantic_input_bytes,
     )
+    _require_package_policy_binding(validated_package, policy)
     cue_ids = tuple(cue.cue_id for cue in validated_package.cues)
     parts = tuple(
         ExpectedStatefulPart(
             part_index=part_index,
             first_cue_id=cue_ids[start],
-            last_cue_id=cue_ids[min(start + STATEFUL_PART_BATCH_SIZE, len(cue_ids)) - 1],
-            cue_ids=cue_ids[start : start + STATEFUL_PART_BATCH_SIZE],
+            last_cue_id=cue_ids[
+                min(start + policy.max_cues_per_part, len(cue_ids)) - 1
+            ],
+            cue_ids=cue_ids[
+                start : start + policy.max_cues_per_part
+            ],
+            max_cues_per_part=policy.max_cues_per_part,
         )
         for part_index, start in enumerate(
-            range(0, len(cue_ids), STATEFUL_PART_BATCH_SIZE),
+            range(0, len(cue_ids), policy.max_cues_per_part),
             start=1,
         )
     )
@@ -516,16 +610,26 @@ def plan_stateful_parts(
         session_id=stateful_session_id_for_package(validated_package),
         input_sha256=hashlib.sha256(semantic_input_bytes).hexdigest(),
         parts=parts,
+        policy_id=policy.policy_id,
+        max_cues_per_part=policy.max_cues_per_part,
     )
 
 
 def build_stateful_part_plan(
     package: StatefulSubtitlePackage,
     semantic_input_bytes: bytes,
+    *,
+    semantic_policy: StatefulSemanticPolicy | str = (
+        DEFAULT_STATEFUL_SEMANTIC_POLICY
+    ),
 ) -> StatefulPartPlan:
     """Explicit alias for the deterministic part-plan constructor."""
 
-    return plan_stateful_parts(package, semantic_input_bytes)
+    return plan_stateful_parts(
+        package,
+        semantic_input_bytes,
+        semantic_policy=semantic_policy,
+    )
 
 
 def _validate_plan(plan: StatefulPartPlan) -> StatefulPartPlan:
@@ -541,6 +645,8 @@ def _validate_plan(plan: StatefulPartPlan) -> StatefulPartPlan:
             session_id=plan.session_id,
             input_sha256=plan.input_sha256,
             parts=plan.parts,
+            policy_id=plan.policy_id,
+            max_cues_per_part=plan.max_cues_per_part,
         )
     except (AttributeError, TypeError, ValueError, OverflowError) as error:
         raise StatefulPartsValidationError(
@@ -557,6 +663,13 @@ def _validate_plan_against_package(
         raise StatefulPartsAssemblyError(
             "package must be the exact frozen package type"
         )
+    try:
+        policy = _resolve_semantic_policy(validated_plan.policy_id)
+        _require_package_policy_binding(package, policy)
+    except StatefulPartsValidationError as error:
+        raise StatefulPartsAssemblyError(
+            "part plan policy is detached from the frozen package"
+        ) from error
     expected_session_id = stateful_session_id_for_package(package)
     expected_ids = tuple(cue.cue_id for cue in package.cues)
     planned_ids = tuple(
@@ -591,6 +704,7 @@ def _validated_part(value: object) -> StatefulSemanticPart:
             first_cue_id=value.first_cue_id,
             last_cue_id=value.last_cue_id,
             cues=value.cues,
+            max_cues_per_part=value.max_cues_per_part,
         )
     except (AttributeError, TypeError, ValueError, OverflowError) as error:
         raise StatefulPartsValidationError(
@@ -745,6 +859,7 @@ def _part_from_payload(
             first_cue_id=parsed["first_cue_id"],
             last_cue_id=parsed["last_cue_id"],
             cues=tuple(_parse_part_cue(cue) for cue in raw_cues),
+            max_cues_per_part=plan.max_cues_per_part,
         )
     except StatefulPartsError:
         raise
@@ -760,6 +875,7 @@ def _part_from_payload(
         or part.part_index != expected.part_index
         or part.first_cue_id != expected.first_cue_id
         or part.last_cue_id != expected.last_cue_id
+        or part.max_cues_per_part != expected.max_cues_per_part
         or tuple(cue.cue_id for cue in part.cues) != expected.cue_ids
     ):
         raise StatefulPartsValidationError(
@@ -1136,6 +1252,7 @@ __all__ = [
     "STATEFUL_PART_FILENAME_PREFIX",
     "STATEFUL_PART_MAX_BYTES",
     "STATEFUL_PART_PENDING_SUFFIX",
+    "STATEFUL_PART_POLICY_ID",
     "STATEFUL_PART_SCHEMA_VERSION",
     "StatefulPartAssemblyError",
     "StatefulPartFilenameError",

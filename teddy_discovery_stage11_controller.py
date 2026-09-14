@@ -78,6 +78,13 @@ from teddy_discovery_stateful_quality_review import (
 from teddy_discovery_stateful_quality_review_clean import (
     materialize_stateful_quality_review_clean,
 )
+from teddy_discovery_stateful_policy import (
+    DEFAULT_STATEFUL_SEMANTIC_POLICY,
+    StatefulSemanticPolicy,
+    StatefulSemanticPolicyError,
+    bind_stateful_policy_generation_key,
+    resolve_stateful_semantic_policy,
+)
 from teddy_discovery_stateful_translator import (
     StatefulSubtitleResult,
     serialize_stateful_result,
@@ -1160,12 +1167,29 @@ def _run_first_pass(
     *,
     route: str,
     staging_root: Path,
+    semantic_policy: StatefulSemanticPolicy | str = (
+        DEFAULT_STATEFUL_SEMANTIC_POLICY
+    ),
 ) -> StatefulSubtitleResult:
     if not callable(runner):
         raise Stage11ControllerValidationError(
             "first_pass_runner must be callable"
         )
-    result = runner(package, route=route, staging_root=staging_root)
+    try:
+        policy = resolve_stateful_semantic_policy(semantic_policy)
+    except StatefulSemanticPolicyError as error:
+        raise Stage11ControllerValidationError(
+            "first-pass semantic policy is unsupported"
+        ) from error
+    if policy == DEFAULT_STATEFUL_SEMANTIC_POLICY:
+        result = runner(package, route=route, staging_root=staging_root)
+    else:
+        result = runner(
+            package,
+            route=route,
+            staging_root=staging_root,
+            semantic_policy=policy,
+        )
     return validate_stateful_result(result, package)
 
 
@@ -1201,6 +1225,9 @@ def run_one_title_stage11(
     hybrid_review_runner: Callable,
     targeted_runner: Callable | None = None,
     holding_resolver: Callable[[str], Mapping[str, object]] | None = None,
+    semantic_policy: StatefulSemanticPolicy | str = (
+        DEFAULT_STATEFUL_SEMANTIC_POLICY
+    ),
 ) -> Stage11ControllerResult:
     """Run one exact canonical DVD-ID through deterministic CLEAN and stop.
 
@@ -1221,6 +1248,14 @@ def run_one_title_stage11(
         raise Stage11ControllerValidationError(
             "claim_token must be a nonnegative exact integer"
         )
+    try:
+        selected_semantic_policy = resolve_stateful_semantic_policy(
+            semantic_policy
+        )
+    except StatefulSemanticPolicyError as error:
+        raise Stage11ControllerValidationError(
+            "semantic policy is unsupported"
+        ) from error
     canonical_video, source_snapshot = _resolve_holding(
         canonical_title,
         holding_resolver,
@@ -1254,6 +1289,10 @@ def run_one_title_stage11(
     )
 
     if completion_exists:
+        if selected_semantic_policy != DEFAULT_STATEFUL_SEMANTIC_POLICY:
+            raise Stage11ControllerArtifactError(
+                "non-default semantic policy cannot reuse a title completion"
+            )
         return _validate_existing_completion(
             report_path,
             clean_path,
@@ -1280,12 +1319,21 @@ def run_one_title_stage11(
             route,
             targeted_artifact,
         )
-        hybrid_preparation = prepare_stateful_hybrid(
-            route,
-            targeted_bindings=targeted_bindings,
-            generation_key="stage11-hybrid-" + generation_suffix,
-            claim_token=claim_token,
-        )
+        try:
+            hybrid_generation_key = bind_stateful_policy_generation_key(
+                "stage11-hybrid-" + generation_suffix,
+                selected_semantic_policy,
+            )
+            hybrid_preparation = prepare_stateful_hybrid(
+                route,
+                targeted_bindings=targeted_bindings,
+                generation_key=hybrid_generation_key,
+                claim_token=claim_token,
+            )
+        except (StatefulSemanticPolicyError, ValueError) as error:
+            raise Stage11ControllerValidationError(
+                "HYBRID generation identity could not bind its semantic policy"
+            ) from error
         try:
             _validate_complete_hybrid_targeted_projection(
                 targeted_artifact,
@@ -1311,18 +1359,28 @@ def run_one_title_stage11(
             generation_key="stage11-asr-source-" + generation_suffix,
             claim_token=claim_token,
         )
-        prepared = prepare_stateful_asr_package(
-            source_package,
-            generation_key="stage11-asr-filtered-" + generation_suffix,
-            asr_result=asr_result,
-            source_quality_decisions=source_quality_decisions,
-        )
+        try:
+            asr_generation_key = bind_stateful_policy_generation_key(
+                "stage11-asr-filtered-" + generation_suffix,
+                selected_semantic_policy,
+            )
+            prepared = prepare_stateful_asr_package(
+                source_package,
+                generation_key=asr_generation_key,
+                asr_result=asr_result,
+                source_quality_decisions=source_quality_decisions,
+            )
+        except (StatefulSemanticPolicyError, ValueError) as error:
+            raise Stage11ControllerValidationError(
+                "ASR generation identity could not bind its semantic policy"
+            ) from error
         package = prepared.package
         first_pass = _run_first_pass(
             first_pass_runner,
             package,
             route=route.route,
             staging_root=staging_root_path,
+            semantic_policy=selected_semantic_policy,
         )
         provenance = build_asr_prefilter_provenance(
             asr_result,
@@ -1372,6 +1430,7 @@ def run_one_title_stage11(
             package,
             route=route.route,
             staging_root=staging_root_path,
+            semantic_policy=selected_semantic_policy,
         )
         document = route.alignment_application.bundle.external_ja_document
         source_quality = classify_source_document(document)

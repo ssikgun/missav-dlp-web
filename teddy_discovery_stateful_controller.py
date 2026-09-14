@@ -11,6 +11,10 @@ from teddy_discovery_stateful_parts import (
     expected_part_filename,
     scan_stateful_canonical_parts,
 )
+from teddy_discovery_stateful_policy import (
+    DEFAULT_STATEFUL_SEMANTIC_POLICY,
+    StatefulSemanticPolicy,
+)
 from teddy_discovery_stateful_translator import (
     STATEFUL_TRANSLATOR_INPUT_FILENAME,
     StatefulSubtitlePackage,
@@ -42,12 +46,17 @@ def decide_stateful_controller_step(
     task_directory: str | Path,
     package: StatefulSubtitlePackage,
     semantic_input_bytes: bytes,
+    *,
+    semantic_policy: StatefulSemanticPolicy | str = (
+        DEFAULT_STATEFUL_SEMANTIC_POLICY
+    ),
 ) -> StatefulControllerDecision:
     """Return the next deterministic action for any package size."""
 
     plan = build_stateful_part_plan(
         package,
         semantic_input_bytes,
+        semantic_policy=semantic_policy,
     )
 
     scan = scan_stateful_canonical_parts(
@@ -126,12 +135,17 @@ def build_stateful_part_query(
     package: StatefulSubtitlePackage,
     semantic_input_bytes: bytes,
     part_index: int,
+    *,
+    semantic_policy: StatefulSemanticPolicy | str = (
+        DEFAULT_STATEFUL_SEMANTIC_POLICY
+    ),
 ) -> str:
     """Build one generic same-session continuation query."""
 
     plan = build_stateful_part_plan(
         package,
         semantic_input_bytes,
+        semantic_policy=semantic_policy,
     )
 
     if type(part_index) is not int or not (
