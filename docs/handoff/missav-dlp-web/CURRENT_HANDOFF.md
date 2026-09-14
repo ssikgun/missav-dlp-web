@@ -26,6 +26,7 @@ subtitle rollout readiness.
 - STAGE12_CP6F6_HERMES_TIMEOUT_TITLE_ISOLATION_PASS
 - STAGE12_CP6_FINAL_CLOSURE_PASS
 - STAGE12_CP7B_LIVE_64_CUE_BENCHMARK_PASS
+- STAGE12_CP7C_ISOLATED_128_CUE_BENCHMARK_PREPARATION_PASS
 
 ## Completed
 
@@ -1350,6 +1351,58 @@ This closure checkpoint changed only this canonical handoff.  It performed no
 new benchmark, 128-cue implementation, production source change, production
 DB write, NAS/Jellyfin call, or Hermes call.
 
+## Stage12 CP7C Isolated 128-Cue Benchmark Preparation — PASS
+
+Marker:
+
+`STAGE12_CP7C_ISOLATED_128_CUE_BENCHMARK_PREPARATION_PASS`
+
+CP7C prepared a benchmark-only `benchmark-stateful-cue128-v1` policy by
+reusing the frozen CP7B partition, validation, pending/promote, telemetry, and
+synthetic runner structure. No 128-cue live benchmark was started.
+
+Production and frozen-policy invariants:
+
+- production `STATEFUL_PART_BATCH_SIZE=16`: unchanged
+- frozen 64 policy `benchmark-stateful-cue64-v1`: unchanged
+- new 128 policy: `benchmark-stateful-cue128-v1`
+- 64 and 128 manifests use separate policy-derived session identities and
+  local/remote paths; 64 state is not reused or overwritten
+- deterministic input SHA and cue boundaries, exact cue coverage/order,
+  pending → validation → promote, resume/recovery telemetry, elapsed telemetry,
+  and token-usage availability contracts remain fail-closed
+
+Expected 128-cue partition counts for the fixed titles:
+
+- AT-099: `1471` semantic cues, `12` parts
+- BLOR-289: `830` semantic cues, `7` parts
+- DROP-141: `173` semantic cues, `2` parts
+- total expected parts / no-retry synthetic requests: `21`
+
+Validation completed:
+
+- `py_compile`: PASS
+- existing 64-cue benchmark smoke regression: `44/44` PASS
+- new 128-cue benchmark smoke: `53/53` PASS
+- stateful parts smoke: `32/32` PASS
+- stateful translator smoke: PASS
+- stateful controller smoke: `26/26` PASS
+- stateful live-runner smoke: `16/16` PASS
+- bounded retry and timeout live-runner smokes: PASS
+- three-title synthetic preflight using the staged semantic inputs: PASS
+- cue coverage/order: PASS for all 3 titles
+- isolated local/remote policy paths: PASS
+- synthetic validation/pending/promote/report path: PASS
+- `LIVE_HERMES_CALLS=0`
+- production calls/writes: `0`
+- token usage remains raw mapping only when supplied; synthetic reports record
+  `token_usage=null` / `TOKEN_USAGE_UNAVAILABLE`
+
+The CP7C changes are benchmark-only and do not alter the production
+controller, live runner, timeout, validator, NAS, Jellyfin, or production DB
+behavior. The next separately authorized action is the isolated 128-cue live
+benchmark; it has not been executed.
+
 ## Next Step
 
 Stage12 scope is frozen and CP6 final closure is **PASS**. The final durable
@@ -1359,19 +1412,19 @@ state across 173 titles is:
 `SKIPPED_EXISTING_KO=0`). The three retryable failures remain preserved and
 are not retried in this closure.
 
-The next candidate checkpoint is preparation for an isolated 128-cue
-benchmark, not a full rollout and not a production change.  Do not implement
-or execute it in this closure.  When separately authorized, the order is:
+The next candidate checkpoint after CP7C is an isolated 128-cue live
+benchmark, not a full rollout and not a production change.  When separately
+authorized, the order is:
 
-1. prepare a benchmark-only 128-cue policy/harness;
-2. preserve production `STATEFUL_PART_BATCH_SIZE=16` unchanged;
-3. use the CP7B 64-cue results as the baseline;
-4. use the same three titles: AT-099, BLOR-289, and DROP-141;
-5. run synthetic validation and dependency preflight before any live attempt;
-6. compare the 64-cue and 128-cue results only after a successful isolated run.
+1. preserve production `STATEFUL_PART_BATCH_SIZE=16` unchanged;
+2. use the CP7B 64-cue results as the baseline;
+3. use the same three titles: AT-099, BLOR-289, and DROP-141;
+4. run the completed synthetic validation and dependency preflight before any
+   live attempt;
+5. compare the 64-cue and 128-cue results only after a successful isolated run.
 
 Expected 128-cue planned parts are AT-099: `12`, BLOR-289: `7`, and
-DROP-141: `2`.  No 128-cue implementation or execution has been performed.
+DROP-141: `2`.  No 128-cue live benchmark has been executed.
 
 Separately evaluate whether existing holdings can use timestamp-aligned
 canonical Japanese SRT plus large-chunk ChatGPT KO conversion, while new
@@ -1391,8 +1444,8 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 ## New Conversation Warnings
 
 - Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
-- Stage12 ACTIVE / CP7B CLOSED / PASS; 128-cue isolated benchmark is only a
-  future candidate before any production change
+- Stage12 ACTIVE / CP7B CLOSED / CP7C PREPARED / PASS; 128-cue isolated live
+  benchmark remains future work before any production change
 - 작품별 튜닝으로 되돌아가지 않기
 - ADN/JUR/HSODA/DVDMS 특정 production logic 금지
 - old canonical KO subtitle overwrite 금지

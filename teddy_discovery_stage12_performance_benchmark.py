@@ -6,10 +6,11 @@ stateful translation continues to use ``STATEFUL_PART_BATCH_SIZE == 16`` and
 its existing plan/validator/resume contract.
 
 The benchmark input is the exact serialized semantic package already supplied
-to the production controller.  A 64-cue manifest is derived from those bytes
-and can be staged under a separately configured benchmark root.  The manifest
-and identity checks are deliberately independent of the production 16-cue
-``ExpectedStatefulPart`` type so that the two state spaces cannot be mixed.
+to the production controller.  A policy-specific manifest is derived from
+those bytes and can be staged under a separately configured benchmark root.
+The manifest and identity checks are deliberately independent of the
+production 16-cue ``ExpectedStatefulPart`` type so that the two state spaces
+cannot be mixed.
 """
 
 from __future__ import annotations
@@ -34,8 +35,13 @@ from teddy_discovery_stateful_translator import (
 
 
 BENCHMARK_MANIFEST_SCHEMA_VERSION: Final[int] = 1
-BENCHMARK_POLICY_ID: Final[str] = "benchmark-stateful-cue64-v1"
-BENCHMARK_MAX_CUES_PER_PART: Final[int] = 64
+BENCHMARK_CUE64_POLICY_ID: Final[str] = "benchmark-stateful-cue64-v1"
+BENCHMARK_CUE64_MAX_CUES_PER_PART: Final[int] = 64
+BENCHMARK_CUE128_POLICY_ID: Final[str] = "benchmark-stateful-cue128-v1"
+BENCHMARK_CUE128_MAX_CUES_PER_PART: Final[int] = 128
+# Frozen 64-cue public names retained for existing callers and smoke tests.
+BENCHMARK_POLICY_ID: Final[str] = BENCHMARK_CUE64_POLICY_ID
+BENCHMARK_MAX_CUES_PER_PART: Final[int] = BENCHMARK_CUE64_MAX_CUES_PER_PART
 BENCHMARK_ROOT: Final[Path] = Path(
     "/opt/missav-dlp-web/discovery/stage12-performance-benchmark"
 )
@@ -72,7 +78,7 @@ class BenchmarkHarnessError(ValueError):
 
 
 class BenchmarkPolicyError(BenchmarkHarnessError):
-    """Raised when a benchmark policy is not the supported 64-cue policy."""
+    """Raised when a benchmark policy or partition size is unsupported."""
 
 
 class BenchmarkIsolationError(BenchmarkHarnessError):
@@ -151,6 +157,13 @@ def _validate_supported_policy(policy_id: object) -> str:
     return policy
 
 
+def _benchmark_max_cues_per_part(policy_id: str) -> int:
+    policy = _validate_supported_policy(policy_id)
+    if policy == BENCHMARK_CUE128_POLICY_ID:
+        return BENCHMARK_CUE128_MAX_CUES_PER_PART
+    return BENCHMARK_MAX_CUES_PER_PART
+
+
 def _resolved_absolute_path(value: Path | str, field_name: str) -> Path:
     candidate = Path(value)
     if not candidate.is_absolute():
@@ -199,12 +212,13 @@ def _validate_package_and_input(
 
 @dataclass(frozen=True)
 class BenchmarkPartition:
-    """One ordered 64-cue range in the isolated benchmark manifest."""
+    """One ordered policy-sized range in the isolated benchmark manifest."""
 
     part_index: int
     first_cue_id: str
     last_cue_id: str
     cue_ids: tuple[str, ...]
+    max_cues_per_part: int = BENCHMARK_MAX_CUES_PER_PART
 
     def __post_init__(self):
         if type(self.part_index) is not int or self.part_index <= 0:
@@ -213,8 +227,15 @@ class BenchmarkPartition:
         _require_exact_text(self.last_cue_id, "last_cue_id")
         if type(self.cue_ids) is not tuple or not self.cue_ids:
             raise BenchmarkManifestError("cue_ids must be a nonempty tuple")
-        if len(self.cue_ids) > BENCHMARK_MAX_CUES_PER_PART:
-            raise BenchmarkPolicyError("benchmark part exceeds 64 cues")
+        if self.max_cues_per_part not in {
+            BENCHMARK_CUE64_MAX_CUES_PER_PART,
+            BENCHMARK_CUE128_MAX_CUES_PER_PART,
+        }:
+            raise BenchmarkPolicyError("benchmark part size is unsupported")
+        if len(self.cue_ids) > self.max_cues_per_part:
+            raise BenchmarkPolicyError(
+                "benchmark part exceeds its policy cue limit"
+            )
         for cue_id in self.cue_ids:
             _require_exact_text(cue_id, "cue_id")
         if self.cue_ids[0] != self.first_cue_id:
@@ -256,9 +277,11 @@ class BenchmarkPartitionManifest:
     def __post_init__(self):
         if self.manifest_schema_version != BENCHMARK_MANIFEST_SCHEMA_VERSION:
             raise BenchmarkManifestError("unsupported benchmark manifest version")
-        _validate_supported_policy(self.policy_id)
-        if self.max_cues_per_part != BENCHMARK_MAX_CUES_PER_PART:
-            raise BenchmarkPolicyError("only the 64-cue policy is supported")
+        expected_max_cues = _benchmark_max_cues_per_part(self.policy_id)
+        if self.max_cues_per_part != expected_max_cues:
+            raise BenchmarkPolicyError(
+                "benchmark policy and partition size are inconsistent"
+            )
         _require_component(self.dvd_id, "dvd_id")
         _require_exact_text(self.generation_key, "generation_key")
         if type(self.claim_token) is not int or self.claim_token < 0:
@@ -271,6 +294,14 @@ class BenchmarkPartitionManifest:
             raise BenchmarkManifestError("parts must be a nonempty tuple")
         if any(type(part) is not BenchmarkPartition for part in self.parts):
             raise BenchmarkManifestError("parts contain a detached partition")
+        if any(
+            part.max_cues_per_part != self.max_cues_per_part
+            or part.cue_count > self.max_cues_per_part
+            for part in self.parts
+        ):
+            raise BenchmarkPolicyError(
+                "benchmark parts exceed the manifest policy cue limit"
+            )
         if tuple(part.part_index for part in self.parts) != tuple(
             range(1, len(self.parts) + 1)
         ):
@@ -372,6 +403,11 @@ def parse_benchmark_manifest(payload: bytes) -> BenchmarkPartitionManifest:
     raw_parts = parsed["parts"]
     if type(raw_parts) is not list:
         raise BenchmarkManifestError("manifest parts must be an array")
+    manifest_max_cues = parsed["max_cues_per_part"]
+    if type(manifest_max_cues) is not int:
+        raise BenchmarkManifestError(
+            "manifest max_cues_per_part must be an integer"
+        )
     parts: list[BenchmarkPartition] = []
     for raw_part in raw_parts:
         if type(raw_part) is not dict:
@@ -392,6 +428,7 @@ def parse_benchmark_manifest(payload: bytes) -> BenchmarkPartitionManifest:
             first_cue_id=raw_part["first_cue_id"],
             last_cue_id=raw_part["last_cue_id"],
             cue_ids=tuple(cue_ids),
+            max_cues_per_part=manifest_max_cues,
         )
         if raw_part["cue_count"] != part.cue_count:
             raise BenchmarkManifestError("manifest cue_count is detached")
@@ -441,13 +478,14 @@ def build_benchmark_manifest(
     *,
     policy_id: str = BENCHMARK_POLICY_ID,
 ) -> BenchmarkPartitionManifest:
-    """Build a deterministic 64-cue manifest from exact production input."""
+    """Build a deterministic policy-sized manifest from exact input."""
 
     validated_package = _validate_package_and_input(
         package,
         semantic_input_bytes,
     )
     policy = _validate_supported_policy(policy_id)
+    max_cues_per_part = _benchmark_max_cues_per_part(policy)
     input_sha256 = hashlib.sha256(semantic_input_bytes).hexdigest()
     cue_ids = tuple(cue.cue_id for cue in validated_package.cues)
     parts = tuple(
@@ -455,21 +493,22 @@ def build_benchmark_manifest(
             part_index=part_index,
             first_cue_id=cue_ids[start],
             last_cue_id=cue_ids[
-                min(start + BENCHMARK_MAX_CUES_PER_PART, len(cue_ids)) - 1
+                min(start + max_cues_per_part, len(cue_ids)) - 1
             ],
             cue_ids=cue_ids[
-                start : start + BENCHMARK_MAX_CUES_PER_PART
+                start : start + max_cues_per_part
             ],
+            max_cues_per_part=max_cues_per_part,
         )
         for part_index, start in enumerate(
-            range(0, len(cue_ids), BENCHMARK_MAX_CUES_PER_PART),
+            range(0, len(cue_ids), max_cues_per_part),
             start=1,
         )
     )
     return BenchmarkPartitionManifest(
         manifest_schema_version=BENCHMARK_MANIFEST_SCHEMA_VERSION,
         policy_id=policy,
-        max_cues_per_part=BENCHMARK_MAX_CUES_PER_PART,
+        max_cues_per_part=max_cues_per_part,
         dvd_id=validated_package.dvd_id,
         generation_key=validated_package.generation_key,
         claim_token=validated_package.claim_token,
@@ -914,6 +953,10 @@ def write_benchmark_report(
 
 __all__ = [
     "BENCHMARK_MANIFEST_SCHEMA_VERSION",
+    "BENCHMARK_CUE64_POLICY_ID",
+    "BENCHMARK_CUE64_MAX_CUES_PER_PART",
+    "BENCHMARK_CUE128_POLICY_ID",
+    "BENCHMARK_CUE128_MAX_CUES_PER_PART",
     "BENCHMARK_POLICY_ID",
     "BENCHMARK_MAX_CUES_PER_PART",
     "BENCHMARK_ROOT",
