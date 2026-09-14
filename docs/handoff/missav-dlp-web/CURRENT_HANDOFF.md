@@ -25,6 +25,7 @@ subtitle rollout readiness.
 - STAGE12_CP6F4_INVALID_SEMANTIC_PART_RETRY_ISOLATION_PASS
 - STAGE12_CP6F6_HERMES_TIMEOUT_TITLE_ISOLATION_PASS
 - STAGE12_CP6_FINAL_CLOSURE_PASS
+- STAGE12_CP7B_LIVE_64_CUE_BENCHMARK_PASS
 
 ## Completed
 
@@ -1284,8 +1285,70 @@ Offline harness smoke: `42` checks PASS.  Related stateful parts/translator/
 controller/live-runner/retry/timeout, Stage11 controller/live-adapter/
 deployment, Stage12 batch, and Stage12 rollout smokes PASS.  No live Hermes,
 STT, SubtitleCat, NAS, Jellyfin, or production rollout-state operation was
-performed.  AT-099 / BLOR-289 / DROP-141 live 64-cue execution remains the
-next checkpoint.
+performed by CP7A.  AT-099 / BLOR-289 / DROP-141 live 64-cue execution was
+completed in CP7B and is recorded below.
+
+## Stage12 CP7B Isolated 64-Cue Live Performance Benchmark — PASS
+
+Marker:
+
+`STAGE12_CP7B_LIVE_64_CUE_BENCHMARK_PASS`
+
+CP7B ran the benchmark-only 64-cue policy against the three fixed titles.  The
+benchmark policy was `benchmark-stateful-cue64-v1`; production
+`STATEFUL_PART_BATCH_SIZE=16` remained unchanged.  The benchmark used the
+isolated local/remote roots and benchmark-only session identity established by
+CP7A.  This closure checkpoint itself performed no new benchmark execution.
+
+### Per-title result
+
+| title | semantic cues | planned parts / Hermes invocations | elapsed seconds | retry | timeout | validation failure | cue coverage / order | result |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| AT-099 | 1471 | 23 / 23 | 4255.821413463913 | 0 | 0 | 0 | PASS / PASS | PASS |
+| BLOR-289 | 830 | 13 / 13 | 1802.081057872856 | 0 | 0 | 0 | PASS / PASS | PASS |
+| DROP-141 | 173 | 3 / 3 | 929.3987664356828 | 0 | 0 | 0 | PASS / PASS | PASS |
+
+Elapsed-time reference: AT-099 was approximately 70 minutes 56 seconds,
+BLOR-289 approximately 30 minutes 02 seconds, and DROP-141 approximately
+15 minutes 29 seconds.
+
+### Aggregate result
+
+- titles: `3`
+- PASS: `3`
+- FAIL: `0`
+- total Hermes invocations: `39`
+- retry total: `0`
+- timeout total: `0`
+- validation failure total: `0`
+- cue coverage/order failures: `0`
+- `CP7B_LIVE_BENCHMARK=PASS`
+
+The fixed 64-cue policy therefore passed `3/3` live benchmark titles.  Against
+the existing 16-cue planned-turn counts, the benchmark reduced planned turns
+by approximately 75%:
+
+- AT-099: `92` turns → `23` turns
+- BLOR-289: `52` turns → `13` turns
+- DROP-141: `11` turns → `3` turns
+
+The existing 16-cue executions do not have equivalent elapsed telemetry, so
+the benchmark does not claim an exact 75% wall-clock reduction.  Hermes/model
+responses did not provide machine-readable token usage; every benchmark report
+records `token_usage=null` and `TOKEN_USAGE_UNAVAILABLE`.  No token reduction
+percentage is estimated.
+
+### Operational conclusion
+
+The CP7B evidence shows no timeout increase at 64 cues, no validation failure,
+no retry, no cue omission, no cue-order error, and normal resume/session
+structure.  The 64-cue policy is sufficiently promising as the next
+production-optimization candidate, but it is not approved for production
+application.  Production remains on the unchanged 16-cue path.
+
+This closure checkpoint changed only this canonical handoff.  It performed no
+new benchmark, 128-cue implementation, production source change, production
+DB write, NAS/Jellyfin call, or Hermes call.
 
 ## Next Step
 
@@ -1296,14 +1359,19 @@ state across 173 titles is:
 `SKIPPED_EXISTING_KO=0`). The three retryable failures remain preserved and
 are not retried in this closure.
 
-The next Stage12 checkpoint is the isolated live 64-cue benchmark, not a full
-rollout. Run it only for AT-099, BLOR-289, and DROP-141 using the production
-semantic packages already staged into the benchmark root. Compare against the
-existing 16-cue logs without rerunning the production baseline. Measure
-per-title total time, model/Hermes call count, input/output tokens when
-machine-readable, validation-failure and timeout rates, cue omission/order
-errors, and resume/recovery safety. Do not implement 128-cue or adaptive
-partitioning until the fixed 64-cue result is reviewed.
+The next candidate checkpoint is preparation for an isolated 128-cue
+benchmark, not a full rollout and not a production change.  Do not implement
+or execute it in this closure.  When separately authorized, the order is:
+
+1. prepare a benchmark-only 128-cue policy/harness;
+2. preserve production `STATEFUL_PART_BATCH_SIZE=16` unchanged;
+3. use the CP7B 64-cue results as the baseline;
+4. use the same three titles: AT-099, BLOR-289, and DROP-141;
+5. run synthetic validation and dependency preflight before any live attempt;
+6. compare the 64-cue and 128-cue results only after a successful isolated run.
+
+Expected 128-cue planned parts are AT-099: `12`, BLOR-289: `7`, and
+DROP-141: `2`.  No 128-cue implementation or execution has been performed.
 
 Separately evaluate whether existing holdings can use timestamp-aligned
 canonical Japanese SRT plus large-chunk ChatGPT KO conversion, while new
@@ -1323,7 +1391,8 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 ## New Conversation Warnings
 
 - Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
-- Stage12 ACTIVE / CP6 CLOSED / PASS; benchmark required before full rollout
+- Stage12 ACTIVE / CP7B CLOSED / PASS; 128-cue isolated benchmark is only a
+  future candidate before any production change
 - 작품별 튜닝으로 되돌아가지 않기
 - ADN/JUR/HSODA/DVDMS 특정 production logic 금지
 - old canonical KO subtitle overwrite 금지
