@@ -30,6 +30,7 @@ subtitle rollout readiness.
 - STAGE12_CP7D_LIVE_128_CUE_BENCHMARK_PASS
 - STAGE12_CP7E_64_VS_128_DECISION_FREEZE_PASS
 - STAGE12_CP7F_PRODUCTION_128_CANDIDATE_IMPLEMENTATION_PASS
+- STAGE12_CP7G_PRODUCTION_128_ONE_TITLE_LIVE_CANARY_PASS
 
 ## Completed
 
@@ -1648,6 +1649,74 @@ performed.
   `teddy_discovery_stage11_controller_smoke.py`
 - canonical handoff: `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md`
 
+## Stage12 CP7G Production 128 One-title Live Canary — PASS
+
+Marker:
+
+`STAGE12_CP7G_PRODUCTION_128_ONE_TITLE_LIVE_CANARY_PASS`
+
+CP7G is **CLOSED / PASS**.  The fixed-128 production candidate completed a
+one-title live canary for `AT-099` through the actual Stage11 controller/live
+adapter path.  This was a canary only; it was not a production rollout and no
+title-specific production branching was added.
+
+### Contract and identity
+
+- policy: `stage11-stateful-cue128-v1`
+- route: `ASR_ONLY`
+- semantic cue count: `1471`
+- planned parts: `12`
+- actual maximum cues per part: `128`
+- production legacy default: `STATEFUL_PART_BATCH_SIZE=16` unchanged
+- candidate session: `4384627a-1cbc-5a0c-844b-c87917fe21c5`
+- legacy 16 session: `a7050d19-e17c-500b-89b0-fc427b980583`
+- session collision: `NO`
+- input SHA identity collision: `NO`
+- remote task identity collision: `NO`
+
+### Live execution
+
+- `12/12` semantic parts validated and promoted
+- `STATEFUL_LIVE_RUN_COMPLETE=YES`
+- `STAGE11_CONTROLLER_END=PASS`
+- `CP7G_LIVE_EXECUTION=COMPLETE`
+- final cue count: `1471`
+- final result SHA256:
+  `37e6ed54f9f0ed5e713231085801a634adde88da95c52b478456bc9848b4dc96`
+- timeout: `600` seconds unchanged
+- validator contract: unchanged
+- retry policy: unchanged
+
+### Artifacts and publication boundary
+
+- CLEAN artifact:
+  `/tmp/stage12-cp7g-production-canary/artifacts/AT-099/clean-ko-v1.srt`
+- `CLEAN_ARTIFACT_VALID=YES`
+- controller report:
+  `/tmp/stage12-cp7g-production-canary/artifacts/AT-099/stage11-controller-report-v1.json`
+- total Hermes live calls: `13`
+  - `12` stateful translation part calls
+  - `1` ASR quality review call
+- token telemetry: `TOKEN_USAGE_UNAVAILABLE`
+- `PUBLICATION_PERFORMED=false`
+- `NAS_WRITES=0`
+- `JELLYFIN_CALLS=0`
+- `ROLLOUT_DB_WRITES=0`
+- Stage12 production publication/rollout changes: `0`
+- CP7G source changes: `0`
+
+The canary confirms that fixed 128 is functional in the real production-path
+controller/live adapter structure and is safely separated from legacy 16
+identity.  Because only `AT-099` was verified and the result was not
+published, CP7G does not promote 128 to the global production default or
+execute a full rollout.  NAS, Jellyfin, and rollout state were not affected.
+
+## CP7G Closure
+
+The CP7G live canary is recorded as **CLOSED / PASS**.  Production remains on
+the unchanged 16-cue default, and token telemetry remains
+`TOKEN_USAGE_UNAVAILABLE`.
+
 ## Next Step
 
 Stage12 scope is frozen and CP6 final closure is **PASS**. The final durable
@@ -1657,13 +1726,13 @@ state across 173 titles is:
 `SKIPPED_EXISTING_KO=0`). The three retryable failures remain preserved and
 are not retried in this closure.
 
-The one next checkpoint is a separately authorized **CP7G fixed-128
-single-title production canary**.  It must preserve production
-`STATEFUL_PART_BATCH_SIZE=16` until the canary starts, run the completed
-preflight and dependency checks, monitor per-part timeout/validation/cue
-coverage telemetry, and retain an immediate rollback/stop path.  It is not a
-batch or full rollout.  Until that canary passes, no production policy value
-changes and production remains on the 16-cue path.
+The one next checkpoint is **bounded production rollout using fixed 128
+candidate**.  It is not executed in CP7H.  Any such rollout must preserve
+production `STATEFUL_PART_BATCH_SIZE=16` as the legacy default, remain
+bounded and separately authorized, monitor per-part timeout/validation/cue
+coverage telemetry, and retain an immediate rollback/stop path.  Until that
+checkpoint is separately completed, production remains on the 16-cue path;
+CP7G does not authorize a full rollout.
 
 All next steps must preserve Stage11's frozen contracts and must not reopen
 Stage11. The accepted-alignment + valid-targeted-unprojectable live path may
@@ -1679,10 +1748,13 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 
 - Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
 - Stage12 ACTIVE / CP7B CLOSED / CP7C PREPARED / CP7D CLOSED / CP7E DECISION
-  FREEZE PASS / CP7F CANDIDATE IMPLEMENTATION PASS; fixed 128 is only a
-  recommendation for the next canary
+  FREEZE PASS / CP7F CANDIDATE IMPLEMENTATION PASS / CP7G CLOSED / PASS;
+  fixed 128 has passed the AT-099 one-title live canary but is not the global
+  production default
 - production `STATEFUL_PART_BATCH_SIZE=16` unchanged; no production policy
   change has been applied
+- the only next checkpoint is bounded production rollout using fixed 128
+  candidate; do not execute that rollout in CP7H
 - 작품별 튜닝으로 되돌아가지 않기
 - ADN/JUR/HSODA/DVDMS 특정 production logic 금지
 - old canonical KO subtitle overwrite 금지
