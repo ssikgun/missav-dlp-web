@@ -266,7 +266,14 @@ class FakeFreshReviewDB:
 
 def _build_deps_with_asr_fake(root, *, candidate, bridge=None, baseline=None, runtime=None):
     baseline = v2_fixture.asr_result() if baseline is None else baseline
-    runtime = controller_fixture.FakeRuntime(baseline) if runtime is None else runtime
+    runtime = (
+        controller_fixture.FakeRuntime(
+            baseline,
+            stage_first_pass_artifacts=False,
+        )
+        if runtime is None
+        else runtime
+    )
     bridge = FakeRemoteBridge() if bridge is None else bridge
     fresh_db = FakeFreshReviewDB()
     provider = _provider(baseline)

@@ -25,6 +25,10 @@ from teddy_discovery_hermes_v2 import (
     HermesV2CueInput,
     HermesV2CueOutput,
 )
+from teddy_discovery_model_input_normalization import (
+    MODEL_INPUT_NORMALIZATION_VERSION,
+    normalize_model_input_cue,
+)
 from teddy_discovery_stateful_policy import (
     DEFAULT_STATEFUL_SEMANTIC_POLICY,
     StatefulSemanticPolicy,
@@ -73,13 +77,22 @@ STATEFUL_TRANSLATOR_PRIVATE_FILE_MODE: Final[int] = 0o600
 STATEFUL_TRANSLATOR_INPUT_FILENAME: Final[str] = (
     "stage11-semantic-input.json"
 )
+STATEFUL_TRANSLATOR_RAW_INPUT_FILENAME: Final[str] = (
+    "stage11-authoritative-input.json"
+)
+STATEFUL_TRANSLATOR_MODEL_INPUT_VERSION: Final[str] = (
+    MODEL_INPUT_NORMALIZATION_VERSION
+)
 STATEFUL_TRANSLATOR_RESULT_FILENAME: Final[str] = (
     "stage11-semantic-result.json"
 )
 STATEFUL_TRANSLATOR_QUERY: Final[str] = (
     "Read all authorized cue evidence from "
     + STATEFUL_TRANSLATOR_INPUT_FILENAME
-    + ". Copy these input identity fields exactly: schema_version, dvd_id, "
+    + ". Treat it as authorized model-input cue evidence. This file is a deterministic projection of retained subtitle "
+    "evidence; repeated pathological spans may be bounded, so do not use "
+    "its compressed text as provenance. Copy these input identity fields exactly: "
+    "schema_version, dvd_id, "
     "generation_key, claim_token. The current Hermes session ID is supplied "
     "by Hermes in the system prompt because --pass-session-id is active; "
     "copy that exact value into result field session_id. Write exactly one "
@@ -383,6 +396,35 @@ def serialize_stateful_package(package: StatefulSubtitlePackage) -> bytes:
     )
 
 
+def build_stateful_model_input_package(
+    package: StatefulSubtitlePackage,
+) -> StatefulSubtitlePackage:
+    """Build a model-only package while retaining the supplied raw package."""
+
+    validated = _validated_package(package)
+    normalized_cues = tuple(
+        normalize_model_input_cue(cue).model_cue
+        for cue in validated.cues
+    )
+    return StatefulSubtitlePackage(
+        schema_version=validated.schema_version,
+        dvd_id=validated.dvd_id,
+        generation_key=validated.generation_key,
+        claim_token=validated.claim_token,
+        cues=normalized_cues,
+    )
+
+
+def serialize_stateful_model_input(
+    package: StatefulSubtitlePackage,
+) -> bytes:
+    """Serialize only the deterministic model-input projection."""
+
+    return serialize_stateful_package(
+        build_stateful_model_input_package(package)
+    )
+
+
 def serialize_stateful_result(result: StatefulSubtitleResult) -> bytes:
     """Serialize one validated result as compact deterministic UTF-8 JSON."""
 
@@ -680,6 +722,83 @@ def derive_stateful_session_id(
     return str(uuid.uuid5(STATEFUL_TRANSLATOR_SESSION_NAMESPACE, identity))
 
 
+def bind_stateful_model_input_generation_key(generation_key: str) -> str:
+    """Bind the model-input projection version before the policy suffix."""
+
+    generation_key = _require_exact_string(
+        generation_key,
+        field_name="generation_key",
+    )
+    marker = "::" + MODEL_INPUT_NORMALIZATION_VERSION
+    marker_count = generation_key.count(marker)
+    if marker_count > 1:
+        raise StatefulTranslatorValidationError(
+            "generation_key contains multiple model-input identities"
+        )
+    if marker_count == 1:
+        marker_index = generation_key.find(marker)
+        after_marker = generation_key[marker_index + len(marker) :]
+        if marker_index == 0 or (
+            after_marker
+            and not after_marker.startswith("::stage11-policy=")
+        ):
+            raise StatefulTranslatorValidationError(
+                "generation_key contains a malformed model-input identity"
+            )
+        policy_index = generation_key.find("::stage11-policy=")
+        if policy_index >= 0 and policy_index < marker_index:
+            raise StatefulTranslatorValidationError(
+                "model-input identity must precede the policy identity"
+            )
+        return generation_key
+
+    policy_marker = "::stage11-policy="
+    policy_index = generation_key.find(policy_marker)
+    if policy_index < 0:
+        bound = generation_key + marker
+    else:
+        bound = (
+            generation_key[:policy_index]
+            + marker
+            + generation_key[policy_index:]
+        )
+    return _require_exact_string(bound, field_name="generation_key")
+
+
+def stateful_model_input_identity_is_bound(generation_key: str) -> bool:
+    """Validate and report whether the reserved model-input marker exists."""
+
+    generation_key = _require_exact_string(
+        generation_key,
+        field_name="generation_key",
+    )
+    marker = "::" + MODEL_INPUT_NORMALIZATION_VERSION
+    if marker not in generation_key:
+        return False
+    bind_stateful_model_input_generation_key(generation_key)
+    return True
+
+
+def bind_stateful_model_input_identity(
+    package: StatefulSubtitlePackage,
+) -> StatefulSubtitlePackage:
+    """Return the same raw package with an explicit model-input identity."""
+
+    validated = _validated_package(package)
+    generation_key = bind_stateful_model_input_generation_key(
+        validated.generation_key
+    )
+    if generation_key == validated.generation_key:
+        return validated
+    return StatefulSubtitlePackage(
+        schema_version=validated.schema_version,
+        dvd_id=validated.dvd_id,
+        generation_key=generation_key,
+        claim_token=validated.claim_token,
+        cues=validated.cues,
+    )
+
+
 def stateful_session_id_for_package(
     package: StatefulSubtitlePackage,
 ) -> str:
@@ -798,6 +917,7 @@ def _validate_staging_filename(filename: object) -> str:
         )
     if filename not in {
         STATEFUL_TRANSLATOR_INPUT_FILENAME,
+        STATEFUL_TRANSLATOR_RAW_INPUT_FILENAME,
         STATEFUL_TRANSLATOR_RESULT_FILENAME,
     }:
         raise StatefulTranslatorStagingError(
@@ -861,6 +981,7 @@ class StatefulTranslatorStagingPaths:
 
     task_directory: Path
     input_path: Path
+    raw_input_path: Path
     result_path: Path
 
 
@@ -873,6 +994,10 @@ def stateful_staging_paths(
         input_path=resolve_stateful_staging_path(
             directory,
             STATEFUL_TRANSLATOR_INPUT_FILENAME,
+        ),
+        raw_input_path=resolve_stateful_staging_path(
+            directory,
+            STATEFUL_TRANSLATOR_RAW_INPUT_FILENAME,
         ),
         result_path=resolve_stateful_staging_path(
             directory,
@@ -991,12 +1116,24 @@ def write_stateful_input(
     task_directory: str | Path,
     package: StatefulSubtitlePackage,
 ) -> Path:
-    """Atomically write the bounded dialogue-bearing input artifact."""
+    """Atomically write the bounded model-input artifact."""
+
+    paths = stateful_staging_paths(task_directory)
+    payload = serialize_stateful_model_input(package)
+    _atomic_private_write(paths.input_path, payload)
+    return paths.input_path
+
+
+def write_stateful_authoritative_input(
+    task_directory: str | Path,
+    package: StatefulSubtitlePackage,
+) -> Path:
+    """Atomically retain the exact raw package beside model input."""
 
     paths = stateful_staging_paths(task_directory)
     payload = serialize_stateful_package(package)
-    _atomic_private_write(paths.input_path, payload)
-    return paths.input_path
+    _atomic_private_write(paths.raw_input_path, payload)
+    return paths.raw_input_path
 
 
 def _read_private_result_bytes(path: Path) -> bytes:
@@ -1081,12 +1218,14 @@ __all__ = [
     "MAX_STATEFUL_TRANSLATOR_RESULT_BYTES",
     "STATEFUL_TRANSLATOR_EXECUTABLE",
     "STATEFUL_TRANSLATOR_INPUT_FILENAME",
+    "STATEFUL_TRANSLATOR_RAW_INPUT_FILENAME",
     "STATEFUL_TRANSLATOR_MAX_CLAIM_TOKEN",
     "STATEFUL_TRANSLATOR_MAX_CUES",
     "STATEFUL_TRANSLATOR_MAX_IDENTIFIER_CHARS",
     "STATEFUL_TRANSLATOR_MAX_PACKAGE_BYTES",
     "STATEFUL_TRANSLATOR_MAX_RESULT_BYTES",
     "STATEFUL_TRANSLATOR_MODEL",
+    "STATEFUL_TRANSLATOR_MODEL_INPUT_VERSION",
     "STATEFUL_TRANSLATOR_PASS_SESSION_ID_FLAG",
     "STATEFUL_TRANSLATOR_PRIVATE_FILE_MODE",
     "STATEFUL_TRANSLATOR_PROFILE",
@@ -1110,6 +1249,10 @@ __all__ = [
     "StatefulTranslatorSessionPremintAdapter",
     "StatefulTranslatorStagingError",
     "StatefulTranslatorStagingPaths",
+    "bind_stateful_model_input_generation_key",
+    "bind_stateful_model_input_identity",
+    "stateful_model_input_identity_is_bound",
+    "build_stateful_model_input_package",
     "StatefulTranslatorValidationError",
     "build_stateful_translator_command",
     "bind_stateful_semantic_policy",
@@ -1122,9 +1265,11 @@ __all__ = [
     "read_stateful_result",
     "resolve_stateful_staging_path",
     "serialize_stateful_package",
+    "serialize_stateful_model_input",
     "serialize_stateful_result",
     "stateful_session_id_for_package",
     "stateful_staging_paths",
     "validate_stateful_result",
     "write_stateful_input",
+    "write_stateful_authoritative_input",
 ]

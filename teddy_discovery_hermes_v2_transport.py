@@ -22,6 +22,10 @@ from teddy_discovery_hermes_v2 import (
     parse_hermes_v2_result,
     serialize_hermes_v2_request,
 )
+from teddy_discovery_model_input_normalization import (
+    ModelInputNormalizationError,
+    normalize_model_input_request,
+)
 
 
 HERMES_V2_REMOTE_HOST: Final[str] = "192.168.1.230"
@@ -171,8 +175,9 @@ def build_hermes_v2_prompt(request: HermesV2Request) -> bytes:
     """Build the deterministic one-shot prompt from the frozen R4-B request."""
 
     try:
-        serialized_request = serialize_hermes_v2_request(request)
-    except HermesV2Error as error:
+        model_request = normalize_model_input_request(request).model_request
+        serialized_request = serialize_hermes_v2_request(model_request)
+    except (HermesV2Error, ModelInputNormalizationError) as error:
         raise HermesV2TransportValidationError("request validation failed") from error
 
     try:

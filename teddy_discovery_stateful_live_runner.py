@@ -38,6 +38,7 @@ from teddy_discovery_stateful_translator import (
     parse_stateful_package,
     parse_stateful_result,
     serialize_stateful_result,
+    stateful_model_input_identity_is_bound,
 )
 
 
@@ -955,10 +956,26 @@ def run(args: argparse.Namespace) -> int:
     )
 
     semantic_input_bytes = package_path.read_bytes()
+    model_package = parse_stateful_package(semantic_input_bytes)
 
-    package = parse_stateful_package(
-        semantic_input_bytes
-    )
+    raw_package_argument = getattr(args, "raw_package", None)
+    if raw_package_argument is None:
+        try:
+            model_input_identity_bound = stateful_model_input_identity_is_bound(
+                model_package.generation_key
+            )
+        except Exception as error:
+            raise StatefulLiveRunnerError(
+                "model-input identity is invalid"
+            ) from error
+        if model_input_identity_bound:
+            raise StatefulLiveRunnerError(
+                "normalized model input requires its authoritative package"
+            )
+        package = model_package
+    else:
+        raw_package_bytes = Path(raw_package_argument).read_bytes()
+        package = parse_stateful_package(raw_package_bytes)
 
     plan = build_stateful_part_plan(
         package,
@@ -1148,6 +1165,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--package",
         required=True,
+    )
+
+    parser.add_argument(
+        "--raw-package",
+        help=(
+            "private authoritative package used for local validation; "
+            "the package file itself remains the model-input projection"
+        ),
     )
 
     parser.add_argument(

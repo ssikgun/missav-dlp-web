@@ -15,6 +15,9 @@ from teddy_discovery_hermes_v2 import (
     HermesV2Result,
     validate_hermes_v2_result,
 )
+from teddy_discovery_model_input_normalization import (
+    normalize_model_input_request,
+)
 
 
 HERMES_V2_LIVE_BATCH_CUES: Final[int] = 16
@@ -55,12 +58,15 @@ def invoke_hermes_v2_batched(
 ) -> HermesV2Result:
     """Invoke contiguous frozen-size batches exactly once and reassemble.
 
-    The original cue objects are sliced into contiguous tuples unchanged.
-    Any failed or invalid batch aborts the whole semantic boundary.  No retry,
-    fallback, partial result, context reconstruction, or cue rematching occurs.
+    A deterministic model-input projection is sliced into contiguous tuples;
+    unchanged cues retain their original immutable objects. Any failed or
+    invalid batch aborts the whole semantic boundary. No retry, fallback,
+    partial result, context reconstruction, or cue rematching occurs.
     """
 
-    full_request = _validated_full_request(request)
+    full_request = normalize_model_input_request(
+        _validated_full_request(request)
+    ).model_request
 
     if not callable(batch_boundary):
         raise HermesV2BatchingValidationError(

@@ -12,9 +12,11 @@ from teddy_discovery_hermes_v2 import HermesV2CueInput, HermesV2CueOutput
 from teddy_discovery_stateful_translator import (
     StatefulSubtitlePackage,
     bind_stateful_semantic_policy,
+    bind_stateful_model_input_identity,
     create_stateful_staging_directory,
     parse_stateful_package,
     read_stateful_result,
+    serialize_stateful_model_input,
     serialize_stateful_package,
     stateful_staging_paths,
     validate_stateful_result,
@@ -119,7 +121,7 @@ def generic_source_case(
     *,
     stt_text: str | None = None,
 ):
-    package = bind_stateful_semantic_policy(StatefulSubtitlePackage(
+    package = bind_stateful_model_input_identity(StatefulSubtitlePackage(
         schema_version=1,
         dvd_id="GENERIC-SOURCE-GUARD",
         generation_key="generic-source-guard-generation",
@@ -135,7 +137,10 @@ def generic_source_case(
             ),
         ),
     ))
-    input_bytes = serialize_stateful_package(package)
+    package = bind_stateful_semantic_policy(package)
+    # Hash the Hermes projection while keeping the raw package in
+    # ``StatefulPartPlan.source_cues`` for CP7M source evidence.
+    input_bytes = serialize_stateful_model_input(package)
     plan = plan_stateful_parts(package, input_bytes)
     baseline = make_part(plan, 1)
     payload = mutated_part_payload(

@@ -87,8 +87,18 @@ from teddy_discovery_stateful_policy import (
     resolve_stateful_semantic_policy,
 )
 from teddy_discovery_stateful_translator import (
+    STATEFUL_TRANSLATOR_MAX_PACKAGE_BYTES,
+    STATEFUL_TRANSLATOR_MAX_RESULT_BYTES,
     StatefulSubtitleResult,
+    build_stateful_model_input_package,
+    bind_stateful_model_input_generation_key,
+    parse_stateful_package,
+    parse_stateful_result,
+    serialize_stateful_model_input,
     serialize_stateful_result,
+    stateful_model_input_identity_is_bound,
+    stateful_session_id_for_package,
+    stateful_staging_paths,
     validate_stateful_result,
 )
 from teddy_discovery_subtitle import (
@@ -1052,10 +1062,81 @@ def _validate_identity(value: object, *, review: bool) -> None:
             )
 
 
+def _validate_existing_semantic_staging(
+    identity: object,
+    *,
+    title: str,
+    stateful_staging_root: Path,
+) -> None:
+    """Require a completed semantic result to carry the CP7U raw/model pair."""
+
+    if type(identity) is not dict:
+        raise Stage11ControllerArtifactError(
+            "translation result identity is not an object"
+        )
+    session_id = identity.get("session_id")
+    result_sha256 = identity.get("sha256")
+    try:
+        staging_directory = stateful_staging_root / session_id
+        paths = stateful_staging_paths(staging_directory)
+        raw_payload = _read_private_file(
+            paths.raw_input_path,
+            max_bytes=STATEFUL_TRANSLATOR_MAX_PACKAGE_BYTES,
+        )
+        model_payload = _read_private_file(
+            paths.input_path,
+            max_bytes=STATEFUL_TRANSLATOR_MAX_PACKAGE_BYTES,
+        )
+        result_payload = _read_private_file(
+            paths.result_path,
+            max_bytes=STATEFUL_TRANSLATOR_MAX_RESULT_BYTES,
+        )
+        raw_package = parse_stateful_package(raw_payload)
+        model_package = parse_stateful_package(model_payload)
+        if raw_package.dvd_id != title:
+            raise Stage11ControllerArtifactError(
+                "completed semantic package is detached from title"
+            )
+        if not stateful_model_input_identity_is_bound(
+            raw_package.generation_key
+        ):
+            raise Stage11ControllerArtifactError(
+                "completed semantic package lacks model-input identity"
+            )
+        if model_package != build_stateful_model_input_package(raw_package):
+            raise Stage11ControllerArtifactError(
+                "completed semantic model input is detached"
+            )
+        if stateful_session_id_for_package(raw_package) != session_id:
+            raise Stage11ControllerArtifactError(
+                "completed semantic package session is detached"
+            )
+        if serialize_stateful_model_input(raw_package) != model_payload:
+            raise Stage11ControllerArtifactError(
+                "completed semantic model bytes are noncanonical"
+            )
+        result = parse_stateful_result(result_payload, raw_package)
+        if result.session_id != session_id:
+            raise Stage11ControllerArtifactError(
+                "completed semantic result session is detached"
+            )
+        if hashlib.sha256(result_payload).hexdigest() != result_sha256:
+            raise Stage11ControllerArtifactError(
+                "completed semantic result bytes differ from report"
+            )
+    except Stage11ControllerError:
+        raise
+    except Exception as error:
+        raise Stage11ControllerArtifactError(
+            "completed semantic staging is missing or detached"
+        ) from error
+
+
 def _validate_existing_completion(
     report_path: Path,
     clean_path: Path,
     baseline_path: Path,
+    stateful_staging_root: Path | None = None,
     *,
     title: str,
     baseline_sha256: str,
@@ -1134,6 +1215,12 @@ def _validate_existing_completion(
         )
     _validate_identity(report["translation_result_identity"], review=False)
     _validate_identity(report["review_result_identity"], review=True)
+    if stateful_staging_root is not None:
+        _validate_existing_semantic_staging(
+            report["translation_result_identity"],
+            title=title,
+            stateful_staging_root=stateful_staging_root,
+        )
     clean_raw = _read_private_file(clean_path, max_bytes=MAX_SUBTITLE_BYTES)
     clean_sha = hashlib.sha256(clean_raw).hexdigest()
     if report["clean_sha256"] != clean_sha:
@@ -1301,6 +1388,7 @@ def run_one_title_stage11(
             report_path,
             clean_path,
             baseline_path,
+            staging_root_path,
             title=canonical_title,
             baseline_sha256=baseline_sha256,
             baseline_reused=baseline_reused,
@@ -1324,8 +1412,11 @@ def run_one_title_stage11(
             targeted_artifact,
         )
         try:
+            hybrid_generation_base = bind_stateful_model_input_generation_key(
+                "stage11-hybrid-" + generation_suffix
+            )
             hybrid_generation_key = bind_stateful_policy_generation_key(
-                "stage11-hybrid-" + generation_suffix,
+                hybrid_generation_base,
                 selected_semantic_policy,
             )
             hybrid_preparation = prepare_stateful_hybrid(
@@ -1360,12 +1451,17 @@ def run_one_title_stage11(
         source_package = build_stateful_asr_package(
             build_asr_only_cue_sequence(route),
             dvd_id=canonical_title,
-            generation_key="stage11-asr-source-" + generation_suffix,
+            generation_key=bind_stateful_model_input_generation_key(
+                "stage11-asr-source-" + generation_suffix
+            ),
             claim_token=claim_token,
         )
         try:
+            asr_generation_base = bind_stateful_model_input_generation_key(
+                "stage11-asr-filtered-" + generation_suffix
+            )
             asr_generation_key = bind_stateful_policy_generation_key(
-                "stage11-asr-filtered-" + generation_suffix,
+                asr_generation_base,
                 selected_semantic_policy,
             )
             prepared = prepare_stateful_asr_package(

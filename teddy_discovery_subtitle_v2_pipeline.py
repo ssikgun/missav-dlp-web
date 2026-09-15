@@ -64,6 +64,9 @@ from teddy_discovery_subtitle_v2_orchestrator import (
     validate_subtitle_v2_route_decision,
 )
 from teddy_discovery_stateful_parts import has_runaway_repetition
+from teddy_discovery_model_input_normalization import (
+    normalize_model_input_request,
+)
 from teddy_discovery_targeted_hybrid_evidence import (
     TargetedASRBinding,
     build_targeted_asr_bindings,
@@ -610,7 +613,8 @@ def _call_semantic_boundary(
             "semantic_boundary must be callable for semantic routes"
         )
     try:
-        result = semantic_boundary(request)
+        model_request = normalize_model_input_request(request).model_request
+        result = semantic_boundary(model_request)
     except Exception as error:
         raise SubtitleV2PipelineBoundaryError(
             "semantic boundary execution failed"

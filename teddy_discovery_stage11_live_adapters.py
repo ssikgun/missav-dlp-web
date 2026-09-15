@@ -35,9 +35,14 @@ from teddy_discovery_targeted_second_evidence_runner import (
     run_targeted_second_evidence_v1_from_local_source,
 )
 from teddy_discovery_stateful_translator import (
-    bind_stateful_semantic_policy, create_stateful_staging_directory,
+    bind_stateful_semantic_policy,
+    create_stateful_staging_directory,
+    build_stateful_model_input_package,
     stateful_session_id_for_package,
-    stateful_staging_paths, write_stateful_input, serialize_stateful_package,
+    stateful_staging_paths, write_stateful_input,
+    write_stateful_authoritative_input,
+    serialize_stateful_package, serialize_stateful_model_input,
+    stateful_model_input_identity_is_bound,
     read_stateful_result, _atomic_private_write, _read_private_result_bytes,
 )
 from teddy_discovery_stateful_policy import (
@@ -212,21 +217,57 @@ def build_first_pass_adapter(*, remote, ssh_key, known_hosts,
                 "first-pass package must already be bound to its semantic policy"
             )
         package = bound_package
+        model_package = build_stateful_model_input_package(package)
+        if model_package != package:
+            try:
+                model_input_identity_bound = stateful_model_input_identity_is_bound(
+                    package.generation_key
+                )
+            except Exception as error:
+                raise Stage11LiveAdapterError(
+                    "changed model input has an invalid normalization identity"
+                ) from error
+            if not model_input_identity_bound:
+                raise Stage11LiveAdapterError(
+                    "changed model input requires an explicit normalization identity"
+                )
         session = stateful_session_id_for_package(package)
         directory = Path(staging_root) / session
         if not directory.exists() and not directory.is_symlink():
             create_stateful_staging_directory(staging_root, session)
         paths = stateful_staging_paths(directory)
+        raw_payload = serialize_stateful_package(package)
+        model_payload = serialize_stateful_model_input(package)
+        raw_input_existed = (
+            paths.raw_input_path.exists()
+            or paths.raw_input_path.is_symlink()
+        )
+        model_input_existed = (
+            paths.input_path.exists()
+            or paths.input_path.is_symlink()
+        )
+        if raw_input_existed:
+            if _read_private_result_bytes(paths.raw_input_path) != raw_payload:
+                raise Stage11LiveAdapterError(
+                    "existing authoritative first-pass input detached"
+                )
+        else:
+            write_stateful_authoritative_input(directory, package)
         if paths.input_path.exists() or paths.input_path.is_symlink():
-            if _read_private_result_bytes(paths.input_path) != serialize_stateful_package(package):
+            if _read_private_result_bytes(paths.input_path) != model_payload:
                 raise Stage11LiveAdapterError("existing first-pass input detached")
         else:
             write_stateful_input(directory, package)
         if paths.result_path.exists() or paths.result_path.is_symlink():
+            if not raw_input_existed or not model_input_existed:
+                raise Stage11LiveAdapterError(
+                    "existing first-pass result lacks bound input artifacts"
+                )
             return read_stateful_result(directory, package, process_finished=True)
         remote_task = prepare_remote(package, paths, route=route)
         parser_args = [
             "--package", str(paths.input_path), "--task-directory", str(directory),
+            "--raw-package", str(paths.raw_input_path),
             "--final-result", str(paths.result_path), "--remote", remote,
             "--remote-task", remote_task, "--ssh-key", ssh_key,
             "--known-hosts", known_hosts,

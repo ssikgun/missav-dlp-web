@@ -45,7 +45,13 @@ from teddy_discovery_stateful_quality_review import (
 )
 from teddy_discovery_stateful_translator import (
     StatefulSubtitleResult,
+    _atomic_private_write,
+    create_stateful_staging_directory,
+    serialize_stateful_result,
     stateful_session_id_for_package,
+    stateful_staging_paths,
+    write_stateful_authoritative_input,
+    write_stateful_input,
 )
 from teddy_discovery_stateful_policy import (
     STATEFUL_SEMANTIC_POLICY_ID_16,
@@ -246,9 +252,16 @@ def _targeted_execution(asr_result, decisions):
 
 
 class FakeRuntime:
-    def __init__(self, asr_result, external=None):
+    def __init__(
+        self,
+        asr_result,
+        external=None,
+        *,
+        stage_first_pass_artifacts=True,
+    ):
         self.asr_result = asr_result
         self.external = external
+        self.stage_first_pass_artifacts = stage_first_pass_artifacts
         self.baseline_calls = 0
         self.external_calls = 0
         self.targeted_calls = 0
@@ -300,7 +313,7 @@ class FakeRuntime:
             self.first_pass_policies.append(semantic_policy.policy_id)
         assert route in {V2_ROUTE_ASR_ONLY, V2_ROUTE_HYBRID}
         self.last_packages[route] = package
-        return StatefulSubtitleResult(
+        result = StatefulSubtitleResult(
             schema_version=package.schema_version,
             dvd_id=package.dvd_id,
             generation_key=package.generation_key,
@@ -311,6 +324,18 @@ class FakeRuntime:
                 for cue in package.cues
             ),
         )
+        if self.stage_first_pass_artifacts:
+            session = stateful_session_id_for_package(package)
+            directory = Path(staging_root) / session
+            if not directory.exists():
+                create_stateful_staging_directory(staging_root, session)
+            write_stateful_authoritative_input(directory, package)
+            write_stateful_input(directory, package)
+            _atomic_private_write(
+                stateful_staging_paths(directory).result_path,
+                serialize_stateful_result(result),
+            )
+        return result
 
     @staticmethod
     def _review_result(request, request_sha):

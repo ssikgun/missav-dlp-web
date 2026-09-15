@@ -2297,6 +2297,222 @@ The next checkpoint is CT108 offline regression completion, followed only by
 a separately authorized production canary/activation.  This CP7Q checkpoint
 does not authorize production activation.
 
+## Stage12 CP7T / CP7U — Pre-Hermes Pathological Repetition Audit and Model-Input Normalization — CP7T PASS / CP7U OFFLINE IMPLEMENTED / CT108 PENDING
+
+`STAGE12_CP7T_PRE_HERMES_REPETITION_AUDIT_PASS`
+
+`STAGE12_CP7U_GENERIC_MODEL_INPUT_NORMALIZATION_OFFLINE_IMPLEMENTED`
+
+`STAGE12_CP7U_READY_FOR_CT108_REGRESSION`
+
+CP7T audited the existing source path on branch `teddy-subtitle-stage11` at
+the expected HEAD `2264f8f0d1202d96ce0a4eb2bcf5c6eb510f9964`.  No production
+call, failed-title retry, rollout-DB write, NAS/Jellyfin operation, Hermes
+state mutation, or ASR-artifact mutation was performed.
+
+### CP7T forensic audit
+
+The existing filters and their contracts are:
+
+- `teddy_discovery_nonlexical.py:classify_nonlexical()` calls the
+  classification-only `_analysis_core()`.  NFKC, outer whitespace, and the
+  narrow surrounding-punctuation view are not returned to the caller.  Only
+  a pure repeated vowel-like Japanese kana run is `OMIT`; all other text is
+  `KEEP` and its source text is unchanged.
+- `teddy_discovery_asr_source_quality.py:_repeated_short_unit()` and
+  `classify_asr_result_source_quality()` observe whole-string structural
+  repetition, consecutive segment runs, and document recurrence.  They do
+  not rewrite text.  The existing nonlexical `OMIT` remains the only hard
+  omission; other source-quality findings remain bounded evidence/action
+  decisions.
+- `teddy_discovery_stateful_prepare.py:prepare_stateful_package()` applies
+  the existing deterministic `OMIT` decisions before retained package
+  construction.  Omitted cues stay omitted and retained cues are copied
+  unchanged.  `build_stateful_asr_package()` and
+  `prepare_stateful_asr_package()` validate exact ASR source text and do not
+  normalize it.
+- `teddy_discovery_subtitle_v2_pipeline.py:_build_local_plan()`,
+  `build_asr_only_cue_sequence()`, and `_build_hybrid_cues()` construct raw
+  external/ASR evidence and preserve cue order/context.  The existing
+  targeted-Hybrid `has_runaway_repetition()` check can omit that targeted
+  evidence from semantic enrichment, but it does not rewrite the retained
+  authoritative cue.
+- `teddy_discovery_stateful_parts.py:has_runaway_repetition()` /
+  `periodic_repetition_evidence()` are existing post-Hermes validator
+  evidence functions.  They inspect only a whole-string exact periodic form
+  after whitespace normalization; they do not delete or normalize input.
+- `teddy_discovery_stateful_translator.py:serialize_stateful_package()` and
+  the prior `write_stateful_input()` path previously serialized retained
+  source as-is.  They were not pre-Hermes source filters.
+- ASR transcript canonicalization remains limited to line-ending/outer-string
+  handling in the existing ASR path; it is not a repetition filter.  CLEAN,
+  quality-review, publication, timestamp, and resource-limit paths remain
+  validators/materializers rather than source normalization paths.
+
+The CP7R cue escaped because `あ` followed by `ー` repeated 444 times is not a
+whole-string periodic repetition: the first codepoint differs from the long
+suffix run, and the full 445-codepoint string is not an exact 1–4-codepoint
+unit repeated an integral number of times.  Therefore
+`has_runaway_repetition=False`, `periodic_repetition_evidence=None`, and the
+existing ASR short-unit observer found no whole-string match.  The mixed
+`あ`/`ー` text also is not the pure vowel-like-kana shape recognized by
+`classify_nonlexical()`, and `ー` is outside that classifier's vowel set.  It
+was consequently retained as `KEEP` and reached Hermes unchanged.
+
+Prior generic evidence includes the CP6F4 `AVSA-455` repeated short-unit ASR
+hallucination, CP7L/CP7M source-grounded periodic source evidence, and
+`HSODA-104` retained-KEEP repeated dialogue evidence.  Together with the
+CP7R `EROFV-387` observation, this supports a generic retained-cue
+model-input bound; it does not support a title/cue/text-specific rule or
+whole-cue deletion.
+
+### CP7U implementation contract
+
+The new pure module `teddy_discovery_model_input_normalization.py` exposes
+`normalize_model_input_text(raw_text)` and immutable projection/metadata
+values.  It is deterministic, idempotent, does not mutate its input, does
+not strip whitespace/punctuation or apply NFKC, never deletes a cue, and
+leaves ambiguous combining/format/emoji-grapheme structures unchanged.
+
+The evidence-based bounds are fixed at pathological codepoint/run floor `64`,
+short-unit maximum `4`, and minimum `16` complete periodic repetitions.  The
+shortest safe unit wins.  A qualifying single-codepoint run is replaced by
+two representative codepoints; a qualifying distinct unit of length 2–4 is
+replaced by two representative units, with an existing trailing partial unit
+prefix preserved.  Punctuation/symbol-only units additionally require a
+64-codepoint span.  Thus `あ` + `ー` × 444 becomes `あーー`, `あ` × 400 is
+bounded when retained, internal extreme short-unit runs are bounded, and
+ordinary `すごーーい`, short repetition, and sub-bound punctuation remain
+unchanged.
+
+The representation boundary is explicit:
+
+- `StatefulSubtitlePackage` and its `external_ja`, `stt_ja`, and any retained
+  raw evidence remain authoritative and exact.  The stateful staging sidecar
+  is `stage11-authoritative-input.json`.
+- `stage11-semantic-input.json` is the deterministic model-input projection
+  produced after existing source filtering and source selection.  It keeps
+  the same cue IDs, order, and package identity metadata; only pathological
+  text spans may differ.  Stateful first-pass staging validates and passes
+  both paths, and the runner requires the raw sidecar whenever the model-input
+  identity is bound.
+- External-JA precedence remains `external_ja` when present, otherwise
+  `stt_ja`; this precedence and the raw values are not rewritten.  `repaired_ja`
+  is an output/provenance field, not a first-pass Hermes input, and remains
+  exact under the unchanged validator/review paths.
+- One-shot semantic calls project at
+  `teddy_discovery_subtitle_v2_pipeline.py:_call_semantic_boundary()` and the
+  Hermes transport/batching boundaries defensively project before prompt or
+  batch construction.  Stateful projection is centralized in
+  `build_stateful_model_input_package()` / `serialize_stateful_model_input()`
+  and staged by the live adapter/deployment path.
+
+The model-input identity is
+`stage11-model-input=repeat-v1`, bound in the existing generation-key
+mechanism before the semantic-policy suffix.  Normalized model bytes are the
+stateful `input_sha256`; the existing UUID5/session derivation algorithm is
+unchanged, while the bound generation key creates a distinct session for the
+new transformation.  Old unnormalized semantic input is rejected by the
+deterministic package projection check; old partial state cannot be read as a
+new normalized session.  Existing raw ASR/external evidence can still be
+reused when its existing provenance validation matches.  The completed
+controller report/publication schema is unchanged, while completion reuse now
+requires the report's translation identity to match the CP7U raw package,
+normalized model package, and semantic result staging; missing or mismatched
+semantic staging fails closed.  The new stateful semantic part/session
+boundary is therefore isolated without changing the UUID algorithm.
+
+CP7M remains source-aware over `StatefulPartPlan.source_cues`, which now
+continues to hold the raw authoritative package while the plan hash is over
+the model-input bytes.  The CP7M predicates and thresholds were not weakened.
+If normalized `あーー` still produced `아` × 474, the raw
+`あ` + `ー` × 444 remains available to the unchanged CP7M/`INVALID_KO`
+decision, so normalization cannot create a false source-grounded exception.
+
+Fixed-64 remains the production default.  Timeout `600`, attempt count `2`,
+CP7K diagnostics, CP7M/`INVALID_KO`, structural/resource limits, timestamps,
+publication, Stage12 state transitions, and the absence of adaptive policy
+remain unchanged.  CP7S retry-feedback work is deferred and is not included
+in CP7U.
+
+### CP7U changed files
+
+- `teddy_discovery_model_input_normalization.py`
+- `teddy_discovery_model_input_normalization_smoke.py`
+- `teddy_discovery_hermes_v2_batching.py`
+- `teddy_discovery_hermes_v2_transport.py`
+- `teddy_discovery_stage11_controller.py`
+- `teddy_discovery_stage11_controller_smoke.py`
+- `teddy_discovery_stage11_deployment.py`
+- `teddy_discovery_stage11_live_adapters.py`
+- `teddy_discovery_stateful_live_runner.py`
+- `teddy_discovery_stateful_parts.py`
+- `teddy_discovery_stateful_parts_smoke.py`
+- `teddy_discovery_stateful_translator.py`
+- `teddy_discovery_subtitle_v2_pipeline.py`
+- `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md`
+
+### CP7U offline verification
+
+- New normalization smoke: `24/24` checks passed, including mixed suffix,
+  pure-nonlexical `OMIT` preservation, normal emphasis, internal periodic
+  runs, idempotence, ambiguous-Unicode fail-closed behavior, one-shot/batch
+  Hermes projection, raw/model separation, raw CP7M rejection/grounding,
+  identity isolation, fixed-16/fixed-64/fixed-128 policy behavior, adapter
+  staging, and no title/cue/text-specific branches.
+- `34` relevant offline smoke programs passed.  Counted suites include
+  stateful ASR `32`, hybrid `49`, ASR-SRT `6`, parts `45`, stateful
+  controller `26`, policy `17`, live runner `16`, thin Stage11 controller
+  `46`, quality review `134`, quality-review CLEAN `32`, context `41`,
+  proximity `66`, review runner `86`, direct ASR review runner `33`, fixed-64
+  benchmark `45`, and fixed-128 benchmark `54`; the CP7U smoke is `24`.
+  The remaining passed smokes reported PASS without an assertion counter.
+- `py_compile` passed for all `13` changed Python files and `git diff --check`
+  passed.
+- `teddy_discovery_stage11_live_adapters_smoke.py` and
+  `teddy_discovery_stage11_deployment_smoke.py` remain environment-blocked
+  before test execution by `ModuleNotFoundError: No module named 'numpy'`.
+  No installation was attempted; CT108 must run these regressions.
+- Offline production counters were zero: production calls/writes `0`,
+  including Hermes, ASR, rollout DB, NAS, and Jellyfin.
+
+No commit or push was attempted.  CP7U is ready for CT108 offline regression;
+it does not authorize production activation or any failed-title retry.
+
+### CP7U CT108 fixture-only regression correction
+
+`STAGE12_CP7U_CT108_FIXTURE_DOUBLE_WRITE_CORRECTED`
+
+The CT108 failure was a test-fixture ownership mismatch, not a production
+double write or stale staging directory.  The live adapter wrote the raw and
+model first-pass artifacts, then the shared controller `FakeRuntime` tried to
+write the same raw/model/result paths again from inside the native callback.
+The fixture now has an explicit staging mode: direct controller tests retain
+their one-time fixture staging, while live-adapter and deployment wrappers use
+a return-only fake and own result installation themselves.  Production
+writers, `_atomic_private_write`, CP7U normalization, CP7M, CP7K, and all
+frozen policy/timeout/retry behavior are unchanged.
+
+Post-correction offline verification:
+
+- Stage11 controller smoke: `46/46`.
+- Model-input normalization smoke: `24/24`.
+- Stateful parts: `45/45`; stateful ASR: `32/32`; stateful ASR-SRT: `6/6`;
+  stateful Hybrid: `49/49`; stateful dynamic controller: `26/26`;
+  stateful live runner: `16/16`; retry and timeout contracts passed;
+  stateful policy: `17/17`.
+- Translator, ASR source-quality, stateful prepare, subtitle-v2 pipeline,
+  Hermes batching, and Hermes transport smokes passed their existing PASS
+  contracts.
+- `py_compile` passed for `13` changed Python files and `git diff --check`
+  passed.  The live-adapter and deployment smokes remain blocked before test
+  execution by `ModuleNotFoundError: No module named 'numpy'`; no dependency
+  installation was attempted.
+- No production call/write, failed-title retry, rollout-DB, NAS, Jellyfin,
+  Hermes-state, or ASR-artifact operation was performed.
+
+`READY_FOR_CT108_REGRESSION=YES`
+
 ## Future roadmap after subtitle pipeline closure — USER-APPROVED / NOT AUTHORIZATION
 
 The following future roadmap requirements came from the user and are approved

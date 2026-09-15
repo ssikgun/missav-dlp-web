@@ -31,12 +31,18 @@ from teddy_discovery_stateful_translator import (
     StatefulTranslatorStagingError,
     _atomic_private_write,
     _validated_task_directory,
+    bind_stateful_model_input_generation_key,
+    stateful_model_input_identity_is_bound,
+    build_stateful_model_input_package,
     parse_stateful_package,
     serialize_stateful_package,
     serialize_stateful_result,
     stateful_session_id_for_package,
     stateful_staging_paths,
     validate_stateful_result,
+)
+from teddy_discovery_model_input_normalization import (
+    ModelInputNormalizationError,
 )
 from teddy_discovery_stateful_policy import (
     DEFAULT_STATEFUL_SEMANTIC_POLICY,
@@ -879,21 +885,36 @@ def _validate_package_for_plan(
         raise StatefulPartsValidationError(
             "semantic input must be nonempty exact bytes"
         )
-    try:
-        parsed_package = parse_stateful_package(semantic_input_bytes)
-    except StatefulTranslatorError as error:
-        raise StatefulPartsValidationError(
-            "semantic input package is invalid"
-        ) from error
     if type(package) is not StatefulSubtitlePackage:
         raise StatefulPartsValidationError(
             "package must be the exact frozen package type"
         )
-    if parsed_package != package:
+    try:
+        parsed_model_package = parse_stateful_package(semantic_input_bytes)
+        expected_model_package = build_stateful_model_input_package(package)
+    except (StatefulTranslatorError, ModelInputNormalizationError) as error:
         raise StatefulPartsValidationError(
-            "semantic input package does not match the parsed package"
+            "semantic input package is invalid"
+        ) from error
+    if parsed_model_package != expected_model_package:
+        raise StatefulPartsValidationError(
+            "semantic input is not the deterministic model-input projection"
         )
-    return parsed_package
+    if parsed_model_package != package:
+        try:
+            bind_stateful_model_input_generation_key(package.generation_key)
+            model_input_identity_bound = stateful_model_input_identity_is_bound(
+                package.generation_key
+            )
+        except StatefulTranslatorError as error:
+            raise StatefulPartsValidationError(
+                "semantic input package has an invalid model-input identity"
+            ) from error
+        if not model_input_identity_bound:
+            raise StatefulPartsValidationError(
+                "changed model input requires an explicit normalization identity"
+            )
+    return package
 
 
 def plan_stateful_parts(

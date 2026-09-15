@@ -177,7 +177,10 @@ def main():
             state = {}
             sessions = FakeNativeSessionDB()
             calls = []
-            fake = fixture.FakeRuntime(baseline)
+            fake = fixture.FakeRuntime(
+                baseline,
+                stage_first_pass_artifacts=False,
+            )
 
             def prepare(package, paths, *, route):
                 assert paths.input_path.read_bytes()

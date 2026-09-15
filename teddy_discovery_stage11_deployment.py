@@ -64,7 +64,9 @@ from teddy_discovery_stateful_translator import (
     STATEFUL_TRANSLATOR_INPUT_FILENAME,
     STATEFUL_TRANSLATOR_PRIVATE_FILE_MODE,
     STATEFUL_TRANSLATOR_SESSION_SOURCE,
-    serialize_stateful_package,
+    build_stateful_model_input_package,
+    serialize_stateful_model_input,
+    stateful_model_input_identity_is_bound,
     stateful_session_id_for_package,
 )
 from teddy_discovery_subtitle_external import (
@@ -992,7 +994,21 @@ def _prepare_remote_factory(
             raise Stage11DeploymentValidationError(
                 "first-pass package is invalid"
             ) from error
-        expected_payload = serialize_stateful_package(package)
+        model_package = build_stateful_model_input_package(package)
+        if model_package != package:
+            try:
+                model_input_identity_bound = stateful_model_input_identity_is_bound(
+                    package.generation_key
+                )
+            except Exception as error:
+                raise Stage11DeploymentValidationError(
+                    "changed model input has an invalid normalization identity"
+                ) from error
+            if not model_input_identity_bound:
+                raise Stage11DeploymentValidationError(
+                    "changed model input requires an explicit normalization identity"
+                )
+        expected_payload = serialize_stateful_model_input(package)
         if _private_local_read(paths.input_path, max_bytes=len(expected_payload)) != expected_payload:
             raise Stage11DeploymentValidationError(
                 "local first-pass input differs from package"
