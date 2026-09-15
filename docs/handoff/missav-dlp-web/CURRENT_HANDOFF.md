@@ -2178,3 +2178,178 @@ The exact Jellyfin-visible destinations are respectively
   `numpy` is not installed; this is separate from the CP7O preflight boundary
   and caused no production operation.
 - No live execution is authorized by CP7O.
+
+## Stage12 CP7O Fresh Fixed-64 Bounded Live Rollout — COMPLETE / 3 of 3 PUBLISHED
+
+The preceding CP7O section records the earlier preparation and fail-closed
+preflight boundary.  The subsequently authorized fresh bounded live rollout
+completed with the following finalized evidence:
+
+`STAGE12_CP7O_LIVE=COMPLETE`
+
+| selected | published | failed_retryable | failed_terminal | skipped | unresolved |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 3 | 3 | 0 | 0 | 0 | 0 |
+
+### CP7O per-title outcomes
+
+#### EBWH-354
+
+- Fixed-64 stateful run completed `5/5` parts.
+- Stage11: `PASS`.
+- Route: `ASR_ONLY`.
+- NAS publication: `PASS`.
+- Jellyfin recognition: `PASS`.
+- Final state: `PUBLISHED`.
+- Destination: `EBWH/EBWH-354/EBWH-354.ko.srt`.
+
+#### EKDV-826
+
+- Cue count: `357`.
+- Fixed-64 part count: `6`.
+- All `6/6` parts `PASS` / promoted.
+- Stage11: `PASS`.
+- Route: `ASR_ONLY`.
+- NAS publication: `PASS`.
+- Jellyfin recognition: `PASS`.
+- Final state: `PUBLISHED`.
+- Destination: `EKDV/EKDV-826/EKDV-826.ko.srt`.
+
+#### EROFV-366
+
+- Cue count: `231`.
+- Fixed-64 part count: `4`.
+- All `4/4` parts `PASS` / promoted.
+- Stage11: `PASS`.
+- Route: `ASR_ONLY`.
+- NAS publication: `PASS`.
+- Jellyfin recognition: `PASS`.
+- Final state: `PUBLISHED`.
+- Destination: `EROFV/EROFV-366/EROFV-366.ko.srt`.
+
+### CP7O decision state
+
+- Fixed-64 has now passed a fresh three-title production-path rollout `3/3`.
+- The prior fixed-128 fresh rollout passed only `1/3`, with two
+  `600`-second Hermes timeouts.
+- This is strong evidence in favor of fixed-64 over fixed-128 for production
+  use, but it does not establish that fixed-64 is universally faster or
+  guaranteed timeout-free.
+- The production global default remains fixed-16 **FOR NOW**.
+- The fixed-64 promotion decision is the next checkpoint.
+- Do not retry the prior failed titles yet.
+- Hermes timeout remains `600` seconds.
+- Bounded retry count remains `2`.
+- CP7K diagnostics and the CP7M validator remain active and unchanged.
+
+## Future roadmap after subtitle pipeline closure — USER-APPROVED / NOT AUTHORIZATION
+
+The following future roadmap requirements came from the user and are approved
+as the intended sequence.  They are recorded for handoff purposes only and are
+**not authorization to implement them yet**.  No current CP7O execution state,
+Stage12 conclusion, timeout, retry policy, rollout state, or production
+operation is changed by this roadmap.
+
+The order below is intentional and must be preserved.
+
+### 1. Finish all subtitle-related stages first
+
+- Complete the current fixed-64 evaluation and all remaining subtitle
+  rollout, quality, and operational work.
+- Decide the final production semantic cue policy only after the evidence is
+  sufficient.
+- Resolve the remaining subtitle-stage operational policy as needed.
+- Do not begin the file-manager stage until the subtitle pipeline is formally
+  closed.
+- Avoid switching back and forth between subtitle work and file-management
+  work.
+
+### 2. Jellyfin DVD-ID / product-code search improvement
+
+#### Goal
+
+Jellyfin currently allows practical title search, but product-code/DVD-ID
+search is inadequate.  Make the canonical DVD-ID/product code searchable in
+Jellyfin, preserve the normal display title where practical, and store the
+canonical DVD-ID separately as a stable identifier as well.
+
+#### Required investigation before implementation
+
+- Do **not** freeze the exact Jellyfin metadata field yet.
+- Before implementation, perform a read-only investigation of the current
+  metadata, NFO, and Jellyfin search behavior in this deployment.
+- Determine which searchable metadata field should carry the DVD-ID without
+  unnecessarily polluting the visible display title.
+- Also retain a canonical identifier field/provider ID/unique ID if
+  appropriate.
+- The final field mapping must be evidence-based from the actual Jellyfin
+  behavior in this deployment.
+
+### 3. Next major stage: NAS Library File Manager
+
+#### Goal
+
+Convert the existing File Management tab from a transient download-file view
+into a persistent NAS JAV library manager.
+
+#### Source of truth and scope
+
+- NAS library root: `/volume1/video/video2/JAV`
+- The UI must list all managed works/files that actually exist in the NAS JAV
+  library, including items that disappeared from the old list after download
+  completion or move.
+
+#### UI requirements
+
+- Use a discovery-style collapsible/expandable list.
+- Each work/title appears as a row/card that can be expanded.
+- Expanded details show screenshots and metadata.
+- Video preview/playback preview is explicitly **not required** in this
+  file-management view.
+- Korean subtitle status is important and must be shown clearly.
+- Japanese subtitle presence does not need to be shown.
+
+#### Search, filter, and sort requirements
+
+- Search by DVD-ID/product code.
+- Search by title.
+- Filter for Korean subtitle present or absent.
+- Sorting must support at least:
+  - download/addition date;
+  - Korean subtitle presence;
+  - release date;
+  - DVD-ID/product code;
+  - title.
+- Additional useful library-management sorts may be added later if they fit
+  the existing design cleanly.
+
+#### Delete behavior
+
+- Provide a delete action for a work/title.
+- Deletion must affect the actual NAS files.
+- This is destructive and must be implemented fail-closed.
+- Require clear user confirmation before deletion.
+- Validate that every deletion target is inside the canonical NAS JAV library
+  root.
+- Never allow path traversal, unexpected paths, symlink escapes, or broad
+  recursive deletion.
+- Prefer work/title-scoped deletion of the exact known managed files.
+- After deletion, refresh or reconcile Jellyfin as needed.
+- Investigate Synology recycle-bin/trash behavior before deciding whether
+  permanent deletion or recycle-bin semantics should be used.
+
+#### Architecture preference
+
+- Do not perform a broad recursive NAS scan on every page load.
+- Prefer a durable inventory/cache/database model with bounded
+  reconciliation.
+- Reuse existing Discovery/holding/metadata knowledge where possible.
+- Keep NAS reads bounded and exact.
+- The native-first/minimal-change policy remains in force.
+
+### 4. Stage transition rule
+
+- Subtitle work must be formally **CLOSED** before starting the
+  Jellyfin-search/file-manager implementation stage.
+- When subtitle closure is reached, create the next implementation plan from
+  this canonical handoff rather than relying on chat memory.
