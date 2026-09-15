@@ -1,11 +1,10 @@
 """Explicit production policies for the Stage11 semantic-part path.
 
-The legacy 16-cue policy is the default and keeps its existing package,
-session, and resume identity.  The opt-in fixed-64 and fixed-128 candidates
-are bound into the package generation identity before the existing
-session/staging machinery is used, so candidate state cannot collide with
-legacy 16-cue state.  The semantic package/result/part JSON envelopes remain
-unchanged.
+The fixed-64 policy is the production default.  Explicit legacy 16-cue use
+keeps its historical package, session, and resume identity, while fixed-64
+and fixed-128 state are bound into the package generation identity before the
+existing session/staging machinery is used.  The semantic package/result/part
+JSON envelopes remain unchanged.
 """
 
 from __future__ import annotations
@@ -102,7 +101,7 @@ STATEFUL_SEMANTIC_POLICY_128: Final[StatefulSemanticPolicy] = (
     )
 )
 DEFAULT_STATEFUL_SEMANTIC_POLICY: Final[StatefulSemanticPolicy] = (
-    STATEFUL_SEMANTIC_POLICY_16
+    STATEFUL_SEMANTIC_POLICY_64
 )
 STATEFUL_SEMANTIC_POLICIES: Final[tuple[StatefulSemanticPolicy, ...]] = (
     STATEFUL_SEMANTIC_POLICY_16,
@@ -164,7 +163,10 @@ def bind_stateful_policy_generation_key(
                 "generation_key is bound to a different semantic policy"
             )
         return generation_key
-    if policy == DEFAULT_STATEFUL_SEMANTIC_POLICY:
+    # Historical 16-cue packages predate policy binding.  Keep that explicit
+    # compatibility path only for legacy-16; every new/default policy must
+    # carry its policy identity so incompatible partial state cannot collide.
+    if policy == STATEFUL_SEMANTIC_POLICY_16:
         return generation_key
     bound = (
         generation_key

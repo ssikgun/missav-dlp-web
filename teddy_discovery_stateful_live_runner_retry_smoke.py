@@ -22,6 +22,7 @@ from teddy_discovery_stateful_parts import (
 )
 from teddy_discovery_stateful_translator import (
     StatefulSubtitlePackage,
+    bind_stateful_semantic_policy,
     serialize_stateful_package,
 )
 
@@ -33,7 +34,7 @@ def check(condition: bool, marker: str):
 
 
 def package_for(count: int) -> StatefulSubtitlePackage:
-    return StatefulSubtitlePackage(
+    return bind_stateful_semantic_policy(StatefulSubtitlePackage(
         schema_version=1,
         dvd_id="SYNTHETIC-RETRY",
         generation_key="synthetic-retry-generation-001",
@@ -49,7 +50,7 @@ def package_for(count: int) -> StatefulSubtitlePackage:
             )
             for index in range(1, count + 1)
         ),
-    )
+    ))
 
 
 def valid_part(plan, part_index: int) -> StatefulSemanticPart:
@@ -248,7 +249,7 @@ def main():
         root = Path(raw)
         recovered = run_synthetic(
             root / "valid-second",
-            cue_count=17,
+            cue_count=65,
             invalid_attempts=1,
             prepromote_first=True,
         )
@@ -382,7 +383,7 @@ def main():
         for reason, mutate in diagnostic_cases:
             diagnostic = run_synthetic(
                 root / ("diagnostic-" + reason),
-                cue_count=32,
+                cue_count=128,
                 invalid_attempts=1,
                 prepromote_first=True,
                 invalid_mutator=mutate,

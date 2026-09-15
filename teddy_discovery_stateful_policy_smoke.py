@@ -1,4 +1,4 @@
-"""Offline smoke for the explicit production 16/64/128 semantic policies."""
+"""Offline smoke for the production default and explicit 16/64/128 policies."""
 
 from pathlib import Path
 import json
@@ -16,12 +16,16 @@ from teddy_discovery_stateful_parts import (
     StatefulSemanticPart,
     build_stateful_part_plan,
     parse_stateful_part,
+    scan_stateful_canonical_parts,
     serialize_stateful_part,
+    stateful_part_filename,
 )
 from teddy_discovery_stateful_policy import (
     DEFAULT_STATEFUL_SEMANTIC_POLICY,
+    STATEFUL_SEMANTIC_POLICY_16,
     STATEFUL_SEMANTIC_POLICY_64,
     STATEFUL_SEMANTIC_POLICY_128,
+    STATEFUL_SEMANTIC_POLICY_GENERATION_KEY_MARKER,
     STATEFUL_SEMANTIC_POLICY_ID_16,
     STATEFUL_SEMANTIC_POLICY_ID_64,
     STATEFUL_SEMANTIC_POLICY_ID_128,
@@ -40,6 +44,9 @@ from teddy_discovery_stateful_translator import (
     serialize_stateful_package,
     serialize_stateful_result,
     stateful_session_id_for_package,
+)
+from teddy_discovery_stage12_performance_benchmark import (
+    BENCHMARK_CUE64_POLICY_ID,
 )
 from teddy_discovery_stage11_live_adapters import (
     Stage11LiveAdapterError,
@@ -123,6 +130,17 @@ def main() -> None:
     legacy_plan = build_stateful_part_plan(
         legacy_package,
         legacy_bytes,
+        semantic_policy=STATEFUL_SEMANTIC_POLICY_16,
+    )
+
+    default_package = bind_stateful_semantic_policy(
+        legacy_package,
+        DEFAULT_STATEFUL_SEMANTIC_POLICY,
+    )
+    default_bytes = serialize_stateful_package(default_package)
+    default_plan = build_stateful_part_plan(
+        default_package,
+        default_bytes,
     )
 
     candidate_package = bind_stateful_semantic_policy(
@@ -136,11 +154,8 @@ def main() -> None:
         semantic_policy=STATEFUL_SEMANTIC_POLICY_128,
     )
 
-    fixed64_package = bind_stateful_semantic_policy(
-        legacy_package,
-        STATEFUL_SEMANTIC_POLICY_64,
-    )
-    fixed64_bytes = serialize_stateful_package(fixed64_package)
+    fixed64_package = default_package
+    fixed64_bytes = default_bytes
     fixed64_plan = build_stateful_part_plan(
         fixed64_package,
         fixed64_bytes,
@@ -152,7 +167,25 @@ def main() -> None:
         and legacy_plan.max_cues_per_part == 16
         and legacy_plan.part_count == 11
         and all(part.cue_count <= 16 for part in legacy_plan.parts),
-        "LEGACY_DEFAULT_16_PRESERVED",
+        "EXPLICIT_LEGACY_16_PRESERVED",
+    )
+    check(
+        bind_stateful_policy_generation_key(
+            legacy_package.generation_key,
+            STATEFUL_SEMANTIC_POLICY_16,
+        ) == legacy_package.generation_key,
+        "LEGACY_16_GENERATION_ID_REMAINS_UNCHANGED",
+    )
+    check(
+        default_plan.policy_id == STATEFUL_SEMANTIC_POLICY_ID_64
+        and default_plan.max_cues_per_part == 64
+        and default_plan.part_count == 3
+        and tuple(part.cue_count for part in default_plan.parts) == (64, 64, 45)
+        and default_package.generation_key.endswith(
+            STATEFUL_SEMANTIC_POLICY_GENERATION_KEY_MARKER
+            + STATEFUL_SEMANTIC_POLICY_ID_64
+        ),
+        "OMITTED_POLICY_RESOLVES_FIXED64_AND_BINDS_IDENTITY",
     )
     check(
         candidate_plan.policy_id == STATEFUL_SEMANTIC_POLICY_ID_128
@@ -170,6 +203,10 @@ def main() -> None:
         and fixed64_plan.parts[1].cue_count == 64
         and fixed64_plan.parts[2].cue_count == 45,
         "CANDIDATE_173_CUES_3_FIXED64_PARTS",
+    )
+    check(
+        BENCHMARK_CUE64_POLICY_ID != STATEFUL_SEMANTIC_POLICY_ID_64,
+        "BENCHMARK_FIXED64_POLICY_REMAINS_DISTINCT",
     )
     expected_candidate_parts = {1471: 12, 830: 7, 173: 2}
     for cue_count, expected_part_count in expected_candidate_parts.items():
@@ -238,10 +275,16 @@ def main() -> None:
 
     legacy_session = stateful_session_id_for_package(legacy_package)
     candidate_session = stateful_session_id_for_package(candidate_package)
+    default_session = stateful_session_id_for_package(default_package)
     check(
-        candidate_package.generation_key != legacy_package.generation_key
+        default_package.generation_key != legacy_package.generation_key
+        and default_session != legacy_session
+        and default_plan.input_sha256 != legacy_plan.input_sha256
+        and candidate_package.generation_key != default_package.generation_key
         and candidate_session != legacy_session
-        and candidate_plan.input_sha256 != legacy_plan.input_sha256,
+        and candidate_session != default_session
+        and candidate_plan.input_sha256 != legacy_plan.input_sha256
+        and candidate_plan.input_sha256 != default_plan.input_sha256,
         "SESSION_AND_INPUT_IDENTITY_ISOLATED",
     )
     check(
@@ -263,7 +306,10 @@ def main() -> None:
     )
 
     parser = build_parser()
-    legacy_args = parser.parse_args(parser_args())
+    default_args = parser.parse_args(parser_args())
+    legacy_args = parser.parse_args(
+        parser_args("--semantic-policy", STATEFUL_SEMANTIC_POLICY_ID_16)
+    )
     candidate_args = parser.parse_args(
         parser_args("--semantic-policy", STATEFUL_SEMANTIC_POLICY_ID_128)
     )
@@ -271,12 +317,13 @@ def main() -> None:
         parser_args("--semantic-policy", STATEFUL_SEMANTIC_POLICY_ID_64)
     )
     check(
-        legacy_args.semantic_policy == STATEFUL_SEMANTIC_POLICY_ID_16
+        default_args.semantic_policy == STATEFUL_SEMANTIC_POLICY_ID_64
+        and legacy_args.semantic_policy == STATEFUL_SEMANTIC_POLICY_ID_16
         and candidate_args.semantic_policy == STATEFUL_SEMANTIC_POLICY_ID_128
         and fixed64_args.semantic_policy == STATEFUL_SEMANTIC_POLICY_ID_64
-        and legacy_args.turn_timeout == 600
+        and default_args.turn_timeout == 600
         and candidate_args.turn_timeout == 600,
-        "POLICY_CONFIG_DEFAULT_AND_TIMEOUT_600",
+        "POLICY_CONFIG_DEFAULT_FIXED64_EXPLICIT_LEGACY16_AND_TIMEOUT_600",
     )
 
     expect(
@@ -305,9 +352,9 @@ def main() -> None:
         lambda: build_stateful_part_plan(
             legacy_package,
             legacy_bytes,
-            semantic_policy=STATEFUL_SEMANTIC_POLICY_128,
+            semantic_policy=DEFAULT_STATEFUL_SEMANTIC_POLICY,
         ),
-        "UNBOUND_128_PACKAGE_FAILS_CLOSED",
+        "UNBOUND_LEGACY_PACKAGE_CANNOT_BE_FIXED64",
     )
     expect(
         StatefulPartsValidationError,
@@ -316,7 +363,16 @@ def main() -> None:
             candidate_bytes,
             semantic_policy=DEFAULT_STATEFUL_SEMANTIC_POLICY,
         ),
-        "128_PACKAGE_CANNOT_RESUME_AS_16",
+        "128_PACKAGE_CANNOT_RESUME_AS_FIXED64",
+    )
+    expect(
+        StatefulPartsValidationError,
+        lambda: build_stateful_part_plan(
+            default_package,
+            default_bytes,
+            semantic_policy=STATEFUL_SEMANTIC_POLICY_16,
+        ),
+        "FIXED64_PACKAGE_CANNOT_RESUME_AS_LEGACY16",
     )
 
     with tempfile.TemporaryDirectory(prefix="stage11-policy-smoke-") as raw:
@@ -335,6 +391,22 @@ def main() -> None:
             and decision.part_index == 1
             and decision.cue_count == 128,
             "CANDIDATE_CONTROLLER_128_PART_PLAN",
+        )
+
+        legacy_partial_root = root / "legacy-partial"
+        legacy_partial_root.mkdir(mode=0o700)
+        legacy_part = make_part(legacy_plan, 1)
+        _atomic_private_write(
+            legacy_partial_root / stateful_part_filename(1, pending=False),
+            serialize_stateful_part(legacy_part),
+        )
+        expect(
+            StatefulPartsValidationError,
+            lambda: scan_stateful_canonical_parts(
+                legacy_partial_root,
+                default_plan,
+            ),
+            "LEGACY_16_PARTIAL_STATE_CANNOT_RESUME_AS_FIXED64",
         )
 
         legacy_root = root / "legacy-local"
@@ -391,6 +463,7 @@ def main() -> None:
             legacy_package,
             route="ASR_ONLY",
             staging_root=legacy_root,
+            semantic_policy=STATEFUL_SEMANTIC_POLICY_16,
         )
         candidate_result = adapter(
             candidate_package,

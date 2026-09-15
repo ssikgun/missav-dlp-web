@@ -21,6 +21,7 @@ from teddy_discovery_stateful_live_runner import (
 )
 from teddy_discovery_stateful_translator import (
     StatefulSubtitlePackage,
+    bind_stateful_semantic_policy,
     serialize_stateful_package,
 )
 
@@ -39,7 +40,7 @@ def check(value, marker):
 
 
 def package_for(count):
-    return StatefulSubtitlePackage(
+    return bind_stateful_semantic_policy(StatefulSubtitlePackage(
         schema_version=1,
         dvd_id="GENERIC-SMOKE",
         generation_key=(
@@ -61,15 +62,15 @@ def package_for(count):
                 count + 1,
             )
         ),
-    )
+    ))
 
 
 for count, expected_parts in (
     (1, 1),
     (16, 1),
-    (17, 2),
-    (661, 42),
-    (1000, 63),
+    (17, 1),
+    (661, 11),
+    (1000, 16),
 ):
     package = package_for(count)
 
@@ -88,7 +89,7 @@ for count, expected_parts in (
     )
 
 
-package = package_for(17)
+package = package_for(100)
 
 payload = serialize_stateful_package(
     package

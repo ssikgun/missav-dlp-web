@@ -41,7 +41,7 @@ from teddy_discovery_stateful_translator import (
 from teddy_discovery_stateful_policy import (
     DEFAULT_STATEFUL_SEMANTIC_POLICY,
     STATEFUL_SEMANTIC_POLICIES,
-    STATEFUL_SEMANTIC_POLICY_ID_16,
+    STATEFUL_SEMANTIC_POLICY_16,
     StatefulSemanticPolicy,
     StatefulSemanticPolicyError,
     resolve_stateful_semantic_policy,
@@ -50,8 +50,10 @@ from teddy_discovery_stateful_policy import (
 
 
 STATEFUL_PART_SCHEMA_VERSION: Final[int] = 1
-STATEFUL_PART_BATCH_SIZE: Final[int] = 16
-STATEFUL_PART_POLICY_ID: Final[str] = STATEFUL_SEMANTIC_POLICY_ID_16
+STATEFUL_PART_BATCH_SIZE: Final[int] = (
+    DEFAULT_STATEFUL_SEMANTIC_POLICY.max_cues_per_part
+)
+STATEFUL_PART_POLICY_ID: Final[str] = DEFAULT_STATEFUL_SEMANTIC_POLICY.policy_id
 STATEFUL_PART_MAX_BYTES: Final[int] = 16 * 1024 * 1024
 STATEFUL_PART_FILE_MODE: Final[int] = 0o600
 STATEFUL_PART_FILENAME_PREFIX: Final[str] = "semantic-part-"
@@ -177,7 +179,10 @@ def _require_package_policy_binding(
             "package generation identity has an invalid semantic policy"
         ) from error
 
-    if policy == DEFAULT_STATEFUL_SEMANTIC_POLICY:
+    if policy == STATEFUL_SEMANTIC_POLICY_16:
+        # Historical legacy-16 packages may be unbound.  This exception is
+        # deliberately narrow: the fixed-64 production default and fixed-128
+        # candidate must both be generation-key-bound.
         if bound_policy_id not in {None, policy.policy_id}:
             raise StatefulPartsValidationError(
                 "package is bound to a different semantic policy"

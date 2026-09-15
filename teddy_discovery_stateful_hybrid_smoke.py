@@ -13,6 +13,7 @@ from teddy_discovery_stateful_hybrid import (
 )
 from teddy_discovery_stateful_translator import (
     StatefulSubtitlePackage, StatefulSubtitleResult, StatefulTranslatorError,
+    bind_stateful_semantic_policy,
     serialize_stateful_package, stateful_session_id_for_package,
 )
 from teddy_discovery_subtitle_v2_pipeline import _build_hybrid_plan, SubtitleV2PipelineError
@@ -192,8 +193,12 @@ def main():
     wire = json.loads(serialize_stateful_package(large.package))
     check(len(wire["cues"]) == 513 and "route_decision" not in wire,
           "ordinary-stateful-wire-no-timing-proof")
-    parts = build_stateful_part_plan(large.package, serialize_stateful_package(large.package))
-    check(parts.part_count == 33, "existing-16-cue-part-planner")
+    bound_large = bind_stateful_semantic_policy(large.package)
+    parts = build_stateful_part_plan(
+        bound_large,
+        serialize_stateful_package(bound_large),
+    )
+    check(parts.part_count == 9, "fixed64-part-planner")
     check(len(build_stateful_hybrid_package(extended_route(4096), **kwargs).cues) == 4096,
           "stateful-4096-limit-supported")
     reject(lambda: build_stateful_hybrid_package(extended_route(4097), **kwargs),

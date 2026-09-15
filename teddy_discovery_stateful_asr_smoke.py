@@ -24,6 +24,7 @@ from teddy_discovery_stateful_parts import (
 )
 from teddy_discovery_stateful_translator import (
     StatefulSubtitlePackage,
+    bind_stateful_semantic_policy,
     parse_stateful_package,
     serialize_stateful_package,
 )
@@ -45,12 +46,12 @@ def asr_cues(count: int) -> tuple[HermesV2CueInput, ...]:
 
 
 def asr_package(count: int) -> StatefulSubtitlePackage:
-    return build_stateful_asr_package(
+    return bind_stateful_semantic_policy(build_stateful_asr_package(
         asr_cues(count),
         dvd_id="TEST-001",
         generation_key=f"asr-generation-{count}",
         claim_token=7,
-    )
+    ))
 
 
 def asr_cues_from_texts(
@@ -80,9 +81,13 @@ def filtered_package(
         generation_key="source-" + generation_key,
         claim_token=7,
     )
-    return prepare_stateful_asr_package(
+    prepared = prepare_stateful_asr_package(
         source,
         generation_key=generation_key,
+    )
+    return replace(
+        prepared,
+        package=bind_stateful_semantic_policy(prepared.package),
     )
 
 
@@ -98,7 +103,7 @@ def matching_asr_result(texts: tuple[str, ...]):
 
 
 def hybrid_package() -> StatefulSubtitlePackage:
-    return StatefulSubtitlePackage(
+    return bind_stateful_semantic_policy(StatefulSubtitlePackage(
         schema_version=1,
         dvd_id="TEST-001",
         generation_key="hybrid-generation",
@@ -113,11 +118,11 @@ def hybrid_package() -> StatefulSubtitlePackage:
                 after_context=(),
             ),
         ),
-    )
+    ))
 
 
 def mixed_package() -> StatefulSubtitlePackage:
-    return StatefulSubtitlePackage(
+    return bind_stateful_semantic_policy(StatefulSubtitlePackage(
         schema_version=1,
         dvd_id="TEST-001",
         generation_key="mixed-generation",
@@ -140,7 +145,7 @@ def mixed_package() -> StatefulSubtitlePackage:
                 after_context=(),
             ),
         ),
-    )
+    ))
 
 
 def reject(callback, label: str):
@@ -196,11 +201,11 @@ def main():
         serialize_stateful_package(package_921),
     )
     check(
-        plan_921.part_count == 58
+        plan_921.part_count == 15
         and tuple(len(part.cue_ids) for part in plan_921.parts[:-1])
-        == (16,) * 57
-        and len(plan_921.parts[-1].cue_ids) == 9,
-        "ADN_921_PART_DISTRIBUTION",
+        == (64,) * 14
+        and len(plan_921.parts[-1].cue_ids) == 25,
+        "FIXED64_921_PART_DISTRIBUTION",
     )
 
     generic_texts = ("普通一", "はい", "はい", "一旦、一旦、一旦、一旦", "普通五")
@@ -324,6 +329,10 @@ def main():
     sparse_prepared = prepare_stateful_asr_package(
         sparse_source,
         generation_key="sparse-filtered",
+    )
+    sparse_prepared = replace(
+        sparse_prepared,
+        package=bind_stateful_semantic_policy(sparse_prepared.package),
     )
     sparse_wire = serialize_stateful_package(sparse_prepared.package)
     sparse_plan = build_stateful_part_plan(

@@ -10,8 +10,10 @@ from teddy_discovery_stateful_controller import (
     decide_stateful_controller_step,
 )
 from teddy_discovery_stateful_parts import build_stateful_part_plan
+from teddy_discovery_stateful_parts import STATEFUL_PART_BATCH_SIZE
 from teddy_discovery_stateful_translator import (
     StatefulSubtitlePackage,
+    bind_stateful_semantic_policy,
     serialize_stateful_package,
 )
 
@@ -40,13 +42,13 @@ def make_package(count):
         for index in range(1, count + 1)
     )
 
-    return StatefulSubtitlePackage(
+    return bind_stateful_semantic_policy(StatefulSubtitlePackage(
         schema_version=1,
         dvd_id="GENERIC-TEST",
         generation_key=f"generic-controller-{count}",
         claim_token=1,
         cues=cues,
-    )
+    ))
 
 
 for count in (1, 16, 17, 33, 100, 661, 1000):
@@ -58,7 +60,7 @@ for count in (1, 16, 17, 33, 100, 661, 1000):
         payload,
     )
 
-    expected_count = math.ceil(count / 16)
+    expected_count = math.ceil(count / STATEFUL_PART_BATCH_SIZE)
 
     check(
         plan.part_count == expected_count,
@@ -86,7 +88,7 @@ for count in (1, 16, 17, 33, 100, 661, 1000):
         )
 
 
-package = make_package(17)
+package = make_package(100)
 payload = serialize_stateful_package(package)
 
 query = build_stateful_part_query(
@@ -106,7 +108,7 @@ check(
 )
 
 check(
-    "ja-000017" in query,
+    "ja-000100" in query,
     "QUERY_DYNAMIC_LAST_RANGE",
 )
 

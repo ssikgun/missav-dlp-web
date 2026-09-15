@@ -2242,6 +2242,61 @@ completed with the following finalized evidence:
 - Bounded retry count remains `2`.
 - CP7K diagnostics and the CP7M validator remain active and unchanged.
 
+## Stage12 CP7P / CP7Q Fixed-64 Production Default Promotion — CP7P APPROVED / CP7Q OFFLINE IMPLEMENTATION INCOMPLETE
+
+CP7P approved promotion of the fixed-64 policy based on the closed CP7B
+benchmark and the fresh CP7O production-path result.  The decision remains
+operational and evidence-based; it does not claim that fixed-64 is
+universally faster or that fixed-128 is conclusively the sole cause of every
+timeout.
+
+`PROMOTION_RECOMMENDATION=APPROVE_FIXED64_DEFAULT`
+
+CP7Q implements the production-default change as follows:
+
+- `DEFAULT_STATEFUL_SEMANTIC_POLICY` is now
+  `stage11-stateful-cue64-v1`.
+- The active default `STATEFUL_PART_BATCH_SIZE`, policy ID, planner defaults,
+  controller defaults, live-runner defaults, and CLI semantic-policy default
+  therefore use `64` cues per part.
+- `stage11-stateful-cue16-v1`, `stage11-stateful-cue64-v1`, and
+  `stage11-stateful-cue128-v1` remain registered and selectable.
+- `benchmark-stateful-cue64-v1` remains a separate benchmark namespace and
+  policy ID; it was not repurposed as the production policy.
+- New/default fixed-64 packages are bound to
+  `::stage11-policy=stage11-stateful-cue64-v1`.  Explicit legacy-16 binding
+  remains a deliberate no-op so valid historical unbound 16-cue package,
+  session, and resume identities remain usable.
+- An unbound legacy package cannot be planned as fixed-64.  Fixed-64,
+  fixed-128, and explicit legacy-16 state are rejected when their policy,
+  session, input, or part identity is mismatched.  Incompatible partial or
+  ambiguous resume state fails closed.  The UUID/session derivation algorithm
+  itself is unchanged.
+- Validated existing completed/PUBLISHED artifacts may still be reused by the
+  default fixed-64 path or explicit legacy-16 path through the existing
+  source/artifact validation contract.  They are not rewritten merely because
+  the default changed.  The fixed-128 candidate remains explicit and is not
+  the default.
+
+The following remain frozen and unchanged: the `600`-second Hermes timeout,
+model attempt count `2`, CP7K diagnostics, the CP7M source-aware validator,
+the `4096` cue structural limit, the `16 MiB` resource bound, deterministic
+timestamps and identity derivation, atomic no-overwrite publication, NAS and
+Jellyfin contracts, Stage12 selection/state transitions, and the absence of
+adaptive or title/cue/text-specific policy branching.
+
+CP7Q performed offline-only implementation and regression work.  No live
+activation, production rollout, failed-title retry, Stage12 state mutation,
+Hermes/ASR call, NAS publication, Jellyfin refresh, or rollout-DB write was
+performed.  The available offline regressions passed; the Stage11 live-adapter
+and deployment smokes could not start because the Codex environment lacks
+`numpy`.  They must be run on CT108 before this implementation is considered
+fully validated.
+
+The next checkpoint is CT108 offline regression completion, followed only by
+a separately authorized production canary/activation.  This CP7Q checkpoint
+does not authorize production activation.
+
 ## Future roadmap after subtitle pipeline closure — USER-APPROVED / NOT AUTHORIZATION
 
 The following future roadmap requirements came from the user and are approved

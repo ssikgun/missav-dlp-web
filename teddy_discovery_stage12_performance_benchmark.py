@@ -2,14 +2,15 @@
 
 This module is benchmark-only.  It does not invoke Hermes, a subtitle
 provider, STT, NAS, Jellyfin, or the Stage12 rollout state store.  Production
-stateful translation continues to use ``STATEFUL_PART_BATCH_SIZE == 16`` and
-its existing plan/validator/resume contract.
+stateful translation uses the fixed-64 default while preserving explicit
+legacy-16 and fixed-128 policy identities and its existing plan/validator/
+resume contract.
 
 The benchmark input is the exact serialized semantic package already supplied
 to the production controller.  A policy-specific manifest is derived from
 those bytes and can be staged under a separately configured benchmark root.
 The manifest and identity checks are deliberately independent of the
-production 16-cue ``ExpectedStatefulPart`` type so that the two state spaces
+production ``ExpectedStatefulPart`` type so that the two state spaces
 cannot be mixed.
 """
 

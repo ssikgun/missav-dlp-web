@@ -11,6 +11,7 @@ import uuid
 from teddy_discovery_hermes_v2 import HermesV2CueInput, HermesV2CueOutput
 from teddy_discovery_stateful_translator import (
     StatefulSubtitlePackage,
+    bind_stateful_semantic_policy,
     create_stateful_staging_directory,
     parse_stateful_package,
     read_stateful_result,
@@ -66,13 +67,13 @@ def cue(index: int) -> HermesV2CueInput:
 
 
 def make_package(count: int = 166) -> StatefulSubtitlePackage:
-    return StatefulSubtitlePackage(
+    return bind_stateful_semantic_policy(StatefulSubtitlePackage(
         schema_version=1,
         dvd_id="SYNTHETIC-TITLE",
         generation_key="synthetic-generation-001",
         claim_token=7,
         cues=tuple(cue(index) for index in range(1, count + 1)),
-    )
+    ))
 
 
 def make_part(plan: StatefulPartPlan, part_index: int) -> StatefulSemanticPart:
@@ -118,7 +119,7 @@ def generic_source_case(
     *,
     stt_text: str | None = None,
 ):
-    package = StatefulSubtitlePackage(
+    package = bind_stateful_semantic_policy(StatefulSubtitlePackage(
         schema_version=1,
         dvd_id="GENERIC-SOURCE-GUARD",
         generation_key="generic-source-guard-generation",
@@ -133,7 +134,7 @@ def generic_source_case(
                 after_context=(),
             ),
         ),
-    )
+    ))
     input_bytes = serialize_stateful_package(package)
     plan = plan_stateful_parts(package, input_bytes)
     baseline = make_part(plan, 1)
@@ -186,26 +187,26 @@ def main():
     parsed_package = parse_stateful_package(input_bytes)
     plan = plan_stateful_parts(parsed_package, input_bytes)
     check(
-        plan.part_count == 11
+        plan.part_count == 3
         and plan.parts[0].cue_ids == tuple(
-            f"asr-{index:04d}" for index in range(1, 17)
+            f"asr-{index:04d}" for index in range(1, 65)
         )
-        and plan.parts[9].first_cue_id == "asr-0145"
-        and plan.parts[9].last_cue_id == "asr-0160"
-        and plan.parts[10].cue_count == 6
-        and plan.parts[10].first_cue_id == "asr-0161"
-        and plan.parts[10].last_cue_id == "asr-0166"
+        and plan.parts[1].first_cue_id == "asr-0065"
+        and plan.parts[1].last_cue_id == "asr-0128"
+        and plan.parts[2].cue_count == 38
+        and plan.parts[2].first_cue_id == "asr-0129"
+        and plan.parts[2].last_cue_id == "asr-0166"
         and all(
             part.cue_count <= STATEFUL_PART_BATCH_SIZE
             for part in plan.parts
         ),
-        "PLAN_166_CUES_11_RANGES_WITH_SHORT_FINAL_PART",
+        "PLAN_166_CUES_3_FIXED64_RANGES_WITH_SHORT_FINAL_PART",
     )
     check(
         stateful_part_filename(1, pending=True)
         == "semantic-part-0001.pending.json"
-        and stateful_part_filename(11, pending=False)
-        == "semantic-part-0011.json",
+        and stateful_part_filename(3, pending=False)
+        == "semantic-part-0003.json",
         "EXACT_PART_FILENAME_CONTRACT",
     )
     expect(
@@ -368,7 +369,7 @@ def main():
         check(
             validated_pending == first_part
             and stat.S_IMODE(os.stat(pending_path).st_mode) == 0o600,
-            "VALID_16_CUE_PENDING_VALIDATES",
+            "VALID_64_CUE_PENDING_VALIDATES",
         )
         promoted = promote_pending_part(task, plan, 1)
         canonical_path = task / first_expected.canonical_filename

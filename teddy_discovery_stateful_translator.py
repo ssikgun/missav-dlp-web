@@ -701,10 +701,10 @@ def bind_stateful_semantic_policy(
 ) -> StatefulSubtitlePackage:
     """Return a package whose generation identity names its semantic policy.
 
-    The default 16-cue policy is intentionally a no-op so existing package,
-    session, and resume identities remain unchanged.  Candidate policies are
-    encoded only in the existing generation identity; no package/result wire
-    fields are added.
+    Explicit legacy-16 binding is intentionally a no-op so existing package,
+    session, and resume identities remain unchanged.  The fixed-64 default
+    and fixed-128 candidate are encoded only in the existing generation
+    identity; no package/result wire fields are added.
     """
 
     validated = _validated_package(package)

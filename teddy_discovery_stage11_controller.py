@@ -80,6 +80,7 @@ from teddy_discovery_stateful_quality_review_clean import (
 )
 from teddy_discovery_stateful_policy import (
     DEFAULT_STATEFUL_SEMANTIC_POLICY,
+    STATEFUL_SEMANTIC_POLICY_16,
     StatefulSemanticPolicy,
     StatefulSemanticPolicyError,
     bind_stateful_policy_generation_key,
@@ -1289,9 +1290,12 @@ def run_one_title_stage11(
     )
 
     if completion_exists:
-        if selected_semantic_policy != DEFAULT_STATEFUL_SEMANTIC_POLICY:
+        if selected_semantic_policy not in {
+            STATEFUL_SEMANTIC_POLICY_16,
+            DEFAULT_STATEFUL_SEMANTIC_POLICY,
+        }:
             raise Stage11ControllerArtifactError(
-                "non-default semantic policy cannot reuse a title completion"
+                "candidate semantic policy cannot reuse a title completion"
             )
         return _validate_existing_completion(
             report_path,

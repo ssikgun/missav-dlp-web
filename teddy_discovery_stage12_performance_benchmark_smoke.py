@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 
 from teddy_discovery_hermes_v2 import HermesV2CueInput
 from teddy_discovery_stateful_parts import STATEFUL_PART_BATCH_SIZE
+from teddy_discovery_stateful_policy import DEFAULT_STATEFUL_SEMANTIC_POLICY
 from teddy_discovery_stateful_translator import (
     StatefulSubtitlePackage,
     stateful_session_id_for_package,
@@ -81,12 +82,17 @@ def package_for(count: int, *, generation_key: str) -> StatefulSubtitlePackage:
 
 
 check(
-    STATEFUL_PART_BATCH_SIZE == 16,
-    "PRODUCTION_PART_BATCH_SIZE_REMAINS_16",
+    STATEFUL_PART_BATCH_SIZE == 64
+    and DEFAULT_STATEFUL_SEMANTIC_POLICY.max_cues_per_part == 64,
+    "PRODUCTION_DEFAULT_PART_BATCH_SIZE_IS_64",
 )
 check(
     BENCHMARK_MAX_CUES_PER_PART == 64,
     "BENCHMARK_PART_BATCH_SIZE_IS_64",
+)
+check(
+    BENCHMARK_POLICY_ID != DEFAULT_STATEFUL_SEMANTIC_POLICY.policy_id,
+    "BENCHMARK_FIXED64_ID_REMAINS_DISTINCT_FROM_PRODUCTION",
 )
 
 at_package = package_for(1471, generation_key="synthetic-at-099")

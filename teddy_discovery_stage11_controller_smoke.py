@@ -47,7 +47,11 @@ from teddy_discovery_stateful_translator import (
     StatefulSubtitleResult,
     stateful_session_id_for_package,
 )
-from teddy_discovery_stateful_policy import STATEFUL_SEMANTIC_POLICY_ID_128
+from teddy_discovery_stateful_policy import (
+    STATEFUL_SEMANTIC_POLICY_ID_16,
+    STATEFUL_SEMANTIC_POLICY_ID_64,
+    STATEFUL_SEMANTIC_POLICY_ID_128,
+)
 from teddy_discovery_subtitle_external import (
     ExternalSubtitleTransportError,
     ExternalSubtitleValidationError,
@@ -489,6 +493,25 @@ def main():
             "explicit stateful staging root reaches native adapters",
             lambda: runtime.staging_roots
             and all(path == staging_root for path in runtime.staging_roots),
+        )
+        check(
+            "omitted controller policy binds fixed64 package identity",
+            lambda: runtime.last_packages[V2_ROUTE_ASR_ONLY].generation_key.endswith(
+                "::stage11-policy=" + STATEFUL_SEMANTIC_POLICY_ID_64
+            ),
+        )
+        legacy_result = _run(
+            artifact_root,
+            staging_root,
+            runtime,
+            targeted_runner=False,
+            semantic_policy=STATEFUL_SEMANTIC_POLICY_ID_16,
+        )
+        check(
+            "explicit legacy16 reuses validated completed artifact",
+            lambda: legacy_result.clean_reused
+            and legacy_result.report_reused
+            and runtime.first_pass_calls == 1,
         )
         reject(
             "non-default policy cannot reuse title completion",

@@ -18,6 +18,7 @@ from teddy_discovery_stateful_parts import (
 )
 from teddy_discovery_stateful_translator import (
     StatefulSubtitlePackage,
+    bind_stateful_semantic_policy,
     serialize_stateful_package,
 )
 
@@ -29,7 +30,7 @@ def check(condition: bool, marker: str):
 
 
 def package_for(count: int = 1) -> StatefulSubtitlePackage:
-    return StatefulSubtitlePackage(
+    return bind_stateful_semantic_policy(StatefulSubtitlePackage(
         schema_version=1,
         dvd_id="SYNTHETIC-TIMEOUT",
         generation_key="synthetic-timeout-generation-001",
@@ -45,7 +46,7 @@ def package_for(count: int = 1) -> StatefulSubtitlePackage:
             )
             for index in range(1, count + 1)
         ),
-    )
+    ))
 
 
 def valid_part(plan, part_index: int = 1) -> StatefulSemanticPart:
@@ -204,7 +205,7 @@ def main():
         "FAIL_INVOCATION_EMITS_FAIL_RESULT",
     )
 
-    package = package_for(17)
+    package = package_for(65)
     package_bytes = serialize_stateful_package(package)
     plan = build_stateful_part_plan(package, package_bytes)
     expected = plan.parts[1]

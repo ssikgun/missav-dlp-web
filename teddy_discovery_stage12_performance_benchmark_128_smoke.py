@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 
 from teddy_discovery_hermes_v2 import HermesV2CueInput
 from teddy_discovery_stateful_parts import STATEFUL_PART_BATCH_SIZE
+from teddy_discovery_stateful_policy import DEFAULT_STATEFUL_SEMANTIC_POLICY
 from teddy_discovery_stateful_translator import (
     StatefulSubtitlePackage,
     serialize_stateful_package,
@@ -74,7 +75,11 @@ def package_for(dvd_id: str, count: int) -> StatefulSubtitlePackage:
     )
 
 
-check(STATEFUL_PART_BATCH_SIZE == 16, "PRODUCTION_PART_BATCH_SIZE_REMAINS_16")
+check(
+    STATEFUL_PART_BATCH_SIZE == 64
+    and DEFAULT_STATEFUL_SEMANTIC_POLICY.max_cues_per_part == 64,
+    "PRODUCTION_DEFAULT_PART_BATCH_SIZE_IS_64",
+)
 check(
     BENCHMARK_CUE64_POLICY_ID == "benchmark-stateful-cue64-v1",
     "CUE64_POLICY_REMAINS_FROZEN",
@@ -82,6 +87,10 @@ check(
 check(
     BENCHMARK_CUE64_MAX_CUES_PER_PART == 64,
     "CUE64_MAX_REMAINS_FROZEN",
+)
+check(
+    BENCHMARK_CUE64_POLICY_ID != DEFAULT_STATEFUL_SEMANTIC_POLICY.policy_id,
+    "CUE64_BENCHMARK_ID_REMAINS_DISTINCT_FROM_PRODUCTION",
 )
 check(
     BENCHMARK_CUE128_POLICY_ID == "benchmark-stateful-cue128-v1",
