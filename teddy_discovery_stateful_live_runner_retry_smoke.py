@@ -1,7 +1,9 @@
 """Synthetic smoke coverage for bounded invalid semantic-part recovery."""
 
+import io
 import json
 import os
+from contextlib import redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -71,8 +73,15 @@ def valid_part(plan, part_index: int) -> StatefulSemanticPart:
 
 
 def invalid_payload(part: StatefulSemanticPart) -> bytes:
+    return mutated_payload(
+        part,
+        lambda data: data["cues"][0].__setitem__("ko", "반복" * 32),
+    )
+
+
+def mutated_payload(part: StatefulSemanticPart, mutate) -> bytes:
     data = json.loads(serialize_stateful_part(part).decode("utf-8"))
-    data["cues"][0]["ko"] = "반복" * 32
+    mutate(data)
     return json.dumps(
         data,
         ensure_ascii=False,
@@ -112,6 +121,7 @@ def run_synthetic(
     cue_count: int,
     invalid_attempts: int,
     prepromote_first: bool,
+    invalid_mutator=None,
 ):
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
     package = package_for(cue_count)
@@ -145,7 +155,12 @@ def run_synthetic(
     valid_payload = serialize_stateful_part(
         valid_part(plan, expected.part_index)
     )
-    invalid = invalid_payload(valid_part(plan, expected.part_index))
+    valid_expected_part = valid_part(plan, expected.part_index)
+    invalid = (
+        invalid_payload(valid_expected_part)
+        if invalid_mutator is None
+        else mutated_payload(valid_expected_part, invalid_mutator)
+    )
 
     def remote_sha(**_kwargs):
         return plan.input_sha256
@@ -174,7 +189,9 @@ def run_synthetic(
         remote["payload"] = None
 
     args = args_for(package_path, task_directory, final_path)
+    output = io.StringIO()
     with (
+        redirect_stdout(output),
         patch.object(live_runner, "_remote_input_sha256", remote_sha),
         patch.object(live_runner, "_remote_pending_status", remote_status),
         patch.object(live_runner, "_invoke_hermes_part", invoke),
@@ -202,6 +219,7 @@ def run_synthetic(
         "calls": calls,
         "promote_calls": promote.call_args_list,
         "first_bytes": first_bytes,
+        "output": output.getvalue(),
     }
 
 
@@ -264,6 +282,36 @@ def main():
             == expected.part_index,
             "VALID_PART_PROMOTED_ONCE",
         )
+        recovered_rejection = (
+            "SEMANTIC_VALIDATION_REJECTED=INVALID_KO"
+            + "|PART_INDEX="
+            + str(expected.part_index)
+            + "|ATTEMPT=1"
+            + "|SESSION_ID="
+            + plan.session_id
+            + "|INPUT_SHA256="
+            + plan.input_sha256
+        )
+        check(
+            recovered_rejection in recovered["output"],
+            "EXACT_SEMANTIC_REASON_MARKER_INCLUDES_CONTEXT",
+        )
+        check(
+            sum(
+                line.startswith("PENDING_ARTIFACT_PATH=")
+                for line in recovered["output"].splitlines()
+            )
+            == 1
+            and "PENDING_ARTIFACT_EXISTS=YES" in recovered["output"]
+            and "PENDING_ARTIFACT_SIZE_BYTES=" in recovered["output"]
+            and "RESULT_ARTIFACT_EXISTS=NO" in recovered["output"]
+            and "RESUME_PROMOTED_ARTIFACT_EXISTS=NO" in recovered["output"],
+            "SEMANTIC_FAILURE_ARTIFACT_STATUS_MARKERS",
+        )
+        check(
+            "반복" not in recovered["output"],
+            "SEMANTIC_FAILURE_DOES_NOT_DUMP_MODEL_OUTPUT",
+        )
         check(
             recovered["first_bytes"]
             == (
@@ -285,6 +333,77 @@ def main():
             == expected.part_index,
             "VALID_SECOND_PAYLOAD_CANONICAL",
         )
+
+        diagnostic_cases = (
+            (
+                "SESSION_ID_MISMATCH",
+                lambda data: data.__setitem__(
+                    "session_id",
+                    "00000000-0000-0000-0000-000000000000",
+                ),
+            ),
+            (
+                "INPUT_SHA256_MISMATCH",
+                lambda data: data.__setitem__("input_sha256", "0" * 64),
+            ),
+            (
+                "MISSING_CUE_ID",
+                lambda data: data["cues"][1].__setitem__(
+                    "cue_id",
+                    "asr-999999",
+                ),
+            ),
+            (
+                "DUPLICATE_CUE_ID",
+                lambda data: data["cues"].__setitem__(
+                    1,
+                    dict(data["cues"][0]),
+                ),
+            ),
+            (
+                "CUE_ORDER_MISMATCH",
+                lambda data: data["cues"].__setitem__(
+                    slice(1, 3),
+                    [data["cues"][2], data["cues"][1]],
+                ),
+            ),
+            (
+                "INVALID_KO",
+                lambda data: data["cues"][0].__setitem__("ko", ""),
+            ),
+            (
+                "INVALID_REPAIRED_JA",
+                lambda data: data["cues"][0].__setitem__(
+                    "repaired_ja",
+                    123,
+                ),
+            ),
+        )
+        for reason, mutate in diagnostic_cases:
+            diagnostic = run_synthetic(
+                root / ("diagnostic-" + reason),
+                cue_count=32,
+                invalid_attempts=1,
+                prepromote_first=True,
+                invalid_mutator=mutate,
+            )
+            expected = diagnostic["expected"]
+            plan = diagnostic["plan"]
+            expected_marker = (
+                "SEMANTIC_VALIDATION_REJECTED="
+                + reason
+                + "|PART_INDEX="
+                + str(expected.part_index)
+                + "|ATTEMPT=1|SESSION_ID="
+                + plan.session_id
+                + "|INPUT_SHA256="
+                + plan.input_sha256
+            )
+            check(
+                diagnostic["error_or_result"] == 0
+                and expected_marker in diagnostic["output"],
+                "DIAGNOSTIC_MARKER_" + reason,
+            )
 
         exhausted = run_synthetic(
             root / "invalid-twice",
@@ -313,6 +432,34 @@ def main():
             ).exists()
             and not exhausted["final"].exists(),
             "EXHAUSTED_INVALID_NEVER_PROMOTED",
+        )
+        exhausted_rejections = [
+            line
+            for line in exhausted["output"].splitlines()
+            if line.startswith("SEMANTIC_VALIDATION_REJECTED=")
+        ]
+        check(
+            len(exhausted_rejections) == 2
+            and all(
+                "SEMANTIC_VALIDATION_REJECTED=INVALID_KO"
+                in line
+                and "|PART_INDEX=1|" in line
+                and "|SESSION_ID=" + exhausted["plan"].session_id in line
+                and "|INPUT_SHA256=" + exhausted["plan"].input_sha256 in line
+                for line in exhausted_rejections
+            )
+            and "|ATTEMPT=1|" in exhausted_rejections[0]
+            and "|ATTEMPT=2|" in exhausted_rejections[1],
+            "EVERY_VALIDATION_ATTEMPT_HAS_EXACT_REASON_MARKER",
+        )
+        check(
+            sum(
+                line.startswith("PENDING_ARTIFACT_PATH=")
+                for line in exhausted["output"].splitlines()
+            )
+            == 2
+            and exhausted["output"].count("RESULT_ARTIFACT_EXISTS=NO") == 2,
+            "EVERY_VALIDATION_ATTEMPT_HAS_ARTIFACT_STATUS",
         )
 
     print("STATEFUL_LIVE_RUNNER_RETRY_SMOKE=PASS")

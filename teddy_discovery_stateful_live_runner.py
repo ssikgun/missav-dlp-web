@@ -10,6 +10,7 @@ from pathlib import Path
 import shlex
 import subprocess
 import tempfile
+import time
 from typing import Final
 
 from teddy_discovery_stateful_controller import (
@@ -25,6 +26,7 @@ from teddy_discovery_stateful_parts import (
     promote_pending_part,
     assemble_stateful_result,
     StatefulPartsValidationError,
+    STATEFUL_VALIDATION_REASON_OTHER_VALIDATOR_PREDICATE,
 )
 from teddy_discovery_stateful_policy import (
     DEFAULT_STATEFUL_SEMANTIC_POLICY,
@@ -46,8 +48,18 @@ class StatefulLiveRunnerError(RuntimeError):
 class StatefulLiveRunnerTimeoutError(StatefulLiveRunnerError):
     """Hermes part invocation exceeded its explicit controller timeout."""
 
-    def __init__(self, *, timeout_seconds: int) -> None:
+    def __init__(
+        self,
+        *,
+        timeout_seconds: int,
+        invocation_start_epoch: float | None = None,
+        invocation_end_epoch: float | None = None,
+        invocation_elapsed_seconds: float | None = None,
+    ) -> None:
         self.timeout_seconds = timeout_seconds
+        self.invocation_start_epoch = invocation_start_epoch
+        self.invocation_end_epoch = invocation_end_epoch
+        self.invocation_elapsed_seconds = invocation_elapsed_seconds
         super().__init__(
             "Hermes part invocation exceeded controller timeout"
         )
@@ -365,6 +377,141 @@ with open(path, "rb") as handle:
     return result.stdout
 
 
+def _format_diagnostic_seconds(value: float) -> str:
+    return f"{value:.6f}"
+
+
+def _print_hermes_invocation_diagnostics(
+    *,
+    end_epoch: float,
+    elapsed_seconds: float,
+    timeout_seconds: int,
+    result: str,
+) -> None:
+    print(
+        "HERMES_INVOCATION_END_EPOCH="
+        + _format_diagnostic_seconds(end_epoch),
+        flush=True,
+    )
+    print(
+        "HERMES_INVOCATION_ELAPSED_SECONDS="
+        + _format_diagnostic_seconds(elapsed_seconds),
+        flush=True,
+    )
+    print(
+        "HERMES_INVOCATION_TIMEOUT_SECONDS="
+        + str(timeout_seconds),
+        flush=True,
+    )
+    print(
+        "HERMES_INVOCATION_RESULT="
+        + result,
+        flush=True,
+    )
+
+
+def _local_artifact_status(path: Path | None) -> tuple[str, int | None]:
+    """Return bounded local lstat evidence without reading artifact content."""
+
+    if path is None:
+        return "UNKNOWN", None
+    try:
+        value = os.lstat(path)
+    except FileNotFoundError:
+        return "NO", None
+    except OSError:
+        return "UNKNOWN", None
+    return "YES", value.st_size if value.st_size >= 0 else None
+
+
+def _pending_status_value(value: bool | None) -> str:
+    if value is True:
+        return "YES"
+    if value is False:
+        return "NO"
+    return "UNKNOWN"
+
+
+def _print_artifact_status(
+    *,
+    remote_pending_path: str,
+    remote_pending_exists: bool | None,
+    remote_pending_size: int | None,
+    pending_observation: str,
+    task_directory: Path,
+    expected,
+    final_path: Path | None,
+) -> None:
+    """Print bounded artifact metadata only; never print artifact contents."""
+
+    local_pending_path = task_directory / expected.pending_filename
+    local_pending_exists, local_pending_size = _local_artifact_status(
+        local_pending_path
+    )
+    result_exists, _ = _local_artifact_status(final_path)
+    promoted_path = task_directory / expected.canonical_filename
+    promoted_exists, _ = _local_artifact_status(promoted_path)
+
+    print(
+        "PENDING_ARTIFACT_PATH="
+        + remote_pending_path,
+        flush=True,
+    )
+    print(
+        "PENDING_ARTIFACT_EXISTS="
+        + _pending_status_value(remote_pending_exists),
+        flush=True,
+    )
+    print(
+        "PENDING_ARTIFACT_OBSERVED_AT="
+        + pending_observation,
+        flush=True,
+    )
+    print(
+        "PENDING_ARTIFACT_SIZE_BYTES="
+        + (
+            str(remote_pending_size)
+            if remote_pending_size is not None
+            else "UNAVAILABLE"
+        ),
+        flush=True,
+    )
+    print(
+        "LOCAL_PENDING_ARTIFACT_PATH="
+        + str(local_pending_path),
+        flush=True,
+    )
+    print(
+        "LOCAL_PENDING_ARTIFACT_EXISTS="
+        + local_pending_exists,
+        flush=True,
+    )
+    print(
+        "LOCAL_PENDING_ARTIFACT_SIZE_BYTES="
+        + (
+            str(local_pending_size)
+            if local_pending_size is not None
+            else "UNAVAILABLE"
+        ),
+        flush=True,
+    )
+    print(
+        "RESULT_ARTIFACT_EXISTS="
+        + result_exists,
+        flush=True,
+    )
+    print(
+        "RESUME_PROMOTED_ARTIFACT_PATH="
+        + str(promoted_path),
+        flush=True,
+    )
+    print(
+        "RESUME_PROMOTED_ARTIFACT_EXISTS="
+        + promoted_exists,
+        flush=True,
+    )
+
+
 def _invoke_hermes_part(
     *,
     remote: str,
@@ -453,6 +600,14 @@ test "$rok" -eq 1
         encoded_query,
     ]
 
+    start_epoch = time.time()
+    start_monotonic = time.monotonic()
+    print(
+        "HERMES_INVOCATION_START_EPOCH="
+        + _format_diagnostic_seconds(start_epoch),
+        flush=True,
+    )
+
     try:
         result = subprocess.run(
             command,
@@ -461,9 +616,49 @@ test "$rok" -eq 1
             timeout=turn_timeout,
         )
     except subprocess.TimeoutExpired as error:
+        end_epoch = time.time()
+        elapsed_seconds = max(
+            0.0,
+            time.monotonic() - start_monotonic,
+        )
+        _print_hermes_invocation_diagnostics(
+            end_epoch=end_epoch,
+            elapsed_seconds=elapsed_seconds,
+            timeout_seconds=turn_timeout,
+            result="TIMEOUT",
+        )
         raise StatefulLiveRunnerTimeoutError(
             timeout_seconds=turn_timeout,
+            invocation_start_epoch=start_epoch,
+            invocation_end_epoch=end_epoch,
+            invocation_elapsed_seconds=elapsed_seconds,
         ) from error
+    except Exception:
+        end_epoch = time.time()
+        elapsed_seconds = max(
+            0.0,
+            time.monotonic() - start_monotonic,
+        )
+        _print_hermes_invocation_diagnostics(
+            end_epoch=end_epoch,
+            elapsed_seconds=elapsed_seconds,
+            timeout_seconds=turn_timeout,
+            result="FAIL",
+        )
+        raise
+
+    end_epoch = time.time()
+    elapsed_seconds = max(
+        0.0,
+        time.monotonic() - start_monotonic,
+    )
+    result_status = "PASS" if result.returncode == 0 else "FAIL"
+    _print_hermes_invocation_diagnostics(
+        end_epoch=end_epoch,
+        elapsed_seconds=elapsed_seconds,
+        timeout_seconds=turn_timeout,
+        result=result_status,
+    )
 
     if result.returncode != 0:
         raise StatefulLiveRunnerError(
@@ -546,6 +741,7 @@ def _request_and_install_part(
     remote_task: str,
     plan,
     expected,
+    final_path: Path | None = None,
     semantic_policy: StatefulSemanticPolicy | str = (
         DEFAULT_STATEFUL_SEMANTIC_POLICY
     ),
@@ -599,15 +795,27 @@ def _request_and_install_part(
                 + expected.last_cue_id
             )
 
-            _invoke_hermes_part(
-                remote=args.remote,
-                ssh_key=args.ssh_key,
-                known_hosts=args.known_hosts,
-                remote_task=remote_task,
-                session_id=plan.session_id,
-                query=query,
-                turn_timeout=args.turn_timeout,
-            )
+            try:
+                _invoke_hermes_part(
+                    remote=args.remote,
+                    ssh_key=args.ssh_key,
+                    known_hosts=args.known_hosts,
+                    remote_task=remote_task,
+                    session_id=plan.session_id,
+                    query=query,
+                    turn_timeout=args.turn_timeout,
+                )
+            except StatefulLiveRunnerTimeoutError:
+                _print_artifact_status(
+                    remote_pending_path=remote_pending,
+                    remote_pending_exists=None,
+                    remote_pending_size=None,
+                    pending_observation="TIMEOUT_STATE_UNAVAILABLE",
+                    task_directory=task_directory,
+                    expected=expected,
+                    final_path=final_path,
+                )
+                raise
 
         payload = _read_remote_regular_file(
             remote=args.remote,
@@ -624,6 +832,33 @@ def _request_and_install_part(
                 expected=expected,
             )
         except StatefulPartsValidationError as error:
+            reason_code = getattr(
+                error,
+                "reason_code",
+                STATEFUL_VALIDATION_REASON_OTHER_VALIDATOR_PREDICATE,
+            )
+            _print_artifact_status(
+                remote_pending_path=remote_pending,
+                remote_pending_exists=True,
+                remote_pending_size=len(payload),
+                pending_observation="REMOTE_READ_AFTER_INVOCATION",
+                task_directory=task_directory,
+                expected=expected,
+                final_path=final_path,
+            )
+            print(
+                "SEMANTIC_VALIDATION_REJECTED="
+                + str(reason_code)
+                + "|PART_INDEX="
+                + str(expected.part_index)
+                + "|ATTEMPT="
+                + str(attempt)
+                + "|SESSION_ID="
+                + plan.session_id
+                + "|INPUT_SHA256="
+                + plan.input_sha256,
+                flush=True,
+            )
             _remove_remote_pending(
                 remote=args.remote,
                 ssh_key=args.ssh_key,
@@ -884,6 +1119,7 @@ def run(args: argparse.Namespace) -> int:
             remote_task=remote_task,
             plan=plan,
             expected=expected,
+            final_path=final_path,
             semantic_policy=semantic_policy,
         )
 

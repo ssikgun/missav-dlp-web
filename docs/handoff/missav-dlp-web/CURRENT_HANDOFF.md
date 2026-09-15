@@ -32,6 +32,8 @@ subtitle rollout readiness.
 - STAGE12_CP7F_PRODUCTION_128_CANDIDATE_IMPLEMENTATION_PASS
 - STAGE12_CP7G_PRODUCTION_128_ONE_TITLE_LIVE_CANARY_PASS
 - STAGE12_CP7I_FIXED128_BOUNDED_ROLLOUT_COMPLETE_FORENSIC
+- STAGE12_CP7J_CLOSED_PASS
+- STAGE12_CP7K_GENERIC_STATEFUL_FAILURE_DIAGNOSTICS_PASS
 
 ## Completed
 
@@ -1720,15 +1722,18 @@ the unchanged 16-cue default, and token telemetry remains
 
 ## Next Step
 
-CP7I is **COMPLETE**, but its fixed-128 bounded rollout result is only
-`1/3 PUBLISHED`. The two retryable failures remain preserved and were not
-blindly retried during forensic review. Fixed 128 is **NOT YET APPROVED** for
-general promotion; production remains on the unchanged 16-cue default.
+CP7J is **CLOSED / PASS** at commit
+`d5c09bf7fe09de69b475b1e652ee4e37753cf77d`. CP7K diagnostic instrumentation
+is **PASS** and observability-only: production behavior, validator/retry/
+timeout contracts, publication, NAS, and Jellyfin behavior are unchanged.
+The CP7I rollout result remains only `1/3 PUBLISHED`; fixed 128 is **NOT YET
+APPROVED** for general promotion, and production remains on the unchanged
+16-cue default.
 
 The one next checkpoint is **CT108 read-only remote artifact forensics** for
-the two unresolved evidence boundaries. It must not retry or re-execute a
-title. Until that checkpoint is separately completed, no new rollout is
-authorized.
+the two unresolved evidence boundaries. CP7K performed no live execution;
+CT108 must not retry or re-execute a title. Until that checkpoint is
+separately completed, no new rollout is authorized.
 
 All next steps must preserve Stage11's frozen contracts and must not reopen
 Stage11. The accepted-alignment + valid-targeted-unprojectable live path may
@@ -1745,12 +1750,13 @@ alignment + valid targeted unprojectable live path는 아직 직접 검증하지
 - Stage11 CLOSED / PASS 상태 유지; 재오픈 금지
 - Stage12 ACTIVE / CP7B CLOSED / CP7C PREPARED / CP7D CLOSED / CP7E DECISION
   FREEZE PASS / CP7F CANDIDATE IMPLEMENTATION PASS / CP7G CLOSED / PASS /
-  CP7I COMPLETE with `1/3 PUBLISHED`; fixed 128 is not the global production
-  default
+  CP7I COMPLETE with `1/3 PUBLISHED` / CP7J CLOSED / PASS / CP7K PASS;
+  fixed 128 is not the global production default
 - production `STATEFUL_PART_BATCH_SIZE=16` unchanged; no production policy
   change has been applied
 - the only next checkpoint is CT108 read-only remote artifact forensics; do
   not blind-retry or re-execute CP7I failures
+- CP7K performed no live execution and no production writes
 - 작품별 튜닝으로 되돌아가지 않기
 - ADN/JUR/HSODA/DVDMS 특정 production logic 금지
 - old canonical KO subtitle overwrite 금지
@@ -1868,10 +1874,87 @@ Forensic-review counters were all zero: `LIVE_HERMES_CALLS=0`, `NAS_WRITES=0`,
 `JELLYFIN_CALLS=0`, `ROLLOUT_DB_WRITES=0`. These counters describe this
 read-only forensic pass; no new rollout action was taken.
 
-### Next checkpoint (one)
+### Historical CP7I checkpoint
 
 **CT108 read-only remote artifact forensics:** recover the CT120 task/session
 metadata and retained validator/pending-output evidence needed to resolve the
 DVAJ-754 inner rejection and DVDES-795 post-timeout state. No retry,
 re-execution, fallback, timeout change, validator change, or publication is
 authorized by this checkpoint.
+
+## CP7J / CP7K Closure — PASS
+
+`STAGE12_CP7J_CLOSED_PASS`
+
+CP7J is **CLOSED / PASS** at commit
+`d5c09bf7fe09de69b475b1e652ee4e37753cf77d` on branch
+`teddy-subtitle-stage11`.
+
+`STAGE12_CP7K_GENERIC_STATEFUL_FAILURE_DIAGNOSTICS_PASS`
+
+CP7K is **PASS** as an observability-only checkpoint. It changes no
+production decision or behavior. The fixed-128 candidate remains unapproved
+for general promotion, and production default `STATEFUL_PART_BATCH_SIZE=16`
+is unchanged.
+
+### Diagnostic instrumentation
+
+- Existing `StatefulPartsValidationError` instances now carry a machine-readable
+  `reason_code` without changing the exception hierarchy or validation rules.
+  Existing validator predicates are exposed as `JSON_PARSE_FAILURE`,
+  `SCHEMA_FAILURE`, `SESSION_ID_MISMATCH`, `INPUT_SHA256_MISMATCH`,
+  `PART_INDEX_MISMATCH`, `FIRST_CUE_ID_MISMATCH`,
+  `LAST_CUE_ID_MISMATCH`, `CUE_COUNT_MISMATCH`, `MISSING_CUE_ID`,
+  `DUPLICATE_CUE_ID`, `UNEXPECTED_CUE_ID`, `CUE_ORDER_MISMATCH`,
+  `INVALID_REPAIRED_JA`, `INVALID_KO`, `INVALID_FIELD`, or
+  `OTHER_VALIDATOR_PREDICATE`.
+- Each rejected semantic attempt logs one bounded
+  `SEMANTIC_VALIDATION_REJECTED=<reason>` marker with `PART_INDEX`,
+  `ATTEMPT`, `SESSION_ID`, and `INPUT_SHA256`. Model output contents are not
+  logged by this instrumentation.
+- Each Hermes semantic invocation logs
+  `HERMES_INVOCATION_START_EPOCH`, `HERMES_INVOCATION_END_EPOCH`,
+  `HERMES_INVOCATION_ELAPSED_SECONDS`,
+  `HERMES_INVOCATION_TIMEOUT_SECONDS`, and
+  `HERMES_INVOCATION_RESULT=PASS|TIMEOUT|FAIL`. The timeout remains exactly
+  `600` seconds, including the timeout path.
+- Validation failure and timeout paths log bounded pending path/existence/
+  size evidence, local pending evidence, result existence, and
+  resume/promoted artifact existence. Unknown remote state remains explicitly
+  `UNKNOWN` when it cannot be safely observed; artifact contents are never
+  dumped.
+- The existing validator, bounded retry count, cue contract, session/resume
+  identity, publication path, NAS/Jellyfin path, and alignment policy are
+  unchanged. No title/cue/text-specific branch was added.
+
+### Offline verification
+
+- Exact reason coverage: session mismatch, SHA mismatch, cue-count/missing
+  cue, duplicate cue, first-cue/order mismatch, malformed `ko`, malformed
+  `repaired_ja`, schema, and JSON parse cases all pass.
+- Hermes timeout simulation passes with start/end/elapsed/timeout/result
+  markers; PASS and FAIL result markers also pass.
+- Existing stateful parts/controller/policy/live-runner/retry/timeout,
+  Stage12 batch/inventory/rollout, and fixed-128 benchmark regression smokes
+  all pass. `py_compile` passes.
+- CP7K live/write counters: `LIVE_HERMES_CALLS=0`, `NAS_WRITES=0`,
+  `JELLYFIN_CALLS=0`, `ROLLOUT_DB_WRITES=0`.
+
+### CP7K changed files
+
+- `teddy_discovery_stateful_parts.py`
+- `teddy_discovery_stateful_live_runner.py`
+- `teddy_discovery_stateful_parts_smoke.py`
+- `teddy_discovery_stateful_live_runner_retry_smoke.py`
+- `teddy_discovery_stateful_live_runner_timeout_smoke.py`
+- `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md`
+
+No commit or push was attempted.
+
+### Next checkpoint (one)
+
+**CT108 read-only remote artifact forensics:** use the new diagnostic fields
+and markers when reading CT120 task/session evidence to resolve the retained
+CP7I DVAJ-754 inner validator reason and DVDES-795 post-timeout artifact state.
+No retry, re-execution, fallback, timeout change, validator change, or
+publication is authorized by this checkpoint.

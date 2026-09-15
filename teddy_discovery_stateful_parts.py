@@ -62,6 +62,47 @@ _PART_FILENAME_RE = re.compile(
 )
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
+STATEFUL_VALIDATION_REASON_JSON_PARSE_FAILURE: Final[str] = (
+    "JSON_PARSE_FAILURE"
+)
+STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE: Final[str] = "SCHEMA_FAILURE"
+STATEFUL_VALIDATION_REASON_SESSION_ID_MISMATCH: Final[str] = (
+    "SESSION_ID_MISMATCH"
+)
+STATEFUL_VALIDATION_REASON_INPUT_SHA256_MISMATCH: Final[str] = (
+    "INPUT_SHA256_MISMATCH"
+)
+STATEFUL_VALIDATION_REASON_PART_INDEX_MISMATCH: Final[str] = (
+    "PART_INDEX_MISMATCH"
+)
+STATEFUL_VALIDATION_REASON_FIRST_CUE_ID_MISMATCH: Final[str] = (
+    "FIRST_CUE_ID_MISMATCH"
+)
+STATEFUL_VALIDATION_REASON_LAST_CUE_ID_MISMATCH: Final[str] = (
+    "LAST_CUE_ID_MISMATCH"
+)
+STATEFUL_VALIDATION_REASON_CUE_COUNT_MISMATCH: Final[str] = (
+    "CUE_COUNT_MISMATCH"
+)
+STATEFUL_VALIDATION_REASON_MISSING_CUE_ID: Final[str] = "MISSING_CUE_ID"
+STATEFUL_VALIDATION_REASON_DUPLICATE_CUE_ID: Final[str] = (
+    "DUPLICATE_CUE_ID"
+)
+STATEFUL_VALIDATION_REASON_UNEXPECTED_CUE_ID: Final[str] = (
+    "UNEXPECTED_CUE_ID"
+)
+STATEFUL_VALIDATION_REASON_CUE_ORDER_MISMATCH: Final[str] = (
+    "CUE_ORDER_MISMATCH"
+)
+STATEFUL_VALIDATION_REASON_INVALID_REPAIRED_JA: Final[str] = (
+    "INVALID_REPAIRED_JA"
+)
+STATEFUL_VALIDATION_REASON_INVALID_KO: Final[str] = "INVALID_KO"
+STATEFUL_VALIDATION_REASON_INVALID_FIELD: Final[str] = "INVALID_FIELD"
+STATEFUL_VALIDATION_REASON_OTHER_VALIDATOR_PREDICATE: Final[str] = (
+    "OTHER_VALIDATOR_PREDICATE"
+)
+
 
 class StatefulPartsError(ValueError):
     """Base class for deterministic semantic-part failures."""
@@ -69,6 +110,15 @@ class StatefulPartsError(ValueError):
 
 class StatefulPartsValidationError(StatefulPartsError):
     """Raised when a semantic part is malformed or detached."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason_code: str = STATEFUL_VALIDATION_REASON_OTHER_VALIDATOR_PREDICATE,
+    ) -> None:
+        self.reason_code = reason_code
+        super().__init__(message)
 
 
 class StatefulPartsLimitError(StatefulPartsValidationError):
@@ -140,11 +190,13 @@ def _require_package_policy_binding(
 def _require_exact_string(value: object, field_name: str) -> str:
     if type(value) is not str:
         raise StatefulPartsValidationError(
-            field_name + " must be an exact string"
+            field_name + " must be an exact string",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
         )
     if not value or value != value.strip():
         raise StatefulPartsValidationError(
-            field_name + " must be nonempty and bounded"
+            field_name + " must be nonempty and bounded",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
         )
     if any(
         ord(character) < 32
@@ -153,7 +205,8 @@ def _require_exact_string(value: object, field_name: str) -> str:
         for character in value
     ):
         raise StatefulPartsValidationError(
-            field_name + " contains unsafe whitespace or control data"
+            field_name + " contains unsafe whitespace or control data",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
         )
     return value
 
@@ -161,7 +214,8 @@ def _require_exact_string(value: object, field_name: str) -> str:
 def _require_sha256(value: object) -> str:
     if type(value) is not str or _SHA256_RE.fullmatch(value) is None:
         raise StatefulPartsValidationError(
-            "input_sha256 must be lowercase hexadecimal SHA256"
+            "input_sha256 must be lowercase hexadecimal SHA256",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
         )
     return value
 
@@ -169,17 +223,20 @@ def _require_sha256(value: object) -> str:
 def _require_session_id(value: object) -> str:
     if type(value) is not str:
         raise StatefulPartsValidationError(
-            "session_id must be an exact string"
+            "session_id must be an exact string",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
         )
     try:
         parsed = uuid.UUID(value)
     except (AttributeError, TypeError, ValueError) as error:
         raise StatefulPartsValidationError(
-            "session_id must be a canonical UUID"
+            "session_id must be a canonical UUID",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
         ) from error
     if str(parsed) != value:
         raise StatefulPartsValidationError(
-            "session_id must be a canonical UUID"
+            "session_id must be a canonical UUID",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
         )
     return value
 
@@ -187,7 +244,8 @@ def _require_session_id(value: object) -> str:
 def _require_part_index(value: object) -> int:
     if type(value) is not int or value <= 0:
         raise StatefulPartsValidationError(
-            "part_index must be a positive exact integer"
+            "part_index must be a positive exact integer",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
         )
     return value
 
@@ -240,7 +298,8 @@ def has_runaway_repetition(text: str) -> bool:
 def _validated_output_cue(value: object) -> HermesV2CueOutput:
     if type(value) is not HermesV2CueOutput:
         raise StatefulPartsValidationError(
-            "part cue has the wrong exact type"
+            "part cue has the wrong exact type",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
         )
     try:
         validated = HermesV2CueOutput(
@@ -250,12 +309,14 @@ def _validated_output_cue(value: object) -> HermesV2CueOutput:
         )
     except (AttributeError, TypeError, ValueError, OverflowError) as error:
         raise StatefulPartsValidationError(
-            "part cue is invalid or detached"
+            "part cue is invalid or detached",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
         ) from error
 
     if has_runaway_repetition(validated.ko):
         raise StatefulPartsValidationError(
-            "part cue ko contains an extreme repeated short-unit pattern"
+            "part cue ko contains an extreme repeated short-unit pattern",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
         )
 
     if (
@@ -263,7 +324,8 @@ def _validated_output_cue(value: object) -> HermesV2CueOutput:
         and has_runaway_repetition(validated.repaired_ja)
     ):
         raise StatefulPartsValidationError(
-            "part cue repaired_ja contains an extreme repeated short-unit pattern"
+            "part cue repaired_ja contains an extreme repeated short-unit pattern",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_REPAIRED_JA,
         )
 
     if (
@@ -276,7 +338,8 @@ def _validated_output_cue(value: object) -> HermesV2CueOutput:
         )
     ):
         raise StatefulPartsValidationError(
-            "part cue repaired_ja must not contain Korean script"
+            "part cue repaired_ja must not contain Korean script",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_REPAIRED_JA,
         )
 
     return validated
@@ -413,7 +476,8 @@ class StatefulSemanticPart:
     def __post_init__(self):
         if type(self.part_schema_version) is not int or self.part_schema_version != STATEFUL_PART_SCHEMA_VERSION:
             raise StatefulPartsValidationError(
-                "unsupported stateful part schema version"
+                "unsupported stateful part schema version",
+                reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
             )
         _require_policy_batch_size(self.max_cues_per_part)
         _require_session_id(self.session_id)
@@ -423,11 +487,13 @@ class StatefulSemanticPart:
         _require_exact_string(self.last_cue_id, "last_cue_id")
         if type(self.cues) is not tuple or not self.cues:
             raise StatefulPartsValidationError(
-                "part cues must be an immutable nonempty tuple"
+                "part cues must be an immutable nonempty tuple",
+                reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
             )
         if len(self.cues) > self.max_cues_per_part:
             raise StatefulPartsLimitError(
-                "part exceeds the stateful part batch size"
+                "part exceeds the stateful part batch size",
+                reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
             )
         validated_cues = tuple(
             _validated_output_cue(cue)
@@ -435,16 +501,19 @@ class StatefulSemanticPart:
         )
         if validated_cues[0].cue_id != self.first_cue_id:
             raise StatefulPartsValidationError(
-                "part first cue identity does not match its cues"
+                "part first cue identity does not match its cues",
+                reason_code=STATEFUL_VALIDATION_REASON_FIRST_CUE_ID_MISMATCH,
             )
         if validated_cues[-1].cue_id != self.last_cue_id:
             raise StatefulPartsValidationError(
-                "part last cue identity does not match its cues"
+                "part last cue identity does not match its cues",
+                reason_code=STATEFUL_VALIDATION_REASON_LAST_CUE_ID_MISMATCH,
             )
         cue_ids = tuple(cue.cue_id for cue in validated_cues)
         if len(set(cue_ids)) != len(cue_ids):
             raise StatefulPartsValidationError(
-                "part cue IDs must be unique"
+                "part cue IDs must be unique",
+                reason_code=STATEFUL_VALIDATION_REASON_DUPLICATE_CUE_ID,
             )
 
 
@@ -757,7 +826,8 @@ def _encode_part_json(data: dict[str, object]) -> bytes:
 
 def _reject_json_constant(value: str):
     raise StatefulPartsValidationError(
-        "JSON constants are not accepted in stateful parts"
+        "JSON constants are not accepted in stateful parts",
+        reason_code=STATEFUL_VALIDATION_REASON_JSON_PARSE_FAILURE,
     )
 
 
@@ -768,7 +838,8 @@ def _reject_duplicate_json_keys(
     for key, value in pairs:
         if key in result:
             raise StatefulPartsValidationError(
-                "duplicate JSON object keys are not accepted"
+                "duplicate JSON object keys are not accepted",
+                reason_code=STATEFUL_VALIDATION_REASON_JSON_PARSE_FAILURE,
             )
         result[key] = value
     return result
@@ -777,7 +848,8 @@ def _reject_duplicate_json_keys(
 def _load_part_json(payload: bytes) -> dict[str, object]:
     if type(payload) is not bytes or not payload:
         raise StatefulPartsValidationError(
-            "part must be nonempty exact UTF-8 JSON bytes"
+            "part must be nonempty exact UTF-8 JSON bytes",
+            reason_code=STATEFUL_VALIDATION_REASON_JSON_PARSE_FAILURE,
         )
     if len(payload) > STATEFUL_PART_MAX_BYTES:
         raise StatefulPartsLimitError(
@@ -793,23 +865,38 @@ def _load_part_json(payload: bytes) -> dict[str, object]:
         raise
     except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as error:
         raise StatefulPartsValidationError(
-            "part must be one JSON object without prose"
+            "part must be one JSON object without prose",
+            reason_code=STATEFUL_VALIDATION_REASON_JSON_PARSE_FAILURE,
         ) from error
     if type(parsed) is not dict:
         raise StatefulPartsValidationError(
-            "part root must be a JSON object"
+            "part root must be a JSON object",
+            reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
         )
     return parsed
+
+
+def _output_field_validation_reason(error: BaseException) -> str:
+    """Classify an existing Hermes output predicate without revalidating it."""
+
+    message = str(error)
+    if message.startswith("repaired_ja"):
+        return STATEFUL_VALIDATION_REASON_INVALID_REPAIRED_JA
+    if message.startswith("ko "):
+        return STATEFUL_VALIDATION_REASON_INVALID_KO
+    return STATEFUL_VALIDATION_REASON_INVALID_FIELD
 
 
 def _parse_part_cue(value: object) -> HermesV2CueOutput:
     if type(value) is not dict:
         raise StatefulPartsValidationError(
-            "part cue must be a JSON object"
+            "part cue must be a JSON object",
+            reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
         )
     if set(value) != {"cue_id", "repaired_ja", "ko"}:
         raise StatefulPartsValidationError(
-            "part cue fields are not exact"
+            "part cue fields are not exact",
+            reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
         )
     try:
         return HermesV2CueOutput(
@@ -819,7 +906,8 @@ def _parse_part_cue(value: object) -> HermesV2CueOutput:
         )
     except (TypeError, ValueError, OverflowError) as error:
         raise StatefulPartsValidationError(
-            "part cue is invalid"
+            "part cue is invalid",
+            reason_code=_output_field_validation_reason(error),
         ) from error
 
 
@@ -839,16 +927,19 @@ def _part_from_payload(
         "cues",
     }:
         raise StatefulPartsValidationError(
-            "part top-level fields are not exact"
+            "part top-level fields are not exact",
+            reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
         )
     raw_cues = parsed["cues"]
     if type(raw_cues) is not list:
         raise StatefulPartsValidationError(
-            "part cues must be a JSON array"
+            "part cues must be a JSON array",
+            reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
         )
     if len(raw_cues) != expected.cue_count:
         raise StatefulPartsValidationError(
-            "part cue count does not match its deterministic range"
+            "part cue count does not match its deterministic range",
+            reason_code=STATEFUL_VALIDATION_REASON_CUE_COUNT_MISMATCH,
         )
     try:
         part = StatefulSemanticPart(
@@ -865,21 +956,59 @@ def _part_from_payload(
         raise
     except (TypeError, ValueError, OverflowError) as error:
         raise StatefulPartsValidationError(
-            "part is invalid"
+            "part is invalid",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
         ) from error
 
-    if (
-        part.part_schema_version != STATEFUL_PART_SCHEMA_VERSION
-        or part.session_id != plan.session_id
-        or part.input_sha256 != plan.input_sha256
-        or part.part_index != expected.part_index
-        or part.first_cue_id != expected.first_cue_id
-        or part.last_cue_id != expected.last_cue_id
-        or part.max_cues_per_part != expected.max_cues_per_part
-        or tuple(cue.cue_id for cue in part.cues) != expected.cue_ids
-    ):
+    if part.part_schema_version != STATEFUL_PART_SCHEMA_VERSION:
         raise StatefulPartsValidationError(
-            "part identity or cue order does not match its deterministic plan"
+            "part identity or cue order does not match its deterministic plan",
+            reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
+        )
+    if part.session_id != plan.session_id:
+        raise StatefulPartsValidationError(
+            "part identity or cue order does not match its deterministic plan",
+            reason_code=STATEFUL_VALIDATION_REASON_SESSION_ID_MISMATCH,
+        )
+    if part.input_sha256 != plan.input_sha256:
+        raise StatefulPartsValidationError(
+            "part identity or cue order does not match its deterministic plan",
+            reason_code=STATEFUL_VALIDATION_REASON_INPUT_SHA256_MISMATCH,
+        )
+    if part.part_index != expected.part_index:
+        raise StatefulPartsValidationError(
+            "part identity or cue order does not match its deterministic plan",
+            reason_code=STATEFUL_VALIDATION_REASON_PART_INDEX_MISMATCH,
+        )
+    if part.first_cue_id != expected.first_cue_id:
+        raise StatefulPartsValidationError(
+            "part identity or cue order does not match its deterministic plan",
+            reason_code=STATEFUL_VALIDATION_REASON_FIRST_CUE_ID_MISMATCH,
+        )
+    if part.last_cue_id != expected.last_cue_id:
+        raise StatefulPartsValidationError(
+            "part identity or cue order does not match its deterministic plan",
+            reason_code=STATEFUL_VALIDATION_REASON_LAST_CUE_ID_MISMATCH,
+        )
+    if part.max_cues_per_part != expected.max_cues_per_part:
+        raise StatefulPartsValidationError(
+            "part identity or cue order does not match its deterministic plan",
+            reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
+        )
+
+    actual_cue_ids = tuple(cue.cue_id for cue in part.cues)
+    if actual_cue_ids != expected.cue_ids:
+        expected_ids = set(expected.cue_ids)
+        actual_ids = set(actual_cue_ids)
+        if any(cue_id not in actual_ids for cue_id in expected.cue_ids):
+            reason_code = STATEFUL_VALIDATION_REASON_MISSING_CUE_ID
+        elif any(cue_id not in expected_ids for cue_id in actual_cue_ids):
+            reason_code = STATEFUL_VALIDATION_REASON_UNEXPECTED_CUE_ID
+        else:
+            reason_code = STATEFUL_VALIDATION_REASON_CUE_ORDER_MISMATCH
+        raise StatefulPartsValidationError(
+            "part identity or cue order does not match its deterministic plan",
+            reason_code=reason_code,
         )
     return part
 
@@ -1246,6 +1375,22 @@ def assemble_stateful_result(
 __all__ = [
     "ExpectedStatefulPart",
     "MAX_STATEFUL_PART_BYTES",
+    "STATEFUL_VALIDATION_REASON_CUE_COUNT_MISMATCH",
+    "STATEFUL_VALIDATION_REASON_CUE_ORDER_MISMATCH",
+    "STATEFUL_VALIDATION_REASON_DUPLICATE_CUE_ID",
+    "STATEFUL_VALIDATION_REASON_FIRST_CUE_ID_MISMATCH",
+    "STATEFUL_VALIDATION_REASON_INPUT_SHA256_MISMATCH",
+    "STATEFUL_VALIDATION_REASON_INVALID_FIELD",
+    "STATEFUL_VALIDATION_REASON_INVALID_KO",
+    "STATEFUL_VALIDATION_REASON_INVALID_REPAIRED_JA",
+    "STATEFUL_VALIDATION_REASON_JSON_PARSE_FAILURE",
+    "STATEFUL_VALIDATION_REASON_LAST_CUE_ID_MISMATCH",
+    "STATEFUL_VALIDATION_REASON_MISSING_CUE_ID",
+    "STATEFUL_VALIDATION_REASON_OTHER_VALIDATOR_PREDICATE",
+    "STATEFUL_VALIDATION_REASON_PART_INDEX_MISMATCH",
+    "STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE",
+    "STATEFUL_VALIDATION_REASON_SESSION_ID_MISMATCH",
+    "STATEFUL_VALIDATION_REASON_UNEXPECTED_CUE_ID",
     "STATEFUL_PART_BATCH_SIZE",
     "STATEFUL_PART_CANONICAL_SUFFIX",
     "STATEFUL_PART_FILE_MODE",

@@ -1,7 +1,9 @@
 """Synthetic smoke coverage for Hermes timeout classification and isolation."""
 
+import io
 import os
 import subprocess
+from contextlib import redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
 from tempfile import TemporaryDirectory
@@ -111,8 +113,9 @@ def main():
         timeout_calls.append((command, kwargs["timeout"]))
         raise subprocess.TimeoutExpired(command, kwargs["timeout"])
 
+    timeout_output = io.StringIO()
     try:
-        with patch.object(
+        with redirect_stdout(timeout_output), patch.object(
             live_runner.subprocess,
             "run",
             side_effect=timeout_process,
@@ -134,10 +137,71 @@ def main():
     check(
         isinstance(timeout_error.__cause__, subprocess.TimeoutExpired)
         and timeout_error.timeout_seconds == 600
+        and timeout_error.invocation_start_epoch is not None
+        and timeout_error.invocation_end_epoch is not None
+        and timeout_error.invocation_elapsed_seconds is not None
+        and timeout_error.invocation_end_epoch
+        >= timeout_error.invocation_start_epoch
         and str(timeout_error)
         == "Hermes part invocation exceeded controller timeout"
         and len(timeout_calls) == 1,
         "SUBPROCESS_TIMEOUT_TYPED_EXACTLY_ONCE",
+    )
+    check(
+        "HERMES_INVOCATION_START_EPOCH=" in timeout_output.getvalue()
+        and "HERMES_INVOCATION_END_EPOCH=" in timeout_output.getvalue()
+        and "HERMES_INVOCATION_ELAPSED_SECONDS=" in timeout_output.getvalue()
+        and "HERMES_INVOCATION_TIMEOUT_SECONDS=600"
+        in timeout_output.getvalue()
+        and "HERMES_INVOCATION_RESULT=TIMEOUT"
+        in timeout_output.getvalue(),
+        "TIMEOUT_EMITS_COMPLETE_TIMING_DIAGNOSTICS",
+    )
+
+    pass_output = io.StringIO()
+    with redirect_stdout(pass_output), patch.object(
+        live_runner.subprocess,
+        "run",
+        return_value=subprocess.CompletedProcess([], 0),
+    ):
+        live_runner._invoke_hermes_part(
+            remote="synthetic@offline",
+            ssh_key="/synthetic/key",
+            known_hosts="/synthetic/known-hosts",
+            remote_task="/synthetic/remote-task",
+            session_id="00000000-0000-4000-8000-000000000001",
+            query="synthetic part query",
+            turn_timeout=600,
+        )
+    check(
+        "HERMES_INVOCATION_RESULT=PASS" in pass_output.getvalue(),
+        "PASS_INVOCATION_EMITS_PASS_RESULT",
+    )
+
+    fail_output = io.StringIO()
+    try:
+        with redirect_stdout(fail_output), patch.object(
+            live_runner.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess([], 1),
+        ):
+            live_runner._invoke_hermes_part(
+                remote="synthetic@offline",
+                ssh_key="/synthetic/key",
+                known_hosts="/synthetic/known-hosts",
+                remote_task="/synthetic/remote-task",
+                session_id="00000000-0000-4000-8000-000000000001",
+                query="synthetic part query",
+                turn_timeout=600,
+            )
+    except live_runner.StatefulLiveRunnerError:
+        failed_invocation = True
+    else:
+        failed_invocation = False
+    check(
+        failed_invocation
+        and "HERMES_INVOCATION_RESULT=FAIL" in fail_output.getvalue(),
+        "FAIL_INVOCATION_EMITS_FAIL_RESULT",
     )
 
     package = package_for(17)
@@ -155,6 +219,7 @@ def main():
         remote_status_calls = []
         hermes_calls = []
         cleanup_calls = []
+        part_timeout_output = io.StringIO()
 
         def missing_remote_pending(*, path, **_kwargs):
             remote_status_calls.append(path)
@@ -167,6 +232,7 @@ def main():
             )
 
         with (
+            redirect_stdout(part_timeout_output),
             patch.object(
                 live_runner,
                 "_remote_pending_status",
@@ -192,6 +258,7 @@ def main():
                     remote_task="/synthetic/remote-task",
                     plan=plan,
                     expected=expected,
+                    final_path=task_directory / "final.json",
                 )
             except live_runner.StatefulLiveRunnerTimeoutError:
                 pass
@@ -210,6 +277,19 @@ def main():
                 task_directory / expected.pending_filename
             ).exists(),
             "TIMEOUT_HAS_ZERO_IMMEDIATE_RETRY_AND_PRESERVES_PROMOTED",
+        )
+        check(
+            "PENDING_ARTIFACT_PATH=/synthetic/remote-task/"
+            in part_timeout_output.getvalue()
+            and "PENDING_ARTIFACT_EXISTS=UNKNOWN"
+            in part_timeout_output.getvalue()
+            and "PENDING_ARTIFACT_SIZE_BYTES=UNAVAILABLE"
+            in part_timeout_output.getvalue()
+            and "RESULT_ARTIFACT_EXISTS=NO"
+            in part_timeout_output.getvalue()
+            and "RESUME_PROMOTED_ARTIFACT_EXISTS=NO"
+            in part_timeout_output.getvalue(),
+            "TIMEOUT_ARTIFACT_STATUS_MARKERS",
         )
 
         pending_payload = serialize_stateful_part(valid_part(plan, 2))

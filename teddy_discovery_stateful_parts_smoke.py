@@ -28,6 +28,19 @@ from teddy_discovery_stateful_parts import (
     StatefulPartsPromotionError,
     StatefulPartsValidationError,
     StatefulSemanticPart,
+    STATEFUL_VALIDATION_REASON_CUE_COUNT_MISMATCH,
+    STATEFUL_VALIDATION_REASON_CUE_ORDER_MISMATCH,
+    STATEFUL_VALIDATION_REASON_DUPLICATE_CUE_ID,
+    STATEFUL_VALIDATION_REASON_FIRST_CUE_ID_MISMATCH,
+    STATEFUL_VALIDATION_REASON_INPUT_SHA256_MISMATCH,
+    STATEFUL_VALIDATION_REASON_INVALID_KO,
+    STATEFUL_VALIDATION_REASON_INVALID_REPAIRED_JA,
+    STATEFUL_VALIDATION_REASON_JSON_PARSE_FAILURE,
+    STATEFUL_VALIDATION_REASON_LAST_CUE_ID_MISMATCH,
+    STATEFUL_VALIDATION_REASON_MISSING_CUE_ID,
+    STATEFUL_VALIDATION_REASON_PART_INDEX_MISMATCH,
+    STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
+    STATEFUL_VALIDATION_REASON_SESSION_ID_MISMATCH,
     assemble_stateful_result,
     plan_stateful_parts,
     promote_pending_part,
@@ -214,22 +227,40 @@ def main():
 
         pending_path.unlink()
 
-        def validation_case(payload: bytes, marker: str, *, mode: int = 0o600):
+        def validation_case(
+            payload: bytes,
+            marker: str,
+            *,
+            mode: int = 0o600,
+            reason_code: str | None = None,
+        ):
             case_task = new_task()
             case_path = case_task / first_expected.pending_filename
             write_private(case_path, payload, mode=mode)
-            expect(
-                StatefulPartsValidationError,
-                lambda: validate_pending_part(case_path, plan),
-                marker,
-            )
+            try:
+                validate_pending_part(case_path, plan)
+            except StatefulPartsValidationError as error:
+                if reason_code is not None:
+                    check(
+                        error.reason_code == reason_code,
+                        marker + "_EXACT_REASON",
+                    )
+                else:
+                    counts["pass"] += 1
+                return
+            counts["fail"] += 1
+            raise AssertionError(marker)
 
         validation_case(
             mutated_part_payload(
                 first_part,
-                lambda data: data.__setitem__("session_id", "0" * 36),
+                lambda data: data.__setitem__(
+                    "session_id",
+                    "00000000-0000-0000-0000-000000000000",
+                ),
             ),
             "WRONG_SESSION_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_SESSION_ID_MISMATCH,
         )
         validation_case(
             mutated_part_payload(
@@ -237,6 +268,7 @@ def main():
                 lambda data: data.__setitem__("input_sha256", "0" * 64),
             ),
             "WRONG_INPUT_HASH_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_INPUT_SHA256_MISMATCH,
         )
         validation_case(
             mutated_part_payload(
@@ -244,6 +276,7 @@ def main():
                 lambda data: data.__setitem__("part_index", 2),
             ),
             "WRONG_PART_INDEX_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_PART_INDEX_MISMATCH,
         )
         validation_case(
             mutated_part_payload(
@@ -251,6 +284,7 @@ def main():
                 lambda data: data.__setitem__("first_cue_id", "asr-0002"),
             ),
             "WRONG_FIRST_CUE_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_FIRST_CUE_ID_MISMATCH,
         )
         validation_case(
             mutated_part_payload(
@@ -258,6 +292,7 @@ def main():
                 lambda data: data.__setitem__("last_cue_id", "asr-0015"),
             ),
             "WRONG_LAST_CUE_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_LAST_CUE_ID_MISMATCH,
         )
         validation_case(
             mutated_part_payload(
@@ -265,6 +300,18 @@ def main():
                 lambda data: data["cues"].pop(),
             ),
             "MISSING_CUE_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_CUE_COUNT_MISMATCH,
+        )
+        validation_case(
+            mutated_part_payload(
+                first_part,
+                lambda data: data["cues"][1].__setitem__(
+                    "cue_id",
+                    "asr-9999",
+                ),
+            ),
+            "MISSING_CUE_ID_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_MISSING_CUE_ID,
         )
         validation_case(
             mutated_part_payload(
@@ -275,6 +322,7 @@ def main():
                 ),
             ),
             "DUPLICATE_CUE_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_DUPLICATE_CUE_ID,
         )
         validation_case(
             mutated_part_payload(
@@ -285,6 +333,18 @@ def main():
                 ),
             ),
             "WRONG_CUE_ORDER_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_FIRST_CUE_ID_MISMATCH,
+        )
+        validation_case(
+            mutated_part_payload(
+                first_part,
+                lambda data: data["cues"].__setitem__(
+                    slice(1, 3),
+                    [data["cues"][2], data["cues"][1]],
+                ),
+            ),
+            "CUE_ORDER_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_CUE_ORDER_MISMATCH,
         )
         validation_case(
             mutated_part_payload(
@@ -292,6 +352,7 @@ def main():
                 lambda data: data.__setitem__("extra", "not allowed"),
             ),
             "EXTRA_TOP_LEVEL_FIELD_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
         )
         validation_case(
             mutated_part_payload(
@@ -302,6 +363,7 @@ def main():
                 ),
             ),
             "EXTRA_CUE_FIELD_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
         )
         validation_case(
             mutated_part_payload(
@@ -309,6 +371,7 @@ def main():
                 lambda data: data["cues"][0].__setitem__("ko", ""),
             ),
             "EMPTY_KO_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
         )
         validation_case(
             mutated_part_payload(
@@ -319,6 +382,7 @@ def main():
                 ),
             ),
             "INVALID_REPAIRED_JA_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_REPAIRED_JA,
         )
         validation_case(
             mutated_part_payload(
@@ -329,10 +393,12 @@ def main():
                 ),
             ),
             "KOREAN_SCRIPT_IN_REPAIRED_JA_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_REPAIRED_JA,
         )
         validation_case(
             b"not json",
             "MALFORMED_JSON_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_JSON_PARSE_FAILURE,
         )
         duplicate_json = (
             b'{"part_schema_version":1,"part_schema_version":1}'
@@ -340,6 +406,7 @@ def main():
         validation_case(
             duplicate_json,
             "DUPLICATE_JSON_KEY_REJECTED",
+            reason_code=STATEFUL_VALIDATION_REASON_JSON_PARSE_FAILURE,
         )
         validation_case(
             serialize_stateful_part(first_part),
