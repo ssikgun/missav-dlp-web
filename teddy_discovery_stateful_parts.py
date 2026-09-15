@@ -10,7 +10,7 @@ or publish an artifact.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import json
 import os
@@ -20,7 +20,10 @@ import stat
 import uuid
 from typing import Final
 
-from teddy_discovery_hermes_v2 import HermesV2CueOutput
+from teddy_discovery_hermes_v2 import (
+    HermesV2CueInput,
+    HermesV2CueOutput,
+)
 from teddy_discovery_stateful_translator import (
     StatefulSubtitlePackage,
     StatefulSubtitleResult,
@@ -255,6 +258,53 @@ STATEFUL_PART_RUNAWAY_MAX_UNIT_CHARS = 4
 STATEFUL_PART_RUNAWAY_MIN_REPETITIONS = 16
 
 
+@dataclass(frozen=True)
+class StatefulRepetitionEvidence:
+    """Deterministic repetition counts without retaining source text."""
+
+    normalized_length: int
+    unit_length: int
+    complete_repetitions: int
+    trailing_prefix_length: int
+
+    def __post_init__(self) -> None:
+        if type(self.normalized_length) is not int or self.normalized_length < 0:
+            raise StatefulPartsValidationError(
+                "repetition evidence normalized length is invalid",
+                reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
+            )
+        if type(self.unit_length) is not int or not (
+            1 <= self.unit_length <= STATEFUL_PART_RUNAWAY_MAX_UNIT_CHARS
+        ):
+            raise StatefulPartsValidationError(
+                "repetition evidence unit length is invalid",
+                reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
+            )
+        if type(self.complete_repetitions) is not int or (
+            self.complete_repetitions < 0
+        ):
+            raise StatefulPartsValidationError(
+                "repetition evidence count is invalid",
+                reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
+            )
+        if type(self.trailing_prefix_length) is not int or not (
+            0 <= self.trailing_prefix_length < self.unit_length
+        ):
+            raise StatefulPartsValidationError(
+                "repetition evidence trailing prefix is invalid",
+                reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
+            )
+        if (
+            self.unit_length * self.complete_repetitions
+            + self.trailing_prefix_length
+            != self.normalized_length
+        ):
+            raise StatefulPartsValidationError(
+                "repetition evidence lengths are inconsistent",
+                reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
+            )
+
+
 def _has_runaway_repetition(text: str) -> bool:
     """Detect only an extreme whole-string repeated short-unit pattern."""
 
@@ -295,7 +345,169 @@ def has_runaway_repetition(text: str) -> bool:
     return _has_runaway_repetition(text)
 
 
-def _validated_output_cue(value: object) -> HermesV2CueOutput:
+def runaway_repetition_evidence(
+    text: str,
+) -> StatefulRepetitionEvidence | None:
+    """Return the frozen detector's exact repeated-unit evidence, if any."""
+
+    if type(text) is not str:
+        raise StatefulPartsValidationError(
+            "repetition analysis requires an exact string"
+        )
+    if not has_runaway_repetition(text):
+        return None
+
+    analysis = "".join(text.split())
+    max_unit_chars = min(
+        STATEFUL_PART_RUNAWAY_MAX_UNIT_CHARS,
+        len(analysis) // STATEFUL_PART_RUNAWAY_MIN_REPETITIONS,
+    )
+    for unit_chars in range(1, max_unit_chars + 1):
+        if len(analysis) % unit_chars != 0:
+            continue
+        repetitions = len(analysis) // unit_chars
+        if repetitions < STATEFUL_PART_RUNAWAY_MIN_REPETITIONS:
+            continue
+        unit = analysis[:unit_chars]
+        if unit * repetitions == analysis:
+            return StatefulRepetitionEvidence(
+                normalized_length=len(analysis),
+                unit_length=unit_chars,
+                complete_repetitions=repetitions,
+                trailing_prefix_length=0,
+            )
+    return None
+
+
+def periodic_repetition_evidence(
+    text: str,
+) -> StatefulRepetitionEvidence | None:
+    """Find one exact short-unit source pattern with an optional final prefix."""
+
+    if type(text) is not str:
+        raise StatefulPartsValidationError(
+            "periodic source analysis requires an exact string"
+        )
+
+    analysis = "".join(text.split())
+    max_unit_chars = min(
+        STATEFUL_PART_RUNAWAY_MAX_UNIT_CHARS,
+        len(analysis),
+    )
+    for unit_chars in range(1, max_unit_chars + 1):
+        repetitions, trailing_prefix_length = divmod(
+            len(analysis),
+            unit_chars,
+        )
+        if repetitions < STATEFUL_PART_RUNAWAY_MIN_REPETITIONS:
+            continue
+        unit = analysis[:unit_chars]
+        if (
+            unit * repetitions + unit[:trailing_prefix_length]
+            == analysis
+        ):
+            return StatefulRepetitionEvidence(
+                normalized_length=len(analysis),
+                unit_length=unit_chars,
+                complete_repetitions=repetitions,
+                trailing_prefix_length=trailing_prefix_length,
+            )
+    return None
+
+
+def _validated_source_cue(value: object) -> HermesV2CueInput:
+    if type(value) is not HermesV2CueInput:
+        raise StatefulPartsValidationError(
+            "source cue has the wrong exact type",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+        )
+    try:
+        validated = HermesV2CueInput(
+            cue_id=value.cue_id,
+            external_ja=value.external_ja,
+            stt_ja=value.stt_ja,
+            en=value.en,
+            before_context=value.before_context,
+            after_context=value.after_context,
+        )
+    except (AttributeError, TypeError, ValueError, OverflowError) as error:
+        raise StatefulPartsValidationError(
+            "source cue is malformed",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+        ) from error
+    if validated != value:
+        raise StatefulPartsValidationError(
+            "source cue is detached",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+        )
+    return validated
+
+
+def _validated_source_cue_sequence(
+    value: object,
+    expected_count: int,
+) -> tuple[HermesV2CueInput, ...]:
+    if type(value) is not tuple:
+        raise StatefulPartsValidationError(
+            "source cues must be an immutable tuple",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+        )
+    if not value:
+        return ()
+    if len(value) != expected_count:
+        raise StatefulPartsValidationError(
+            "source cues are detached from their output cues",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+        )
+    validated = tuple(_validated_source_cue(cue) for cue in value)
+    if validated != value:
+        raise StatefulPartsValidationError(
+            "source cues are detached from their output cues",
+            reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+        )
+    return validated
+
+
+def _authoritative_japanese_source(
+    source_cue: object,
+) -> str | None:
+    """Reuse package precedence: external_ja first, then stt_ja."""
+
+    try:
+        validated = _validated_source_cue(source_cue)
+    except StatefulPartsValidationError:
+        return None
+    if validated.external_ja is not None:
+        return validated.external_ja
+    return validated.stt_ja
+
+
+def _source_grounded_ko_exception_allowed(
+    ko_evidence: StatefulRepetitionEvidence | None,
+    source_cue: object,
+) -> bool:
+    if ko_evidence is None:
+        return False
+    source_text = _authoritative_japanese_source(source_cue)
+    if source_text is None:
+        return False
+    try:
+        source_evidence = periodic_repetition_evidence(source_text)
+    except StatefulPartsValidationError:
+        return False
+    return (
+        source_evidence is not None
+        and source_evidence.complete_repetitions >= STATEFUL_PART_RUNAWAY_MIN_REPETITIONS
+        and ko_evidence.complete_repetitions
+        <= source_evidence.complete_repetitions
+    )
+
+
+def _validated_output_cue(
+    value: object,
+    *,
+    source_cue: HermesV2CueInput | None = None,
+) -> HermesV2CueOutput:
     if type(value) is not HermesV2CueOutput:
         raise StatefulPartsValidationError(
             "part cue has the wrong exact type",
@@ -314,10 +526,15 @@ def _validated_output_cue(value: object) -> HermesV2CueOutput:
         ) from error
 
     if has_runaway_repetition(validated.ko):
-        raise StatefulPartsValidationError(
-            "part cue ko contains an extreme repeated short-unit pattern",
-            reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
-        )
+        ko_evidence = runaway_repetition_evidence(validated.ko)
+        if not _source_grounded_ko_exception_allowed(
+            ko_evidence,
+            source_cue,
+        ):
+            raise StatefulPartsValidationError(
+                "part cue ko contains an extreme repeated short-unit pattern",
+                reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+            )
 
     if (
         validated.repaired_ja is not None
@@ -413,6 +630,10 @@ class StatefulPartPlan:
     parts: tuple[ExpectedStatefulPart, ...]
     policy_id: str = STATEFUL_PART_POLICY_ID
     max_cues_per_part: int = STATEFUL_PART_BATCH_SIZE
+    source_cues: tuple[HermesV2CueInput, ...] = field(
+        default=(),
+        repr=False,
+    )
 
     def __post_init__(self):
         if type(self.policy_id) is not str:
@@ -454,6 +675,22 @@ class StatefulPartPlan:
             raise StatefulPartsValidationError(
                 "part plan indices must be contiguous from one"
             )
+        planned_cue_ids = tuple(
+            cue_id
+            for part in self.parts
+            for cue_id in part.cue_ids
+        )
+        validated_sources = _validated_source_cue_sequence(
+            self.source_cues,
+            len(planned_cue_ids),
+        )
+        if validated_sources and tuple(
+            cue.cue_id for cue in validated_sources
+        ) != planned_cue_ids:
+            raise StatefulPartsValidationError(
+                "part plan source cues are detached from cue order",
+                reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+            )
 
     @property
     def part_count(self) -> int:
@@ -472,6 +709,11 @@ class StatefulSemanticPart:
     last_cue_id: str
     cues: tuple[HermesV2CueOutput, ...]
     max_cues_per_part: int = STATEFUL_PART_BATCH_SIZE
+    source_cues: tuple[HermesV2CueInput, ...] = field(
+        default=(),
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self):
         if type(self.part_schema_version) is not int or self.part_schema_version != STATEFUL_PART_SCHEMA_VERSION:
@@ -495,9 +737,20 @@ class StatefulSemanticPart:
                 "part exceeds the stateful part batch size",
                 reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
             )
+        source_cues = _validated_source_cue_sequence(
+            self.source_cues,
+            len(self.cues),
+        )
         validated_cues = tuple(
-            _validated_output_cue(cue)
-            for cue in self.cues
+            _validated_output_cue(
+                cue,
+                source_cue=(
+                    source_cues[index]
+                    if source_cues
+                    else None
+                ),
+            )
+            for index, cue in enumerate(self.cues)
         )
         if validated_cues[0].cue_id != self.first_cue_id:
             raise StatefulPartsValidationError(
@@ -681,6 +934,7 @@ def plan_stateful_parts(
         parts=parts,
         policy_id=policy.policy_id,
         max_cues_per_part=policy.max_cues_per_part,
+        source_cues=validated_package.cues,
     )
 
 
@@ -716,6 +970,7 @@ def _validate_plan(plan: StatefulPartPlan) -> StatefulPartPlan:
             parts=plan.parts,
             policy_id=plan.policy_id,
             max_cues_per_part=plan.max_cues_per_part,
+            source_cues=plan.source_cues,
         )
     except (AttributeError, TypeError, ValueError, OverflowError) as error:
         raise StatefulPartsValidationError(
@@ -756,6 +1011,10 @@ def _validate_plan_against_package(
         raise StatefulPartsAssemblyError(
             "part plan is detached from the frozen package"
         )
+    if validated_plan.source_cues and validated_plan.source_cues != package.cues:
+        raise StatefulPartsAssemblyError(
+            "part plan source cues are detached from the frozen package"
+        )
     return validated_plan
 
 
@@ -774,6 +1033,7 @@ def _validated_part(value: object) -> StatefulSemanticPart:
             last_cue_id=value.last_cue_id,
             cues=value.cues,
             max_cues_per_part=value.max_cues_per_part,
+            source_cues=value.source_cues,
         )
     except (AttributeError, TypeError, ValueError, OverflowError) as error:
         raise StatefulPartsValidationError(
@@ -941,6 +1201,22 @@ def _part_from_payload(
             "part cue count does not match its deterministic range",
             reason_code=STATEFUL_VALIDATION_REASON_CUE_COUNT_MISMATCH,
         )
+    source_cues: tuple[HermesV2CueInput, ...] = ()
+    if plan.source_cues:
+        source_by_id = {
+            cue.cue_id: cue
+            for cue in plan.source_cues
+        }
+        try:
+            source_cues = tuple(
+                source_by_id[cue_id]
+                for cue_id in expected.cue_ids
+            )
+        except KeyError as error:
+            raise StatefulPartsValidationError(
+                "part plan source cues are unavailable for this range",
+                reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+            ) from error
     try:
         part = StatefulSemanticPart(
             part_schema_version=parsed["part_schema_version"],
@@ -951,6 +1227,7 @@ def _part_from_payload(
             last_cue_id=parsed["last_cue_id"],
             cues=tuple(_parse_part_cue(cue) for cue in raw_cues),
             max_cues_per_part=plan.max_cues_per_part,
+            source_cues=source_cues,
         )
     except StatefulPartsError:
         raise
@@ -1407,6 +1684,7 @@ __all__ = [
     "StatefulPartsLimitError",
     "StatefulPartsPromotionError",
     "StatefulPartsValidationError",
+    "StatefulRepetitionEvidence",
     "StatefulSemanticPart",
     "assemble_stateful_result",
     "build_stateful_part_plan",
@@ -1414,7 +1692,9 @@ __all__ = [
     "has_runaway_repetition",
     "parse_stateful_part",
     "plan_stateful_parts",
+    "periodic_repetition_evidence",
     "promote_pending_part",
+    "runaway_repetition_evidence",
     "scan_canonical_parts",
     "scan_stateful_canonical_parts",
     "serialize_stateful_part",

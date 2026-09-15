@@ -1951,6 +1951,54 @@ is unchanged.
 
 No commit or push was attempted.
 
+## CP7L / CP7M — Source-Aware Generic Runaway Validation
+
+`STAGE12_CP7L_SOURCE_AWARE_RUNAWAY_FORENSIC`
+
+CP7L's exact diagnosis is a generic validator-boundary false positive, not a
+title-specific translation rule or a fixed-128 failure. The existing KO guard
+correctly rejects a whole-string short-unit runaway on its own, but it had no
+access to the authoritative Japanese source for the corresponding output cue.
+
+- Case A: the source had 13 periodic repetitions while KO had 72 repetitions.
+  The KO output was amplified relative to source, so rejection remains the
+  correct fail-closed result.
+- Case B: the source had 74 complete periodic repetitions plus a trailing
+  partial unit while KO had 40 repetitions. The KO was source-grounded and
+  shorter, so the existing source-blind detector falsely rejected it.
+- No title, cue, or text-specific production branch is justified by this
+  finding.
+
+`STAGE12_CP7M_GENERIC_SOURCE_AWARE_RUNAWAY_CANDIDATE`
+
+CP7M implements the conservative candidate exception at the stateful part
+validator boundary:
+
+- The existing `has_runaway_repetition()` call and thresholds remain the first
+  gate. Source evidence is evaluated only when that existing KO detector fires.
+- The exact source cue is retained from the already-authorized package/input
+  flow. Existing precedence is reused: `external_ja` when present, otherwise
+  `stt_ja`; context and EN are not source authority.
+- Source evidence uses whitespace-normalized text and accepts only a 1–4
+  character unit with at least 16 complete repetitions in the exact form
+  `unit * N + optional prefix(unit)`. A middle mismatch produces no evidence.
+- The exception is allowed only when source evidence exists and the complete KO
+  repetition count reported by the existing detector is less than or equal to
+  the source complete repetition count. Source unavailable, ambiguous, or
+  malformed remains `INVALID_KO`.
+- The part/result JSON envelopes, cue identity/order/SHA/session checks,
+  repaired-JA validation, retry count, and timeout remain unchanged.
+
+The production default remains `STATEFUL_PART_BATCH_SIZE=16`. Fixed-128 general
+promotion is still **NOT APPROVED**; CP7M does not promote fixed-128 globally.
+The generic offline matrix passed: source 13 / KO 72 rejected; source 74 plus
+partial / KO 40 accepted; non-periodic, larger-KO, absent-source, and malformed
+source cases rejected; equal and smaller KO counts accepted. The existing
+runaway/retry/timeout/policy smokes and `py_compile` also passed.
+
+CP7M counters were all zero: `LIVE_HERMES_CALLS=0`, `NAS_WRITES=0`,
+`JELLYFIN_CALLS=0`, `ROLLOUT_DB_WRITES=0`. No commit or push was attempted.
+
 ### Next checkpoint (one)
 
 **CT108 read-only remote artifact forensics:** use the new diagnostic fields

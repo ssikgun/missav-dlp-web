@@ -1,6 +1,6 @@
 """Synthetic offline smoke tests for the stateful semantic-part controller."""
 
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 import json
 import os
 from pathlib import Path
@@ -43,7 +43,10 @@ from teddy_discovery_stateful_parts import (
     STATEFUL_VALIDATION_REASON_SESSION_ID_MISMATCH,
     assemble_stateful_result,
     plan_stateful_parts,
+    parse_stateful_part,
+    periodic_repetition_evidence,
     promote_pending_part,
+    runaway_repetition_evidence,
     scan_stateful_canonical_parts,
     serialize_stateful_part,
     stateful_part_filename,
@@ -107,6 +110,38 @@ def mutated_part_payload(
         ensure_ascii=False,
         separators=(",", ":"),
     ).encode("utf-8")
+
+
+def generic_source_case(
+    source_text: str,
+    ko_text: str,
+    *,
+    stt_text: str | None = None,
+):
+    package = StatefulSubtitlePackage(
+        schema_version=1,
+        dvd_id="GENERIC-SOURCE-GUARD",
+        generation_key="generic-source-guard-generation",
+        claim_token=1,
+        cues=(
+            HermesV2CueInput(
+                cue_id="generic-source-0001",
+                external_ja=source_text,
+                stt_ja=stt_text,
+                en=None,
+                before_context=(),
+                after_context=(),
+            ),
+        ),
+    )
+    input_bytes = serialize_stateful_package(package)
+    plan = plan_stateful_parts(package, input_bytes)
+    baseline = make_part(plan, 1)
+    payload = mutated_part_payload(
+        baseline,
+        lambda data: data["cues"][0].__setitem__("ko", ko_text),
+    )
+    return package, plan, payload
 
 
 def write_private(path: Path, payload: bytes, mode: int = STATEFUL_PART_FILE_MODE):
@@ -177,6 +212,138 @@ def main():
         FrozenInstanceError,
         lambda: setattr(plan.parts[0], "part_index", 2),
         "EXPECTED_PART_METADATA_IMMUTABLE",
+    )
+
+    def reject_source_aware_runaway(
+        candidate_plan: StatefulPartPlan,
+        payload: bytes,
+        marker: str,
+    ):
+        try:
+            parse_stateful_part(
+                payload,
+                candidate_plan.parts[0],
+                candidate_plan,
+            )
+        except StatefulPartsValidationError as error:
+            check(
+                error.reason_code == STATEFUL_VALIDATION_REASON_INVALID_KO,
+                marker,
+            )
+            return
+        counts["fail"] += 1
+        raise AssertionError(marker)
+
+    source_evidence = periodic_repetition_evidence("かな" * 74 + "か")
+    ko_evidence = runaway_repetition_evidence("번역" * 40)
+    check(
+        source_evidence is not None
+        and source_evidence.normalized_length == 149
+        and source_evidence.unit_length == 2
+        and source_evidence.complete_repetitions == 74
+        and source_evidence.trailing_prefix_length == 1
+        and ko_evidence is not None
+        and ko_evidence.complete_repetitions == 40
+        and ko_evidence.trailing_prefix_length == 0,
+        "GENERIC_PERIODIC_EVIDENCE_COUNTS",
+    )
+    check(
+        periodic_repetition_evidence("かな" * 13) is None,
+        "SOURCE_13_REPEATS_HAVE_NO_EXCEPTION_EVIDENCE",
+    )
+
+    _, source_13_plan, source_13_payload = generic_source_case(
+        "かな" * 13,
+        "번역" * 72,
+    )
+    reject_source_aware_runaway(
+        source_13_plan,
+        source_13_payload,
+        "CASE_A_SOURCE_13_KO_72_REJECTED",
+    )
+
+    _, source_74_plan, source_74_payload = generic_source_case(
+        "かな" * 74 + "か",
+        "번역" * 40,
+    )
+    accepted = parse_stateful_part(
+        source_74_payload,
+        source_74_plan.parts[0],
+        source_74_plan,
+    )
+    check(
+        accepted.cues[0].ko == "번역" * 40
+        and serialize_stateful_part(accepted) == source_74_payload,
+        "CASE_B_SOURCE_74_PLUS_PREFIX_KO_40_ACCEPTED",
+    )
+
+    _, nonperiodic_plan, nonperiodic_payload = generic_source_case(
+        "これは通常の日本語の文章です",
+        "번역" * 40,
+    )
+    reject_source_aware_runaway(
+        nonperiodic_plan,
+        nonperiodic_payload,
+        "NONPERIODIC_SOURCE_KO_RUNAWAY_REJECTED",
+    )
+
+    _, larger_ko_plan, larger_ko_payload = generic_source_case(
+        "かな" * 74 + "か",
+        "번역" * 75,
+    )
+    reject_source_aware_runaway(
+        larger_ko_plan,
+        larger_ko_payload,
+        "PERIODIC_SOURCE_KO_LARGER_REJECTED",
+    )
+
+    _, equal_ko_plan, equal_ko_payload = generic_source_case(
+        "かな" * 74 + "か",
+        "번역" * 74,
+    )
+    check(
+        parse_stateful_part(
+            equal_ko_payload,
+            equal_ko_plan.parts[0],
+            equal_ko_plan,
+        ).cues[0].ko == "번역" * 74,
+        "PERIODIC_SOURCE_KO_EQUAL_ACCEPTED",
+    )
+
+    _, smaller_ko_plan, smaller_ko_payload = generic_source_case(
+        "かな" * 74 + "か",
+        "번역" * 72,
+    )
+    check(
+        parse_stateful_part(
+            smaller_ko_payload,
+            smaller_ko_plan.parts[0],
+            smaller_ko_plan,
+        ).cues[0].ko == "번역" * 72,
+        "PERIODIC_SOURCE_KO_SMALLER_ACCEPTED",
+    )
+
+    source_absent_plan = replace(source_74_plan, source_cues=())
+    reject_source_aware_runaway(
+        source_absent_plan,
+        source_74_payload,
+        "SOURCE_ABSENT_FAILS_CLOSED",
+    )
+    expect(
+        StatefulPartsValidationError,
+        lambda: replace(source_74_plan, source_cues=(object(),)),
+        "MALFORMED_SOURCE_FAILS_CLOSED",
+    )
+
+    _, precedence_plan, precedence_payload = generic_source_case(
+        "これは通常の日本語の文章です",
+        "번역" * 40,
+        stt_text="かな" * 74 + "か",
+    )
+    reject_source_aware_runaway(
+        precedence_plan,
+        precedence_payload,
+        "EXTERNAL_JA_PRECEDENCE_REUSED",
     )
 
     with tempfile.TemporaryDirectory(prefix="stage11-parts-smoke-") as root:
