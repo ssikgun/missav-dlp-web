@@ -34,6 +34,9 @@ subtitle rollout readiness.
 - STAGE12_CP7I_FIXED128_BOUNDED_ROLLOUT_COMPLETE_FORENSIC
 - STAGE12_CP7J_CLOSED_PASS
 - STAGE12_CP7K_GENERIC_STATEFUL_FAILURE_DIAGNOSTICS_PASS
+- STAGE12_CP7L_SOURCE_AWARE_RUNAWAY_FORENSIC
+- STAGE12_CP7M_SOURCE_AWARE_GENERIC_RUNAWAY_VALIDATION_CANDIDATE
+- STAGE12_CP7N_FIXED128_FRESH_BOUNDED_ROLLOUT_COMPLETE
 
 ## Completed
 
@@ -2006,3 +2009,67 @@ and markers when reading CT120 task/session evidence to resolve the retained
 CP7I DVAJ-754 inner validator reason and DVDES-795 post-timeout artifact state.
 No retry, re-execution, fallback, timeout change, validator change, or
 publication is authorized by this checkpoint.
+
+## Stage12 CP7N Fresh Fixed-128 Bounded Rollout — COMPLETE / 1 of 3 PUBLISHED
+
+`STAGE12_CP7N_FIXED128_FRESH_BOUNDED_ROLLOUT_COMPLETE`
+
+CP7N is **CLOSED / COMPLETE**. It ran one fresh deterministic three-title
+fixed-128 batch in `dvd_id` ascending order. The finalized live summary is:
+
+- `STAGE12_CP7N_LIVE=COMPLETE`
+- `selected=3`
+- `published=1`
+- `failed_retryable=2`
+- `failed_terminal=0`
+- `skipped=0`
+- `unresolved=0`
+
+The selector remained the generic bounded selector:
+`PENDING AND ELIGIBLE_NEEDS_KO AND existing_ko=ABSENT`, ordered by `dvd_id`
+ascending. No title-specific selection or production branch was used.
+
+### CP7N per-title outcomes
+
+- `DVDMS-117`: Stage11 `PASS`; route `ASR_ONLY`; baseline cue count `491`;
+  fixed-128 stateful part count `4`; NAS publication `PASS`; Jellyfin
+  recognition `PASS`; final state `PUBLISHED`; destination
+  `DVDMS/DVDMS-117/DVDMS-117.ko.srt`.
+- `EBWH-350`: baseline cue count `943`; fixed-128 planned part count `8`;
+  parts `1–4` promoted successfully; part `5` Hermes invocation timed out at
+  the unchanged `600` seconds; Stage11 `FAIL`; NAS publication `NOT_RUN`;
+  Jellyfin recognition `NOT_RUN`; final state `FAILED_RETRYABLE`.
+- `EBWH-353`: baseline cue count `1468`; fixed-128 planned part count `12`;
+  part `1` Hermes invocation timed out at the unchanged `600` seconds;
+  Stage11 `FAIL`; NAS publication `NOT_RUN`; Jellyfin recognition `NOT_RUN`;
+  final state `FAILED_RETRYABLE`.
+
+Title-level isolation held: the two timeout failures did not stop the
+successful title, and failed titles were not published or sent to Jellyfin.
+No failed title was retried during closure.
+
+### CP7N policy and diagnostic decision
+
+- Fixed-128 policy: `stage11-stateful-cue128-v1`.
+- Production global default: `16`, unchanged.
+- Hermes timeout: `600` seconds, unchanged.
+- Stateful retry count: unchanged; no timeout-triggered blind retry.
+- Validator structural rules: unchanged; validators were not weakened.
+- CP7K generic stateful failure diagnostics: active and retained.
+- CP7M source-aware repeated-cue validator: active and unchanged.
+- Fixed-128 general production promotion: **NOT APPROVED**.
+- Failed titles must not be blindly retried.
+
+CP7N provides fresh evidence that fixed-128 is not yet reliable enough for
+general production promotion. The two timeout outcomes do not establish that
+`128` itself is conclusively the root cause of both failures; that causal
+claim remains unproven.
+
+This closure update changed only this canonical handoff. It performed no new
+Hermes, ASR, NAS, Jellyfin, or rollout-state operation.
+
+### CP7N next checkpoint (one)
+
+Make a separately authorized fixed-128 reliability decision from the complete
+CP7N evidence; until then retain the 16-cue production default and do not
+retry the failed titles or change timeout, retry, or validator policy.
