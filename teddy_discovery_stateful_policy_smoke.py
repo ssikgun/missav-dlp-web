@@ -1,4 +1,4 @@
-"""Offline smoke for the explicit production 16/128 semantic policies."""
+"""Offline smoke for the explicit production 16/64/128 semantic policies."""
 
 from pathlib import Path
 import json
@@ -20,8 +20,10 @@ from teddy_discovery_stateful_parts import (
 )
 from teddy_discovery_stateful_policy import (
     DEFAULT_STATEFUL_SEMANTIC_POLICY,
+    STATEFUL_SEMANTIC_POLICY_64,
     STATEFUL_SEMANTIC_POLICY_128,
     STATEFUL_SEMANTIC_POLICY_ID_16,
+    STATEFUL_SEMANTIC_POLICY_ID_64,
     STATEFUL_SEMANTIC_POLICY_ID_128,
     StatefulSemanticPolicy,
     StatefulSemanticPolicyError,
@@ -134,6 +136,17 @@ def main() -> None:
         semantic_policy=STATEFUL_SEMANTIC_POLICY_128,
     )
 
+    fixed64_package = bind_stateful_semantic_policy(
+        legacy_package,
+        STATEFUL_SEMANTIC_POLICY_64,
+    )
+    fixed64_bytes = serialize_stateful_package(fixed64_package)
+    fixed64_plan = build_stateful_part_plan(
+        fixed64_package,
+        fixed64_bytes,
+        semantic_policy=STATEFUL_SEMANTIC_POLICY_64,
+    )
+
     check(
         legacy_plan.policy_id == STATEFUL_SEMANTIC_POLICY_ID_16
         and legacy_plan.max_cues_per_part == 16
@@ -148,6 +161,15 @@ def main() -> None:
         and candidate_plan.parts[0].cue_count == 128
         and candidate_plan.parts[1].cue_count == 45,
         "CANDIDATE_173_CUES_2_PARTS",
+    )
+    check(
+        fixed64_plan.policy_id == STATEFUL_SEMANTIC_POLICY_ID_64
+        and fixed64_plan.max_cues_per_part == 64
+        and fixed64_plan.part_count == 3
+        and fixed64_plan.parts[0].cue_count == 64
+        and fixed64_plan.parts[1].cue_count == 64
+        and fixed64_plan.parts[2].cue_count == 45,
+        "CANDIDATE_173_CUES_3_FIXED64_PARTS",
     )
     expected_candidate_parts = {1471: 12, 830: 7, 173: 2}
     for cue_count, expected_part_count in expected_candidate_parts.items():
@@ -245,9 +267,13 @@ def main() -> None:
     candidate_args = parser.parse_args(
         parser_args("--semantic-policy", STATEFUL_SEMANTIC_POLICY_ID_128)
     )
+    fixed64_args = parser.parse_args(
+        parser_args("--semantic-policy", STATEFUL_SEMANTIC_POLICY_ID_64)
+    )
     check(
         legacy_args.semantic_policy == STATEFUL_SEMANTIC_POLICY_ID_16
         and candidate_args.semantic_policy == STATEFUL_SEMANTIC_POLICY_ID_128
+        and fixed64_args.semantic_policy == STATEFUL_SEMANTIC_POLICY_ID_64
         and legacy_args.turn_timeout == 600
         and candidate_args.turn_timeout == 600,
         "POLICY_CONFIG_DEFAULT_AND_TIMEOUT_600",

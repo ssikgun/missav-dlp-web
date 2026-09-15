@@ -1,10 +1,11 @@
 """Explicit production policies for the Stage11 semantic-part path.
 
 The legacy 16-cue policy is the default and keeps its existing package,
-session, and resume identity.  The 128-cue candidate is bound into the
-package generation identity before the existing session/staging machinery is
-used, so its state cannot collide with legacy 16-cue state.  The semantic
-package/result/part JSON envelopes remain unchanged.
+session, and resume identity.  The opt-in fixed-64 and fixed-128 candidates
+are bound into the package generation identity before the existing
+session/staging machinery is used, so candidate state cannot collide with
+legacy 16-cue state.  The semantic package/result/part JSON envelopes remain
+unchanged.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from typing import Final
 
 
 STATEFUL_SEMANTIC_POLICY_ID_16: Final[str] = "stage11-stateful-cue16-v1"
+STATEFUL_SEMANTIC_POLICY_ID_64: Final[str] = "stage11-stateful-cue64-v1"
 STATEFUL_SEMANTIC_POLICY_ID_128: Final[str] = "stage11-stateful-cue128-v1"
 STATEFUL_SEMANTIC_POLICY_TIMEOUT_SECONDS: Final[int] = 600
 STATEFUL_SEMANTIC_POLICY_GENERATION_KEY_MARKER: Final[str] = (
@@ -22,9 +24,10 @@ STATEFUL_SEMANTIC_POLICY_GENERATION_KEY_MARKER: Final[str] = (
 )
 STATEFUL_SEMANTIC_POLICY_MAX_IDENTIFIER_CHARS: Final[int] = 256
 
-_POLICY_ID_RE = re.compile(r"^stage11-stateful-cue(?:16|128)-v1$")
+_POLICY_ID_RE = re.compile(r"^stage11-stateful-cue(?:16|64|128)-v1$")
 _POLICY_PART_SIZES: Final[dict[str, int]] = {
     STATEFUL_SEMANTIC_POLICY_ID_16: 16,
+    STATEFUL_SEMANTIC_POLICY_ID_64: 64,
     STATEFUL_SEMANTIC_POLICY_ID_128: 128,
 }
 
@@ -86,6 +89,12 @@ STATEFUL_SEMANTIC_POLICY_16: Final[StatefulSemanticPolicy] = (
         max_cues_per_part=16,
     )
 )
+STATEFUL_SEMANTIC_POLICY_64: Final[StatefulSemanticPolicy] = (
+    StatefulSemanticPolicy(
+        policy_id=STATEFUL_SEMANTIC_POLICY_ID_64,
+        max_cues_per_part=64,
+    )
+)
 STATEFUL_SEMANTIC_POLICY_128: Final[StatefulSemanticPolicy] = (
     StatefulSemanticPolicy(
         policy_id=STATEFUL_SEMANTIC_POLICY_ID_128,
@@ -97,6 +106,7 @@ DEFAULT_STATEFUL_SEMANTIC_POLICY: Final[StatefulSemanticPolicy] = (
 )
 STATEFUL_SEMANTIC_POLICIES: Final[tuple[StatefulSemanticPolicy, ...]] = (
     STATEFUL_SEMANTIC_POLICY_16,
+    STATEFUL_SEMANTIC_POLICY_64,
     STATEFUL_SEMANTIC_POLICY_128,
 )
 
@@ -168,9 +178,11 @@ __all__ = [
     "DEFAULT_STATEFUL_SEMANTIC_POLICY",
     "STATEFUL_SEMANTIC_POLICIES",
     "STATEFUL_SEMANTIC_POLICY_16",
+    "STATEFUL_SEMANTIC_POLICY_64",
     "STATEFUL_SEMANTIC_POLICY_128",
     "STATEFUL_SEMANTIC_POLICY_GENERATION_KEY_MARKER",
     "STATEFUL_SEMANTIC_POLICY_ID_16",
+    "STATEFUL_SEMANTIC_POLICY_ID_64",
     "STATEFUL_SEMANTIC_POLICY_ID_128",
     "STATEFUL_SEMANTIC_POLICY_TIMEOUT_SECONDS",
     "StatefulSemanticPolicy",

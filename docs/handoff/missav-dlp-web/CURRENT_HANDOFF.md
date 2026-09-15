@@ -37,6 +37,7 @@ subtitle rollout readiness.
 - STAGE12_CP7L_SOURCE_AWARE_RUNAWAY_FORENSIC
 - STAGE12_CP7M_SOURCE_AWARE_GENERIC_RUNAWAY_VALIDATION_CANDIDATE
 - STAGE12_CP7N_FIXED128_FRESH_BOUNDED_ROLLOUT_COMPLETE
+- STAGE12_CP7O_FIXED64_BOUNDED_ROLLOUT_PREPARATION
 
 ## Completed
 
@@ -2073,3 +2074,107 @@ Hermes, ASR, NAS, Jellyfin, or rollout-state operation.
 Make a separately authorized fixed-128 reliability decision from the complete
 CP7N evidence; until then retain the 16-cue production default and do not
 retry the failed titles or change timeout, retry, or validator policy.
+
+## Stage12 CP7O Fresh Fixed-64 Bounded Rollout Preparation — PREFLIGHT / NETWORK DEFERRED
+
+`STAGE12_CP7O_FIXED64_BOUNDED_ROLLOUT_PREPARATION`
+
+CP7O prepared an isolated generic fixed-64 production-path candidate for a
+fresh bounded three-title rollout.  This checkpoint is preparation only:
+there was no Hermes call, ASR call, NAS write, Jellyfin write/call, or rollout
+DB write, and no existing `FAILED_RETRYABLE` title was retried.
+
+### Repository and policy contract
+
+- At CP7O start, before the candidate registration edits, the repository was
+  clean at HEAD `bb3392aec2af0948e95710f3813a47f30346f141` on branch
+  `teddy-subtitle-stage11`.
+- The existing isolated benchmark fixed-64 identity remains
+  `benchmark-stateful-cue64-v1`.  CP7O registers the opt-in production-path
+  candidate identity `stage11-stateful-cue64-v1` through the existing native
+  policy mechanism; its maximum is `64` cues per part.
+- Production global default remains `stage11-stateful-cue16-v1` / `16` cues.
+  Fixed-64 general promotion is **NOT APPROVED**.
+- Hermes timeout remains `600` seconds; bounded retry count remains `2`.
+  Validators, CP7K diagnostics, CP7M source-aware validation, and Stage11
+  controller behavior remain unchanged.
+
+### Generic deterministic selection
+
+The selector is exactly:
+
+`PENDING AND eligibility = ELIGIBLE_NEEDS_KO AND existing_ko = ABSENT ORDER BY dvd_id ASC LIMIT 3`
+
+The read-only rollout DB contained `152 PENDING`, `7 FAILED_RETRYABLE`,
+`13 PUBLISHED`, `1 UNRESOLVED`, and no `RUNNING` / `GENERATED` rows.  The
+fresh selected titles were:
+
+| dvd_id | status | eligibility | existing_ko |
+| --- | --- | --- | --- |
+| `EBWH-354` | `PENDING` | `ELIGIBLE_NEEDS_KO` | `ABSENT` |
+| `EKDV-826` | `PENDING` | `ELIGIBLE_NEEDS_KO` | `ABSENT` |
+| `EROFV-366` | `PENDING` | `ELIGIBLE_NEEDS_KO` | `ABSENT` |
+
+No title ID is present in the selector or production logic.
+
+### Per-title read-only preflight
+
+All three selected titles had no reusable baseline in either the isolated
+CP7O artifact root or the canonical reusable baseline root.  Therefore no
+baseline cue count or deterministic fixed-64 part count was available without
+an ASR call; every expected part count is `N/A` at this checkpoint.
+
+| dvd_id | reusable baseline | baseline cues | expected fixed-64 parts | exact publication destination | current NAS canonical KO |
+| --- | --- | ---: | ---: | --- | --- |
+| `EBWH-354` | `ABSENT` | `N/A` | `N/A` | `EBWH/EBWH-354/EBWH-354.ko.srt` | `DEFERRED_SANDBOX` — exact path not read |
+| `EKDV-826` | `ABSENT` | `N/A` | `N/A` | `EKDV/EKDV-826/EKDV-826.ko.srt` | `DEFERRED_SANDBOX` — exact path not read |
+| `EROFV-366` | `ABSENT` | `N/A` | `N/A` | `EROFV/EROFV-366/EROFV-366.ko.srt` | `DEFERRED_SANDBOX` — exact path not read |
+
+The exact Jellyfin-visible destinations are respectively
+`/media/adult/EBWH/EBWH-354/EBWH-354.ko.srt`,
+`/media/adult/EKDV/EKDV-826/EKDV-826.ko.srt`, and
+`/media/adult/EROFV/EROFV-366/EROFV-366.ko.srt`.
+
+### Safety and connectivity checks
+
+- Serial title isolation: `PASS` through the existing Stage12 batch runner.
+- Atomic no-overwrite publication: `PASS` through the existing publisher.
+- Exact NAS recheck immediately before publication: `PASS` by source-order
+  inspection of the existing Stage12 batch runner.
+- Jellyfin item-specific recognition: `PASS` by source-order inspection of
+  the exact item/playback/refresh contract.
+- CP7K diagnostics: `ACTIVE`.
+- CP7M source-aware validator: `ACTIVE`.
+- CT120 Hermes, VM122 ASR, NAS, and Jellyfin TCP probes:
+  `DEFERRED_SANDBOX` because this execution environment disables network
+  access.  The exact selected NAS subtitle inventory was consequently not
+  executed, and canonical KO presence is not claimed absent.
+
+### Isolated runner and offline result
+
+- Runner: `/tmp/stage12-cp7o-fixed64-rollout-runner.py`.
+- Live authorization is explicitly gated by
+  `CP7O_ALLOW_LIVE=CP7O_AUTHORIZED`; the marker was not set and live mode
+  negative smoke returned `2` with zero calls/writes.
+- `py_compile`: `PASS`.
+- Existing relevant stateful/controller/Stage12/benchmark offline smokes:
+  `PASS`.
+- CP7O preflight: `INCOMPLETE_NETWORK_DEFERRED` / **FAIL CLOSED** at the
+  required exact-NAS connectivity gate.
+- `READY_FOR_AUTHORIZATION`: **NO**.  Exact NAS revalidation and all four
+  connectivity checks must pass in an authorized networked environment before
+  any live decision.
+- Counters: `LIVE_HERMES_CALLS=0`, `ASR_CALLS=0`, `NAS_WRITES=0`,
+  `JELLYFIN_CALLS=0`, `ROLLOUT_DB_WRITES=0`.
+
+### CP7O changed files and blocker
+
+- `teddy_discovery_stateful_policy.py`: opt-in fixed-64 production policy
+  registration only.
+- `teddy_discovery_stateful_policy_smoke.py`: fixed-64 policy/partition smoke
+  coverage.
+- This handoff.
+- The deployment smoke could not run in the available environment because
+  `numpy` is not installed; this is separate from the CP7O preflight boundary
+  and caused no production operation.
+- No live execution is authorized by CP7O.
