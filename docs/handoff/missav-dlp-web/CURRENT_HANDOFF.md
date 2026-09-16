@@ -2663,3 +2663,62 @@ FAILED_RETRYABLE.  Any new recovery attempt requires a fresh CP7W preflight,
 must use the normalized identity, must not reuse the failed old semantic
 session, and must retain fixed-64 as the default.  CP7U normalization remains
 active.
+
+## Stage12 CP7W — EROFV-387 Normalized Recovery Completed
+
+STAGE12_CP7W_CLOSED
+
+The authorized normalized recovery of EROFV-387 completed successfully.
+The raw authoritative pathological cue remained exactly `あ` followed by
+`ー` repeated 444 times, while the Hermes model-input projection was the
+bounded representative `あーー`.  The model-input normalization identity was
+`stage11-model-input=repeat-v1`.  All seven semantic parts completed; part 6,
+which had failed validation in the prior run, passed validation and was
+promoted.
+
+The recovery used semantic policy `stage11-stateful-cue64-v1` with the old
+session `134bcb2f-2e84-5802-b7c8-3fabaeefade4` kept separate from the new
+session `f1381da2-f514-54bf-8769-aff34dd71d48`.  Stage11 passed and the
+rollout reached `PUBLISHED`.
+
+Confirmed recovery identities:
+
+- `FINAL_RESULT_SHA256`: `84345f2cb6a8aea7db3047ecd0d4582eceb3e1159502506c9f8efff91cb46e44`
+- `FINAL_CUE_COUNT`: `386`
+- `CLEAN_SHA256`: `161aade5dc4f2562ed36dacc32b9b55d5825335730cfdaf96b866d1121a29524`
+- NAS publication: `PASS`
+- rollout final state: `PUBLISHED`
+
+Structured Jellyfin recognition passed with `external_visible=true`,
+`subtitle_language=kor`, subtitle path
+`/media/adult/EROFV/EROFV-387/EROFV-387.ko.srt`, and item ID
+`4feab2175c2ae0bf72645afc9c37ad74`.  A top-level
+`JELLYFIN_RECOGNITION=UNKNOWN` summary field is a reporting discrepancy only;
+the structured recognition result is authoritative and successful.
+
+### CP7W runner incidents and resolution
+
+1. The first temporary runner used an invalid `_artifact` import, failed before
+   Stage11 execution, and left an orphan state that was repaired through the
+   existing Stage12 transition contract.
+2. The second temporary runner found that the newly configured CT120 remote
+   task root was absent.  `ensure_task` expects its configured parent root to
+   already exist, so it failed before session creation and Hermes execution.
+3. The hardened r3 temporary runner provisioned and verified the exact CT120
+   remote task root before the rollout claim, preventing another
+   provisioning-caused orphan `RUNNING` state.
+4. The r3 live recovery then completed successfully.
+
+The corrected r3 runner remains temporary and outside the repository.  No
+tracked production-source modification was made for these runner fixes.
+
+### CP7W interpretation
+
+CP7U pathological-repetition normalization now has one successful production
+recovery confirmation on EROFV-387.  This is evidence for the generic
+normalization path, not evidence that every `FAILED_RETRYABLE` title is
+repetition-related.  Fixed-64 remains the production default; fixed-128
+remains explicit and non-default.  Timeout and retry settings are unchanged.
+The CP7S structured retry-feedback improvement remains deferred.
+
+STAGE12_CP7W_FINAL_RESULT=PASS
