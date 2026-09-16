@@ -2624,3 +2624,42 @@ into a persistent NAS JAV library manager.
   Jellyfin-search/file-manager implementation stage.
 - When subtitle closure is reached, create the next implementation plan from
   this canonical handoff rather than relying on chat memory.
+
+## Stage12 CP7W / CP7X — EROFV-387 Normalized Recovery Attempt and Orphan-State Repair — CP7X CLOSED / FRESH PREFLIGHT REQUIRED
+
+STAGE12_CP7W_FIRST_LIVE_ATTEMPT_RECORDED
+
+STAGE12_CP7X_ORPHAN_STATE_REPAIR_RECORDED
+
+CP7W's first live attempt targeted EROFV-387 while its rollout state was
+FAILED_RETRYABLE.  Event 246 claimed the title through
+FAILED_RETRYABLE -> RUNNING with normalization
+stage11-model-input=repeat-v1 and new session
+f1381da2-f514-54bf-8769-aff34dd71d48.  The temporary recovery runner then
+failed before Stage11 execution because it attempted to import _artifact from
+teddy_discovery_stage12_rollout, where that symbol does not exist.
+
+Forensic review confirmed that no CP7W process remained active, no Stage11
+semantic execution completed, no NAS publication or Jellyfin refresh
+occurred, and artifact/report fields remained NULL.  Event 246 therefore
+left an orphan RUNNING state.  The corrected temporary runner obtains
+_artifact from teddy_discovery_stage12_batch; it remains outside the
+repository and no tracked production-source modification was made.
+
+CP7X repaired the orphan through the existing
+Stage12RolloutStateStore.transition(...) contract with
+expected_from=RUNNING, using reason STAGE12_TITLE_FAILURE.  The direct
+CT108 exact NAS canonical KO check was ABSENT.  The repair transitioned
+RUNNING -> FAILED_RETRYABLE, appended event 247, and advanced
+transition_sequence from 4 to 5.  Its provenance operation was
+STAGE12_CP7W_ORPHAN_STATE_REPAIR with retry_performed=false, the CP7W batch
+membership, normalization version, new session, and the temporary-runner
+ImportError context.
+
+Prior events 23/244/245/246 remain unchanged; artifact/report fields remain
+NULL; no other rollout title changed; and the repair performed zero Hermes,
+ASR, NAS, or Jellyfin calls/writes.  EROFV-387 is safely back in
+FAILED_RETRYABLE.  Any new recovery attempt requires a fresh CP7W preflight,
+must use the normalized identity, must not reuse the failed old semantic
+session, and must retain fixed-64 as the default.  CP7U normalization remains
+active.
