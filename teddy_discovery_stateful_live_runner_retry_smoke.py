@@ -6,6 +6,7 @@ import os
 from contextlib import redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import teddy_discovery_stateful_live_runner as live_runner
@@ -123,6 +124,7 @@ def run_synthetic(
     invalid_attempts: int,
     prepromote_first: bool,
     invalid_mutator=None,
+    missing_remote_pending: bool = False,
 ):
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
     package = package_for(cue_count)
@@ -151,6 +153,7 @@ def run_synthetic(
         "model": [],
         "read": [],
         "remove": [],
+        "events": [],
     }
     expected = plan.parts[1 if prepromote_first else 0]
     valid_payload = serialize_stateful_part(
@@ -172,7 +175,12 @@ def run_synthetic(
 
     def invoke(*, query, **_kwargs):
         calls["model"].append(query)
+        calls["events"].append("hermes_pass")
         attempt = len(calls["model"])
+        if missing_remote_pending:
+            remote["pending"] = False
+            remote["payload"] = None
+            return
         remote["pending"] = True
         remote["payload"] = invalid if attempt <= invalid_attempts else valid_payload
 
@@ -181,6 +189,14 @@ def run_synthetic(
         if not remote["pending"] or remote["payload"] is None:
             raise AssertionError("synthetic remote pending was not installed")
         return remote["payload"]
+
+    def missing_pending_read(*_args, **_kwargs):
+        calls["events"].append("remote_pending_read")
+        return SimpleNamespace(
+            returncode=1,
+            stdout=b"",
+            stderr=b"REMOTE_PENDING_ARTIFACT_MISSING\n",
+        )
 
     def remove_remote(*, path, **_kwargs):
         calls["remove"].append(path)
@@ -196,7 +212,6 @@ def run_synthetic(
         patch.object(live_runner, "_remote_input_sha256", remote_sha),
         patch.object(live_runner, "_remote_pending_status", remote_status),
         patch.object(live_runner, "_invoke_hermes_part", invoke),
-        patch.object(live_runner, "_read_remote_regular_file", read_remote),
         patch.object(live_runner, "_remove_remote_pending", remove_remote),
         patch.object(
             live_runner,
@@ -204,10 +219,23 @@ def run_synthetic(
             wraps=live_runner.promote_pending_part,
         ) as promote,
     ):
-        try:
-            result = live_runner.run(args)
-        except Exception as error:
-            result = error
+        if missing_remote_pending:
+            pending_read_patch = patch.object(
+                live_runner.subprocess,
+                "run",
+                missing_pending_read,
+            )
+        else:
+            pending_read_patch = patch.object(
+                live_runner,
+                "_read_remote_regular_file",
+                read_remote,
+            )
+        with pending_read_patch:
+            try:
+                result = live_runner.run(args)
+            except Exception as error:
+                result = error
 
     return {
         "error_or_result": result,
@@ -322,6 +350,44 @@ def main():
                 recovered["task"] / expected.pending_filename
             ).exists(),
             "PREVIOUS_PROMOTED_PART_PRESERVED",
+        )
+
+        missing_pending = run_synthetic(
+            root / "missing-remote-pending",
+            cue_count=65,
+            invalid_attempts=0,
+            prepromote_first=True,
+            missing_remote_pending=True,
+        )
+        missing_error = missing_pending["error_or_result"]
+        check(
+            isinstance(
+                missing_error,
+                live_runner.StatefulLiveRunnerPendingArtifactError,
+            )
+            and missing_pending["calls"]["events"]
+            == ["hermes_pass", "remote_pending_read"]
+            and len(missing_pending["calls"]["model"]) == 1,
+            "MISSING_REMOTE_PENDING_AFTER_HERMES_PASS_TYPED",
+        )
+        missing_expected = missing_pending["expected"]
+        missing_plan = missing_pending["plan"]
+        check(
+            missing_pending["first_bytes"]
+            == (
+                missing_pending["task"]
+                / missing_plan.parts[0].canonical_filename
+            ).read_bytes()
+            and not (
+                missing_pending["task"]
+                / missing_expected.pending_filename
+            ).exists()
+            and not (
+                missing_pending["task"]
+                / missing_expected.canonical_filename
+            ).exists()
+            and not missing_pending["final"].exists(),
+            "MISSING_REMOTE_PENDING_PRESERVES_PROMOTED_PARTS",
         )
         check(
             parse_stateful_part(

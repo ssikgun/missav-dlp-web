@@ -25,8 +25,9 @@ from teddy_discovery_stage12_batch import (
 )
 from teddy_discovery_stateful_live_runner import (
     StatefulLiveRunnerError,
-    StatefulSemanticOutputValidationRetryExhausted,
+    StatefulLiveRunnerPendingArtifactError,
     StatefulLiveRunnerTimeoutError,
+    StatefulSemanticOutputValidationRetryExhausted,
 )
 from teddy_discovery_stage12_inventory import (
     ELIGIBLE_NEEDS_KO,
@@ -199,6 +200,7 @@ def controller_for(
     validation_retry_exhausted_ids=(),
     timeout_ids=(),
     runner_error_ids=(),
+    pending_artifact_error_ids=(),
     unexpected_ids=(),
 ):
     bundles = {}
@@ -211,6 +213,10 @@ def controller_for(
             raise Stage12BatchSystemicError("shared contract failure")
         if dvd_id in runner_error_ids:
             raise StatefulLiveRunnerError("generic live runner failure")
+        if dvd_id in pending_artifact_error_ids:
+            raise StatefulLiveRunnerPendingArtifactError(
+                "remote pending artifact missing after model invocation"
+            )
         if dvd_id in timeout_ids:
             raise StatefulLiveRunnerTimeoutError(timeout_seconds=600)
         if dvd_id in unexpected_ids:
@@ -246,6 +252,7 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
                 fail_ids=(), systemic_ids=(),
                 validation_retry_exhausted_ids=(), unexpected_ids=(),
                 timeout_ids=(), runner_error_ids=(),
+                pending_artifact_error_ids=(),
                 jellyfin=recognition_for):
     return Stage12BatchRunner(
         store=store,
@@ -263,6 +270,7 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
             validation_retry_exhausted_ids=validation_retry_exhausted_ids,
             timeout_ids=timeout_ids,
             runner_error_ids=runner_error_ids,
+            pending_artifact_error_ids=pending_artifact_error_ids,
             unexpected_ids=unexpected_ids,
         ),
         jellyfin_recognizer=jellyfin,
@@ -519,6 +527,48 @@ def main():
             and timeout_result.titles[0].final_state == STATE_PUBLISHED
             and timeout_result.titles[2].final_state == STATE_PUBLISHED,
             "HERMES_TIMEOUT_TITLE_ISOLATION_AND_PROVENANCE",
+        )
+
+        pending_error_root = Path(temp) / "pending-artifact-error-artifacts"
+        pending_error_root.mkdir()
+        pending_error_store = Stage12RolloutStateStore(
+            Path(temp) / "pending-artifact-error.sqlite3"
+        )
+        pending_error_store.initialize_from_inventory(
+            Stage12HoldingsInventoryReport(records[:3])
+        )
+        pending_error_nas = FakeNAS(records[:3])
+        pending_error_publisher = FakePublisher(pending_error_nas)
+        pending_error_calls: list[str] = []
+        pending_error_runner = make_runner(
+            pending_error_root,
+            records[:3],
+            pending_error_store,
+            controller_calls=pending_error_calls,
+            nas=pending_error_nas,
+            publisher=pending_error_publisher,
+            pending_artifact_error_ids={"AAA-002"},
+        )
+        pending_error_result = pending_error_runner.run(
+            Stage12BatchSelection(3, ("AAA-001", "AAA-002", "AAA-003"))
+        )
+        pending_error_state = pending_error_store.get("AAA-002")
+        pending_error_provenance = json.loads(
+            pending_error_state.last_transition_provenance_json
+        )
+        require(
+            pending_error_calls == ["AAA-001", "AAA-002", "AAA-003"]
+            and pending_error_result.titles[1].final_state
+            == STATE_FAILED_RETRYABLE
+            and pending_error_result.titles[1].stage11_result == "FAIL"
+            and pending_error_result.titles[1].publication_result == "NOT_RUN"
+            and pending_error_result.titles[1].jellyfin_recognition == "NOT_RUN"
+            and pending_error_provenance["error_type"]
+            == "StatefulLiveRunnerPendingArtifactError"
+            and pending_error_result.titles[0].final_state == STATE_PUBLISHED
+            and pending_error_result.titles[2].final_state == STATE_PUBLISHED
+            and pending_error_publisher.calls == ["AAA-001", "AAA-003"],
+            "PENDING_ARTIFACT_FAILURE_TITLE_RETRYABLE_AND_BATCH_CONTINUES",
         )
 
         # An unrelated programmer exception remains systemic and stops the

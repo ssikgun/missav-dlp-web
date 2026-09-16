@@ -2722,3 +2722,32 @@ remains explicit and non-default.  Timeout and retry settings are unchanged.
 The CP7S structured retry-feedback improvement remains deferred.
 
 STAGE12_CP7W_FINAL_RESULT=PASS
+
+## Stage12 R5B Recovery and DVDES-795 Missing-Pending Fix — COMPLETE
+
+`STAGE12_R5B_RECOVERY_BATCH_COMPLETE`
+
+The R5B recovery batch completed. `AVSA-456`, `DVAJ-754`, and `EBWH-353`
+were recovered and published; previously recovered `AVSA-455` remains
+`PUBLISHED`. Remaining `FAILED_RETRYABLE` titles are `DASS-884`,
+`DVDES-795`, and `EBWH-350`. `DASS-884` timed out at Hermes part `28/30`,
+and `EBWH-350` at part `10/15`; both retained `timeout=600`.
+
+`DVDES-795` Hermes part 5 returned `PASS`, but the expected remote
+`semantic-part-0005.pending.json` was absent. `_read_remote_regular_file()`
+raised generic `StatefulLiveRunnerError`; Stage12 did not classify it as a
+title exception and wrapped it in `Stage12BatchSystemicError`.
+
+The narrow fix adds `StatefulLiveRunnerPendingArtifactError`. Only a remote
+`FileNotFoundError` for the pending artifact maps to this subclass. Generic
+`StatefulLiveRunnerError` remains systemic, and Stage12 treats only this new
+pending-artifact exception as title-level retryable. Timeout behavior,
+fixed-64 default, `repeat-v1`, model retries `2`, and validator strictness are
+unchanged. There is no adaptive fallback or title/cue/text-specific production
+logic; publication and Jellyfin behavior are unchanged.
+
+Direct CT108 verification reported PASS / `RC=0` for `py_compile`,
+`teddy_discovery_stateful_live_runner_retry_smoke.py`,
+`teddy_discovery_stateful_live_runner_timeout_smoke.py`,
+`teddy_discovery_stage12_batch_smoke.py`, and `git diff --check`.
+No live production retry has been performed after this fix.

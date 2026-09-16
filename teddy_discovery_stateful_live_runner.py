@@ -46,6 +46,10 @@ class StatefulLiveRunnerError(RuntimeError):
     pass
 
 
+class StatefulLiveRunnerPendingArtifactError(StatefulLiveRunnerError):
+    """The remote pending artifact was missing after model invocation."""
+
+
 class StatefulLiveRunnerTimeoutError(StatefulLiveRunnerError):
     """Hermes part invocation exceeded its explicit controller timeout."""
 
@@ -336,16 +340,20 @@ import stat
 import sys
 
 path = sys.argv[1]
-value = os.lstat(path)
 
-if stat.S_ISLNK(value.st_mode):
-    raise SystemExit("REMOTE_FILE_IS_SYMLINK")
+try:
+    value = os.lstat(path)
 
-if not stat.S_ISREG(value.st_mode):
-    raise SystemExit("REMOTE_FILE_NOT_REGULAR")
+    if stat.S_ISLNK(value.st_mode):
+        raise SystemExit("REMOTE_FILE_IS_SYMLINK")
 
-with open(path, "rb") as handle:
-    sys.stdout.buffer.write(handle.read())
+    if not stat.S_ISREG(value.st_mode):
+        raise SystemExit("REMOTE_FILE_NOT_REGULAR")
+
+    with open(path, "rb") as handle:
+        sys.stdout.buffer.write(handle.read())
+except FileNotFoundError:
+    raise SystemExit("REMOTE_PENDING_ARTIFACT_MISSING")
 """
 
     command = (
@@ -367,12 +375,17 @@ with open(path, "rb") as handle:
     )
 
     if result.returncode != 0:
+        stderr = result.stderr.decode(
+            "utf-8",
+            errors="replace",
+        ).strip()
+        if "REMOTE_PENDING_ARTIFACT_MISSING" in stderr.splitlines():
+            raise StatefulLiveRunnerPendingArtifactError(
+                "remote pending artifact missing after model invocation"
+            )
         raise StatefulLiveRunnerError(
             "remote part read failed: "
-            + result.stderr.decode(
-                "utf-8",
-                errors="replace",
-            ).strip()
+            + stderr
         )
 
     return result.stdout

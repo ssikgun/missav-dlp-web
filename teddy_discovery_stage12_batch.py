@@ -30,8 +30,9 @@ from teddy_discovery_stage11_deployment import (
     Stage11DeploymentError,
 )
 from teddy_discovery_stateful_live_runner import (
-    StatefulSemanticOutputValidationRetryExhausted,
+    StatefulLiveRunnerPendingArtifactError,
     StatefulLiveRunnerTimeoutError,
+    StatefulSemanticOutputValidationRetryExhausted,
 )
 from teddy_discovery_stage12_inventory import (
     ELIGIBLE_NEEDS_KO,
@@ -721,6 +722,7 @@ class Stage12BatchRunner:
                 Stage12BatchTitleError,
                 Stage11ControllerError,
                 StatefulSemanticOutputValidationRetryExhausted,
+                StatefulLiveRunnerPendingArtifactError,
                 StatefulLiveRunnerTimeoutError,
             ),
         )
