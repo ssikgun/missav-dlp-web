@@ -17,6 +17,7 @@ from teddy_discovery_stateful_policy import (
 )
 from teddy_discovery_stateful_translator import (
     STATEFUL_TRANSLATOR_INPUT_FILENAME,
+    STATEFUL_TRANSLATOR_SEMANTIC_REPETITION_INSTRUCTION,
     StatefulSubtitlePackage,
 )
 
@@ -208,6 +209,7 @@ def build_stateful_part_query(
         "cue_id, repaired_ja, ko. repaired_ja must be null unless an obvious "
         "Japanese transcription error truly requires contextual repair. "
         "Produce natural Korean while preserving uncertainty. "
+        + STATEFUL_TRANSLATOR_SEMANTIC_REPETITION_INSTRUCTION
         + semantic_evidence_instruction
         + "Do not invent, remove, merge, or reorder cues. "
         "Do not emit timestamps, routing data, commentary, markdown, or extra fields."

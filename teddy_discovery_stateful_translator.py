@@ -86,6 +86,19 @@ STATEFUL_TRANSLATOR_MODEL_INPUT_VERSION: Final[str] = (
 STATEFUL_TRANSLATOR_RESULT_FILENAME: Final[str] = (
     "stage11-semantic-result.json"
 )
+STATEFUL_TRANSLATOR_SEMANTIC_REPETITION_INSTRUCTION: Final[str] = (
+    "When subtitle evidence contains excessive non-semantic repetition, such as "
+    "repeated interjections, fillers, or non-lexical vocalizations, compress it "
+    "to a short natural representative expression instead of reproducing the "
+    "full repeated run. Preserve repetition when it carries semantic meaning, "
+    "emphasis, stuttering, chanting, rhythm, or other scene-relevant content. "
+    "Never increase the number of repeated units beyond the current authorized "
+    "model-input evidence. Do not reconstruct a longer repetition from earlier "
+    "session history or other historical artifacts. When uncertain whether "
+    "repetition is meaningful, preserve the cue conservatively rather than "
+    "deleting it. "
+)
+
 STATEFUL_TRANSLATOR_QUERY: Final[str] = (
     "Read all authorized cue evidence from "
     + STATEFUL_TRANSLATOR_INPUT_FILENAME
@@ -102,7 +115,9 @@ STATEFUL_TRANSLATOR_QUERY: Final[str] = (
     "generation_key, claim_token, session_id, cues. Every cue object must "
     "contain exactly: cue_id, repaired_ja, ko. Set repaired_ja to null "
     "unless a materially justified Japanese repair exists. Preserve cue IDs "
-    "and order exactly. Every cue requires Korean output. Use no external "
+    "and order exactly. Every cue requires Korean output. "
+    + STATEFUL_TRANSLATOR_SEMANTIC_REPETITION_INSTRUCTION
+    + "Use no external "
     "Korean source. Do not output timestamps, additional fields, or prose "
     "outside the JSON. A partial result is not valid."
 )
@@ -1244,6 +1259,7 @@ __all__ = [
     "STATEFUL_TRANSLATOR_PROFILE",
     "STATEFUL_TRANSLATOR_PROVIDER",
     "STATEFUL_TRANSLATOR_QUERY",
+    "STATEFUL_TRANSLATOR_SEMANTIC_REPETITION_INSTRUCTION",
     "STATEFUL_TRANSLATOR_QUERY_FLAG",
     "STATEFUL_TRANSLATOR_REASONING",
     "STATEFUL_TRANSLATOR_RESULT_FILENAME",

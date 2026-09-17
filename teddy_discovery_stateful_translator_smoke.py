@@ -404,6 +404,22 @@ def main():
         ),
     ):
         require(required_phrase in STATEFUL_TRANSLATOR_QUERY, marker)
+
+        require(
+            "excessive non-semantic repetition"
+            in STATEFUL_TRANSLATOR_QUERY,
+            "QUERY_COMPRESS_NON_SEMANTIC_REPETITION",
+        )
+        require(
+            "Never increase the number of repeated units"
+            in STATEFUL_TRANSLATOR_QUERY,
+            "QUERY_NO_REPEAT_AMPLIFICATION",
+        )
+        require(
+            "Do not reconstruct a longer repetition"
+            in STATEFUL_TRANSLATOR_QUERY,
+            "QUERY_NO_HISTORY_REPEAT_RECONSTRUCTION",
+        )
     require(
         "authorized-ja" not in STATEFUL_TRANSLATOR_QUERY
         and "한국어" not in STATEFUL_TRANSLATOR_QUERY,

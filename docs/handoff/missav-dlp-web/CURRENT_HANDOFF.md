@@ -718,3 +718,89 @@ The immediate next checkpoint is:
 If the live recovery fails, keep the failure title-local as `FAILED_RETRYABLE` and inspect the new evidence before changing policy.
 
 After `EBWH-350` is resolved, continue the existing Stage12 remaining-work order toward formal closure, then start Stage13.
+
+## 2026-09-17 — EBWH-350 repeat-v2 live forensic + semantic repetition policy
+
+### Status
+
+- Stage12 remains **ACTIVE**.
+- EBWH-350 repeat-v2 bounded live canary did **not publish** and remains `FAILED_RETRYABLE`.
+- Parts 1–9 validated/promoted successfully.
+- Part 10 ended at the controller with `INACTIVITY_TIMEOUT`.
+- NAS publication: **NOT_RUN**
+- Jellyfin refresh: **NOT_RUN**
+
+### EBWH-350 repeat-v2 forensic result
+
+The repeat-v2 model-input normalization itself is confirmed working correctly.
+
+For the problematic source cue:
+
+- authoritative/raw `stt_ja`: 74 spaced repetitions
+- local semantic/model input: 2 representative repetitions
+- remote CT120 semantic input: 2 representative repetitions
+- Hermes part-10 output: 87 Korean repetitions
+
+Therefore the remaining repetition failure is **not** a repeat-v2 projection/wiring failure.
+Hermes semantically re-expanded a correctly bounded model input.
+
+The existing output validator correctly rejected this kind of runaway result and was not weakened.
+
+### Part-10 timeout / remote lifecycle finding
+
+The part-10 remote pending artifact existed and was structurally complete before the controller timed out.
+
+Observed:
+
+- remote `semantic-part-0010.pending.json` mtime was about 42 seconds after part start
+- JSON parsed successfully
+- cue coverage: 64 / 64 unique, correct first/last cue IDs
+- controller later reached the 600-second inactivity timeout
+- CT120 still had the exact subtitle-translator shell/Hermes process alive after the CT108 controller had already returned
+
+This proves a separate remote lifecycle bug:
+
+- controller timeout can leave the remote Hermes task/process running
+- manual forensic cleanup terminated the exact orphan task processes
+- generic Hermes dashboard/gateway and unrelated Codex processes were not targeted
+
+This orphan cleanup behavior is **not yet fixed in production source**.
+
+### Generic semantic repetition policy added
+
+A shared stateful semantic repetition instruction is now used by both:
+
+1. the initial whole-title `STATEFUL_TRANSLATOR_QUERY`
+2. every resumed deterministic part query built by the stateful controller
+
+Policy is generic and title-independent:
+
+- excessive non-semantic repetition such as fillers/interjections/non-lexical vocalizations should be compressed to a short natural representative expression
+- meaningful repetition, emphasis, stuttering, chanting, rhythm, or other scene-relevant repetition should be preserved
+- translated output must not increase repeated units beyond the current authorized model-input evidence
+- a longer repetition must not be reconstructed from earlier session history or historical artifacts
+- uncertain repetition is retained conservatively rather than deleted
+
+No DVD ID, work-specific phrase, cue ID, or title-specific literal is embedded in production policy.
+
+### Validation
+
+- Python compile: **PASS**
+- stateful translator smoke: **PASS**
+- stateful controller smoke: **29 PASS / 0 FAIL**
+- stateful live runner smoke: **16 PASS / 0 FAIL**
+- `git diff --check`: **PASS**
+
+### Next work
+
+Next highest-priority checkpoint:
+
+**Fix the generic CT120 remote-process lifecycle so a controller timeout terminates/reaps only the exact remote subtitle-translator task and cannot leave an orphan Hermes invocation.**
+
+After that fix and regression smoke, run a fresh bounded EBWH-350 canary session using:
+
+- repeat-v2 model input
+- the new generic semantic repetition policy
+- the fixed remote timeout cleanup path
+
+Do not weaken semantic validators to force publication.

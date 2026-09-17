@@ -112,6 +112,21 @@ check(
     "QUERY_DYNAMIC_LAST_RANGE",
 )
 
+check(
+    "excessive non-semantic repetition" in query,
+    "QUERY_HAS_NON_SEMANTIC_REPEAT_POLICY",
+)
+
+check(
+    "Never increase the number of repeated units" in query,
+    "QUERY_PREVENTS_REPEAT_AMPLIFICATION",
+)
+
+check(
+    "Do not reconstruct a longer repetition" in query,
+    "QUERY_PREVENTS_HISTORY_REPEAT_RECONSTRUCTION",
+)
+
 source = Path(
     "teddy_discovery_stateful_controller.py"
 ).read_text(encoding="utf-8")
