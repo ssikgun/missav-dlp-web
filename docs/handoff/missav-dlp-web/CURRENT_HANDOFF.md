@@ -1398,3 +1398,105 @@ Build the current `teddy-subtitle-stage11` commit through the existing
 GitHub Actions workflow, pin the resulting immutable image in production,
 verify `/api/subtitles/status` and the Settings mini-panel, then start the
 remaining 143-title Stage12 production rollout with heartbeat reporting.
+
+## 2026-09-18 — Stage12 bulk runner prepared
+
+### Current production UI
+
+The Downloader Settings subtitle-status mini-panel is deployed and verified.
+
+Production web image:
+
+- revision: `24f6a6c62058ea0ad4d0ec204b9c9ecc285c9de8`
+- digest: `sha256:fb1e9c6dc655c3cd7044e8a8c1711414589e2c1695503e866fe178c3396e6b79`
+
+The Stage12 rollout DB and heartbeat directory are mounted read-only inside
+the Downloader container.
+
+Current visible rollout state before bulk execution:
+
+- PUBLISHED: 29
+- PENDING: 143
+- FAILED_RETRYABLE: 0
+- FAILED_TERMINAL: 0
+- UNRESOLVED: 1
+- active RUNNING/GENERATED: 0
+
+Dark-mode styling of the temporary Settings card is intentionally deferred
+until the card is moved into the future file-management page.
+
+### Formal Stage12 bulk runner
+
+Added:
+
+- `teddy_discovery_stage12_bulk_runner.py`
+- `teddy_discovery_stage12_bulk_runner_smoke.py`
+
+The runner reuses the existing production contracts rather than introducing
+a new subtitle pipeline:
+
+- deterministic eligible PENDING selection
+- exact selected NAS inventory revalidation
+- frozen Stage11 controller
+- cue64 semantic policy
+- repeat-v2 model input
+- 600-second Hermes inactivity timeout
+- 3600-second absolute timeout
+- two validation attempts
+- exact-process Hermes cleanup
+- malformed external-JA fallback to ASR_ONLY
+- serial Stage12 title isolation
+- atomic no-overwrite publication
+- exact Jellyfin external-KO recognition
+- bounded Default-to-FullRefresh Jellyfin fallback
+
+FAILED_RETRYABLE, FAILED_TERMINAL, PUBLISHED and UNRESOLVED titles are not
+implicitly selected as normal bulk work.
+
+No title/DVD-specific production branch is present.
+
+### Heartbeat
+
+The bulk runner writes an atomic heartbeat to:
+
+`/opt/missav-dlp-web/discovery/stage12-runtime/status.json`
+
+Heartbeat interval:
+
+- 30 seconds
+
+The heartbeat carries:
+
+- runner state
+- current DVD ID
+- high-level stage
+- process PID
+- authorized Git HEAD
+- batch number / processed count when available
+
+If the runner dies without finalization, the Downloader status panel will
+eventually show a stale runner state instead of falsely claiming normal
+activity.
+
+### Crash policy
+
+The bulk runner does not silently recover durable RUNNING or GENERATED
+states. If either exists at startup, preflight fails closed.
+
+`RUNNING` crash recovery remains the explicit existing
+`Stage12RolloutStateStore.recover_running()` procedure after exact runtime
+verification. GENERATED/publication ambiguity remains subject to the existing
+reconciliation rules.
+
+### Validation before live authorization
+
+Offline validation required before commit:
+
+- Python compile
+- bulk-runner smoke
+- Stage12 batch smoke
+- Stage12 rollout smoke
+- `git diff --check`
+
+The next checkpoint is a read-only bulk preflight on the committed clean
+worktree. Actual 143-title execution remains separately authorization-gated.
