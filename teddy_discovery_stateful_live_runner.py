@@ -7,8 +7,10 @@ import base64
 import hashlib
 import os
 from pathlib import Path
+import selectors
 import shlex
 import subprocess
+import sys
 import tempfile
 import time
 from typing import Final
@@ -56,18 +58,43 @@ class StatefulLiveRunnerTimeoutError(StatefulLiveRunnerError):
     def __init__(
         self,
         *,
-        timeout_seconds: int,
+        timeout_seconds: int | float,
+        timeout_reason: str = "INACTIVITY_TIMEOUT",
+        inactivity_timeout_seconds: int | float | None = None,
+        absolute_timeout_seconds: int | float | None = None,
         invocation_start_epoch: float | None = None,
         invocation_end_epoch: float | None = None,
         invocation_elapsed_seconds: float | None = None,
+        seconds_since_last_output_activity: float | None = None,
     ) -> None:
+        if timeout_reason not in (
+            "INACTIVITY_TIMEOUT",
+            "ABSOLUTE_TIMEOUT",
+        ):
+            raise ValueError("unsupported Hermes timeout reason")
         self.timeout_seconds = timeout_seconds
+        self.timeout_reason = timeout_reason
+        self.inactivity_timeout_seconds = (
+            timeout_seconds
+            if inactivity_timeout_seconds is None
+            else inactivity_timeout_seconds
+        )
+        self.absolute_timeout_seconds = absolute_timeout_seconds
         self.invocation_start_epoch = invocation_start_epoch
         self.invocation_end_epoch = invocation_end_epoch
         self.invocation_elapsed_seconds = invocation_elapsed_seconds
+        self.seconds_since_last_output_activity = (
+            seconds_since_last_output_activity
+        )
         super().__init__(
             "Hermes part invocation exceeded controller timeout"
         )
+
+
+DEFAULT_HERMES_INACTIVITY_TIMEOUT_SECONDS: Final[int] = 600
+# Smoke/review candidate only. Validate this against live invocation evidence
+# before treating it as a production-final limit.
+CANDIDATE_HERMES_ABSOLUTE_TIMEOUT_SECONDS: Final[int] = 3600
 
 
 STATEFUL_PART_MODEL_MAX_ATTEMPTS: Final[int] = 2
@@ -399,9 +426,23 @@ def _print_hermes_invocation_diagnostics(
     *,
     end_epoch: float,
     elapsed_seconds: float,
-    timeout_seconds: int,
+    timeout_seconds: int | float,
     result: str,
+    inactivity_timeout_seconds: int | float | None = None,
+    absolute_timeout_seconds: int | float | None = None,
+    timeout_reason: str | None = None,
+    seconds_since_last_output_activity: float | None = None,
 ) -> None:
+    configured_inactivity_timeout = (
+        timeout_seconds
+        if inactivity_timeout_seconds is None
+        else inactivity_timeout_seconds
+    )
+    configured_absolute_timeout = (
+        CANDIDATE_HERMES_ABSOLUTE_TIMEOUT_SECONDS
+        if absolute_timeout_seconds is None
+        else absolute_timeout_seconds
+    )
     print(
         "HERMES_INVOCATION_END_EPOCH="
         + _format_diagnostic_seconds(end_epoch),
@@ -418,10 +459,82 @@ def _print_hermes_invocation_diagnostics(
         flush=True,
     )
     print(
+        "HERMES_INVOCATION_CONFIGURED_INACTIVITY_TIMEOUT_SECONDS="
+        + str(configured_inactivity_timeout),
+        flush=True,
+    )
+    print(
+        "HERMES_INVOCATION_CONFIGURED_ABSOLUTE_TIMEOUT_SECONDS="
+        + str(configured_absolute_timeout),
+        flush=True,
+    )
+    print(
+        "HERMES_INVOCATION_TIMEOUT_REASON="
+        + (timeout_reason if timeout_reason is not None else "NONE"),
+        flush=True,
+    )
+    print(
+        "HERMES_INVOCATION_SECONDS_SINCE_LAST_OUTPUT_ACTIVITY="
+        + (
+            _format_diagnostic_seconds(
+                seconds_since_last_output_activity
+            )
+            if seconds_since_last_output_activity is not None
+            else "UNAVAILABLE"
+        ),
+        flush=True,
+    )
+    print(
         "HERMES_INVOCATION_RESULT="
         + result,
         flush=True,
     )
+
+
+def _forward_hermes_output(stream_name: str, payload: bytes) -> None:
+    """Relay one ready SSH output chunk to the corresponding caller stream."""
+
+    target = sys.stdout if stream_name == "stdout" else sys.stderr
+    binary_target = getattr(target, "buffer", None)
+    if binary_target is not None:
+        binary_target.write(payload)
+        binary_target.flush()
+        return
+
+    encoding = getattr(target, "encoding", None) or "utf-8"
+    target.write(payload.decode(encoding, errors="replace"))
+    target.flush()
+
+
+def _stop_hermes_process(
+    process: subprocess.Popen[bytes],
+    selector: selectors.BaseSelector,
+) -> None:
+    """Stop a timed-out local SSH process and relay bytes already in its pipes."""
+
+    if process.poll() is None:
+        process.kill()
+    process.wait()
+
+    for key in list(selector.get_map().values()):
+        try:
+            os.set_blocking(key.fd, False)
+        except OSError:
+            pass
+        while True:
+            try:
+                payload = os.read(key.fd, 65536)
+            except BlockingIOError:
+                break
+            except OSError:
+                break
+            if not payload:
+                break
+            _forward_hermes_output(key.data, payload)
+        try:
+            selector.unregister(key.fileobj)
+        except (KeyError, ValueError):
+            pass
 
 
 def _local_artifact_status(path: Path | None) -> tuple[str, int | None]:
@@ -534,7 +647,10 @@ def _invoke_hermes_part(
     remote_task: str,
     session_id: str,
     query: str,
-    turn_timeout: int,
+    turn_timeout: int | float,
+    absolute_timeout: int | float = (
+        CANDIDATE_HERMES_ABSOLUTE_TIMEOUT_SECONDS
+    ),
 ) -> None:
     encoded_query = base64.b64encode(
         query.encode("utf-8")
@@ -614,6 +730,15 @@ test "$rok" -eq 1
         encoded_query,
     ]
 
+    if turn_timeout <= 0:
+        raise StatefulLiveRunnerError(
+            "Hermes inactivity timeout must be positive"
+        )
+    if absolute_timeout <= 0:
+        raise StatefulLiveRunnerError(
+            "Hermes absolute timeout must be positive"
+        )
+
     start_epoch = time.time()
     start_monotonic = time.monotonic()
     print(
@@ -622,32 +747,138 @@ test "$rok" -eq 1
         flush=True,
     )
 
+    process: subprocess.Popen[bytes] | None = None
+    last_output_activity_monotonic: float | None = None
+    timeout_reason: str | None = None
+    timeout_observed_monotonic: float | None = None
     try:
-        result = subprocess.run(
+        process = subprocess.Popen(
             command,
-            input=remote_script.encode("utf-8"),
-            check=False,
-            timeout=turn_timeout,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=0,
         )
-    except subprocess.TimeoutExpired as error:
-        end_epoch = time.time()
-        elapsed_seconds = max(
-            0.0,
-            time.monotonic() - start_monotonic,
-        )
-        _print_hermes_invocation_diagnostics(
-            end_epoch=end_epoch,
-            elapsed_seconds=elapsed_seconds,
-            timeout_seconds=turn_timeout,
-            result="TIMEOUT",
-        )
-        raise StatefulLiveRunnerTimeoutError(
-            timeout_seconds=turn_timeout,
-            invocation_start_epoch=start_epoch,
-            invocation_end_epoch=end_epoch,
-            invocation_elapsed_seconds=elapsed_seconds,
-        ) from error
+        if process.stdin is None or process.stdout is None or process.stderr is None:
+            raise StatefulLiveRunnerError(
+                "Hermes subprocess streams were not created"
+            )
+
+        try:
+            process.stdin.write(remote_script.encode("utf-8"))
+        except BrokenPipeError:
+            pass
+        finally:
+            try:
+                process.stdin.close()
+            except BrokenPipeError:
+                pass
+
+        with selectors.DefaultSelector() as selector:
+            selector.register(process.stdout, selectors.EVENT_READ, "stdout")
+            selector.register(process.stderr, selectors.EVENT_READ, "stderr")
+
+            while True:
+                now_monotonic = time.monotonic()
+                elapsed_seconds = max(
+                    0.0,
+                    now_monotonic - start_monotonic,
+                )
+                absolute_remaining = absolute_timeout - elapsed_seconds
+                inactivity_anchor = (
+                    last_output_activity_monotonic
+                    if last_output_activity_monotonic is not None
+                    else start_monotonic
+                )
+                inactivity_remaining = turn_timeout - max(
+                    0.0,
+                    now_monotonic - inactivity_anchor,
+                )
+
+                if absolute_remaining <= 0:
+                    timeout_reason = "ABSOLUTE_TIMEOUT"
+                    timeout_observed_monotonic = now_monotonic
+                    break
+                if inactivity_remaining <= 0:
+                    timeout_reason = "INACTIVITY_TIMEOUT"
+                    timeout_observed_monotonic = now_monotonic
+                    break
+
+                ready = selector.select(
+                    min(
+                        absolute_remaining,
+                        inactivity_remaining,
+                        0.1,
+                    )
+                )
+                now_monotonic = time.monotonic()
+                elapsed_seconds = max(
+                    0.0,
+                    now_monotonic - start_monotonic,
+                )
+
+                # The absolute bound is checked before processing newly ready
+                # data, so activity can never move that deadline.
+                if elapsed_seconds >= absolute_timeout:
+                    timeout_reason = "ABSOLUTE_TIMEOUT"
+                    timeout_observed_monotonic = now_monotonic
+                    break
+                inactivity_anchor = (
+                    last_output_activity_monotonic
+                    if last_output_activity_monotonic is not None
+                    else start_monotonic
+                )
+                if now_monotonic - inactivity_anchor >= turn_timeout:
+                    timeout_reason = "INACTIVITY_TIMEOUT"
+                    timeout_observed_monotonic = now_monotonic
+                    break
+
+                for key, _events in ready:
+                    try:
+                        payload = os.read(key.fd, 65536)
+                    except BlockingIOError:
+                        continue
+                    if not payload:
+                        selector.unregister(key.fileobj)
+                        continue
+
+                    last_output_activity_monotonic = time.monotonic()
+                    _forward_hermes_output(key.data, payload)
+
+                return_code = process.poll()
+                if return_code is not None and not selector.get_map():
+                    break
+
+            if timeout_reason is not None:
+                if timeout_observed_monotonic is None:
+                    timeout_observed_monotonic = time.monotonic()
+                seconds_since_last_output_activity = (
+                    max(
+                        0.0,
+                        timeout_observed_monotonic
+                        - last_output_activity_monotonic,
+                    )
+                    if last_output_activity_monotonic is not None
+                    else None
+                )
+                _stop_hermes_process(process, selector)
+            else:
+                return_code = process.wait()
+                seconds_since_last_output_activity = (
+                    max(
+                        0.0,
+                        time.monotonic()
+                        - last_output_activity_monotonic,
+                    )
+                    if last_output_activity_monotonic is not None
+                    else None
+                )
+    except StatefulLiveRunnerTimeoutError:
+        raise
     except Exception:
+        if process is not None and process.poll() is None:
+            process.kill()
+            process.wait()
         end_epoch = time.time()
         elapsed_seconds = max(
             0.0,
@@ -657,24 +888,79 @@ test "$rok" -eq 1
             end_epoch=end_epoch,
             elapsed_seconds=elapsed_seconds,
             timeout_seconds=turn_timeout,
+            inactivity_timeout_seconds=turn_timeout,
+            absolute_timeout_seconds=absolute_timeout,
+            seconds_since_last_output_activity=(
+                max(
+                    0.0,
+                    time.monotonic()
+                    - last_output_activity_monotonic,
+                )
+                if last_output_activity_monotonic is not None
+                else None
+            ),
             result="FAIL",
         )
         raise
+    finally:
+        if process is not None:
+            for stream in (process.stdin, process.stdout, process.stderr):
+                if stream is not None and not stream.closed:
+                    stream.close()
 
     end_epoch = time.time()
     elapsed_seconds = max(
         0.0,
         time.monotonic() - start_monotonic,
     )
-    result_status = "PASS" if result.returncode == 0 else "FAIL"
+    if timeout_reason is not None:
+        _print_hermes_invocation_diagnostics(
+            end_epoch=end_epoch,
+            elapsed_seconds=elapsed_seconds,
+            timeout_seconds=(
+                turn_timeout
+                if timeout_reason == "INACTIVITY_TIMEOUT"
+                else absolute_timeout
+            ),
+            inactivity_timeout_seconds=turn_timeout,
+            absolute_timeout_seconds=absolute_timeout,
+            timeout_reason=timeout_reason,
+            seconds_since_last_output_activity=(
+                seconds_since_last_output_activity
+            ),
+            result="TIMEOUT",
+        )
+        raise StatefulLiveRunnerTimeoutError(
+            timeout_seconds=(
+                turn_timeout
+                if timeout_reason == "INACTIVITY_TIMEOUT"
+                else absolute_timeout
+            ),
+            timeout_reason=timeout_reason,
+            inactivity_timeout_seconds=turn_timeout,
+            absolute_timeout_seconds=absolute_timeout,
+            invocation_start_epoch=start_epoch,
+            invocation_end_epoch=end_epoch,
+            invocation_elapsed_seconds=elapsed_seconds,
+            seconds_since_last_output_activity=(
+                seconds_since_last_output_activity
+            ),
+        ) from TimeoutError(timeout_reason)
+
+    result_status = "PASS" if return_code == 0 else "FAIL"
     _print_hermes_invocation_diagnostics(
         end_epoch=end_epoch,
         elapsed_seconds=elapsed_seconds,
         timeout_seconds=turn_timeout,
+        inactivity_timeout_seconds=turn_timeout,
+        absolute_timeout_seconds=absolute_timeout,
+        seconds_since_last_output_activity=(
+            seconds_since_last_output_activity
+        ),
         result=result_status,
     )
 
-    if result.returncode != 0:
+    if return_code != 0:
         raise StatefulLiveRunnerError(
             "Hermes part invocation failed"
         )
@@ -818,6 +1104,7 @@ def _request_and_install_part(
                     session_id=plan.session_id,
                     query=query,
                     turn_timeout=args.turn_timeout,
+                    absolute_timeout=args.absolute_timeout,
                 )
             except StatefulLiveRunnerTimeoutError:
                 _print_artifact_status(
@@ -1220,8 +1507,24 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--turn-timeout",
+        "--inactivity-timeout",
+        dest="turn_timeout",
         type=int,
-        default=600,
+        default=DEFAULT_HERMES_INACTIVITY_TIMEOUT_SECONDS,
+        help=(
+            "maximum seconds without Hermes stdout or stderr activity "
+            "(default: 600)"
+        ),
+    )
+
+    parser.add_argument(
+        "--absolute-timeout",
+        type=int,
+        default=CANDIDATE_HERMES_ABSOLUTE_TIMEOUT_SECONDS,
+        help=(
+            "absolute Hermes invocation safety cap in seconds "
+            "(default candidate: 3600; validate before production use)"
+        ),
     )
 
     parser.add_argument(
@@ -1239,7 +1542,12 @@ def main() -> int:
 
     if args.turn_timeout <= 0:
         raise StatefulLiveRunnerError(
-            "turn timeout must be positive"
+            "Hermes inactivity timeout must be positive"
+        )
+
+    if args.absolute_timeout <= 0:
+        raise StatefulLiveRunnerError(
+            "Hermes absolute timeout must be positive"
         )
 
     return run(args)

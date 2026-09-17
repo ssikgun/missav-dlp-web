@@ -681,6 +681,19 @@ class Stage12BatchRunner:
             transition_reason = "STAGE12_HERMES_PART_TIMEOUT"
             failure_provenance["hermes_timeout"] = {
                 "timeout_seconds": error.timeout_seconds,
+                "timeout_reason": error.timeout_reason,
+                "configured_inactivity_timeout_seconds": (
+                    error.inactivity_timeout_seconds
+                ),
+                "configured_absolute_timeout_seconds": (
+                    error.absolute_timeout_seconds
+                ),
+                "invocation_elapsed_seconds": (
+                    error.invocation_elapsed_seconds
+                ),
+                "seconds_since_last_output_activity": (
+                    error.seconds_since_last_output_activity
+                ),
             }
         if publication_result == "PASS":
             if clean_sha256 is None or destination is None:

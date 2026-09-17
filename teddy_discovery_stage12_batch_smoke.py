@@ -218,7 +218,14 @@ def controller_for(
                 "remote pending artifact missing after model invocation"
             )
         if dvd_id in timeout_ids:
-            raise StatefulLiveRunnerTimeoutError(timeout_seconds=600)
+            raise StatefulLiveRunnerTimeoutError(
+                timeout_seconds=3600,
+                timeout_reason="ABSOLUTE_TIMEOUT",
+                inactivity_timeout_seconds=600,
+                absolute_timeout_seconds=3600,
+                invocation_elapsed_seconds=3600,
+                seconds_since_last_output_activity=0.01,
+            )
         if dvd_id in unexpected_ids:
             raise RuntimeError("unexpected programmer failure")
         if dvd_id in validation_retry_exhausted_ids:
@@ -523,7 +530,14 @@ def main():
             == "StatefulLiveRunnerTimeoutError"
             and timeout_provenance["retry_performed"] is False
             and timeout_provenance["hermes_timeout"]
-            == {"timeout_seconds": 600}
+            == {
+                "timeout_seconds": 3600,
+                "timeout_reason": "ABSOLUTE_TIMEOUT",
+                "configured_inactivity_timeout_seconds": 600,
+                "configured_absolute_timeout_seconds": 3600,
+                "invocation_elapsed_seconds": 3600,
+                "seconds_since_last_output_activity": 0.01,
+            }
             and timeout_result.titles[0].final_state == STATE_PUBLISHED
             and timeout_result.titles[2].final_state == STATE_PUBLISHED,
             "HERMES_TIMEOUT_TITLE_ISOLATION_AND_PROVENANCE",

@@ -2751,3 +2751,26 @@ Direct CT108 verification reported PASS / `RC=0` for `py_compile`,
 `teddy_discovery_stateful_live_runner_timeout_smoke.py`,
 `teddy_discovery_stage12_batch_smoke.py`, and `git diff --check`.
 No live production retry has been performed after this fix.
+
+## Activity-aware Hermes Timeout Candidate — FROZEN FOR CANARY REVIEW
+
+The previous Hermes timeout was a hard wall-clock `subprocess.run` timeout of
+600 seconds. DASS-884 part 28 timed out at 600.000880 seconds and EBWH-350
+part 10 at 600.001017 seconds. Both logs contained reasoning output, but did
+not timestamp every output event; continuous activity through the timeout was
+not proven.
+
+The isolated generic candidate keeps a 600-second default inactivity timeout,
+reset by bytes received on stdout or stderr, and forwards both streams live.
+It adds a separate 3600-second absolute timeout that activity never resets.
+Timeouts are classified as `INACTIVITY_TIMEOUT` or `ABSOLUTE_TIMEOUT`; Stage12
+provenance records both configured limits and invocation/activity timing.
+The 3600-second value is for canary/review evaluation, not production-final.
+
+The fixed-64 default, `repeat-v1`, model retry count `2`, and validators remain
+unchanged. There is no adaptive fallback or title/cue/text-specific logic. No
+production title has been retried with this timeout candidate.
+
+Direct CT108 verification: `git diff --check`, `py_compile`, activity-aware
+timeout smoke, retry smoke, live-runner contract smoke, stateful policy smoke,
+Stage12 batch smoke, and Stage11 live adapters smoke all PASS with `RC=0`.
