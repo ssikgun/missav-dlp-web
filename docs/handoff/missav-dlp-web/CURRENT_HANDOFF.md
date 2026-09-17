@@ -874,3 +874,79 @@ Expected objective:
 - verify the pathological source cue no longer expands in Korean output
 - verify no CT120 orphan process remains if a timeout occurs
 - publish nothing unless the existing semantic validators accept the result
+
+## 2026-09-17 — EBWH-350 repeat-v2 production canary PASS
+
+### Final result
+
+EBWH-350 Stage12 recovery canary completed successfully.
+
+Production result:
+
+- Stage11 semantic translation: PASS
+- total cues: 925
+- total parts: 15
+- all 15 parts validated and promoted
+- NAS publication: PASS
+- Jellyfin recognition: PASS
+- final rollout state: `PUBLISHED`
+- destination: `EBWH/EBWH-350/EBWH-350.ko.srt`
+
+Final rollout counts:
+
+- `PUBLISHED=22`
+- `FAILED_RETRYABLE=2`
+- `PENDING=148`
+- `UNRESOLVED=1`
+
+### Repetition regression proof
+
+The previous failure occurred in part 10 around the pathological repeated cue.
+
+With repeat-v2 plus the generic semantic repetition guard:
+
+- the semantic input remained bounded
+- Hermes did not regenerate the previous excessive repetition
+- cue `asr-000624` produced Korean `어? 어?`
+- part 10 passed current Stage11 validators
+- validators were not weakened
+
+This live run confirms the generic repetition policy works on the original failing production case.
+
+### Timeout/orphan lifecycle proof
+
+The live runner exited normally after the canary.
+
+Post-run verification:
+
+- local canary runner: exited
+- `.stage11-hermes-runtime.pid`: absent
+- `.stage11-hermes-runtime.meta`: absent
+
+No stale CT120 runtime ownership marker remained.
+
+The earlier timeout cleanup implementation had already passed synthetic exact-process-group cleanup validation.
+This successful production run additionally confirms the normal-completion lifecycle leaves no runtime marker residue.
+
+### Frozen EBWH-350 conclusion
+
+EBWH-350 is closed as a successful Stage12 recovery case.
+
+The validated production combination is:
+
+- `stage11-model-input=repeat-v2`
+- `stage11-stateful-cue64-v1`
+- generic semantic repetition guard
+- inactivity timeout: 600 seconds
+- absolute timeout: 3600 seconds
+- exact task/session-scoped remote Hermes lifecycle ownership
+- existing Stage11 validators unchanged
+
+### Remaining Stage12 failures
+
+Two `FAILED_RETRYABLE` titles remain:
+
+- DVDES-795
+- DASS-884
+
+EBWH-350 must not be retried again unless a new regression is discovered.
