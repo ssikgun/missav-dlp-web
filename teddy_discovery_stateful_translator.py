@@ -723,19 +723,28 @@ def derive_stateful_session_id(
 
 
 def bind_stateful_model_input_generation_key(generation_key: str) -> str:
-    """Bind the model-input projection version before the policy suffix."""
+    """Bind exactly one current model-input projection identity."""
 
     generation_key = _require_exact_string(
         generation_key,
         field_name="generation_key",
     )
+
+    prefix = "::stage11-model-input="
     marker = "::" + MODEL_INPUT_NORMALIZATION_VERSION
-    marker_count = generation_key.count(marker)
-    if marker_count > 1:
+    identity_count = generation_key.count(prefix)
+
+    if identity_count > 1:
         raise StatefulTranslatorValidationError(
             "generation_key contains multiple model-input identities"
         )
-    if marker_count == 1:
+
+    if identity_count == 1:
+        if marker not in generation_key:
+            raise StatefulTranslatorValidationError(
+                "generation_key contains a stale or unsupported model-input identity"
+            )
+
         marker_index = generation_key.find(marker)
         after_marker = generation_key[marker_index + len(marker) :]
         if marker_index == 0 or (
@@ -745,6 +754,7 @@ def bind_stateful_model_input_generation_key(generation_key: str) -> str:
             raise StatefulTranslatorValidationError(
                 "generation_key contains a malformed model-input identity"
             )
+
         policy_index = generation_key.find("::stage11-policy=")
         if policy_index >= 0 and policy_index < marker_index:
             raise StatefulTranslatorValidationError(
@@ -766,15 +776,18 @@ def bind_stateful_model_input_generation_key(generation_key: str) -> str:
 
 
 def stateful_model_input_identity_is_bound(generation_key: str) -> bool:
-    """Validate and report whether the reserved model-input marker exists."""
+    """Validate any present model-input marker and report current binding."""
 
     generation_key = _require_exact_string(
         generation_key,
         field_name="generation_key",
     )
-    marker = "::" + MODEL_INPUT_NORMALIZATION_VERSION
-    if marker not in generation_key:
+
+    prefix = "::stage11-model-input="
+    if prefix not in generation_key:
         return False
+
+    # This raises for stale, duplicated, or malformed model-input identities.
     bind_stateful_model_input_generation_key(generation_key)
     return True
 

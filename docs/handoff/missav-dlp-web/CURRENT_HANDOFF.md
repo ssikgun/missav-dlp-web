@@ -162,7 +162,7 @@ Commit:
 Current production candidate behavior:
 
 - semantic policy default: `stage11-stateful-cue64-v1`
-- model-input normalization: `stage11-model-input=repeat-v1`
+- model-input normalization: `stage11-model-input=repeat-v2`
 - model validation attempts: `2`
 - inactivity timeout: **600 seconds**
 - **any stdout or stderr bytes reset the inactivity deadline**
@@ -289,7 +289,7 @@ The same long repeated source is present in `stage11-semantic-input.json`.
 
 Hermes part-10 output translated that into a very long repeated Korean sequence such as repeated `어?`.
 
-Therefore this case is **not simply a pure model-amplified runaway**. The source itself is pathologically repetitive. The current `INVALID_KO` rejection is likely a **source-aware repetition/normalization/validator-equivalence edge case**, but the exact validator predicate that rejected the cue still needs to be identified before changing policy.
+Follow-up forensic identified the exact edge case. The authoritative source contains 74 spaced `え?` tokens with a leading delimiter. The source-aware KO validator itself is behaving correctly: it rejects genuine model amplification and must remain unchanged. The gap was in `repeat-v1` model-input normalization, which handled compact contiguous repetition but did not recognize identical short units separated by bounded horizontal whitespace. Hermes therefore received the pathological 74-token model input and amplified it further.
 
 Do **not** solve this by title hardcode or by disabling the repetition validator.
 
@@ -307,29 +307,52 @@ This happened **after** the true semantic failure had already been recorded. The
 
 Treat this as a **temporary canary/reporting harness bug unless production code proves otherwise**. Fix it before reusing this temp runner so later failures are reported cleanly.
 
-### 8.6 Exact next investigation for EBWH-350
+### 8.6 EBWH-350 forensic resolved — `repeat-v2` ready for bounded live retry
 
-The next session should first do a **read-only validator forensic**, not another blind live retry.
+The read-only forensic and generic correction are complete.
 
-Determine exactly:
+Confirmed root cause:
 
-1. which `INVALID_KO` predicate rejects part 10 / cue 624;
-2. how source-aware repetition validation compares Japanese source repetition against Korean output repetition;
-3. whether `repeat-v1` model-input normalization is actually applied to this cue at the package sent to Hermes, and if not, why this repeated token+separator shape escapes it;
-4. whether the generic correct fix belongs in model-input normalization, source-aware validator equivalence, or both;
-5. preserve legitimate repetition without allowing genuine model amplification/runaway.
+1. `asr-000624` authoritative raw `stt_ja` is length `223` and contains 74 repeated short tokens separated by spaces, with a leading delimiter;
+2. `repeat-v1` did not normalize that shape because its model-input repetition scanner required contiguous repeated units;
+3. the source-aware validator strips whitespace for source evidence but still evaluates the full source string, so the leading delimiter prevents whole-string periodic evidence;
+4. Hermes received the pathological unbounded model input and produced an even larger Korean repetition;
+5. the validator therefore correctly rejected the amplified KO. **The validator was not weakened.**
 
-Required fix properties:
+Generic fix implemented locally:
 
-- generic and evidence-based
-- no `EBWH-350`, `asr-000624`, `え?`, or `어?` production hardcode
-- deterministic/idempotent
-- source-aware
-- validators remain fail-closed for genuine amplification
-- add focused smoke reproducing repeated short token + punctuation/separator input
-- run relevant CP7M/CP7U/stateful validation regressions
+- model-input identity advanced to `stage11-model-input=repeat-v2`;
+- identical short units separated by one identical, bounded horizontal-whitespace separator can now be reduced to two representative units;
+- line boundaries are never crossed;
+- ordinary Japanese and ambiguous Unicode remain unchanged/fail-closed;
+- authoritative raw source objects remain byte-for-byte separate from the model-input projection;
+- stale or duplicate `stage11-model-input=*` generation identities now fail closed instead of accumulating multiple identities;
+- no title, cue, or literal production hardcode was added.
 
-Only after this forensic + smoke-backed generic fix should `EBWH-350` be retried.
+Focused verification completed:
+
+- Python compile: PASS;
+- model-input normalization smoke: `28 PASS / 0 FAIL`;
+- stateful translator smoke: PASS;
+- stateful parts smoke: `45 PASS / 0 FAIL`;
+- stateful policy smoke: `17 PASS / 0 FAIL`;
+- live runner smoke: `16 PASS / 0 FAIL`;
+- retry smoke: PASS;
+- activity-aware timeout smoke: PASS;
+- `git diff --check`: PASS.
+
+Source-shaped forensic verification also passed:
+
+- raw length remains `223`;
+- raw token count remains `74`;
+- model-input token count becomes `2`;
+- projected model text is `- え? え?`;
+- generation key contains `stage11-model-input=repeat-v2`;
+- bound session identity differs from the old unbound session.
+
+No Hermes live call, NAS publication, Jellyfin mutation, or production DB write was performed during this fix.
+
+**Next action:** fix the separate temporary EBWH canary `_session_reader` reporting bug, ensure the retry uses a fresh `repeat-v2` semantic session rather than the old `repeat-v1` session, then run one bounded `EBWH-350` recovery canary with the existing fixed64 / inactivity-600 / absolute-3600 / attempts-2 safety contract.
 
 ---
 
@@ -415,7 +438,7 @@ Root cause and solution are described above. Never broaden all `StatefulLiveRunn
 
 ### Source-aware repetition / model amplification history
 
-The pipeline previously saw genuine model-amplified repetition as well as source-grounded repetition false positives. Generic source-aware handling and `repeat-v1` model-input normalization were introduced specifically to avoid aggressive text deletion and prevent runaway model input/output.
+The pipeline previously saw genuine model-amplified repetition as well as source-grounded repetition false positives. Generic source-aware handling remains in place. The original `repeat-v1` model-input normalization has now been superseded by separator-aware `repeat-v2`, while the validator remains fail-closed against genuine model amplification.
 
 Do not regress to “long repeated text = delete/reject” without considering source evidence.
 
@@ -457,7 +480,7 @@ Do these in order, one bounded checkpoint at a time.
 ### S12-3 — Recover DASS-884
 
 - preflight current source/NAS/state
-- bounded fixed64/repeat-v1 recovery
+- bounded fixed64/repeat-v2 recovery
 - observe activity-aware timeout behavior
 - preserve promoted parts according to current contract
 - publish/Jellyfin only after full PASS
@@ -477,7 +500,7 @@ Use bounded serial rollout with durable resume/failure isolation.
 Requirements:
 
 - fixed64 default
-- repeat-v1 normalization
+- repeat-v2 normalization
 - activity-aware Hermes timeout
 - existing validators unchanged except evidence-backed generic fixes made above
 - exact NAS KO check before title execution/publication
@@ -681,14 +704,17 @@ Implementation discipline:
 
 ## 15. First Checkpoint in the New Chat
 
-**Do not immediately retry EBWH-350.**
+The `EBWH-350` validator forensic and generic `repeat-v2` implementation are complete and smoke/regression tested.
 
-First checkpoint should be read-only and answer one question:
+Do **not** redo the validator investigation and do **not** weaken the validator.
 
-> **Why exactly does the current KO validator reject EBWH-350 part 10 when the pathological repetition is already present in the authoritative source cue `asr-000624`?**
+The immediate next checkpoint is:
 
-Inspect the exact validator predicate, the source-aware comparison, and the actual model-input package after `repeat-v1` normalization. Then decide the smallest generic correction and add a focused regression test.
+1. inspect/fix the temporary EBWH canary `_session_reader` reporting bug only;
+2. verify that the bounded retry will create/use a fresh `repeat-v2` semantic session and will not reuse the old `repeat-v1` semantic session;
+3. run one observable bounded `EBWH-350` recovery canary;
+4. publish to NAS/Jellyfin only if the complete Stage11 result reaches valid CLEAN through the normal Stage12 publication path.
 
-After that, fix the temp runner `_session_reader` reporting bug and perform one bounded EBWH-350 recovery canary.
+If the live recovery fails, keep the failure title-local as `FAILED_RETRYABLE` and inspect the new evidence before changing policy.
 
-This is the shortest safe path to Stage12 closure and then Stage13.
+After `EBWH-350` is resolved, continue the existing Stage12 remaining-work order toward formal closure, then start Stage13.

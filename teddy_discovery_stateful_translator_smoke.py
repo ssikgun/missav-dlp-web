@@ -12,6 +12,9 @@ from teddy_discovery_hermes_v2 import (
     HermesV2CueOutput,
     MAX_HERMES_V2_REQUEST_CUES,
 )
+from teddy_discovery_model_input_normalization import (
+    MODEL_INPUT_NORMALIZATION_VERSION,
+)
 from teddy_discovery_stateful_translator import (
     MAX_STATEFUL_TRANSLATOR_CUES,
     STATEFUL_TRANSLATOR_EXECUTABLE,
@@ -34,6 +37,7 @@ from teddy_discovery_stateful_translator import (
     StatefulTranslatorSessionError,
     StatefulTranslatorStagingError,
     StatefulTranslatorValidationError,
+    bind_stateful_model_input_generation_key,
     build_stateful_translator_command,
     create_stateful_staging_directory,
     derive_stateful_session_id,
@@ -44,6 +48,7 @@ from teddy_discovery_stateful_translator import (
     resolve_stateful_staging_path,
     serialize_stateful_package,
     serialize_stateful_result,
+    stateful_model_input_identity_is_bound,
     stateful_session_id_for_package,
     stateful_staging_paths,
     validate_stateful_result,
@@ -604,6 +609,65 @@ def main():
             ),
             "SYMLINK_RESULT_REJECTED",
         )
+
+    model_input_base = "generation-model-input"
+    model_input_bound = bind_stateful_model_input_generation_key(
+        model_input_base
+    )
+    require(
+        model_input_bound
+        == model_input_base + "::" + MODEL_INPUT_NORMALIZATION_VERSION
+        and model_input_bound.count("::stage11-model-input=") == 1
+        and stateful_model_input_identity_is_bound(model_input_bound),
+        "MODEL_INPUT_CURRENT_IDENTITY_BOUND",
+    )
+    require(
+        bind_stateful_model_input_generation_key(model_input_bound)
+        == model_input_bound,
+        "MODEL_INPUT_CURRENT_IDENTITY_IDEMPOTENT",
+    )
+
+    model_input_with_policy = (
+        "generation-model-input::stage11-policy=stage11-stateful-cue64-v1"
+    )
+    model_input_policy_bound = bind_stateful_model_input_generation_key(
+        model_input_with_policy
+    )
+    require(
+        model_input_policy_bound
+        == (
+            "generation-model-input::"
+            + MODEL_INPUT_NORMALIZATION_VERSION
+            + "::stage11-policy=stage11-stateful-cue64-v1"
+        ),
+        "MODEL_INPUT_IDENTITY_PRECEDES_POLICY",
+    )
+
+    stale_model_input = (
+        "generation-model-input::stage11-model-input=repeat-v1"
+    )
+    expect_raises(
+        StatefulTranslatorValidationError,
+        lambda: bind_stateful_model_input_generation_key(stale_model_input),
+        "STALE_MODEL_INPUT_IDENTITY_REJECTED",
+    )
+    expect_raises(
+        StatefulTranslatorValidationError,
+        lambda: stateful_model_input_identity_is_bound(stale_model_input),
+        "STALE_MODEL_INPUT_IDENTITY_CHECK_FAILS_CLOSED",
+    )
+
+    duplicate_model_input = (
+        "generation-model-input::stage11-model-input=repeat-v1::"
+        + MODEL_INPUT_NORMALIZATION_VERSION
+    )
+    expect_raises(
+        StatefulTranslatorValidationError,
+        lambda: bind_stateful_model_input_generation_key(
+            duplicate_model_input
+        ),
+        "MULTIPLE_MODEL_INPUT_IDENTITIES_REJECTED",
+    )
 
     policy = Path(__file__).with_name(
         "teddy_discovery_stateful_translator_policy.txt"

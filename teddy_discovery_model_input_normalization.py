@@ -19,7 +19,7 @@ from teddy_discovery_hermes_v2 import (
 
 
 MODEL_INPUT_NORMALIZATION_VERSION: Final[str] = (
-    "stage11-model-input=repeat-v1"
+    "stage11-model-input=repeat-v2"
 )
 MODEL_INPUT_PATHOLOGICAL_RUN_FLOOR: Final[int] = 64
 MODEL_INPUT_SHORT_UNIT_MAX: Final[int] = 4
@@ -36,8 +36,9 @@ MODEL_INPUT_MIN_PERIODIC_REPETITIONS: Final[int] = (
     MODEL_INPUT_PERIODIC_MIN_REPETITIONS
 )
 
-_PATHOLOGICAL_REPEAT_RULE: Final[str] = "pathological-repeat-v1"
+_PATHOLOGICAL_REPEAT_RULE: Final[str] = "pathological-repeat-v2"
 _PUNCTUATION_RUN_FLOOR: Final[int] = MODEL_INPUT_PATHOLOGICAL_RUN_FLOOR
+_HORIZONTAL_SEPARATOR_MAX: Final[int] = 4
 
 
 class ModelInputNormalizationError(ValueError):
@@ -52,6 +53,7 @@ class ModelInputNormalizationEvent:
     source_start: int
     source_end: int
     unit_length: int
+    separator_length: int
     complete_repetitions: int
     trailing_prefix_length: int
     replacement_length: int
@@ -75,6 +77,12 @@ class ModelInputNormalizationEvent:
             raise ModelInputNormalizationError(
                 "normalization event unit_length is outside its bound"
             )
+        if type(self.separator_length) is not int or not (
+            0 <= self.separator_length <= _HORIZONTAL_SEPARATOR_MAX
+        ):
+            raise ModelInputNormalizationError(
+                "normalization event separator_length is outside its bound"
+            )
         if type(self.complete_repetitions) is not int or self.complete_repetitions < 1:
             raise ModelInputNormalizationError(
                 "normalization event repetition count is invalid"
@@ -87,6 +95,7 @@ class ModelInputNormalizationEvent:
             )
         expected_source_length = (
             self.unit_length * self.complete_repetitions
+            + self.separator_length * max(self.complete_repetitions - 1, 0)
             + self.trailing_prefix_length
         )
         if self.source_end - self.source_start != expected_source_length:
@@ -243,18 +252,64 @@ def _all_punctuation_or_symbols(unit: str) -> bool:
 class _RepeatCandidate:
     end: int
     unit: str
+    separator: str
     repetitions: int
     trailing_prefix_length: int
     replacement: str
+
+
+def _repeat_qualifies(
+    unit: str,
+    repetitions: int,
+) -> bool:
+    unit_length = len(unit)
+    if unit_length == 1:
+        return (
+            repetitions * unit_length
+            >= MODEL_INPUT_PATHOLOGICAL_RUN_FLOOR
+        )
+    if repetitions < MODEL_INPUT_PERIODIC_MIN_REPETITIONS:
+        return False
+    if (
+        _all_punctuation_or_symbols(unit)
+        and repetitions * unit_length < _PUNCTUATION_RUN_FLOOR
+    ):
+        return False
+    return True
+
+
+def _horizontal_separator_at(
+    text: str,
+    start: int,
+) -> str | None:
+    """Return one short horizontal-whitespace separator without crossing lines."""
+
+    if not 0 <= start < len(text):
+        return None
+
+    cursor = start
+    while cursor < len(text) and text[cursor].isspace():
+        character = text[cursor]
+        category = unicodedata.category(character)
+        if character in {"\r", "\n", "\v", "\f"} or category in {"Zl", "Zp"}:
+            return None
+        cursor += 1
+        if cursor - start > _HORIZONTAL_SEPARATOR_MAX:
+            return None
+
+    if cursor == start:
+        return None
+    return text[start:cursor]
 
 
 def _candidate_at(text: str, start: int) -> _RepeatCandidate | None:
     remaining = len(text) - start
     max_unit_length = min(MODEL_INPUT_SHORT_UNIT_MAX, remaining)
 
-    # The shortest valid unit wins.  This mirrors the existing validator's
-    # evidence search and makes ``ああ...`` a codepoint run rather than an
-    # artificial two-codepoint unit.
+    # The shortest valid unit wins.  Contiguous repetition remains the first
+    # choice.  repeat-v2 additionally accepts one identical, bounded,
+    # horizontal-whitespace separator between complete units.  It never spans
+    # a line boundary and never rewrites the authoritative source object.
     for unit_length in range(1, max_unit_length + 1):
         unit = text[start : start + unit_length]
         if not _safe_unit(unit):
@@ -272,35 +327,65 @@ def _candidate_at(text: str, start: int) -> _RepeatCandidate | None:
             repetitions += 1
             cursor += unit_length
 
-        if unit_length == 1:
-            if repetitions * unit_length < MODEL_INPUT_PATHOLOGICAL_RUN_FLOOR:
-                continue
-        else:
-            if repetitions < MODEL_INPUT_PERIODIC_MIN_REPETITIONS:
-                continue
+        if _repeat_qualifies(unit, repetitions):
+            trailing_prefix_length = 0
+            for prefix_length in range(1, unit_length):
+                if text[cursor : cursor + prefix_length] == unit[:prefix_length]:
+                    trailing_prefix_length = prefix_length
+
+            end = cursor + trailing_prefix_length
+            if _safe_boundary(text, start, end):
+                replacement = (
+                    unit * MODEL_INPUT_REPRESENTATIVE_REPETITIONS
+                    + unit[:trailing_prefix_length]
+                )
+                return _RepeatCandidate(
+                    end=end,
+                    unit=unit,
+                    separator="",
+                    repetitions=repetitions,
+                    trailing_prefix_length=trailing_prefix_length,
+                    replacement=replacement,
+                )
+
+        # Separated repetition is deliberately narrower than contiguous
+        # repetition: only an identical short horizontal-whitespace separator
+        # is accepted, and only complete units are bounded.
+        separator_start = start + unit_length
+        separator = _horizontal_separator_at(text, separator_start)
+        if separator is None:
+            continue
+
+        repetitions = 1
+        cursor = separator_start
+        while True:
+            if text[cursor : cursor + len(separator)] != separator:
+                break
+            next_unit_start = cursor + len(separator)
             if (
-                _all_punctuation_or_symbols(unit)
-                and repetitions * unit_length < _PUNCTUATION_RUN_FLOOR
+                text[next_unit_start : next_unit_start + unit_length]
+                != unit
             ):
-                continue
+                break
+            repetitions += 1
+            cursor = next_unit_start + unit_length
 
-        trailing_prefix_length = 0
-        for prefix_length in range(1, unit_length):
-            if text[cursor : cursor + prefix_length] == unit[:prefix_length]:
-                trailing_prefix_length = prefix_length
+        if not _repeat_qualifies(unit, repetitions):
+            continue
 
-        end = cursor + trailing_prefix_length
+        end = cursor
         if not _safe_boundary(text, start, end):
             continue
-        replacement = (
-            unit * MODEL_INPUT_REPRESENTATIVE_REPETITIONS
-            + unit[:trailing_prefix_length]
+
+        replacement = separator.join(
+            unit for _ in range(MODEL_INPUT_REPRESENTATIVE_REPETITIONS)
         )
         return _RepeatCandidate(
             end=end,
             unit=unit,
+            separator=separator,
             repetitions=repetitions,
-            trailing_prefix_length=trailing_prefix_length,
+            trailing_prefix_length=0,
             replacement=replacement,
         )
 
@@ -314,8 +399,11 @@ def normalize_model_input_text(
 ) -> ModelInputNormalization:
     """Bound contiguous pathological repetition in one retained text value.
 
-    No whitespace, punctuation, Unicode normalization, or semantic cleanup is
-    performed.  A single-codepoint run needs at least 64 codepoints; a
+    No whitespace normalization, punctuation cleanup, Unicode normalization,
+    or semantic cleanup is performed.  repeat-v2 may recognize one identical
+    bounded horizontal-whitespace separator between repeated short units, but
+    preserves that separator in the representative model input.  A
+    single-codepoint run needs at least 64 codepoints; a
     distinct short unit of at most four codepoints needs at least 16 complete
     repetitions.  The repeated span is replaced by two representative units,
     plus one existing partial prefix when present.  Unicode combining/format
@@ -347,6 +435,7 @@ def normalize_model_input_text(
                 source_start=cursor,
                 source_end=candidate.end,
                 unit_length=len(candidate.unit),
+                separator_length=len(candidate.separator),
                 complete_repetitions=candidate.repetitions,
                 trailing_prefix_length=candidate.trailing_prefix_length,
                 replacement_length=len(replacement),

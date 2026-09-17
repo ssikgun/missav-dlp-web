@@ -157,6 +157,43 @@ def main() -> None:
         == short_unit.normalized_text,
         "NORMALIZATION_IDEMPOTENT",
     )
+
+    spaced_token = "え?"
+    spaced_raw = "- " + " ".join([spaced_token] * 74)
+    spaced = normalize_model_input_text(spaced_raw)
+    check(
+        spaced.changed
+        and spaced.normalized_text == "- え? え?"
+        and spaced_raw == "- " + " ".join([spaced_token] * 74)
+        and len(spaced.events) == 1
+        and spaced.events[0].source_start == 2
+        and spaced.events[0].source_end == len(spaced_raw)
+        and spaced.events[0].unit_length == 2
+        and spaced.events[0].separator_length == 1
+        and spaced.events[0].complete_repetitions == 74,
+        "SPACED_SHORT_TOKEN_RUN_BOUNDED",
+    )
+    check(
+        normalize_model_input_text(spaced.normalized_text).normalized_text
+        == spaced.normalized_text,
+        "SPACED_NORMALIZATION_IDEMPOTENT",
+    )
+
+    ordinary_spaced = "これは 普通の 日本語です"
+    ordinary_spaced_result = normalize_model_input_text(ordinary_spaced)
+    check(
+        not ordinary_spaced_result.changed
+        and ordinary_spaced_result.normalized_text == ordinary_spaced,
+        "ORDINARY_SPACED_JAPANESE_UNCHANGED",
+    )
+
+    line_broken = ("え?\n" * 74).rstrip("\n")
+    line_broken_result = normalize_model_input_text(line_broken)
+    check(
+        not line_broken_result.changed
+        and line_broken_result.normalized_text == line_broken,
+        "SEPARATOR_NORMALIZATION_NEVER_CROSSES_LINES",
+    )
     ambiguous_unicode = "a\u0301" * 64
     ambiguous_result = normalize_model_input_text(ambiguous_unicode)
     check(
@@ -460,13 +497,18 @@ def main() -> None:
     check(
         "EROFV-387" not in source
         and "asr-000333" not in source
+        and "EBWH-350" not in source
+        and "asr-000624" not in source
+        and "え?" not in source
         and "if raw_text ==" not in source,
         "NO_TITLE_CUE_TEXT_SPECIFIC_BRANCHES",
     )
     check(
         MODEL_INPUT_PATHOLOGICAL_RUN_FLOOR == 64
         and MODEL_INPUT_SHORT_UNIT_MAX == 4
-        and MODEL_INPUT_PERIODIC_MIN_REPETITIONS == 16,
+        and MODEL_INPUT_PERIODIC_MIN_REPETITIONS == 16
+        and MODEL_INPUT_NORMALIZATION_VERSION
+        == "stage11-model-input=repeat-v2",
         "EVIDENCE_BASED_NORMALIZATION_BOUNDS",
     )
 
