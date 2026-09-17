@@ -537,6 +537,152 @@ def _stop_hermes_process(
             pass
 
 
+def _cleanup_timed_out_remote_hermes(
+    *,
+    remote: str,
+    ssh_key: str,
+    known_hosts: str,
+    remote_task: str,
+    session_id: str,
+) -> None:
+    """Terminate only the exact timed-out Stage11 remote Hermes process group."""
+
+    cleanup_script = r"""
+TASK="$1"
+SID="$2"
+
+PID_FILE="$TASK/.stage11-hermes-runtime.pid"
+META_FILE="$TASK/.stage11-hermes-runtime.meta"
+
+if [ "$(hostname)" != "hermes-lxc-slack" ]; then
+  echo "REMOTE_TIMEOUT_CLEANUP_RESULT=WRONG_HOST"
+  exit 20
+fi
+
+if [ ! -d "$TASK" ]; then
+  echo "REMOTE_TIMEOUT_CLEANUP_RESULT=TASK_MISSING"
+  exit 21
+fi
+
+if [ ! -f "$PID_FILE" ]; then
+  echo "REMOTE_TIMEOUT_CLEANUP_RESULT=NO_PID_FILE"
+  exit 0
+fi
+
+if [ ! -f "$META_FILE" ]; then
+  echo "REMOTE_TIMEOUT_CLEANUP_RESULT=META_MISSING"
+  exit 22
+fi
+
+IFS= read -r PID < "$PID_FILE"
+META="$(cat "$META_FILE")"
+
+case "$PID" in
+  ''|*[!0-9]*)
+    echo "REMOTE_TIMEOUT_CLEANUP_RESULT=INVALID_PID"
+    exit 23
+    ;;
+esac
+
+if [ "$META" != "session_id=$SID" ]; then
+  echo "REMOTE_TIMEOUT_CLEANUP_RESULT=SESSION_MISMATCH"
+  exit 24
+fi
+
+if [ ! -d "/proc/$PID" ]; then
+  rm -f "$PID_FILE" "$META_FILE"
+  echo "REMOTE_TIMEOUT_CLEANUP_RESULT=ALREADY_EXITED"
+  exit 0
+fi
+
+CWD="$(readlink -f "/proc/$PID/cwd" 2>/dev/null || true)"
+if [ "$CWD" != "$TASK" ]; then
+  echo "REMOTE_TIMEOUT_CLEANUP_RESULT=CWD_MISMATCH"
+  exit 25
+fi
+
+CMDLINE="$(
+  tr '\0' ' ' < "/proc/$PID/cmdline" 2>/dev/null
+)"
+
+case "$CMDLINE" in
+  *"$HOME/.local/bin/hermes"*"--profile subtitle-translator"*"--resume $SID"*)
+    ;;
+  *)
+    echo "REMOTE_TIMEOUT_CLEANUP_RESULT=CMDLINE_MISMATCH"
+    exit 26
+    ;;
+esac
+
+PGID="$(
+  ps -o pgid= -p "$PID" 2>/dev/null |
+  tr -d '[:space:]'
+)"
+
+if [ "$PGID" != "$PID" ]; then
+  echo "REMOTE_TIMEOUT_CLEANUP_RESULT=PGID_MISMATCH"
+  exit 27
+fi
+
+kill -TERM -- "-$PGID" 2>/dev/null || true
+
+i=0
+while [ "$i" -lt 50 ] && [ -d "/proc/$PID" ]; do
+  sleep 0.1
+  i=$((i + 1))
+done
+
+if [ -d "/proc/$PID" ]; then
+  kill -KILL -- "-$PGID" 2>/dev/null || true
+
+  i=0
+  while [ "$i" -lt 50 ] && [ -d "/proc/$PID" ]; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+fi
+
+if [ -d "/proc/$PID" ]; then
+  echo "REMOTE_TIMEOUT_CLEANUP_RESULT=PROCESS_STILL_ALIVE"
+  exit 28
+fi
+
+rm -f "$PID_FILE" "$META_FILE"
+
+echo "REMOTE_TIMEOUT_CLEANUP_RESULT=PASS"
+"""
+
+    result = subprocess.run(
+        _ssh_base(
+            remote,
+            ssh_key,
+            known_hosts,
+        )
+        + [
+            "bash",
+            "-s",
+            "--",
+            remote_task,
+            session_id,
+        ],
+        input=cleanup_script.encode("utf-8"),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=15,
+        check=False,
+    )
+
+    if result.stdout:
+        _forward_hermes_output("stdout", result.stdout)
+    if result.stderr:
+        _forward_hermes_output("stderr", result.stderr)
+
+    if result.returncode != 0:
+        raise StatefulLiveRunnerError(
+            "remote Hermes timeout cleanup failed"
+        )
+
+
 def _local_artifact_status(path: Path | None) -> tuple[str, int | None]:
     """Return bounded local lstat evidence without reading artifact content."""
 
@@ -694,7 +840,19 @@ if [ "$rok" -eq 1 ]; then
 fi
 
 if [ "$rok" -eq 1 ]; then
-  "$HOME/.local/bin/hermes" \
+  PID_FILE="$TASK/.stage11-hermes-runtime.pid"
+  META_FILE="$TASK/.stage11-hermes-runtime.meta"
+
+  if [ -e "$PID_FILE" ] || [ -e "$META_FILE" ]; then
+    echo "REMOTE_RUNTIME_MARKER_PREEXISTING=YES"
+    rok=0
+  fi
+fi
+
+if [ "$rok" -eq 1 ]; then
+  umask 077
+
+  setsid "$HOME/.local/bin/hermes" \
     --profile subtitle-translator \
     chat \
     -Q \
@@ -703,14 +861,36 @@ if [ "$rok" -eq 1 ]; then
     --provider openai-codex \
     --model gpt-5.6-luna \
     --reasoning xhigh \
-    -q "$QUERY"
+    -q "$QUERY" &
 
-  MODEL_RC=$?
+  MODEL_PID=$!
 
-  echo
-  echo "MODEL_RC=$MODEL_RC"
+  if ! printf '%s\n' "$MODEL_PID" > "$PID_FILE"; then
+    kill -TERM -- "-$MODEL_PID" 2>/dev/null || true
+    wait "$MODEL_PID" 2>/dev/null || true
+    rok=0
+  fi
 
-  [ "$MODEL_RC" -eq 0 ] || rok=0
+  if [ "$rok" -eq 1 ]; then
+    if ! printf 'session_id=%s\n' "$SID" > "$META_FILE"; then
+      kill -TERM -- "-$MODEL_PID" 2>/dev/null || true
+      wait "$MODEL_PID" 2>/dev/null || true
+      rm -f "$PID_FILE"
+      rok=0
+    fi
+  fi
+
+  if [ "$rok" -eq 1 ]; then
+    wait "$MODEL_PID"
+    MODEL_RC=$?
+
+    rm -f "$PID_FILE" "$META_FILE"
+
+    echo
+    echo "MODEL_RC=$MODEL_RC"
+
+    [ "$MODEL_RC" -eq 0 ] || rok=0
+  fi
 fi
 
 echo "REMOTE_MODEL_STEP_RESULT=$rok"
@@ -862,6 +1042,13 @@ test "$rok" -eq 1
                     else None
                 )
                 _stop_hermes_process(process, selector)
+                _cleanup_timed_out_remote_hermes(
+                    remote=remote,
+                    ssh_key=ssh_key,
+                    known_hosts=known_hosts,
+                    remote_task=remote_task,
+                    session_id=session_id,
+                )
             else:
                 return_code = process.wait()
                 seconds_since_last_output_activity = (

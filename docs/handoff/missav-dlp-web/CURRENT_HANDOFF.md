@@ -804,3 +804,73 @@ After that fix and regression smoke, run a fresh bounded EBWH-350 canary session
 - the fixed remote timeout cleanup path
 
 Do not weaken semantic validators to force publication.
+
+## 2026-09-17 — Remote Hermes timeout lifecycle cleanup
+
+### Status
+
+The CT120 orphan-Hermes timeout bug found during the EBWH-350 repeat-v2 canary is now fixed in production source.
+
+Root cause:
+
+- CT108 inactivity/absolute timeout stopped only the local SSH `Popen`
+- the already-running CT120 `bash` / Hermes process could survive after SSH termination
+- this was live-proven during the EBWH-350 part-10 timeout
+
+### Fix
+
+The stateful live runner now uses task-scoped runtime ownership markers:
+
+- `.stage11-hermes-runtime.pid`
+- `.stage11-hermes-runtime.meta`
+
+Remote Hermes execution is started in its own process group with `setsid`.
+
+On controller timeout, a second bounded SSH cleanup verifies all of the following before terminating anything:
+
+- expected CT120 hostname
+- exact remote task directory exists
+- PID and metadata files exist and are valid
+- metadata session ID exactly matches the current Stage11 session
+- `/proc/<pid>/cwd` exactly matches the current remote task directory
+- `/proc/<pid>/cmdline` identifies the subtitle-translator Hermes invocation
+- exact `--resume <session_id>` is present
+- process-group ID equals the recorded leader PID
+
+Only after these checks does cleanup send TERM to the exact process group.
+KILL is used only as a bounded fallback if that exact process remains alive.
+
+No broad `pkill`, `killall`, or generic Hermes process scan is used.
+
+Runtime marker files are removed after successful cleanup.
+Existing semantic pending artifacts are not deleted by timeout cleanup.
+
+### Validation
+
+Synthetic end-to-end timeout lifecycle smoke: **PASS**
+
+Confirmed:
+
+- target timeout process group was terminated
+- target process was reaped
+- runtime PID/meta markers were removed
+- unrelated concurrent Hermes process remained alive
+- existing inactivity timeout classification still passes
+- existing absolute timeout classification still passes
+- activity-aware timeout behavior remains unchanged
+- remote pending recovery contract remains unchanged
+- `git diff --check`: **PASS**
+
+### Next work
+
+Run a fresh bounded EBWH-350 canary session using:
+
+- repeat-v2 model-input normalization
+- generic semantic repetition guard
+- exact remote timeout lifecycle cleanup
+
+Expected objective:
+
+- verify the pathological source cue no longer expands in Korean output
+- verify no CT120 orphan process remains if a timeout occurs
+- publish nothing unless the existing semantic validators accept the result

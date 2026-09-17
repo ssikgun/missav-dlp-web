@@ -94,10 +94,17 @@ def invoke_synthetic(
     inactivity_timeout: float,
     absolute_timeout: float,
 ) -> None:
-    with patch.object(
-        live_runner,
-        "_ssh_base",
-        return_value=[sys.executable, "-u", "-c", script],
+    with (
+        patch.object(
+            live_runner,
+            "_ssh_base",
+            return_value=[sys.executable, "-u", "-c", script],
+        ),
+        patch.object(
+            live_runner,
+            "_cleanup_timed_out_remote_hermes",
+            return_value=None,
+        ),
     ):
         live_runner._invoke_hermes_part(
             remote="synthetic@offline",
@@ -551,6 +558,178 @@ def main():
             and (recovery_task / expected.pending_filename).exists(),
             "REMOTE_PENDING_RECOVERY_CONTRACT_PRESERVED",
         )
+
+
+    # End-to-end synthetic proof for the remote timeout lifecycle.
+    #
+    # This runs the real _invoke_hermes_part() remote shell locally with:
+    # - a fake hermes executable,
+    # - a fake hostname reporting the expected CT120 hostname,
+    # - one target Hermes process group that must be cleaned,
+    # - one unrelated Hermes process group that must remain alive.
+    check(
+        ".stage11-hermes-runtime.pid" in source
+        and ".stage11-hermes-runtime.meta" in source
+        and "setsid" in source
+        and "_cleanup_timed_out_remote_hermes" in source,
+        "REMOTE_TIMEOUT_RUNTIME_MARKER_AND_CLEANUP_WIRING_PRESENT",
+    )
+
+    check(
+        "pkill" not in source
+        and "killall" not in source
+        and "pgrep" not in source,
+        "REMOTE_TIMEOUT_CLEANUP_HAS_NO_BROAD_PROCESS_KILL",
+    )
+
+    with TemporaryDirectory(prefix="stateful-remote-cleanup-smoke-") as raw:
+        synthetic_root = Path(raw)
+        synthetic_home = synthetic_root / "home"
+        synthetic_bin = synthetic_root / "bin"
+        target_task = synthetic_root / "target-task"
+        unrelated_task = synthetic_root / "unrelated-task"
+
+        (synthetic_home / ".local" / "bin").mkdir(parents=True)
+        synthetic_bin.mkdir()
+        target_task.mkdir()
+        unrelated_task.mkdir()
+
+        fake_hostname = synthetic_bin / "hostname"
+        fake_hostname.write_text(
+            "#!/bin/sh\nprintf '%s\\n' 'hermes-lxc-slack'\n",
+            encoding="utf-8",
+        )
+        fake_hostname.chmod(0o755)
+
+        fake_hermes = synthetic_home / ".local" / "bin" / "hermes"
+        fake_hermes.write_text(
+            "#!/bin/sh\n"
+            "printf '%s\\n' \"$$\" > synthetic-hermes.pid\n"
+            "while :; do\n"
+            "  sleep 1\n"
+            "done\n",
+            encoding="utf-8",
+        )
+        fake_hermes.chmod(0o755)
+
+        synthetic_env = os.environ.copy()
+        synthetic_env["HOME"] = str(synthetic_home)
+        synthetic_env["PATH"] = (
+            str(synthetic_bin)
+            + os.pathsep
+            + synthetic_env.get("PATH", "")
+        )
+
+        target_session = "00000000-0000-4000-8000-000000000111"
+        unrelated_session = "00000000-0000-4000-8000-000000000222"
+
+        unrelated = subprocess.Popen(
+            [
+                str(fake_hermes),
+                "--profile",
+                "subtitle-translator",
+                "chat",
+                "--resume",
+                unrelated_session,
+            ],
+            cwd=unrelated_task,
+            env=synthetic_env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+
+        ssh_prefix = [
+            "env",
+            "HOME=" + str(synthetic_home),
+            "PATH=" + synthetic_env["PATH"],
+        ]
+
+        cleanup_output = io.StringIO()
+        cleanup_error = None
+
+        try:
+            with (
+                patch.object(
+                    live_runner,
+                    "_ssh_base",
+                    return_value=ssh_prefix,
+                ),
+                redirect_stdout(cleanup_output),
+                redirect_stderr(io.StringIO()),
+            ):
+                try:
+                    live_runner._invoke_hermes_part(
+                        remote="synthetic@offline",
+                        ssh_key="/synthetic/key",
+                        known_hosts="/synthetic/known-hosts",
+                        remote_task=str(target_task),
+                        session_id=target_session,
+                        query="synthetic timeout cleanup query",
+                        turn_timeout=0.5,
+                        absolute_timeout=2.0,
+                    )
+                except live_runner.StatefulLiveRunnerTimeoutError as error:
+                    cleanup_error = error
+                else:
+                    raise AssertionError(
+                        "synthetic remote cleanup invocation did not time out"
+                    )
+
+            target_pid_path = target_task / "synthetic-hermes.pid"
+            check(
+                cleanup_error is not None
+                and cleanup_error.timeout_reason == "INACTIVITY_TIMEOUT"
+                and "REMOTE_TIMEOUT_CLEANUP_RESULT=PASS"
+                in cleanup_output.getvalue(),
+                "REMOTE_TIMEOUT_EXACT_PROCESS_GROUP_CLEANUP",
+            )
+
+            check(
+                target_pid_path.exists(),
+                "REMOTE_TIMEOUT_TARGET_PROCESS_STARTED",
+            )
+
+            target_pid = int(
+                target_pid_path.read_text(encoding="utf-8").strip()
+            )
+
+            check(
+                not Path("/proc/" + str(target_pid)).exists(),
+                "REMOTE_TIMEOUT_TARGET_PROCESS_IS_REAPED",
+            )
+
+            check(
+                not (
+                    target_task / ".stage11-hermes-runtime.pid"
+                ).exists()
+                and not (
+                    target_task / ".stage11-hermes-runtime.meta"
+                ).exists(),
+                "REMOTE_TIMEOUT_RUNTIME_MARKERS_REMOVED",
+            )
+
+            check(
+                unrelated.poll() is None,
+                "REMOTE_TIMEOUT_UNRELATED_HERMES_SURVIVES",
+            )
+
+        finally:
+            if unrelated.poll() is None:
+                try:
+                    os.killpg(unrelated.pid, 15)
+                except ProcessLookupError:
+                    pass
+
+                try:
+                    unrelated.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(unrelated.pid, 9)
+                    except ProcessLookupError:
+                        pass
+                    unrelated.wait(timeout=3)
+
 
     print("STATEFUL_LIVE_RUNNER_TIMEOUT_SMOKE=PASS")
 
