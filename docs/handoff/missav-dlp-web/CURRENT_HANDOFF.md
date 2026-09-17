@@ -1024,3 +1024,74 @@ Only one `FAILED_RETRYABLE` title remains:
 - `DASS-884`
 
 `DVDES-795` must not be retried again unless a new regression is discovered.
+
+## 2026-09-17 — DASS-884 production recovery PASS
+
+### Final result
+
+DASS-884 Stage12 recovery completed successfully.
+
+Production result:
+
+- fresh repeat-v2 semantic session
+- total cues: 1868
+- total parts: 30
+- all 30 parts validated and promoted
+- Stage11 result: PASS
+- NAS publication: PASS
+- Jellyfin recognition: PASS
+- final rollout state: `PUBLISHED`
+- destination: `DASS/DASS-884/DASS-884.ko.srt`
+
+Final rollout counts:
+
+- `PUBLISHED=24`
+- `PENDING=148`
+- `UNRESOLVED=1`
+- `FAILED_RETRYABLE=0`
+
+### Previous timeout recovery
+
+The previous DASS-884 recovery used repeat-v1 with the old fixed 600-second wall-clock timeout.
+
+That run:
+
+- promoted through part 27/30
+- requested part 28/30
+- terminated at approximately 600.000880 seconds
+- ended as `FAILED_RETRYABLE`
+
+The successful recovery used the current production contract:
+
+- `stage11-model-input=repeat-v2`
+- `stage11-stateful-cue64-v1`
+- inactivity timeout: 600 seconds
+- absolute timeout: 3600 seconds
+- current Stage11 validators unchanged
+- fresh semantic session; previous failed session was not reused
+
+Part 28 passed successfully in the new recovery and execution continued through part 30.
+
+Note: this successful run proves recovery from the former part-28 failure, but it does not independently prove a >600-second live invocation surviving via activity reset because the successful part 28 completed below 600 seconds.
+
+### Runtime cleanup verification
+
+Post-run verification:
+
+- local canary runner: exited
+- `.stage11-hermes-runtime.pid`: absent
+- `.stage11-hermes-runtime.meta`: absent
+
+No runtime ownership marker remained on CT120 after successful completion.
+
+### Stage12 current state
+
+There are now no `FAILED_RETRYABLE` titles.
+
+Remaining work:
+
+- process the remaining `PENDING=148` titles
+- resolve the single `UNRESOLVED=1` title separately
+- the unresolved title is JUR-750 with its noncanonical KO sidecar condition
+
+DASS-884 must not be retried again unless a new regression is discovered.
