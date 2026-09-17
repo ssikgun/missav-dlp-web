@@ -12,6 +12,7 @@ import teddy_discovery_stage11_controller_smoke as controller_fixture
 import teddy_discovery_stage11_live_adapters as adapters
 from teddy_discovery_alignment import (
     AlignmentLimitError,
+    AlignmentValidationError,
     MAX_LEXICAL_PAIR_COMPARISONS,
 )
 from teddy_discovery_alignment_acceptance import AlignmentAcceptancePolicy
@@ -112,6 +113,66 @@ def main():
         "external subtitle alignment exceeded bounded lexical comparison limit"
     )
     print("PASS adapter maps AlignmentLimitError to validation failure")
+
+    validation_error = AlignmentValidationError(
+        "matching text contains a control character"
+    )
+    with patch.object(
+        adapters,
+        "generate_monotonic_anchor_candidates",
+        side_effect=validation_error,
+    ):
+        mapped = _capture(
+            ExternalSubtitleValidationError,
+            lambda: external(holding, baseline),
+        )
+    assert type(mapped) is ExternalSubtitleValidationError
+    assert isinstance(mapped.__cause__, AlignmentValidationError)
+    assert str(mapped) == "external subtitle alignment validation failed"
+    print(
+        "PASS adapter maps generic AlignmentValidationError "
+        "to validation failure"
+    )
+
+    with TemporaryDirectory(
+        prefix="alignment-validation-fallback-smoke-"
+    ) as raw:
+        artifact_root, staging_root = controller_fixture._roots(Path(raw))
+        baseline_path = controller_fixture._prepopulate_baseline(
+            artifact_root, baseline
+        )
+        baseline_raw = baseline_path.read_bytes()
+        runtime = controller_fixture.FakeRuntime(baseline)
+
+        with patch.object(
+            adapters,
+            "generate_monotonic_anchor_candidates",
+            side_effect=validation_error,
+        ):
+            result = _run_controller(
+                artifact_root,
+                staging_root,
+                runtime,
+                external,
+            )
+
+        report = json.loads(
+            result.report_path.read_text(encoding="utf-8")
+        )
+
+        assert result.route == V2_ROUTE_ASR_ONLY
+        assert result.external_ja_outcome == EXTERNAL_JA_VALIDATION_FAILURE
+        assert result.alignment_outcome == ALIGNMENT_NOT_ATTEMPTED
+        assert result.baseline_reused is True
+        assert baseline_path.read_bytes() == baseline_raw
+        assert report["baseline_reused"] is True
+        assert runtime.hybrid_review_calls == 0
+        assert runtime.asr_review_calls == 1
+
+    print(
+        "PASS generic alignment validation failure falls back "
+        "to ASR_ONLY without Hybrid review"
+    )
 
     with TemporaryDirectory(prefix="alignment-limit-fallback-smoke-") as raw:
         artifact_root, staging_root = controller_fixture._roots(Path(raw))

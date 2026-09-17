@@ -20,6 +20,7 @@ from teddy_discovery_asr_transcriber import FullTitleASRTranscriber
 from teddy_discovery_asr_audio import iter_audio_chunks
 from teddy_discovery_alignment import (
     AlignmentLimitError,
+    AlignmentValidationError,
     generate_monotonic_anchor_candidates, select_monotonic_anchors,
     infer_robust_affine_alignment,
 )
@@ -178,6 +179,10 @@ def build_external_ja_adapter(*, discovery, provider, acceptance_policy,
         except AlignmentLimitError as error:
             raise ExternalSubtitleValidationError(
                 "external subtitle alignment exceeded bounded lexical comparison limit"
+            ) from error
+        except AlignmentValidationError as error:
+            raise ExternalSubtitleValidationError(
+                "external subtitle alignment validation failed"
             ) from error
         decision = decide_alignment_acceptance(alignment, acceptance_policy)
         return apply_alignment_acceptance(
