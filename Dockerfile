@@ -25,7 +25,7 @@ COPY . .
 
 # Source + patch scripts must all parse before any build-time mutation.
 RUN python -m py_compile \
-    app.py teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py \
+    app.py teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py teddy_subtitle_status.py \
     teddy_routing.py teddy_duplicates.py teddy_ownership.py teddy_ownership_smoke.py teddy_logging.py teddy_storage.py teddy_browser_config.py teddy_auth.py \
     teddy_discovery_runtime.py teddy_discovery_download_api.py teddy_discovery_runtime_smoke.py teddy_discovery_ui_shell_smoke.py teddy_discovery_download_api_smoke.py \
     teddy_generic.py teddy_123av.py teddy_bootstrap.py teddy_verify_build.py teddy_hls_transport.py teddy_hls_benchmark.py \
@@ -126,6 +126,8 @@ RUN grep -Fq 'rel="manifest" href="/static/teddy-manifest.webmanifest"' template
     test -s templates/teddy-icon.svg
 
 RUN python teddy_discovery_ui_shell_smoke.py templates/index.html templates/teddy-discovery.css templates/teddy-discovery.js
+RUN python teddy_subtitle_status_smoke.py
+RUN python teddy_subtitle_status_ui_smoke.py
 
 # Split-storage production guards. /downloads remains local work/state;
 # TEDDY_FINAL_DIR points completed public files at the final filesystem.

@@ -12,6 +12,7 @@ from flask import Flask, request, render_template, jsonify, send_file, Response
 import yt_dlp
 from yt_dlp.extractor.common import InfoExtractor
 from curl_cffi import requests as cffi_requests
+import teddy_subtitle_status
 
 # surrit.com CDN의 Cloudflare 봇 차단 통과용 브라우저 TLS 지문 후보.
 # 실사용상 Firefox 지문이 가장 잘 통과되어 Firefox 전용으로 시도한다.
@@ -127,6 +128,7 @@ start_spoofdpi()
 
 # static_folder 설정 추가
 app = Flask(__name__, static_folder='templates', static_url_path='/static')
+teddy_subtitle_status.install_routes(app, jsonify)
 
 download_queue = queue.Queue()
 tasks = {}

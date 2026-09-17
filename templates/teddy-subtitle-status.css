@@ -1,0 +1,91 @@
+.subtitle-status-panel {
+    max-width: 560px;
+    margin: 0 0 28px;
+    padding: 18px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #f8fafc;
+}
+
+.subtitle-status-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.subtitle-status-title {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.subtitle-status-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.subtitle-status-badge.running {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.subtitle-status-badge.attention,
+.subtitle-status-badge.stale,
+.subtitle-status-badge.error,
+.subtitle-status-badge.unavailable {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.subtitle-status-current {
+    margin-bottom: 14px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: #334155;
+}
+
+.subtitle-status-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.subtitle-status-metric {
+    padding: 10px 8px;
+    border-radius: 9px;
+    background: #ffffff;
+    text-align: center;
+}
+
+.subtitle-status-metric strong {
+    display: block;
+    font-size: 17px;
+    line-height: 1.2;
+}
+
+.subtitle-status-metric span {
+    display: block;
+    margin-top: 3px;
+    font-size: 10px;
+    color: #94a3b8;
+}
+
+.subtitle-status-foot {
+    margin-top: 12px;
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+@media (max-width: 680px) {
+    .subtitle-status-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

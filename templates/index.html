@@ -558,6 +558,7 @@
         }
     </style>
     <link rel="stylesheet" href="/static/teddy-discovery.css">
+    <link rel="stylesheet" href="/static/teddy-subtitle-status.css">
 </head>
 <body>
     <!-- Sidebar -->
@@ -660,6 +661,61 @@
         <div id="page-settings" class="page">
             <div class="page-title">설정</div>
             <div class="page-subtitle">다운로드 및 시스템 설정을 관리합니다</div>
+
+            <section
+                class="subtitle-status-panel"
+                id="subtitle-status-panel"
+                aria-live="polite"
+            >
+                <div class="subtitle-status-head">
+                    <div class="subtitle-status-title">
+                        자막 처리 현황
+                    </div>
+                    <span
+                        class="subtitle-status-badge"
+                        id="subtitle-status-badge"
+                    >
+                        확인 중
+                    </span>
+                </div>
+
+                <div
+                    class="subtitle-status-current"
+                    id="subtitle-status-current"
+                >
+                    상태를 확인하고 있습니다.
+                </div>
+
+                <div class="subtitle-status-grid">
+                    <div class="subtitle-status-metric">
+                        <strong id="subtitle-count-published">-</strong>
+                        <span>완료</span>
+                    </div>
+                    <div class="subtitle-status-metric">
+                        <strong id="subtitle-count-pending">-</strong>
+                        <span>남음</span>
+                    </div>
+                    <div class="subtitle-status-metric">
+                        <strong id="subtitle-count-retryable">-</strong>
+                        <span>재시도</span>
+                    </div>
+                    <div class="subtitle-status-metric">
+                        <strong id="subtitle-count-terminal">-</strong>
+                        <span>실패</span>
+                    </div>
+                    <div class="subtitle-status-metric">
+                        <strong id="subtitle-count-unresolved">-</strong>
+                        <span>보류</span>
+                    </div>
+                </div>
+
+                <div
+                    class="subtitle-status-foot"
+                    id="subtitle-status-foot"
+                >
+                    마지막 활동: 확인 중
+                </div>
+            </section>
 
             <div class="settings-form">
                 <div class="setting-group">
@@ -1532,5 +1588,6 @@ missav01.com</textarea>
     });
     </script>
     <script src="/static/teddy-discovery.js"></script>
+    <script src="/static/teddy-subtitle-status.js"></script>
 </body>
 </html>

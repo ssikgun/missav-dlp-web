@@ -1286,3 +1286,115 @@ PENDING rollout work.
 Resume Stage12 from the remaining ordinary `PENDING` titles under the current
 generic production contract. Do not rerun already `PUBLISHED` titles.
 Do not automatically include JUR-750 in normal PENDING processing.
+
+## 2026-09-18 — Subtitle status mini-panel
+
+### Goal
+
+Expose Stage12 subtitle rollout status in the Downloader Settings page before
+starting the remaining bulk subtitle rollout.
+
+The panel is intentionally read-only and temporary in the Settings page.
+It can later be moved to the future file-management page without changing
+the status API contract.
+
+### Implemented
+
+New read-only endpoint:
+
+- `GET /api/subtitles/status`
+
+New components:
+
+- `teddy_subtitle_status.py`
+- `teddy_subtitle_status_smoke.py`
+- `teddy_subtitle_status_ui_smoke.py`
+- `templates/teddy-subtitle-status.css`
+- `templates/teddy-subtitle-status.js`
+
+Settings UI now displays:
+
+- overall runner state
+- current DVD ID
+- current stage / part progress when heartbeat provides it
+- PUBLISHED
+- PENDING
+- FAILED_RETRYABLE
+- FAILED_TERMINAL
+- UNRESOLVED
+- last activity
+
+The panel does not expose start/stop/retry controls.
+
+### State sources
+
+The status API reads the existing Stage12 rollout SQLite database read-only.
+
+Production container contract:
+
+- `TEDDY_SUBTITLE_STATE_PATH=/stage12/stage12-rollout-state.sqlite3`
+- `TEDDY_SUBTITLE_HEARTBEAT_PATH=/stage12-runtime/status.json`
+
+Production mounts:
+
+- rollout DB: exact file, read-only
+- heartbeat directory: read-only
+
+The Downloader container never writes Stage12 rollout state or heartbeat.
+
+### Runner-state contract
+
+A remaining PENDING count does not mean the runner is active.
+
+The UI distinguishes:
+
+- `running`: fresh runner heartbeat says RUNNING
+- `idle`: no live runner and no active rollout title
+- `stale`: durable RUNNING/GENERATED state exists without a fresh heartbeat
+- `attention`: retryable/terminal failures exist
+- `error`: fresh runner heartbeat reports ERROR
+
+Heartbeat freshness threshold is currently 120 seconds.
+
+The upcoming bulk Stage12 runner must write the heartbeat atomically to:
+
+`/opt/missav-dlp-web/discovery/stage12-runtime/status.json`
+
+### Validation
+
+Completed before deployment:
+
+- Python compile: PASS
+- subtitle status backend smoke: PASS
+- subtitle status UI smoke: PASS
+- existing Discovery UI shell regression: PASS
+- `git diff --check`: PASS
+- production compose validation: PASS
+
+Current read-only rollout snapshot at implementation time:
+
+- PUBLISHED: 29
+- PENDING: 143
+- FAILED_RETRYABLE: 0
+- FAILED_TERMINAL: 0
+- UNRESOLVED: 1
+- runner status: idle
+
+### Deployment state
+
+Production compose was prepared with read-only Stage12 mounts and backed up
+before modification.
+
+The running production image has not yet been replaced.
+
+The Docker workflow automatically builds on `teddy-custom` pushes only.
+For this `teddy-subtitle-stage11` branch, use `workflow_dispatch` to build
+the immutable `teddy-<commit SHA>` image. Do not promote the mutable
+`teddy-custom` tag from this branch.
+
+### Next action
+
+Build the current `teddy-subtitle-stage11` commit through the existing
+GitHub Actions workflow, pin the resulting immutable image in production,
+verify `/api/subtitles/status` and the Settings mini-panel, then start the
+remaining 143-title Stage12 production rollout with heartbeat reporting.
