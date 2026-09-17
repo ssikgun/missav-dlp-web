@@ -285,10 +285,19 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
 
 
 class FakeJellyfinClient:
-    def __init__(self, item_path, subtitle_path, *, already_visible=False):
+    def __init__(
+        self,
+        item_path,
+        subtitle_path,
+        *,
+        already_visible=False,
+        requires_full_refresh=False,
+    ):
         self.item_path = item_path
         self.subtitle_path = subtitle_path
         self.already_visible = already_visible
+        self.requires_full_refresh = requires_full_refresh
+        self.full_refresh_seen = False
         self.calls: list[tuple[str, str]] = []
         self.playback_calls = 0
 
@@ -298,7 +307,12 @@ class FakeJellyfinClient:
             return {"Items": [{"Id": "exact-item", "Path": self.item_path}]}
         if path == "/Items/exact-item/PlaybackInfo":
             self.playback_calls += 1
-            visible = self.already_visible or self.playback_calls >= 2
+            if self.already_visible:
+                visible = True
+            elif self.requires_full_refresh:
+                visible = self.full_refresh_seen
+            else:
+                visible = self.playback_calls >= 2
             streams = []
             if visible:
                 streams.append(
@@ -316,6 +330,8 @@ class FakeJellyfinClient:
                 ]
             }
         if path.startswith("/Items/exact-item/Refresh?"):
+            if "MetadataRefreshMode=FullRefresh" in path:
+                self.full_refresh_seen = True
             return None
         raise AssertionError("unexpected Jellyfin call: " + method + " " + path)
 
@@ -337,6 +353,44 @@ def smoke_jellyfin_exact_refresh():
         sum(path.startswith("/Items/exact-item/Refresh?") for _, path in client.calls)
         == 1,
         "JELLYFIN_ITEM_REFRESH_ONCE",
+    )
+
+    full_refresh = FakeJellyfinClient(
+        item_path,
+        subtitle_path,
+        requires_full_refresh=True,
+    )
+    result = recognize_jellyfin_external_subtitle(
+        full_refresh,
+        video_relative="AAA/AAA-001/AAA-001.mp4",
+        subtitle_relative="AAA/AAA-001/AAA-001.ko.srt",
+        poll_interval_seconds=0,
+        max_attempts=2,
+    )
+    require(
+        result.external_visible is True,
+        "JELLYFIN_FULL_REFRESH_RECOGNIZED",
+    )
+    refresh_paths = [
+        path
+        for _, path in full_refresh.calls
+        if path.startswith("/Items/exact-item/Refresh?")
+    ]
+    require(
+        len(refresh_paths) == 2,
+        "JELLYFIN_DEFAULT_THEN_FULL_REFRESH",
+    )
+    require(
+        "MetadataRefreshMode=Default" in refresh_paths[0],
+        "JELLYFIN_DEFAULT_REFRESH_FIRST",
+    )
+    require(
+        "MetadataRefreshMode=FullRefresh" in refresh_paths[1],
+        "JELLYFIN_FULL_REFRESH_SECOND",
+    )
+    require(
+        "FullRefresh" in result.refresh_method,
+        "JELLYFIN_FULL_REFRESH_PROVENANCE",
     )
 
     already = FakeJellyfinClient(

@@ -476,6 +476,35 @@ def recognize_jellyfin_external_subtitle(
                 time.sleep(float(poll_interval_seconds))
 
     if stream is None:
+        full_refresh_query = urlencode(
+            {
+                "MetadataRefreshMode": "FullRefresh",
+                "ImageRefreshMode": "Default",
+                "ReplaceAllImages": "false",
+                "ReplaceMetadata": "false",
+                "RegenerateThumbnail": "false",
+            }
+        )
+        try:
+            client._request(
+                "POST",
+                "/Items/" + item_id + "/Refresh?" + full_refresh_query,
+            )
+        except JellyfinError as error:
+            raise Stage12BatchSystemicError(
+                "Jellyfin item-specific full refresh failed"
+            ) from error
+        refresh_method = (
+            "POST /Items/{itemId}/Refresh Default->FullRefresh"
+        )
+        for attempt in range(max_attempts):
+            stream = matching_stream()
+            if stream is not None:
+                break
+            if attempt + 1 < max_attempts:
+                time.sleep(float(poll_interval_seconds))
+
+    if stream is None:
         raise Stage12BatchTitleError(
             "Jellyfin external Korean subtitle not recognized"
         )

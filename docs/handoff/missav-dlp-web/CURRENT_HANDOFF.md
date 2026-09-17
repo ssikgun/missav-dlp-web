@@ -1187,3 +1187,102 @@ Resume only the four unfinished members of the original canary:
 Use a fresh batch/runtime namespace and the current production contract:
 cue64, repeat-v2, 600-second inactivity timeout, 3600-second absolute timeout,
 retry count 2, and exact-process Hermes orphan cleanup.
+
+## 2026-09-18 — Pending4 canary closure and Jellyfin FullRefresh fallback
+
+### Pending4 canary final result
+
+The four-title continuation canary ran on the current Stage11/Stage12
+production contract:
+
+- semantic policy: `stage11-stateful-cue64-v1`
+- model input: `stage11-model-input=repeat-v2`
+- inactivity timeout: 600 seconds
+- absolute timeout: 3600 seconds
+- model retries: 2
+- exact-process Hermes orphan cleanup retained
+
+Selected titles:
+
+1. EYAN-228
+2. FBOS-015
+3. FC2-PPV-4451371
+4. FC2-PPV-4551303
+
+Final title states:
+
+- EYAN-228: `PUBLISHED`
+- FBOS-015: `PUBLISHED`
+- FC2-PPV-4451371: `PUBLISHED`
+- FC2-PPV-4551303: `PUBLISHED`
+
+EYAN-228 confirmed the malformed-external-JA fallback fix in production:
+the unsafe external Japanese candidate was rejected and the title continued
+through `ASR_ONLY` instead of aborting the batch.
+
+The canary also confirmed title-level isolation. FC2-PPV-4451371 encountered
+a Jellyfin recognition failure after successful Stage11 generation and NAS
+publication, but the serial batch continued and FC2-PPV-4551303 completed
+successfully.
+
+### FC2-PPV-4451371 Jellyfin recovery
+
+For FC2-PPV-4451371:
+
+- Stage11 result: PASS
+- NAS publication: PASS
+- durable CLEAN SHA-256:
+  `c2e76532d5ba84b335815b1a7ca88a3e9a4300f1f4203e75e9709c08d2669fdb`
+- NAS destination SHA matched the durable CLEAN artifact exactly
+- Jellyfin Default item refresh did not discover the new external subtitle
+- item-specific `MetadataRefreshMode=FullRefresh` discovered the exact
+  external Korean SUBRIP stream
+- official `Stage12RolloutStateStore.reconcile_published()` was used
+- no controller rerun
+- no translation rerun
+- no NAS rewrite
+- final state: `PUBLISHED`
+- reconciliation reason: `PUBLICATION_RECONCILED`
+
+### Generic Jellyfin production hardening
+
+`teddy_discovery_stage12_batch.py` now retains the existing bounded
+item-specific Default refresh first.
+
+If the exact external Korean subtitle is still not visible after that polling
+window, the same exact Jellyfin item receives one item-specific FullRefresh,
+followed by the same bounded PlaybackInfo polling.
+
+This is generic behavior:
+
+- no DVD-ID-specific branch
+- no title-specific path rule
+- no subtitle-text-specific logic
+- no library-wide refresh
+- existing exact item/path/language/codec checks remain unchanged
+
+Validation completed before handoff update:
+
+- Python compile: PASS
+- `teddy_discovery_stage12_batch_smoke.py`: PASS
+- `teddy_discovery_stage12_rollout_smoke.py`: PASS
+- `git diff --check`: PASS
+
+### Current Stage12 rollout state
+
+- PUBLISHED: `29`
+- PENDING: `143`
+- FAILED_RETRYABLE: `0`
+- FAILED_TERMINAL: `0`
+- RUNNING: `0`
+- GENERATED: `0`
+- UNRESOLVED: `1`
+
+The one UNRESOLVED title remains JUR-750 and stays isolated from normal
+PENDING rollout work.
+
+### Next action
+
+Resume Stage12 from the remaining ordinary `PENDING` titles under the current
+generic production contract. Do not rerun already `PUBLISHED` titles.
+Do not automatically include JUR-750 in normal PENDING processing.
