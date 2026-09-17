@@ -1095,3 +1095,95 @@ Remaining work:
 - the unresolved title is JUR-750 with its noncanonical KO sidecar condition
 
 DASS-884 must not be retried again unless a new regression is discovered.
+
+## 2026-09-17 — Pending5 malformed external JA fallback incident
+
+### Incident
+
+The first current-policy five-title Stage12 PENDING canary selected:
+
+- EROFV-390
+- EYAN-228
+- FBOS-015
+- FC2-PPV-4451371
+- FC2-PPV-4551303
+
+EROFV-390 completed successfully:
+
+- route: `ASR_ONLY`
+- Stage11: PASS
+- NAS publication: PASS
+- Jellyfin recognition: PASS
+- final rollout state: `PUBLISHED`
+
+The batch then claimed EYAN-228 as `RUNNING`.
+
+Its external Japanese subtitle contained an invalid control character during
+lexical alignment. `normalize_japanese_for_matching()` correctly raised
+`AlignmentValidationError`, but the live external-JA adapter mapped only
+`AlignmentLimitError` into `ExternalSubtitleValidationError`.
+
+That validation error therefore escaped the intended external-subtitle
+fallback boundary and Stage12 conservatively promoted the unexpected
+exception to `Stage12BatchSystemicError`, stopping the serial batch.
+
+### Generic fix
+
+Production code now maps generic `AlignmentValidationError` from external-JA
+alignment to `ExternalSubtitleValidationError`.
+
+This preserves the existing controller contract:
+
+malformed external JA -> external validation failure -> `ASR_ONLY`
+
+The existing specialized `AlignmentLimitError` message remains unchanged.
+
+No DVD-ID, title, cue, literal subtitle text, or work-specific production
+condition was added.
+
+Source-fix commit before this handoff update:
+
+- `26b09202a87096726bfb1dd796a641c55b61d0b9`
+
+Validation:
+
+- alignment fallback smoke: PASS
+- Stage11 live adapters smoke: PASS
+- Stage11 controller smoke: PASS
+- Stage12 batch smoke: PASS
+- `git diff --check`: PASS
+
+### Crash recovery
+
+After the failed batch process had exited and all exact CT120 Hermes runtime
+PID/meta markers were confirmed absent, EYAN-228 was recovered through the
+existing official `Stage12RolloutStateStore.recover_running()` path:
+
+`RUNNING -> PENDING`
+
+Reason:
+
+- `CRASH_RECOVERY`
+
+EROFV-390 must not be rerun.
+
+Current rollout counts after recovery:
+
+- `PUBLISHED=25`
+- `PENDING=147`
+- `RUNNING=0`
+- `UNRESOLVED=1`
+- `FAILED_RETRYABLE=0`
+
+### Next action
+
+Resume only the four unfinished members of the original canary:
+
+1. EYAN-228
+2. FBOS-015
+3. FC2-PPV-4451371
+4. FC2-PPV-4551303
+
+Use a fresh batch/runtime namespace and the current production contract:
+cue64, repeat-v2, 600-second inactivity timeout, 3600-second absolute timeout,
+retry count 2, and exact-process Hermes orphan cleanup.
