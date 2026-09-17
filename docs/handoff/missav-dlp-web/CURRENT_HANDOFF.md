@@ -950,3 +950,77 @@ Two `FAILED_RETRYABLE` titles remain:
 - DASS-884
 
 EBWH-350 must not be retried again unless a new regression is discovered.
+
+## 2026-09-17 — DVDES-795 production recovery PASS
+
+### Final result
+
+DVDES-795 Stage12 recovery completed successfully.
+
+Production result:
+
+- semantic session: fresh repeat-v2 session
+- total cues: 1594
+- total parts: 25
+- all 25 parts validated and promoted
+- Stage11 result: PASS
+- NAS publication: PASS
+- Jellyfin recognition: PASS
+- final rollout state: `PUBLISHED`
+- destination: `DVDES/DVDES-795/DVDES-795.ko.srt`
+
+Final rollout counts:
+
+- `PUBLISHED=23`
+- `FAILED_RETRYABLE=1`
+- `PENDING=148`
+- `UNRESOLVED=1`
+
+### Missing-pending regression proof
+
+DVDES-795 previously failed after Hermes returned PASS for part 5 because the remote pending artifact was missing and the generic error path was treated as systemic.
+
+The frozen generic fix introduced:
+
+- `StatefulLiveRunnerPendingArtifactError`
+- only the exact missing-pending condition is title-level retryable
+- unrelated remote read/safety/systemic failures remain systemic
+- previously promoted parts remain preserved
+
+The production recovery passed the original failure boundary:
+
+- part 5 validated successfully
+- `PROMOTED_PART=5/25`
+- execution continued through all 25 parts
+- no validator weakening was required
+
+This is the production proof for the missing-pending recovery contract.
+
+### Current production policy
+
+The successful recovery used:
+
+- `stage11-model-input=repeat-v2`
+- `stage11-stateful-cue64-v1`
+- inactivity timeout: 600 seconds
+- absolute timeout: 3600 seconds
+- current Stage11 validators unchanged
+- fresh semantic session; previous failed session was not reused
+
+### Runtime cleanup verification
+
+Post-run verification:
+
+- local canary runner: exited
+- `.stage11-hermes-runtime.pid`: absent
+- `.stage11-hermes-runtime.meta`: absent
+
+No runtime ownership marker remained on CT120 after successful completion.
+
+### Remaining Stage12 failure
+
+Only one `FAILED_RETRYABLE` title remains:
+
+- `DASS-884`
+
+`DVDES-795` must not be retried again unless a new regression is discovered.
