@@ -1500,3 +1500,51 @@ Offline validation required before commit:
 
 The next checkpoint is a read-only bulk preflight on the committed clean
 worktree. Actual 143-title execution remains separately authorization-gated.
+
+## 2026-09-18 — Stage12 production first4 PASS
+
+Formal production Stage12 bulk execution was started with the repository
+runner `teddy_discovery_stage12_bulk_runner.py`.
+
+First production batch:
+
+- FC2-PPV-4555371
+- FC2-PPV-4575470
+- FC2-PPV-4592689
+- FC2-PPV-4640215
+
+Result:
+
+- processed: 4
+- published: 4
+- FAILED_RETRYABLE: 0
+- FAILED_TERMINAL: 0
+- systemic failure: none
+
+Durable rollout state after completion:
+
+- PUBLISHED: 33
+- PENDING: 139
+- UNRESOLVED: 1
+- RUNNING/GENERATED: 0
+
+The production runner heartbeat operated correctly and the Downloader
+Settings mini-panel showed the current DVD ID and active processing state.
+
+Deferred mini-panel improvements for the future File Management tab:
+
+1. match the Downloader dark theme
+2. replace internal stage names such as `STAGE11` with plain Korean labels
+   such as `자막 생성·번역 중`
+3. expose real stateful part progress from the execution path and show
+   `current part / total parts` plus optional percentage
+
+Do not derive part progress heuristically. It must come from the actual
+stateful/Hermes part execution state.
+
+Next operation:
+
+- launch the same formal production runner for all remaining ordinary
+  PENDING titles
+- no new canary implementation
+- no title-specific production logic
