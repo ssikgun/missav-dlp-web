@@ -1548,3 +1548,64 @@ Next operation:
   PENDING titles
 - no new canary implementation
 - no title-specific production logic
+
+## 2026-09-19 — Stage12 malformed external JA incident
+
+The long-running Stage12 production bulk stopped during batch 9.
+
+Durable state at the stop:
+
+- PUBLISHED: 63
+- PENDING: 104
+- FAILED_RETRYABLE: 4
+- RUNNING: 1
+- UNRESOLVED: 1
+- stuck RUNNING title: `HAWA-345`
+
+The bulk process was no longer running and heartbeat finalized as ERROR.
+
+Root cause was confirmed by an exact route-only replay using the already
+persisted HAWA-345 baseline artifact:
+
+- external Japanese subtitle SRT contained an invalid non-positive cue index
+- subtitle parser raised `SubtitleParseError`
+- immutable Hybrid construction wrapped this as
+  `HybridEvidenceValidationError`
+- the live external-JA adapter did not map that evidence-validation failure
+  into its normal external-subtitle validation boundary
+- Stage12 therefore treated it as an unexpected systemic Stage11 exception
+  and stopped the entire bulk run
+
+This is a generic malformed-external-subtitle boundary defect, not a
+HAWA-345-specific rule.
+
+Generic fix:
+
+- `build_external_ja_adapter()` now catches
+  `HybridEvidenceValidationError` while constructing immutable external
+  Hybrid evidence
+- it maps the error to `ExternalSubtitleValidationError`
+- the existing Stage11 route selector then conservatively rejects the bad
+  external subtitle and continues as `ASR_ONLY`
+
+Validation after the fix:
+
+- `git diff --check`: PASS
+- Python compile: PASS
+- Stage11 live-adapter smoke: PASS
+- Stage11 controller smoke: 46 PASS
+- Stage12 batch smoke: PASS
+- Stage12 bulk-runner smoke: PASS
+- production HAWA-345 route-only replay:
+  - `ROUTE=ASR_ONLY`
+  - `EXTERNAL_OUTCOME=VALIDATION_FAILURE`
+  - `ALIGNMENT_OUTCOME=NOT_ATTEMPTED`
+
+No title/DVD-specific production branch was added.
+
+HAWA-345 has durable baseline ASR and targeted second evidence but no
+first-pass staging, CLEAN subtitle, controller report, Stage12 GENERATED
+state, publication, or Jellyfin update.
+
+Explicit `RUNNING -> PENDING` crash recovery is required before resuming
+ordinary bulk processing.

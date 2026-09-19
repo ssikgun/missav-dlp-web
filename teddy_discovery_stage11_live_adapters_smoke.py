@@ -145,6 +145,28 @@ def main():
             provider=provider, acceptance_policy=policy, residual_threshold_ms=100)
         accepted = external(fixture.fixture.holding(), baseline)
         assert accepted.decision.verdict == "ACCEPT_HYBRID"
+
+        malformed_provider = SubtitleCatProvider(
+            fetch_detail=lambda url: SubtitleCatDetailPage(
+                url,
+                '<html><a href="test-ja.srt">Japanese</a></html>',
+            ),
+            payload_fetcher=lambda candidate: (
+                b"0\n"
+                b"00:00:00,000 --> 00:00:01,000\n"
+                b"broken\n"
+            ),
+        )
+        expect(
+            ExternalSubtitleValidationError,
+            lambda: adapters.build_external_ja_adapter(
+                discovery=discovery(True),
+                provider=malformed_provider,
+                acceptance_policy=policy,
+                residual_threshold_ms=100,
+            )(fixture.fixture.holding(), baseline),
+        )
+        print("PASS malformed immutable external payload maps to validation failure")
         assert adapters.build_external_ja_adapter(discovery=discovery(False),
             provider=provider, acceptance_policy=policy,
             residual_threshold_ms=100)(fixture.fixture.holding(), baseline) is None

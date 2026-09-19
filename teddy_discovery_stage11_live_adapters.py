@@ -28,6 +28,7 @@ from teddy_discovery_alignment_acceptance import ACCEPT_HYBRID, decide_alignment
 from teddy_discovery_alignment_application import apply_alignment_acceptance
 from teddy_discovery_hybrid_evidence import (
     HybridEvidenceBundle, HybridAlignmentProvenance,
+    HybridEvidenceValidationError,
     ALIGNMENT_PROVENANCE_UNRESOLVED,
 )
 from teddy_discovery_subtitlecat_discovery import SubtitleCatSearchError
@@ -163,12 +164,17 @@ def build_external_ja_adapter(*, discovery, provider, acceptance_policy,
         payload = provider.fetch_original_japanese_payload(
             dvd_id=title, detail_url=found.candidates[0].detail_url,
         )
-        bundle = HybridEvidenceBundle.from_external_ja_and_asr(
-            dvd_id=title, external_ja_payload=payload, asr_result=asr_result,
-            alignment=HybridAlignmentProvenance(
-                ALIGNMENT_PROVENANCE_UNRESOLVED, "lexical-affine",
-            ),
-        )
+        try:
+            bundle = HybridEvidenceBundle.from_external_ja_and_asr(
+                dvd_id=title, external_ja_payload=payload, asr_result=asr_result,
+                alignment=HybridAlignmentProvenance(
+                    ALIGNMENT_PROVENANCE_UNRESOLVED, "lexical-affine",
+                ),
+            )
+        except HybridEvidenceValidationError as error:
+            raise ExternalSubtitleValidationError(
+                "external subtitle immutable payload validation failed"
+            ) from error
         try:
             alignment = infer_robust_affine_alignment(
                 select_monotonic_anchors(
