@@ -1609,3 +1609,22 @@ state, publication, or Jellyfin update.
 
 Explicit `RUNNING -> PENDING` crash recovery is required before resuming
 ordinary bulk processing.
+
+### 2026-09-19 crash recovery completed
+
+After confirming the old bulk PID was dead, HAWA-345 was the only active
+rollout title, no GENERATED state existed, no Stage11 CLEAN/report existed,
+and the canonical NAS Korean subtitle destination was absent,
+`Stage12RolloutStateStore.recover_running("HAWA-345")` was executed.
+
+Post-recovery durable state:
+
+- HAWA-345: PENDING
+- PENDING: 105
+- PUBLISHED: 63
+- FAILED_RETRYABLE: 4
+- UNRESOLVED: 1
+- RUNNING/GENERATED: 0
+
+The four FAILED_RETRYABLE titles remain excluded from ordinary PENDING bulk
+selection and will be handled separately after the ordinary PENDING queue.
