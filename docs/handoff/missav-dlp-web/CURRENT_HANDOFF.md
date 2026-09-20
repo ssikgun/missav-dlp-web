@@ -6,11 +6,19 @@
 
 ## 0. 2026-09-20 HMN-899 Stage12 systemic-stop forensic and fix
 
-The production rollout remains intentionally untouched after the stopped bulk
-run: `HMN-899` is still `RUNNING` at transition sequence 2 with reason
-`STAGE12_BATCH_START`, and the bulk heartbeat remains `runner_state=ERROR`.
-No recovery, retry, publication, NAS subtitle write, Jellyfin write, or rollout
-DB write was performed during this investigation.
+The root-cause fix is committed as
+`e33dc36e83d03e863aafcebc1017cab089107a96`. After that forensic session,
+the operator completed the explicit crash recovery for `HMN-899`:
+`RUNNING -> PENDING`, reason `CRASH_RECOVERY`, transition sequence `2 -> 3`.
+There are now no active rollout IDs. The bulk runner has not been restarted,
+and no NAS or Jellyfin production write occurred during recovery.
+
+Current authoritative rollout state after recovery:
+
+- `PUBLISHED=65`, `PENDING=102`, `FAILED_RETRYABLE=5`, `UNRESOLVED=1`
+- `ACTIVE_IDS=[]`
+- `HMN-899=PENDING`, transition sequence 3, reason `CRASH_RECOVERY`
+- bulk runner not restarted
 
 Authoritative read-only state at investigation time:
 
@@ -58,10 +66,9 @@ Validation passed:
 - Stage12 batch and bulk-runner smokes
 - `git diff --check`
 
-Operator next action after deploying this commit: explicitly recover only the
-stale `HMN-899` `RUNNING` state through the approved recovery workflow, then
-restart the bulk runner under normal authorization. This was deliberately not
-done by the forensic session.
+Operator next action: restart the bulk runner under normal authorization. The
+stale `HMN-899` state has already been explicitly recovered; do not run crash
+recovery for it again.
 
 ## 1. Immediate Goal
 
