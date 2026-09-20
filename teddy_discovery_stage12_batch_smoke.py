@@ -8,6 +8,7 @@ import json
 from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 
+from teddy_discovery_asr_audio import ASRAudioValidationError
 from teddy_discovery_stage11_controller import (
     ALIGNMENT_NOT_ATTEMPTED,
     EXTERNAL_JA_TRANSPORT_FAILURE,
@@ -201,6 +202,7 @@ def controller_for(
     timeout_ids=(),
     runner_error_ids=(),
     pending_artifact_error_ids=(),
+    audio_error_ids=(),
     unexpected_ids=(),
 ):
     bundles = {}
@@ -216,6 +218,10 @@ def controller_for(
         if dvd_id in pending_artifact_error_ids:
             raise StatefulLiveRunnerPendingArtifactError(
                 "remote pending artifact missing after model invocation"
+            )
+        if dvd_id in audio_error_ids:
+            raise ASRAudioValidationError(
+                "audio frame timestamp has an unsafe discontinuity"
             )
         if dvd_id in timeout_ids:
             raise StatefulLiveRunnerTimeoutError(
@@ -260,6 +266,7 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
                 validation_retry_exhausted_ids=(), unexpected_ids=(),
                 timeout_ids=(), runner_error_ids=(),
                 pending_artifact_error_ids=(),
+                audio_error_ids=(),
                 jellyfin=recognition_for):
     return Stage12BatchRunner(
         store=store,
@@ -278,6 +285,7 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
             timeout_ids=timeout_ids,
             runner_error_ids=runner_error_ids,
             pending_artifact_error_ids=pending_artifact_error_ids,
+            audio_error_ids=audio_error_ids,
             unexpected_ids=unexpected_ids,
         ),
         jellyfin_recognizer=jellyfin,
@@ -637,6 +645,46 @@ def main():
             and pending_error_result.titles[2].final_state == STATE_PUBLISHED
             and pending_error_publisher.calls == ["AAA-001", "AAA-003"],
             "PENDING_ARTIFACT_FAILURE_TITLE_RETRYABLE_AND_BATCH_CONTINUES",
+        )
+
+        # A typed media timeline failure is operational for one title.  It is
+        # isolated without broadening unrelated programmer errors.
+        audio_error_root = Path(temp) / "audio-error-artifacts"
+        audio_error_root.mkdir()
+        audio_error_store = Stage12RolloutStateStore(
+            Path(temp) / "audio-error.sqlite3"
+        )
+        audio_error_store.initialize_from_inventory(
+            Stage12HoldingsInventoryReport(records[:3])
+        )
+        audio_error_nas = FakeNAS(records[:3])
+        audio_error_publisher = FakePublisher(audio_error_nas)
+        audio_error_calls: list[str] = []
+        audio_error_runner = make_runner(
+            audio_error_root,
+            records[:3],
+            audio_error_store,
+            controller_calls=audio_error_calls,
+            nas=audio_error_nas,
+            publisher=audio_error_publisher,
+            audio_error_ids={"AAA-002"},
+        )
+        audio_error_result = audio_error_runner.run(
+            Stage12BatchSelection(3, ("AAA-001", "AAA-002", "AAA-003"))
+        )
+        audio_error_provenance = json.loads(
+            audio_error_store.get(
+                "AAA-002"
+            ).last_transition_provenance_json
+        )
+        require(
+            audio_error_calls == ["AAA-001", "AAA-002", "AAA-003"]
+            and audio_error_result.titles[1].final_state
+            == STATE_FAILED_RETRYABLE
+            and audio_error_provenance["error_type"]
+            == "ASRAudioValidationError"
+            and audio_error_publisher.calls == ["AAA-001", "AAA-003"],
+            "AUDIO_FAILURE_TITLE_RETRYABLE_AND_BATCH_CONTINUES",
         )
 
         # An unrelated programmer exception remains systemic and stops the

@@ -2,7 +2,66 @@
 
 > Canonical handoff for the next chat/session.  Read this file first and continue from here rather than reconstructing Stage11/Stage12 from old chat history.
 >
-> Last refreshed for chat handoff: **2026-09-17 KST**
+> Last refreshed for chat handoff: **2026-09-20 KST**
+
+## 0. 2026-09-20 HMN-899 Stage12 systemic-stop forensic and fix
+
+The production rollout remains intentionally untouched after the stopped bulk
+run: `HMN-899` is still `RUNNING` at transition sequence 2 with reason
+`STAGE12_BATCH_START`, and the bulk heartbeat remains `runner_state=ERROR`.
+No recovery, retry, publication, NAS subtitle write, Jellyfin write, or rollout
+DB write was performed during this investigation.
+
+Authoritative read-only state at investigation time:
+
+- `PUBLISHED=65`, `PENDING=101`, `FAILED_RETRYABLE=5`, `RUNNING=1`,
+  `UNRESOLVED=1`
+- `HMN-899` rollout source: `HMN/HMN-899/HMN-899.mp4`, size
+  `3847055679`, mtime_ns `1788055221873611116`
+- exact NAS `lstat`, obtained through
+  `teddy_discovery_stage12_rollout.build_nas_preflight_filesystem`, matched all
+  three identities and confirmed a regular file
+
+A bounded `/tmp` forensic reproduction copied the exact canonical source,
+verified the copied snapshot, and requested only the first production-shaped
+600-second audio chunk. Source copy succeeded in about 30 seconds. Audio decode
+then raised exactly:
+
+`teddy_discovery_asr_audio.ASRAudioValidationError: audio frame timestamp has an unsafe discontinuity`
+
+The exception had no `__cause__` and no unsuppressed `__context__`; that single
+exception is the complete chain. It occurred in `_validate_frame_timeline()`
+while advancing `iter_audio_chunks()`, before the first chunk was yielded, so
+the Remote ASR HTTP boundary was never called.
+
+Root cause of the bulk-wide stop was a Stage12 typed-boundary omission.
+`FullTitleASRTranscriber` deliberately preserves `ASRAudioError` from its audio
+iterator, but `Stage12BatchRunner._is_title_exception()` did not recognize that
+typed operational media failure. `_run_one()` consequently wrapped it as
+`Stage12BatchSystemicError("unexpected Stage11 title execution exception")` and
+stopped the immutable batch while leaving the already-transitioned title
+`RUNNING`.
+
+The minimal generic fix adds only the `ASRAudioError` hierarchy to the Stage12
+title-exception tuple. It does not catch all `Exception` or all `ASRError`, does
+not weaken audio validation, and has no DVD/title-specific condition. A new
+Stage12 batch regression proves that the exact `ASRAudioValidationError` is
+recorded as `FAILED_RETRYABLE` and the next selected title proceeds; existing
+tests continue to prove unrelated `RuntimeError`, generic live-runner,
+deployment, and explicit systemic failures stop the batch.
+
+Validation passed:
+
+- Python compile for the changed batch module and smoke
+- Stage11 ASR source, audio, Remote ASR, and full-title transcriber smokes
+- Stage11 live-adapters and controller smokes
+- Stage12 batch and bulk-runner smokes
+- `git diff --check`
+
+Operator next action after deploying this commit: explicitly recover only the
+stale `HMN-899` `RUNNING` state through the approved recovery workflow, then
+restart the bulk runner under normal authorization. This was deliberately not
+done by the forensic session.
 
 ## 1. Immediate Goal
 

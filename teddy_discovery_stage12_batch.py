@@ -22,6 +22,7 @@ from teddy_discovery_jellyfin import (
     JellyfinError,
     jellyfin_media_path,
 )
+from teddy_discovery_asr_audio import ASRAudioError
 from teddy_discovery_stage11_controller import (
     Stage11ControllerError,
     Stage11ControllerResult,
@@ -763,6 +764,7 @@ class Stage12BatchRunner:
             (
                 Stage12BatchTitleError,
                 Stage11ControllerError,
+                ASRAudioError,
                 StatefulSemanticOutputValidationRetryExhausted,
                 StatefulLiveRunnerPendingArtifactError,
                 StatefulLiveRunnerTimeoutError,
