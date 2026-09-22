@@ -1,6 +1,21 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
-## 2026-09-22 SNOS-120 Stage12 timeout forensic
+## 2026-09-22 SNOS-120 Stage12 timeout forensic and recovery
+
+The timeout cleanup fix is committed as
+`2f26fe54e6c83029df5c7c9b06ea9f6cacdd76b4`. After that fix, the
+operator completed explicit crash recovery for SNOS-120: `RUNNING -> PENDING`,
+reason `CRASH_RECOVERY`, transition sequence `2 -> 3`.
+
+Current authoritative rollout state after recovery:
+
+- `PUBLISHED=128`, `PENDING=28`, `FAILED_RETRYABLE=16`, `UNRESOLVED=1`
+- `ACTIVE_IDS=[]`
+- `SNOS-120=PENDING`, transition sequence 3, reason `CRASH_RECOVERY`
+- Bulk runner has not been restarted; no NAS/Jellyfin production write occurred.
+- CT120 has no orphan process for the SNOS-120 session.
+
+The counts below describe the earlier forensic snapshot before recovery.
 
 At authorized HEAD `1208ce107a4ecc919fa90b254365a8e447c2fdda`, the
 production bulk runner stopped on SNOS-120 (session
@@ -41,13 +56,13 @@ programmer/systemic retention), Stage12 bulk runner smoke, Python compile,
 and `git diff --check` all passed. No production Hermes retry, DB write,
 `recover_running()`, NAS/Jellyfin write, bulk restart, or remote kill occurred.
 
-Operator next action: inspect the committed fix and explicitly decide whether
-to recover the stale SNOS-120 `RUNNING` transition before any authorized bulk
-restart. This forensic task did not perform that recovery.
+Operator next action: review the recovered `PENDING` state and the committed
+timeout fix before any separately authorized bulk restart. Do not recover
+SNOS-120 again.
 
 > Canonical handoff for the next chat/session.  Read this file first and continue from here rather than reconstructing Stage11/Stage12 from old chat history.
 >
-> Last refreshed for chat handoff: **2026-09-20 KST**
+> Last refreshed for chat handoff: **2026-09-22 KST**
 
 ## 0. 2026-09-20 HMN-899 Stage12 systemic-stop forensic and fix
 
