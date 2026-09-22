@@ -1,5 +1,50 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-22 SNOS-120 Stage12 timeout forensic
+
+At authorized HEAD `1208ce107a4ecc919fa90b254365a8e447c2fdda`, the
+production bulk runner stopped on SNOS-120 (session
+`28586729-7f58-5b69-99de-194a0e081567`, 564 cues, 9 parts). Read-only
+rollout DB evidence: `PUBLISHED=128`, `PENDING=27`, `FAILED_RETRYABLE=16`,
+`RUNNING=1` (SNOS-120), `UNRESOLVED=1`; SNOS-120 transition sequence 2,
+reason `STAGE12_BATCH_START`. No runner process was present on CT108. CT120
+read-only process and runtime-marker checks found no process or marker for the
+session at investigation time; no orphan cleanup was performed.
+
+Root cause: `_invoke_hermes_part()` observed an inactivity timeout after
+600 seconds without output, stopped local SSH, then called remote timeout
+cleanup. The remote script emitted `REMOTE_TIMEOUT_CLEANUP_RESULT=CMDLINE_MISMATCH`
+and exited 26, preserving its fail-closed PID identity check. That exit made
+`_cleanup_timed_out_remote_hermes()` raise exactly `StatefulLiveRunnerError(
+"remote Hermes timeout cleanup failed")`, with no explicit cause or context.
+It happened before `_invoke_hermes_part()` could construct its typed
+`StatefulLiveRunnerTimeoutError`. Its broad diagnostic handler printed
+`HERMES_INVOCATION_TIMEOUT_REASON=NONE` and `RESULT=FAIL` because that handler
+does not pass the already-set timeout reason. Stage12's exact title-exception
+boundary does not classify generic `StatefulLiveRunnerError`, so it wrapped
+the error in `Stage12BatchSystemicError("unexpected Stage11 title execution
+exception")`. The production log does not contain a Python traceback; this
+exception chain is established from its unique marker sequence and the
+authorized source path.
+
+Generic fix: once timeout is observed, catch only `StatefulLiveRunnerError`
+from remote cleanup and retain it as the explicit `__cause__` of the primary
+`StatefulLiveRunnerTimeoutError`. Emit the original timeout reason and
+`RESULT=TIMEOUT`. The remote cmdline/CWD/session/PGID checks and fail-closed
+behavior remain unchanged. Unexpected programming or transport exceptions
+remain systemic.
+
+Validation: stateful live runner smoke, timeout smoke (including stalled fake
+process, successful remote process-group cleanup, cleanup failure and exact
+CMDLINE_MISMATCH exception), Stage12 batch smoke (timeout isolation and
+programmer/systemic retention), Stage12 bulk runner smoke, Python compile,
+and `git diff --check` all passed. No production Hermes retry, DB write,
+`recover_running()`, NAS/Jellyfin write, bulk restart, or remote kill occurred.
+
+Operator next action: inspect the committed fix and explicitly decide whether
+to recover the stale SNOS-120 `RUNNING` transition before any authorized bulk
+restart. This forensic task did not perform that recovery.
+
 > Canonical handoff for the next chat/session.  Read this file first and continue from here rather than reconstructing Stage11/Stage12 from old chat history.
 >
 > Last refreshed for chat handoff: **2026-09-20 KST**

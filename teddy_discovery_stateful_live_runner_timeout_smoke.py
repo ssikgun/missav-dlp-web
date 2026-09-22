@@ -228,6 +228,82 @@ def main():
         "TIMEOUT_EMITS_COMPLETE_TIMING_DIAGNOSTICS",
     )
 
+    mismatch_output = io.StringIO()
+    cleanup_failure = live_runner.StatefulLiveRunnerError(
+        "remote Hermes timeout cleanup failed"
+    )
+    with (
+        patch.object(
+            live_runner,
+            "_ssh_base",
+            return_value=[sys.executable, "-u", "-c", "import time; time.sleep(2)"],
+        ),
+        patch.object(
+            live_runner,
+            "_cleanup_timed_out_remote_hermes",
+            side_effect=cleanup_failure,
+        ),
+        redirect_stdout(mismatch_output),
+    ):
+        try:
+            live_runner._invoke_hermes_part(
+                remote="synthetic@offline",
+                ssh_key="/synthetic/key",
+                known_hosts="/synthetic/known-hosts",
+                remote_task="/synthetic/remote-task",
+                session_id="00000000-0000-4000-8000-000000000001",
+                query="synthetic part query",
+                turn_timeout=0.25,
+                absolute_timeout=1.0,
+            )
+        except live_runner.StatefulLiveRunnerTimeoutError as error:
+            mismatch_error = error
+        else:
+            raise AssertionError("cleanup failure covered the timeout")
+    check(
+        mismatch_error.timeout_reason == "INACTIVITY_TIMEOUT"
+        and mismatch_error.__cause__ is cleanup_failure
+        and mismatch_error.__context__ is None
+        and "HERMES_INVOCATION_TIMEOUT_REASON=INACTIVITY_TIMEOUT"
+        in mismatch_output.getvalue()
+        and "HERMES_INVOCATION_RESULT=TIMEOUT" in mismatch_output.getvalue(),
+        "TIMEOUT_CLEANUP_FAILURE_PRESERVES_PRIMARY_EXCEPTION",
+    )
+
+    mismatch_marker_output = io.StringIO()
+    with (
+        patch.object(live_runner, "_ssh_base", return_value=["synthetic-ssh"]),
+        patch.object(
+            live_runner.subprocess,
+            "run",
+            return_value=SimpleNamespace(
+                returncode=26,
+                stdout=b"REMOTE_TIMEOUT_CLEANUP_RESULT=CMDLINE_MISMATCH\n",
+                stderr=b"",
+            ),
+        ),
+        redirect_stdout(mismatch_marker_output),
+    ):
+        try:
+            live_runner._cleanup_timed_out_remote_hermes(
+                remote="synthetic@offline",
+                ssh_key="/synthetic/key",
+                known_hosts="/synthetic/known-hosts",
+                remote_task="/synthetic/remote-task",
+                session_id="00000000-0000-4000-8000-000000000001",
+            )
+        except live_runner.StatefulLiveRunnerError as error:
+            check(
+                type(error) is live_runner.StatefulLiveRunnerError
+                and error.__cause__ is None
+                and error.__context__ is None
+                and "REMOTE_TIMEOUT_CLEANUP_RESULT=CMDLINE_MISMATCH"
+                in mismatch_marker_output.getvalue(),
+                "CMDLINE_MISMATCH_CLEANUP_EXACT_EXCEPTION",
+            )
+        else:
+            raise AssertionError("cmdline mismatch cleanup unexpectedly passed")
+
     stdout_activity_output = io.StringIO()
     with redirect_stdout(stdout_activity_output), redirect_stderr(io.StringIO()):
         invoke_synthetic(

@@ -931,6 +931,7 @@ test "$rok" -eq 1
     last_output_activity_monotonic: float | None = None
     timeout_reason: str | None = None
     timeout_observed_monotonic: float | None = None
+    timeout_cleanup_error: StatefulLiveRunnerError | None = None
     try:
         process = subprocess.Popen(
             command,
@@ -1042,13 +1043,19 @@ test "$rok" -eq 1
                     else None
                 )
                 _stop_hermes_process(process, selector)
-                _cleanup_timed_out_remote_hermes(
-                    remote=remote,
-                    ssh_key=ssh_key,
-                    known_hosts=known_hosts,
-                    remote_task=remote_task,
-                    session_id=session_id,
-                )
+                try:
+                    _cleanup_timed_out_remote_hermes(
+                        remote=remote,
+                        ssh_key=ssh_key,
+                        known_hosts=known_hosts,
+                        remote_task=remote_task,
+                        session_id=session_id,
+                    )
+                except StatefulLiveRunnerError as error:
+                    # Cleanup is fail-closed. Preserve the already-observed
+                    # operational timeout and retain the cleanup failure as
+                    # its explicit cause for forensic inspection.
+                    timeout_cleanup_error = error
             else:
                 return_code = process.wait()
                 seconds_since_last_output_activity = (
@@ -1117,7 +1124,7 @@ test "$rok" -eq 1
             ),
             result="TIMEOUT",
         )
-        raise StatefulLiveRunnerTimeoutError(
+        timeout_error = StatefulLiveRunnerTimeoutError(
             timeout_seconds=(
                 turn_timeout
                 if timeout_reason == "INACTIVITY_TIMEOUT"
@@ -1132,7 +1139,10 @@ test "$rok" -eq 1
             seconds_since_last_output_activity=(
                 seconds_since_last_output_activity
             ),
-        ) from TimeoutError(timeout_reason)
+        )
+        if timeout_cleanup_error is not None:
+            raise timeout_error from timeout_cleanup_error
+        raise timeout_error from TimeoutError(timeout_reason)
 
     result_status = "PASS" if return_code == 0 else "FAIL"
     _print_hermes_invocation_diagnostics(
