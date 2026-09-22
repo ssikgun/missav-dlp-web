@@ -1754,3 +1754,124 @@ Post-recovery durable state:
 
 The four FAILED_RETRYABLE titles remain excluded from ordinary PENDING bulk
 selection and will be handled separately after the ordinary PENDING queue.
+
+## 2026-09-23 — Stage12 bulk complete and failure forensic
+
+The formal Stage12 bulk live run completed normally. This is the latest
+authoritative production state and supersedes earlier pending-count and
+next-operation notes in this handoff:
+
+- `STAGE12_BULK_LIVE=COMPLETE`
+- `PROCESSED_THIS_RUN=28`
+- final rollout: `PUBLISHED=152`, `FAILED_RETRYABLE=20`, `UNRESOLVED=1`,
+  `PENDING=0`
+- final publications, including `VEC-737` and `VEMA-246`, completed normally
+
+A read-only forensic pass compared the rollout DB events and provenance,
+existing bulk logs, local artifacts/staging, and current repository code.
+No rollout state, retry, recovery, live execution, NAS/Jellyfin write, or
+source change was made during that pass.
+
+### FAILED_RETRYABLE — ASR audio timeline validation (9)
+
+Titles:
+
+- `HMN-899`
+- `NHDTC-250`
+- `PRED-889`
+- `SGKI-075`
+- `SGKI-106`
+- `SNOS-334`
+- `SVFLA-014`
+- `SW-216`
+- `NIMA-059`
+
+Exact recorded failures:
+
+- Eight titles: `ASRAudioValidationError: audio frame timestamp has an unsafe
+  discontinuity`
+- `NIMA-059`: `ASRAudioValidationError: resampler output cannot reconcile to
+  source end`
+
+These failures occurred in ASR audio decoding/validation, before Remote ASR,
+semantic translation, artifact validation, publication, NAS, or Jellyfin.
+The current code isolates typed `ASRAudioError` failures to individual titles,
+so they no longer stop the batch; this does not repair the source timeline or
+the underlying audio validation failure. Blind retry against the same source
+is not expected to resolve it.
+
+- current-code root-cause status: **NOT RESOLVED**
+- next action: **FIX_FIRST** — inspect the affected media timeline/source and
+  determine a valid input or generic audio handling correction before retry
+
+### FAILED_RETRYABLE — Jellyfin external Korean subtitle recognition (6)
+
+Titles:
+
+- `FC2-PPV-4758058`
+- `FC2-PPV-4973050`
+- `MKON-126`
+- `NHDTB-93803`
+- `SDDE-763`
+- `START-636`
+
+Exact final failure for all six:
+`Stage12BatchTitleError: Jellyfin external Korean subtitle not recognized`.
+Each transitioned `RUNNING -> GENERATED -> FAILED_RETRYABLE`; Stage11 passed,
+the generated artifact was validated, and publication recorded an atomic,
+verified destination with its SHA-256. Read-only SHA-256 checks confirmed the
+local `clean-ko-v1.srt` and controller report files still match the hashes
+stored in rollout state.
+
+The repository already has a Jellyfin refresh fallback, including full
+refresh, but these attempts still ended in recognition failure after that
+fallback. The artifact/report pair remains available and hash-matched, so it
+may be reused only after the existing provenance/source checks pass. Inspect
+the exact Jellyfin item/path and external subtitle stream state before another
+recognition attempt.
+
+- current-code root-cause status: **NOT RESOLVED**
+- next action: **FIX_FIRST** — read-only item/path/stream reconciliation;
+  preserve the verified artifacts for eligible reuse
+
+### FAILED_RETRYABLE — semantic output validation retry exhausted (5)
+
+Titles and failed part indexes:
+
+- `FNS-235` — part 7
+- `GDTM-091` — part 12
+- `HMN-896` — part 5
+- `MAAN-1193` — part 9
+- `SCOP-830` — part 3
+
+Exact final exception for each:
+`StatefulSemanticOutputValidationRetryExhausted: semantic output validation
+retry exhausted`; all recorded `attempts=2`, `max_attempts=2`. These failed
+during semantic validation, before clean artifact acceptance/publication.
+The DB/bulk evidence records the exhausted retry and part index; it does not
+preserve a more specific validator message per title.
+
+- current-code root-cause status: **NOT RESOLVED**
+- next action: **MANUAL_REVIEW** — inspect rejected part output and its
+  validation reason before choosing any targeted input/data correction or
+  retry
+
+### UNRESOLVED — JUR-750
+
+`JUR-750` was already `UNRESOLVED` during `INITIALIZE_FROM_INVENTORY`, with
+`SUBTITLE_INVENTORY_INVALID`; it has no execution history. The associated
+noncanonical sidecar is `JUR-750.R6B2-Clean.ko.srt`.
+
+- current-code root-cause status: **NOT RESOLVED**
+- next action: **MANUAL_REVIEW** — decide explicitly how to handle the
+  noncanonical sidecar before inventory resolution
+- do not automatically rename, delete, or overwrite the sidecar
+
+### Next Stage12 operation
+
+Start with read-only forensic reconciliation of the six Jellyfin recognition
+failures: verify each exact Jellyfin item/path and external subtitle stream,
+then establish whether the existing hash-verified artifact can be reused.
+Do not run retry/recovery or write to NAS/Jellyfin until the forensic result
+supports a separately authorized operation. Keep the nine ASR failures and
+five semantic failures out of blind retry; handle them using the actions above.
