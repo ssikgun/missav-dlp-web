@@ -142,6 +142,14 @@ def _failing_controller(calls):
     return run
 
 
+def _systemic_controller(calls):
+    def run(dvd_id):
+        calls.append(dvd_id)
+        raise RuntimeError("synthetic shared adapter failure")
+
+    return run
+
+
 def main_smoke():
     contract_check()
     from teddy_discovery_stage12_batch import (
@@ -289,6 +297,46 @@ def main_smoke():
         require(event.transition_sequence == failed.transition_sequence + 2,
                 "RETRY_START_AND_FAILURE_EVENTS_RECORDED")
 
+    with TemporaryDirectory(prefix="stage12-retry-systemic-smoke-") as raw:
+        root = Path(raw)
+        store, record, other, failed = failed_fixture(root, "TRY-002")
+        other_before = store.get(other.dvd_id)
+        runner, nas, publisher, calls = build_runner(
+            root, store, record, fail=True
+        )
+        runner.controller_runner = _systemic_controller(calls)
+        try:
+            runner.run(Stage12BatchSelection(1, (record.dvd_id,)))
+        except Stage12BatchSystemicError as error:
+            require(
+                "RuntimeError @" in str(error)
+                and "synthetic shared adapter failure" not in str(error),
+                "EXPLICIT_RETRY_ORIGINAL_EXCEPTION_DIAGNOSTIC",
+            )
+            require(
+                isinstance(error.__cause__, RuntimeError),
+                "EXPLICIT_RETRY_SYSTEMIC_CAUSE_RETAINED",
+            )
+            require(
+                str(error.__cause__) == "synthetic shared adapter failure",
+                "EXPLICIT_RETRY_SYSTEMIC_ORIGINAL_CONTEXT_RETAINED",
+            )
+        else:
+            raise AssertionError("EXPLICIT_RETRY_SYSTEMIC_REMAINS_SYSTEMIC")
+        current = store.get(record.dvd_id)
+        require(
+            current.status == STATE_RUNNING
+            and current.transition_sequence == failed.transition_sequence + 1
+            and current.last_transition_reason == "STAGE12_EXPLICIT_RETRY_START",
+            "EXPLICIT_RETRY_SYSTEMIC_DOES_NOT_DOWNGRADE_OR_FAKE_FAILURE",
+        )
+        require(
+            store.get(other.dvd_id) == other_before
+            and publisher.calls == []
+            and calls == [record.dvd_id],
+            "EXPLICIT_RETRY_SYSTEMIC_SINGLE_TITLE_BOUND",
+        )
+
     with TemporaryDirectory(prefix="stage12-retry-success-smoke-") as raw:
         root = Path(raw)
         store, record, other, failed = failed_fixture(root, "TRY-101")
@@ -320,6 +368,7 @@ def main_smoke():
     print("JELLYFIN_CONTRACT_MUTATION_GUARD=PASS")
     print("PREFLIGHT_AUTH_SEQUENCE_FINGERPRINT=PASS")
     print("FAILURE_ISOLATION_AND_SINGLE_TITLE_BOUND=PASS")
+    print("EXPLICIT_RETRY_SYSTEMIC_CAUSE_REMAINS_SYSTEMIC=PASS")
     print("STAGE11_PUBLICATION_PATH_REUSE=PASS")
     print("OTHER_TITLE_STATE_INVARIANT=PASS")
 

@@ -1,5 +1,51 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-23 NHDTC-250 explicit retry systemic failure
+
+At production canary HEAD `31db7b4da48e8841d5a33bde7c00ed1363c4c4b2`,
+the explicitly authorized retry for `NHDTC-250` passed preflight, copied the
+6,618,791,523-byte source into the configured disk-backed ASR temp root, then
+stopped during Stage11 baseline ASR before a baseline ASR artifact was
+created. Stage12 recorded `FAILED_RETRYABLE -> RUNNING`, sequence `3 -> 4`,
+reason `STAGE12_EXPLICIT_RETRY_START`. The runner returned
+`Stage12BatchSystemicError: unexpected Stage11 title execution exception`;
+the existing saved heartbeat/CLI output did not preserve the original
+low-level exception, so its type/message cannot be recovered from the
+available production logs. Available evidence places the failure after source
+copy and before baseline ASR artifact persistence. No publication or Jellyfin
+stage was reached. Remote ASR request success cannot be determined from the
+retained logs.
+
+The request temp directory was cleaned. At the end of the canary,
+`/tmp` usage was about 78 MiB, available RAM about 8.5 GiB, and no runner or
+ffmpeg process remained. No other title state changed. The authoritative
+rollout snapshot was `PUBLISHED=158`, `FAILED_RETRYABLE=13`, `RUNNING=1`,
+`UNRESOLVED=1`, with `NHDTC-250=RUNNING`, sequence 4, reason
+`STAGE12_EXPLICIT_RETRY_START`.
+
+Diagnostic-only fix: Stage12 now persists a bounded exception-chain summary
+with exception types and source locations at the systemic Stage11 wrapper.
+Only controlled ASR exception messages are included; arbitrary exception
+messages remain in-process to avoid storing subtitle text. The original
+exception remains chained, systemic classification is unchanged, and this
+does not broaden title-local failure isolation. Batch and explicit-retry
+smokes confirm the cause is retained while an unexpected `RuntimeError`
+remains systemic and the retry title is not falsely marked failed. These
+smokes, Stage12 bulk/reconciliation/rollout, ASR source/temp policy, Stage11
+controller, compile, and `git diff --check` passed. ASR audio and Stage11
+deployment/live-adapter smokes could not run in this checkout because the
+available Python environments lack `numpy`.
+
+At this handoff update, no RUNNING recovery or retry has been performed.
+Publication/Jellyfin writes and Remote ASR/Stage11 re-execution remain
+unperformed. The only supported recovery API found in source is
+`Stage12RolloutStateStore.recover_running(dvd_id)`, which transitions
+`RUNNING -> PENDING` with `CRASH_RECOVERY`; it does not transition to
+`FAILED_RETRYABLE`. Do not use it for this requested FAILED_RETRYABLE recovery.
+There is no dedicated one-title `RUNNING -> FAILED_RETRYABLE` recovery path;
+stop without changing rollout state unless a separately authorized supported
+path is established.
+
 ## 2026-09-23 Stage12 Jellyfin contract preflight false positive
 
 At source HEAD `8b6848d8913190a540fe4f14e9a2adfd228ffd7e`, an authorized

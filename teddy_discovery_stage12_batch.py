@@ -92,6 +92,59 @@ class Stage12BatchSystemicError(Stage12BatchError):
     """A shared contract, safety, or unexpected-program failure."""
 
 
+def _exception_chain_summary(error: BaseException, *, max_depth: int = 4) -> str:
+    """Return bounded exception types and source locations for diagnostics.
+
+    Only controlled Stage11 ASR errors include messages; arbitrary failures may
+    contain subtitle text and therefore keep their details in-process only.
+    """
+
+    parts: list[str] = []
+    seen: set[int] = set()
+    current: BaseException | None = error
+    while (
+        current is not None
+        and len(parts) < max_depth
+        and id(current) not in seen
+    ):
+        seen.add(id(current))
+        message = ""
+        if type(current).__module__.startswith("teddy_discovery_asr"):
+            try:
+                message = str(current).replace("\r", " ").replace("\n", " ")
+            except Exception:
+                message = "<unprintable exception>"
+        message = message[:120]
+        location = ""
+        tb = current.__traceback__
+        final_frame = None
+        while tb is not None:
+            final_frame = tb.tb_frame
+            final_line = tb.tb_lineno
+            tb = tb.tb_next
+        if final_frame is not None:
+            location = (
+                " @ "
+                + Path(final_frame.f_code.co_filename).name
+                + ":"
+                + str(final_line)
+                + ":"
+                + final_frame.f_code.co_name
+            )
+        parts.append(
+            type(current).__name__
+            + (": " + message if message else "")
+            + location
+        )
+        if current.__cause__ is not None:
+            current = current.__cause__
+        elif not current.__suppress_context__:
+            current = current.__context__
+        else:
+            current = None
+    return " <- ".join(parts)[:360]
+
+
 @dataclass(frozen=True)
 class Stage12BatchSelection:
     """Immutable membership for one bounded serial run."""
@@ -988,7 +1041,8 @@ class Stage12BatchRunner:
         except Exception as error:
             if not self._is_title_exception(error):
                 raise Stage12BatchSystemicError(
-                    "unexpected Stage11 title execution exception"
+                    "unexpected Stage11 title execution exception; "
+                    "cause_chain=" + _exception_chain_summary(error)
                 ) from error
             return self._fail_title(
                 running,

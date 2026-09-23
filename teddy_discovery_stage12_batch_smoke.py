@@ -788,13 +788,28 @@ def main():
             publisher=unexpected_publisher,
             unexpected_ids={"AAA-002"},
         )
-        expect_raises(
-            Stage12BatchSystemicError,
-            lambda: unexpected_runner.run(
+        try:
+            unexpected_runner.run(
                 Stage12BatchSelection(3, ("AAA-001", "AAA-002", "AAA-003"))
-            ),
-            "UNEXPECTED_PROGRAMMER_ERROR_REMAINS_SYSTEMIC",
-        )
+            )
+        except Stage12BatchSystemicError as error:
+            require(
+                "RuntimeError @" in str(error)
+                and "unexpected programmer failure" not in str(error),
+                "UNEXPECTED_PROGRAMMER_ERROR_CAUSE_IS_PERSISTED",
+            )
+            require(
+                isinstance(error.__cause__, RuntimeError),
+                "UNEXPECTED_PROGRAMMER_ERROR_CAUSE_CHAIN_RETAINED",
+            )
+            require(
+                str(error.__cause__) == "unexpected programmer failure",
+                "UNEXPECTED_PROGRAMMER_ERROR_ORIGINAL_CONTEXT_RETAINED",
+            )
+        else:
+            raise AssertionError(
+                "UNEXPECTED_PROGRAMMER_ERROR_REMAINS_SYSTEMIC"
+            )
         require(
             unexpected_calls == ["AAA-001", "AAA-002"]
             and unexpected_store.get("AAA-002").status == "RUNNING"
