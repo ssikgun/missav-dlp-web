@@ -461,6 +461,7 @@ def main():
             end_seconds=None,
             audio_index=6,
             resampler_class=FakeResampler,
+            timeline_diagnostics_callback=None,
         ):
             stream = SimpleNamespace(index=audio_index)
             container = FakeContainer(
@@ -478,6 +479,7 @@ def main():
                         resampler_class=resampler_class,
                     ),
                     numpy_module=np,
+                    timeline_diagnostics_callback=timeline_diagnostics_callback,
                 )
             )
             return output, container, stream
@@ -699,10 +701,12 @@ def main():
                 pts=49,
             ),
         ]
+        boundary_records = []
         boundary_result, _, _ = run_frames(
             boundary_frames,
             chunk_seconds=1,
             resampler_class=BoundaryResampler,
+            timeline_diagnostics_callback=boundary_records.append,
         )
         assert len(boundary_result) == 1
         boundary_samples = boundary_result[0].samples
@@ -720,6 +724,9 @@ def main():
             boundary_frames[1],
             None,
         ]
+        assert boundary_records[-1].forward_gap_count == 1
+        assert boundary_records[-1].forward_gap_duration == Fraction(17, 16_000)
+        assert boundary_records[-1].canonicalized_overlap_count == 0
 
         one_second_gap, _, _ = run_frames(
             [
@@ -896,15 +903,166 @@ def main():
                 ]
             )[0],
         )
+        # Duplicate raw timestamps remain fail-closed even when sample count
+        # could otherwise suggest a continuous output clock.
         expect(
             ASRAudioValidationError,
             lambda: run_frames(
                 [
-                    FakeFrame(np.zeros(16_000, np.float32), pts=0),
-                    FakeFrame(np.zeros(1, np.float32), pts=15_000),
+                    FakeFrame(np.zeros(1024, np.float32), pts=0),
+                    FakeFrame(np.zeros(1024, np.float32), pts=0),
                 ]
             )[0],
         )
+
+        # Short AAC-like packet intervals are canonicalized from decoded
+        # sample counts without dropping or duplicating emitted samples.
+        timeline_records = []
+        bounded, _, _ = run_frames(
+            [
+                FakeFrame(np.full(1024, 0.1, np.float32), pts=0),
+                FakeFrame(np.full(1024, 0.2, np.float32), pts=992),
+                FakeFrame(np.full(1024, 0.3, np.float32), pts=2000),
+                FakeFrame(np.full(1024, 0.4, np.float32), pts=2992),
+            ],
+            timeline_diagnostics_callback=timeline_records.append,
+        )
+        assert len(bounded) == 1 and bounded[0].samples.size == 4096
+
+        def quantized(value):
+            return np.float32(round(value * 32768) / 32768)
+
+        assert np.all(bounded[0].samples[:1024] == quantized(0.1))
+        assert np.all(bounded[0].samples[1024:2048] == quantized(0.2))
+        assert np.all(bounded[0].samples[2048:3072] == quantized(0.3))
+        assert np.all(bounded[0].samples[3072:] == quantized(0.4))
+        frame_records = [
+            item for item in timeline_records if item.kind == "frame"
+        ]
+        assert [item.per_frame_correction for item in frame_records][1:] == [
+            Fraction(1, 500),
+            Fraction(1, 1_000),
+            Fraction(1, 500),
+        ]
+        assert timeline_records[-1].canonicalized_overlap_count == 3
+
+        class RatioThreeResampler(FakeResampler):
+            instances = []
+
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self.total_input = 0
+                self.total_output = 0
+
+            def resample(self, frame):
+                self.calls.append(frame)
+                if frame is None:
+                    return []
+                self.total_input += frame.samples
+                expected = (self.total_input * 16_000 + 24_000) // 48_000
+                size = expected - self.total_output
+                self.total_output = expected
+                return [FakeOutputFrame(np.zeros(size, dtype=np.int16))]
+
+        # Replay each measured first-failure pair at its actual 48 kHz clock.
+        # These are forensic test vectors only; production has no title map.
+        measured_short_intervals = [992, 992, 992, 1008, 992, 475, 86, 1]
+        for short_interval in measured_short_intervals:
+            pair_records = []
+            pair, _, _ = run_frames(
+                [
+                    FakeFrame(
+                        np.zeros(1, np.float32), pts=0,
+                        time_base=Fraction(1, 48_000), sample_rate=48_000,
+                        source_samples=1024,
+                    ),
+                    FakeFrame(
+                        np.zeros(1, np.float32), pts=short_interval,
+                        time_base=Fraction(1, 48_000), sample_rate=48_000,
+                        source_samples=1024,
+                    ),
+                ],
+                resampler_class=RatioThreeResampler,
+                timeline_diagnostics_callback=pair_records.append,
+            )
+            assert sum(item.samples.size for item in pair) == 683
+            assert pair_records[-1].per_frame_correction == Fraction(
+                1024 - short_interval, 48_000
+            )
+
+        nima_like_records = []
+        nima_frames = [
+            FakeFrame(
+                np.zeros(1, np.float32), pts=index * 1025,
+                time_base=Fraction(1, 48_000), sample_rate=48_000,
+                source_samples=1024,
+            )
+            for index in range(2726)
+        ]
+        nima_like, _, _ = run_frames(
+            nima_frames,
+            resampler_class=RatioThreeResampler,
+            timeline_diagnostics_callback=nima_like_records.append,
+        )
+        assert sum(item.samples.size for item in nima_like) == 930_475
+        assert nima_like_records[-1].cumulative_drift == Fraction(2725, 48_000)
+
+        # More than the three-frame cumulative budget remains fail-closed.
+        drifting_frames = [
+            FakeFrame(np.zeros(1, np.float32), pts=index * 1023,
+                      time_base=Fraction(1, 16_000), source_samples=1024)
+            for index in range(3074)
+        ]
+        drift_records = []
+        expect(
+            ASRAudioValidationError,
+            lambda: run_frames(
+                drifting_frames,
+                timeline_diagnostics_callback=drift_records.append,
+            )[0],
+        )
+        assert drift_records[-1].fail_closed_reason == (
+            "cumulative sample-clock correction exceeds three decoded frames"
+        )
+
+        # A sample-count/end mismatch not explained by timestamp corrections
+        # still fails at EOF.
+        class ShortOutputResampler(FakeResampler):
+            def resample(self, frame):
+                self.calls.append(frame)
+                if frame is None:
+                    return []
+                return [FakeOutputFrame(np.zeros(1, dtype=np.int16))]
+
+        unsafe_end_records = []
+        expect(
+            ASRAudioValidationError,
+            lambda: run_frames(
+                [FakeFrame(np.zeros(1024, np.float32), pts=0)],
+                resampler_class=ShortOutputResampler,
+                timeline_diagnostics_callback=unsafe_end_records.append,
+            )[0],
+        )
+        assert unsafe_end_records[-1].fail_closed_reason == (
+            "resampler output cannot reconcile to source end"
+        )
+        assert unsafe_end_records[-1].expected_output_samples == 1024
+        assert unsafe_end_records[-1].actual_output_samples == 1
+        assert unsafe_end_records[-1].output_sample_mismatch == -1023
+
+        # Correction across an ASR chunk boundary preserves both chunk sizes
+        # and their absolute sample-clock cue times.
+        boundary_chunks, _, _ = run_frames(
+            [
+                FakeFrame(np.full(1000, 0.1, np.float32), pts=0),
+                FakeFrame(np.full(1000, 0.2, np.float32), pts=968),
+            ],
+            chunk_seconds=0.0625,
+        )
+        assert [item.samples.size for item in boundary_chunks] == [1000, 1000]
+        assert [(item.start_ms, item.end_ms) for item in boundary_chunks] == [
+            (0, 63), (63, 125)
+        ]
         expect(
             ASRAudioValidationError,
             lambda: run_frames(

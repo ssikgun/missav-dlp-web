@@ -10,9 +10,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from fractions import Fraction
+import logging
 import math
 import os
 import stat
+from typing import Callable
 
 from teddy_discovery_asr import (
     ASRError,
@@ -29,6 +31,10 @@ MAX_ASR_AUDIO_SAMPLES = (
 )
 _ONE_OUTPUT_SAMPLE_SECONDS = Fraction(1, ASR_AUDIO_SAMPLE_RATE)
 _MAX_TIMESTAMP_ROUNDING_TOLERANCE = Fraction(1, 1_000)
+_MAX_FRAME_CORRECTION_FRAMES = 1
+_MAX_CUMULATIVE_CORRECTION_FRAMES = 3
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class ASRAudioError(ASRError):
@@ -41,6 +47,34 @@ class ASRAudioValidationError(ASRAudioError):
 
 class ASRAudioLimitError(ASRAudioError):
     """Raised when a bounded audio request or chunk is too large."""
+
+
+@dataclass(frozen=True)
+class ASRAudioTimelineDiagnostic:
+    """One read-only record from the decoded-sample timeline canonicalizer.
+
+    PTS values are kept as exact fractions. ``raw_source_pts`` is in source
+    ticks and ``time_base`` converts it to seconds; the expected PTS and
+    corrections are in seconds. Callers can stream these records to a bounded
+    logger or diagnostic sink without retaining the full audio timeline.
+    """
+
+    kind: str
+    frame_index: int | None
+    raw_source_pts: Fraction | None
+    time_base: Fraction | None
+    sample_clock_expected_pts: Fraction | None
+    per_frame_correction: Fraction
+    cumulative_correction: Fraction
+    cumulative_drift: Fraction
+    forward_gap_count: int
+    forward_gap_duration: Fraction
+    canonicalized_overlap_count: int
+    canonicalized_overlap_duration: Fraction
+    expected_output_samples: int | None = None
+    actual_output_samples: int | None = None
+    output_sample_mismatch: int | None = None
+    fail_closed_reason: str | None = None
 
 
 def _load_numpy(numpy_module):
@@ -245,7 +279,9 @@ def _fraction_from_value(value: object, *, field_name: str) -> Fraction:
     return result
 
 
-def _frame_timing(frame: object) -> tuple[Fraction, Fraction, Fraction]:
+def _frame_timing(
+    frame: object,
+) -> tuple[Fraction, Fraction, Fraction, Fraction]:
     pts = _fraction_from_value(
         getattr(frame, "pts", None),
         field_name="audio frame pts",
@@ -270,7 +306,7 @@ def _frame_timing(frame: object) -> tuple[Fraction, Fraction, Fraction]:
             "audio frame sample rate is invalid"
         )
 
-    return pts * time_base, time_base, Fraction(sample_count, sample_rate)
+    return pts * time_base, time_base, Fraction(sample_count, sample_rate), pts
 
 
 def _round_fraction(value: Fraction) -> int:
@@ -300,39 +336,6 @@ def _timestamp_tolerance(
         _MAX_TIMESTAMP_ROUNDING_TOLERANCE,
         max(_ONE_OUTPUT_SAMPLE_SECONDS, quantization),
     )
-
-
-def _validate_frame_timeline(
-    *,
-    timestamp: Fraction,
-    time_base: Fraction,
-    duration: Fraction,
-    previous_timestamp: Fraction | None,
-    previous_time_base: Fraction | None,
-    expected_timestamp: Fraction | None,
-) -> Fraction:
-    if previous_timestamp is not None:
-        if timestamp < previous_timestamp:
-            raise ASRAudioValidationError(
-                "audio frame timestamps moved backwards"
-            )
-
-        if expected_timestamp is None or previous_time_base is None:
-            raise ASRAudioValidationError(
-                "audio frame timeline state is incomplete"
-            )
-
-        tolerance = _timestamp_tolerance(
-            previous_time_base,
-            time_base,
-        )
-        deviation = timestamp - expected_timestamp
-        if deviation < -tolerance:
-            raise ASRAudioValidationError(
-                "audio frame timestamp has an unsafe discontinuity"
-            )
-
-    return timestamp + duration
 
 
 def _iter_decoded_frames(decoded_frames: object):
@@ -662,6 +665,9 @@ def _iter_audio_chunks(
     end_sample: int | None,
     av_module,
     numpy_module,
+    timeline_diagnostics_callback: (
+        Callable[[ASRAudioTimelineDiagnostic], None] | None
+    ) = None,
 ):
     container = None
     try:
@@ -682,9 +688,56 @@ def _iter_audio_chunks(
 
         accumulator = None
         emission_cursor = None
-        previous_timestamp = None
         previous_time_base = None
         expected_timestamp = None
+        previous_raw_timestamp = None
+        previous_raw_pts = None
+        previous_duration = None
+        cumulative_correction = Fraction(0)
+        cumulative_drift = Fraction(0)
+        forward_gap_count = 0
+        forward_gap_duration = Fraction(0)
+        canonicalized_overlap_count = 0
+        canonicalized_overlap_duration = Fraction(0)
+        frame_index = 0
+
+        def report_timeline(
+            *, kind, raw_pts=None, time_base=None, expected=None,
+            correction=Fraction(0), expected_output_samples=None,
+            actual_output_samples=None, fail_closed_reason=None,
+        ):
+            record = ASRAudioTimelineDiagnostic(
+                kind=kind,
+                frame_index=frame_index - 1 if raw_pts is not None else None,
+                raw_source_pts=raw_pts,
+                time_base=time_base,
+                sample_clock_expected_pts=expected,
+                per_frame_correction=correction,
+                cumulative_correction=cumulative_correction,
+                cumulative_drift=cumulative_drift,
+                forward_gap_count=forward_gap_count,
+                forward_gap_duration=forward_gap_duration,
+                canonicalized_overlap_count=canonicalized_overlap_count,
+                canonicalized_overlap_duration=canonicalized_overlap_duration,
+                expected_output_samples=expected_output_samples,
+                actual_output_samples=actual_output_samples,
+                output_sample_mismatch=(
+                    None
+                    if expected_output_samples is None
+                    or actual_output_samples is None
+                    else actual_output_samples - expected_output_samples
+                ),
+                fail_closed_reason=fail_closed_reason,
+            )
+            if timeline_diagnostics_callback is not None:
+                try:
+                    timeline_diagnostics_callback(record)
+                except Exception as error:
+                    raise ASRAudioError(
+                        "audio timeline diagnostic callback failed"
+                    ) from error
+            if kind != "frame" or correction or forward_gap_count:
+                _LOGGER.info("ASR audio timeline: %s", record)
         saw_decoded_frame = False
         fed_source_frame = False
         last_fed_expected_timestamp = None
@@ -702,19 +755,95 @@ def _iter_audio_chunks(
             ) from error
 
         for frame in _iter_decoded_frames(decoded_frames):
-            timestamp, time_base, duration = _frame_timing(frame)
+            timestamp, time_base, duration, raw_pts = _frame_timing(frame)
+            frame_index += 1
             prior_expected_timestamp = expected_timestamp
             prior_time_base = previous_time_base
-            expected_timestamp = _validate_frame_timeline(
-                timestamp=timestamp,
+            frame_correction = Fraction(0)
+            if previous_raw_timestamp is not None:
+                reason = None
+                if timestamp <= previous_raw_timestamp:
+                    reason = "duplicate or backward raw source PTS"
+                elif prior_expected_timestamp is None or previous_duration is None:
+                    reason = "audio frame timeline state is incomplete"
+                if reason:
+                    report_timeline(kind="fail", raw_pts=raw_pts,
+                                    time_base=time_base,
+                                    expected=prior_expected_timestamp,
+                                    fail_closed_reason=reason)
+                    raise ASRAudioValidationError(reason)
+
+                # Apply the already-established integer sample-clock offset
+                # before distinguishing harmless timestamp jitter from a real
+                # positive source gap.
+                adjusted_timestamp = timestamp + cumulative_correction
+                deviation = adjusted_timestamp - prior_expected_timestamp
+                tolerance = _timestamp_tolerance(prior_time_base, time_base)
+                if deviation > tolerance:
+                    timestamp = adjusted_timestamp
+                    forward_gap_count += 1
+                    forward_gap_duration += deviation
+                else:
+                    correction = prior_expected_timestamp - adjusted_timestamp
+                    frame_bound = (
+                        previous_duration * _MAX_FRAME_CORRECTION_FRAMES
+                    )
+                    if abs(correction) > frame_bound:
+                        reason = (
+                            "per-frame sample-clock correction exceeds "
+                            "one decoded frame"
+                        )
+                        report_timeline(
+                            kind="fail",
+                            raw_pts=raw_pts,
+                            time_base=time_base,
+                            expected=prior_expected_timestamp,
+                            correction=correction,
+                            fail_closed_reason=reason,
+                        )
+                        raise ASRAudioValidationError(reason)
+                    new_drift = cumulative_drift + abs(correction)
+                    drift_bound = (
+                        max(previous_duration, duration)
+                        * _MAX_CUMULATIVE_CORRECTION_FRAMES
+                    )
+                    if new_drift > drift_bound:
+                        reason = (
+                            "cumulative sample-clock correction exceeds "
+                            "three decoded frames"
+                        )
+                        report_timeline(
+                            kind="fail",
+                            raw_pts=raw_pts,
+                            time_base=time_base,
+                            expected=prior_expected_timestamp,
+                            correction=correction,
+                            fail_closed_reason=reason,
+                        )
+                        raise ASRAudioValidationError(reason)
+                    if correction:
+                        if deviation < 0:
+                            canonicalized_overlap_count += 1
+                            canonicalized_overlap_duration += -deviation
+                        cumulative_correction += correction
+                        cumulative_drift = new_drift
+                        frame_correction = correction
+                    timestamp = prior_expected_timestamp
+            else:
+                adjusted_timestamp = timestamp
+
+            expected_timestamp = timestamp + duration
+            report_timeline(
+                kind="frame",
+                raw_pts=raw_pts,
                 time_base=time_base,
-                duration=duration,
-                previous_timestamp=previous_timestamp,
-                previous_time_base=previous_time_base,
-                expected_timestamp=expected_timestamp,
+                expected=prior_expected_timestamp,
+                correction=frame_correction,
             )
-            previous_timestamp = timestamp
+            previous_raw_timestamp = raw_pts * time_base
+            previous_raw_pts = raw_pts
             previous_time_base = time_base
+            previous_duration = duration
             saw_decoded_frame = True
             frame_sample = _timestamp_to_sample_index(timestamp)
             if emission_cursor is None:
@@ -760,6 +889,10 @@ def _iter_audio_chunks(
                         prior_expected_timestamp
                     )
                     if abs(emission_cursor.value - boundary_sample) > 1:
+                        report_timeline(
+                            kind="fail", expected=prior_expected_timestamp,
+                            fail_closed_reason="resampler output cannot reconcile to source boundary",
+                        )
                         raise ASRAudioValidationError(
                             "resampler output cannot reconcile to source boundary"
                         )
@@ -880,6 +1013,14 @@ def _iter_audio_chunks(
                     last_fed_expected_timestamp
                 )
                 if abs(emission_cursor.value - boundary_sample) > 1:
+                    report_timeline(
+                        kind="fail", raw_pts=previous_raw_pts,
+                        time_base=previous_time_base,
+                        expected=last_fed_expected_timestamp,
+                        expected_output_samples=boundary_sample,
+                        actual_output_samples=emission_cursor.value,
+                        fail_closed_reason="resampler output cannot reconcile to source end",
+                    )
                     raise ASRAudioValidationError(
                         "resampler output cannot reconcile to source end"
                     )
@@ -903,6 +1044,9 @@ def iter_audio_chunks(
     end_seconds=None,
     av_module=None,
     numpy_module=None,
+    timeline_diagnostics_callback: (
+        Callable[[ASRAudioTimelineDiagnostic], None] | None
+    ) = None,
 ):
     """Return a one-pass iterator of bounded sequential audio chunks."""
 
@@ -922,6 +1066,7 @@ def iter_audio_chunks(
         end_sample=end_sample,
         av_module=av,
         numpy_module=numpy,
+        timeline_diagnostics_callback=timeline_diagnostics_callback,
     )
 
 
@@ -929,6 +1074,7 @@ __all__ = [
     "ASRAudioChunk",
     "ASRAudioError",
     "ASRAudioLimitError",
+    "ASRAudioTimelineDiagnostic",
     "ASRAudioValidationError",
     "ASR_AUDIO_SAMPLE_RATE",
     "MAX_ASR_AUDIO_CHUNK_SECONDS",

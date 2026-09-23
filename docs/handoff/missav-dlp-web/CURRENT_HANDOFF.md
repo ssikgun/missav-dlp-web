@@ -62,7 +62,7 @@ SNOS-120 again.
 
 > Canonical handoff for the next chat/session.  Read this file first and continue from here rather than reconstructing Stage11/Stage12 from old chat history.
 >
-> Last refreshed for chat handoff: **2026-09-22 KST**
+> Last refreshed for chat handoff: **2026-09-23 KST**
 
 ## 0. 2026-09-20 HMN-899 Stage12 systemic-stop forensic and fix
 
@@ -1793,16 +1793,72 @@ Exact recorded failures:
 - `NIMA-059`: `ASRAudioValidationError: resampler output cannot reconcile to
   source end`
 
-These failures occurred in ASR audio decoding/validation, before Remote ASR,
-semantic translation, artifact validation, publication, NAS, or Jellyfin.
-The current code isolates typed `ASRAudioError` failures to individual titles,
-so they no longer stop the batch; this does not repair the source timeline or
-the underlying audio validation failure. Blind retry against the same source
-is not expected to resolve it.
+The point at which the iterator failed varied by title. Remote ASR call
+history for the failed titles was:
 
-- current-code root-cause status: **NOT RESOLVED**
-- next action: **FIX_FIRST** — inspect the affected media timeline/source and
-  determine a valid input or generic audio handling correction before retry
+- zero calls: `HMN-899`, `PRED-889`, `SGKI-075`, `SGKI-106`, `SNOS-334`,
+  `SW-216`
+- six earlier 600-second chunks had already been sent for `NHDTC-250`
+- fifteen earlier chunks had already been sent for `SVFLA-014`
+- ten full chunks had already been sent for `NIMA-059`; its final partial
+  chunk was not yielded because the iterator rejected the EOF/source-end
+  reconciliation
+
+The iterator exception happens while preparing the next chunk, so prior
+yielded chunks can already have crossed Remote ASR before a later timeline or
+EOF error. Typed `ASRAudioError` failures remain isolated to individual
+titles; they no longer stop the batch.
+
+### Generic decoded-sample-clock correction
+
+Implemented in `teddy_discovery_asr_audio.py` after offline smoke validation:
+
+- The first decoded frame timestamp anchors the output timeline unchanged.
+- Later frames are checked against the exact cumulative decoded-sample clock.
+  Strictly duplicate/backward raw PTS fail closed.
+- Bounded timestamp jitter/overlap is corrected by moving the canonical frame
+  start to the decoded sample clock. Per-frame correction is limited to one
+  preceding decoded-frame duration. Total absolute correction is limited to
+  three decoded-frame durations (64 ms for 1024-sample AAC at 48 kHz).
+- A forward deviation larger than the existing timestamp tolerance stays a
+  segment boundary: flush the old resampler and preserve the exact interval as
+  silence. It is not absorbed into timestamp correction.
+- Correction, cumulative drift, gap and overlap totals, raw PTS, expected PTS,
+  output sample counts, and fail-closed reason are available as structured
+  diagnostics; corrected frames and gaps are logged without retaining the
+  whole timeline.
+- EOF still requires resampled output to reconcile within one 16 kHz sample
+  of the corrected source end. No decoded audio samples are dropped or
+  duplicated, and the existing absolute chunk/sample boundaries remain in
+  force.
+
+The bounds are tied to decoded frame lengths rather than a title or codec
+allowlist. The one-frame per-event bound covers the observed AAC timing errors;
+the three-frame accumulated bound allows small repeated timestamp quantization
+while rejecting unbounded drift. Duplicate/backward raw PTS, per-frame bound
+excess, cumulative bound excess, gap-boundary resampler mismatch, and EOF
+sample-count mismatch all remain fail-closed.
+
+Read-only simulations against the previously measured failure points:
+
+| DVD-ID | Observed short interval / correction | Trigger-pair result |
+| --- | ---: | --- |
+| `HMN-899` | 992 / 1024 ticks; 32 ticks (0.667 ms) | bounded correction accepted |
+| `PRED-889` | 992 / 1024 ticks; 32 ticks (0.667 ms) | bounded correction accepted |
+| `SGKI-075` | 992 / 1024 ticks; 32 ticks (0.667 ms) | bounded correction accepted |
+| `SGKI-106` | 1008 / 1024 ticks; 16 ticks (0.333 ms) | bounded correction accepted |
+| `SNOS-334` | 992 / 1024 ticks; 32 ticks (0.667 ms) | bounded correction accepted |
+| `SW-216` | 475 / 1024 ticks; 549 ticks (11.438 ms) | bounded correction accepted |
+| `NHDTC-250` | 86 / 1024 ticks; 938 ticks (19.542 ms) | bounded correction accepted |
+| `SVFLA-014` | 1 / 1024 ticks; 1023 ticks (21.313 ms) | bounded correction accepted |
+| `NIMA-059` | 2725 ticks cumulative (56.771 ms) | synthetic cumulative/end replay accepted under 3072-tick (64 ms) cap; 305244160 decoded source samples map to 101748053 output samples, matching the resampler count |
+
+The eight trigger-pair simulations use the exact first failing frame pairs
+from the read-only forensic pass. Full-duration source replay was not performed
+in this implementation run, so the cumulative correction budget over each
+entire Group A title is not claimed as cleared here. The generic runtime
+continues to reject any title that exceeds that budget. No media was remuxed,
+transcoded, retried, or submitted to live ASR.
 
 ### FAILED_RETRYABLE — Jellyfin external Korean subtitle recognition (6)
 
