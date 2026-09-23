@@ -34,11 +34,19 @@ sequence, start event, source drift, other active titles, other-title state
 invariance, the audited transition, and unchanged ordinary crash recovery.
 Stage12 retry/batch/bulk/rollout/reconciliation, ASR audio/source/transcriber
 and temp policy, Stage11 controller/deployment/live adapters, compile, and
-`git diff --check` pass under the production venv. Production state has not
-yet been recovered and no retry has been rerun. After this implementation is
-committed and pushed, recheck exact HEAD/worktree and NHDTC-250 sequence 4,
-then invoke only the documented `recover-retry` path. Do not run `--mode
-retry` in that operation.
+`git diff --check` pass under the production venv.
+
+After commit `c6ebe093d23578c118cb2b649fd44007d5ba1fa3` was pushed and its
+clean HEAD/worktree rechecked, the authorized `recover-retry` path verified
+the exact source identity/fingerprint and recovered NHDTC-250 only:
+`RUNNING -> FAILED_RETRYABLE`, sequence `4 -> 5`, reason
+`STAGE12_EXPLICIT_RETRY_CRASH_RECOVERY`, event time
+`2026-09-23T23:51:04.881089+00:00`. Counts are now
+`PUBLISHED=158`, `FAILED_RETRYABLE=14`, `RUNNING=0`, `UNRESOLVED=1`.
+The only rollout event in the recovery interval was NHDTC-250's sequence-5
+event; no other title state changed. No retry, Stage11, Remote ASR, NAS write,
+or Jellyfin write ran. Do not run `--mode retry` without a separate operator
+authorization.
 
 Recovery command shape (fill `--expected-head` only with the reviewed clean
 commit after push):
