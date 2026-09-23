@@ -1875,3 +1875,67 @@ then establish whether the existing hash-verified artifact can be reused.
 Do not run retry/recovery or write to NAS/Jellyfin until the forensic result
 supports a separately authorized operation. Keep the nine ASR failures and
 five semantic failures out of blind retry; handle them using the actions above.
+
+## Stage12 delayed Jellyfin indexing and publication reconciliation
+
+The follow-up read-only Jellyfin forensic confirmed five prior recognition
+failures already have the exact published sidecar visible in Jellyfin:
+
+- `FC2-PPV-4758058`
+- `FC2-PPV-4973050`
+- `MKON-126`
+- `NHDTB-93803`
+- `SDDE-763`
+
+For those five, current NAS sidecar, recorded publication SHA/provenance,
+Jellyfin exact item path, external stream path, Korean language, and `subrip`
+codec agree. The evidence supports delayed Jellyfin indexing as the common
+false-negative: the original bounded polling window ended before the stream
+appeared. There is no evidence for a shared filename, path, or SRT defect.
+`START-636` remains different: its exact external Korean stream was absent at
+the read-only check and must stay `FAILED_RETRYABLE` unless a later exact GET
+proves recognition. Do not add a title-specific workaround.
+
+The generic recognizer retains the item-specific Default refresh followed by
+FullRefresh, but accepts a separate bounded `full_refresh_max_attempts` window.
+The bulk runner allows 42 full-refresh polls at its existing 5-second cadence
+(up to 205 seconds for that phase), while keeping the default-refresh window
+unchanged. A visible stream is accepted only for the exact media item and
+sidecar path, Korean language, external status, and `subrip` codec. If the
+stream never appears, the existing title failure path remains in force.
+
+Added `teddy_discovery_stage12_reconcile.py` as a separate, explicit one-title
+reconciliation path. It does not regenerate Stage11 output, republish, write
+NAS, or refresh Jellyfin. Before the rollout state can be reconciled, it
+revalidates current Discovery and NAS source identity/fingerprint, the full
+Stage11 baseline/CLEAN/report provenance, immutable publication event proof,
+destination bytes and SHA-256, and exact Jellyfin item/stream evidence using
+GET requests only. The only state write is the existing audited
+`FAILED_RETRYABLE -> PUBLISHED` reconciliation after every check passes. The
+bulk runner exposes this path only as explicit `--mode reconcile --dvd-id`
+and requires `TEDDY_STAGE12_PUBLICATION_RECONCILE_AUTHORIZED` to be set to the
+review token. No production reconciliation was run in this change; the five
+titles remain untouched pending separate approval. `START-636` cannot pass
+the stream-presence gate while its exact stream is absent.
+
+Smoke coverage:
+
+- delayed visibility after FullRefresh succeeds within the added bounded
+  polling window;
+- permanently absent, wrong-path, wrong-language, non-external, and wrong
+  codec streams are rejected;
+- reconciliation rejects NAS SHA, source identity, and publication
+  provenance mismatch without changing state;
+- exact valid existing publication evidence reconciles in an isolated
+  temporary fixture without Jellyfin writes;
+- Stage12 batch, bulk runner, rollout, and reconciliation smoke tests pass;
+- changed modules compile and `git diff --check` passes.
+
+Next operational step, only after separate review/approval: run one explicit
+reconciliation invocation per eligible title, first reviewing read-only
+evidence for the exact artifact provenance, current source fingerprint, NAS
+destination SHA, and Jellyfin stream. Do not include `START-636` unless its
+exact stream becomes visible. If `START-636` remains absent, use a dedicated
+read-only scanner diagnostic to compare the exact item's library path and
+refresh/scan visibility; leave rollout state unchanged until evidence proves
+the expected stream exists.

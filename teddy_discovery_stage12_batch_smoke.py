@@ -185,6 +185,7 @@ def recognition_for(_dvd_id, video, destination):
         item_path=jellyfin_media_path(video.relative_path),
         subtitle_path=jellyfin_media_path(destination),
         subtitle_language="kor",
+        subtitle_codec="subrip",
         external_visible=True,
         refresh_required=False,
         refresh_method="NONE_ALREADY_VISIBLE",
@@ -300,11 +301,21 @@ class FakeJellyfinClient:
         *,
         already_visible=False,
         requires_full_refresh=False,
+        visible_after_playback_calls=None,
+        stream_path=None,
+        stream_language="kor",
+        stream_external=True,
+        stream_codec="subrip",
     ):
         self.item_path = item_path
         self.subtitle_path = subtitle_path
         self.already_visible = already_visible
         self.requires_full_refresh = requires_full_refresh
+        self.visible_after_playback_calls = visible_after_playback_calls
+        self.stream_path = stream_path or subtitle_path
+        self.stream_language = stream_language
+        self.stream_external = stream_external
+        self.stream_codec = stream_codec
         self.full_refresh_seen = False
         self.calls: list[tuple[str, str]] = []
         self.playback_calls = 0
@@ -317,6 +328,11 @@ class FakeJellyfinClient:
             self.playback_calls += 1
             if self.already_visible:
                 visible = True
+            elif self.visible_after_playback_calls is not None:
+                visible = (
+                    self.playback_calls
+                    >= self.visible_after_playback_calls
+                )
             elif self.requires_full_refresh:
                 visible = self.full_refresh_seen
             else:
@@ -327,9 +343,10 @@ class FakeJellyfinClient:
                     {
                         "Type": "Subtitle",
                         "IsTextSubtitleStream": True,
-                        "IsExternal": True,
-                        "Language": "kor",
-                        "Path": self.subtitle_path,
+                        "IsExternal": self.stream_external,
+                        "Language": self.stream_language,
+                        "Codec": self.stream_codec,
+                        "Path": self.stream_path,
                     }
                 )
             return {
@@ -354,6 +371,7 @@ def smoke_jellyfin_exact_refresh():
         subtitle_relative="AAA/AAA-001/AAA-001.ko.srt",
         poll_interval_seconds=0,
         max_attempts=2,
+        full_refresh_max_attempts=4,
     )
     require(result.external_visible is True, "JELLYFIN_REFRESH_RECOGNIZED")
     require(result.refresh_required is True, "JELLYFIN_REFRESH_REQUIRED")
@@ -399,6 +417,67 @@ def smoke_jellyfin_exact_refresh():
     require(
         "FullRefresh" in result.refresh_method,
         "JELLYFIN_FULL_REFRESH_PROVENANCE",
+    )
+
+    late = FakeJellyfinClient(
+        item_path,
+        subtitle_path,
+        visible_after_playback_calls=6,
+    )
+    late_result = recognize_jellyfin_external_subtitle(
+        late,
+        video_relative="AAA/AAA-001/AAA-001.mp4",
+        subtitle_relative="AAA/AAA-001/AAA-001.ko.srt",
+        poll_interval_seconds=0,
+        max_attempts=2,
+        full_refresh_max_attempts=4,
+    )
+    require(
+        late_result.external_visible is True
+        and late_result.refresh_method.endswith("FullRefresh"),
+        "JELLYFIN_LATE_STREAM_AFTER_FULL_REFRESH_PASS",
+    )
+
+    for marker, overrides in (
+        ("WRONG_PATH", {"stream_path": subtitle_path + ".other"}),
+        ("WRONG_LANGUAGE", {"stream_language": "eng"}),
+        ("NON_EXTERNAL", {"stream_external": False}),
+    ):
+        invalid = FakeJellyfinClient(
+            item_path,
+            subtitle_path,
+            already_visible=True,
+            **overrides,
+        )
+        expect_raises(
+            Stage12BatchTitleError,
+            lambda invalid=invalid: recognize_jellyfin_external_subtitle(
+                invalid,
+                video_relative="AAA/AAA-001/AAA-001.mp4",
+                subtitle_relative="AAA/AAA-001/AAA-001.ko.srt",
+                poll_interval_seconds=0,
+                max_attempts=1,
+                full_refresh_max_attempts=1,
+            ),
+            "JELLYFIN_INVALID_STREAM_REJECTED_" + marker,
+        )
+
+    absent = FakeJellyfinClient(
+        item_path,
+        subtitle_path,
+        visible_after_playback_calls=999,
+    )
+    expect_raises(
+        Stage12BatchTitleError,
+        lambda: recognize_jellyfin_external_subtitle(
+            absent,
+            video_relative="AAA/AAA-001/AAA-001.mp4",
+            subtitle_relative="AAA/AAA-001/AAA-001.ko.srt",
+            poll_interval_seconds=0,
+            max_attempts=2,
+            full_refresh_max_attempts=3,
+        ),
+        "JELLYFIN_NO_STREAM_STAYS_FAILURE",
     )
 
     already = FakeJellyfinClient(

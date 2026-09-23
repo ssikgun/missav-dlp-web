@@ -61,9 +61,12 @@ CLAIM_TOKEN = 2026091801
 
 HEARTBEAT_INTERVAL_SECONDS = 30.0
 DEFAULT_BATCH_SIZE = 4
+JELLYFIN_FULL_REFRESH_MAX_ATTEMPTS = 42
 
 AUTH_ENV = "TEDDY_STAGE12_BULK_ALLOW_LIVE"
 AUTH_VALUE = "TEDDY_STAGE12_BULK_AUTHORIZED"
+RECONCILE_AUTH_ENV = "TEDDY_STAGE12_PUBLICATION_RECONCILE_AUTHORIZED"
+RECONCILE_AUTH_VALUE = "YES_I_HAVE_REVIEWED_THE_TITLE_EVIDENCE"
 
 NAS = {
     "nas_host": "192.168.1.201",
@@ -567,6 +570,7 @@ def contract_check() -> None:
         '"/Items/" + item_id + "/PlaybackInfo"',
         '"/Items/" + item_id + "/Refresh?"',
         '"MetadataRefreshMode": "FullRefresh"',
+        "full_refresh_max_attempts",
         "expected_item_path",
         "expected_subtitle_path",
     ):
@@ -1479,6 +1483,9 @@ def run_live(
                             poll_interval_seconds=
                                 5.0,
                             max_attempts=30,
+                            full_refresh_max_attempts=(
+                                JELLYFIN_FULL_REFRESH_MAX_ATTEMPTS
+                            ),
                         )
                     )
 
@@ -1574,12 +1581,74 @@ def run_live(
             raise
 
 
+def run_reconciliation(
+    *,
+    expected_head: str,
+    dvd_id: str,
+) -> int:
+    """Explicit one-title path; no Stage11, publisher, or refresh calls."""
+
+    from teddy_discovery_jellyfin import JellyfinClient
+    from teddy_discovery_stage12_inventory import (
+        build_subtitle_ssh_reader,
+    )
+    from teddy_discovery_stage12_reconcile import (
+        reconcile_failed_publication,
+    )
+    from teddy_discovery_stage12_rollout import (
+        Stage12RolloutStateStore,
+        build_nas_preflight_filesystem,
+    )
+
+    if os.environ.get(RECONCILE_AUTH_ENV) != RECONCILE_AUTH_VALUE:
+        emit("RECONCILIATION_AUTHORIZATION", "BLOCKED")
+        emit("RECONCILIATION_EXECUTED", "NO")
+        return 2
+
+    check_repo(expected_head)
+    if type(dvd_id) is not str or not dvd_id:
+        raise Stage12BulkRunnerError(
+            "one exact --dvd-id is required for reconciliation"
+        )
+    store = Stage12RolloutStateStore(ROLLOUT_DB)
+    state = store.get(dvd_id)
+    if state.status != "FAILED_RETRYABLE":
+        raise Stage12BulkRunnerError(
+            "only FAILED_RETRYABLE titles can be reconciled"
+        )
+    discovery_row = read_discovery_rows((dvd_id,), store)[0]
+
+    for key in (NAS["nas_key"], NAS["nas_known_hosts"], JELLYFIN_API_KEY):
+        require_regular(Path(key))
+    nas_filesystem = build_nas_preflight_filesystem(**NAS)
+    subtitle_reader = build_subtitle_ssh_reader(**NAS)
+    jellyfin_client = JellyfinClient(
+        base_url=JELLYFIN_BASE_URL,
+        api_key_path=JELLYFIN_API_KEY,
+        timeout=10,
+    )
+
+    reconciled = reconcile_failed_publication(
+        dvd_id=dvd_id,
+        store=store,
+        discovery_row=discovery_row,
+        artifact_root=ARTIFACT_ROOT,
+        nas_filesystem=nas_filesystem,
+        subtitle_reader=subtitle_reader,
+        jellyfin_client=jellyfin_client,
+    )
+    emit("RECONCILIATION_RESULT", reconciled.status)
+    emit("RECONCILIATION_DVD_ID", dvd_id)
+    emit("RECONCILIATION_REASON", reconciled.last_transition_reason)
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
         "--mode",
-        choices=("preflight", "live"),
+        choices=("preflight", "live", "reconcile"),
         default="preflight",
     )
 
@@ -1600,6 +1669,14 @@ def build_parser():
         default=0,
         help=(
             "0 means process all ordinary PENDING titles"
+        ),
+    )
+
+    parser.add_argument(
+        "--dvd-id",
+        help=(
+            "one exact FAILED_RETRYABLE title for explicit publication "
+            "reconciliation mode"
         ),
     )
 
@@ -1625,6 +1702,26 @@ def main() -> int:
             "FAIL_INVALID_MAX_TITLES",
         )
         return 2
+
+    if args.mode == "reconcile":
+        if not args.dvd_id:
+            emit("STAGE12_RECONCILIATION", "FAIL_DVD_ID_REQUIRED")
+            return 2
+        try:
+            return run_reconciliation(
+                expected_head=args.expected_head,
+                dvd_id=args.dvd_id,
+            )
+        except KeyboardInterrupt:
+            emit("STAGE12_RECONCILIATION", "INTERRUPTED")
+            return 130
+        except Exception as error:
+            emit(
+                "STAGE12_RECONCILIATION",
+                "FAIL_" + type(error).__name__,
+            )
+            emit("ERROR", str(error))
+            return 1
 
     try:
         if args.mode == "live":

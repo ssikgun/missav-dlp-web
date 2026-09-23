@@ -131,6 +131,7 @@ class Stage12JellyfinRecognition:
     item_path: str
     subtitle_path: str
     subtitle_language: str
+    subtitle_codec: str
     external_visible: bool
     refresh_required: bool
     refresh_method: str
@@ -141,6 +142,7 @@ class Stage12JellyfinRecognition:
             self.item_path,
             self.subtitle_path,
             self.subtitle_language,
+            self.subtitle_codec,
             self.refresh_method,
         ):
             if type(value) is not str or not value:
@@ -150,6 +152,10 @@ class Stage12JellyfinRecognition:
         if self.external_visible is not True:
             raise Stage12BatchTitleError(
                 "Jellyfin external subtitle is not visible"
+            )
+        if self.subtitle_codec.casefold() != "subrip":
+            raise Stage12BatchTitleError(
+                "Jellyfin external Korean subtitle codec is not SUBRIP"
             )
         if type(self.refresh_required) is not bool:
             raise Stage12BatchSystemicError(
@@ -162,6 +168,7 @@ class Stage12JellyfinRecognition:
             "item_path": self.item_path,
             "subtitle_path": self.subtitle_path,
             "subtitle_language": self.subtitle_language,
+            "subtitle_codec": self.subtitle_codec,
             "external_visible": self.external_visible,
             "refresh_required": self.refresh_required,
             "refresh_method": self.refresh_method,
@@ -341,20 +348,13 @@ def _subtitle_streams(playback: object) -> list[dict[str, object]]:
     return streams
 
 
-def recognize_jellyfin_external_subtitle(
+def _jellyfin_external_subtitle_probe(
     client: JellyfinClient,
     *,
     video_relative: str,
     subtitle_relative: str,
-    poll_interval_seconds: float = 3.0,
-    max_attempts: int = 10,
-) -> Stage12JellyfinRecognition:
-    """Resolve one exact item and verify one exact external Korean stream.
-
-    The initial library query is metadata-only and filters its result by the
-    exact container-visible media path.  Refresh is sent only to that item and
-    only when the exact subtitle stream is not already visible.
-    """
+):
+    """Build an exact item probe that performs GET requests only."""
 
     if not isinstance(client, JellyfinClient) and not callable(
         getattr(client, "_request", None)
@@ -365,18 +365,6 @@ def recognize_jellyfin_external_subtitle(
     if type(video_relative) is not str or type(subtitle_relative) is not str:
         raise Stage12BatchSystemicError(
             "Jellyfin path inputs must be exact strings"
-        )
-    if type(max_attempts) is not int or max_attempts <= 0:
-        raise Stage12BatchSystemicError(
-            "max_attempts must be a positive exact integer"
-        )
-    if (
-        isinstance(poll_interval_seconds, bool)
-        or not isinstance(poll_interval_seconds, (int, float))
-        or poll_interval_seconds < 0
-    ):
-        raise Stage12BatchSystemicError(
-            "poll_interval_seconds must be nonnegative"
         )
 
     expected_item_path = jellyfin_media_path(video_relative)
@@ -412,14 +400,13 @@ def recognize_jellyfin_external_subtitle(
         raise Stage12BatchTitleError(
             "Jellyfin exact media path did not resolve to one item"
         )
-    item = matches[0]
-    item_id = str(item.get("Id") or "").strip()
+    item_id = str(matches[0].get("Id") or "").strip()
     if not item_id:
         raise Stage12BatchSystemicError(
             "Jellyfin exact item has no ItemId"
         )
 
-    def playback_streams() -> list[dict[str, object]]:
+    def probe() -> Stage12JellyfinRecognition | None:
         try:
             playback = client._request(
                 "GET",
@@ -429,24 +416,107 @@ def recognize_jellyfin_external_subtitle(
             raise Stage12BatchSystemicError(
                 "Jellyfin PlaybackInfo request failed"
             ) from error
-        return _subtitle_streams(playback)
-
-    def matching_stream() -> dict[str, object] | None:
-        for stream in playback_streams():
-            language = str(stream.get("language") or "").lower()
+        for stream in _subtitle_streams(playback):
+            language = str(stream.get("language") or "").casefold()
             stream_path = str(stream.get("path") or "")
+            codec = str(stream.get("codec") or "")
             if (
                 stream.get("source_path") == expected_item_path
                 and stream.get("is_external") is True
                 and language in {"ko", "kor", "korean"}
+                and stream_path == expected_subtitle_path
                 and PurePosixPath(stream_path).name
                 == PurePosixPath(expected_subtitle_path).name
-                and stream_path == expected_subtitle_path
+                and codec.casefold() == "subrip"
             ):
-                return stream
+                return Stage12JellyfinRecognition(
+                    item_id=item_id,
+                    item_path=expected_item_path,
+                    subtitle_path=expected_subtitle_path,
+                    subtitle_language=str(stream.get("language")),
+                    subtitle_codec=codec,
+                    external_visible=True,
+                    refresh_required=False,
+                    refresh_method="NONE_ALREADY_VISIBLE",
+                )
         return None
 
-    stream = matching_stream()
+    return item_id, expected_item_path, expected_subtitle_path, probe
+
+
+def inspect_jellyfin_external_subtitle(
+    client: JellyfinClient,
+    *,
+    video_relative: str,
+    subtitle_relative: str,
+) -> Stage12JellyfinRecognition | None:
+    """Return exact current Jellyfin evidence without causing a refresh."""
+
+    _, _, _, probe = _jellyfin_external_subtitle_probe(
+        client,
+        video_relative=video_relative,
+        subtitle_relative=subtitle_relative,
+    )
+    return probe()
+
+
+def recognize_jellyfin_external_subtitle(
+    client: JellyfinClient,
+    *,
+    video_relative: str,
+    subtitle_relative: str,
+    poll_interval_seconds: float = 3.0,
+    max_attempts: int = 10,
+    full_refresh_max_attempts: int | None = None,
+) -> Stage12JellyfinRecognition:
+    """Resolve one exact item and verify one exact external Korean stream.
+
+    The initial library query is metadata-only and filters its result by the
+    exact container-visible media path.  Refresh is sent only to that item and
+    only when the exact subtitle stream is not already visible.
+    """
+
+    if not isinstance(client, JellyfinClient) and not callable(
+        getattr(client, "_request", None)
+    ):
+        raise Stage12BatchSystemicError(
+            "Jellyfin client lacks the existing request contract"
+        )
+    if type(video_relative) is not str or type(subtitle_relative) is not str:
+        raise Stage12BatchSystemicError(
+            "Jellyfin path inputs must be exact strings"
+        )
+    if type(max_attempts) is not int or max_attempts <= 0:
+        raise Stage12BatchSystemicError(
+            "max_attempts must be a positive exact integer"
+        )
+    if full_refresh_max_attempts is None:
+        full_refresh_max_attempts = max_attempts
+    if (
+        type(full_refresh_max_attempts) is not int
+        or full_refresh_max_attempts <= 0
+    ):
+        raise Stage12BatchSystemicError(
+            "full_refresh_max_attempts must be a positive exact integer"
+        )
+    if (
+        isinstance(poll_interval_seconds, bool)
+        or not isinstance(poll_interval_seconds, (int, float))
+        or poll_interval_seconds < 0
+    ):
+        raise Stage12BatchSystemicError(
+            "poll_interval_seconds must be nonnegative"
+        )
+
+    item_id, expected_item_path, expected_subtitle_path, probe = (
+        _jellyfin_external_subtitle_probe(
+            client,
+            video_relative=video_relative,
+            subtitle_relative=subtitle_relative,
+        )
+    )
+
+    stream = probe()
     refresh_required = stream is None
     refresh_method = "NONE_ALREADY_VISIBLE"
     if stream is None:
@@ -470,7 +540,7 @@ def recognize_jellyfin_external_subtitle(
             ) from error
         refresh_method = "POST /Items/{itemId}/Refresh"
         for attempt in range(max_attempts):
-            stream = matching_stream()
+            stream = probe()
             if stream is not None:
                 break
             if attempt + 1 < max_attempts:
@@ -498,11 +568,11 @@ def recognize_jellyfin_external_subtitle(
         refresh_method = (
             "POST /Items/{itemId}/Refresh Default->FullRefresh"
         )
-        for attempt in range(max_attempts):
-            stream = matching_stream()
+        for attempt in range(full_refresh_max_attempts):
+            stream = probe()
             if stream is not None:
                 break
-            if attempt + 1 < max_attempts:
+            if attempt + 1 < full_refresh_max_attempts:
                 time.sleep(float(poll_interval_seconds))
 
     if stream is None:
@@ -512,8 +582,9 @@ def recognize_jellyfin_external_subtitle(
     return Stage12JellyfinRecognition(
         item_id=item_id,
         item_path=expected_item_path,
-        subtitle_path=str(stream["path"]),
-        subtitle_language=str(stream["language"]),
+        subtitle_path=stream.subtitle_path,
+        subtitle_language=stream.subtitle_language,
+        subtitle_codec=stream.subtitle_codec,
         external_visible=True,
         refresh_required=refresh_required,
         refresh_method=refresh_method,
