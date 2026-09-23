@@ -1939,3 +1939,38 @@ exact stream becomes visible. If `START-636` remains absent, use a dedicated
 read-only scanner diagnostic to compare the exact item's library path and
 refresh/scan visibility; leave rollout state unchanged until evidence proves
 the expected stream exists.
+
+## Stage12 production reconciliation canary — 2026-09-23
+
+Ran one explicitly authorized reconciliation for `FC2-PPV-4758058` using
+code HEAD `d18dd5ecde8743c8c780ddd4eaf9a4a493aec7cc`. Before execution, HEAD
+matched exactly, the worktree was clean, and the title was
+`FAILED_RETRYABLE`, transition sequence 4, with reason
+`STAGE12_TITLE_FAILURE`. The targeted reconcile coordinator returned PASS:
+`RECONCILIATION_RESULT=PUBLISHED`, reason `PUBLICATION_RECONCILED`.
+
+Fresh evidence matched at reconciliation time:
+
+- Canonical Discovery source path was
+  `FC2-PPV/FC2-PPV-4758058/FC2-PPV-4758058.mp4`; source size and nanosecond
+  mtime matched rollout state and NAS read-only `lstat`.
+- Existing Stage11 CLEAN/report/baseline bundle passed provenance validation;
+  CLEAN SHA-256 was
+  `359c7293b4b1a8c6c11a640ee4834020fe6f0b7cbe48dd7aada4c1739b5aacf5`, and
+  report SHA-256 matched recorded state.
+- NAS destination
+  `FC2-PPV/FC2-PPV-4758058/FC2-PPV-4758058.ko.srt` was read-only verified at
+  1,908 bytes. Its SHA-256 matched both the Stage11 artifact and immutable
+  publication proof.
+- Jellyfin GET resolved item `f572f98325049203905b21a25a427aba` at the exact
+  expected media path and reported the exact sidecar as an external `kor`,
+  `subrip` subtitle stream.
+- The reconciliation event records `controller_call_performed=false` and
+  `nas_write_performed=false`; the code path used Jellyfin GET only and made
+  no refresh/write request. No Stage11 rerun, translation, or republication
+  occurred.
+
+Afterward, only this title had a new rollout event: sequence 5,
+`FAILED_RETRYABLE -> PUBLISHED`, reason `PUBLICATION_RECONCILED`. Final
+rollout counts are `PUBLISHED=153`, `FAILED_RETRYABLE=19`,
+`UNRESOLVED=1`, `PENDING=0`. `START-636` was not touched.
