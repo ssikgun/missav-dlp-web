@@ -2006,3 +2006,45 @@ Final rollout counts after the four-title sequence are `PUBLISHED=157`,
 `FAILED_RETRYABLE=15`, `UNRESOLVED=1`, `PENDING=0`. Together with the earlier
 canary, the complete five-title delayed-indexing group is reconciled; all
 other rollout titles remain unchanged.
+
+## START-636 delayed Jellyfin indexing diagnostic and reconciliation — 2026-09-23
+
+The exact `START-636` Jellyfin item received one item-specific Default refresh
+as a separate bounded diagnostic. The expected external Korean stream first
+appeared on the second post-refresh PlaybackInfo poll, about 5.2 seconds after
+the refresh. Its metadata was `Language=kor`, `IsExternal=true`,
+`Codec=subrip`, and exact path
+`/media/adult/START/START-636/START-636.ko.srt`; the item was
+`157b376a8917d59c87de7b6ee5c01ec7` at
+`/media/adult/START/START-636/START-636.mp4`. The stream appeared during the
+Default polling window, so no FullRefresh was issued. This confirms delayed
+Jellyfin indexing for the remaining title; no filename or sidecar workaround
+was needed.
+
+Then, using code HEAD `3155d1a455baa3753d5bf65271c6fb7089b874eb`, ran the
+existing explicit one-title `--mode reconcile --dvd-id START-636` path. Before
+execution, HEAD matched, the worktree was clean, and current read-only checks
+confirmed `FAILED_RETRYABLE`, sequence 4, reason `STAGE12_TITLE_FAILURE`.
+Discovery and NAS source identity matched at
+`START/START-636/START-636.mp4` (1,801,037,186 bytes; mtime
+1788861288542183653 ns). The existing Stage11 artifact/report bundle passed
+provenance validation: CLEAN SHA-256
+`e2400ea07c0a7f2b90885d6de2bf6231fffdafef20c61ceba236770b9cf2f629`, report
+SHA-256 `fbe6e0390812bae89c51c98c19d7bf14777c41dedecf203101f7a9da8c9a0e6c`.
+NAS sidecar `START/START-636/START-636.ko.srt` was 364 bytes; its read-only
+SHA-256 matched both the CLEAN artifact and verified publication proof.
+Jellyfin GET reconfirmed the exact item and stream metadata above.
+
+Reconciliation passed: only `START-636` changed from sequence 4
+`FAILED_RETRYABLE` / `STAGE12_TITLE_FAILURE` to sequence 5 `PUBLISHED` /
+`PUBLICATION_RECONCILED` (event 728). The audited event records
+`controller_call_performed=false` and `nas_write_performed=false`; reconciliation
+used Jellyfin GET only and issued no refresh. No Stage11 rerun, translation,
+republication, NAS write, or direct Jellyfin DB write occurred. A full
+before/after snapshot of every other rollout title's status, sequence, and
+reason was identical.
+
+Final rollout counts are `PUBLISHED=158`, `FAILED_RETRYABLE=14`,
+`UNRESOLVED=1`, `PENDING=0`. The separate diagnostic's one exact-item Default
+refresh is recorded above; it did not alter rollout state or write the NAS
+sidecar.
