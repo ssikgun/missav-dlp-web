@@ -1915,8 +1915,9 @@ GET requests only. The only state write is the existing audited
 bulk runner exposes this path only as explicit `--mode reconcile --dvd-id`
 and requires `TEDDY_STAGE12_PUBLICATION_RECONCILE_AUTHORIZED` to be set to the
 review token. No production reconciliation was run in this change; the five
-titles remain untouched pending separate approval. `START-636` cannot pass
-the stream-presence gate while its exact stream is absent.
+titles were pending separate approval at the time of this implementation
+commit. `START-636` cannot pass the stream-presence gate while its exact
+stream is absent.
 
 Smoke coverage:
 
@@ -1931,14 +1932,13 @@ Smoke coverage:
 - Stage12 batch, bulk runner, rollout, and reconciliation smoke tests pass;
 - changed modules compile and `git diff --check` passes.
 
-Next operational step, only after separate review/approval: run one explicit
-reconciliation invocation per eligible title, first reviewing read-only
-evidence for the exact artifact provenance, current source fingerprint, NAS
-destination SHA, and Jellyfin stream. Do not include `START-636` unless its
-exact stream becomes visible. If `START-636` remains absent, use a dedicated
-read-only scanner diagnostic to compare the exact item's library path and
-refresh/scan visibility; leave rollout state unchanged until evidence proves
-the expected stream exists.
+At the time of this implementation update, the next operation was one
+explicit reconciliation per eligible title after separate review. Subsequent
+production results are recorded below. Do not include `START-636` unless its
+exact stream becomes visible. If it remains absent, use a dedicated read-only
+scanner diagnostic to compare the exact item's library path and refresh/scan
+visibility; leave rollout state unchanged until evidence proves the expected
+stream exists.
 
 ## Stage12 production reconciliation canary — 2026-09-23
 
@@ -1974,3 +1974,35 @@ Afterward, only this title had a new rollout event: sequence 5,
 `FAILED_RETRYABLE -> PUBLISHED`, reason `PUBLICATION_RECONCILED`. Final
 rollout counts are `PUBLISHED=153`, `FAILED_RETRYABLE=19`,
 `UNRESOLVED=1`, `PENDING=0`. `START-636` was not touched.
+
+## Stage12 remaining Jellyfin reconciliation titles — 2026-09-23
+
+After the canary passed, independently revalidated and reconciled the other
+four forensic-approved titles. Each title was gated on its current
+`FAILED_RETRYABLE` state, canonical Discovery source identity and NAS source
+fingerprint, Stage11 baseline/CLEAN/report provenance, immutable publication
+proof, NAS destination bytes/SHA, and a fresh Jellyfin GET for the exact item
+and exact external KO stream (`Language=kor`, `IsExternal=true`,
+`Codec=subrip`, exact expected sidecar path). All four passed. Each moved from
+sequence 4 `FAILED_RETRYABLE` / `STAGE12_TITLE_FAILURE` to sequence 5
+`PUBLISHED` / `PUBLICATION_RECONCILED`.
+
+| DVD-ID | NAS sidecar bytes / SHA-256 | Jellyfin item ID |
+| --- | ---: | --- |
+| `FC2-PPV-4973050` | 795 / `0eab564e9a01ee5e70e61a4e05076b41861d4d7ab0a4d014b55fa16b6eb2a380` | `38558e5c4604af22e39557fe8b699d40` |
+| `MKON-126` | 18,607 / `288b16e92029a6f22e974d9e4c625703afaa8e593a17b76887b7c5381269bace` | `db6af239d58cab308da599eaba297cba` |
+| `NHDTB-93803` | 68 / `28676cd94f390ef965a8557512332c7a3d9ece65a9d6838f3c9c3ecdaa5e328f` | `d83183871bf60382367b987172d60c77` |
+| `SDDE-763` | 42,342 / `bfe384e976f0311144804f099ed06f106820fcbe019ba792cfddc5dda057d8e9` | `9c9b380e38b05f9ae20fa5acd9ae808f` |
+
+For every title, the local CLEAN SHA matched the report/provenance and the
+read-only NAS destination SHA; the Jellyfin item and stream paths matched the
+expected media and `.ko.srt` paths. Reconciliation used no controller call,
+NAS write, or Jellyfin refresh/write. No Stage11 rerun, translation, or
+republication occurred. The four appended rollout events are event IDs
+724–727 and apply only to these four DVD-IDs. `START-636` remains
+`FAILED_RETRYABLE` and was not touched.
+
+Final rollout counts after the four-title sequence are `PUBLISHED=157`,
+`FAILED_RETRYABLE=15`, `UNRESOLVED=1`, `PENDING=0`. Together with the earlier
+canary, the complete five-title delayed-indexing group is reconciled; all
+other rollout titles remain unchanged.
