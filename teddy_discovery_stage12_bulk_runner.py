@@ -65,6 +65,8 @@ JELLYFIN_FULL_REFRESH_MAX_ATTEMPTS = 42
 
 AUTH_ENV = "TEDDY_STAGE12_BULK_ALLOW_LIVE"
 AUTH_VALUE = "TEDDY_STAGE12_BULK_AUTHORIZED"
+EXPLICIT_RETRY_AUTH_ENV = "TEDDY_STAGE12_EXPLICIT_RETRY_AUTHORIZED"
+EXPLICIT_RETRY_AUTH_VALUE = "YES_I_HAVE_REVIEWED_THE_SINGLE_TITLE"
 RECONCILE_AUTH_ENV = "TEDDY_STAGE12_PUBLICATION_RECONCILE_AUTHORIZED"
 RECONCILE_AUTH_VALUE = "YES_I_HAVE_REVIEWED_THE_TITLE_EVIDENCE"
 
@@ -872,6 +874,82 @@ def read_exact_nas_inventory(
     return selected
 
 
+def explicit_retry_inventory(
+    *,
+    dvd_id: str,
+    expected_sequence: int,
+    store,
+    subtitle_reader,
+    nas_filesystem,
+):
+    """Bind one retry to current Discovery, NAS, and durable rollout identity."""
+
+    from teddy_discovery_stage12_rollout import (
+        Stage12RolloutStateStore,
+        _record_video,
+    )
+
+    if not isinstance(store, Stage12RolloutStateStore):
+        raise Stage12BulkRunnerError("invalid explicit retry state store")
+    state = store.get(dvd_id)
+    rows = read_discovery_rows((dvd_id,), store)
+    if len(rows) != 1:
+        raise Stage12BulkRunnerError("explicit retry Discovery row is not unique")
+    row = rows[0]
+    validated = store.validate_explicit_retry(
+        dvd_id,
+        expected_sequence=expected_sequence,
+        media_path_identity=str(row["relative_path"]),
+        holding_identity="jav:" + str(row["relative_path"]),
+        source_size_bytes=int(row["size_bytes"]),
+        source_mtime_ns=int(row["mtime_ns"]),
+    )
+    if validated != state:
+        raise Stage12BulkRunnerError(
+            "explicit retry state changed during identity preflight"
+        )
+    records = read_exact_nas_inventory(rows, subtitle_reader)
+    if set(records) != {dvd_id}:
+        raise Stage12BulkRunnerError(
+            "explicit retry NAS inventory membership mismatch"
+        )
+    record = records[dvd_id]
+    video = _record_video(record)
+    if (
+        record.source_size_bytes != state.source_size_bytes
+        or record.source_mtime_ns != state.source_mtime_ns
+        or record.media_path_identity != state.media_path_identity
+    ):
+        raise Stage12BulkRunnerError(
+            "explicit retry NAS inventory differs from rollout fingerprint"
+        )
+    source_stat = nas_filesystem.lstat(video.relative_path)
+    if (
+        not stat.S_ISREG(int(getattr(source_stat, "st_mode", 0)))
+        or int(getattr(source_stat, "st_size", -1))
+        != state.source_size_bytes
+        or int(getattr(source_stat, "st_mtime_ns", -1))
+        != state.source_mtime_ns
+    ):
+        raise Stage12BulkRunnerError(
+            "explicit retry NAS source fingerprint drift"
+        )
+    destination = state.destination_relative
+    if destination is None:
+        from teddy_discovery_subtitle import derive_target_ko_relative
+
+        destination = derive_target_ko_relative(video)
+    try:
+        nas_filesystem.lstat(destination)
+    except FileNotFoundError:
+        pass
+    else:
+        raise Stage12BulkRunnerError(
+            "explicit retry destination already exists"
+        )
+    return records
+
+
 def atomic_write_json(
     path: Path,
     payload: dict[str, object],
@@ -1233,11 +1311,60 @@ def run_preflight(
     return 0
 
 
+def run_explicit_retry_preflight(
+    *,
+    expected_head: str,
+    dvd_id: str,
+    expected_sequence: int,
+) -> int:
+    """Read-only preflight for one explicitly authorized retry title."""
+
+    from teddy_discovery_stage12_inventory import build_subtitle_ssh_reader
+    from teddy_discovery_stage12_rollout import Stage12RolloutStateStore
+    from teddy_discovery_stage12_rollout import build_nas_preflight_filesystem
+
+    emit("STAGE12_EXPLICIT_RETRY_PREFLIGHT", "START")
+    emit("LIVE_EXECUTED", "NO")
+    check_repo(expected_head)
+    contract_check()
+    inspect_runtime_directories()
+    inspect_remote_root()
+    network_probe()
+
+    store = Stage12RolloutStateStore(ROLLOUT_DB)
+    active = active_rollout_ids(store)
+    emit("ACTIVE_ROLLOUT_IDS", active)
+    if active:
+        raise Stage12BulkRunnerError(
+            "active RUNNING/GENERATED state exists; explicit retry is blocked"
+        )
+    state = store.get(dvd_id)
+    emit("RETRY_TARGET", {"dvd_id": dvd_id, "status": state.status,
+                           "sequence": state.transition_sequence})
+    records = explicit_retry_inventory(
+        dvd_id=dvd_id,
+        expected_sequence=expected_sequence,
+        store=store,
+        subtitle_reader=build_subtitle_ssh_reader(**NAS),
+        nas_filesystem=build_nas_preflight_filesystem(**NAS),
+    )
+    if set(records) != {dvd_id}:
+        raise Stage12BulkRunnerError(
+            "explicit retry preflight did not resolve exactly one title"
+        )
+    emit("EXPLICIT_RETRY_IDENTITY", "PASS")
+    emit("PRODUCTION_WRITES_TOTAL", 0)
+    emit("STAGE12_EXPLICIT_RETRY_PREFLIGHT", "PASS")
+    return 0
+
+
 def run_live(
     *,
     expected_head: str,
     batch_size: int,
     max_titles: int,
+    retry_dvd_id: str | None = None,
+    retry_expected_sequence: int | None = None,
 ) -> int:
     from teddy_discovery_completion_ssh import (
         CompletionSSH,
@@ -1250,6 +1377,8 @@ def run_live(
     )
     from teddy_discovery_stage12_batch import (
         Stage12BatchRunner,
+        Stage12BatchSelection,
+        Stage12ExplicitRetryAuthorization,
         recognize_jellyfin_external_subtitle,
         select_pending_batch,
     )
@@ -1264,17 +1393,41 @@ def run_live(
         SubtitleSSHMutator,
     )
 
-    if os.environ.get(AUTH_ENV) != AUTH_VALUE:
-        emit("LIVE_AUTHORIZATION", "BLOCKED")
-        emit("LIVE_EXECUTED", "NO")
-        return 2
-
-    # Full read-only verification before the first
-    # production mutation.
-    run_preflight(
-        expected_head=expected_head,
-        batch_size=batch_size,
-    )
+    explicit_retry = retry_dvd_id is not None
+    if explicit_retry:
+        if (
+            type(retry_dvd_id) is not str
+            or not retry_dvd_id
+            or type(retry_expected_sequence) is not int
+            or retry_expected_sequence < 1
+            or batch_size != 1
+            or max_titles not in (0, 1)
+        ):
+            raise Stage12BulkRunnerError(
+                "explicit retry requires one DVD-ID, one expected sequence, and a one-title bound"
+            )
+        if os.environ.get(EXPLICIT_RETRY_AUTH_ENV) != EXPLICIT_RETRY_AUTH_VALUE:
+            emit("EXPLICIT_RETRY_AUTHORIZATION", "BLOCKED")
+            emit("LIVE_EXECUTED", "NO")
+            return 2
+        run_explicit_retry_preflight(
+            expected_head=expected_head,
+            dvd_id=retry_dvd_id,
+            expected_sequence=retry_expected_sequence,
+        )
+    else:
+        if retry_expected_sequence is not None:
+            raise Stage12BulkRunnerError(
+                "expected sequence is valid only for explicit retry"
+            )
+        if os.environ.get(AUTH_ENV) != AUTH_VALUE:
+            emit("LIVE_AUTHORIZATION", "BLOCKED")
+            emit("LIVE_EXECUTED", "NO")
+            return 2
+        run_preflight(
+            expected_head=expected_head,
+            batch_size=batch_size,
+        )
 
     with RunnerLock(LOCK_PATH):
         # Revalidate repo and durable active state after
@@ -1290,6 +1443,18 @@ def run_live(
         if active:
             raise Stage12BulkRunnerError(
                 "active rollout state appeared before live start"
+            )
+
+        retry_records = None
+        if explicit_retry:
+            subtitle_reader_for_retry = build_subtitle_ssh_reader(**NAS)
+            nas_filesystem_for_retry = build_nas_preflight_filesystem(**NAS)
+            retry_records = explicit_retry_inventory(
+                dvd_id=retry_dvd_id,
+                expected_sequence=retry_expected_sequence,
+                store=store,
+                subtitle_reader=subtitle_reader_for_retry,
+                nas_filesystem=nas_filesystem_for_retry,
             )
 
         ensure_runtime_directories()
@@ -1348,25 +1513,28 @@ def run_live(
             batch_number = 0
 
             while True:
-                pending = eligible_pending_ids(
-                    store
-                )
-
-                size = configured_batch_size(
-                    len(pending),
-                    batch_size,
-                    processed=processed,
-                    max_titles=max_titles,
-                )
+                if explicit_retry:
+                    if processed:
+                        break
+                    size = 1
+                else:
+                    pending = eligible_pending_ids(store)
+                    size = configured_batch_size(
+                        len(pending),
+                        batch_size,
+                        processed=processed,
+                        max_titles=max_titles,
+                    )
 
                 if size == 0:
                     break
 
                 batch_number += 1
 
-                selection = select_pending_batch(
-                    store,
-                    batch_size=size,
+                selection = (
+                    Stage12BatchSelection(1, (retry_dvd_id,))
+                    if explicit_retry
+                    else select_pending_batch(store, batch_size=size)
                 )
 
                 heartbeat.update(
@@ -1377,19 +1545,26 @@ def run_live(
                     processed_titles=processed,
                 )
 
-                discovery_rows = (
-                    read_discovery_rows(
+                if explicit_retry:
+                    selected_records = retry_records
+                else:
+                    discovery_rows = read_discovery_rows(
                         selection.dvd_ids,
                         store,
                     )
-                )
-
-                selected_records = (
-                    read_exact_nas_inventory(
+                    selected_records = read_exact_nas_inventory(
                         discovery_rows,
                         subtitle_reader,
                     )
-                )
+
+                if explicit_retry:
+                    selected_records = explicit_retry_inventory(
+                        dvd_id=retry_dvd_id,
+                        expected_sequence=retry_expected_sequence,
+                        store=store,
+                        subtitle_reader=subtitle_reader,
+                        nas_filesystem=nas_filesystem,
+                    )
 
                 emit(
                     "BATCH_SELECTION",
@@ -1505,6 +1680,14 @@ def run_live(
                             controller_runner,
                         jellyfin_recognizer=
                             jellyfin_recognizer,
+                        retry_authorization=(
+                            Stage12ExplicitRetryAuthorization(
+                                retry_dvd_id,
+                                retry_expected_sequence,
+                            )
+                            if explicit_retry
+                            else None
+                        ),
                     )
                 )
 
@@ -1527,6 +1710,9 @@ def run_live(
                             processed,
                     },
                 )
+
+                if explicit_retry:
+                    break
 
                 heartbeat.update(
                     current_dvd_id=None,
@@ -1648,7 +1834,7 @@ def build_parser():
 
     parser.add_argument(
         "--mode",
-        choices=("preflight", "live", "reconcile"),
+        choices=("preflight", "live", "retry", "reconcile"),
         default="preflight",
     )
 
@@ -1674,10 +1860,16 @@ def build_parser():
 
     parser.add_argument(
         "--dvd-id",
+        action="append",
         help=(
-            "one exact FAILED_RETRYABLE title for explicit publication "
-            "reconciliation mode"
+            "one exact title for explicit retry or publication reconciliation; "
+            "may be supplied exactly once"
         ),
+    )
+    parser.add_argument(
+        "--expected-sequence",
+        type=int,
+        help="durable rollout event sequence required for explicit retry",
     )
 
     return parser
@@ -1703,14 +1895,18 @@ def main() -> int:
         )
         return 2
 
+    dvd_ids = args.dvd_id or []
     if args.mode == "reconcile":
-        if not args.dvd_id:
+        if len(dvd_ids) != 1:
             emit("STAGE12_RECONCILIATION", "FAIL_DVD_ID_REQUIRED")
+            return 2
+        if args.expected_sequence is not None:
+            emit("STAGE12_RECONCILIATION", "FAIL_UNEXPECTED_SEQUENCE")
             return 2
         try:
             return run_reconciliation(
                 expected_head=args.expected_head,
-                dvd_id=args.dvd_id,
+                dvd_id=dvd_ids[0],
             )
         except KeyboardInterrupt:
             emit("STAGE12_RECONCILIATION", "INTERRUPTED")
@@ -1722,6 +1918,36 @@ def main() -> int:
             )
             emit("ERROR", str(error))
             return 1
+
+    if args.mode == "retry":
+        if len(dvd_ids) != 1:
+            emit("STAGE12_EXPLICIT_RETRY", "FAIL_EXACTLY_ONE_DVD_ID_REQUIRED")
+            return 2
+        if type(args.expected_sequence) is not int or args.expected_sequence < 1:
+            emit("STAGE12_EXPLICIT_RETRY", "FAIL_EXPECTED_SEQUENCE_REQUIRED")
+            return 2
+        if args.batch_size != 1 or args.max_titles not in (0, 1):
+            emit("STAGE12_EXPLICIT_RETRY", "FAIL_SINGLE_TITLE_BOUND_REQUIRED")
+            return 2
+        try:
+            return run_live(
+                expected_head=args.expected_head,
+                batch_size=1,
+                max_titles=1,
+                retry_dvd_id=dvd_ids[0],
+                retry_expected_sequence=args.expected_sequence,
+            )
+        except KeyboardInterrupt:
+            emit("STAGE12_EXPLICIT_RETRY", "INTERRUPTED")
+            return 130
+        except Exception as error:
+            emit("STAGE12_EXPLICIT_RETRY", "FAIL_" + type(error).__name__)
+            emit("ERROR", str(error))
+            return 1
+
+    if dvd_ids or args.expected_sequence is not None:
+        emit("STAGE12_BULK", "FAIL_SELECTOR_ONLY_VALID_FOR_RETRY_OR_RECONCILE")
+        return 2
 
     try:
         if args.mode == "live":

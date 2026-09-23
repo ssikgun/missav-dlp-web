@@ -124,6 +124,24 @@ class Stage12BatchSelection:
 
 
 @dataclass(frozen=True)
+class Stage12ExplicitRetryAuthorization:
+    """One-title retry gate bound to an observed durable event sequence."""
+
+    dvd_id: str
+    expected_sequence: int
+
+    def __post_init__(self):
+        if type(self.dvd_id) is not str or not self.dvd_id:
+            raise Stage12BatchSystemicError(
+                "explicit retry authorization requires one exact DVD-ID"
+            )
+        if type(self.expected_sequence) is not int or self.expected_sequence < 1:
+            raise Stage12BatchSystemicError(
+                "explicit retry authorization requires a positive sequence"
+            )
+
+
+@dataclass(frozen=True)
 class Stage12JellyfinRecognition:
     """Exact item/stream proof returned by the bounded Jellyfin check."""
 
@@ -661,6 +679,7 @@ class Stage12BatchRunner:
         jellyfin_recognizer: Callable[
             [str, CanonicalVideoHolding, str], Stage12JellyfinRecognition
         ],
+        retry_authorization: Stage12ExplicitRetryAuthorization | None = None,
     ):
         if not isinstance(store, Stage12RolloutStateStore):
             raise Stage12BatchSystemicError("invalid rollout state store")
@@ -724,6 +743,7 @@ class Stage12BatchRunner:
         self.publisher = publisher
         self.controller_runner = controller_runner
         self.jellyfin_recognizer = jellyfin_recognizer
+        self.retry_authorization = retry_authorization
 
     def _fail_title(
         self,
@@ -762,7 +782,7 @@ class Stage12BatchRunner:
             "retry_performed": (
                 error.attempts > 1
                 if semantic_retry_exhausted
-                else False
+                else self.retry_authorization is not None
             ),
             "destination": destination,
         }
@@ -844,7 +864,27 @@ class Stage12BatchRunner:
 
     def _run_one(self, dvd_id: str) -> Stage12BatchTitleResult:
         state = self.store.get(dvd_id)
-        if state.status != STATE_PENDING:
+        retry = self.retry_authorization
+        explicit_retry = retry is not None
+        if explicit_retry:
+            if (
+                retry.dvd_id != dvd_id
+                or state.status != STATE_FAILED_RETRYABLE
+                or state.transition_sequence != retry.expected_sequence
+                or any(
+                    value is not None
+                    for value in (
+                        state.artifact_path,
+                        state.artifact_sha256,
+                        state.report_path,
+                        state.report_sha256,
+                    )
+                )
+            ):
+                raise Stage12BatchSystemicError(
+                    "explicit retry authorization no longer matches durable state"
+                )
+        elif state.status != STATE_PENDING:
             raise Stage12BatchSystemicError(
                 "immutable batch title is no longer PENDING: " + dvd_id
             )
@@ -871,6 +911,10 @@ class Stage12BatchRunner:
                     "canonical KO destination already exists"
                 )
         except Stage12BatchTitleError as error:
+            if explicit_retry:
+                raise Stage12BatchSystemicError(
+                    "explicit retry source/destination preflight failed; durable state is unchanged"
+                ) from error
             return self._fail_title(
                 state,
                 error=error,
@@ -883,6 +927,10 @@ class Stage12BatchRunner:
                 jellyfin_recognition="NOT_RUN",
             )
         except (FileNotFoundError, OSError) as error:
+            if explicit_retry:
+                raise Stage12BatchSystemicError(
+                    "explicit retry NAS preflight failed; durable state is unchanged"
+                ) from error
             title_error = Stage12BatchTitleError(
                 "exact NAS preflight failed: " + type(error).__name__
             )
@@ -901,12 +949,32 @@ class Stage12BatchRunner:
         running = self.store.transition(
             dvd_id,
             STATE_RUNNING,
-            expected_from=STATE_PENDING,
-            reason="STAGE12_BATCH_START",
+            expected_from=(
+                STATE_FAILED_RETRYABLE if explicit_retry else STATE_PENDING
+            ),
+            expected_sequence=(
+                retry.expected_sequence if explicit_retry else None
+            ),
+            reason=(
+                "STAGE12_EXPLICIT_RETRY_START"
+                if explicit_retry
+                else "STAGE12_BATCH_START"
+            ),
             provenance={
-                "operation": "STAGE12_SERIAL_BATCH",
-                "batch_membership": "immutable-selection",
-                "retry_performed": False,
+                "operation": (
+                    "STAGE12_EXPLICIT_RETRY"
+                    if explicit_retry
+                    else "STAGE12_SERIAL_BATCH"
+                ),
+                "batch_membership": (
+                    "one-explicit-title"
+                    if explicit_retry
+                    else "immutable-selection"
+                ),
+                "retry_performed": explicit_retry,
+                "expected_sequence": (
+                    retry.expected_sequence if explicit_retry else None
+                ),
             },
         )
         try:
@@ -993,7 +1061,7 @@ class Stage12BatchRunner:
                 "route": controller_result.route,
                 "external_ja_outcome": controller_result.external_ja_outcome,
                 "alignment_outcome": controller_result.alignment_outcome,
-                "retry_performed": False,
+                "retry_performed": self.retry_authorization is not None,
             },
             artifact_path=str(clean_path),
             artifact_sha256=clean_sha,
@@ -1147,7 +1215,7 @@ class Stage12BatchRunner:
                 "destination_relative": destination,
                 "destination_sha256": clean_sha,
                 "jellyfin_recognition": jellyfin.to_dict(),
-                "retry_performed": False,
+                "retry_performed": self.retry_authorization is not None,
             },
             destination_relative=destination,
         )
@@ -1166,6 +1234,13 @@ class Stage12BatchRunner:
     def run(self, selection: Stage12BatchSelection) -> Stage12BatchResult:
         if not isinstance(selection, Stage12BatchSelection):
             raise Stage12BatchSystemicError("invalid immutable batch selection")
+        if self.retry_authorization is not None and (
+            selection.batch_size != 1
+            or selection.dvd_ids != (self.retry_authorization.dvd_id,)
+        ):
+            raise Stage12BatchSystemicError(
+                "explicit retry requires exactly its one authorized title"
+            )
         titles = tuple(
             self._run_one(dvd_id)
             for dvd_id in selection.dvd_ids
@@ -1178,6 +1253,7 @@ __all__ = [
     "Stage12BatchResult",
     "Stage12BatchRunner",
     "Stage12BatchSelection",
+    "Stage12ExplicitRetryAuthorization",
     "Stage12BatchSystemicError",
     "Stage12BatchTerminalTitleError",
     "Stage12BatchTitleError",

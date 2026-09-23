@@ -988,6 +988,105 @@ class Stage12RolloutStateStore:
         finally:
             connection.close()
 
+    def validate_explicit_retry(
+        self,
+        dvd_id: str,
+        *,
+        expected_sequence: int,
+        media_path_identity: str,
+        holding_identity: str,
+        source_size_bytes: int,
+        source_mtime_ns: int,
+    ) -> Stage12RolloutState:
+        """Validate one retryable title and its durable history without writes."""
+
+        dvd_id = _validated_dvd_id(dvd_id)
+        if type(expected_sequence) is not int or expected_sequence < 1:
+            raise Stage12RolloutValidationError(
+                "explicit retry requires a positive expected sequence"
+            )
+        with self._transaction() as connection:
+            row = self._get_in_transaction(connection, dvd_id)
+            if row is None:
+                raise Stage12RolloutValidationError(
+                    "explicit retry title does not exist"
+                )
+            state = _state_from_row(row)
+            if state.status != STATE_FAILED_RETRYABLE:
+                raise Stage12InvalidTransitionError(
+                    "explicit retry requires FAILED_RETRYABLE"
+                )
+            if state.transition_sequence != expected_sequence:
+                raise Stage12InvalidTransitionError(
+                    "explicit retry sequence does not match"
+                )
+            if (
+                state.media_path_identity != media_path_identity
+                or state.holding_identity != holding_identity
+                or state.source_size_bytes != source_size_bytes
+                or state.source_mtime_ns != source_mtime_ns
+                or state.holding_identity != "jav:" + state.media_path_identity
+            ):
+                raise Stage12RolloutIdentityError(
+                    "explicit retry source fingerprint differs from rollout"
+                )
+            if any(
+                value is not None
+                for value in (
+                    state.artifact_path,
+                    state.artifact_sha256,
+                    state.report_path,
+                    state.report_sha256,
+                )
+            ):
+                raise Stage12RolloutIdentityError(
+                    "explicit retry conflicts with recorded artifact provenance"
+                )
+            video = _canonical_video_for_state(
+                dvd_id,
+                state.media_path_identity,
+            )
+            expected_destination = derive_target_ko_relative(video)
+            if state.destination_relative not in (None, expected_destination):
+                raise Stage12RolloutIdentityError(
+                    "explicit retry conflicts with recorded destination identity"
+                )
+
+            events = tuple(
+                connection.execute(
+                    """
+                    SELECT * FROM stage12_rollout_events
+                    WHERE dvd_id = ?
+                    ORDER BY transition_sequence
+                    """,
+                    (dvd_id,),
+                ).fetchall()
+            )
+            if (
+                len(events) != state.transition_sequence
+                or not events
+                or int(events[-1]["transition_sequence"])
+                != state.transition_sequence
+                or events[-1]["to_status"] != state.status
+                or events[-1]["reason"] != state.last_transition_reason
+                or events[-1]["provenance_json"]
+                != state.last_transition_provenance_json
+            ):
+                raise Stage12RolloutValidationError(
+                    "explicit retry event history is inconsistent"
+                )
+            for event in events:
+                if event["to_status"] in {STATE_GENERATED, STATE_PUBLISHED}:
+                    raise Stage12RolloutIdentityError(
+                        "explicit retry conflicts with prior generated or published state"
+                    )
+                provenance = _event_value_from_row(event)
+                if provenance.get("publication_performed") is True:
+                    raise Stage12RolloutIdentityError(
+                        "explicit retry conflicts with publication provenance"
+                    )
+            return state
+
     def transition(
         self,
         dvd_id: str,
@@ -996,6 +1095,7 @@ class Stage12RolloutStateStore:
         reason: str,
         provenance: Mapping[str, object],
         expected_from: str | None = None,
+        expected_sequence: int | None = None,
         artifact_path: str | None = None,
         artifact_sha256: str | None = None,
         report_path: str | None = None,
@@ -1019,10 +1119,20 @@ class Stage12RolloutStateStore:
                     "cannot transition a missing rollout state"
                 )
             current_status = row["status"]
+            current_sequence = int(row["transition_sequence"])
             if expected_from is not None and expected_from != current_status:
                 raise Stage12InvalidTransitionError(
                     "transition source status does not match"
                 )
+            if expected_sequence is not None:
+                if type(expected_sequence) is not int or expected_sequence < 1:
+                    raise Stage12RolloutValidationError(
+                        "expected transition sequence must be a positive exact integer"
+                    )
+                if expected_sequence != current_sequence:
+                    raise Stage12InvalidTransitionError(
+                        "rollout transition sequence does not match"
+                    )
             if to_status not in _ALLOWED_TRANSITIONS[current_status]:
                 raise Stage12InvalidTransitionError(
                     current_status + " cannot transition to " + to_status
@@ -1123,7 +1233,7 @@ class Stage12RolloutStateStore:
                     destination_relative = ?, updated_at = ?,
                     transition_sequence = ?, last_transition_reason = ?,
                     last_transition_provenance_json = ?
-                WHERE dvd_id = ? AND status = ?
+                WHERE dvd_id = ? AND status = ? AND transition_sequence = ?
                 """,
                 (
                     to_status,
@@ -1138,6 +1248,7 @@ class Stage12RolloutStateStore:
                     provenance_json,
                     dvd_id,
                     current_status,
+                    current_sequence,
                 ),
             )
             if cursor.rowcount != 1:

@@ -2147,3 +2147,50 @@ Final rollout counts are `PUBLISHED=158`, `FAILED_RETRYABLE=14`,
 `UNRESOLVED=1`, `PENDING=0`. The separate diagnostic's one exact-item Default
 refresh is recorded above; it did not alter rollout state or write the NAS
 sidecar.
+
+## Stage12 explicit FAILED_RETRYABLE retry path — 2026-09-23
+
+Added `teddy_discovery_stage12_bulk_runner.py --mode retry` as a generic,
+operator-authorized single-title path from `FAILED_RETRYABLE` through the
+existing Stage11 controller, Stage12 artifact validation/publication, and
+Jellyfin external-stream check. This path is separate from ordinary bulk
+`live` selection and publication-only `reconcile`.
+
+The retry command requires exactly one `--dvd-id`, a positive
+`--expected-sequence`, exact `--expected-head`, a clean worktree, and the
+separate `TEDDY_STAGE12_EXPLICIT_RETRY_AUTHORIZED=YES_I_HAVE_REVIEWED_THE_SINGLE_TITLE`
+authorization. It fails closed on active RUNNING/GENERATED rollout state,
+state/sequence mismatch, Discovery or NAS source fingerprint drift, existing
+destination, inconsistent event history, or recorded artifact/publication
+provenance. The durable transition is directly
+`FAILED_RETRYABLE -> RUNNING`, reason `STAGE12_EXPLICIT_RETRY_START`, with the
+authorized sequence recorded in event provenance; the database update is
+sequence-guarded. Retry execution uses the normal `Stage12BatchRunner._run_one`
+path with immutable one-title selection. Any title failure follows the
+existing Stage12 failure classification; retryable failures return to
+`FAILED_RETRYABLE`, while existing terminal safety conflicts retain their
+terminal handling.
+
+No production retry was run while implementing this path. Read-only rollout
+state still showed `NHDTC-250=FAILED_RETRYABLE`, sequence 3,
+`STAGE12_TITLE_FAILURE`, source size 6,618,791,523 bytes, and source mtime
+1788879891350125554 ns. Rollout counts were `PUBLISHED=158`,
+`FAILED_RETRYABLE=14`, `UNRESOLVED=1`.
+
+Offline retry smoke passed: exact one-title selection, missing/duplicate
+selector rejection, absent authorization, status/sequence/fingerprint and
+artifact-provenance guards, title failure isolation, normal Stage11 and
+publication path reuse, and unchanged other-title state. Existing Stage12
+batch, bulk-runner, rollout, and reconciliation smokes also passed; compile
+and `git diff --check` passed. The retry command shape for the later NHDTC-250
+canary is:
+
+```sh
+TEDDY_STAGE12_EXPLICIT_RETRY_AUTHORIZED=YES_I_HAVE_REVIEWED_THE_SINGLE_TITLE \
+  python3 /opt/missav-pwa-subtitle-stage11/teddy_discovery_stage12_bulk_runner.py \
+  --mode retry --dvd-id NHDTC-250 --expected-sequence 3 \
+  --expected-head <exact-clean-authorized-HEAD>
+```
+
+Replace the HEAD value only after checking the exact clean code revision at
+execution time. This command has not been run.
