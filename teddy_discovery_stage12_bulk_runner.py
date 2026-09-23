@@ -433,6 +433,7 @@ def contract_check() -> None:
     )
     from teddy_discovery_stage12_batch import (
         Stage12BatchRunner,
+        _jellyfin_external_subtitle_probe,
         recognize_jellyfin_external_subtitle,
     )
     from teddy_discovery_stateful_live_runner import (
@@ -567,9 +568,11 @@ def contract_check() -> None:
     jellyfin_source = inspect.getsource(
         recognize_jellyfin_external_subtitle
     )
+    jellyfin_probe_source = inspect.getsource(
+        _jellyfin_external_subtitle_probe
+    )
 
     for token in (
-        '"/Items/" + item_id + "/PlaybackInfo"',
         '"/Items/" + item_id + "/Refresh?"',
         '"MetadataRefreshMode": "FullRefresh"',
         "full_refresh_max_attempts",
@@ -580,6 +583,13 @@ def contract_check() -> None:
             raise Stage12BulkRunnerError(
                 "Jellyfin recognition/fallback contract changed"
             )
+
+    if '"/Items/" + item_id + "/PlaybackInfo"' not in (
+        jellyfin_probe_source
+    ):
+        raise Stage12BulkRunnerError(
+            "Jellyfin recognition/fallback contract changed"
+        )
 
     external_source = inspect.getsource(
         build_external_ja_adapter

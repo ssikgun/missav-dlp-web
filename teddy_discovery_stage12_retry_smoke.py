@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import redirect_stdout
 import io
+import inspect
 import os
 from pathlib import Path
 import sys
@@ -42,7 +43,12 @@ from teddy_discovery_stage12_rollout import (
 )
 from teddy_discovery_stage12_rollout_smoke import write_valid_bundle
 from teddy_discovery_stage12_reconcile_smoke import failed_reconciliation_fixture
-from teddy_discovery_stage12_bulk_runner import main, run_live
+from teddy_discovery_stage12_bulk_runner import (
+    Stage12BulkRunnerError,
+    contract_check,
+    main,
+    run_live,
+)
 from teddy_discovery_subtitle import derive_target_ko_relative
 from teddy_discovery_stage12_batch_smoke import video_for
 
@@ -137,6 +143,32 @@ def _failing_controller(calls):
 
 
 def main_smoke():
+    contract_check()
+    from teddy_discovery_stage12_batch import (
+        _jellyfin_external_subtitle_probe,
+    )
+
+    original_getsource = inspect.getsource
+
+    def without_playback_probe_contract(value):
+        source = original_getsource(value)
+        if value is _jellyfin_external_subtitle_probe:
+            return source.replace(
+                '"/Items/" + item_id + "/PlaybackInfo"',
+                '"/Items/" + item_id + "/PlaybackInfo_REMOVED"',
+            )
+        return source
+
+    with patch(
+        "teddy_discovery_stage12_bulk_runner.inspect.getsource",
+        side_effect=without_playback_probe_contract,
+    ):
+        expect_raises(
+            Stage12BulkRunnerError,
+            contract_check,
+            "JELLYFIN_RECOGNITION_CONTRACT_MUTATION_REJECTED",
+        )
+
     with TemporaryDirectory(prefix="stage12-retry-smoke-") as raw:
         root = Path(raw)
         store, record, other, failed = failed_fixture(root)
@@ -285,6 +317,7 @@ def main_smoke():
         )
 
     print("STAGE12_EXPLICIT_RETRY_SMOKE=PASS")
+    print("JELLYFIN_CONTRACT_MUTATION_GUARD=PASS")
     print("PREFLIGHT_AUTH_SEQUENCE_FINGERPRINT=PASS")
     print("FAILURE_ISOLATION_AND_SINGLE_TITLE_BOUND=PASS")
     print("STAGE11_PUBLICATION_PATH_REUSE=PASS")

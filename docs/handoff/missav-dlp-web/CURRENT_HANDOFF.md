@@ -1,5 +1,36 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-23 Stage12 Jellyfin contract preflight false positive
+
+At source HEAD `8b6848d8913190a540fe4f14e9a2adfd228ffd7e`, an authorized
+NHDTC-250 explicit retry command stopped in read-only preflight with
+`Jellyfin recognition/fallback contract changed` and `LIVE_EXECUTED=NO`.
+No rollout event/state, Remote ASR, Stage11, publication, or Jellyfin write
+occurred. NHDTC-250 remains `FAILED_RETRYABLE`, sequence 3, reason
+`STAGE12_TITLE_FAILURE`; rollout counts remain `PUBLISHED=158`,
+`FAILED_RETRYABLE=14`, `UNRESOLVED=1`, with no active IDs.
+
+Root cause: `contract_check()` in `teddy_discovery_stage12_bulk_runner.py`
+required the `PlaybackInfo` request literal to appear in
+`recognize_jellyfin_external_subtitle()`. Commit `d18dd5e` factored the exact
+GET-only item/playback probe into `_jellyfin_external_subtitle_probe()` but
+left that source-location predicate unchanged. The preflight therefore
+reported a stale source-structure check, not a changed Jellyfin runtime
+contract: the required PlaybackInfo route and exact path/language/external/
+SubRip stream checks remain in the helper. Default item refresh, FullRefresh
+fallback, the 42-attempt post-FullRefresh polling bound, and publication
+reconciliation behavior are unchanged.
+
+The generic fix keeps one shared `contract_check()` for PENDING and explicit
+retry paths and checks the PlaybackInfo route in the helper that owns it.
+Retry smoke now proves both the current contract passes and removal/mutation
+of the helper route fails closed. Read-only explicit-retry and PENDING
+preflight functions passed with the local dirty-worktree check isolated for
+source-diff smoke; both reported `LIVE_EXECUTED=NO` and zero writes. Stage12
+retry, batch, bulk-runner, reconciliation, rollout smokes, compile, and
+`git diff --check` passed. The production retry remains unexecuted; perform it
+only after reviewing this fix and authorizing a fresh single-title canary.
+
 ## 2026-09-22 SNOS-120 Stage12 timeout forensic and recovery
 
 The timeout cleanup fix is committed as
