@@ -2195,3 +2195,37 @@ TEDDY_STAGE12_EXPLICIT_RETRY_AUTHORIZED=YES_I_HAVE_REVIEWED_THE_SINGLE_TITLE \
 
 Replace the HEAD value only after checking the exact clean code revision at
 execution time. This command has not been run.
+
+## Production ASR media temp storage — 2026-09-23
+
+The CT108 tmpfs incident was traced to the production Stage11 factory creating
+`ASRMediaSourceReader` without `temp_root`; `tempfile.mkdtemp(dir=None)` then
+resolved to `/tmp`. A 6,618,791,523-byte source could be fully copied there,
+contributing to RAM/swap exhaustion and an SSH outage. No production retry or
+media copy was run for this fix.
+
+The shared Stage11 deployment config now injects
+`/var/tmp/teddy-stage11-asr-production` with disk-backed filesystem validation
+for both ordinary Stage12 bulk and explicit retry. The reader rejects `/tmp`,
+symlinked/non-private/unwritable roots, and non-disk filesystem types without
+fallback. After remote source stat, preflight requires
+`source_size_bytes + 4 GiB` free. A single-source bound is sufficient because
+the Stage12 runner lock excludes competing bulk/retry runs, batch execution is
+serial, and the baseline transcriber cleans its source in `finally` before the
+controller can invoke the targeted adapter; targeted evidence uses its own
+context-managed copy afterward.
+
+Partial transfer catches `BaseException`, aborts the transfer child, removes
+only that request's media file/directory, and re-raises the primary failure.
+Normal baseline/targeted use cleans the same per-request directory. Cleanup
+outcome, temp-root resolution, source size, free bytes, required bytes, and
+request-directory basename are logged. Existing source identity and mtime
+checks are unchanged.
+
+Tiny-payload temp policy smoke passed root creation/permissions, free-space
+pass/fail, sibling-directory preservation, sequential baseline/targeted
+lifecycle, and partial-copy cleanup for `Exception`, `KeyboardInterrupt`, and
+`SystemExit`. ASR source/audio/transcriber, Stage11 adapter/controller/
+deployment, Stage12 retry/batch/bulk/rollout/reconciliation smokes, compile,
+and `git diff --check` all passed. No large media fixture, Remote ASR, Whisper,
+rollout mutation, or NAS/Jellyfin write was used.

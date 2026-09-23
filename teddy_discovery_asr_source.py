@@ -10,11 +10,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import logging
 import math
 import os
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 import selectors
 import shlex
+import shutil
+import stat
 import subprocess
 import tempfile
 import time
@@ -31,6 +34,11 @@ from teddy_discovery_subtitle import CanonicalVideoHolding
 
 MEDIA_TRANSFER_CHUNK_BYTES = 1 * 1024 * 1024
 PROCESS_CLEANUP_TIMEOUT_SECONDS = 1.0
+ASR_MEDIA_TEMP_RESERVE_BYTES = 4 * 1024**3
+_DISK_BACKED_FILESYSTEMS = frozenset(
+    {"btrfs", "ext2", "ext3", "ext4", "f2fs", "xfs", "zfs"}
+)
+_LOGGER = logging.getLogger(__name__)
 
 
 class ASRSourceError(ASRError):
@@ -271,6 +279,38 @@ def _abort_process(process: object) -> None:
         return
 
 
+def _filesystem_type(path: Path) -> str:
+    """Return the Linux mount type covering path without spawning a helper."""
+
+    try:
+        target = str(path.resolve(strict=True))
+        mounts = Path("/proc/self/mountinfo").read_text(encoding="utf-8")
+    except OSError as error:
+        raise ASRSourceError(
+            "ASR media temp filesystem could not be verified"
+        ) from error
+    matches: list[tuple[int, str]] = []
+    for line in mounts.splitlines():
+        fields = line.split()
+        try:
+            separator = fields.index("-")
+            mount_point = fields[4]
+            filesystem = fields[separator + 1]
+        except (ValueError, IndexError):
+            continue
+        mount_point = (
+            mount_point.replace("\\040", " ")
+            .replace("\\011", "\t")
+            .replace("\\012", "\n")
+            .replace("\\134", "\\")
+        )
+        if target == mount_point or target.startswith(mount_point.rstrip("/") + "/"):
+            matches.append((len(mount_point), filesystem))
+    if not matches:
+        raise ASRSourceError("ASR media temp mount is unknown")
+    return max(matches)[1]
+
+
 class ASRLocalMediaSource:
     """A private local media file whose lifetime is controlled by a context."""
 
@@ -316,23 +356,13 @@ class ASRLocalMediaSource:
     def cleanup(self) -> None:
         if self._cleaned:
             return
-
-        try:
-            os.unlink(self._local_path)
-        except FileNotFoundError:
-            pass
-        except OSError as error:
-            raise ASRSourceError("local ASR media cleanup failed") from error
-        finally:
-            self._cleaned = True
-
-        try:
-            os.rmdir(self._temp_directory)
-        except FileNotFoundError:
-            pass
-        except OSError:
-            # The directory is ours, but never remove unexpected contents.
-            pass
+        cleaned = ASRMediaSourceReader._cleanup_temp_paths(
+            self._temp_directory,
+            self._local_path,
+        )
+        if not cleaned:
+            raise ASRSourceError("local ASR media cleanup failed")
+        self._cleaned = True
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         self.cleanup()
@@ -352,6 +382,8 @@ class ASRMediaSourceReader:
         runner=subprocess.run,
         popen_factory=subprocess.Popen,
         temp_root=None,
+        require_disk_backed=False,
+        reserve_bytes=0,
     ):
         self.host = str(host)
         self.user = str(user)
@@ -361,6 +393,108 @@ class ASRMediaSourceReader:
         self.runner = runner
         self.popen_factory = popen_factory
         self.temp_root = None if temp_root is None else str(temp_root)
+        if type(require_disk_backed) is not bool:
+            raise ASRValidationError(
+                "require_disk_backed must be boolean"
+            )
+        if require_disk_backed and self.temp_root is None:
+            raise ASRValidationError(
+                "disk-backed ASR media temp root must be explicit"
+            )
+        if type(reserve_bytes) is not int or reserve_bytes < 0:
+            raise ASRValidationError(
+                "ASR media temp reserve must be a nonnegative exact integer"
+            )
+        self.require_disk_backed = require_disk_backed
+        self.reserve_bytes = reserve_bytes
+
+    def _prepare_temp_root(self) -> Path:
+        root = Path(
+            self.temp_root if self.temp_root is not None else tempfile.gettempdir()
+        )
+        if not root.is_absolute():
+            raise ASRSourceError("ASR media temp root must be absolute")
+        if self.require_disk_backed:
+            configured = Path(self.temp_root)
+            if configured == Path("/tmp") or Path("/tmp") in configured.parents:
+                _LOGGER.warning(
+                    "ASR media temp root preflight FAIL root=%s",
+                    configured,
+                )
+                raise ASRSourceError(
+                    "disk-backed ASR media temp root cannot use /tmp"
+                )
+        try:
+            root.mkdir(mode=0o700, parents=True, exist_ok=True)
+            info = root.lstat()
+            resolved = root.resolve(strict=True)
+            if (
+                root.is_symlink()
+                or not stat.S_ISDIR(info.st_mode)
+                or resolved != root
+                or (
+                    self.require_disk_backed
+                    and (info.st_mode & 0o077 or info.st_mode & 0o222 == 0)
+                )
+                or not os.access(root, os.W_OK | os.X_OK)
+            ):
+                raise ASRSourceError(
+                    "ASR media temp root permissions or identity are unsafe"
+                )
+            filesystem = _filesystem_type(root) if self.require_disk_backed else None
+            if (
+                self.require_disk_backed
+                and filesystem not in _DISK_BACKED_FILESYSTEMS
+            ):
+                raise ASRSourceError(
+                    "ASR media temp root is not on an approved disk filesystem"
+                )
+        except ASRSourceError:
+            _LOGGER.error(
+                "ASR media temp root preflight FAIL root=%s",
+                root,
+            )
+            raise
+        except OSError as error:
+            _LOGGER.error(
+                "ASR media temp root preflight FAIL root=%s",
+                root,
+            )
+            raise ASRSourceError(
+                "ASR media temp root is unavailable"
+            ) from error
+        _LOGGER.warning(
+            "ASR media temp root resolved=%s filesystem=%s",
+            resolved,
+            filesystem or "default",
+        )
+        return resolved
+
+    def _preflight_free_space(self, root: Path, source_size: int) -> None:
+        required_bytes = source_size + self.reserve_bytes
+        try:
+            free_bytes = shutil.disk_usage(root).free
+        except OSError as error:
+            _LOGGER.warning(
+                "ASR media temp preflight FAIL source_size=%d free_bytes=unknown required_bytes=%d",
+                source_size,
+                required_bytes,
+            )
+            raise ASRSourceError(
+                "ASR media temp free-space preflight failed"
+            ) from error
+        passed = free_bytes >= required_bytes
+        _LOGGER.warning(
+            "ASR media temp preflight %s source_size=%d free_bytes=%d required_bytes=%d",
+            "PASS" if passed else "FAIL",
+            source_size,
+            free_bytes,
+            required_bytes,
+        )
+        if not passed:
+            raise ASRSourceError(
+                "ASR media temp free-space preflight failed"
+            )
 
     def _base_argv(self) -> list[str]:
         return [
@@ -579,6 +713,10 @@ class ASRMediaSourceReader:
             if process is not None:
                 _abort_process(process)
             raise ASRSourceError("remote media transfer could not be started") from error
+        except BaseException:
+            if process is not None:
+                _abort_process(process)
+            raise
         finally:
             if process is not None:
                 _close_quietly(getattr(process, "stdin", None))
@@ -591,6 +729,8 @@ class ASRMediaSourceReader:
             prefix=".teddy-stage11-asr-",
             dir=temp_root,
         )
+        descriptor = None
+        path = None
         try:
             descriptor, path = tempfile.mkstemp(
                 prefix=".media-",
@@ -598,30 +738,43 @@ class ASRMediaSourceReader:
                 dir=directory,
             )
             os.close(descriptor)
+            descriptor = None
         except BaseException:
-            try:
-                os.rmdir(directory)
-            except OSError:
-                pass
+            if descriptor is not None:
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+            ASRMediaSourceReader._cleanup_temp_paths(directory, path)
             raise
 
         return directory, path
 
     @staticmethod
-    def _cleanup_temp_paths(directory: str | None, path: str | None) -> None:
+    def _cleanup_temp_paths(directory: str | None, path: str | None) -> bool:
+        cleanup_ok = True
         if path is not None:
             try:
                 os.unlink(path)
             except FileNotFoundError:
                 pass
             except OSError:
-                pass
+                cleanup_ok = False
 
         if directory is not None:
             try:
                 os.rmdir(directory)
-            except OSError:
+            except FileNotFoundError:
                 pass
+            except OSError:
+                cleanup_ok = False
+
+        _LOGGER.warning(
+            "ASR media temp cleanup %s temp_dir=%s",
+            "PASS" if cleanup_ok else "FAIL",
+            Path(directory).name if directory is not None else "not-created",
+        )
+        return cleanup_ok
 
     def copy_to_temp(
         self,
@@ -639,15 +792,17 @@ class ASRMediaSourceReader:
 
         directory = None
         path = None
+        root = self._prepare_temp_root()
         try:
             before_size, before_mtime_ns = self._stat_remote(
                 validated,
                 max_media_bytes=max_media_bytes,
                 deadline=deadline,
             )
+            self._preflight_free_space(root, before_size)
 
             directory, path = self._create_temp_paths(
-                self.temp_root,
+                str(root),
                 "." + validated.video_format,
             )
 
@@ -696,23 +851,32 @@ class ASRMediaSourceReader:
                 source_mtime_ns=before_mtime_ns,
             )
 
-            return ASRLocalMediaSource(
+            local_source = ASRLocalMediaSource(
                 local_path=path,
                 source_snapshot=snapshot,
                 temp_directory=directory,
             )
-        except (ASRValidationError, ASRLimitError, ASRSourceError):
-            self._cleanup_temp_paths(directory, path)
+            _LOGGER.warning(
+                "ASR media temp copy complete source_size=%d temp_dir=%s",
+                before_size,
+                Path(directory).name,
+            )
+            return local_source
+        except BaseException as error:
+            if directory is not None or path is not None:
+                self._cleanup_temp_paths(directory, path)
+            if isinstance(error, (ASRValidationError, ASRLimitError, ASRSourceError)):
+                raise
+            if isinstance(error, (OSError, subprocess.SubprocessError)):
+                raise ASRSourceError("canonical media copy failed") from error
             raise
-        except (OSError, subprocess.SubprocessError) as error:
-            self._cleanup_temp_paths(directory, path)
-            raise ASRSourceError("canonical media copy failed") from error
 
 
 __all__ = [
     "ASRLocalMediaSource",
     "ASRMediaSourceReader",
     "ASRSourceError",
+    "ASR_MEDIA_TEMP_RESERVE_BYTES",
     "MEDIA_TRANSFER_CHUNK_BYTES",
     "PROCESS_CLEANUP_TIMEOUT_SECONDS",
     "REMOTE_STAT_SCRIPT",

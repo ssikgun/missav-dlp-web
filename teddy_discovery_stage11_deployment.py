@@ -31,7 +31,10 @@ from teddy_discovery_alignment_application import (
 from teddy_discovery_asr_artifact import serialize_asr_result
 from teddy_discovery_asr_audio import iter_audio_chunks
 from teddy_discovery_asr_remote import RemoteFasterWhisperASR
-from teddy_discovery_asr_source import ASRMediaSourceReader
+from teddy_discovery_asr_source import (
+    ASRMediaSourceReader,
+    ASR_MEDIA_TEMP_RESERVE_BYTES,
+)
 from teddy_discovery_quality_review_session import (
     QualityReviewSessionError,
     validate_canonical_review_execution_session_id,
@@ -204,6 +207,8 @@ class Stage11DeploymentConfig:
     expected_profile_name: str = REMOTE_HERMES_PROFILE_NAME
     subtitlecat_timeout_seconds: int | float = 20.0
     subtitlecat_proxy_url: str | None = None
+    asr_media_temp_root: str = "/var/tmp/teddy-stage11-asr-production"
+    asr_media_temp_reserve_bytes: int = ASR_MEDIA_TEMP_RESERVE_BYTES
 
     def __post_init__(self):
         for name in ("nas_host", "nas_user", "remote_host", "remote_user"):
@@ -224,6 +229,21 @@ class Stage11DeploymentConfig:
                 self,
                 name,
                 _absolute_path(getattr(self, name), field_name=name),
+            )
+        object.__setattr__(
+            self,
+            "asr_media_temp_root",
+            _absolute_path(
+                self.asr_media_temp_root,
+                field_name="asr_media_temp_root",
+            ),
+        )
+        if (
+            type(self.asr_media_temp_reserve_bytes) is not int
+            or self.asr_media_temp_reserve_bytes < 0
+        ):
+            raise Stage11DeploymentValidationError(
+                "asr_media_temp_reserve_bytes must be a nonnegative exact integer"
             )
         object.__setattr__(
             self,
@@ -1373,6 +1393,9 @@ def build_stage11_deployment_dependencies(
             key=config.nas_key,
             known_hosts=config.nas_known_hosts,
             library_root=config.nas_library_root,
+            temp_root=config.asr_media_temp_root,
+            require_disk_backed=True,
+            reserve_bytes=config.asr_media_temp_reserve_bytes,
         )
     live_whisper = whisper
     if live_whisper is None:

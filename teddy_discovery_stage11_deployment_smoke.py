@@ -20,6 +20,7 @@ import teddy_discovery_subtitle_v2_pipeline_smoke as v2_fixture
 import teddy_discovery_stateful_quality_review as review
 from teddy_discovery_alignment_acceptance import AlignmentAcceptancePolicy
 from teddy_discovery_asr_remote import RemoteFasterWhisperASR
+from teddy_discovery_asr_source import ASRMediaSourceReader
 from teddy_discovery_asr_source_quality import classify_asr_result_source_quality
 from teddy_discovery_stateful_asr_quality_review import (
     asr_quality_review_request_sha256,
@@ -502,6 +503,29 @@ def main():
             "VM122_TIMEOUT_IS_EXPLICIT",
             isinstance(default_asr.whisper, RemoteFasterWhisperASR)
             and default_asr.whisper.request_timeout_seconds == 1200,
+        )
+        production_source_deps = deployment.build_stage11_deployment_dependencies(
+            _config(root),
+            acceptance_policy=AlignmentAcceptancePolicy(
+                3, 3, 0.8, 100.0, 0, 0.9, 1.1
+            ),
+            residual_threshold_ms=100,
+            holding_resolver=lambda title: _holding(v2_fixture.asr_result()),
+            remote_bridge=FakeRemoteBridge(),
+            native_first_pass_run=lambda args: 1,
+            asr_review_options={
+                "executor": _asr_executor(runtime),
+                "fresh_session_preparer": lambda sid: None,
+            },
+        )
+        check(
+            "PRODUCTION_ASR_SOURCE_USES_DISK_TEMP_POLICY",
+            isinstance(production_source_deps.source_provider, ASRMediaSourceReader)
+            and production_source_deps.source_provider.temp_root
+            == "/var/tmp/teddy-stage11-asr-production"
+            and production_source_deps.source_provider.require_disk_backed
+            and production_source_deps.source_provider.reserve_bytes
+            == 4 * 1024**3,
         )
 
         # ASR-only controller + deployment + live adapter flow.

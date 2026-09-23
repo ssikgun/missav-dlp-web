@@ -54,6 +54,9 @@ def make_reader(
     stat_items=(),
     returncode: int = 0,
     record: dict | None = None,
+    require_disk_backed: bool = False,
+    reserve_bytes: int = 0,
+    process_factory=None,
 ):
     record = {} if record is None else record
     responses = list(stat_items)
@@ -71,7 +74,11 @@ def make_reader(
     def popen_factory(command, **kwargs):
         record["popen_command"] = command
         record["popen_kwargs"] = kwargs
-        process = FakeProcess(payload=payload, returncode=returncode)
+        process = (
+            FakeProcess(payload=payload, returncode=returncode)
+            if process_factory is None
+            else process_factory(payload, returncode)
+        )
         record["process"] = process
         return process
 
@@ -84,6 +91,8 @@ def make_reader(
         runner=runner,
         popen_factory=popen_factory,
         temp_root=temp_root,
+        require_disk_backed=require_disk_backed,
+        reserve_bytes=reserve_bytes,
     ), record
 
 
