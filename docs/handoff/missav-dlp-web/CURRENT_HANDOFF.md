@@ -1811,54 +1811,97 @@ titles; they no longer stop the batch.
 
 ### Generic decoded-sample-clock correction
 
-Implemented in `teddy_discovery_asr_audio.py` after offline smoke validation:
+Implemented in `teddy_discovery_asr_audio.py`; this section supersedes the
+earlier trigger-pair-only replay note below:
 
 - The first decoded frame timestamp anchors the output timeline unchanged.
 - Later frames are checked against the exact cumulative decoded-sample clock.
   Strictly duplicate/backward raw PTS fail closed.
 - Bounded timestamp jitter/overlap is corrected by moving the canonical frame
   start to the decoded sample clock. Per-frame correction is limited to one
-  preceding decoded-frame duration. Total absolute correction is limited to
-  three decoded-frame durations (64 ms for 1024-sample AAC at 48 kHz).
+  preceding decoded-frame duration. The absolute **peak signed net offset** is
+  limited to three adjacent decoded-frame durations (64 ms for 1024-sample AAC
+  at 48 kHz).
 - A forward deviation larger than the existing timestamp tolerance stays a
   segment boundary: flush the old resampler and preserve the exact interval as
   silence. It is not absorbed into timestamp correction.
-- Correction, cumulative drift, gap and overlap totals, raw PTS, expected PTS,
-  output sample counts, and fail-closed reason are available as structured
-  diagnostics; corrected frames and gaps are logged without retaining the
-  whole timeline.
+- Raw PTS, sample-clock expected PTS, per-frame correction, current signed
+  offset, peak absolute net offset, one-second window net/absolute correction,
+  lifetime absolute correction, preserved gap count/duration, overlap count,
+  EOF output counts, and fail-closed reason are structured diagnostics.
 - EOF still requires resampled output to reconcile within one 16 kHz sample
   of the corrected source end. No decoded audio samples are dropped or
   duplicated, and the existing absolute chunk/sample boundaries remain in
   force.
 
-The bounds are tied to decoded frame lengths rather than a title or codec
-allowlist. The one-frame per-event bound covers the observed AAC timing errors;
-the three-frame accumulated bound allows small repeated timestamp quantization
-while rejecting unbounded drift. Duplicate/backward raw PTS, per-frame bound
-excess, cumulative bound excess, gap-boundary resampler mismatch, and EOF
-sample-count mismatch all remain fail-closed.
+Lifetime absolute correction remains a diagnostic only. It is not a production
+reject criterion because long alternating ±1-tick timestamp jitter in the
+already-PUBLISHED 44.1 kHz control `SIRO-4448` produced 2,253 tiny corrections
+totalling 102.177 ms while its signed EOF drift was zero and peak net offset
+was only 22.676 µs. The old lifetime-sum guard incorrectly rejected it. The
+three-frame peak bound remains unchanged; it now rejects sustained same-way
+timeline movement while allowing that zero-mean jitter.
 
-Read-only simulations against the previously measured failure points:
+### Full-media read-only replay — 2026-09-23
 
-| DVD-ID | Observed short interval / correction | Trigger-pair result |
-| --- | ---: | --- |
-| `HMN-899` | 992 / 1024 ticks; 32 ticks (0.667 ms) | bounded correction accepted |
-| `PRED-889` | 992 / 1024 ticks; 32 ticks (0.667 ms) | bounded correction accepted |
-| `SGKI-075` | 992 / 1024 ticks; 32 ticks (0.667 ms) | bounded correction accepted |
-| `SGKI-106` | 1008 / 1024 ticks; 16 ticks (0.333 ms) | bounded correction accepted |
-| `SNOS-334` | 992 / 1024 ticks; 32 ticks (0.667 ms) | bounded correction accepted |
-| `SW-216` | 475 / 1024 ticks; 549 ticks (11.438 ms) | bounded correction accepted |
-| `NHDTC-250` | 86 / 1024 ticks; 938 ticks (19.542 ms) | bounded correction accepted |
-| `SVFLA-014` | 1 / 1024 ticks; 1023 ticks (21.313 ms) | bounded correction accepted |
-| `NIMA-059` | 2725 ticks cumulative (56.771 ms) | synthetic cumulative/end replay accepted under 3072-tick (64 ms) cap; 305244160 decoded source samples map to 101748053 output samples, matching the resampler count |
+Replayed all nine failed titles, the three previously used PUBLISHED controls,
+and ten additional PUBLISHED controls selected by source-size quantiles from
+the rollout DB (bounded selection; no NAS-wide scan). Each source path, size,
+and mtime matched the rollout row before replay. Production iterator/decode,
+resample and chunking ran to EOF; failed titles also received an in-memory
+diagnostic continuation to EOF after their exact production fail point. That
+continuation does not change the production decision or validator bound. Each
+source SHA-256 was recorded; the source copy used the dedicated
+`/var/tmp/teddy-stage11-asr-replay` directory, and every title cleanup was
+verified empty before checking `df -h /var/tmp` and `free -h` and starting the
+next. `/tmp` was not used for media. Forward gaps are counted as gaps and
+preserve silence. The following values are in seconds unless marked otherwise;
+`window` is the maximum correction within the one-second diagnostic window.
 
-The eight trigger-pair simulations use the exact first failing frame pairs
-from the read-only forensic pass. Full-duration source replay was not performed
-in this implementation run, so the cumulative correction budget over each
-entire Group A title is not claimed as cleared here. The generic runtime
-continues to reject any title that exceeds that budget. No media was remuxed,
-transcoded, retried, or submitted to live ASR.
+| DVD-ID | Production | Full decoded frames | Overlap events / lifetime absolute | Max single correction | EOF signed / peak net | 1s window net / absolute | Forward gaps: count / duration / max | EOF expected → resampled (mismatch) | Production fail point |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| HMN-899 | FAIL | 400,294 | 60,222 / 20.218 s | 0.667 ms | +20.218 s / 20.218 s | 3.667 / 3.667 ms | 30,655 / 20.218 s / 0.667 ms | 136,957,179 → 136,957,178 (−1) | frame 1,690, PTS 1,730,560; peak net > 3 frames |
+| NHDTC-250 | PASS | 515,004 | 2 / 20.229 ms | 19.542 ms | +20.229 / 20.229 ms | 19.542 / 19.542 ms | 2,747 / 157.944 s / 63.854 ms | 178,315,129 → 178,315,129 (0) | — |
+| PRED-889 | FAIL | 344,708 | 53,649 / 17.942 s | 0.667 ms | +17.942 s / 17.942 s | 3.667 / 3.667 ms | 29,474 / 125.508 s / 64 ms | 119,668,464 → 119,668,464 (0) | frame 1,780, PTS 1,847,728; peak net > 3 frames |
+| SGKI-075 | FAIL | 408,245 | 60,210 / 21.554 s | 0.667 ms | +21.554 s / 21.554 s | 3.667 / 3.667 ms | 36,643 / 21.554 s / 0.667 ms | 139,692,491 → 139,692,490 (−1) | frame 1,275, PTS 1,305,616; peak net > 3 frames |
+| SGKI-106 | FAIL | 378,701 | 59,639 / 20.141 s | 0.667 ms | +20.141 s / 20.141 s | 3.333 / 3.333 ms | 33,670 / 138.342 s / 64 ms | 131,476,752 → 131,476,752 (0) | frame 1,294, PTS 1,341,904; peak net > 3 frames |
+| SNOS-334 | FAIL | 448,855 | 18,783 / 12.322 s | 0.667 ms | +12.322 s / 12.322 s | 2.333 / 2.333 ms | 38,121 / 65.460 s / 33.333 ms | 154,256,541 → 154,256,541 (0) | frame 2,323, PTS 2,390,035; peak net > 3 frames |
+| SVFLA-014 | FAIL | 726,376 | 5 / 92.958 ms | 21.313 ms | +92.958 / 92.958 ms | 92.958 / 92.958 ms | 3,874 / 220.370 s / 63.5 ms | 251,462,257 → 251,462,257 (0) | frame 423,389, PTS 439,850,641; peak net > 3 frames |
+| SW-216 | FAIL | 363,276 | 6,523 / 63.779 s | 21.313 ms | +63.738 s / 63.738 s | 65.75 / 65.75 ms | 8,094 / 164.979 s / 91.313 ms | 126,637,870 → 126,637,869 (−1) | frame 438, PTS 457,093; signed peak 66.292 ms exceeds 64 ms |
+| NIMA-059 | FAIL | 298,090 | 4,763 / 99.229 ms | 20.833 µs | +99.229 / 99.229 ms | 41.667 / 41.667 µs | 2 / 156 ms / 92 ms | 101,750,549 → 101,750,549 (0) | frame 192,407, PTS 197,029,183; peak net > 3 frames |
+
+The eight Group A files and NIMA still exceed the generic three-frame peak
+bound over their full timelines; their production errors remain
+`ASRAudioValidationError` and title-scoped. `NHDTC-250` is the only one of the
+nine that passes full production replay. In SW-216, units matter: the early
+production crossing is 66.292 ms, while the EOF diagnostic net offset is
+63.738 **seconds**, not milliseconds.
+
+All 13 PUBLISHED controls passed full replay with EOF mismatch of 0 or −1
+sample. Twelve had zero canonicalized overlap and zero net/peak drift. The
+exception, `SIRO-4448`, had the 2,253 tiny alternating corrections described
+above and still passed with zero signed EOF drift. The controls covered both
+forward-gap and no-gap sources. The additional bounded cohort was
+`FC2-PPV-4660439`, `FC2-PPV-4640215`, `SNOS-120`, `SIRO-5537`, `MNGS-076`,
+`FCT-201`, `DOKI-037`, `FNS-237`, `DOKS-689`, and `NHDTA-663`; all decoded AAC
+at 48 kHz. Existing controls add both 44.1 kHz (`SIRO-4448`) and 48 kHz
+(`FC2-PPV-4575470`, `FC2-PPV-4551303`). Existing controls included both short
+and long files, and forward gaps ranged from none to 2940 events / 172.481 s.
+The ten added controls each had zero overlap corrections; they exercised
+forward-gap preservation and EOF/resampler accounting.
+
+Regression validation passed: long alternating ±1-tick jitter, sustained
+same-direction drift fail, per-frame unsafe overlap fail, duplicate/backward
+PTS fail, forward-gap silence preservation, EOF mismatch fail, chunk boundary
+regressions, ASR audio/source/remote/transcriber smokes, Stage11 controller/
+live-adapter/deployment smokes, Stage12 batch/bulk-runner/rollout smokes,
+Python compile, and `git diff --check`. No retry, live ASR/Whisper call, rollout
+state change, NAS/Jellyfin write, remux, or transcode occurred.
+
+Canary candidate among these nine: `NHDTC-250` only. It passed complete
+production replay with two bounded overlap corrections, 2,747 forward gaps
+preserved as silence, and exact EOF sample reconciliation. This is a replay
+result, not a canary execution or retry approval.
 
 ### FAILED_RETRYABLE — Jellyfin external Korean subtitle recognition (6)
 

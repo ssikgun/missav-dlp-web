@@ -991,21 +991,35 @@ def main():
             )
 
         nima_like_records = []
-        nima_frames = [
-            FakeFrame(
-                np.zeros(1, np.float32), pts=index * 1025,
-                time_base=Fraction(1, 48_000), sample_rate=48_000,
-                source_samples=1024,
+        nima_frames = []
+        pts = 0
+        for index in range(2726):
+            nima_frames.append(
+                FakeFrame(
+                    np.zeros(1, np.float32), pts=pts,
+                    time_base=Fraction(1, 48_000), sample_rate=48_000,
+                    source_samples=1024,
+                )
             )
-            for index in range(2726)
-        ]
+            if index + 1 < 2726:
+                # Long-running ±1 tick jitter has large lifetime absolute
+                # correction but a bounded signed sample-clock phase.
+                pts += 1023 if index % 2 == 0 else 1025
         nima_like, _, _ = run_frames(
             nima_frames,
             resampler_class=RatioThreeResampler,
             timeline_diagnostics_callback=nima_like_records.append,
         )
         assert sum(item.samples.size for item in nima_like) == 930_475
-        assert nima_like_records[-1].cumulative_drift == Fraction(2725, 48_000)
+        assert nima_like_records[-1].lifetime_absolute_correction == Fraction(
+            2725, 48_000
+        )
+        assert nima_like_records[-1].peak_absolute_net_drift == Fraction(
+            1, 48_000
+        )
+        assert nima_like_records[-1].window_max_absolute_net_drift <= Fraction(
+            1, 48_000
+        )
 
         # More than the three-frame cumulative budget remains fail-closed.
         drifting_frames = [
@@ -1022,7 +1036,66 @@ def main():
             )[0],
         )
         assert drift_records[-1].fail_closed_reason == (
-            "cumulative sample-clock correction exceeds three decoded frames"
+            "peak net sample-clock drift exceeds three decoded frames"
+        )
+        assert drift_records[-1].peak_absolute_net_drift > Fraction(
+            3 * 1024, 16_000
+        )
+
+        # A peak that was valid when established must not be re-judged
+        # against a later shorter decoded-frame duration if net drift moves
+        # back toward zero.
+        class SourceCountResampler(FakeResampler):
+            def resample(self, frame):
+                self.calls.append(frame)
+                if frame is None:
+                    return []
+                return [
+                    FakeOutputFrame(
+                        np.zeros(frame.samples, dtype=np.int16)
+                    )
+                ]
+
+        variable_duration_frames = [
+            FakeFrame(
+                np.zeros(1, np.float32), pts=0,
+                sample_rate=16_000, source_samples=1024,
+            )
+        ]
+        pts = 0
+        for _ in range(3070):
+            pts += 1023
+            variable_duration_frames.append(
+                FakeFrame(
+                    np.zeros(1, np.float32), pts=pts,
+                    sample_rate=16_000, source_samples=1024,
+                )
+            )
+        pts += 1025
+        variable_duration_frames.append(
+            FakeFrame(
+                np.zeros(1, np.float32), pts=pts,
+                sample_rate=16_000, source_samples=900,
+            )
+        )
+        pts += 901
+        variable_duration_frames.append(
+            FakeFrame(
+                np.zeros(1, np.float32), pts=pts,
+                sample_rate=16_000, source_samples=900,
+            )
+        )
+        variable_records = []
+        variable_duration, _, _ = run_frames(
+            variable_duration_frames,
+            resampler_class=SourceCountResampler,
+            timeline_diagnostics_callback=variable_records.append,
+        )
+        assert sum(item.samples.size for item in variable_duration) == (
+            3071 * 1024 + 1800
+        )
+        assert variable_records[-1].peak_absolute_net_drift == Fraction(
+            3070, 16_000
         )
 
         # A sample-count/end mismatch not explained by timestamp corrections

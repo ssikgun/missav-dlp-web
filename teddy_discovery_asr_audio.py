@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from fractions import Fraction
+from collections import deque
 import logging
 import math
 import os
@@ -32,7 +33,8 @@ MAX_ASR_AUDIO_SAMPLES = (
 _ONE_OUTPUT_SAMPLE_SECONDS = Fraction(1, ASR_AUDIO_SAMPLE_RATE)
 _MAX_TIMESTAMP_ROUNDING_TOLERANCE = Fraction(1, 1_000)
 _MAX_FRAME_CORRECTION_FRAMES = 1
-_MAX_CUMULATIVE_CORRECTION_FRAMES = 3
+_MAX_PEAK_NET_DRIFT_FRAMES = 3
+_CORRECTION_DIAGNOSTIC_WINDOW_SECONDS = Fraction(1, 1)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,8 +57,8 @@ class ASRAudioTimelineDiagnostic:
 
     PTS values are kept as exact fractions. ``raw_source_pts`` is in source
     ticks and ``time_base`` converts it to seconds; the expected PTS and
-    corrections are in seconds. Callers can stream these records to a bounded
-    logger or diagnostic sink without retaining the full audio timeline.
+    corrections are in seconds. ``cumulative_drift`` is the lifetime absolute
+    correction diagnostic and is not a production rejection criterion.
     """
 
     kind: str
@@ -71,6 +73,11 @@ class ASRAudioTimelineDiagnostic:
     forward_gap_duration: Fraction
     canonicalized_overlap_count: int
     canonicalized_overlap_duration: Fraction
+    peak_absolute_net_drift: Fraction = Fraction(0)
+    window_max_absolute_net_drift: Fraction = Fraction(0)
+    window_max_absolute_correction: Fraction = Fraction(0)
+    correction_window_seconds: Fraction = Fraction(1, 1)
+    lifetime_absolute_correction: Fraction = Fraction(0)
     expected_output_samples: int | None = None
     actual_output_samples: int | None = None
     output_sample_mismatch: int | None = None
@@ -695,6 +702,12 @@ def _iter_audio_chunks(
         previous_duration = None
         cumulative_correction = Fraction(0)
         cumulative_drift = Fraction(0)
+        peak_absolute_net_drift = Fraction(0)
+        window_corrections = deque()
+        window_signed_correction = Fraction(0)
+        window_absolute_correction = Fraction(0)
+        window_max_absolute_net_drift = Fraction(0)
+        window_max_absolute_correction = Fraction(0)
         forward_gap_count = 0
         forward_gap_duration = Fraction(0)
         canonicalized_overlap_count = 0
@@ -719,6 +732,10 @@ def _iter_audio_chunks(
                 forward_gap_duration=forward_gap_duration,
                 canonicalized_overlap_count=canonicalized_overlap_count,
                 canonicalized_overlap_duration=canonicalized_overlap_duration,
+                peak_absolute_net_drift=peak_absolute_net_drift,
+                window_max_absolute_net_drift=window_max_absolute_net_drift,
+                window_max_absolute_correction=window_max_absolute_correction,
+                lifetime_absolute_correction=cumulative_drift,
                 expected_output_samples=expected_output_samples,
                 actual_output_samples=actual_output_samples,
                 output_sample_mismatch=(
@@ -802,36 +819,69 @@ def _iter_audio_chunks(
                             fail_closed_reason=reason,
                         )
                         raise ASRAudioValidationError(reason)
+                    new_signed_correction = cumulative_correction + correction
                     new_drift = cumulative_drift + abs(correction)
+                    previous_peak_net_drift = peak_absolute_net_drift
+                    new_peak_net_drift = max(
+                        peak_absolute_net_drift,
+                        abs(new_signed_correction),
+                    )
                     drift_bound = (
                         max(previous_duration, duration)
-                        * _MAX_CUMULATIVE_CORRECTION_FRAMES
+                        * _MAX_PEAK_NET_DRIFT_FRAMES
                     )
-                    if new_drift > drift_bound:
-                        reason = (
-                            "cumulative sample-clock correction exceeds "
-                            "three decoded frames"
-                        )
-                        report_timeline(
-                            kind="fail",
-                            raw_pts=raw_pts,
-                            time_base=time_base,
-                            expected=prior_expected_timestamp,
-                            correction=correction,
-                            fail_closed_reason=reason,
-                        )
-                        raise ASRAudioValidationError(reason)
                     if correction:
                         if deviation < 0:
                             canonicalized_overlap_count += 1
                             canonicalized_overlap_duration += -deviation
-                        cumulative_correction += correction
+                        cumulative_correction = new_signed_correction
                         cumulative_drift = new_drift
+                        peak_absolute_net_drift = new_peak_net_drift
                         frame_correction = correction
+
+                        correction_time = prior_expected_timestamp
+                        window_corrections.append(
+                            (correction_time, correction)
+                        )
+                        window_signed_correction += correction
+                        window_absolute_correction += abs(correction)
+                        if (
+                            new_peak_net_drift > previous_peak_net_drift
+                            and new_peak_net_drift > drift_bound
+                        ):
+                            reason = (
+                                "peak net sample-clock drift exceeds "
+                                "three decoded frames"
+                            )
+                            report_timeline(
+                                kind="fail",
+                                raw_pts=raw_pts,
+                                time_base=time_base,
+                                expected=prior_expected_timestamp,
+                                correction=correction,
+                                fail_closed_reason=reason,
+                            )
+                            raise ASRAudioValidationError(reason)
                     timestamp = prior_expected_timestamp
             else:
                 adjusted_timestamp = timestamp
 
+            window_start = timestamp - _CORRECTION_DIAGNOSTIC_WINDOW_SECONDS
+            while (
+                window_corrections
+                and window_corrections[0][0] < window_start
+            ):
+                _, expired_correction = window_corrections.popleft()
+                window_signed_correction -= expired_correction
+                window_absolute_correction -= abs(expired_correction)
+            window_max_absolute_net_drift = max(
+                window_max_absolute_net_drift,
+                abs(window_signed_correction),
+            )
+            window_max_absolute_correction = max(
+                window_max_absolute_correction,
+                window_absolute_correction,
+            )
             expected_timestamp = timestamp + duration
             report_timeline(
                 kind="frame",
