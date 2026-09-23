@@ -2188,7 +2188,8 @@ canary is:
 ```sh
 TEDDY_STAGE12_EXPLICIT_RETRY_AUTHORIZED=YES_I_HAVE_REVIEWED_THE_SINGLE_TITLE \
   python3 /opt/missav-pwa-subtitle-stage11/teddy_discovery_stage12_bulk_runner.py \
-  --mode retry --dvd-id NHDTC-250 --expected-sequence 3 \
+  --mode retry --batch-size 1 --max-titles 1 \
+  --dvd-id NHDTC-250 --expected-sequence 3 \
   --expected-head <exact-clean-authorized-HEAD>
 ```
 
