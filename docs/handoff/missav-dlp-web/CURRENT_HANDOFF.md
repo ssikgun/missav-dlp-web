@@ -1,5 +1,56 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-24 Stage12 production interpreter guard and explicit-retry recovery
+
+Stage12 now fails closed before any PENDING bulk or explicit retry state
+transition unless the process is launched by
+`/opt/stage11-stt-venv/bin/python`, its resolved virtualenv prefix matches
+`/opt/stage11-stt-venv`, and imports of local audio runtime dependencies
+`numpy` and `av` succeed. The guard records `sys.executable`, its realpath,
+prefix, and dependency results. Preflight-only CLI modes use the same guard.
+This prevents another retry launched as system `python3` from reaching Stage11
+or performing NAS/Jellyfin writes. The exact historical retry command below
+now uses the production venv interpreter.
+
+The generic `--mode recover-retry` path recovers only an explicitly selected
+single stranded explicit retry from `RUNNING` to `FAILED_RETRYABLE`. It
+requires the dedicated
+`TEDDY_STAGE12_EXPLICIT_RETRY_RECOVERY_AUTHORIZED=YES_I_HAVE_REVIEWED_THE_SINGLE_TITLE`
+authorization, one `--dvd-id`, expected sequence, exact clean HEAD, and the
+singleton runner lock. It requires that title to be the only active
+RUNNING/GENERATED title; verifies the Discovery/NAS path, source size and
+mtime against rollout identity; checks artifact/publication absence and that
+the latest event is exactly `FAILED_RETRYABLE -> RUNNING` with reason
+`STAGE12_EXPLICIT_RETRY_START`; and uses a sequence plus previous-event CAS.
+The audited recovery reason is
+`STAGE12_EXPLICIT_RETRY_CRASH_RECOVERY`. Existing `recover_running()` remains
+unchanged and still means `RUNNING -> PENDING` for ordinary crash recovery.
+This recovery is an explicit operator action after a stranded retry; it does
+not change Stage12's title-local/systemic exception classification or the
+bounded exception-chain diagnostics added after the canary failure.
+
+The recovery smoke covers authorization, exact selector, wrong status,
+sequence, start event, source drift, other active titles, other-title state
+invariance, the audited transition, and unchanged ordinary crash recovery.
+Stage12 retry/batch/bulk/rollout/reconciliation, ASR audio/source/transcriber
+and temp policy, Stage11 controller/deployment/live adapters, compile, and
+`git diff --check` pass under the production venv. Production state has not
+yet been recovered and no retry has been rerun. After this implementation is
+committed and pushed, recheck exact HEAD/worktree and NHDTC-250 sequence 4,
+then invoke only the documented `recover-retry` path. Do not run `--mode
+retry` in that operation.
+
+Recovery command shape (fill `--expected-head` only with the reviewed clean
+commit after push):
+
+```sh
+TEDDY_STAGE12_EXPLICIT_RETRY_RECOVERY_AUTHORIZED=YES_I_HAVE_REVIEWED_THE_SINGLE_TITLE \
+  /opt/stage11-stt-venv/bin/python /opt/missav-pwa-subtitle-stage11/teddy_discovery_stage12_bulk_runner.py \
+  --mode recover-retry --batch-size 1 --max-titles 1 \
+  --dvd-id <exact-dvd-id> --expected-sequence <current-sequence> \
+  --expected-head <exact-clean-authorized-HEAD>
+```
+
 ## 2026-09-23 NHDTC-250 explicit retry systemic failure
 
 At production canary HEAD `31db7b4da48e8841d5a33bde7c00ed1363c4c4b2`,
@@ -2264,7 +2315,7 @@ canary is:
 
 ```sh
 TEDDY_STAGE12_EXPLICIT_RETRY_AUTHORIZED=YES_I_HAVE_REVIEWED_THE_SINGLE_TITLE \
-  python3 /opt/missav-pwa-subtitle-stage11/teddy_discovery_stage12_bulk_runner.py \
+  /opt/stage11-stt-venv/bin/python /opt/missav-pwa-subtitle-stage11/teddy_discovery_stage12_bulk_runner.py \
   --mode retry --batch-size 1 --max-titles 1 \
   --dvd-id NHDTC-250 --expected-sequence 3 \
   --expected-head <exact-clean-authorized-HEAD>

@@ -49,6 +49,7 @@ from teddy_discovery_stage12_rollout import (
     STATE_PUBLISHED,
     STATE_RUNNING,
     STATE_UNRESOLVED,
+    STAGE12_EXPLICIT_RETRY_START,
     Stage12RolloutState,
     Stage12RolloutStateStore,
     Stage12RolloutValidationError,
@@ -1009,7 +1010,7 @@ class Stage12BatchRunner:
                 retry.expected_sequence if explicit_retry else None
             ),
             reason=(
-                "STAGE12_EXPLICIT_RETRY_START"
+                STAGE12_EXPLICIT_RETRY_START
                 if explicit_retry
                 else "STAGE12_BATCH_START"
             ),

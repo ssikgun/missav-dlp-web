@@ -73,6 +73,10 @@ STATE_SKIPPED_EXISTING_KO = "SKIPPED_EXISTING_KO"
 STATE_UNRESOLVED = "UNRESOLVED"
 STATE_FAILED_RETRYABLE = "FAILED_RETRYABLE"
 STATE_FAILED_TERMINAL = "FAILED_TERMINAL"
+STAGE12_EXPLICIT_RETRY_START = "STAGE12_EXPLICIT_RETRY_START"
+STAGE12_EXPLICIT_RETRY_CRASH_RECOVERY = (
+    "STAGE12_EXPLICIT_RETRY_CRASH_RECOVERY"
+)
 
 STATE_STATUSES = (
     STATE_PENDING,
@@ -1087,6 +1091,105 @@ class Stage12RolloutStateStore:
                     )
             return state
 
+    def validate_explicit_retry_recovery(
+        self,
+        dvd_id: str,
+        *,
+        expected_sequence: int,
+        media_path_identity: str,
+        holding_identity: str,
+        source_size_bytes: int,
+        source_mtime_ns: int,
+    ) -> Stage12RolloutState:
+        """Validate one stranded explicit retry without changing its state."""
+
+        dvd_id = _validated_dvd_id(dvd_id)
+        if type(expected_sequence) is not int or expected_sequence < 1:
+            raise Stage12RolloutValidationError(
+                "explicit retry recovery requires a positive expected sequence"
+            )
+        with self._transaction() as connection:
+            row = self._get_in_transaction(connection, dvd_id)
+            if row is None:
+                raise Stage12RolloutValidationError(
+                    "explicit retry recovery title does not exist"
+                )
+            state = _state_from_row(row)
+            if state.status != STATE_RUNNING:
+                raise Stage12InvalidTransitionError(
+                    "explicit retry recovery requires RUNNING"
+                )
+            if state.transition_sequence != expected_sequence:
+                raise Stage12InvalidTransitionError(
+                    "explicit retry recovery sequence does not match"
+                )
+            if (
+                state.last_transition_reason != STAGE12_EXPLICIT_RETRY_START
+                or state.media_path_identity != media_path_identity
+                or state.holding_identity != holding_identity
+                or state.source_size_bytes != source_size_bytes
+                or state.source_mtime_ns != source_mtime_ns
+                or state.holding_identity != "jav:" + state.media_path_identity
+            ):
+                raise Stage12RolloutIdentityError(
+                    "explicit retry recovery identity or start reason differs"
+                )
+            if any(
+                value is not None
+                for value in (
+                    state.artifact_path,
+                    state.artifact_sha256,
+                    state.report_path,
+                    state.report_sha256,
+                )
+            ):
+                raise Stage12RolloutIdentityError(
+                    "explicit retry recovery conflicts with recorded artifacts"
+                )
+            video = _canonical_video_for_state(
+                dvd_id,
+                state.media_path_identity,
+            )
+            expected_destination = derive_target_ko_relative(video)
+            if state.destination_relative not in (None, expected_destination):
+                raise Stage12RolloutIdentityError(
+                    "explicit retry recovery conflicts with destination identity"
+                )
+
+            events = tuple(
+                connection.execute(
+                    """
+                    SELECT * FROM stage12_rollout_events
+                    WHERE dvd_id = ? ORDER BY transition_sequence
+                    """,
+                    (dvd_id,),
+                ).fetchall()
+            )
+            if (
+                len(events) != state.transition_sequence
+                or not events
+                or int(events[-1]["transition_sequence"])
+                != state.transition_sequence
+                or events[-1]["from_status"] != STATE_FAILED_RETRYABLE
+                or events[-1]["to_status"] != STATE_RUNNING
+                or events[-1]["reason"] != STAGE12_EXPLICIT_RETRY_START
+                or events[-1]["provenance_json"]
+                != state.last_transition_provenance_json
+            ):
+                raise Stage12RolloutValidationError(
+                    "explicit retry recovery event history is inconsistent"
+                )
+            for event in events:
+                if event["to_status"] in {STATE_GENERATED, STATE_PUBLISHED}:
+                    raise Stage12RolloutIdentityError(
+                        "explicit retry recovery conflicts with generated or published state"
+                    )
+                if _event_value_from_row(event).get("publication_performed") is True:
+                    raise Stage12RolloutIdentityError(
+                        "explicit retry recovery conflicts with publication provenance"
+                    )
+            return state
+
     def transition(
         self,
         dvd_id: str,
@@ -1096,6 +1199,7 @@ class Stage12RolloutStateStore:
         provenance: Mapping[str, object],
         expected_from: str | None = None,
         expected_sequence: int | None = None,
+        expected_previous_event: tuple[str | None, str, str] | None = None,
         artifact_path: str | None = None,
         artifact_sha256: str | None = None,
         report_path: str | None = None,
@@ -1132,6 +1236,26 @@ class Stage12RolloutStateStore:
                 if expected_sequence != current_sequence:
                     raise Stage12InvalidTransitionError(
                         "rollout transition sequence does not match"
+                    )
+            if expected_previous_event is not None:
+                if (
+                    not isinstance(expected_previous_event, tuple)
+                    or len(expected_previous_event) != 3
+                ):
+                    raise Stage12RolloutValidationError(
+                        "expected previous event must be a transition tuple"
+                    )
+                previous_event = connection.execute(
+                    """
+                    SELECT from_status, to_status, reason
+                    FROM stage12_rollout_events
+                    WHERE dvd_id = ? AND transition_sequence = ?
+                    """,
+                    (dvd_id, current_sequence),
+                ).fetchone()
+                if previous_event is None or tuple(previous_event) != expected_previous_event:
+                    raise Stage12InvalidTransitionError(
+                        "latest rollout event does not match expected transition"
                     )
             if to_status not in _ALLOWED_TRANSITIONS[current_status]:
                 raise Stage12InvalidTransitionError(
@@ -1711,6 +1835,34 @@ class Stage12RolloutStateStore:
                 "operation": "RECOVER_RUNNING",
                 "from": STATE_RUNNING,
                 "to": STATE_PENDING,
+            },
+        )
+
+    def recover_explicit_retry_running(
+        self,
+        dvd_id: str,
+        *,
+        expected_sequence: int,
+    ) -> Stage12RolloutState:
+        """Move one stranded explicit retry to retryable, with event CAS."""
+
+        return self.transition(
+            dvd_id,
+            STATE_FAILED_RETRYABLE,
+            expected_from=STATE_RUNNING,
+            expected_sequence=expected_sequence,
+            expected_previous_event=(
+                STATE_FAILED_RETRYABLE,
+                STATE_RUNNING,
+                STAGE12_EXPLICIT_RETRY_START,
+            ),
+            reason=STAGE12_EXPLICIT_RETRY_CRASH_RECOVERY,
+            provenance={
+                "operation": "RECOVER_EXPLICIT_RETRY",
+                "from": STATE_RUNNING,
+                "to": STATE_FAILED_RETRYABLE,
+                "recovery": "EXPLICIT_RETRY_CRASH",
+                "recovered_start_reason": STAGE12_EXPLICIT_RETRY_START,
             },
         )
 

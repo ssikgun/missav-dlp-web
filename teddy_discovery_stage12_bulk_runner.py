@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import fcntl
+import importlib
 import inspect
 import json
 import os
@@ -67,8 +68,15 @@ AUTH_ENV = "TEDDY_STAGE12_BULK_ALLOW_LIVE"
 AUTH_VALUE = "TEDDY_STAGE12_BULK_AUTHORIZED"
 EXPLICIT_RETRY_AUTH_ENV = "TEDDY_STAGE12_EXPLICIT_RETRY_AUTHORIZED"
 EXPLICIT_RETRY_AUTH_VALUE = "YES_I_HAVE_REVIEWED_THE_SINGLE_TITLE"
+EXPLICIT_RETRY_RECOVERY_AUTH_ENV = (
+    "TEDDY_STAGE12_EXPLICIT_RETRY_RECOVERY_AUTHORIZED"
+)
+EXPLICIT_RETRY_RECOVERY_AUTH_VALUE = "YES_I_HAVE_REVIEWED_THE_SINGLE_TITLE"
 RECONCILE_AUTH_ENV = "TEDDY_STAGE12_PUBLICATION_RECONCILE_AUTHORIZED"
 RECONCILE_AUTH_VALUE = "YES_I_HAVE_REVIEWED_THE_TITLE_EVIDENCE"
+PRODUCTION_STAGE11_PYTHON = Path("/opt/stage11-stt-venv/bin/python")
+PRODUCTION_STAGE11_PREFIX = Path("/opt/stage11-stt-venv")
+PRODUCTION_AUDIO_IMPORTS = ("numpy", "av")
 
 NAS = {
     "nas_host": "192.168.1.201",
@@ -113,6 +121,55 @@ def emit(name: str, value: object) -> None:
         ),
         flush=True,
     )
+
+
+def require_production_interpreter(
+    *,
+    executable: str | None = None,
+    prefix: str | None = None,
+    importer=None,
+) -> None:
+    """Fail closed unless Stage12 is running in the Stage11 runtime."""
+
+    launched = Path(sys.executable if executable is None else executable)
+    active_prefix = Path(sys.prefix if prefix is None else prefix)
+    import_module = importlib.import_module if importer is None else importer
+    try:
+        expected_real = PRODUCTION_STAGE11_PYTHON.resolve(strict=True)
+        launched_real = launched.resolve(strict=True)
+        prefix_real = active_prefix.resolve(strict=True)
+        expected_prefix = PRODUCTION_STAGE11_PREFIX.resolve(strict=True)
+    except OSError as error:
+        emit("PRODUCTION_PYTHON_PREFLIGHT", "FAIL_PATH_UNAVAILABLE")
+        raise Stage12BulkRunnerError(
+            "production Stage11 Python path is unavailable"
+        ) from error
+
+    emit("PYTHON_EXECUTABLE", str(launched))
+    emit("PYTHON_REALPATH", str(launched_real))
+    emit("PYTHON_PREFIX", str(prefix_real))
+    if (
+        launched.absolute() != PRODUCTION_STAGE11_PYTHON.absolute()
+        or launched_real != expected_real
+        or prefix_real != expected_prefix
+    ):
+        emit("PRODUCTION_PYTHON_PREFLIGHT", "FAIL_INTERPRETER_MISMATCH")
+        raise Stage12BulkRunnerError(
+            "Stage12 requires /opt/stage11-stt-venv/bin/python"
+        )
+
+    for module_name in PRODUCTION_AUDIO_IMPORTS:
+        try:
+            import_module(module_name)
+        except Exception as error:
+            emit("PRODUCTION_AUDIO_DEPENDENCY", module_name + "=FAIL")
+            emit("PRODUCTION_PYTHON_PREFLIGHT", "FAIL_AUDIO_DEPENDENCY")
+            raise Stage12BulkRunnerError(
+                "production Python is missing a required Stage11 audio dependency"
+            ) from error
+        emit("PRODUCTION_AUDIO_DEPENDENCY", module_name + "=PASS")
+
+    emit("PRODUCTION_PYTHON_PREFLIGHT", "PASS")
 
 
 def utc_now() -> str:
@@ -891,8 +948,9 @@ def explicit_retry_inventory(
     store,
     subtitle_reader,
     nas_filesystem,
+    recovery: bool = False,
 ):
-    """Bind one retry to current Discovery, NAS, and durable rollout identity."""
+    """Bind a retry or its recovery to Discovery, NAS, and rollout identity."""
 
     from teddy_discovery_stage12_rollout import (
         Stage12RolloutStateStore,
@@ -906,7 +964,12 @@ def explicit_retry_inventory(
     if len(rows) != 1:
         raise Stage12BulkRunnerError("explicit retry Discovery row is not unique")
     row = rows[0]
-    validated = store.validate_explicit_retry(
+    validate = (
+        store.validate_explicit_retry_recovery
+        if recovery
+        else store.validate_explicit_retry
+    )
+    validated = validate(
         dvd_id,
         expected_sequence=expected_sequence,
         media_path_identity=str(row["relative_path"]),
@@ -1241,6 +1304,7 @@ def run_preflight(
         Stage12RolloutStateStore,
     )
 
+    require_production_interpreter()
     emit("STAGE12_BULK_PREFLIGHT", "START")
     emit("LIVE_EXECUTED", "NO")
 
@@ -1333,6 +1397,7 @@ def run_explicit_retry_preflight(
     from teddy_discovery_stage12_rollout import Stage12RolloutStateStore
     from teddy_discovery_stage12_rollout import build_nas_preflight_filesystem
 
+    require_production_interpreter()
     emit("STAGE12_EXPLICIT_RETRY_PREFLIGHT", "START")
     emit("LIVE_EXECUTED", "NO")
     check_repo(expected_head)
@@ -1366,6 +1431,87 @@ def run_explicit_retry_preflight(
     emit("PRODUCTION_WRITES_TOTAL", 0)
     emit("STAGE12_EXPLICIT_RETRY_PREFLIGHT", "PASS")
     return 0
+
+
+def run_explicit_retry_recovery(
+    *,
+    expected_head: str,
+    dvd_id: str,
+    expected_sequence: int,
+) -> int:
+    """Recover exactly one stranded explicit retry to FAILED_RETRYABLE."""
+
+    from teddy_discovery_stage12_inventory import build_subtitle_ssh_reader
+    from teddy_discovery_stage12_rollout import (
+        STATE_FAILED_RETRYABLE,
+        STATE_RUNNING,
+        Stage12RolloutStateStore,
+        build_nas_preflight_filesystem,
+    )
+
+    emit("STAGE12_EXPLICIT_RETRY_RECOVERY", "START")
+    emit("RECOVERY_EXECUTED", "NO")
+    if (
+        os.environ.get(EXPLICIT_RETRY_RECOVERY_AUTH_ENV)
+        != EXPLICIT_RETRY_RECOVERY_AUTH_VALUE
+    ):
+        emit("EXPLICIT_RETRY_RECOVERY_AUTHORIZATION", "BLOCKED")
+        return 2
+    require_production_interpreter()
+    check_repo(expected_head)
+
+    with RunnerLock(LOCK_PATH):
+        check_repo(expected_head)
+        store = Stage12RolloutStateStore(ROLLOUT_DB)
+        active = active_rollout_ids(store)
+        if active != (dvd_id,):
+            raise Stage12BulkRunnerError(
+                "explicit retry recovery requires the target as the only active title"
+            )
+
+        state = store.get(dvd_id)
+        emit(
+            "RECOVERY_TARGET",
+            {
+                "dvd_id": dvd_id,
+                "status": state.status,
+                "sequence": state.transition_sequence,
+                "reason": state.last_transition_reason,
+            },
+        )
+        records = explicit_retry_inventory(
+            dvd_id=dvd_id,
+            expected_sequence=expected_sequence,
+            store=store,
+            subtitle_reader=build_subtitle_ssh_reader(**NAS),
+            nas_filesystem=build_nas_preflight_filesystem(**NAS),
+            recovery=True,
+        )
+        if set(records) != {dvd_id}:
+            raise Stage12BulkRunnerError(
+                "explicit retry recovery did not resolve exactly one source"
+            )
+
+        recovered = store.recover_explicit_retry_running(
+            dvd_id,
+            expected_sequence=expected_sequence,
+        )
+        emit(
+            "RECOVERY_TRANSITION",
+            {
+                "dvd_id": dvd_id,
+                "from": STATE_RUNNING,
+                "to": STATE_FAILED_RETRYABLE,
+                "sequence": recovered.transition_sequence,
+                "reason": recovered.last_transition_reason,
+            },
+        )
+        emit("ROLLOUT_COUNTS", rollout_counts(store))
+        emit("OTHER_ACTIVE_TITLES", [])
+        emit("NAS_JELLYFIN_WRITES", 0)
+        emit("RECOVERY_EXECUTED", "YES")
+        emit("STAGE12_EXPLICIT_RETRY_RECOVERY", "COMPLETE")
+        return 0
 
 
 def run_live(
@@ -1443,6 +1589,7 @@ def run_live(
         # Revalidate repo and durable active state after
         # acquiring the singleton runner lock.
         check_repo(expected_head)
+        require_production_interpreter()
 
         store = Stage12RolloutStateStore(
             ROLLOUT_DB
@@ -1844,7 +1991,13 @@ def build_parser():
 
     parser.add_argument(
         "--mode",
-        choices=("preflight", "live", "retry", "reconcile"),
+        choices=(
+            "preflight",
+            "live",
+            "retry",
+            "recover-retry",
+            "reconcile",
+        ),
         default="preflight",
     )
 
@@ -1872,14 +2025,14 @@ def build_parser():
         "--dvd-id",
         action="append",
         help=(
-            "one exact title for explicit retry or publication reconciliation; "
+            "one exact title for explicit retry, retry recovery, or publication reconciliation; "
             "may be supplied exactly once"
         ),
     )
     parser.add_argument(
         "--expected-sequence",
         type=int,
-        help="durable rollout event sequence required for explicit retry",
+        help="durable rollout event sequence required for retry or retry recovery",
     )
 
     return parser
@@ -1952,6 +2105,42 @@ def main() -> int:
             return 130
         except Exception as error:
             emit("STAGE12_EXPLICIT_RETRY", "FAIL_" + type(error).__name__)
+            emit("ERROR", str(error))
+            return 1
+
+    if args.mode == "recover-retry":
+        if len(dvd_ids) != 1:
+            emit(
+                "STAGE12_EXPLICIT_RETRY_RECOVERY",
+                "FAIL_EXACTLY_ONE_DVD_ID_REQUIRED",
+            )
+            return 2
+        if type(args.expected_sequence) is not int or args.expected_sequence < 1:
+            emit(
+                "STAGE12_EXPLICIT_RETRY_RECOVERY",
+                "FAIL_EXPECTED_SEQUENCE_REQUIRED",
+            )
+            return 2
+        if args.batch_size != 1 or args.max_titles != 1:
+            emit(
+                "STAGE12_EXPLICIT_RETRY_RECOVERY",
+                "FAIL_SINGLE_TITLE_BOUND_REQUIRED",
+            )
+            return 2
+        try:
+            return run_explicit_retry_recovery(
+                expected_head=args.expected_head,
+                dvd_id=dvd_ids[0],
+                expected_sequence=args.expected_sequence,
+            )
+        except KeyboardInterrupt:
+            emit("STAGE12_EXPLICIT_RETRY_RECOVERY", "INTERRUPTED")
+            return 130
+        except Exception as error:
+            emit(
+                "STAGE12_EXPLICIT_RETRY_RECOVERY",
+                "FAIL_" + type(error).__name__,
+            )
             emit("ERROR", str(error))
             return 1
 
