@@ -33,6 +33,7 @@ from teddy_discovery_asr_remote import (
     REMOTE_ASR_SCHEMA_VERSION,
     REMOTE_ASR_PATH,
     REMOTE_ASR_TARGETED_PATH,
+    REMOTE_ASR_TARGETED_DIAGNOSTIC_PATH,
 )
 
 
@@ -85,12 +86,19 @@ class FakeModelFactory:
         return self.model
 
 
-def raw_segment(start, end, text, words=()):
+def raw_segment(
+    start, end, text, words=(), *, avg_logprob=-0.25,
+    no_speech_prob=0.02, compression_ratio=1.1, temperature=0.0,
+):
     return SimpleNamespace(
         start=start,
         end=end,
         text=text,
         words=list(words),
+        avg_logprob=avg_logprob,
+        no_speech_prob=no_speech_prob,
+        compression_ratio=compression_ratio,
+        temperature=temperature,
     )
 
 
@@ -445,6 +453,44 @@ def main():
         },
     ]
 
+    diagnostic_model = FakeModel([[
+        raw_segment(
+            0.125, 0.175, "must-not-leak",
+            [SimpleNamespace(start=0.130, end=0.160, word="secret-token")],
+            avg_logprob=-0.375,
+            no_speech_prob=0.125,
+            compression_ratio=1.25,
+            temperature=0.0,
+        ),
+    ]])
+    diagnostic_worker = FasterWhisperGPUWorker(
+        model_factory=FakeModelFactory(diagnostic_model),
+        vad_getter=FakeVAD([]),
+    )
+    diagnostic_body = diagnostic_worker.process_targeted_diagnostic_request(
+        payload,
+        schema_version=REMOTE_ASR_SCHEMA_VERSION,
+        sample_rate=ASR_AUDIO_SAMPLE_RATE,
+    )
+    diagnostic_response = json.loads(diagnostic_body.decode("utf-8"))
+    assert set(diagnostic_response) == {
+        "schema_version", "engine_version", "input_sha256", "sample_rate",
+        "sample_count", "segment_count", "segments",
+    }
+    assert diagnostic_response["segment_count"] == 1
+    assert diagnostic_response["segments"] == [{
+        "start_ms": 125,
+        "end_ms": 175,
+        "avg_logprob": -0.375,
+        "no_speech_prob": 0.125,
+        "compression_ratio": 1.25,
+        "temperature": 0.0,
+    }]
+    assert b"must-not-leak" not in diagnostic_body
+    assert b"secret-token" not in diagnostic_body
+    assert b'"text"' not in diagnostic_body
+    assert b'"words"' not in diagnostic_body
+
     # Targeted requests run the model without VAD; an empty model iterable is
     # a successful response, not an error or a missing planned window.
     empty_targeted_model = FakeModel([[]])
@@ -486,6 +532,7 @@ def main():
     Stage11ASRRequestHandler.do_POST(unknown_handler)
     assert unknown_handler.status == 404
     assert REMOTE_ASR_TARGETED_PATH != unknown_handler.path
+    assert REMOTE_ASR_TARGETED_DIAGNOSTIC_PATH != unknown_handler.path
 
     class FailingWorker:
         def __init__(self, error):
@@ -579,6 +626,24 @@ def main():
     Stage11ASRRequestHandler.do_POST(success_handler)
     assert success_handler.status == 200
     assert success_handler.wfile.getvalue() == b'{"success":true}'
+
+    class DiagnosticSuccessWorker(SuccessWorker):
+        def process_targeted_diagnostic_request(
+            self, body, *, schema_version, sample_rate
+        ):
+            assert body == b"success-payload"
+            return b'{"segment_count":0,"segments":[]}'
+
+    diagnostic_success_handler = SuccessHandler()
+    diagnostic_success_handler.path = REMOTE_ASR_TARGETED_DIAGNOSTIC_PATH
+    diagnostic_success_handler.server = SimpleNamespace(
+        worker=DiagnosticSuccessWorker()
+    )
+    Stage11ASRRequestHandler.do_POST(diagnostic_success_handler)
+    assert diagnostic_success_handler.status == 200
+    assert diagnostic_success_handler.wfile.getvalue() == (
+        b'{"segment_count":0,"segments":[]}'
+    )
 
     silent_vad = FakeVAD([])
     silent_factory = FakeModelFactory(FakeModel([]))

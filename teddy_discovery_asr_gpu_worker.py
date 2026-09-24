@@ -39,6 +39,7 @@ from teddy_discovery_asr_remote import (
     REMOTE_ASR_MAX_RESPONSE_BYTES,
     REMOTE_ASR_PATH,
     REMOTE_ASR_TARGETED_PATH,
+    REMOTE_ASR_TARGETED_DIAGNOSTIC_PATH,
     REMOTE_ASR_SCHEMA_VERSION,
 )
 from teddy_discovery_asr_whisper import seconds_to_milliseconds
@@ -366,6 +367,7 @@ def _convert_region_segments(
     region_end_sample: int,
     sample_count: int,
     aggregate_count: int,
+    numeric_diagnostics: list[dict[str, int | float]] | None = None,
 ) -> tuple[ASRSegment, ...]:
     if isinstance(raw_segments, (str, bytes, Mapping)):
         raise GPUASRProtocolError("Whisper segments must be iterable")
@@ -443,6 +445,36 @@ def _convert_region_segments(
             )
         except ASRValidationError as error:
             raise GPUASRProtocolError("Whisper segment is invalid") from error
+
+        if numeric_diagnostics is not None:
+            diagnostic_values = {}
+            for field_name in (
+                "avg_logprob", "no_speech_prob", "compression_ratio", "temperature",
+            ):
+                value = _field(raw_segment, field_name)
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    raise GPUASRProtocolError(
+                        "Whisper numeric diagnostic field is invalid"
+                    )
+                numeric_value = float(value)
+                if not math.isfinite(numeric_value):
+                    raise GPUASRProtocolError(
+                        "Whisper numeric diagnostic field is not finite"
+                    )
+                if field_name in {"no_speech_prob", "compression_ratio", "temperature"} and numeric_value < 0:
+                    raise GPUASRProtocolError(
+                        "Whisper numeric diagnostic field is below its bound"
+                    )
+                if field_name == "no_speech_prob" and numeric_value > 1:
+                    raise GPUASRProtocolError(
+                        "Whisper no_speech_prob exceeds its bound"
+                    )
+                diagnostic_values[field_name] = numeric_value
+            numeric_diagnostics.append({
+                "start_ms": segment.start_ms,
+                "end_ms": segment.end_ms,
+                **diagnostic_values,
+            })
 
         previous_start_ms = relative_start_ms
         converted.append(segment)
@@ -533,6 +565,7 @@ class FasterWhisperGPUWorker:
         region_end_sample: int,
         sample_count: int,
         aggregate_count: int,
+        numeric_diagnostics: list[dict[str, int | float]] | None = None,
     ) -> tuple[ASRSegment, ...]:
         region_samples = samples[region_start_sample:region_end_sample]
         try:
@@ -568,6 +601,7 @@ class FasterWhisperGPUWorker:
             region_end_sample=region_end_sample,
             sample_count=sample_count,
             aggregate_count=aggregate_count,
+            numeric_diagnostics=numeric_diagnostics,
         )
 
     def process_request(
@@ -666,6 +700,43 @@ class FasterWhisperGPUWorker:
             max_response_bytes=self.max_response_bytes,
         )
 
+    def process_targeted_diagnostic_request(
+        self,
+        payload: bytes,
+        *,
+        schema_version: int,
+        sample_rate: int,
+    ) -> bytes:
+        """Run the existing no-VAD targeted inference and return numeric-only metadata."""
+
+        input_sha256, samples = _validated_request_samples(
+            payload,
+            schema_version=schema_version,
+            sample_rate=sample_rate,
+        )
+        sample_count = int(samples.size)
+        numeric_segments: list[dict[str, int | float]] = []
+        segments = self._transcribe_region(
+            self._get_model(),
+            samples,
+            region_start_sample=0,
+            region_end_sample=sample_count,
+            sample_count=sample_count,
+            aggregate_count=0,
+            numeric_diagnostics=numeric_segments,
+        )
+        if len(segments) != len(numeric_segments):
+            raise GPUASRProtocolError(
+                "Whisper numeric diagnostic count mismatch"
+            )
+        return _serialize_targeted_diagnostic_response_body(
+            input_sha256=input_sha256,
+            engine_version=self.engine_version,
+            sample_count=sample_count,
+            segments=numeric_segments,
+            max_response_bytes=self.max_response_bytes,
+        )
+
 
 def _serialize_response_body(
     *,
@@ -715,6 +786,41 @@ def _serialize_response_body(
     return response_body
 
 
+def _serialize_targeted_diagnostic_response_body(
+    *,
+    input_sha256: str,
+    engine_version: str,
+    sample_count: int,
+    segments: list[dict[str, int | float]],
+    max_response_bytes: int,
+) -> bytes:
+    """Serialize the isolated opt-in response; transcript fields cannot enter."""
+
+    response = {
+        "schema_version": REMOTE_ASR_SCHEMA_VERSION,
+        "engine_version": engine_version,
+        "input_sha256": input_sha256,
+        "sample_rate": ASR_AUDIO_SAMPLE_RATE,
+        "sample_count": sample_count,
+        "segment_count": len(segments),
+        "segments": segments,
+    }
+    try:
+        response_body = json.dumps(
+            response,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as error:
+        raise GPUASRProtocolError(
+            "ASR diagnostic response could not be serialized"
+        ) from error
+    if len(response_body) > max_response_bytes:
+        raise ASRLimitError("ASR diagnostic response exceeds its byte bound")
+    return response_body
+
+
 def _error_response(handler: BaseHTTPRequestHandler, *, status: int):
     body = b'{"error":"stage11_asr_request_failed"}'
     handler.send_response(status)
@@ -760,7 +866,11 @@ class Stage11ASRRequestHandler(BaseHTTPRequestHandler):
         return
 
     def do_POST(self):
-        if self.path not in {REMOTE_ASR_PATH, REMOTE_ASR_TARGETED_PATH}:
+        if self.path not in {
+            REMOTE_ASR_PATH,
+            REMOTE_ASR_TARGETED_PATH,
+            REMOTE_ASR_TARGETED_DIAGNOSTIC_PATH,
+        }:
             _error_response(self, status=404)
             return
         if self.headers.get("Content-Type") != REMOTE_ASR_CONTENT_TYPE:
@@ -790,11 +900,12 @@ class Stage11ASRRequestHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            processor = (
-                self.server.worker.process_targeted_request
-                if self.path == REMOTE_ASR_TARGETED_PATH
-                else self.server.worker.process_request
-            )
+            if self.path == REMOTE_ASR_TARGETED_PATH:
+                processor = self.server.worker.process_targeted_request
+            elif self.path == REMOTE_ASR_TARGETED_DIAGNOSTIC_PATH:
+                processor = self.server.worker.process_targeted_diagnostic_request
+            else:
+                processor = self.server.worker.process_request
             response_body = processor(
                 body,
                 schema_version=REMOTE_ASR_SCHEMA_VERSION,

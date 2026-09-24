@@ -27,10 +27,13 @@ from teddy_discovery_asr_remote import (
     REMOTE_ASR_PATH,
     REMOTE_ASR_SCHEMA_VERSION,
     REMOTE_ASR_TARGETED_PATH,
+    REMOTE_ASR_TARGETED_DIAGNOSTIC_PATH,
     RemoteASRHTTPResponse,
     RemoteASRLimitError,
     RemoteASRProtocolError,
     RemoteASRTransportError,
+    TargetedASRNumericDiagnostics,
+    TargetedASRNumericSegment,
     RemoteFasterWhisperASR,
 )
 from teddy_discovery_subtitle import validate_canonical_holding
@@ -197,6 +200,82 @@ def main():
         "X-Stage11-ASR-Sample-Rate": str(ASR_AUDIO_SAMPLE_RATE),
     }
     assert targeted_body == transport.calls[0][1]
+
+    def diagnostic_response_body(body, *, updates=None):
+        response = {
+            "schema_version": REMOTE_ASR_SCHEMA_VERSION,
+            "engine_version": "1.2.1",
+            "input_sha256": hashlib.sha256(body).hexdigest(),
+            "sample_rate": ASR_AUDIO_SAMPLE_RATE,
+            "sample_count": int(chunk.samples.size),
+            "segment_count": 1,
+            "segments": [{
+                "start_ms": 250,
+                "end_ms": 1_250,
+                "avg_logprob": -0.375,
+                "no_speech_prob": 0.125,
+                "compression_ratio": 1.25,
+                "temperature": 0.0,
+            }],
+        }
+        if updates:
+            response.update(updates)
+        return json.dumps(response, separators=(",", ":")).encode("utf-8")
+
+    diagnostic_transport = FakeTransport(diagnostic_response_body)
+    diagnostic_client = adapter_for(diagnostic_transport)
+    diagnostic_result = diagnostic_client.transcribe_targeted_chunk_diagnostics(
+        chunk
+    )
+    assert diagnostic_result == TargetedASRNumericDiagnostics(segments=(
+        TargetedASRNumericSegment(
+            start_ms=chunk.start_ms + 250,
+            end_ms=chunk.start_ms + 1_250,
+            avg_logprob=-0.375,
+            no_speech_prob=0.125,
+            compression_ratio=1.25,
+            temperature=0.0,
+        ),
+    ))
+    diagnostic_url, diagnostic_body, _, _ = diagnostic_transport.calls[0]
+    assert diagnostic_url == (
+        "http://vm122.test:8082" + REMOTE_ASR_TARGETED_DIAGNOSTIC_PATH
+    )
+
+    def diagnostic_client_with(update):
+        return adapter_for(FakeTransport(
+            lambda body: diagnostic_response_body(
+                body,
+                updates=update,
+            )
+        ))
+
+    expect(
+        RemoteASRProtocolError,
+        lambda: diagnostic_client_with({
+            "segments": [{
+                "start_ms": 250, "end_ms": 1_250,
+                "avg_logprob": -0.3, "no_speech_prob": 0.1,
+                "compression_ratio": 1.0, "temperature": 0.0,
+                "text": "must-not-accept",
+            }],
+        }).transcribe_targeted_chunk_diagnostics(chunk),
+    )
+    expect(
+        RemoteASRProtocolError,
+        lambda: diagnostic_client_with({
+            "segments": [{
+                "start_ms": 250, "end_ms": 1_250,
+                "avg_logprob": float("nan"), "no_speech_prob": 0.1,
+                "compression_ratio": 1.0, "temperature": 0.0,
+            }],
+        }).transcribe_targeted_chunk_diagnostics(chunk),
+    )
+    expect(
+        RemoteASRProtocolError,
+        lambda: diagnostic_client_with({"segment_count": 2})
+        .transcribe_targeted_chunk_diagnostics(chunk),
+    )
 
     empty_targeted_transport = FakeTransport(
         lambda body: response_body(

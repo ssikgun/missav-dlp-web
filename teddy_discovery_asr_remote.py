@@ -39,6 +39,7 @@ from teddy_discovery_asr_audio import (
 REMOTE_ASR_SCHEMA_VERSION = 1
 REMOTE_ASR_PATH = "/v1/asr/transcribe"
 REMOTE_ASR_TARGETED_PATH = "/v1/asr/transcribe-targeted"
+REMOTE_ASR_TARGETED_DIAGNOSTIC_PATH = "/v1/asr/transcribe-targeted-diagnostic"
 REMOTE_ASR_CONTENT_TYPE = "application/x-npy"
 REMOTE_ASR_MAX_NPY_HEADER_BYTES = 4_096
 REMOTE_ASR_MAX_REQUEST_BYTES = (
@@ -70,6 +71,25 @@ class RemoteASRHTTPResponse:
 
     status_code: int
     body: bytes
+
+
+@dataclass(frozen=True)
+class TargetedASRNumericSegment:
+    """Transcript-free numeric diagnostics for one targeted segment."""
+
+    start_ms: int
+    end_ms: int
+    avg_logprob: float
+    no_speech_prob: float
+    compression_ratio: float
+    temperature: float
+
+
+@dataclass(frozen=True)
+class TargetedASRNumericDiagnostics:
+    """Opt-in targeted ASR metadata without transcript or token content."""
+
+    segments: tuple[TargetedASRNumericSegment, ...]
 
 
 def _load_numpy():
@@ -120,6 +140,7 @@ def _endpoint_from_base_url(
 
     path = parsed.path.rstrip("/")
     for known_endpoint_path in (
+        REMOTE_ASR_TARGETED_DIAGNOSTIC_PATH,
         REMOTE_ASR_TARGETED_PATH,
         REMOTE_ASR_PATH,
     ):
@@ -259,6 +280,25 @@ def _require_response_int(
     if minimum is not None and value < minimum:
         raise RemoteASRProtocolError(field_name + " is below its bound")
     return value
+
+
+def _require_response_finite_number(
+    value: object,
+    *,
+    field_name: str,
+    minimum: float | None = None,
+    maximum: float | None = None,
+) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise RemoteASRProtocolError(field_name + " must be numeric")
+    numeric = float(value)
+    if not math.isfinite(numeric):
+        raise RemoteASRProtocolError(field_name + " must be finite")
+    if minimum is not None and numeric < minimum:
+        raise RemoteASRProtocolError(field_name + " is below its bound")
+    if maximum is not None and numeric > maximum:
+        raise RemoteASRProtocolError(field_name + " exceeds its bound")
+    return numeric
 
 
 def _decode_response_body(body: object) -> object:
@@ -572,6 +612,139 @@ class RemoteFasterWhisperASR:
 
         return tuple(converted)
 
+    def _decode_targeted_diagnostics(
+        self,
+        response: RemoteASRHTTPResponse,
+        *,
+        chunk: ASRAudioChunk,
+        request_body: bytes,
+    ) -> TargetedASRNumericDiagnostics:
+        if type(response.status_code) is not int or not 200 <= response.status_code < 300:
+            raise RemoteASRTransportError(
+                "remote ASR diagnostic HTTP request failed"
+            )
+        if not isinstance(response.body, bytes):
+            raise RemoteASRTransportError(
+                "remote ASR diagnostic response body must be bytes"
+            )
+        if len(response.body) > self.max_response_bytes:
+            raise RemoteASRLimitError(
+                "remote ASR diagnostic response exceeds its configured byte bound"
+            )
+        decoded = _decode_response_body(response.body)
+        required = {
+            "schema_version", "engine_version", "input_sha256",
+            "sample_rate", "sample_count", "segment_count", "segments",
+        }
+        if not isinstance(decoded, dict) or set(decoded) != required:
+            raise RemoteASRProtocolError(
+                "remote ASR diagnostic response has an invalid top-level shape"
+            )
+        if _require_response_int(
+            decoded["schema_version"],
+            field_name="remote ASR diagnostic schema_version",
+            minimum=0,
+        ) != REMOTE_ASR_SCHEMA_VERSION:
+            raise RemoteASRProtocolError(
+                "remote ASR diagnostic schema_version is unsupported"
+            )
+        if (
+            not isinstance(decoded["engine_version"], str)
+            or not decoded["engine_version"].strip()
+            or _has_control_characters(decoded["engine_version"])
+            or decoded["engine_version"] != self.engine_version
+        ):
+            raise RemoteASRProtocolError(
+                "remote ASR diagnostic engine_version is invalid"
+            )
+        request_sha256 = hashlib.sha256(request_body).hexdigest()
+        if decoded["input_sha256"] != request_sha256:
+            raise RemoteASRProtocolError(
+                "remote ASR diagnostic input SHA-256 mismatch"
+            )
+        if _require_response_int(
+            decoded["sample_rate"],
+            field_name="remote ASR diagnostic sample_rate",
+            minimum=0,
+        ) != ASR_AUDIO_SAMPLE_RATE:
+            raise RemoteASRProtocolError(
+                "remote ASR diagnostic sample_rate is invalid"
+            )
+        if _require_response_int(
+            decoded["sample_count"],
+            field_name="remote ASR diagnostic sample_count",
+            minimum=1,
+        ) != int(chunk.samples.size):
+            raise RemoteASRProtocolError(
+                "remote ASR diagnostic sample_count mismatch"
+            )
+        raw_segments = decoded["segments"]
+        count = _require_response_int(
+            decoded["segment_count"],
+            field_name="remote ASR diagnostic segment_count",
+            minimum=0,
+        )
+        if not isinstance(raw_segments, list) or count != len(raw_segments):
+            raise RemoteASRProtocolError(
+                "remote ASR diagnostic segment_count mismatch"
+            )
+        if count > MAX_ASR_SEGMENTS:
+            raise RemoteASRLimitError(
+                "remote ASR diagnostic segments exceed MAX_ASR_SEGMENTS"
+            )
+
+        chunk_duration_ms = chunk.end_ms - chunk.start_ms
+        previous_start_ms = None
+        converted = []
+        keys = {
+            "start_ms", "end_ms", "avg_logprob", "no_speech_prob",
+            "compression_ratio", "temperature",
+        }
+        for raw in raw_segments:
+            if not isinstance(raw, dict) or set(raw) != keys:
+                raise RemoteASRProtocolError(
+                    "remote ASR diagnostic segment has an invalid shape"
+                )
+            start_ms = _require_response_int(
+                raw["start_ms"],
+                field_name="remote ASR diagnostic start_ms",
+                minimum=0,
+            )
+            end_ms = _require_response_int(
+                raw["end_ms"],
+                field_name="remote ASR diagnostic end_ms",
+                minimum=1,
+            )
+            if end_ms <= start_ms or end_ms > chunk_duration_ms:
+                raise RemoteASRProtocolError(
+                    "remote ASR diagnostic segment timestamp is invalid"
+                )
+            if previous_start_ms is not None and start_ms < previous_start_ms:
+                raise RemoteASRProtocolError(
+                    "remote ASR diagnostic starts are not nondecreasing"
+                )
+            previous_start_ms = start_ms
+            converted.append(TargetedASRNumericSegment(
+                start_ms=chunk.start_ms + start_ms,
+                end_ms=chunk.start_ms + end_ms,
+                avg_logprob=_require_response_finite_number(
+                    raw["avg_logprob"], field_name="avg_logprob",
+                ),
+                no_speech_prob=_require_response_finite_number(
+                    raw["no_speech_prob"], field_name="no_speech_prob",
+                    minimum=0.0, maximum=1.0,
+                ),
+                compression_ratio=_require_response_finite_number(
+                    raw["compression_ratio"], field_name="compression_ratio",
+                    minimum=0.0,
+                ),
+                temperature=_require_response_finite_number(
+                    raw["temperature"], field_name="temperature",
+                    minimum=0.0,
+                ),
+            ))
+        return TargetedASRNumericDiagnostics(segments=tuple(converted))
+
     def _transcribe_at_endpoint(
         self,
         chunk: ASRAudioChunk,
@@ -638,6 +811,48 @@ class RemoteFasterWhisperASR:
             expected_vad_region_count=0,
         )
 
+    def transcribe_targeted_chunk_diagnostics(
+        self,
+        chunk: ASRAudioChunk,
+    ) -> TargetedASRNumericDiagnostics:
+        """Explicitly request numeric-only diagnostics for a targeted window."""
+
+        if not isinstance(chunk, ASRAudioChunk):
+            raise ASRValidationError("chunk must be an ASRAudioChunk")
+        request_body = self._serialize_chunk(chunk)
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": REMOTE_ASR_CONTENT_TYPE,
+            "Content-Length": str(len(request_body)),
+            "X-Stage11-ASR-Schema-Version": str(REMOTE_ASR_SCHEMA_VERSION),
+            "X-Stage11-ASR-Sample-Rate": str(ASR_AUDIO_SAMPLE_RATE),
+        }
+        try:
+            response = self._transport(
+                _endpoint_from_base_url(
+                    self.targeted_endpoint_url,
+                    endpoint_path=REMOTE_ASR_TARGETED_DIAGNOSTIC_PATH,
+                ),
+                request_body,
+                headers,
+                self.request_timeout_seconds,
+            )
+        except RemoteASRError:
+            raise
+        except (OSError, TimeoutError, ValueError) as error:
+            raise RemoteASRTransportError(
+                "remote ASR diagnostic transport failed"
+            ) from error
+        if not isinstance(response, RemoteASRHTTPResponse):
+            raise RemoteASRProtocolError(
+                "remote ASR diagnostic transport returned an invalid response"
+            )
+        return self._decode_targeted_diagnostics(
+            response,
+            chunk=chunk,
+            request_body=request_body,
+        )
+
 
 __all__ = [
     "REMOTE_ASR_CONTENT_TYPE",
@@ -647,6 +862,7 @@ __all__ = [
     "REMOTE_ASR_MAX_RESPONSE_BYTES",
     "REMOTE_ASR_PATH",
     "REMOTE_ASR_TARGETED_PATH",
+    "REMOTE_ASR_TARGETED_DIAGNOSTIC_PATH",
     "REMOTE_ASR_SCHEMA_VERSION",
     "RemoteASRError",
     "RemoteASRHTTPResponse",
@@ -654,4 +870,6 @@ __all__ = [
     "RemoteASRProtocolError",
     "RemoteASRTransportError",
     "RemoteFasterWhisperASR",
+    "TargetedASRNumericDiagnostics",
+    "TargetedASRNumericSegment",
 ]

@@ -1,5 +1,27 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-24 Targeted ASR numeric-only diagnostic contract
+
+Added the explicit VM122 endpoint
+`/v1/asr/transcribe-targeted-diagnostic` and
+`RemoteFasterWhisperASR.transcribe_targeted_chunk_diagnostics()`. It runs the
+existing whole-window, no-VAD targeted inference with unchanged model options.
+The separate strict response carries only segment timestamps,
+`avg_logprob`, `no_speech_prob`, `compression_ratio`, and `temperature`, plus
+bounded request identity/count fields. It cannot carry transcript, word, or
+token fields. The existing targeted endpoint and response schema are
+unchanged; existing callers do not opt in and continue using the original
+decoder.
+
+The worker/remote protocol smokes verify unchanged normal targeted responses,
+numeric-only diagnostics, and fail-closed rejection of text-bearing,
+non-finite, and count-inconsistent diagnostic responses. GPU worker, remote
+ASR, targeted second-evidence, Stage11 controller, compile, and `git diff
+--check` passed under `/opt/stage11-stt-venv/bin/python`. No production
+request, rollout mutation, publication, or Jellyfin write was performed for
+implementation validation. VM122 deployment and bounded NHDTC-250 numeric
+comparison remain pending.
+
 ## 2026-09-24 NHDTC-250 full-title ASR empty result and recovery
 
 At clean production HEAD `6e263d5dc35267a143b1cbeb6ff978d9b55fdcda`,
