@@ -17,10 +17,52 @@ The worker/remote protocol smokes verify unchanged normal targeted responses,
 numeric-only diagnostics, and fail-closed rejection of text-bearing,
 non-finite, and count-inconsistent diagnostic responses. GPU worker, remote
 ASR, targeted second-evidence, Stage11 controller, compile, and `git diff
---check` passed under `/opt/stage11-stt-venv/bin/python`. No production
-request, rollout mutation, publication, or Jellyfin write was performed for
-implementation validation. VM122 deployment and bounded NHDTC-250 numeric
-comparison remain pending.
+--check` passed under `/opt/stage11-stt-venv/bin/python`. The implementation
+was committed and pushed as `6654fb6b018a25faa2cf0517ef3ebd5542ea3a74`.
+
+VM122's previous worker and remote module hashes were
+`ddb39a490d0a44a04d72b51293dea541dc7be4ab212b083fa5b16b336358f927` and
+`e3fabce4890b14b4c006a2f67f7a12895d3af0b4ae8e6dc32a0a9735d3dd67b0`.
+After exact old-hash checks, the modules were atomically replaced with
+`a8df232ba220ae15d736137545e90f3c3bae7cb2432e5cc062688c76ad58e619` and
+`0c68f7a7ed28da08cb3bd353e5f32daccd018cbb592e61d79678800ae579bfe8`.
+The existing worker launcher and environment were retained; PID 97869 logged
+`WORKER_READY`, owns port 8091, and serves both targeted routes. A valid legacy
+targeted request using the original NHDTC-250 30–90-second PCM returned one
+segment. Both old and new routes also rejected an empty invalid request with
+HTTP 413. The numeric endpoint returned four bounded responses: three
+NHDTC-250 windows and the FC2-PPV-4575470 control. No transcript text was
+printed or saved.
+
+All four full-decode PCM SHA-256 values matched the previously verified
+windows exactly. NHDTC-250 segments (start/end are source milliseconds) were:
+
+| Window (s) | Segment | Start–end (ms) | avg_logprob | no_speech_prob | compression_ratio | temperature |
+|---|---:|---:|---:|---:|---:|---:|
+| 30–90 | 1 | 88,940–89,980 | -0.664063 | 0.845703 | 0.857143 | 0 |
+| 5,550–5,610 | 1 | 5,550,000–5,556,000 | -0.805990 | 0.821777 | 0.700000 | 0 |
+| 5,550–5,610 | 2 | 5,583,020–5,596,780 | -0.063856 | 0.160400 | 0.700000 | 0 |
+| 10,920–10,980 | 1 | 10,925,060–10,932,400 | -0.670573 | 0.742676 | 0.700000 | 0 |
+| 10,920–10,980 | 2 | 10,956,880–10,979,980 | -0.580078 | 0.177124 | 0.600000 | 0 |
+
+The FC2-PPV-4575470 30–90-second control returned 23 segments. Its numeric
+score clusters were: segments 1–10 `avg_logprob=-0.283995`,
+`no_speech_prob=0.386719`, `compression_ratio=1.656827`; segments 11–22
+`-0.296944`, `0.005554`, `3.726141`; segment 23 `-0.216688`, `0.007515`,
+`1.000000`. Temperature was 0 for all 23. NHDTC-250 therefore has a mixed
+confidence profile: three segments have high no-speech probability and weaker
+log probability, while two are materially better. This is **C**; the bounded
+scores do not by themselves establish whether the weak segments are
+hallucinations. Any later targeted-evidence fallback needs a generic,
+validated confidence gate before it is trusted.
+
+Both per-request source copies were on `/var/tmp` ext4, used one at a time,
+and were removed successfully. `/tmp` remained 78 MiB; local available RAM was
+8.4 GiB. VM122 returned to 3.9 GiB available RAM and 3.4 GiB free GPU memory;
+the worker remained healthy. A read-only rollout query still showed
+NHDTC-250 `FAILED_RETRYABLE`, sequence 7, with counts
+`PUBLISHED=158`, `FAILED_RETRYABLE=14`, `RUNNING=0`, `UNRESOLVED=1`.
+No rollout, publication, Stage11 controller, NAS, or Jellyfin writes occurred.
 
 ## 2026-09-24 NHDTC-250 full-title ASR empty result and recovery
 
