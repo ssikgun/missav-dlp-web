@@ -1,5 +1,48 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-24 NHDTC-250 full-title ASR empty result and recovery
+
+At clean production HEAD `6e263d5dc35267a143b1cbeb6ff978d9b55fdcda`,
+NHDTC-250's explicit retry reached EOF after full-media decode,
+sample-clock canonicalization and source-end validation passed. The
+transcriber then raised `FullTitleASRError: full-title ASR produced no speech
+segments` at `teddy_discovery_asr_transcriber.py:420` because the validated
+aggregate was empty. The iterator uses 600-second chunks. The preceding
+read-only full replay recorded 178,315,129 output samples, yielding 19 chunks
+(18 full chunks and a final partial chunk); the transcriber calls the remote
+adapter once for each chunk and completed the loop before raising.
+
+The production adapter returns decoded remote segments directly, and local
+segment validation returns the tuple unchanged or raises; it does not filter
+segments. Remote transport, HTTP and response-protocol errors also raise and
+are not converted to empty success. Therefore this execution is classified
+**A1 at the application boundary**: all 19 calls completed with zero segments
+in aggregate (raw 0, accepted 0, rejected 0). The remote worker can return an
+HTTP 200 response with `segments=[]` when VAD finds no regions. VM122's worker
+log contains only its Sep 10 startup line; success requests are not logged, and
+there is no per-request response/VAD count for this run. Its logs therefore do
+not independently confirm each response or whether the audio was actually
+silent. Existing PUBLISHED artifacts using the same large-v3 engine contain
+275 segments for `FC2-PPV-4575470` and 404 for `SIRO-4448`; no transcript text
+was copied into this note. NHDTC-250 produced no baseline artifact, and the
+failure occurred before publication/Jellyfin.
+
+Minimum generic diagnostics for a future run: chunk count, remote call count,
+successful remote call count, raw/accepted/rejected segment counts, and the
+first/last accepted timestamps. Keep transcript and subtitle text out of logs;
+do not change systemic/title-local classification based on this incident.
+
+The official `--mode recover-retry` path revalidated the Discovery/NAS source
+identity and recovered only NHDTC-250, `RUNNING -> FAILED_RETRYABLE`, sequence
+`6 -> 7`, reason `STAGE12_EXPLICIT_RETRY_CRASH_RECOVERY`, at
+`2026-09-24T01:09:35.359448+00:00`. Counts are `PUBLISHED=158`,
+`FAILED_RETRYABLE=14`, `RUNNING=0`, `UNRESOLVED=1`; the active-title set is
+empty and the only new rollout event is NHDTC-250. No retry, Stage11, remote
+ASR, publication, or Jellyfin write was performed during recovery. The
+production ASR temp directory is empty, `/tmp` remains 78 MiB, `/var/tmp` is
+the disk-backed `/dev/loop4` with 36 GiB available, and available RAM is 8.5
+GiB.
+
 ## 2026-09-24 Stage12 production interpreter guard and explicit-retry recovery
 
 Stage12 now fails closed before any PENDING bulk or explicit retry state
