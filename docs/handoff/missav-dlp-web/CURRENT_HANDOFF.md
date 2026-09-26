@@ -1,5 +1,29 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-26 NHDTC-250 explicit retry production canary
+
+At expected production HEAD
+`ec021dfe356e6b9bd299764dc0bece5fcf3302a7`, the single-title explicit retry
+passed the production interpreter, exact source identity, expected sequence,
+and zero-active-title preflights. NHDTC-250 transitioned
+`FAILED_RETRYABLE -> RUNNING`, sequence `7 -> 8`. The 6,618,791,523-byte
+source copied to the configured temporary ASR root and full-title audio
+processing completed through end-of-audio; every processed chunk's ASR call
+returned normally and the aggregate had zero segments. Stage11 raised the
+typed `FullTitleASRNoSpeechError`; this was not a systemic failure.
+
+Stage12 recorded `RUNNING -> UNRESOLVED`, sequence `8 -> 9`, reason
+`STAGE12_BASELINE_ASR_NO_SPEECH`, with `stage11_outcome=NO_SPEECH` and
+`error_type=FullTitleASRNoSpeechError`. Final counts are `PUBLISHED=158`,
+`FAILED_RETRYABLE=13`, `RUNNING=0`, `UNRESOLVED=2`. No baseline/report
+artifact was created; publication and Jellyfin were not run. The retry
+selected exactly one title, and the rollout event log has zero other-title
+events since its start.
+
+ASR temporary cleanup reported PASS and the production ASR temp root was
+empty afterward. `/tmp` usage was 78 MiB (1%); available RAM was 8.5 GiB.
+The retry process had exited, with no follow-up recovery or retry performed.
+
 ## 2026-09-26 Full-title ASR no-speech semantics and human ground truth
 
 The five bounded NHDTC-250 targeted direct-Whisper audio clips were reviewed
