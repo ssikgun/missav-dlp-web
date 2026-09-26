@@ -1,5 +1,37 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-26 SGKI-106 explicit retry production canary
+
+Before retry, SGKI-106 was `FAILED_RETRYABLE`, sequence 3, reason
+`STAGE12_TITLE_FAILURE`; counts were `PUBLISHED=158`,
+`FAILED_RETRYABLE=8`, `RUNNING=0`, `UNRESOLVED=7`. The canonical full replay
+recorded cumulative peak signed drift +20.141 s beyond the existing
+three-decoded-frame bound at frame 1,294 / PTS 1,341,904, corrected EOF
+sample mismatch 0, and maximum single-frame correction 0.667 ms. The replay
+procedure recorded matching source path/size/mtime against rollout identity.
+Current NAS source matched that identity: `SGKI/SGKI-106/SGKI-106.mp4`,
+4,898,003,063 bytes, mtime_ns `1788274311454167056`. The replay identified
+the cumulative peak as the fail point; it recorded no duplicate/backward PTS
+or per-frame correction bound violation.
+
+At expected production HEAD
+`bd52ae98ac4848480e31791316868aad4ad6d635`, the single explicit retry passed
+production interpreter, clean worktree, expected sequence, exact source
+identity, and zero-active-title preflights. It transitioned
+`FAILED_RETRYABLE -> RUNNING -> UNRESOLVED`, sequence `3 -> 4 -> 5`.
+Production reproduced `ASRAudioUnsafeTimelineError: peak net sample-clock
+drift exceeds three decoded frames`; Stage12 recorded reason
+`STAGE12_UNSAFE_AUDIO_TIMELINE` and outcome `UNSAFE_AUDIO_TIMELINE`. Final
+counts are `PUBLISHED=158`, `FAILED_RETRYABLE=7`, `RUNNING=0`,
+`UNRESOLVED=8`.
+
+No baseline artifact/report was stored. The typed Stage11 failure stopped
+before external subtitle evidence lookup/alignment and publication/Jellyfin.
+Only SGKI-106 was selected; no other title was processed. Temporary ASR
+cleanup reported PASS; the production temp root was empty afterward, `/tmp`
+had no files over 100 MiB, `/var/tmp` had 35 GiB free, and 8.5 GiB RAM was
+available. No recovery or second retry was performed.
+
 ## 2026-09-26 SGKI-075 explicit retry production canary
 
 Before retry, SGKI-075 was `FAILED_RETRYABLE`, sequence 3, reason
