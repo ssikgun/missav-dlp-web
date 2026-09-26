@@ -1,5 +1,37 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-26 HMN-899 explicit retry production canary
+
+Before retry, HMN-899 was `FAILED_RETRYABLE`, sequence 5, reason
+`STAGE12_TITLE_FAILURE`; counts were `PUBLISHED=158`,
+`FAILED_RETRYABLE=11`, `RUNNING=0`, `UNRESOLVED=4`. The canonical full replay
+recorded the unsafe peak crossing at frame 1,690 / PTS 1,730,560, peak signed
+drift +20.218 s, corrected EOF mismatch −1 sample, and maximum single-frame
+correction 0.667 ms. The replay procedure recorded matching source
+path/size/mtime against rollout identity. Current NAS source matched that
+identity: `HMN/HMN-899/HMN-899.mp4`, 3,847,055,679 bytes, mtime_ns
+`1788055221873611116`. No duplicate/backward PTS or per-frame correction
+bound violation was indicated; the recorded fail point was the cumulative
+peak-drift bound.
+
+At expected production HEAD
+`99e12455030a8b681efa1c2499d465eace4aedfa`, the single explicit retry passed
+production interpreter, clean worktree, expected sequence, source identity,
+and zero-active-title preflights. It transitioned
+`FAILED_RETRYABLE -> RUNNING -> UNRESOLVED`, sequence `5 -> 6 -> 7`.
+Production reproduced `ASRAudioUnsafeTimelineError: peak net sample-clock
+drift exceeds three decoded frames`; Stage12 recorded reason
+`STAGE12_UNSAFE_AUDIO_TIMELINE` and outcome `UNSAFE_AUDIO_TIMELINE`. Final
+counts are `PUBLISHED=158`, `FAILED_RETRYABLE=10`, `RUNNING=0`,
+`UNRESOLVED=5`.
+
+No baseline artifact/report was stored. The typed Stage11 failure stopped
+before external subtitle evidence lookup/alignment and publication/Jellyfin.
+Only HMN-899 was selected; no other title was processed. Temporary ASR
+cleanup reported PASS; the production temp root was empty afterward, `/tmp`
+had no files over 100 MiB, `/var/tmp` had 35 GiB free, and 8.5 GiB RAM was
+available. No recovery or second retry was performed.
+
 ## 2026-09-26 NIMA-059 explicit retry production canary
 
 Before retry, NIMA-059 was `FAILED_RETRYABLE`, sequence 3, with reason
