@@ -15,6 +15,7 @@ from teddy_discovery_asr_audio import (
     ASRAudioChunk,
     ASRAudioError,
     ASRAudioLimitError,
+    ASRAudioUnsafeTimelineError,
     ASRAudioValidationError,
     ASR_AUDIO_SAMPLE_RATE,
     MAX_ASR_AUDIO_CHUNK_SECONDS,
@@ -895,7 +896,7 @@ def main():
             raise AssertionError("lazy post-frame error was not wrapped")
 
         expect(
-            ASRAudioValidationError,
+            ASRAudioUnsafeTimelineError,
             lambda: run_frames(
                 [
                     FakeFrame(np.zeros(1, np.float32), pts=1_000),
@@ -906,13 +907,39 @@ def main():
         # Duplicate raw timestamps remain fail-closed even when sample count
         # could otherwise suggest a continuous output clock.
         expect(
-            ASRAudioValidationError,
+            ASRAudioUnsafeTimelineError,
             lambda: run_frames(
                 [
                     FakeFrame(np.zeros(1024, np.float32), pts=0),
                     FakeFrame(np.zeros(1024, np.float32), pts=0),
                 ]
             )[0],
+        )
+
+        # A strictly increasing PTS can still require more than one decoded
+        # frame of correction when very short decoded frames fall inside the
+        # timestamp quantization tolerance. Keep that source invariant typed.
+        per_frame_records = []
+        expect(
+            ASRAudioUnsafeTimelineError,
+            lambda: run_frames(
+                [
+                    FakeFrame(
+                        np.zeros(1, np.float32), pts=0,
+                        time_base=Fraction(1, 48_000), sample_rate=48_000,
+                        source_samples=1,
+                    ),
+                    FakeFrame(
+                        np.zeros(1, np.float32), pts=3,
+                        time_base=Fraction(1, 48_000), sample_rate=48_000,
+                        source_samples=1,
+                    ),
+                ],
+                timeline_diagnostics_callback=per_frame_records.append,
+            )[0],
+        )
+        assert per_frame_records[-1].fail_closed_reason == (
+            "per-frame sample-clock correction exceeds one decoded frame"
         )
 
         # Short AAC-like packet intervals are canonicalized from decoded
@@ -1029,7 +1056,7 @@ def main():
         ]
         drift_records = []
         expect(
-            ASRAudioValidationError,
+            ASRAudioUnsafeTimelineError,
             lambda: run_frames(
                 drifting_frames,
                 timeline_diagnostics_callback=drift_records.append,

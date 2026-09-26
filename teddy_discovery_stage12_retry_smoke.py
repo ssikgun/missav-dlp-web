@@ -14,6 +14,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from teddy_discovery_asr_transcriber import FullTitleASRNoSpeechError
+from teddy_discovery_asr_audio import ASRAudioUnsafeTimelineError
 from teddy_discovery_stage12_batch import (
     Stage12BatchRunner,
     Stage12BatchSelection,
@@ -188,6 +189,16 @@ def _no_speech_controller(calls):
         calls.append(dvd_id)
         raise FullTitleASRNoSpeechError(
             "full-title ASR produced no speech segments"
+        )
+
+    return run
+
+
+def _unsafe_timeline_controller(calls):
+    def run(dvd_id):
+        calls.append(dvd_id)
+        raise ASRAudioUnsafeTimelineError(
+            "peak net sample-clock drift exceeds three decoded frames"
         )
 
     return run
@@ -461,6 +472,53 @@ def main_smoke():
             and no_speech_publisher.calls == []
             and no_speech_nas.published == {},
             "EXPLICIT_RETRY_NO_SPEECH_TERMINATES_UNRESOLVED",
+        )
+
+    with TemporaryDirectory(prefix="stage12-retry-unsafe-timeline-smoke-") as raw:
+        root = Path(raw)
+        store, record, other, failed = failed_fixture(
+            root,
+            "TRY-003",
+        )
+        other_before = store.get(other.dvd_id)
+        runner, nas, publisher, calls = build_runner(root, store, record)
+        runner.controller_runner = _unsafe_timeline_controller(calls)
+        result = runner.run(Stage12BatchSelection(1, (record.dvd_id,)))
+        unresolved = store.get(record.dvd_id)
+        require(
+            result.titles[0].stage11_result == "UNSAFE_AUDIO_TIMELINE"
+            and result.titles[0].final_state == STATE_UNRESOLVED
+            and unresolved.status == STATE_UNRESOLVED
+            and unresolved.transition_sequence
+            == failed.transition_sequence + 2
+            and unresolved.last_transition_reason
+            == "STAGE12_UNSAFE_AUDIO_TIMELINE"
+            and calls == [record.dvd_id]
+            and publisher.calls == []
+            and nas.published == {}
+            and store.get(other.dvd_id) == other_before,
+            "EXPLICIT_RETRY_UNSAFE_TIMELINE_TERMINATES_UNRESOLVED",
+        )
+
+        blocked_root = root / "blocked-follow-up-retry"
+        blocked_root.mkdir()
+        blocked_runner, _, blocked_publisher, blocked_calls = build_runner(
+            blocked_root,
+            store,
+            record,
+        )
+        expect_raises(
+            Stage12BatchSystemicError,
+            lambda: blocked_runner.run(
+                Stage12BatchSelection(1, (record.dvd_id,))
+            ),
+            "UNRESOLVED_UNSAFE_TIMELINE_CANNOT_BE_RETRIED",
+        )
+        require(
+            blocked_calls == []
+            and blocked_publisher.calls == []
+            and store.get(record.dvd_id) == unresolved,
+            "UNSAFE_TIMELINE_RETRY_PREFLIGHT_PRESERVES_STATE",
         )
 
     with TemporaryDirectory(prefix="stage12-retry-systemic-smoke-") as raw:

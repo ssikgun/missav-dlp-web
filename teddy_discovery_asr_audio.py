@@ -47,6 +47,10 @@ class ASRAudioValidationError(ASRAudioError):
     """Raised when a source, range, frame, or chunk is malformed."""
 
 
+class ASRAudioUnsafeTimelineError(ASRAudioValidationError):
+    """A deterministic source PTS violation prevents safe ASR timing."""
+
+
 class ASRAudioLimitError(ASRAudioError):
     """Raised when a bounded audio request or chunk is too large."""
 
@@ -778,12 +782,15 @@ def _iter_audio_chunks(
             prior_time_base = previous_time_base
             frame_correction = Fraction(0)
             if previous_raw_timestamp is not None:
-                reason = None
                 if timestamp <= previous_raw_timestamp:
                     reason = "duplicate or backward raw source PTS"
-                elif prior_expected_timestamp is None or previous_duration is None:
+                    report_timeline(kind="fail", raw_pts=raw_pts,
+                                    time_base=time_base,
+                                    expected=prior_expected_timestamp,
+                                    fail_closed_reason=reason)
+                    raise ASRAudioUnsafeTimelineError(reason)
+                if prior_expected_timestamp is None or previous_duration is None:
                     reason = "audio frame timeline state is incomplete"
-                if reason:
                     report_timeline(kind="fail", raw_pts=raw_pts,
                                     time_base=time_base,
                                     expected=prior_expected_timestamp,
@@ -818,7 +825,7 @@ def _iter_audio_chunks(
                             correction=correction,
                             fail_closed_reason=reason,
                         )
-                        raise ASRAudioValidationError(reason)
+                        raise ASRAudioUnsafeTimelineError(reason)
                     new_signed_correction = cumulative_correction + correction
                     new_drift = cumulative_drift + abs(correction)
                     previous_peak_net_drift = peak_absolute_net_drift
@@ -861,7 +868,7 @@ def _iter_audio_chunks(
                                 correction=correction,
                                 fail_closed_reason=reason,
                             )
-                            raise ASRAudioValidationError(reason)
+                            raise ASRAudioUnsafeTimelineError(reason)
                     timestamp = prior_expected_timestamp
             else:
                 adjusted_timestamp = timestamp
@@ -1125,6 +1132,7 @@ __all__ = [
     "ASRAudioError",
     "ASRAudioLimitError",
     "ASRAudioTimelineDiagnostic",
+    "ASRAudioUnsafeTimelineError",
     "ASRAudioValidationError",
     "ASR_AUDIO_SAMPLE_RATE",
     "MAX_ASR_AUDIO_CHUNK_SECONDS",

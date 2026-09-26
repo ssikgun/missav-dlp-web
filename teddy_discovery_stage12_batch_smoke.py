@@ -11,13 +11,17 @@ from tempfile import TemporaryDirectory
 from teddy_discovery_asr_source import ASRSourceError
 from teddy_discovery_asr_transcriber import FullTitleASRNoSpeechError
 from teddy_discovery_asr_whisper import ASRWhisperError
-from teddy_discovery_asr_audio import ASRAudioValidationError
+from teddy_discovery_asr_audio import (
+    ASRAudioUnsafeTimelineError,
+    ASRAudioValidationError,
+)
 from teddy_discovery_stage11_controller import (
     ALIGNMENT_NOT_ATTEMPTED,
     EXTERNAL_JA_TRANSPORT_FAILURE,
     Stage11ControllerResult,
     V2_ROUTE_ASR_ONLY,
 )
+from teddy_discovery_stage11_deployment import Stage11DeploymentTransportError
 from teddy_discovery_stage12_batch import (
     Stage12BatchSelection,
     Stage12BatchRunner,
@@ -207,9 +211,11 @@ def controller_for(
     runner_error_ids=(),
     pending_artifact_error_ids=(),
     audio_error_ids=(),
+    unsafe_timeline_error_ids=(),
     no_speech_ids=(),
     source_error_ids=(),
     whisper_error_ids=(),
+    deployment_transport_error_ids=(),
     unexpected_ids=(),
 ):
     bundles = {}
@@ -228,7 +234,11 @@ def controller_for(
             )
         if dvd_id in audio_error_ids:
             raise ASRAudioValidationError(
-                "audio frame timestamp has an unsafe discontinuity"
+                "synthetic audio validation failure"
+            )
+        if dvd_id in unsafe_timeline_error_ids:
+            raise ASRAudioUnsafeTimelineError(
+                "peak net sample-clock drift exceeds three decoded frames"
             )
         if dvd_id in no_speech_ids:
             raise FullTitleASRNoSpeechError(
@@ -238,6 +248,10 @@ def controller_for(
             raise ASRSourceError("synthetic source transfer failure")
         if dvd_id in whisper_error_ids:
             raise ASRWhisperError("synthetic remote response protocol failure")
+        if dvd_id in deployment_transport_error_ids:
+            raise Stage11DeploymentTransportError(
+                "synthetic Stage11 transport failure"
+            )
         if dvd_id in timeout_ids:
             raise StatefulLiveRunnerTimeoutError(
                 timeout_seconds=3600,
@@ -282,9 +296,11 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
                 timeout_ids=(), runner_error_ids=(),
                 pending_artifact_error_ids=(),
                 audio_error_ids=(),
+                unsafe_timeline_error_ids=(),
                 no_speech_ids=(),
                 source_error_ids=(),
                 whisper_error_ids=(),
+                deployment_transport_error_ids=(),
                 jellyfin=recognition_for):
     return Stage12BatchRunner(
         store=store,
@@ -304,9 +320,11 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
             runner_error_ids=runner_error_ids,
             pending_artifact_error_ids=pending_artifact_error_ids,
             audio_error_ids=audio_error_ids,
+            unsafe_timeline_error_ids=unsafe_timeline_error_ids,
             no_speech_ids=no_speech_ids,
             source_error_ids=source_error_ids,
             whisper_error_ids=whisper_error_ids,
+            deployment_transport_error_ids=deployment_transport_error_ids,
             unexpected_ids=unexpected_ids,
         ),
         jellyfin_recognizer=jellyfin,
@@ -786,6 +804,63 @@ def main():
             "AUDIO_FAILURE_TITLE_RETRYABLE_AND_BATCH_CONTINUES",
         )
 
+        unsafe_timeline_root = Path(temp) / "unsafe-timeline-artifacts"
+        unsafe_timeline_root.mkdir()
+        unsafe_timeline_store = Stage12RolloutStateStore(
+            Path(temp) / "unsafe-timeline.sqlite3"
+        )
+        unsafe_timeline_store.initialize_from_inventory(
+            Stage12HoldingsInventoryReport(records[:3])
+        )
+        unsafe_timeline_nas = FakeNAS(records[:3])
+        unsafe_timeline_publisher = FakePublisher(unsafe_timeline_nas)
+        unsafe_timeline_calls: list[str] = []
+        unsafe_timeline_runner = make_runner(
+            unsafe_timeline_root,
+            records[:3],
+            unsafe_timeline_store,
+            controller_calls=unsafe_timeline_calls,
+            nas=unsafe_timeline_nas,
+            publisher=unsafe_timeline_publisher,
+            unsafe_timeline_error_ids={"AAA-002"},
+        )
+        unsafe_timeline_result = unsafe_timeline_runner.run(
+            Stage12BatchSelection(3, ("AAA-001", "AAA-002", "AAA-003"))
+        )
+        unsafe_timeline_state = unsafe_timeline_store.get("AAA-002")
+        unsafe_timeline_provenance = json.loads(
+            unsafe_timeline_state.last_transition_provenance_json
+        )
+        require(
+            unsafe_timeline_calls == ["AAA-001", "AAA-002", "AAA-003"]
+            and unsafe_timeline_result.summary()["unresolved"] == 1
+            and unsafe_timeline_result.titles[1].stage11_result
+            == "UNSAFE_AUDIO_TIMELINE"
+            and unsafe_timeline_result.titles[1].final_state
+            == STATE_UNRESOLVED
+            and unsafe_timeline_result.titles[1].publication_result
+            == "NOT_RUN"
+            and unsafe_timeline_result.titles[1].jellyfin_recognition
+            == "NOT_RUN"
+            and unsafe_timeline_state.last_transition_reason
+            == "STAGE12_UNSAFE_AUDIO_TIMELINE"
+            and unsafe_timeline_provenance["error_type"]
+            == "ASRAudioUnsafeTimelineError"
+            and unsafe_timeline_provenance["stage11_outcome"]
+            == "UNSAFE_AUDIO_TIMELINE"
+            and unsafe_timeline_publisher.calls == ["AAA-001", "AAA-003"]
+            and set(unsafe_timeline_nas.published)
+            == {
+                derive_target_ko_relative(video_for(records[0])),
+                derive_target_ko_relative(video_for(records[2])),
+            }
+            and unsafe_timeline_result.titles[0].final_state
+            == STATE_PUBLISHED
+            and unsafe_timeline_result.titles[2].final_state
+            == STATE_PUBLISHED,
+            "UNSAFE_TIMELINE_UNRESOLVED_NO_PUBLICATION_BATCH_CONTINUES",
+        )
+
         # A completed baseline with zero segments is a terminal unresolved
         # title outcome, while the serial batch continues safely.
         no_speech_root = Path(temp) / "no-speech-artifacts"
@@ -830,11 +905,17 @@ def main():
             "NO_SPEECH_UNRESOLVED_AND_BATCH_CONTINUES",
         )
 
-        # Source-copy and remote-worker/protocol failures remain systemic;
-        # only the dedicated completed-no-speech type is isolated as outcome.
-        for failure_name, failure_options in (
-            ("SOURCE", {"source_error_ids": {"AAA-002"}}),
-            ("REMOTE", {"whisper_error_ids": {"AAA-002"}}),
+        # Typed source, Whisper protocol, and deployment transport failures
+        # remain title-scoped and retryable. Unexpected programming failures
+        # below remain systemic.
+        for failure_name, failure_options, expected_error_type in (
+            ("SOURCE", {"source_error_ids": {"AAA-002"}}, "ASRSourceError"),
+            ("REMOTE", {"whisper_error_ids": {"AAA-002"}}, "ASRWhisperError"),
+            (
+                "DEPLOYMENT_TRANSPORT",
+                {"deployment_transport_error_ids": {"AAA-002"}},
+                "Stage11DeploymentTransportError",
+            ),
         ):
             failure_root = Path(temp) / (failure_name.lower() + "-error-artifacts")
             failure_root.mkdir()
@@ -856,18 +937,29 @@ def main():
                 publisher=failure_publisher,
                 **failure_options,
             )
-            expect_raises(
-                Stage12BatchSystemicError,
-                lambda: failure_runner.run(
-                    Stage12BatchSelection(1, ("AAA-002",))
-                ),
-                failure_name + "_FAILURE_REMAINS_SYSTEMIC",
+            failure_result = failure_runner.run(
+                Stage12BatchSelection(
+                    3,
+                    ("AAA-001", "AAA-002", "AAA-003"),
+                )
+            )
+            failure_state = failure_store.get("AAA-002")
+            failure_provenance = json.loads(
+                failure_state.last_transition_provenance_json
             )
             require(
-                failure_calls == ["AAA-002"]
-                and failure_store.get("AAA-002").status == "RUNNING"
-                and failure_publisher.calls == [],
-                failure_name + "_FAILURE_NOT_MISCLASSIFIED_AS_NO_SPEECH",
+                failure_calls == ["AAA-001", "AAA-002", "AAA-003"]
+                and failure_result.titles[1].final_state
+                == STATE_FAILED_RETRYABLE
+                and failure_result.titles[1].publication_result == "NOT_RUN"
+                and failure_result.titles[1].jellyfin_recognition == "NOT_RUN"
+                and failure_state.last_transition_reason
+                == "STAGE12_TITLE_FAILURE"
+                and failure_provenance["error_type"] == expected_error_type
+                and failure_publisher.calls == ["AAA-001", "AAA-003"]
+                and failure_result.titles[0].final_state == STATE_PUBLISHED
+                and failure_result.titles[2].final_state == STATE_PUBLISHED,
+                failure_name + "_FAILURE_REMAINS_RETRYABLE_AND_BATCH_CONTINUES",
             )
 
         # An unrelated programmer exception remains systemic and stops the

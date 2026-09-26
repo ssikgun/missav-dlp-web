@@ -1,5 +1,43 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-26 deterministic unsafe audio timeline rollout semantics
+
+Added `ASRAudioUnsafeTimelineError`, a narrow subtype of
+`ASRAudioValidationError`. The audio canonicalizer raises it only for
+deterministic source PTS invariants that make baseline timestamps unsafe:
+duplicate/backward raw PTS, a per-frame correction beyond one decoded frame,
+or peak signed net drift beyond the existing three-frame bound. The bound,
+silence handling, and timestamp correction behavior are unchanged.
+
+Stage11 lets this exception propagate from baseline transcription. Baseline
+artifact persistence happens only after transcription returns, so this outcome
+creates no baseline artifact and stops before external subtitle lookup or
+alignment, targeted evidence, translation, or CLEAN materialization. External
+subtitle evidence cannot bypass the unsafe baseline timeline.
+
+Stage12 records the typed outcome as `RUNNING -> UNRESOLVED`, reason
+`STAGE12_UNSAFE_AUDIO_TIMELINE`, with `stage11_outcome=UNSAFE_AUDIO_TIMELINE`.
+It does not publish or query Jellyfin; batch processing can continue with the
+next selected title. UNRESOLVED has no retry transition. Other
+`ASRAudioValidationError` and `ASRAudioError` cases remain on their existing
+retryable title path; the change does not make all audio validation errors
+terminal.
+
+Typed source-read (`ASRSourceError`), Whisper transport/protocol
+(`ASRWhisperError`), and Stage11 deployment transport failures are title-scoped
+`FAILED_RETRYABLE` outcomes. Unclassified deployment failures and unexpected
+programming exceptions remain systemic. Existing typed worker timeout and
+pending-artifact retry behavior is unchanged.
+
+Audio, Stage11 controller, Stage12 batch, explicit retry, bulk runner, rollout,
+deployment, ASR source, Whisper, and full-title transcriber smokes passed under
+`/opt/stage11-stt-venv/bin/python`; compile and `git diff --check` passed. No
+SVFLA-014 retry or production state change was performed. It remains
+`FAILED_RETRYABLE`, sequence 3, with rollout counts
+`PUBLISHED=158`, `FAILED_RETRYABLE=13`, `RUNNING=0`, `UNRESOLVED=2`. A later
+authorized retry against the same unsafe source will resolve to UNRESOLVED
+under this code. No title-specific branch or media repair was added.
+
 ## 2026-09-26 NHDTC-250 explicit retry production canary
 
 At expected production HEAD

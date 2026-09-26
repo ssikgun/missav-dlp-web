@@ -22,7 +22,12 @@ from teddy_discovery_jellyfin import (
     JellyfinError,
     jellyfin_media_path,
 )
-from teddy_discovery_asr_audio import ASRAudioError
+from teddy_discovery_asr_source import ASRSourceError
+from teddy_discovery_asr_whisper import ASRWhisperError
+from teddy_discovery_asr_audio import (
+    ASRAudioError,
+    ASRAudioUnsafeTimelineError,
+)
 from teddy_discovery_asr_transcriber import FullTitleASRNoSpeechError
 from teddy_discovery_stage11_controller import (
     Stage11ControllerError,
@@ -30,6 +35,7 @@ from teddy_discovery_stage11_controller import (
 )
 from teddy_discovery_stage11_deployment import (
     Stage11DeploymentError,
+    Stage11DeploymentTransportError,
 )
 from teddy_discovery_stateful_live_runner import (
     StatefulLiveRunnerPendingArtifactError,
@@ -818,13 +824,17 @@ class Stage12BatchRunner:
             StatefulSemanticOutputValidationRetryExhausted,
         )
         no_speech = isinstance(error, FullTitleASRNoSpeechError)
+        unsafe_audio_timeline = isinstance(
+            error,
+            ASRAudioUnsafeTimelineError,
+        )
         hermes_timeout = isinstance(
             error,
             StatefulLiveRunnerTimeoutError,
         )
         if semantic_retry_exhausted or hermes_timeout:
             terminal = False
-        if no_speech:
+        if no_speech or unsafe_audio_timeline:
             to_status = STATE_UNRESOLVED
         else:
             to_status = (
@@ -851,6 +861,11 @@ class Stage12BatchRunner:
         if no_speech:
             transition_reason = "STAGE12_BASELINE_ASR_NO_SPEECH"
             failure_provenance["stage11_outcome"] = "NO_SPEECH"
+        elif unsafe_audio_timeline:
+            transition_reason = "STAGE12_UNSAFE_AUDIO_TIMELINE"
+            failure_provenance["stage11_outcome"] = (
+                "UNSAFE_AUDIO_TIMELINE"
+            )
         elif semantic_retry_exhausted:
             transition_reason = (
                 "STAGE12_SEMANTIC_OUTPUT_VALIDATION_RETRY_EXHAUSTED"
@@ -920,6 +935,8 @@ class Stage12BatchRunner:
                 Stage12BatchTitleError,
                 Stage11ControllerError,
                 ASRAudioError,
+                ASRSourceError,
+                ASRWhisperError,
                 StatefulSemanticOutputValidationRetryExhausted,
                 StatefulLiveRunnerPendingArtifactError,
                 StatefulLiveRunnerTimeoutError,
@@ -1044,6 +1061,18 @@ class Stage12BatchRunner:
         )
         try:
             controller_result = self.controller_runner(dvd_id)
+        except Stage11DeploymentTransportError as error:
+            return self._fail_title(
+                running,
+                error=error,
+                terminal=False,
+                destination=destination,
+                stage11_result="FAIL",
+                route=None,
+                clean_sha256=None,
+                publication_result="NOT_RUN",
+                jellyfin_recognition="NOT_RUN",
+            )
         except Stage11DeploymentError as error:
             raise Stage12BatchSystemicError(
                 "Stage11 deployment boundary failed: " + str(error)
@@ -1064,6 +1093,8 @@ class Stage12BatchRunner:
                 stage11_result=(
                     "NO_SPEECH"
                     if isinstance(error, FullTitleASRNoSpeechError)
+                    else "UNSAFE_AUDIO_TIMELINE"
+                    if isinstance(error, ASRAudioUnsafeTimelineError)
                     else "FAIL"
                 ),
                 route=None,

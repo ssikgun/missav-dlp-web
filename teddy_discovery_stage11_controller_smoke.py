@@ -22,6 +22,7 @@ from teddy_discovery_alignment_acceptance import (
 )
 from teddy_discovery_alignment_application import apply_alignment_acceptance
 from teddy_discovery_asr import ASRSegment
+from teddy_discovery_asr_audio import ASRAudioUnsafeTimelineError
 from teddy_discovery_asr_artifact import persist_asr_result, serialize_asr_result
 from teddy_discovery_asr_transcriber import FullTitleASRNoSpeechError
 from teddy_discovery_asr_source_quality import classify_asr_result_source_quality
@@ -512,6 +513,43 @@ def main():
                     / controller.MECHANICAL_REPORT_FILENAME
                 ).exists(),
             )
+
+    # A deterministic unsafe baseline timeline also fails before baseline
+    # persistence, external subtitle lookup/alignment, or artifact creation.
+    with tempfile.TemporaryDirectory(
+        prefix="stage11-controller-unsafe-timeline-"
+    ) as raw:
+        artifact_root, staging_root = _roots(Path(raw))
+        runtime = FakeRuntime(fixture.asr_result(), external=ACCEPT_HYBRID)
+
+        def unsafe_timeline_baseline(_canonical_video):
+            runtime.baseline_calls += 1
+            raise ASRAudioUnsafeTimelineError(
+                "peak net sample-clock drift exceeds three decoded frames"
+            )
+
+        runtime.baseline = unsafe_timeline_baseline
+        try:
+            _run(artifact_root, staging_root, runtime)
+        except ASRAudioUnsafeTimelineError:
+            pass
+        else:
+            raise AssertionError("UNSAFE_TIMELINE_MUST_PROPAGATE")
+        check(
+            "unsafe baseline timeline stops before external lookup and artifacts",
+            lambda: runtime.baseline_calls == 1
+            and runtime.external_calls == 0
+            and runtime.targeted_calls == 0
+            and not (
+                artifact_root / TITLE / controller.BASELINE_ASR_FILENAME
+            ).exists()
+            and not (
+                artifact_root / TITLE / controller.CLEAN_SRT_FILENAME
+            ).exists()
+            and not (
+                artifact_root / TITLE / controller.MECHANICAL_REPORT_FILENAME
+            ).exists(),
+        )
 
     # Existing baseline, no external candidate, REQUIRE=0, ASR-only full flow.
     with tempfile.TemporaryDirectory(prefix="stage11-controller-existing-") as raw:
