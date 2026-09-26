@@ -8,6 +8,9 @@ import json
 from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 
+from teddy_discovery_asr_source import ASRSourceError
+from teddy_discovery_asr_transcriber import FullTitleASRNoSpeechError
+from teddy_discovery_asr_whisper import ASRWhisperError
 from teddy_discovery_asr_audio import ASRAudioValidationError
 from teddy_discovery_stage11_controller import (
     ALIGNMENT_NOT_ATTEMPTED,
@@ -204,6 +207,9 @@ def controller_for(
     runner_error_ids=(),
     pending_artifact_error_ids=(),
     audio_error_ids=(),
+    no_speech_ids=(),
+    source_error_ids=(),
+    whisper_error_ids=(),
     unexpected_ids=(),
 ):
     bundles = {}
@@ -224,6 +230,14 @@ def controller_for(
             raise ASRAudioValidationError(
                 "audio frame timestamp has an unsafe discontinuity"
             )
+        if dvd_id in no_speech_ids:
+            raise FullTitleASRNoSpeechError(
+                "full-title ASR produced no speech segments"
+            )
+        if dvd_id in source_error_ids:
+            raise ASRSourceError("synthetic source transfer failure")
+        if dvd_id in whisper_error_ids:
+            raise ASRWhisperError("synthetic remote response protocol failure")
         if dvd_id in timeout_ids:
             raise StatefulLiveRunnerTimeoutError(
                 timeout_seconds=3600,
@@ -268,6 +282,9 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
                 timeout_ids=(), runner_error_ids=(),
                 pending_artifact_error_ids=(),
                 audio_error_ids=(),
+                no_speech_ids=(),
+                source_error_ids=(),
+                whisper_error_ids=(),
                 jellyfin=recognition_for):
     return Stage12BatchRunner(
         store=store,
@@ -287,6 +304,9 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
             runner_error_ids=runner_error_ids,
             pending_artifact_error_ids=pending_artifact_error_ids,
             audio_error_ids=audio_error_ids,
+            no_speech_ids=no_speech_ids,
+            source_error_ids=source_error_ids,
+            whisper_error_ids=whisper_error_ids,
             unexpected_ids=unexpected_ids,
         ),
         jellyfin_recognizer=jellyfin,
@@ -765,6 +785,90 @@ def main():
             and audio_error_publisher.calls == ["AAA-001", "AAA-003"],
             "AUDIO_FAILURE_TITLE_RETRYABLE_AND_BATCH_CONTINUES",
         )
+
+        # A completed baseline with zero segments is a terminal unresolved
+        # title outcome, while the serial batch continues safely.
+        no_speech_root = Path(temp) / "no-speech-artifacts"
+        no_speech_root.mkdir()
+        no_speech_store = Stage12RolloutStateStore(
+            Path(temp) / "no-speech.sqlite3"
+        )
+        no_speech_store.initialize_from_inventory(
+            Stage12HoldingsInventoryReport(records[:3])
+        )
+        no_speech_nas = FakeNAS(records[:3])
+        no_speech_publisher = FakePublisher(no_speech_nas)
+        no_speech_calls: list[str] = []
+        no_speech_runner = make_runner(
+            no_speech_root,
+            records[:3],
+            no_speech_store,
+            controller_calls=no_speech_calls,
+            nas=no_speech_nas,
+            publisher=no_speech_publisher,
+            no_speech_ids={"AAA-002"},
+        )
+        no_speech_result = no_speech_runner.run(
+            Stage12BatchSelection(3, ("AAA-001", "AAA-002", "AAA-003"))
+        )
+        no_speech_state = no_speech_store.get("AAA-002")
+        no_speech_provenance = json.loads(
+            no_speech_state.last_transition_provenance_json
+        )
+        require(
+            no_speech_calls == ["AAA-001", "AAA-002", "AAA-003"]
+            and no_speech_result.titles[1].stage11_result == "NO_SPEECH"
+            and no_speech_result.titles[1].final_state == STATE_UNRESOLVED
+            and no_speech_result.titles[1].publication_result == "NOT_RUN"
+            and no_speech_result.titles[1].jellyfin_recognition == "NOT_RUN"
+            and no_speech_state.last_transition_reason
+            == "STAGE12_BASELINE_ASR_NO_SPEECH"
+            and no_speech_provenance["stage11_outcome"] == "NO_SPEECH"
+            and no_speech_publisher.calls == ["AAA-001", "AAA-003"]
+            and no_speech_result.titles[0].final_state == STATE_PUBLISHED
+            and no_speech_result.titles[2].final_state == STATE_PUBLISHED,
+            "NO_SPEECH_UNRESOLVED_AND_BATCH_CONTINUES",
+        )
+
+        # Source-copy and remote-worker/protocol failures remain systemic;
+        # only the dedicated completed-no-speech type is isolated as outcome.
+        for failure_name, failure_options in (
+            ("SOURCE", {"source_error_ids": {"AAA-002"}}),
+            ("REMOTE", {"whisper_error_ids": {"AAA-002"}}),
+        ):
+            failure_root = Path(temp) / (failure_name.lower() + "-error-artifacts")
+            failure_root.mkdir()
+            failure_store = Stage12RolloutStateStore(
+                Path(temp) / (failure_name.lower() + "-error.sqlite3")
+            )
+            failure_store.initialize_from_inventory(
+                Stage12HoldingsInventoryReport(records[:3])
+            )
+            failure_nas = FakeNAS(records[:3])
+            failure_publisher = FakePublisher(failure_nas)
+            failure_calls: list[str] = []
+            failure_runner = make_runner(
+                failure_root,
+                records[:3],
+                failure_store,
+                controller_calls=failure_calls,
+                nas=failure_nas,
+                publisher=failure_publisher,
+                **failure_options,
+            )
+            expect_raises(
+                Stage12BatchSystemicError,
+                lambda: failure_runner.run(
+                    Stage12BatchSelection(1, ("AAA-002",))
+                ),
+                failure_name + "_FAILURE_REMAINS_SYSTEMIC",
+            )
+            require(
+                failure_calls == ["AAA-002"]
+                and failure_store.get("AAA-002").status == "RUNNING"
+                and failure_publisher.calls == [],
+                failure_name + "_FAILURE_NOT_MISCLASSIFIED_AS_NO_SPEECH",
+            )
 
         # An unrelated programmer exception remains systemic and stops the
         # immutable serial batch.

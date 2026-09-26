@@ -18,6 +18,7 @@ from teddy_discovery_asr import (
 from teddy_discovery_asr_audio import ASRAudioChunk, ASRAudioError
 from teddy_discovery_asr_source import (
     ASRLocalMediaSource,
+    ASRSourceError,
 )
 from teddy_discovery_asr_whisper import ASRWhisperError, FasterWhisperASR
 from teddy_discovery_subtitle import CanonicalVideoHolding
@@ -396,14 +397,14 @@ def main():
     finally:
         transcriber_module.MAX_ASR_SEGMENTS = old_limit
 
-    # J. Zero audio chunks are a typed no-speech failure, not an empty result.
+    # J. A decoder that yields no chunks is not evidence that speech is absent.
     adapter, _provider, whisper, one_pass, path, directory = make_transcriber(
         title,
         [],
         [],
     )
     expect(
-        transcriber_module.FullTitleASRError,
+        transcriber_module.FullTitleASRContractError,
         lambda: adapter(title),
         "ZERO_CHUNKS",
     )
@@ -411,20 +412,40 @@ def main():
     require(one_pass.iterations == 1, "ZERO_CHUNKS_ONE_PASS")
     require(not path.exists() and not directory.exists(), "ZERO_CHUNKS_CLEANUP")
 
-    # K. All chunks silent is a typed no-speech failure, not an empty result.
-    adapter, _provider, _whisper, _one_pass, path, directory = make_transcriber(
+    # K. Completed chunks with empty Whisper results are a typed no-speech
+    # outcome. It is distinct from source/decode/worker failures.
+    adapter, _provider, whisper, _one_pass, path, directory = make_transcriber(
         title,
-        [forced_chunk(snapshot, 0, 1_000)],
-        [()],
+        [
+            forced_chunk(snapshot, 0, 1_000),
+            forced_chunk(snapshot, 1_000, 2_000),
+        ],
+        [(), ()],
     )
     expect(
-        transcriber_module.FullTitleASRError,
+        transcriber_module.FullTitleASRNoSpeechError,
         lambda: adapter(title),
-        "ALL_SILENT",
+        "COMPLETED_ZERO_SEGMENTS",
     )
-    require(not path.exists() and not directory.exists(), "ALL_SILENT_CLEANUP")
+    require(len(whisper.calls) == 2, "ZERO_SEGMENTS_ALL_CHUNKS_CALLED")
+    require(not path.exists() and not directory.exists(), "NO_SPEECH_CLEANUP")
 
-    # K/L. Failure during iteration or Whisper still cleans the source and
+    # L. Decode, source and remote protocol failures still propagate as errors.
+    source_failure = ASRSourceError("synthetic source transfer failure")
+
+    class FailingSourceProvider:
+        def copy_to_temp(self, *_args, **_kwargs):
+            raise source_failure
+
+    source_adapter = transcriber_module.FullTitleASRTranscriber(
+        source_provider=FailingSourceProvider(),
+        max_media_bytes=987_654,
+        whisper=FakeWhisper([(ASRSegment(100, 200, "日本語"),)]),
+        audio_chunk_iterator=lambda *_args, **_kwargs: (),
+    )
+    expect(ASRSourceError, lambda: source_adapter(title), "SOURCE_FAILURE")
+
+    # M. Failure during iteration or Whisper still cleans the source and
     # keeps the original typed failure visible.
     iterator_failure = ASRAudioError("synthetic audio failure")
     adapter, _provider, _whisper, _one_pass, path, directory = make_transcriber(
@@ -458,7 +479,7 @@ def main():
     require(failing_whisper.calls == 1, "WHISPER_FAILURE_CALL")
     require(not path.exists() and not directory.exists(), "WHISPER_FAILURE_CLEANUP")
 
-    # M. Source identity mismatch fails before the iterator/Whisper.
+    # N. Source identity mismatch fails before the iterator/Whisper.
     wrong_source, wrong_path, wrong_directory = local_source(video("ABC-123"))
     adapter, provider, whisper, one_pass, _path, _directory = make_transcriber(
         title,
@@ -474,7 +495,7 @@ def main():
     require(not whisper.calls and one_pass.iterations == 0, "SOURCE_MISMATCH_NO_AUDIO")
     require(not wrong_path.exists() and not wrong_directory.exists(), "SOURCE_MISMATCH_CLEANUP")
 
-    # N. An expected source snapshot binds the media-size limit and is checked
+    # O. An expected source snapshot binds the media-size limit and is checked
     # before the first audio chunk reaches the ASR backend.
     expected_snapshot = snapshot_for(title, source_size=123, source_mtime_ns=456)
     matching_source, matching_path, matching_directory = local_source(
@@ -559,7 +580,7 @@ def main():
         "MAX_MEDIA_MISMATCH_CLEANUP",
     )
 
-    # O. Invalid configuration is rejected before source access.
+    # P. Invalid configuration is rejected before source access.
     for kwargs, label in (
         ({"max_media_bytes": 0}, "MAX_MEDIA_ZERO"),
         ({"chunk_seconds": 0}, "CHUNK_ZERO"),

@@ -23,6 +23,7 @@ from teddy_discovery_alignment_acceptance import (
 from teddy_discovery_alignment_application import apply_alignment_acceptance
 from teddy_discovery_asr import ASRSegment
 from teddy_discovery_asr_artifact import persist_asr_result, serialize_asr_result
+from teddy_discovery_asr_transcriber import FullTitleASRNoSpeechError
 from teddy_discovery_asr_source_quality import classify_asr_result_source_quality
 from teddy_discovery_hermes_v2 import HermesV2CueOutput
 from teddy_discovery_hybrid_evidence import (
@@ -471,6 +472,46 @@ def main():
                 holding_resolver=runtime.holding,
             ),
         )
+
+    # A valid full-title no-speech outcome stops before external lookup.
+    # The external subtitle's possible presence cannot bypass the baseline
+    # ASR/alignment invariant; absence also yields no usable subtitle source.
+    for external, label in ((None, "ABSENT"), (ACCEPT_HYBRID, "PRESENT")):
+        with tempfile.TemporaryDirectory(
+            prefix="stage11-controller-no-speech-" + label.lower() + "-"
+        ) as raw:
+            artifact_root, staging_root = _roots(Path(raw))
+            runtime = FakeRuntime(fixture.asr_result(), external=external)
+
+            def no_speech_baseline(_canonical_video):
+                runtime.baseline_calls += 1
+                raise FullTitleASRNoSpeechError(
+                    "full-title ASR produced no speech segments"
+                )
+
+            runtime.baseline = no_speech_baseline
+            try:
+                _run(artifact_root, staging_root, runtime)
+            except FullTitleASRNoSpeechError:
+                pass
+            else:
+                raise AssertionError("NO_SPEECH_OUTCOME_MUST_PROPAGATE")
+            check(
+                "baseline no speech stops before external lookup " + label,
+                lambda: runtime.baseline_calls == 1
+                and runtime.external_calls == 0
+                and runtime.targeted_calls == 0
+                and not (
+                    artifact_root
+                    / TITLE
+                    / controller.BASELINE_ASR_FILENAME
+                ).exists()
+                and not (
+                    artifact_root
+                    / TITLE
+                    / controller.MECHANICAL_REPORT_FILENAME
+                ).exists(),
+            )
 
     # Existing baseline, no external candidate, REQUIRE=0, ASR-only full flow.
     with tempfile.TemporaryDirectory(prefix="stage11-controller-existing-") as raw:

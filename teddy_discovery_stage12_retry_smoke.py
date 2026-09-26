@@ -13,6 +13,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from teddy_discovery_asr_transcriber import FullTitleASRNoSpeechError
 from teddy_discovery_stage12_batch import (
     Stage12BatchRunner,
     Stage12BatchSelection,
@@ -39,6 +40,7 @@ from teddy_discovery_stage12_rollout import (
     STATE_PENDING,
     STATE_PUBLISHED,
     STATE_RUNNING,
+    STATE_UNRESOLVED,
     STAGE12_EXPLICIT_RETRY_START,
     STAGE12_EXPLICIT_RETRY_CRASH_RECOVERY,
     Stage12InvalidTransitionError,
@@ -177,6 +179,16 @@ def _systemic_controller(calls):
     def run(dvd_id):
         calls.append(dvd_id)
         raise RuntimeError("synthetic shared adapter failure")
+
+    return run
+
+
+def _no_speech_controller(calls):
+    def run(dvd_id):
+        calls.append(dvd_id)
+        raise FullTitleASRNoSpeechError(
+            "full-title ASR produced no speech segments"
+        )
 
     return run
 
@@ -423,6 +435,33 @@ def main_smoke():
         event = store.get(record.dvd_id)
         require(event.transition_sequence == failed.transition_sequence + 2,
                 "RETRY_START_AND_FAILURE_EVENTS_RECORDED")
+
+        # An explicit retry that again completes with zero segments becomes
+        # unresolved, so another identical retry is not offered.
+        no_speech_retry_root = root / "no-speech-retry"
+        no_speech_retry_root.mkdir()
+        no_speech_runner, no_speech_nas, no_speech_publisher, no_speech_calls = (
+            build_runner(no_speech_retry_root, store, record)
+        )
+        no_speech_runner.controller_runner = _no_speech_controller(
+            no_speech_calls
+        )
+        no_speech_result = no_speech_runner.run(
+            Stage12BatchSelection(1, (record.dvd_id,))
+        )
+        no_speech_state = store.get(record.dvd_id)
+        require(
+            no_speech_result.titles[0].stage11_result == "NO_SPEECH"
+            and no_speech_state.status == STATE_UNRESOLVED
+            and no_speech_state.last_transition_reason
+            == "STAGE12_BASELINE_ASR_NO_SPEECH"
+            and no_speech_state.transition_sequence
+            == event.transition_sequence + 2
+            and no_speech_calls == [record.dvd_id]
+            and no_speech_publisher.calls == []
+            and no_speech_nas.published == {},
+            "EXPLICIT_RETRY_NO_SPEECH_TERMINATES_UNRESOLVED",
+        )
 
     with TemporaryDirectory(prefix="stage12-retry-systemic-smoke-") as raw:
         root = Path(raw)

@@ -23,6 +23,7 @@ from teddy_discovery_jellyfin import (
     jellyfin_media_path,
 )
 from teddy_discovery_asr_audio import ASRAudioError
+from teddy_discovery_asr_transcriber import FullTitleASRNoSpeechError
 from teddy_discovery_stage11_controller import (
     Stage11ControllerError,
     Stage11ControllerResult,
@@ -816,13 +817,19 @@ class Stage12BatchRunner:
             error,
             StatefulSemanticOutputValidationRetryExhausted,
         )
+        no_speech = isinstance(error, FullTitleASRNoSpeechError)
         hermes_timeout = isinstance(
             error,
             StatefulLiveRunnerTimeoutError,
         )
         if semantic_retry_exhausted or hermes_timeout:
             terminal = False
-        to_status = STATE_FAILED_TERMINAL if terminal else STATE_FAILED_RETRYABLE
+        if no_speech:
+            to_status = STATE_UNRESOLVED
+        else:
+            to_status = (
+                STATE_FAILED_TERMINAL if terminal else STATE_FAILED_RETRYABLE
+            )
         if state.status == STATE_PENDING and terminal:
             # The frozen state machine deliberately has no direct
             # PENDING -> FAILED_TERMINAL edge.  A destination conflict found
@@ -841,7 +848,10 @@ class Stage12BatchRunner:
             "destination": destination,
         }
         transition_reason = "STAGE12_TITLE_FAILURE"
-        if semantic_retry_exhausted:
+        if no_speech:
+            transition_reason = "STAGE12_BASELINE_ASR_NO_SPEECH"
+            failure_provenance["stage11_outcome"] = "NO_SPEECH"
+        elif semantic_retry_exhausted:
             transition_reason = (
                 "STAGE12_SEMANTIC_OUTPUT_VALIDATION_RETRY_EXHAUSTED"
             )
@@ -913,6 +923,7 @@ class Stage12BatchRunner:
                 StatefulSemanticOutputValidationRetryExhausted,
                 StatefulLiveRunnerPendingArtifactError,
                 StatefulLiveRunnerTimeoutError,
+                FullTitleASRNoSpeechError,
             ),
         )
 
@@ -1050,7 +1061,11 @@ class Stage12BatchRunner:
                 error=error,
                 terminal=isinstance(error, Stage11ControllerError),
                 destination=destination,
-                stage11_result="FAIL",
+                stage11_result=(
+                    "NO_SPEECH"
+                    if isinstance(error, FullTitleASRNoSpeechError)
+                    else "FAIL"
+                ),
                 route=None,
                 clean_sha256=None,
                 publication_result="NOT_RUN",

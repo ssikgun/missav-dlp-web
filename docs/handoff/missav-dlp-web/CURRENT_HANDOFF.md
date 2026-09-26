@@ -1,5 +1,36 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-26 Full-title ASR no-speech semantics and human ground truth
+
+The five bounded NHDTC-250 targeted direct-Whisper audio clips were reviewed
+by a human against the source. All five contain no human conversation;
+non-speech vocalizations such as groans are present. The targeted segments are
+therefore hallucinated/non-speech transcriptions, not speech evidence. One
+segment had apparently favorable metrics (`avg_logprob=-0.063856`,
+`no_speech_prob=0.160400`) despite having no speech. Numeric-only confidence
+gates are not a safe production fix. Do not add non-VAD Whisper fallback when
+VAD returns zero, and do not lower/loosen VAD thresholds.
+
+Generic Stage11 policy: a full-title run that successfully decodes and submits
+at least one audio chunk, completes all Whisper calls without transport or
+protocol errors, and aggregates zero validated speech segments is a typed
+`FullTitleASRNoSpeechError` outcome. An empty decoded-chunk stream remains a
+contract/source failure. Decode, source transfer, worker, network, and
+protocol errors retain their existing error paths. ASR result/artifact
+non-empty validators stay strict.
+
+Stage11 requires a non-empty baseline ASR result before it persists the
+baseline, checks external JA subtitles, aligns evidence, or enters semantic
+translation/review. External JA alignment also requires that ASR result, so
+there is no safe existing continuation when baseline ASR has zero segments.
+With an external JA subtitle present, Stage11 stops before querying it; with
+one absent, it stops at the same boundary. Stage12 records this typed outcome
+as terminal `UNRESOLVED` (`stage11_result=NO_SPEECH`, reason
+`STAGE12_BASELINE_ASR_NO_SPEECH`), skips publication/Jellyfin, and continues
+other titles in the batch. Repeating the same full-title inference is not
+useful; no-speech is not `FAILED_RETRYABLE`. Real source/decode/transport/
+worker/protocol failures keep their existing title/systemic classification.
+
 ## 2026-09-24 Targeted ASR numeric-only diagnostic contract
 
 Added the explicit VM122 endpoint

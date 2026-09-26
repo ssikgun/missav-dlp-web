@@ -37,6 +37,10 @@ class FullTitleASRError(ASRError):
     """Base class for full-title ASR orchestration failures."""
 
 
+class FullTitleASRNoSpeechError(FullTitleASRError):
+    """ASR completed every decoded audio chunk and found no speech."""
+
+
 class FullTitleASRValidationError(FullTitleASRError):
     """Raised for invalid adapter configuration or canonical input."""
 
@@ -378,6 +382,7 @@ class FullTitleASRTranscriber:
                 ) from error
 
             aggregated: list[ASRSegment] = []
+            completed_chunk_count = 0
             previous_chunk_end_ms = None
             previous_segment_start_ms = None
             previous_segment_end_ms = None
@@ -414,10 +419,15 @@ class FullTitleASRTranscriber:
                         aggregate_count=len(aggregated),
                     )
                 )
+                completed_chunk_count += 1
                 aggregated.extend(segments)
 
             if not aggregated:
-                raise FullTitleASRError(
+                if completed_chunk_count == 0:
+                    raise FullTitleASRContractError(
+                        "full-title ASR source produced no audio chunks"
+                    )
+                raise FullTitleASRNoSpeechError(
                     "full-title ASR produced no speech segments"
                 )
 
@@ -470,6 +480,7 @@ class FullTitleASRTranscriber:
 __all__ = [
     "FullTitleASRError",
     "FullTitleASRContractError",
+    "FullTitleASRNoSpeechError",
     "FullTitleASRTranscriber",
     "FullTitleASRValidationError",
 ]
