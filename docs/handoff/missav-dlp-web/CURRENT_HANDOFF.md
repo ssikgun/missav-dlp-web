@@ -1,5 +1,31 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-26 SVFLA-014 explicit retry production canary
+
+At expected production HEAD
+`5bb175dd655f24af9d6695e4e0e1424e60be269d`, the authorized one-title retry
+passed production interpreter, exact repository/worktree, rollout sequence,
+source fingerprint, and zero-active-title preflights. The source fingerprint
+matched at 8,577,682,550 bytes and mtime_ns `1788086386432050851`. The
+8,577,682,550-byte source was copied under the disk-backed
+`/var/tmp/teddy-stage11-asr-production` root; temp capacity preflight passed.
+
+SVFLA-014 transitioned `FAILED_RETRYABLE -> RUNNING -> UNRESOLVED`, sequence
+`3 -> 4 -> 5`. Full-title processing reproduced the unsafe timeline at the
+existing three-decoded-frame bound: `ASRAudioUnsafeTimelineError`,
+“peak net sample-clock drift exceeds three decoded frames.” Stage12 recorded
+reason `STAGE12_UNSAFE_AUDIO_TIMELINE` and outcome
+`UNSAFE_AUDIO_TIMELINE`. Final counts are `PUBLISHED=158`,
+`FAILED_RETRYABLE=12`, `RUNNING=0`, `UNRESOLVED=3`.
+
+The typed Stage11 failure stopped before baseline artifact persistence,
+external subtitle evidence lookup/alignment, and publication/Jellyfin. The
+rollout row has null artifact/report paths and hashes. The explicit immutable
+selection contained only SVFLA-014; no other title was processed. Temporary
+ASR cleanup reported PASS; the configured temp root was empty afterward,
+`/tmp` had no files over 100 MiB, `/var/tmp` had 35 GiB free, and 8.5 GiB RAM
+was available. No recovery or second retry was performed.
+
 ## 2026-09-26 deterministic unsafe audio timeline rollout semantics
 
 Added `ASRAudioUnsafeTimelineError`, a narrow subtype of
