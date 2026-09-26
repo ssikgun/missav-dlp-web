@@ -1,5 +1,38 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-26 SW-216 explicit retry production canary
+
+Before retry, SW-216 was `FAILED_RETRYABLE`, sequence 3, reason
+`STAGE12_TITLE_FAILURE`; counts were `PUBLISHED=158`,
+`FAILED_RETRYABLE=6`, `RUNNING=0`, `UNRESOLVED=9`. The canonical replay
+recorded the **production fail point** at frame 438 / PTS 457,093: signed
+peak drift 66.292 ms exceeded the 64 ms three-decoded-frame bound. Separately,
+the full replay EOF diagnostic showed signed drift +63.738 s and corrected
+EOF sample mismatch −1. Maximum single-frame correction was 21.313 ms (one
+decoded-frame duration); the recorded fail point was cumulative peak drift,
+not an EOF failure. The replay procedure recorded matching source
+path/size/mtime against rollout identity. Current NAS source matched:
+`SW/SW-216/SW-216.mp4`, 4,172,018,393 bytes, mtime_ns
+`1788082693280273595`. No duplicate/backward PTS violation was recorded.
+
+At expected production HEAD
+`22f5e75d338fa6b80356de23e465037c6fcc721e`, the single explicit retry passed
+production interpreter, clean worktree, expected sequence, exact source
+identity, and zero-active-title preflights. It transitioned
+`FAILED_RETRYABLE -> RUNNING -> UNRESOLVED`, sequence `3 -> 4 -> 5`.
+Production reproduced `ASRAudioUnsafeTimelineError: peak net sample-clock
+drift exceeds three decoded frames`; Stage12 recorded reason
+`STAGE12_UNSAFE_AUDIO_TIMELINE` and outcome `UNSAFE_AUDIO_TIMELINE`. Final
+counts are `PUBLISHED=158`, `FAILED_RETRYABLE=5`, `RUNNING=0`,
+`UNRESOLVED=10`.
+
+No baseline artifact/report was stored. The typed Stage11 failure stopped
+before external subtitle evidence lookup/alignment and publication/Jellyfin.
+Only SW-216 was selected; no other title was processed. Temporary ASR
+cleanup reported PASS; the production temp root was empty afterward, `/tmp`
+had no files over 100 MiB, `/var/tmp` had 35 GiB free, and 8.5 GiB RAM was
+available. No recovery or second retry was performed.
+
 ## 2026-09-26 SNOS-334 explicit retry production canary
 
 Before retry, SNOS-334 was `FAILED_RETRYABLE`, sequence 3, reason
