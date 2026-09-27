@@ -406,6 +406,11 @@ def main():
             *,
             mode: int = 0o600,
             reason_code: str | None = None,
+            diagnostic_subcode: str | None = None,
+            cue_ordinal: int | None = None,
+            expected_count: int | None = None,
+            actual_count: int | None = None,
+            location: str | None = None,
         ):
             case_task = new_task()
             case_path = case_task / first_expected.pending_filename
@@ -418,8 +423,34 @@ def main():
                         error.reason_code == reason_code,
                         marker + "_EXACT_REASON",
                     )
+                if diagnostic_subcode is not None:
+                    check(
+                        error.diagnostic_subcode == diagnostic_subcode,
+                        marker + "_EXACT_SUBCODE",
+                    )
+                if cue_ordinal is not None:
+                    check(
+                        error.cue_ordinal == cue_ordinal,
+                        marker + "_EXACT_CUE_ORDINAL",
+                    )
+                if expected_count is not None:
+                    check(
+                        error.expected_count == expected_count,
+                        marker + "_EXPECTED_COUNT",
+                    )
+                if actual_count is not None:
+                    check(
+                        error.actual_count == actual_count,
+                        marker + "_ACTUAL_COUNT",
+                    )
+                if location is not None:
+                    check(
+                        error.location == location,
+                        marker + "_EXACT_LOCATION",
+                    )
                 else:
-                    counts["pass"] += 1
+                    if reason_code is None:
+                        counts["pass"] += 1
                 return
             counts["fail"] += 1
             raise AssertionError(marker)
@@ -434,6 +465,7 @@ def main():
             ),
             "WRONG_SESSION_REJECTED",
             reason_code=STATEFUL_VALIDATION_REASON_SESSION_ID_MISMATCH,
+            location="part.session_id",
         )
         validation_case(
             mutated_part_payload(
@@ -474,6 +506,8 @@ def main():
             ),
             "MISSING_CUE_REJECTED",
             reason_code=STATEFUL_VALIDATION_REASON_CUE_COUNT_MISMATCH,
+            expected_count=first_expected.cue_count,
+            actual_count=first_expected.cue_count - 1,
         )
         validation_case(
             mutated_part_payload(
@@ -545,7 +579,30 @@ def main():
             ),
             "EMPTY_KO_REJECTED",
             reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+            diagnostic_subcode="KO_EMPTY_OR_WHITESPACE",
+            cue_ordinal=1,
         )
+        invalid_ko_predicates = (
+            ("KO_REQUIRED", None),
+            ("KO_NOT_EXACT_STRING", 42),
+            ("KO_TEXT_LIMIT", "x" * 8193),
+            ("KO_CONTROL_CHARACTER", "unsafe\x01ko"),
+            ("KO_RUNAWAY_REPETITION", "반복" * 32),
+        )
+        for subcode, invalid_value in invalid_ko_predicates:
+            validation_case(
+                mutated_part_payload(
+                    first_part,
+                    lambda data, invalid_value=invalid_value: data["cues"][1].__setitem__(
+                        "ko",
+                        invalid_value,
+                    ),
+                ),
+                "INVALID_KO_" + subcode,
+                reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+                diagnostic_subcode=subcode,
+                cue_ordinal=2,
+            )
         validation_case(
             mutated_part_payload(
                 first_part,

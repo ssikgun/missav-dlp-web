@@ -1,5 +1,30 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-27 Stage11 semantic validation body-free diagnostics
+
+Added generic safe diagnostics for rejected stateful semantic parts without
+changing validator predicates, retry count, prompt, or output acceptance. The
+validation exception carries its reason code plus safe optional fields for an
+`INVALID_KO` subcode and 1-based cue ordinal, cue-count expected/actual values,
+or the fixed `part.session_id` location. The Stage11 live runner records the
+part number, retry attempt, response byte length, and SHA-256 alongside the
+validation code. It no longer logs the session identifier on this rejection
+line. No response body or subtitle fields are logged.
+
+`INVALID_KO` output predicates now have distinct safe subcodes:
+`KO_REQUIRED`, `KO_NOT_EXACT_STRING`, `KO_EMPTY_OR_WHITESPACE`,
+`KO_TEXT_LIMIT`, `KO_CONTROL_CHARACTER`, and `KO_RUNAWAY_REPETITION`.
+Existing source-cue integrity predicates retain `INVALID_KO` and carry separate
+source-cue subcodes; an unrecognized legacy path is marked
+`INVALID_KO_UNCLASSIFIED`. Ordinals are 1-based within the part.
+
+Offline verification passed: stateful parts smoke (65 PASS / 0 FAIL), live
+runner retry smoke (including body-sentinel redaction and payload digest),
+stateful controller smoke (29 PASS / 0 FAIL), live runner smoke (16 PASS / 0
+FAIL), Stage12 batch, retry, bulk runner, and rollout smokes, Python compile,
+and `git diff --check`. No Hermes invocation, production retry, rollout DB
+write, publication, or Jellyfin write was performed.
+
 ## 2026-09-26 SW-216 explicit retry production canary
 
 Before retry, SW-216 was `FAILED_RETRYABLE`, sequence 3, reason

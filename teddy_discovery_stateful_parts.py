@@ -23,6 +23,7 @@ from typing import Final
 from teddy_discovery_hermes_v2 import (
     HermesV2CueInput,
     HermesV2CueOutput,
+    HermesV2LimitError,
 )
 from teddy_discovery_stateful_translator import (
     StatefulSubtitlePackage,
@@ -114,6 +115,40 @@ STATEFUL_VALIDATION_REASON_OTHER_VALIDATOR_PREDICATE: Final[str] = (
     "OTHER_VALIDATOR_PREDICATE"
 )
 
+STATEFUL_INVALID_KO_SUBCODE_REQUIRED: Final[str] = "KO_REQUIRED"
+STATEFUL_INVALID_KO_SUBCODE_NOT_EXACT_STRING: Final[str] = (
+    "KO_NOT_EXACT_STRING"
+)
+STATEFUL_INVALID_KO_SUBCODE_EMPTY: Final[str] = "KO_EMPTY_OR_WHITESPACE"
+STATEFUL_INVALID_KO_SUBCODE_TEXT_LIMIT: Final[str] = "KO_TEXT_LIMIT"
+STATEFUL_INVALID_KO_SUBCODE_CONTROL_CHARACTER: Final[str] = (
+    "KO_CONTROL_CHARACTER"
+)
+STATEFUL_INVALID_KO_SUBCODE_RUNAWAY_REPETITION: Final[str] = (
+    "KO_RUNAWAY_REPETITION"
+)
+STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUE_TYPE: Final[str] = (
+    "SOURCE_CUE_WRONG_TYPE"
+)
+STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUE_MALFORMED: Final[str] = (
+    "SOURCE_CUE_MALFORMED"
+)
+STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUE_DETACHED: Final[str] = (
+    "SOURCE_CUE_DETACHED"
+)
+STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUES_IMMUTABLE: Final[str] = (
+    "SOURCE_CUES_NOT_IMMUTABLE_TUPLE"
+)
+STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUE_COUNT: Final[str] = (
+    "SOURCE_CUE_COUNT_MISMATCH"
+)
+STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUE_ORDER: Final[str] = (
+    "SOURCE_CUE_ORDER_MISMATCH"
+)
+STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUE_UNAVAILABLE: Final[str] = (
+    "SOURCE_CUE_UNAVAILABLE"
+)
+
 
 class StatefulPartsError(ValueError):
     """Base class for deterministic semantic-part failures."""
@@ -127,8 +162,22 @@ class StatefulPartsValidationError(StatefulPartsError):
         message: str,
         *,
         reason_code: str = STATEFUL_VALIDATION_REASON_OTHER_VALIDATOR_PREDICATE,
+        diagnostic_subcode: str | None = None,
+        cue_ordinal: int | None = None,
+        expected_count: int | None = None,
+        actual_count: int | None = None,
+        location: str | None = None,
     ) -> None:
         self.reason_code = reason_code
+        self.diagnostic_subcode = diagnostic_subcode or (
+            "INVALID_KO_UNCLASSIFIED"
+            if reason_code == STATEFUL_VALIDATION_REASON_INVALID_KO
+            else None
+        )
+        self.cue_ordinal = cue_ordinal
+        self.expected_count = expected_count
+        self.actual_count = actual_count
+        self.location = location
         super().__init__(message)
 
 
@@ -431,6 +480,7 @@ def _validated_source_cue(value: object) -> HermesV2CueInput:
         raise StatefulPartsValidationError(
             "source cue has the wrong exact type",
             reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+            diagnostic_subcode=STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUE_TYPE,
         )
     try:
         validated = HermesV2CueInput(
@@ -445,11 +495,13 @@ def _validated_source_cue(value: object) -> HermesV2CueInput:
         raise StatefulPartsValidationError(
             "source cue is malformed",
             reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+            diagnostic_subcode=STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUE_MALFORMED,
         ) from error
     if validated != value:
         raise StatefulPartsValidationError(
             "source cue is detached",
             reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+            diagnostic_subcode=STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUE_DETACHED,
         )
     return validated
 
@@ -462,6 +514,7 @@ def _validated_source_cue_sequence(
         raise StatefulPartsValidationError(
             "source cues must be an immutable tuple",
             reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+            diagnostic_subcode=STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUES_IMMUTABLE,
         )
     if not value:
         return ()
@@ -469,12 +522,14 @@ def _validated_source_cue_sequence(
         raise StatefulPartsValidationError(
             "source cues are detached from their output cues",
             reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+            diagnostic_subcode=STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUE_COUNT,
         )
     validated = tuple(_validated_source_cue(cue) for cue in value)
     if validated != value:
         raise StatefulPartsValidationError(
             "source cues are detached from their output cues",
             reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+            diagnostic_subcode=STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUE_DETACHED,
         )
     return validated
 
@@ -518,6 +573,7 @@ def _validated_output_cue(
     value: object,
     *,
     source_cue: HermesV2CueInput | None = None,
+    cue_ordinal: int | None = None,
 ) -> HermesV2CueOutput:
     if type(value) is not HermesV2CueOutput:
         raise StatefulPartsValidationError(
@@ -545,6 +601,10 @@ def _validated_output_cue(
             raise StatefulPartsValidationError(
                 "part cue ko contains an extreme repeated short-unit pattern",
                 reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+                diagnostic_subcode=(
+                    STATEFUL_INVALID_KO_SUBCODE_RUNAWAY_REPETITION
+                ),
+                cue_ordinal=cue_ordinal,
             )
 
     if (
@@ -701,6 +761,9 @@ class StatefulPartPlan:
             raise StatefulPartsValidationError(
                 "part plan source cues are detached from cue order",
                 reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+                diagnostic_subcode=(
+                    STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUE_ORDER
+                ),
             )
 
     @property
@@ -760,6 +823,7 @@ class StatefulSemanticPart:
                     if source_cues
                     else None
                 ),
+                cue_ordinal=index + 1,
             )
             for index, cue in enumerate(self.cues)
         )
@@ -1173,7 +1237,31 @@ def _output_field_validation_reason(error: BaseException) -> str:
     return STATEFUL_VALIDATION_REASON_INVALID_FIELD
 
 
-def _parse_part_cue(value: object) -> HermesV2CueOutput:
+def _invalid_ko_subcode(error: BaseException) -> str:
+    """Map fixed Hermes validator predicates to safe diagnostic enums."""
+
+    message = str(error)
+    if message == "ko is required":
+        return STATEFUL_INVALID_KO_SUBCODE_REQUIRED
+    if message == "ko must be an exact string":
+        return STATEFUL_INVALID_KO_SUBCODE_NOT_EXACT_STRING
+    if message == "ko must be nonempty when supplied":
+        return STATEFUL_INVALID_KO_SUBCODE_EMPTY
+    if (
+        isinstance(error, HermesV2LimitError)
+        and message == "ko exceeds MAX_HERMES_V2_TEXT_CHARS"
+    ):
+        return STATEFUL_INVALID_KO_SUBCODE_TEXT_LIMIT
+    if message == "ko contains a control character":
+        return STATEFUL_INVALID_KO_SUBCODE_CONTROL_CHARACTER
+    return "INVALID_KO_UNCLASSIFIED"
+
+
+def _parse_part_cue(
+    value: object,
+    *,
+    cue_ordinal: int,
+) -> HermesV2CueOutput:
     if type(value) is not dict:
         raise StatefulPartsValidationError(
             "part cue must be a JSON object",
@@ -1191,9 +1279,20 @@ def _parse_part_cue(value: object) -> HermesV2CueOutput:
             ko=value["ko"],
         )
     except (TypeError, ValueError, OverflowError) as error:
+        reason_code = _output_field_validation_reason(error)
         raise StatefulPartsValidationError(
             "part cue is invalid",
-            reason_code=_output_field_validation_reason(error),
+            reason_code=reason_code,
+            diagnostic_subcode=(
+                _invalid_ko_subcode(error)
+                if reason_code == STATEFUL_VALIDATION_REASON_INVALID_KO
+                else None
+            ),
+            cue_ordinal=(
+                cue_ordinal
+                if reason_code == STATEFUL_VALIDATION_REASON_INVALID_KO
+                else None
+            ),
         ) from error
 
 
@@ -1226,6 +1325,8 @@ def _part_from_payload(
         raise StatefulPartsValidationError(
             "part cue count does not match its deterministic range",
             reason_code=STATEFUL_VALIDATION_REASON_CUE_COUNT_MISMATCH,
+            expected_count=expected.cue_count,
+            actual_count=len(raw_cues),
         )
     source_cues: tuple[HermesV2CueInput, ...] = ()
     if plan.source_cues:
@@ -1242,6 +1343,9 @@ def _part_from_payload(
             raise StatefulPartsValidationError(
                 "part plan source cues are unavailable for this range",
                 reason_code=STATEFUL_VALIDATION_REASON_INVALID_KO,
+                diagnostic_subcode=(
+                    STATEFUL_INVALID_KO_SUBCODE_SOURCE_CUE_UNAVAILABLE
+                ),
             ) from error
     try:
         part = StatefulSemanticPart(
@@ -1251,7 +1355,10 @@ def _part_from_payload(
             part_index=parsed["part_index"],
             first_cue_id=parsed["first_cue_id"],
             last_cue_id=parsed["last_cue_id"],
-            cues=tuple(_parse_part_cue(cue) for cue in raw_cues),
+            cues=tuple(
+                _parse_part_cue(cue, cue_ordinal=index + 1)
+                for index, cue in enumerate(raw_cues)
+            ),
             max_cues_per_part=plan.max_cues_per_part,
             source_cues=source_cues,
         )
@@ -1272,6 +1379,7 @@ def _part_from_payload(
         raise StatefulPartsValidationError(
             "part identity or cue order does not match its deterministic plan",
             reason_code=STATEFUL_VALIDATION_REASON_SESSION_ID_MISMATCH,
+            location="part.session_id",
         )
     if part.input_sha256 != plan.input_sha256:
         raise StatefulPartsValidationError(
@@ -1693,6 +1801,12 @@ __all__ = [
     "STATEFUL_VALIDATION_REASON_PART_INDEX_MISMATCH",
     "STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE",
     "STATEFUL_VALIDATION_REASON_SESSION_ID_MISMATCH",
+    "STATEFUL_INVALID_KO_SUBCODE_CONTROL_CHARACTER",
+    "STATEFUL_INVALID_KO_SUBCODE_EMPTY",
+    "STATEFUL_INVALID_KO_SUBCODE_NOT_EXACT_STRING",
+    "STATEFUL_INVALID_KO_SUBCODE_REQUIRED",
+    "STATEFUL_INVALID_KO_SUBCODE_RUNAWAY_REPETITION",
+    "STATEFUL_INVALID_KO_SUBCODE_TEXT_LIMIT",
     "STATEFUL_VALIDATION_REASON_UNEXPECTED_CUE_ID",
     "STATEFUL_PART_BATCH_SIZE",
     "STATEFUL_PART_CANONICAL_SUFFIX",

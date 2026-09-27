@@ -1335,6 +1335,38 @@ def _request_and_install_part(
                 "reason_code",
                 STATEFUL_VALIDATION_REASON_OTHER_VALIDATOR_PREDICATE,
             )
+            diagnostic_subcode = getattr(error, "diagnostic_subcode", None)
+            cue_ordinal = getattr(error, "cue_ordinal", None)
+            expected_count = getattr(error, "expected_count", None)
+            actual_count = getattr(error, "actual_count", None)
+            location = getattr(error, "location", None)
+            safe_diagnostic_fields = [
+                "VALIDATION_ERROR_CODE=" + str(reason_code),
+                "PART_NUMBER=" + str(expected.part_index),
+                "RETRY_ATTEMPT=" + str(attempt),
+                "RESPONSE_BYTES=" + str(len(payload)),
+                "RESPONSE_SHA256=" + hashlib.sha256(payload).hexdigest(),
+            ]
+            if diagnostic_subcode is not None:
+                safe_diagnostic_fields.append(
+                    "INVALID_KO_SUBCODE=" + str(diagnostic_subcode)
+                )
+            if cue_ordinal is not None:
+                safe_diagnostic_fields.append(
+                    "FAILED_CUE_ORDINAL=" + str(cue_ordinal)
+                )
+            if expected_count is not None:
+                safe_diagnostic_fields.append(
+                    "EXPECTED_CUE_COUNT=" + str(expected_count)
+                )
+            if actual_count is not None:
+                safe_diagnostic_fields.append(
+                    "ACTUAL_CUE_COUNT=" + str(actual_count)
+                )
+            if location is not None:
+                safe_diagnostic_fields.append(
+                    "VALIDATION_LOCATION=" + str(location)
+                )
             _print_artifact_status(
                 remote_pending_path=remote_pending,
                 remote_pending_exists=True,
@@ -1351,10 +1383,15 @@ def _request_and_install_part(
                 + str(expected.part_index)
                 + "|ATTEMPT="
                 + str(attempt)
-                + "|SESSION_ID="
-                + plan.session_id
                 + "|INPUT_SHA256="
                 + plan.input_sha256,
+                flush=True,
+            )
+            # Log only allowlisted, non-content diagnostics.  The raw
+            # response and its text fields never enter either message.
+            print(
+                "SEMANTIC_VALIDATION_DIAGNOSTICS="
+                + "|".join(safe_diagnostic_fields),
                 flush=True,
             )
             _remove_remote_pending(

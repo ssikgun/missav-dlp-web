@@ -1,6 +1,7 @@
 """Synthetic smoke coverage for bounded invalid semantic-part recovery."""
 
 import io
+import hashlib
 import json
 import os
 from contextlib import redirect_stdout
@@ -248,6 +249,7 @@ def run_synthetic(
         "calls": calls,
         "promote_calls": promote.call_args_list,
         "first_bytes": first_bytes,
+        "invalid_payload": invalid,
         "output": output.getvalue(),
     }
 
@@ -316,14 +318,23 @@ def main():
             + "|PART_INDEX="
             + str(expected.part_index)
             + "|ATTEMPT=1"
-            + "|SESSION_ID="
-            + plan.session_id
             + "|INPUT_SHA256="
             + plan.input_sha256
         )
         check(
             recovered_rejection in recovered["output"],
             "EXACT_SEMANTIC_REASON_MARKER_INCLUDES_CONTEXT",
+        )
+        check(
+            "PART_NUMBER=" + str(expected.part_index) in recovered["output"]
+            and "RETRY_ATTEMPT=1" in recovered["output"]
+            and "RESPONSE_BYTES="
+            + str(len(recovered["invalid_payload"]))
+            in recovered["output"]
+            and "RESPONSE_SHA256="
+            + hashlib.sha256(recovered["invalid_payload"]).hexdigest()
+            in recovered["output"],
+            "SAFE_PAYLOAD_LENGTH_HASH_AND_ATTEMPT_DIAGNOSTICS",
         )
         check(
             sum(
@@ -461,9 +472,7 @@ def main():
                 + reason
                 + "|PART_INDEX="
                 + str(expected.part_index)
-                + "|ATTEMPT=1|SESSION_ID="
-                + plan.session_id
-                + "|INPUT_SHA256="
+                + "|ATTEMPT=1|INPUT_SHA256="
                 + plan.input_sha256
             )
             check(
@@ -471,6 +480,30 @@ def main():
                 and expected_marker in diagnostic["output"],
                 "DIAGNOSTIC_MARKER_" + reason,
             )
+
+        body_sentinel = "PRIVATE_KO_BODY_SENTINEL"
+        body_diagnostic = run_synthetic(
+            root / "body-redaction",
+            cue_count=1,
+            invalid_attempts=1,
+            prepromote_first=False,
+            invalid_mutator=lambda data: data["cues"][0].__setitem__(
+                "ko",
+                body_sentinel + "\x01",
+            ),
+        )
+        body_payload_hash = hashlib.sha256(
+            body_diagnostic["invalid_payload"]
+        ).hexdigest()
+        check(
+            body_diagnostic["error_or_result"] == 0
+            and "PRIVATE_KO_BODY_SENTINEL"
+            not in body_diagnostic["output"]
+            and "KO_CONTROL_CHARACTER" in body_diagnostic["output"]
+            and "RESPONSE_SHA256=" + body_payload_hash
+            in body_diagnostic["output"],
+            "RESPONSE_BODY_REDACTED_BUT_SAFE_DIAGNOSTICS_RECORDED",
+        )
 
         exhausted = run_synthetic(
             root / "invalid-twice",
@@ -511,7 +544,6 @@ def main():
                 "SEMANTIC_VALIDATION_REJECTED=INVALID_KO"
                 in line
                 and "|PART_INDEX=1|" in line
-                and "|SESSION_ID=" + exhausted["plan"].session_id in line
                 and "|INPUT_SHA256=" + exhausted["plan"].input_sha256 in line
                 for line in exhausted_rejections
             )
