@@ -1,5 +1,43 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-27 GDTM-091 semantic retry-feedback production canary
+
+At expected HEAD `512e8de3459d440021302674ba0feefcebef2b4b`, read-only
+preflight confirmed a clean worktree, `GDTM-091=FAILED_RETRYABLE` sequence 3
+with reason `STAGE12_SEMANTIC_OUTPUT_VALIDATION_RETRY_EXHAUSTED`, no active
+rollout title, and production interpreter/dependency PASS. Source identity
+matched Discovery, rollout, and current NAS: `GDTM/GDTM-091/GDTM-091.mp4`,
+2,841,873,974 bytes, mtime_ns `1788070014563915057`.
+
+Part 12 attempt 1 used a 3,022-byte prompt, SHA-256
+`df7752671d224f0683ef6e0c62c7ed40c9546a22d86d3bb41bfd374c9dd45522`. It
+failed `INVALID_KO`, subcode `KO_CONTROL_CHARACTER`, cue ordinal 2. The
+rejected response was 6,440 bytes, SHA-256
+`ebba1d7afef8a05056ee16b61c15f979b1434a8db5d7d7e4af2701188513268c`.
+Attempt 2 used a 3,245-byte prompt, SHA-256
+`64613974408042798e410cdd1ca257b8186e4ca2f5dca11d30e67963cfa0d0df`. The
+Hermes prompt record confirms it included the exact safe feedback suffix for
+`INVALID_KO`, `KO_CONTROL_CHARACTER`, part 12, cue ordinal 2. It passed
+validation. The accepted response payload was 6,430 bytes, SHA-256
+`0973216e6c537cc69d86aad1306c78ae96d30e0e27c5403258a89bb404e40de0`.
+
+**Logging disclosure:** the Hermes CLI emitted a raw review diff for the
+attempt-1 response to the live execution stream, including subtitle body.
+Stage11's own validation diagnostic line contained only safe metadata, and
+the retry feedback and this handoff contain no subtitle body. The CLI diff
+was not copied into the report or retained in the handoff. Attempt 2 passed;
+the runner continued through the remaining Stage11 parts and publication.
+
+The one-title run finished `PUBLISHED`, sequence 6, reason
+`STAGE12_PUBLICATION_AND_JELLYFIN_VERIFIED`. Final counts:
+`PUBLISHED=160`, `FAILED_RETRYABLE=3`, `RUNNING=0`, `UNRESOLVED=10`. Stage12
+selected and processed only GDTM-091; no other title state changed.
+
+The runner exited with heartbeat `COMPLETE` and no active rollout title. No
+runner process remained; `/tmp` had no file larger than 100 MiB and `/var/tmp`
+had 37,546,962,944 bytes free. Per-session Stage12 staging remains in the
+runtime area as run evidence (19 files); it was not manually deleted.
+
 ## 2026-09-27 MAAN-1193 semantic retry-feedback production canary
 
 At expected HEAD `0459f77d551273b5166d0227bd67965261d0efd5`, read-only
