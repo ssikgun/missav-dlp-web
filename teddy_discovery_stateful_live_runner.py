@@ -7,6 +7,8 @@ import base64
 import hashlib
 import os
 from pathlib import Path
+import re
+import secrets
 import selectors
 import shlex
 import subprocess
@@ -157,6 +159,32 @@ def _ssh_base(
     ]
 
 
+def _safe_subprocess_output_diagnostics(result) -> str:
+    """Describe captured subprocess streams without embedding their contents."""
+
+    def as_bytes(value) -> bytes:
+        if value is None:
+            return b""
+        if isinstance(value, bytes):
+            return value
+        return str(value).encode("utf-8", errors="replace")
+
+    stdout = as_bytes(getattr(result, "stdout", b""))
+    stderr = as_bytes(getattr(result, "stderr", b""))
+    return (
+        "EXIT_CODE="
+        + str(getattr(result, "returncode", "UNAVAILABLE"))
+        + " STDOUT_BYTES="
+        + str(len(stdout))
+        + " STDOUT_SHA256="
+        + hashlib.sha256(stdout).hexdigest()
+        + " STDERR_BYTES="
+        + str(len(stderr))
+        + " STDERR_SHA256="
+        + hashlib.sha256(stderr).hexdigest()
+    )
+
+
 def build_stateful_ssh_argv(
     remote: str,
     ssh_key: str,
@@ -203,8 +231,8 @@ def _remote_input_sha256(
 
     if result.returncode != 0:
         raise StatefulLiveRunnerError(
-            "remote semantic input could not be verified: "
-            + result.stderr.strip()
+            "remote semantic input could not be verified; "
+            + _safe_subprocess_output_diagnostics(result)
         )
 
     value = result.stdout.strip()
@@ -264,8 +292,8 @@ else:
 
     if result.returncode != 0:
         raise StatefulLiveRunnerError(
-            "remote pending status failed: "
-            + result.stderr.strip()
+            "remote pending status failed; "
+            + _safe_subprocess_output_diagnostics(result)
         )
 
     value = result.stdout.strip()
@@ -345,8 +373,8 @@ print("REMOVED")
 
     if result.returncode != 0:
         raise StatefulLiveRunnerError(
-            "remote invalid pending cleanup failed: "
-            + result.stderr.strip()
+            "remote invalid pending cleanup failed; "
+            + _safe_subprocess_output_diagnostics(result)
         )
 
     if result.stdout.strip() not in {"REMOVED", "MISSING"}:
@@ -412,8 +440,8 @@ except FileNotFoundError:
                 "remote pending artifact missing after model invocation"
             )
         raise StatefulLiveRunnerError(
-            "remote part read failed: "
-            + stderr
+            "remote part read failed; "
+            + _safe_subprocess_output_diagnostics(result)
         )
 
     return result.stdout
@@ -492,26 +520,127 @@ def _print_hermes_invocation_diagnostics(
     )
 
 
-def _forward_hermes_output(stream_name: str, payload: bytes) -> None:
-    """Relay one ready SSH output chunk to the corresponding caller stream."""
+_SAFE_REMOTE_DIAGNOSTIC_PATTERNS = (
+    re.compile(r"^MODEL_RC=(-?[0-9]{1,3})$"),
+    re.compile(r"^REMOTE_MODEL_STEP_RESULT=([01])$"),
+    re.compile(
+        r"^REMOTE_PREFLIGHT="
+        r"(WRONG_HOST|QUERY_DECODE_FAILED|TASK_MISSING|"
+        r"RUNTIME_MARKER_PREEXISTING)$"
+    ),
+    re.compile(
+        r"^REMOTE_TIMEOUT_CLEANUP_RESULT="
+        r"(WRONG_HOST|TASK_MISSING|NO_PID_FILE|META_MISSING|INVALID_PID|"
+        r"SESSION_MISMATCH|ALREADY_EXITED|CWD_MISMATCH|CMDLINE_MISMATCH|"
+        r"PGID_MISMATCH|PROCESS_STILL_ALIVE|PASS)$"
+    ),
+)
 
-    target = sys.stdout if stream_name == "stdout" else sys.stderr
-    binary_target = getattr(target, "buffer", None)
-    if binary_target is not None:
-        binary_target.write(payload)
-        binary_target.flush()
-        return
 
-    encoding = getattr(target, "encoding", None) or "utf-8"
-    target.write(payload.decode(encoding, errors="replace"))
-    target.flush()
+class _HermesOutputCapture:
+    """Hash remote CLI streams and retain only bounded allowlisted diagnostics."""
+
+    _MAX_DIAGNOSTIC_LINE_BYTES = 256
+
+    def __init__(self, diagnostic_token: str | None = None) -> None:
+        self._diagnostic_token = diagnostic_token
+        self._streams = {
+            name: {
+                "bytes": 0,
+                "digest": hashlib.sha256(),
+                "line": bytearray(),
+                "discard_line": False,
+                "diagnostics": [],
+            }
+            for name in ("stdout", "stderr")
+        }
+
+    def consume(self, stream_name: str, payload: bytes) -> None:
+        state = self._streams[stream_name]
+        state["bytes"] += len(payload)
+        state["digest"].update(payload)
+        remaining = payload
+
+        while remaining:
+            if state["discard_line"]:
+                newline = remaining.find(b"\n")
+                if newline < 0:
+                    return
+                remaining = remaining[newline + 1 :]
+                state["discard_line"] = False
+                continue
+
+            newline = remaining.find(b"\n")
+            segment = remaining if newline < 0 else remaining[:newline]
+            line = bytes(state["line"]) + segment
+            if len(line) > self._MAX_DIAGNOSTIC_LINE_BYTES:
+                state["line"].clear()
+                if newline < 0:
+                    state["discard_line"] = True
+                    return
+                remaining = remaining[newline + 1 :]
+                continue
+
+            if newline < 0:
+                state["line"][:] = line
+                return
+
+            state["line"].clear()
+            self._record_safe_diagnostic(state, line.rstrip(b"\r"))
+            remaining = remaining[newline + 1 :]
+
+    def _record_safe_diagnostic(self, state: dict, line: bytes) -> None:
+        try:
+            text = line.decode("ascii")
+        except UnicodeDecodeError:
+            return
+        diagnostic_prefix = (
+            "STAGE11_SAFE_DIAGNOSTIC:" + str(self._diagnostic_token) + ":"
+            if self._diagnostic_token is not None
+            else None
+        )
+        if diagnostic_prefix is not None:
+            if not text.startswith(diagnostic_prefix):
+                return
+            text = text[len(diagnostic_prefix) :]
+            patterns = _SAFE_REMOTE_DIAGNOSTIC_PATTERNS[:3]
+        else:
+            patterns = (_SAFE_REMOTE_DIAGNOSTIC_PATTERNS[3],)
+        if any(pattern.fullmatch(text) for pattern in patterns):
+            diagnostics = state["diagnostics"]
+            if text not in diagnostics:
+                diagnostics.append(text)
+
+    def emit_safe_summary(self) -> None:
+        print("HERMES_RAW_OUTPUT_SUPPRESSED=YES", flush=True)
+        for stream_name, state in self._streams.items():
+            prefix = "HERMES_REMOTE_" + stream_name.upper()
+            print(prefix + "_BYTES=" + str(state["bytes"]), flush=True)
+            print(
+                prefix + "_SHA256=" + state["digest"].hexdigest(),
+                flush=True,
+            )
+            for diagnostic in state["diagnostics"]:
+                print(
+                    "HERMES_SAFE_DIAGNOSTIC=" + diagnostic,
+                    flush=True,
+                )
+
+    def safe_diagnostic_value(self, key: str) -> str | None:
+        prefix = key + "="
+        for state in self._streams.values():
+            for diagnostic in state["diagnostics"]:
+                if diagnostic.startswith(prefix):
+                    return diagnostic[len(prefix) :]
+        return None
 
 
 def _stop_hermes_process(
     process: subprocess.Popen[bytes],
     selector: selectors.BaseSelector,
+    output_capture: _HermesOutputCapture,
 ) -> None:
-    """Stop a timed-out local SSH process and relay bytes already in its pipes."""
+    """Stop timed-out SSH and drain captured bytes without displaying them."""
 
     if process.poll() is None:
         process.kill()
@@ -531,7 +660,7 @@ def _stop_hermes_process(
                 break
             if not payload:
                 break
-            _forward_hermes_output(key.data, payload)
+            output_capture.consume(key.data, payload)
         try:
             selector.unregister(key.fileobj)
         except (KeyError, ValueError):
@@ -673,14 +802,15 @@ echo "REMOTE_TIMEOUT_CLEANUP_RESULT=PASS"
         check=False,
     )
 
-    if result.stdout:
-        _forward_hermes_output("stdout", result.stdout)
-    if result.stderr:
-        _forward_hermes_output("stderr", result.stderr)
+    output_capture = _HermesOutputCapture()
+    output_capture.consume("stdout", result.stdout or b"")
+    output_capture.consume("stderr", result.stderr or b"")
+    output_capture.emit_safe_summary()
 
     if result.returncode != 0:
         raise StatefulLiveRunnerError(
-            "remote Hermes timeout cleanup failed"
+            "remote Hermes timeout cleanup failed; SSH_EXIT_CODE="
+            + str(result.returncode)
         )
 
 
@@ -807,11 +937,17 @@ def _invoke_hermes_part(
 SID="$1"
 TASK="$2"
 QUERY_B64="$3"
+DIAGNOSTIC_TOKEN="$4"
+
+safe_diagnostic() {
+  printf 'STAGE11_SAFE_DIAGNOSTIC:%s:%s\\n' \\
+    "$DIAGNOSTIC_TOKEN" "$1"
+}
 
 rok=1
 
 if [ "$(hostname)" != "hermes-lxc-slack" ]; then
-  echo "WRONG_REMOTE_HOST=$(hostname)"
+  safe_diagnostic "REMOTE_PREFLIGHT=WRONG_HOST"
   rok=0
 fi
 
@@ -824,14 +960,14 @@ if [ "$rok" -eq 1 ]; then
   DECODE_RC=$?
 
   if [ "$DECODE_RC" -ne 0 ]; then
-    echo "QUERY_DECODE_FAILED=YES"
+    safe_diagnostic "REMOTE_PREFLIGHT=QUERY_DECODE_FAILED"
     rok=0
   fi
 fi
 
 if [ "$rok" -eq 1 ]; then
   if [ ! -d "$TASK" ]; then
-    echo "REMOTE_TASK_MISSING=YES"
+    safe_diagnostic "REMOTE_PREFLIGHT=TASK_MISSING"
     rok=0
   fi
 fi
@@ -845,7 +981,7 @@ if [ "$rok" -eq 1 ]; then
   META_FILE="$TASK/.stage11-hermes-runtime.meta"
 
   if [ -e "$PID_FILE" ] || [ -e "$META_FILE" ]; then
-    echo "REMOTE_RUNTIME_MARKER_PREEXISTING=YES"
+    safe_diagnostic "REMOTE_PREFLIGHT=RUNTIME_MARKER_PREEXISTING"
     rok=0
   fi
 fi
@@ -888,13 +1024,13 @@ if [ "$rok" -eq 1 ]; then
     rm -f "$PID_FILE" "$META_FILE"
 
     echo
-    echo "MODEL_RC=$MODEL_RC"
+    safe_diagnostic "MODEL_RC=$MODEL_RC"
 
     [ "$MODEL_RC" -eq 0 ] || rok=0
   fi
 fi
 
-echo "REMOTE_MODEL_STEP_RESULT=$rok"
+safe_diagnostic "REMOTE_MODEL_STEP_RESULT=$rok"
 test "$rok" -eq 1
 """
 
@@ -910,6 +1046,8 @@ test "$rok" -eq 1
         remote_task,
         encoded_query,
     ]
+    diagnostic_token = secrets.token_hex(16)
+    command.append(diagnostic_token)
 
     if turn_timeout <= 0:
         raise StatefulLiveRunnerError(
@@ -930,6 +1068,8 @@ test "$rok" -eq 1
 
     process: subprocess.Popen[bytes] | None = None
     last_output_activity_monotonic: float | None = None
+    output_capture = _HermesOutputCapture(diagnostic_token)
+    output_summary_emitted = False
     timeout_reason: str | None = None
     timeout_observed_monotonic: float | None = None
     timeout_cleanup_error: StatefulLiveRunnerError | None = None
@@ -1025,7 +1165,7 @@ test "$rok" -eq 1
                         continue
 
                     last_output_activity_monotonic = time.monotonic()
-                    _forward_hermes_output(key.data, payload)
+                    output_capture.consume(key.data, payload)
 
                 return_code = process.poll()
                 if return_code is not None and not selector.get_map():
@@ -1043,7 +1183,11 @@ test "$rok" -eq 1
                     if last_output_activity_monotonic is not None
                     else None
                 )
-                _stop_hermes_process(process, selector)
+                _stop_hermes_process(
+                    process,
+                    selector,
+                    output_capture,
+                )
                 try:
                     _cleanup_timed_out_remote_hermes(
                         remote=remote,
@@ -1068,12 +1212,17 @@ test "$rok" -eq 1
                     if last_output_activity_monotonic is not None
                     else None
                 )
+        output_capture.emit_safe_summary()
+        output_summary_emitted = True
     except StatefulLiveRunnerTimeoutError:
         raise
     except Exception:
         if process is not None and process.poll() is None:
             process.kill()
             process.wait()
+        if not output_summary_emitted:
+            output_capture.emit_safe_summary()
+            output_summary_emitted = True
         end_epoch = time.time()
         elapsed_seconds = max(
             0.0,
@@ -1159,8 +1308,17 @@ test "$rok" -eq 1
     )
 
     if return_code != 0:
+        model_rc = output_capture.safe_diagnostic_value("MODEL_RC")
+        remote_step = output_capture.safe_diagnostic_value(
+            "REMOTE_MODEL_STEP_RESULT"
+        )
         raise StatefulLiveRunnerError(
-            "Hermes part invocation failed"
+            "Hermes part invocation failed; SSH_EXIT_CODE="
+            + str(return_code)
+            + "; MODEL_RC="
+            + (model_rc if model_rc is not None else "UNAVAILABLE")
+            + "; REMOTE_MODEL_STEP_RESULT="
+            + (remote_step if remote_step is not None else "UNAVAILABLE")
         )
 
 

@@ -1,5 +1,51 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-27 Stage11 Hermes raw-output stream containment
+
+Forensic at HEAD `80da72bc02a8218d237760dd8d04dbadf13f7a55` found that the
+semantic runner already invoked Hermes with `-Q --quiet`, but the GDTM-091
+canary still displayed the CLI's raw `review diff`. The installed `hermes chat
+--help` describes quiet mode as suppressing banners, spinners, and tool
+previews; it exposes no separate raw-diff/output suppression option. Quiet
+mode therefore did not protect this path.
+
+The remote Hermes command had no PTY and no stdout/stderr redirection. The
+local runner used `subprocess.Popen(..., stdout=PIPE, stderr=PIPE)` and a
+selector, then forwarded each received byte chunk unchanged to the matching
+parent stdout/stderr stream. The execution interface merged those parent
+streams, so the retained evidence cannot establish whether GDTM's raw diff
+came from stdout, stderr, or both. No tee or line filter was involved. The
+semantic response traveled separately: Hermes wrote the remote pending JSON,
+and `_read_remote_regular_file` captured its bytes for validation. Thus CLI
+display output was unnecessary for semantic processing.
+
+The GDTM execution stream did expose response text. The runner itself did not
+write a raw stdout/stderr log file; the runtime tree had only the heartbeat
+and a 70-byte last-run summary log. The accepted semantic response remains
+present as a Stage12 staging artifact (part 12: 6,430 bytes); this is the raw
+response artifact, distinct from an execution log. No subtitle body was read
+back or copied into this handoff. Filesystem inspection cannot establish the
+retention policy of the external execution-stream service.
+
+The live runner now captures both CLI streams only in bounded memory, hashes
+them, and never forwards their bytes to stdout, stderr, runner logs, or
+heartbeat. It emits only stream byte counts/SHA-256 and exact safe remote
+status lines carrying a per-invocation random nonce. Nonzero results retain
+SSH/model exit codes plus safe stream digests; arbitrary stderr is never
+embedded in an exception. Timeout activity detection still observes captured
+bytes and retains the existing inactivity/absolute timeout and remote
+cleanup behavior. Other captured SSH errors now use byte counts and hashes
+instead of raw stderr. The remote pending JSON read used by the validator is
+unchanged.
+
+Offline verification passed: stream fixture (raw sentinels absent from
+stdout/stderr/execution log; safe diagnostics, error exit codes and timeout
+behavior preserved), stateful parts (65/0), controller (39/0), live runner
+(16/0), live runner retry, Stage12 batch/retry/bulk/rollout, Python compile,
+and `git diff --check`. No Hermes production invocation, rollout write,
+publication, Jellyfin write, prompt/validator change, or retry-count change
+was made.
+
 ## 2026-09-27 GDTM-091 semantic retry-feedback production canary
 
 At expected HEAD `512e8de3459d440021302674ba0feefcebef2b4b`, read-only
