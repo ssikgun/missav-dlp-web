@@ -1,5 +1,43 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-27 MAAN-1193 semantic retry-feedback production canary
+
+At expected HEAD `0459f77d551273b5166d0227bd67965261d0efd5`, read-only
+preflight confirmed a clean worktree, `MAAN-1193=FAILED_RETRYABLE` sequence 5
+with reason `STAGE12_SEMANTIC_OUTPUT_VALIDATION_RETRY_EXHAUSTED`, matching
+source identity (`MAAN/MAAN-1193/MAAN-1193.mp4`, 2,431,792,344 bytes,
+mtime_ns `1788865578276147930`), no active rollout title, and passing
+production interpreter/dependency checks.
+
+The authorized single-title retry used the new feedback contract. For part 9,
+attempt 1's unchanged base prompt was 3,020 bytes, SHA-256
+`10ce370bead05ea1efaaba30c37bc60e674e96727eaa9d372d5a437cffed969a`. It
+failed `INVALID_KO`, subcode `KO_EMPTY_OR_WHITESPACE`, cue ordinal 8. The
+rejected response was 4,993 bytes, SHA-256
+`fc36ea51c15ac83d97dd328c972ab10c9309e21811136900ae4424fd5c55160c`.
+
+Attempt 2 used a 3,244-byte prompt, SHA-256
+`61c106f558eb69ba5e419b8d9cff678729287a02afab67a369f842c21650a4ab`. Its
+prompt record confirms that it included `INVALID_KO`,
+`KO_EMPTY_OR_WHITESPACE`, and ordinal 8 as machine-generated feedback. It
+passed validation. The accepted response payload was 5,207 bytes, SHA-256
+`a0b76396ec3ffda18d11c010d8157b022d90fc1bb31711fbd65ee2240188550c`. The
+feedback/log diagnostics contained no subtitle text or rejected response
+body. All ten parts covering 603 cues validated; the complete result SHA-256
+was `6584a9a802d510a9afc486b3dbd815bd4994262e78fedb1617d5c82cc49d97b2`.
+
+Stage12 processed exactly one title. `MAAN-1193` finished `PUBLISHED`,
+sequence 8, reason `STAGE12_PUBLICATION_AND_JELLYFIN_VERIFIED`. Final counts:
+`PUBLISHED=159`, `FAILED_RETRYABLE=4`, `RUNNING=0`, `UNRESOLVED=10`. No other
+title was selected or changed.
+
+The runner exited with heartbeat `COMPLETE` and no active rollout title. No
+runner process remained; `/tmp` had no file larger than 100 MiB and `/var/tmp`
+had 37,550,080,000 bytes free. The Stage12 per-session staging artifacts
+(validated semantic parts/input/result) remain in the runtime staging area as
+run evidence; no separate audio temporary workspace remained. No recovery or
+additional retry was performed.
+
 ## 2026-09-27 MAAN-1193 semantic retry contract forensic and fix
 
 Read-only forensic of the MAAN-1193 sequence-5 canary confirmed that part 9's
