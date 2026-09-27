@@ -1,5 +1,36 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-27 MAAN-1193 semantic diagnostic retry canary
+
+At expected HEAD `82d417a450bf881ec926a73fab907400559c254e`, preflight
+confirmed a clean worktree, `MAAN-1193=FAILED_RETRYABLE` at sequence 3 with
+reason `STAGE12_SEMANTIC_OUTPUT_VALIDATION_RETRY_EXHAUSTED`, no active
+`RUNNING`/`GENERATED` titles, and matching Discovery/NAS source identity:
+`MAAN/MAAN-1193/MAAN-1193.mp4`, 2,431,792,344 bytes,
+mtime_ns `1788865578276147930`. Production Python, NumPy, and PyAV preflight
+passed.
+
+The one authorized explicit retry transitioned MAAN-1193 from
+`FAILED_RETRYABLE` sequence 3 to `RUNNING` sequence 4, then back to
+`FAILED_RETRYABLE` sequence 5 with reason
+`STAGE12_SEMANTIC_OUTPUT_VALIDATION_RETRY_EXHAUSTED`. Part 9 failed
+`INVALID_KO` on both attempts. Both responses were 4,993 bytes with identical
+SHA-256 `fc36ea51c15ac83d97dd328c972ab10c9309e21811136900ae4424fd5c55160c`,
+so both attempts returned the same payload. The exact predicate was
+`KO_EMPTY_OR_WHITESPACE`, at 1-based cue ordinal 8. No response or subtitle
+text, nor session ID, was retained in this handoff.
+
+Final counts remain `PUBLISHED=158`, `FAILED_RETRYABLE=5`, `RUNNING=0`,
+`UNRESOLVED=10`. No other title state changed. No artifact/report was
+accepted, and publication/Jellyfin were not reached. The runner completed
+with one title processed and no active title left behind. Both rejected
+remote pending responses were cleaned by the retry path. The private
+`/var/tmp` capture was removed after extracting safe diagnostics; `/tmp` had
+no files over 100 MiB, `/var/tmp` had 35 GiB free, and 8.5 GiB RAM was
+available. A pre-existing Stage11 staging directory remained with content
+timestamps predating the canary; it was left intact. No new artifact/report
+directory appeared. No recovery or second retry was performed.
+
 ## 2026-09-27 Stage11 semantic validation body-free diagnostics
 
 Added generic safe diagnostics for rejected stateful semantic parts without
