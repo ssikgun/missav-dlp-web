@@ -292,14 +292,35 @@ def main():
             and len(recovered["calls"]["remove"]) == 1,
             "INVALID_PART_RETRIED_EXACTLY_ONCE",
         )
-        check(
-            recovered["calls"]["model"][0]
-            == recovered["calls"]["model"][1],
-            "RETRY_QUERY_IS_IDENTICAL",
-        )
-        query = recovered["calls"]["model"][0]
+        first_query, retry_query = recovered["calls"]["model"]
+        query = first_query
         expected = recovered["expected"]
         plan = recovered["plan"]
+        check(
+            first_query
+            == live_runner.build_stateful_part_query(
+                recovered["package"],
+                recovered["package_bytes"],
+                expected.part_index,
+            ),
+            "FIRST_ATTEMPT_PROMPT_BYTES_UNCHANGED",
+        )
+        check(
+            retry_query.startswith(
+                first_query
+                + "\n\nLOCAL_VALIDATION_FEEDBACK_V1"
+            )
+            and retry_query != first_query
+            and hashlib.sha256(retry_query.encode("utf-8")).hexdigest()
+            != hashlib.sha256(first_query.encode("utf-8")).hexdigest(),
+            "RETRY_QUERY_ADDS_VALIDATION_FEEDBACK_AND_CHANGES_HASH",
+        )
+        check(
+            "validation_error_code=INVALID_KO" in retry_query
+            and "invalid_ko_subcode=KO_RUNAWAY_REPETITION" in retry_query
+            and "failed_cue_ordinal_1_based=1" in retry_query,
+            "RETRY_QUERY_CONTAINS_SAFE_VALIDATION_CODE_SUBCODE_ORDINAL",
+        )
         check(
             f"part {expected.part_index} of {plan.part_count}" in query
             and expected.first_cue_id in query
@@ -353,6 +374,10 @@ def main():
             "SEMANTIC_FAILURE_DOES_NOT_DUMP_MODEL_OUTPUT",
         )
         check(
+            "반복" not in retry_query,
+            "RETRY_FEEDBACK_DOES_NOT_INCLUDE_REJECTED_KO_BODY",
+        )
+        check(
             recovered["first_bytes"]
             == (
                 recovered["task"] / plan.parts[0].canonical_filename
@@ -361,6 +386,19 @@ def main():
                 recovered["task"] / expected.pending_filename
             ).exists(),
             "PREVIOUS_PROMOTED_PART_PRESERVED",
+        )
+
+        valid_first_pass = run_synthetic(
+            root / "valid-first-pass",
+            cue_count=1,
+            invalid_attempts=0,
+            prepromote_first=False,
+        )
+        check(
+            valid_first_pass["error_or_result"] == 0
+            and len(valid_first_pass["calls"]["model"]) == 1
+            and valid_first_pass["calls"]["remove"] == [],
+            "VALID_FIRST_RESPONSE_HAS_NO_RETRY_OR_FEEDBACK",
         )
 
         missing_pending = run_synthetic(
@@ -419,6 +457,10 @@ def main():
                     "session_id",
                     "00000000-0000-0000-0000-000000000000",
                 ),
+            ),
+            (
+                "CUE_COUNT_MISMATCH",
+                lambda data: data["cues"].pop(),
             ),
             (
                 "INPUT_SHA256_MISMATCH",
@@ -480,6 +522,34 @@ def main():
                 and expected_marker in diagnostic["output"],
                 "DIAGNOSTIC_MARKER_" + reason,
             )
+            retry_query = diagnostic["calls"]["model"][1]
+            check(
+                "validation_error_code=" + reason in retry_query,
+                "RETRY_FEEDBACK_CODE_" + reason,
+            )
+            if reason == "SESSION_ID_MISMATCH":
+                check(
+                    "mismatch_location=part.session_id" in retry_query
+                    and "required_action=COPY_REQUIRED_SESSION_ID_FROM_PART_CONTRACT"
+                    in retry_query,
+                    "RETRY_FEEDBACK_SESSION_CONTRACT_END_TO_END",
+                )
+            elif reason == "CUE_COUNT_MISMATCH":
+                check(
+                    "expected_cue_count=" + str(expected.cue_count)
+                    in retry_query
+                    and "actual_cue_count="
+                    + str(expected.cue_count - 1)
+                    in retry_query,
+                    "RETRY_FEEDBACK_CUE_COUNTS_END_TO_END",
+                )
+            elif reason == "INVALID_KO":
+                check(
+                    "invalid_ko_subcode=KO_EMPTY_OR_WHITESPACE"
+                    in retry_query
+                    and "failed_cue_ordinal_1_based=1" in retry_query,
+                    "RETRY_FEEDBACK_INVALID_KO_END_TO_END",
+                )
 
         body_sentinel = "PRIVATE_KO_BODY_SENTINEL"
         body_diagnostic = run_synthetic(
@@ -501,7 +571,9 @@ def main():
             not in body_diagnostic["output"]
             and "KO_CONTROL_CHARACTER" in body_diagnostic["output"]
             and "RESPONSE_SHA256=" + body_payload_hash
-            in body_diagnostic["output"],
+            in body_diagnostic["output"]
+            and "PRIVATE_KO_BODY_SENTINEL"
+            not in body_diagnostic["calls"]["model"][1],
             "RESPONSE_BODY_REDACTED_BUT_SAFE_DIAGNOSTICS_RECORDED",
         )
 

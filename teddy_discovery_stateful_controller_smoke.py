@@ -7,6 +7,7 @@ from teddy_discovery_hermes_v2 import HermesV2CueInput
 from teddy_discovery_stateful_controller import (
     REQUEST_PART,
     build_stateful_part_query,
+    build_stateful_validation_retry_feedback,
     decide_stateful_controller_step,
 )
 from teddy_discovery_stateful_parts import build_stateful_part_plan
@@ -125,6 +126,68 @@ check(
 check(
     "Do not reconstruct a longer repetition" in query,
     "QUERY_PREVENTS_HISTORY_REPEAT_RECONSTRUCTION",
+)
+
+check(
+    "Local deterministic validator feedback" not in query,
+    "FIRST_PASS_QUERY_HAS_NO_RETRY_FEEDBACK",
+)
+
+for subcode in (
+    "KO_REQUIRED",
+    "KO_NOT_EXACT_STRING",
+    "KO_EMPTY_OR_WHITESPACE",
+    "KO_TEXT_LIMIT",
+    "KO_CONTROL_CHARACTER",
+    "KO_RUNAWAY_REPETITION",
+):
+    feedback = build_stateful_validation_retry_feedback(
+        reason_code="INVALID_KO",
+        diagnostic_subcode=subcode,
+        cue_ordinal=8,
+        part_number=9,
+    )
+    check(
+        "validation_error_code=INVALID_KO" in feedback
+        and "invalid_ko_subcode=" + subcode in feedback
+        and "failed_cue_ordinal_1_based=8" in feedback
+        and "part_number=9" in feedback,
+        "RETRY_FEEDBACK_INVALID_KO_" + subcode,
+    )
+
+count_feedback = build_stateful_validation_retry_feedback(
+    reason_code="CUE_COUNT_MISMATCH",
+    part_number=4,
+    expected_count=64,
+    actual_count=63,
+)
+check(
+    "expected_cue_count=64" in count_feedback
+    and "actual_cue_count=63" in count_feedback,
+    "RETRY_FEEDBACK_CUE_COUNT_EXPECTED_ACTUAL",
+)
+
+session_feedback = build_stateful_validation_retry_feedback(
+    reason_code="SESSION_ID_MISMATCH",
+    part_number=3,
+    location="part.session_id",
+)
+check(
+    "mismatch_location=part.session_id" in session_feedback
+    and "required_action=COPY_REQUIRED_SESSION_ID_FROM_PART_CONTRACT"
+    in session_feedback,
+    "RETRY_FEEDBACK_SESSION_ID_CONTRACT",
+)
+
+check(
+    "PRIVATE_SUBTITLE_SENTINEL"
+    not in build_stateful_validation_retry_feedback(
+        reason_code="INVALID_KO",
+        diagnostic_subcode="KO_EMPTY_OR_WHITESPACE",
+        cue_ordinal=8,
+        part_number=9,
+    ),
+    "RETRY_FEEDBACK_CONTAINS_NO_SUBTITLE_BODY",
 )
 
 source = Path(

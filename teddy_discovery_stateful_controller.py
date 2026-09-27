@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from pathlib import Path
+import re
 
 from teddy_discovery_stateful_parts import (
     build_stateful_part_plan,
@@ -29,6 +30,74 @@ COMPLETE = "COMPLETE"
 
 class StatefulControllerError(ValueError):
     """Fail-closed controller planning error."""
+
+
+_SAFE_VALIDATION_TOKEN_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
+
+
+def build_stateful_validation_retry_feedback(
+    *,
+    reason_code: str,
+    part_number: int,
+    diagnostic_subcode: str | None = None,
+    cue_ordinal: int | None = None,
+    expected_count: int | None = None,
+    actual_count: int | None = None,
+    location: str | None = None,
+) -> str:
+    """Build retry-only feedback from allowlisted validator metadata.
+
+    This formatter intentionally accepts no response or source text fields.
+    The first request remains the unmodified normal part query.
+    """
+
+    if (
+        type(reason_code) is not str
+        or _SAFE_VALIDATION_TOKEN_RE.fullmatch(reason_code) is None
+    ):
+        reason_code = "OTHER_VALIDATOR_PREDICATE"
+    if type(part_number) is not int or part_number < 1:
+        raise StatefulControllerError("retry feedback part number is invalid")
+
+    lines = [
+        "LOCAL_VALIDATION_FEEDBACK_V1",
+        "validation_error_code=" + reason_code,
+        "part_number=" + str(part_number),
+    ]
+
+    if reason_code == "INVALID_KO":
+        if (
+            type(diagnostic_subcode) is not str
+            or _SAFE_VALIDATION_TOKEN_RE.fullmatch(diagnostic_subcode) is None
+        ):
+            diagnostic_subcode = "INVALID_KO_UNCLASSIFIED"
+        lines.append("invalid_ko_subcode=" + diagnostic_subcode)
+        if type(cue_ordinal) is int and cue_ordinal >= 1:
+            lines.append("failed_cue_ordinal_1_based=" + str(cue_ordinal))
+        lines.append(
+            "required_action=RETURN_NONEMPTY_KO_FOR_FAILED_CUE_"
+            "USING_AUTHORIZED_EVIDENCE"
+        )
+    elif reason_code == "CUE_COUNT_MISMATCH":
+        if (
+            type(expected_count) is int
+            and expected_count >= 0
+            and type(actual_count) is int
+            and actual_count >= 0
+        ):
+            lines.append("expected_cue_count=" + str(expected_count))
+            lines.append("actual_cue_count=" + str(actual_count))
+        lines.append(
+            "required_action=RETURN_EXPECTED_CUE_COUNT_IN_REQUESTED_ORDER"
+        )
+    elif reason_code == "SESSION_ID_MISMATCH":
+        if location == "part.session_id":
+            lines.append("mismatch_location=part.session_id")
+        lines.append("required_action=COPY_REQUIRED_SESSION_ID_FROM_PART_CONTRACT")
+    else:
+        lines.append("required_action=SATISFY_EXISTING_PART_CONTRACT")
+
+    return "\n".join(lines)
 
 
 @dataclass(frozen=True)
@@ -223,5 +292,6 @@ __all__ = [
     "StatefulControllerDecision",
     "StatefulControllerError",
     "build_stateful_part_query",
+    "build_stateful_validation_retry_feedback",
     "decide_stateful_controller_step",
 ]

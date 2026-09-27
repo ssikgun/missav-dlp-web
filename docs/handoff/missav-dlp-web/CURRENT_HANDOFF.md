@@ -1,5 +1,50 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-27 MAAN-1193 semantic retry contract forensic and fix
+
+Read-only forensic of the MAAN-1193 sequence-5 canary confirmed that part 9's
+two failed requests were separate user-message turns in the existing Hermes
+session. The profile's read-only message history records them at
+2026-09-27 05:11:23.837871 UTC and 05:12:51.278167 UTC. Both prompt messages
+were 3,020 bytes with SHA-256
+`10ce370bead05ea1efaaba30c37bc60e674e96727eaa9d372d5a437cffed969a`.
+The reconstructed base64 CLI query payload was 4,028 bytes with SHA-256
+`6228ace347bd1eb3e5e9a17d7094b2cf42e0e0eb2a1cb48694d898d34eda6de8`.
+Both requests referenced the same immutable semantic input, SHA-256
+`60968f77cc913b1dc40769e3593192a106036693847ce2b6211e76b9fa03e84c`.
+The two prompt records had no validation feedback. The runner removed the
+first rejected remote pending response before issuing attempt 2, then reused
+the same part query and session. No provider request ID was persisted; the
+session's aggregate API-call counter cannot identify these two calls. No
+explicit temperature or seed was passed by the runner, and the provider's
+effective defaults were not recoverable. There is no evidence of local
+pending-response reuse or provider caching; caching cannot be ruled out.
+
+Cause: generic retry-contract bug (A). Before this change a validation retry
+made a distinct model request but repeated the same prompt without telling the
+model what predicate failed. The prompt requires Korean output for each cue
+and validator requires nonempty Korean, but it does not state an empty-output
+exception for non-speech cues. No direct prompt/validator contradiction was
+found. The rejected part-9 cue had a nonempty 9-character Japanese source;
+only structural metadata was inspected. Its rejected Korean output and all
+other subtitle text remain excluded from this handoff.
+
+The second attempt now appends a machine-generated feedback block built only
+from safe validator enums and numeric/location fields. The first attempt's
+query is byte-for-byte unchanged. `INVALID_KO` feedback carries its subcode
+and cue ordinal; count mismatch carries expected/actual counts; session
+mismatch states the required fixed contract location. The feedback includes
+no source or rejected response text. Validators, output acceptance, prompt
+semantics on the first attempt, and the one-retry limit are unchanged.
+
+Verification passed: stateful parts (65/0), controller (39/0), live runner
+(16/0), live runner retry (PASS), Stage12 batch/retry/bulk/rollout (all PASS),
+compile, and `git diff --check`. Retry smoke proves the first query is
+unchanged, second query and hash differ, safe failure metadata is included,
+sentinel subtitle text is absent, and a valid first response does not retry.
+No Hermes production invocation, MAAN-1193 retry, rollout DB write,
+publication, or Jellyfin write was performed.
+
 ## 2026-09-27 MAAN-1193 semantic diagnostic retry canary
 
 At expected HEAD `82d417a450bf881ec926a73fab907400559c254e`, preflight
@@ -51,7 +96,7 @@ source-cue subcodes; an unrecognized legacy path is marked
 
 Offline verification passed: stateful parts smoke (65 PASS / 0 FAIL), live
 runner retry smoke (including body-sentinel redaction and payload digest),
-stateful controller smoke (29 PASS / 0 FAIL), live runner smoke (16 PASS / 0
+stateful controller smoke (39 PASS / 0 FAIL), live runner smoke (16 PASS / 0
 FAIL), Stage12 batch, retry, bulk runner, and rollout smokes, Python compile,
 and `git diff --check`. No Hermes invocation, production retry, rollout DB
 write, publication, or Jellyfin write was performed.

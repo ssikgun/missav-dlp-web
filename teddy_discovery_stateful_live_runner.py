@@ -20,6 +20,7 @@ from teddy_discovery_stateful_controller import (
     PROMOTE_PENDING,
     REQUEST_PART,
     build_stateful_part_query,
+    build_stateful_validation_retry_feedback,
     decide_stateful_controller_step,
 )
 from teddy_discovery_stateful_parts import (
@@ -1245,6 +1246,7 @@ def _request_and_install_part(
 ) -> None:
     """Request one deterministic part with a bounded validation retry."""
 
+    retry_feedback: str | None = None
     for attempt in range(1, STATEFUL_PART_MODEL_MAX_ATTEMPTS + 1):
         print(
             "MODEL_PART_ATTEMPT="
@@ -1280,6 +1282,8 @@ def _request_and_install_part(
                 expected.part_index,
                 semantic_policy=semantic_policy,
             )
+            if retry_feedback is not None:
+                query += "\n\n" + retry_feedback
 
             print(
                 "REQUESTING_PART="
@@ -1416,6 +1420,15 @@ def _request_and_install_part(
                     attempts=attempt,
                     max_attempts=STATEFUL_PART_MODEL_MAX_ATTEMPTS,
                 ) from error
+            retry_feedback = build_stateful_validation_retry_feedback(
+                reason_code=str(reason_code),
+                part_number=expected.part_index,
+                diagnostic_subcode=diagnostic_subcode,
+                cue_ordinal=cue_ordinal,
+                expected_count=expected_count,
+                actual_count=actual_count,
+                location=location,
+            )
             print(
                 "RETRYING_PART="
                 + str(expected.part_index)
