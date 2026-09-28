@@ -46,6 +46,48 @@ and `git diff --check`. No Hermes production invocation, rollout write,
 publication, Jellyfin write, prompt/validator change, or retry-count change
 was made.
 
+## 2026-09-28 SCOP-830 semantic retry-feedback and stream-redaction canary
+
+At expected HEAD `fa68ec685f9379568d8edb3cc22934632681f1c7`, the explicit
+single-title retry preflight passed with a clean worktree, production Python
+and audio dependencies, `SCOP-830=FAILED_RETRYABLE` sequence 3, zero active
+titles, and matching source identity
+`SCOP/SCOP-830/SCOP-830.mp4` (1,714,450,031 bytes; mtime_ns
+`1788020170245532124`). The only rollout transitions during this canary were
+SCOP-830: `FAILED_RETRYABLE -> RUNNING -> GENERATED -> PUBLISHED`, sequences
+3 -> 4 -> 5 -> 6.
+
+Part 3 attempt 1 failed `INVALID_KO / KO_CONTROL_CHARACTER` at cue ordinal 36.
+Its semantic query UTF-8 SHA-256 was
+`b3434294bc8ae497226806c7a05bd65702f46caf0a1dfb84d84c534e77e5a532`; the raw
+response was 7,846 bytes with SHA-256
+`15c903a08e07b1bea74e52329dc5649d695832d8903877d2f8df517adab9a2ac`.
+Attempt 2 included the machine-generated validation feedback. Its query
+UTF-8 SHA-256 was
+`369516e74474f8fd13e53ae3887846cd7289b3db8e836baf397dec893af6af96`; the
+validated response was 7,850 bytes with SHA-256
+`cc7cee36932fc4a3f6373717909ef4eed9e0bb9d7ad82c7fbd6656c3351d26fd`.
+Attempt 2 passed. All 13 parts completed; final semantic cue count was 786.
+No response or subtitle text was copied into this handoff.
+
+Every Hermes call reported `HERMES_RAW_OUTPUT_SUPPRESSED=YES`; stdout/stderr
+were represented only by byte counts and SHA-256 digests, plus allowlisted
+model/remote exit status. No raw diff or subtitle body appeared in the runner
+output, execution stream, or structured heartbeat. The runner does not persist
+its stdout/stderr streams. The runtime last-run summary file was 70 bytes; its
+contents were not read, so that file is not independently attested here.
+Heartbeat ended `COMPLETE`; no active RUNNING/GENERATED title remained. The
+published artifact and report were hash-verified, and Jellyfin external
+subtitle recognition was verified. Final counts: `PUBLISHED=161`,
+`FAILED_RETRYABLE=2`, `RUNNING=0`, `UNRESOLVED=10`. No other title state
+changed.
+
+After verifying all 13 remote pending response hashes against the local
+canonical parts, the exact per-session remote and local staging copies were
+removed (remote/local cleanup PASS; 16 local files, 382,145 bytes removed).
+The published artifact and controller report remain in their durable
+artifact directory. No other title's staging or runtime data was touched.
+
 ## 2026-09-27 GDTM-091 semantic retry-feedback production canary
 
 At expected HEAD `512e8de3459d440021302674ba0feefcebef2b4b`, read-only
