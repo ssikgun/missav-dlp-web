@@ -1,0 +1,72 @@
+from pathlib import Path
+
+
+def require(condition, message):
+    if not condition:
+        raise AssertionError(message)
+
+
+root = Path(__file__).parent
+html = (root / "templates/index.html").read_text()
+js = (root / "templates/teddy-library.js").read_text()
+css = (root / "templates/teddy-library.css").read_text()
+discovery_js = (root / "templates/teddy-discovery.js").read_text()
+
+# Separate SPA page/tab while retaining the old Files page and shared modal.
+for marker in ('data-page="library"', 'id="page-library"', 'id="librarySummary"',
+               'id="librarySearch"', 'id="libraryFilter"', 'id="librarySort"',
+               'id="libraryStatus"', 'id="libraryList"'):
+    require(marker in html, f"missing File Manager marker: {marker}")
+require('data-page="files"' in html and 'id="page-files"' in html,
+        "existing Files tab must remain installed")
+require('btn.dataset.page === \'files\'' in html, "existing Files SPA routing changed")
+require('/static/teddy-library.css' in html and '/static/teddy-library.js' in html,
+        "Library assets are not wired")
+require("/api/library/" in html and "'/stream'" in html and "openVideoStream" in html,
+        "Library playback adapter is not connected to the shared player")
+require(html.count('<video ') == 1 and 'id="videoPlayer"' in html,
+        "Library must reuse the single existing player")
+require("player.src = url" in html and "player.pause()" in html,
+        "shared player source and close behavior must remain present")
+
+# Server-side search, filters and all Stage13-B sort modes.
+for marker in ("fetch(queryUrl()", "params.set('q', q)", "params.set('ko', 'present')",
+               "params.set('ko', 'absent')", "params.set('unresolved', 'true')",
+               "params.set('mismatch', 'true')", "params.set('sort', sortBy)",
+               "params.set('order', order)", "setTimeout(loadLibrary, 300)"):
+    require(marker in js, f"missing query wiring: {marker}")
+for sort_key in ('nas_added:desc', 'nas_added:asc', 'release_date:desc', 'dvd_id:asc',
+                 'title:asc', 'size:desc', 'subtitle_status:asc'):
+    require(sort_key in html, f"missing sort choice: {sort_key}")
+
+# Display mappings; values are read from the API response without client-side reclassification.
+for marker in ("case 'VALID'", "case 'ABSENT'", "case 'UNRESOLVED'",
+               "한국어 자막", "자막 없음", "자막 미해결", "자막 상태 확인 필요",
+               "jellyfinLabel", "RECOGNIZED", "Jellyfin 미인식",
+               "추가 날짜 확인 불가", "nas_added_date", "managed_size_bytes",
+               "size_unknown_count", "size_complete", "managed_relative_path",
+               "stage12_status", "unresolved_label"):
+    require(marker in js, f"missing display contract: {marker}")
+require("/api/discovery/media/cover/" in js, "existing Discovery cover route not reused")
+require("discovery-row" in js and "discovery-row-summary" in js and "discovery-detail" in js,
+        "Discovery expandable row structure not reused")
+require("data-play-dvd" in js and "playLibraryItem" in js,
+        "Library row does not use the shared playback adapter")
+
+# No destructive request or private/raw payload rendering.
+require("method: 'DELETE'" not in js and 'method: "DELETE"' not in js and "fetch('/api/library" not in js,
+        "Library UI must not call a delete endpoint")
+for marker in ("JSON.stringify", "session_id", "subtitle_body", "artifact_json", "report_json"):
+    require(marker not in js, f"raw or private payload marker present: {marker}")
+for marker in ("라이브러리를 불러오는 중", "조건에 맞는 작품이 없습니다.",
+               "라이브러리 정보를 불러오지 못했습니다."):
+    require(marker in js, f"missing load/empty/error state: {marker}")
+
+# Responsive layout uses the Discovery family and adapts at desktop/tablet/mobile widths.
+require(".discovery-row-summary.library-row-summary" in css, "Discovery summary styling not reused")
+for breakpoint in ("max-width: 1020px", "max-width: 720px", "max-width: 420px"):
+    require(breakpoint in css, f"missing responsive breakpoint: {breakpoint}")
+require("overflow-wrap: anywhere" in css, "long IDs/paths must wrap on narrow screens")
+require("discovery-row" in discovery_js, "Discovery regression source unavailable")
+
+print("Stage13-C Library UI shell smoke: OK")

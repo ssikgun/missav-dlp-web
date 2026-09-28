@@ -3490,3 +3490,29 @@ byte-for-byte unchanged fixture databases. The full Docker image build and the
 Stage12 inventory, Jellyfin, Downloader API and existing stream-range smokes
 passed. `python -m py_compile` and `git diff --check` passed. Next checkpoint:
 Stage13-C File Manager UI.
+
+## Stage13-C File Manager UI — 2026-09-28
+
+Added a separate `영상 라이브러리` SPA tab backed by the GET-only Stage13-B
+`/api/library` list response. The existing Files page remains intact. The new
+page renders the current holdings summary, server-side DVD-ID/title search,
+KO/unresolved/mismatch filters and Library API sort modes. Expandable rows
+reuse Discovery row/detail styles and show cover, identity, metadata, managed
+relative path, subtitle/Stage12/Jellyfin states, NAS date provenance and
+bounded size status. Unknown date/size and incomplete library totals remain
+explicitly unknown; no browser-side timestamp or size fallback is used.
+
+Playback uses the existing video modal and `<video>` element through the
+canonical DVD-ID `/api/library/<dvd_id>/stream` adapter. Existing Files
+preview continues through the same shared modal. Covers use the existing
+Discovery cover route. No delete control or request was added. The UI has no
+per-item detail fetch and makes no per-item playback/Jellyfin requests.
+
+Validation passed: new File Manager UI shell smoke, existing Discovery UI
+shell smoke, subtitle status UI smoke, Stage13-B fixture Library API smoke in
+the Docker image, Python compile, `git diff --check`, and a full Docker image
+build. Responsive CSS breakpoints were checked by the UI shell smoke; no
+browser rendering harness is installed in the local environment. This is a
+source-only checkpoint: no production deployment/restart, database/NAS write,
+Jellyfin write/refresh, or delete request was performed. Next checkpoint:
+Stage13-C production deployment preflight and read-only canary.
