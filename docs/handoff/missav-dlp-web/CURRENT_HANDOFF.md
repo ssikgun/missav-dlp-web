@@ -1,5 +1,40 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-28 Stage13-C UI information-architecture correction
+
+User clarified the original Files page is **not** the durable JAV library. It
+shows downloader-side files only while they remain in the downloader storage;
+after the organizer moves a completed title into the canonical JAV library,
+that title disappears from the old Files page. This disappearance is the
+reason Stage13 exists.
+
+Freeze the UI semantics accordingly:
+
+- The new Stage13 current-holdings Library view is the durable **File
+  Management** destination and should become the single sidebar
+  `파일 관리` entry.
+- Do not keep a second sidebar entry that competes with it as
+  `영상 라이브러리`.
+- The legacy Files view is transient/downloader-side state, not the permanent
+  library. Preserve its functionality, but relocate/rename it under the
+  Download area as a secondary view such as `다운로드 파일` / `정리 전 파일`;
+  it must not be presented as the primary File Management destination.
+- Move the existing `자막 처리 현황` panel out of Settings into the durable
+  File Management area. It is operational/library status, not a preference.
+- File Management should therefore center on:
+  1. current JAV holdings/library (default),
+  2. subtitle processing status/monitoring.
+- Settings should retain actual configuration/system controls only.
+- Existing transient Files playback behavior must remain available after the
+  navigation move; no functionality should be silently removed.
+- Permanent-delete work later in Stage13 belongs to the durable JAV File
+  Management view, never the transient downloader Files view.
+
+This is a Stage13-C information-architecture correction before formal C
+closure; production candidate remains deployed pending this UI refinement and
+manual visual acceptance.
+
+
 ## 2026-09-28 Stage13-A forensic / contract freeze — PASS
 
 Stage13-A read-only forensic is complete. No source, DB, NAS, Jellyfin, Hermes,
