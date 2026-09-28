@@ -1,5 +1,44 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-28 Post-Stage13 next priority — automatic subtitles for newly completed downloads
+
+This requirement is intentionally **outside Stage13** so the Stage13 NAS Library
+File Manager can be completed without changing the subtitle production
+pipeline.
+
+After Stage13 is CLOSED / PASS, the next priority is to automate subtitle
+follow-up for **newly downloaded/completed titles**. Stage12 closed the bounded
+rollout for the already-held library; it must not be treated as an ongoing
+whole-library job.
+
+Required future behavior:
+
+- Trigger only after a newly downloaded title has completed the existing
+  canonical completion/organizer flow and the final JAV holding is durable.
+- Read the existing canonical subtitle inventory first. If a valid canonical
+  Korean sidecar already exists, finish as a no-op/skip and never overwrite it.
+- If Korean subtitles are absent, enqueue exactly that title into a durable,
+  resumable, idempotent subtitle job that reuses the proven Stage11 generation
+  pipeline and Stage12 publication/Jellyfin-recognition safety contracts.
+- Subtitle failure must remain isolated from the completed media: it must not
+  undo the download, organizer result, holding, metadata, or Jellyfin media
+  item.
+- Preserve the existing generic evidence-based rules: no title/cue-specific
+  production hardcoding, no broad NAS scan, no direct Jellyfin DB write, and
+  no unsafe overwrite of existing KO subtitles.
+- Avoid duplicate subtitle work when the same completion event is observed
+  more than once; the job identity should be tied to the canonical DVD-ID and
+  source/media fingerprint.
+- The future automation should be event/queue based around the existing
+  completion boundary rather than periodically rerunning the closed Stage12
+  173-title rollout.
+
+This is the first post-Stage13 implementation priority. Its exact stage name,
+queue schema, trigger point, and rollout contract should be frozen only after a
+read-only forensic of the current Stage9 completion hook and the reusable
+Stage11/Stage12 single-title boundaries.
+
+
 ## 2026-09-28 Stage12 final closure after bounded staging cleanup
 
 ### CURRENT STATUS — Stage12 CLOSED / PASS
