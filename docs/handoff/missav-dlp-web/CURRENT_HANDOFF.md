@@ -1,5 +1,51 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-29 Stage13-E2D origin forensic — PASS
+
+The exact production rejection for the authenticated ADN-785 delete DRY-RUN
+prepare was confirmed:
+
+- response code: `invalid_request_origin`
+- guard subreason: `scheme_mismatch`
+- browser Origin: `https://downloader.ssikgun.com`
+- Flask request view: scheme `http`, host `downloader.ssikgun.com`
+- `X-Forwarded-Proto=https`
+- `X-Forwarded-Host`: missing
+- `Sec-Fetch-Site=same-origin`
+
+Therefore the failure is specifically reverse-proxy/public-origin scheme
+normalization. The public host itself matches; the request reaches Flask as
+HTTP while the browser correctly identifies the public origin as HTTPS.
+
+No ProxyFix or other app-wide trusted forwarded-header normalization primitive
+currently exists. The upstream proxy/trust-hop topology is not sufficiently
+documented to justify blindly trusting arbitrary forwarded headers.
+
+Frozen fix direction:
+
+- keep authentication, JSON/intent, Origin, host, and same-site checks;
+- do not weaken or remove Origin validation;
+- do not trust arbitrary `X-Forwarded-*` headers;
+- add a centrally configured trusted public origin (for example
+  `TEDDY_PUBLIC_ORIGIN`) and an app-wide helper that parses/canonicalizes that
+  configured origin;
+- compare browser Origin against that configured trusted public origin and keep
+  request-host validation consistent with the configured public host;
+- do not hard-code `downloader.ssikgun.com` inside production logic;
+- fail closed if the configured public origin is absent or invalid for this
+  destructive-intent path.
+
+Safety state remains:
+
+- token issued: NO
+- validate reached: NO
+- delete/commit endpoint: absent
+- NAS/DB/Jellyfin write/delete: 0
+
+Next checkpoint is implementation + fixture validation of the configured
+public-origin helper. Production deployment remains a separate checkpoint.
+
+
 ## 2026-09-29 Stage13-E2C manual reproduction — invalid_request_origin confirmed
 
 Teddy manually retried the authenticated production DRY-RUN prepare for
