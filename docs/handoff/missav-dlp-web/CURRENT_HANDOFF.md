@@ -3600,3 +3600,47 @@ generation, and delete operations were all zero. Production remains on the
 previous known image after the Stage13-C1 source fix. Next: build and deploy
 the corrected source candidate, then rerun the Stage13-C production
 read-only canary.
+
+## Stage13-C2 hotfix production redeploy and canary — 2026-09-28
+
+Built exact source HEAD `044be13a507b20bb1040eb432cb16cb8deb22233` as
+`ghcr.io/ssikgun/missav-dlp-web:stage13c2-044be13a507b` with image ID
+`sha256:2ac1125af07b5f55e78daa85030a9e32c793e44eb1182a3cff0fe58e34a48566`.
+The source revision label and Library API/UI assets were verified. Using the
+production Compose file and env source, only `missav-dlp-web` was recreated;
+the original port, network, storage mounts and read-only NAS/rollout/Jellyfin
+secret boundaries were retained. Gluetun and browser service container IDs
+were unchanged. The new image is running with restart count 0. No rollback was
+performed.
+
+The production read-only Library list canary passed with 177 current
+holdings, `VALID=163`, `UNRESOLVED=10`, `ABSENT=4`, and mismatch 0. It retained
+EBWH-296, MIAD-866, MIRD-258 and SKMJ-774. Exact reason results were:
+HMN-899 `STAGE12_UNSAFE_AUDIO_TIMELINE` / `오디오 타임라인 이상`, NHDTC-250
+`STAGE12_BASELINE_ASR_NO_SPEECH` / `음성 대사 없음`, and JUR-750
+`SUBTITLE_INVENTORY_INVALID` / `기존 자막 상태 확인 필요`. None returned the
+generic fallback. This closes the Stage13-C1 production reason blocker.
+
+Bounded representative NAS/Jellyfin check for ADN-785 returned positive known
+managed size, NAS date `2026-09-01` with `nas_added_at=null` and
+`ORGANIZER_COMPLETION_BOUNDED_DATE`, and Jellyfin `RECOGNIZED`. HMN-899 Library
+playback returned HTTP 206 for bytes 0–1023 (1,024 bytes); no media body was
+saved. The existing Files list helper returned zero remote media entries, so
+there was no safe existing Files item on which to run the requested Range
+regression. No arbitrary path was tried. The Files playback Range canary
+remains unverified until an existing remote Files entry is available.
+
+Library JS/CSS returned HTTP 200. The deployed template has Library, Discovery
+and Files tabs, one shared video element/modal, and the Library DVD-ID stream
+adapter; no Library delete UI/request exists. Public auth behavior remained
+`/` redirect and API 401. A Chrome process exists in the separate browser
+container, but there is no authenticated DevTools/render harness; visual
+viewport verification is `PENDING_MANUAL`.
+
+No rollback. Production write audit: DB writes 0, NAS writes/deletes 0,
+Jellyfin refresh/write 0, Hermes 0, VM122 0, subtitle generation 0, permanent
+delete 0. Production remains on image
+`sha256:2ac1125af07b5f55e78daa85030a9e32c793e44eb1182a3cff0fe58e34a48566`.
+Next: verify existing Files playback when a remote Files media item is
+available, then perform authenticated desktop and narrow/mobile viewport
+review. The deployed candidate is retained while those checks are pending.
