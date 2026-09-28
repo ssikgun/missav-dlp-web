@@ -1,5 +1,37 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-28 Safe subtitle-artifact preflight inspection
+
+The HMN-896 read-only forensic command used recursive `rg` with a title
+identifier against the artifact directory. The minified targeted-evidence JSON
+contained that identifier, so ripgrep emitted its complete matching line,
+including subtitle-bearing fields. This was the direct leak source; the
+execution wrapper did not redact or truncate matching file lines. `cat`,
+`jq` body projections, or Python printing parsed objects have the same unsafe
+property if used on subtitle-bearing artifacts. The body was not copied into
+this handoff and is not repeated here.
+
+Added `teddy_discovery_safe_artifact_inspector.py`, a read-only JSON inspector
+for ASR, targeted evidence, semantic input/output, review, and controller
+report artifacts. It parses internally and emits only artifact kind, exists,
+byte size, SHA-256, integer schema version, validated public DVD-ID, source
+fingerprint match state, cue/segment/source/window/result counts, allowlisted
+targeted status counts, part/count metadata, allowlisted route, and raw-session
+field/fingerprint counts. It never emits the supplied path, JSON fragments,
+free-form strings, or exception text. Malformed JSON reports only
+`INVALID_JSON` with safe size/hash metadata. The helper is available for
+future Stage11/Stage12 read-only artifact preflight; production validators and
+runners were not changed.
+
+Offline smoke passed: sentinel subtitle/session fields and a sentinel session
+path were absent from stdout/stderr for targeted evidence, ASR, semantic
+input/output, review, and controller-report fixtures; targeted counts, source
+fingerprint match, size/hash were exact; malformed input emitted only a safe
+error code. Existing ASR/targeted artifact, semantic translator/review,
+Stage11 controller, and Stage12 batch/retry/bulk/rollout smokes passed, as did
+compile and `git diff --check`. No HMN-896 retry, rollout write, Hermes call,
+publication, or Jellyfin write occurred.
+
 ## 2026-09-28 Stage11 durable-report session identity privacy fix
 
 Read-only forensic at expected HEAD `d6366666b9b26824602b7e122fb61a11b7d7f7eb`
