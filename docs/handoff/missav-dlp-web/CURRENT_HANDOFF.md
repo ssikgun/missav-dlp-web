@@ -4369,3 +4369,17 @@ delete 0. The only production mutations were the public-origin env/config
 setting and replacement of the web app image/container. Next: Teddy performs
 the authenticated ADN-785 prepare and validate-only flow in the browser.
 Actual deletion remains disabled.
+
+## Stage13-E2 authenticated production DRY-RUN closure — 2026-09-29
+
+Teddy completed the authenticated production UI DRY-RUN for ADN-785. Prepare
+reported 4 managed files totaling approximately 3.3 GB, manifest SHA prefix
+`646a207fa39f`, Korean subtitle present and Jellyfin recognized. Validate
+returned `READY_FOR_COMMIT`. Actual deletion remained disabled and no
+production file was deleted.
+
+Stage13-E2 is CLOSED / PASS for the prepare/validate DRY-RUN contract.
+ADN-785 was only the DRY-RUN subject; this outcome does not approve it or any
+other title for a future real deletion canary. Stage13-F1 implementation
+continues offline with its feature gate disabled and production delete count
+remaining zero.
