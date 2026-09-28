@@ -3714,3 +3714,58 @@ DB/NAS/Jellyfin writes, Jellyfin refreshes, subtitle generation, permanent
 delete, Hermes calls and VM122 calls were all zero. Next: deploy the new UI
 source separately, then perform authenticated manual desktop and narrow/mobile
 visual acceptance.
+
+## Stage13-C4 File Management production redeploy and focused canary — 2026-09-28
+
+Built exact source revision
+`6063c51247f1f2dc919fe583557482b225bbdd8c` as
+`ghcr.io/ssikgun/missav-dlp-web:stage13c4-6063c51`; image ID is
+`sha256:46b71ff6fdbc2a4d764b2fc6d62877c2e82750176b4c98f4e60641eb2d255d38`.
+The image revision label matches the full source SHA and Library/navigation
+assets were present. Candidate Compose rendering used the production
+`compose.yaml`, `gluetun.env`, existing C2 override and an app-image-only
+override. App port/network/storage and read-only secret, Discovery DB,
+Stage12 DB/runtime and Jellyfin mounts matched the running configuration.
+Only `missav-dlp-web` was recreated with `--no-deps`; gluetun and both browser
+container IDs did not change. The app is running with restart count 0; no
+container healthcheck is configured, and `/login` returned HTTP 200.
+
+Deployed image static/runtime checks confirmed exactly one File Management
+sidebar entry, no standalone Files or Video Library entry, and retained
+Download, Discovery, Browser and Settings entries. File Management has the
+`보유 라이브러리` default tab and `자막 처리 현황`; Download has
+`다운로드 작업` default and `정리 전 파일`. Settings retains its config
+controls and no subtitle status panel. The status API path, active-page plus
+active-subtab polling guard, 10-second interval, semantic status labels,
+single shared video element, separate Library and Files stream wiring, and
+absence of Library delete UI/request were confirmed from the deployed image.
+
+The production read-only Library model returned 177 current holdings,
+`VALID=163`, `UNRESOLVED=10`, `ABSENT=4`, mismatch 0; all four holdings without
+Stage12 rows remained present. Known managed size totaled 509,297,211,868
+bytes with complete=true and zero unknown items. HMN-899, NHDTC-250 and
+JUR-750 retained their concrete expected reason codes and Korean labels.
+Bounded representative NAS sizes were positive, ADN-785 had date
+`2026-09-01` with `nas_added_at=null` and
+`ORGANIZER_COMPLETION_BOUNDED_DATE`, and representative Jellyfin GET matches
+were `RECOGNIZED`. The subtitle status read-only snapshot was `idle`, with
+163 PUBLISHED, 10 UNRESOLVED, no active DVD-ID, and the existing heartbeat
+marked stale; last activity was retained by the status source.
+
+The canonical ADN-785 stream mapping passed to the existing Range helper and
+returned 206 for bytes 0–1023 (1,024 bytes); the body was not saved. This was
+an internal helper canary, not an authenticated HTTP route request. The
+existing Files metadata helper reported zero current entries, so
+`TRANSIENT_FILES_RANGE_CANARY=N/A_NO_CURRENT_FILE`. The old Files API,
+`fetchFiles`, search/sort, action and stream wiring remain in the deployed
+image. Unauthenticated `/` retained its login redirect, `/api/library`
+returned 401, and Library JS/CSS plus subtitle JS returned HTTP 200. No
+authenticated HTTP or DevTools browser harness was available, so the
+authenticated API route/interactive subtab lifecycle and desktop/mobile
+visual viewport remain pending Teddy review; no auth bypass was used.
+
+The new image remains deployed; no rollback was performed. Production write
+audit: DB writes 0, NAS writes/deletes 0, Jellyfin refresh/write 0, Hermes 0,
+VM122 0, subtitle generation 0, permanent Library delete 0. Only the web app
+image/container was replaced. Next: Teddy performs authenticated desktop and
+narrow/mobile review, including the subtab interactions and playback button.
