@@ -1,5 +1,33 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-28 Stage13-C4 manual visual finding — dark-theme defect
+
+Manual authenticated visual inspection confirmed the Stage13-C3/C4 navigation
+refactor is present in production, but **Stage13-C remains open** because the
+`자막 처리 현황` panel does not honor the application's dark theme.
+
+Observed defect:
+
+- The surrounding File Management page is correctly dark.
+- `templates/teddy-subtitle-status.css` still hard-codes light panel,
+  metric-card, border, and text colors.
+- Unlike the Stage13 Library CSS, it has no
+  `html[data-theme="dark"]` overrides.
+- The result is a large light status card inside an otherwise dark page.
+
+Required next fix is UI-only:
+
+- add scoped dark-theme overrides for the subtitle-status panel, metric cards,
+  text, border, and status badges while preserving meaning-first labels;
+- keep light theme unchanged;
+- do not change subtitle status API/polling/state semantics;
+- validate both light and dark rendering and narrow layout;
+- redeploy only the web app and keep DB/NAS/Jellyfin writes at zero.
+
+The production Stage13-C4 candidate remains running until this visual defect is
+fixed and manually accepted.
+
+
 ## 2026-09-28 Stage13-C UI information-architecture correction
 
 User clarified the original Files page is **not** the durable JAV library. It
