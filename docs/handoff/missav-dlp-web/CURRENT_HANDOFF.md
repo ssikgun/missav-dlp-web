@@ -3578,3 +3578,25 @@ subtitle generation 0, permanent deletes 0. Only the Downloader app container
 was deployed and rolled back. Next: correct terminal-reason precedence or
 normalization, run the fixture smoke and exact-source deployment preflight
 again, then repeat the read-only canary.
+
+## Stage13-C1 unresolved reason resolver hotfix — 2026-09-28
+
+Updated the Library `_reason()` resolver to inspect
+`last_transition_reason` and `inventory_reason` independently, using the
+existing `UNRESOLVED_LABELS` concrete reason list. A specific transition
+reason now wins when present; otherwise a specific inventory reason remains
+authoritative. Only when neither field contains a known concrete reason does
+an unresolved terminal state use `STAGE12_UNRESOLVED` / `자막 상태 확인 필요`.
+The inventory-only helper call path remains supported. No per-title behavior
+or DVD-ID mapping was added.
+
+Fixture cases passed for unsafe audio timeline, baseline ASR no speech,
+inventory-invalid-only, generic unresolved, and inventory-only helper
+compatibility. The complete Stage13-B fixture Library API smoke, Stage13-C
+Library UI shell smoke, Stage12 holdings inventory smoke, Python compile and
+`git diff --check` passed. These tests used fixtures only. Production was not
+deployed or restarted; DB/NAS/Jellyfin writes, Hermes/VM122 calls, subtitle
+generation, and delete operations were all zero. Production remains on the
+previous known image after the Stage13-C1 source fix. Next: build and deploy
+the corrected source candidate, then rerun the Stage13-C production
+read-only canary.

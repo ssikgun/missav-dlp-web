@@ -202,10 +202,15 @@ def _jellyfin_paths():
 
 
 def _reason(state):
-    reason=str(state.get("inventory_reason") or state.get("last_transition_reason") or "")
-    for needle, label in UNRESOLVED_LABELS.items():
-        short=needle.removeprefix("STAGE12_")
-        if needle in reason or short in reason: return needle, label
+    # Terminal transition reasons usually identify the concrete Stage12
+    # failure, while inventory_reason may still describe the generic absence
+    # that made the item eligible. Check both fields independently so one
+    # generic value cannot hide a specific reason in the other field.
+    for field in ("last_transition_reason", "inventory_reason"):
+        candidate=str(state.get(field) or "")
+        for needle, label in UNRESOLVED_LABELS.items():
+            short=needle.removeprefix("STAGE12_")
+            if needle in candidate or short in candidate: return needle, label
     if "UNRESOLVED" in str(state.get("status") or ""):
         return "STAGE12_UNRESOLVED", "자막 상태 확인 필요"
     return "SUBTITLE_INVENTORY_UNAVAILABLE", "자막 상태 확인 불가"

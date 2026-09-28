@@ -16,7 +16,7 @@ from werkzeug.security import generate_password_hash
 
 from teddy_discovery_organizer import canonical_destination
 from teddy_discovery_subtitle import derive_target_ko_relative
-from teddy_library_api import create_library_blueprint, _INVENTORY_SCRIPT, _is_canonical_dvd_id
+from teddy_library_api import create_library_blueprint, _INVENTORY_SCRIPT, _is_canonical_dvd_id, _reason
 import teddy_auth
 import teddy_discovery_runtime
 import teddy_storage
@@ -38,6 +38,30 @@ def add_holding(db, dvd, title, *, parse="MATCHED", created="2026-01-02T00:00:00
 
 
 def main():
+    assert _reason({
+        "status":"UNRESOLVED",
+        "inventory_reason":"NO_CANONICAL_KO_SRT",
+        "last_transition_reason":"STAGE12_UNSAFE_AUDIO_TIMELINE",
+    }) == ("STAGE12_UNSAFE_AUDIO_TIMELINE","오디오 타임라인 이상")
+    assert _reason({
+        "status":"UNRESOLVED",
+        "inventory_reason":"NO_CANONICAL_KO_SRT",
+        "last_transition_reason":"STAGE12_BASELINE_ASR_NO_SPEECH",
+    }) == ("STAGE12_BASELINE_ASR_NO_SPEECH","음성 대사 없음")
+    assert _reason({
+        "status":"UNRESOLVED",
+        "inventory_reason":"SUBTITLE_INVENTORY_INVALID",
+        "last_transition_reason":"INITIALIZE_FROM_INVENTORY",
+    }) == ("SUBTITLE_INVENTORY_INVALID","기존 자막 상태 확인 필요")
+    assert _reason({
+        "status":"UNRESOLVED",
+        "inventory_reason":"NO_CANONICAL_KO_SRT",
+        "last_transition_reason":"INITIALIZE_FROM_INVENTORY",
+    }) == ("STAGE12_UNRESOLVED","자막 상태 확인 필요")
+    # Preserve the inventory-only helper contract used by local KO classification.
+    assert _reason({"inventory_reason":"SUBTITLE_INVENTORY_INVALID"}) == (
+        "SUBTITLE_INVENTORY_INVALID","기존 자막 상태 확인 필요")
+
     with tempfile.TemporaryDirectory(prefix="library-nas-fixture-") as nas_root:
         title=Path(nas_root)/"ABCD"/"ABCD-123"; title.mkdir(parents=True)
         (title/"ABCD-123.mp4").write_bytes(b"12345")
