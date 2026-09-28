@@ -89,3 +89,46 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
+
+html[data-theme="dark"] .subtitle-status-panel {
+    background: #111827;
+    border-color: #273449;
+}
+
+html[data-theme="dark"] .subtitle-status-title {
+    color: #f8fafc;
+}
+
+html[data-theme="dark"] .subtitle-status-current {
+    color: #cbd5e1;
+}
+
+html[data-theme="dark"] .subtitle-status-metric {
+    background: #1f2937;
+}
+
+html[data-theme="dark"] .subtitle-status-metric strong {
+    color: #f8fafc;
+}
+
+html[data-theme="dark"] .subtitle-status-metric span,
+html[data-theme="dark"] .subtitle-status-foot {
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] .subtitle-status-badge {
+    border: 1px solid #334155;
+    background: #1f2937;
+    color: #e5e7eb;
+}
+
+html[data-theme="dark"] .subtitle-status-badge.idle,
+html[data-theme="dark"] .subtitle-status-badge.running,
+html[data-theme="dark"] .subtitle-status-badge.attention,
+html[data-theme="dark"] .subtitle-status-badge.stale,
+html[data-theme="dark"] .subtitle-status-badge.error,
+html[data-theme="dark"] .subtitle-status-badge.unavailable {
+    border-color: #334155;
+    background: #1f2937;
+    color: #e5e7eb;
+}

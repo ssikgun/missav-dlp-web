@@ -3797,3 +3797,29 @@ audit: DB writes 0, NAS writes/deletes 0, Jellyfin refresh/write 0, Hermes 0,
 VM122 0, subtitle generation 0, permanent Library delete 0. Only the web app
 image/container was replaced. Next: Teddy performs authenticated desktop and
 narrow/mobile review, including the subtab interactions and playback button.
+
+## Stage13-C5 subtitle status dark-theme CSS hotfix — 2026-09-28
+
+Added scoped `html[data-theme="dark"]` overrides to
+`templates/teddy-subtitle-status.css`. The panel now uses the existing
+`#111827` dark surface and `#273449` border; metric cards and badges use the
+existing `#1f2937` secondary surface with readable foregrounds. Title,
+current status, metric values/labels and footer use the established dark
+theme text palette. Every badge state, including idle, running, attention,
+stale, error and unavailable, remains legible with neutral styling; emoji and
+text continue to carry the state meaning. Existing light-theme base values
+and the 680px two-column metric layout were left unchanged.
+
+Extended `teddy_subtitle_status_ui_smoke.py` to check dark selectors and
+foreground/background declarations, preserve the light base declarations,
+and retain the narrow grid. Subtitle status UI, File Management navigation,
+Library UI, Discovery UI shell, Python compile and `git diff --check` passed.
+The full local Docker image build `missav-stage13c5-smoke:9692b06` passed,
+including all configured UI smoke checks.
+
+No production deploy or restart was performed. Production remains on the C4
+candidate image `sha256:46b71ff6fdbc2a4d764b2fc6d62877c2e82750176b4c98f4e60641eb2d255d38`.
+DB/NAS/Jellyfin writes, Jellyfin refresh, Hermes/VM122 calls, subtitle
+generation and delete operations were all zero. Next: deploy the CSS hotfix
+by replacing only the production web app, then Teddy verifies dark-mode status
+panel appearance.

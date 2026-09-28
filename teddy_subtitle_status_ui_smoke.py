@@ -1,9 +1,24 @@
 from pathlib import Path
+import re
 
 
 def require(value, name):
     if not value:
         raise AssertionError(name)
+
+
+def rule(css, selector):
+    for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", css, re.S):
+        selectors = [part.strip() for part in match.group(1).split(",")]
+        if selector in selectors:
+            return match.group(2)
+    raise AssertionError("missing CSS rule: " + selector)
+
+
+def declaration(block, name, value, label):
+    require(re.search(r"(?:^|;)\s*" + re.escape(name) + r"\s*:\s*"
+                      + re.escape(value) + r"\s*(?:;|$)", block) is not None,
+            label)
 
 
 def main():
@@ -67,6 +82,45 @@ def main():
         ".subtitle-status-panel" in css,
         "STATUS_UI_STYLE",
     )
+
+    # Light-theme values remain the base; dark mode uses the app/library palette.
+    light_checks = (
+        (".subtitle-status-panel", "background", "#f8fafc"),
+        (".subtitle-status-panel", "border", "1px solid #e2e8f0"),
+        (".subtitle-status-current", "color", "#334155"),
+        (".subtitle-status-metric", "background", "#ffffff"),
+        (".subtitle-status-badge", "background", "#e2e8f0"),
+        (".subtitle-status-badge", "color", "#475569"),
+    )
+    for selector, name, value in light_checks:
+        declaration(rule(css, selector), name, value,
+                    "LIGHT_THEME_REGRESSION:" + selector + ":" + name)
+
+    dark_checks = (
+        ('html[data-theme="dark"] .subtitle-status-panel', "background", "#111827"),
+        ('html[data-theme="dark"] .subtitle-status-panel', "border-color", "#273449"),
+        ('html[data-theme="dark"] .subtitle-status-title', "color", "#f8fafc"),
+        ('html[data-theme="dark"] .subtitle-status-current', "color", "#cbd5e1"),
+        ('html[data-theme="dark"] .subtitle-status-metric', "background", "#1f2937"),
+        ('html[data-theme="dark"] .subtitle-status-metric strong', "color", "#f8fafc"),
+        ('html[data-theme="dark"] .subtitle-status-metric span', "color", "#94a3b8"),
+        ('html[data-theme="dark"] .subtitle-status-foot', "color", "#94a3b8"),
+        ('html[data-theme="dark"] .subtitle-status-badge', "background", "#1f2937"),
+        ('html[data-theme="dark"] .subtitle-status-badge', "color", "#e5e7eb"),
+        ('html[data-theme="dark"] .subtitle-status-badge.idle', "background", "#1f2937"),
+        ('html[data-theme="dark"] .subtitle-status-badge.running', "background", "#1f2937"),
+        ('html[data-theme="dark"] .subtitle-status-badge.attention', "background", "#1f2937"),
+        ('html[data-theme="dark"] .subtitle-status-badge.stale', "background", "#1f2937"),
+        ('html[data-theme="dark"] .subtitle-status-badge.error', "background", "#1f2937"),
+        ('html[data-theme="dark"] .subtitle-status-badge.unavailable', "background", "#1f2937"),
+    )
+    for selector, name, value in dark_checks:
+        declaration(rule(css, selector), name, value,
+                    "DARK_THEME_CONTRACT:" + selector + ":" + name)
+
+    require("@media (max-width: 680px)" in css
+            and "grid-template-columns: repeat(2, minmax(0, 1fr))" in css,
+            "NARROW_METRIC_GRID_REGRESSION")
 
     panel = template.split(
         'id="subtitle-status-panel"',
