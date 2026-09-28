@@ -1,5 +1,22 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-28 Stage12 rollout-summary wrapper correction
+
+The HMN-896 result-collection wrapper that exited nonzero was an inline
+post-run Python snippet, not a tracked repository utility. It imported
+`Stage12RolloutStateStore` and `rollout_counts` from
+`teddy_discovery_stage12_rollout`; `rollout_counts` is defined in
+`teddy_discovery_stage12_bulk_runner`, while the rollout store's existing
+public read-only summary API is `Stage12RolloutStateStore.status_counts()`.
+The summary path now uses only the canonical rollout module:
+`from teddy_discovery_stage12_rollout import Stage12RolloutStateStore`, then
+`store.status_counts()`. It does not import the bulk runner or call its
+production entry point. Repository search found no duplicate bad import in
+other wrappers or utilities. A temporary read-only fixture verified exit 0
+and `PUBLISHED=163`, `FAILED_RETRYABLE=0`, `RUNNING=0`, `UNRESOLVED=10`;
+Stage12 batch, retry, bulk-runner, rollout smokes, compile, and diff checks
+passed. No production state or runner semantics changed.
+
 ## 2026-09-28 HMN-896 final explicit retry canary
 
 At expected HEAD `41517e57bc59d3f536644e91ad49c28fb27d26f8`, the read-only
