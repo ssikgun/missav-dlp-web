@@ -44,7 +44,8 @@ Exact supplied-input read-only replay:
   repeated-text anchor ambiguity; until then, the production external-JA path
   remains fail-closed for this replay.
 
-Source changes and smoke checks are local pending commit/push.
+Source changes and this handoff are committed as `54010d7` and pushed to
+`origin/teddy-subtitle-stage11`.
 
 ## 2026-09-29 Stage13-E2B prepare-guard forensic — INCOMPLETE
 
