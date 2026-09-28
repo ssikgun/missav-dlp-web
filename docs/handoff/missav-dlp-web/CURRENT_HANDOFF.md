@@ -3963,3 +3963,52 @@ production title was prepared. Actual delete calls = 0; DB writes = 0; NAS
 writes/deletes = 0; Jellyfin writes/refresh = 0; Discovery reconcile writes =
 0; Hermes/VM122 calls = 0; subtitle generation = 0. Next: Stage13-E2 may deploy
 the DRY-RUN endpoints for a read-only canary; actual deletion remains disabled.
+
+## Stage13-E2 Permanent Delete DRY-RUN production deployment — 2026-09-28
+
+Built and deployed exact source HEAD `ebd04178991659661efd416d0435e03e0ddc5584`
+as `ghcr.io/ssikgun/missav-dlp-web:stage13e2-ebd0417`, image
+`sha256:62c276b041a42a20a81fbbe925ff165f0b49a0674dff898fd5e2855f60afadef`.
+The previous running app image was
+`sha256:7f427ebf957180466c7fe0d56122dd5eddfc833f3919ab9527741d8a1399df19`.
+Production Compose was rendered with the existing env and C2/C4/C6 overrides;
+only the app image differed. Only `missav-dlp-web` was recreated. The app is
+running with restart count 0; other service container IDs were unchanged.
+Unauthenticated `/` still redirects to login and Library/status/prepare/
+validate API requests remain 401. No credential or auth bypass was used.
+
+The current read-only Discovery source was 182 present JAV holdings before
+deployment and remained 182 afterward (182 distinct IDs, all `MATCHED`, no
+duplicate IDs), rather than the E2 expected 177. This is recorded as a
+pre-existing count discrepancy; no cause or timing is inferred. ADN-785 was
+rechecked as one valid present canonical holding with no active subtitle job.
+Using the deployed bounded manifest reader against only its exact canonical
+title directory found 4 direct regular files totaling 3,528,183,972 bytes;
+manifest identity SHA prefix `646a207fa39f`. The canonical media size/mtime
+matched the holding. No symlink, special file, nested directory or entry
+bound violation was found. Read-only state was KO `VALID` and Jellyfin
+`RECOGNIZED`. This was an internal exact-folder reader canary, not a call to
+the authenticated prepare API; no token was issued.
+
+The production prepare/validate/replay HTTP canary was not run because no
+existing authenticated same-origin HTTP/browser session was available. The
+unauthenticated guard was verified, including form-style prepare rejection;
+authentication was not bypassed. Therefore API prepare summary, `READY_FOR_COMMIT`,
+and replay idempotency remain unverified in production. Source/runtime route
+inspection confirms only prepare and validate routes are registered; there is
+no delete commit endpoint. Deployed UI wiring contains prepare/validate only,
+and no commit button. Fixture smoke remains the evidence for token expiry,
+wrong identity, missing acknowledgement, drift and replay paths.
+
+Deployed template/static checks passed for the Library page, prepare/validate
+UI wiring, existing Library and transient Files stream adapters, and exactly
+one shared video element. No authenticated browser harness is installed, so
+`DELETE_DRYRUN_UI_VISUAL=PENDING_TEDDY`.
+
+No rollback was performed. The E2 candidate remains deployed. Production write
+audit: DB writes 0, NAS writes/deletes 0, Jellyfin write/refresh 0, Discovery
+reconcile writes 0, Hermes 0, VM122 0, subtitle generation 0, permanent delete
+0. The only production mutation was replacement of the web app image/container.
+E2 is incomplete pending an authenticated same-origin prepare/validate/replay
+canary and reconciliation of the observed 182-versus-177 holdings count before
+claiming the requested production contract. Actual deletion remains disabled.
