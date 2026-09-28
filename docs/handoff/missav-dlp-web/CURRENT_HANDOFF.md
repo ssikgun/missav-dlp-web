@@ -1,5 +1,61 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-28 Stage13-E2A current-holdings delta forensic — PASS
+
+The previous Stage13-A/C value of 177 present JAV holdings was a point-in-time
+snapshot, not a permanent production invariant.
+
+Current read-only Discovery state:
+
+- present JAV holdings: **184**
+- unique DVD-ID: **184**
+- MATCHED: **184**
+- duplicate DVD-ID: **0**
+- canonical/parse mismatch: **0**
+
+Seven holdings have `first_seen_at` after the prior 177 snapshot boundary and
+all seven are classified as `NEW_CANONICAL_HOLDING_CONFIRMED`:
+
+- EROFV-313
+- SVVRT-086
+- NTR-102
+- DAL-012
+- FTHT-361
+- FTHTD-219
+- FTHTD-228
+
+Each has `discovered_by=completion-stage9` and one matching COMPLETED organizer
+job for the same canonical destination. This confirms the current 184 count is
+explained by verified new canonical holdings since the prior snapshot. The
+organizer timestamps are completion evidence, not exact filesystem placement
+instants.
+
+Historical removal reconstruction remains unavailable because the current
+schema does not preserve a complete holding-transition history. Do not infer
+that no historical removal ever occurred.
+
+Current Stage12 relationship:
+
+- Stage12 rollout rows remain **173**.
+- Current holdings without a Stage12 rollout row: **11**
+  (`DAL-012`, `EBWH-296`, `EROFV-313`, `FTHT-361`, `FTHTD-219`,
+  `FTHTD-228`, `MIAD-866`, `MIRD-258`, `NTR-102`, `SKMJ-774`,
+  `SVVRT-086`).
+
+Frozen Stage13 contract:
+
+- File Management `total_titles` is derived from the **current** read-only
+  `storage_root='jav' AND present=1` holdings snapshot at request time.
+- Never use 177 (or any other historical count) as a production hard gate.
+- Stage12 terminal state remains an optional LEFT JOIN.
+- Current holdings without Stage12 rollout rows are valid File Management items.
+- Stage13-E2 prepare/validate canaries must compare against the current snapshot
+  captured immediately before the canary.
+
+The remaining E2 blocker is only the authenticated same-origin
+prepare/validate/replay canary. Actual delete remains disabled.
+
+
 ## 2026-09-28 Post-Stage13 subtitle automation — progress visibility requirement
 
 When the post-Stage13 automatic subtitle workflow for newly completed downloads
