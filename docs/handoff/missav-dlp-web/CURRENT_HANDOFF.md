@@ -1,5 +1,32 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-28 Post-Stage13 subtitle automation — progress visibility requirement
+
+When the post-Stage13 automatic subtitle workflow for newly completed downloads
+is implemented, File Management > `자막 처리 현황` must become the operational
+progress view for that automation.
+
+Required visible progress semantics:
+
+- Always show the currently processing DVD-ID when a subtitle job is active.
+- Show the current pipeline stage with a short human-readable Korean label
+  (for example inventory check, ASR, evidence preparation, Hermes semantic
+  translation/review, publication, Jellyfin verification).
+- When Hermes is processing split semantic parts, show exact progress as
+  `Part n/N`, using the existing controller/runtime progress source rather
+  than guessing from elapsed time.
+- Preserve the current status summary counts and heartbeat/last-activity
+  information, but distinguish active-job progress from aggregate library
+  holdings counts.
+- Idle state must clearly say there is no current title.
+- Retry/failure/unresolved states must remain title-local and expose a concise
+  machine-derived reason without subtitle body/raw response/session identity.
+- The UI should update from the durable job/controller state so browser reloads
+  do not lose the current progress view.
+- This requirement belongs to the post-Stage13 new-download subtitle automation
+  work; do not expand Stage13 permanent-delete scope to implement it now.
+
+
 ## 2026-09-28 Stage13-C visual acceptance — CLOSED / PASS
 
 Manual authenticated browser verification by Teddy confirmed the final Stage13-C
