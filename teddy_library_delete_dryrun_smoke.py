@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -96,6 +98,9 @@ def main():
         root, title, media, db_path, relative, dvd = make_fixture(tmp)
         calls = []
         app, client = app_for(db_path, root, calls)
+        diagnostic_output = io.StringIO()
+        diagnostic_handler = logging.StreamHandler(diagnostic_output)
+        app.logger.addHandler(diagnostic_handler)
         rows, terminal = _holding_rows(str(db_path), "", dvd)
         fixture_row = dict(rows[0])
         fixture_video = validate_canonical_holding(fixture_row, dvd)
@@ -106,9 +111,48 @@ def main():
         fixture_fingerprint = source_identity_fingerprint(fixture_row, fixture_video.relative_path)
         PrepareTokenRegistry().issue(dvd_id=dvd, manifest_sha256=fixture_manifest["manifest_sha256"], source_fingerprint=fixture_fingerprint)
         url = f"/api/library/{dvd}/delete/prepare"
+        client.set_cookie("diagnostic_marker", "COOKIE_SECRET_MARKER")
         unauth = app.test_client().post(url, json={}, base_url="http://localhost",
                                        headers={"Origin": "http://localhost", "X-Teddy-Delete-Intent": "prepare"})
         assert unauth.status_code == 401
+
+        invalid_mimetype = client.post(url, data="{}", base_url="http://localhost",
+                                       content_type="text/plain",
+                                       headers={"Origin": "http://localhost", "X-Teddy-Delete-Intent": "prepare"})
+        assert invalid_mimetype.status_code == 403
+        wrong_intent = client.post(url, json={"prepare_token": "TOKEN_SECRET_MARKER"}, base_url="http://localhost",
+                                   headers={"Origin": "http://localhost", "X-Teddy-Delete-Intent": "wrong"})
+        assert wrong_intent.status_code == 403
+        missing_origin = client.post(url, json={}, base_url="http://localhost",
+                                     headers={"X-Teddy-Delete-Intent": "prepare"})
+        assert missing_origin.status_code == 403
+        scheme_mismatch = client.post(url, json={}, base_url="http://localhost",
+                                      headers={"Origin": "https://localhost", "X-Teddy-Delete-Intent": "prepare"})
+        assert scheme_mismatch.status_code == 403
+        host_mismatch = client.post(url, json={}, base_url="http://localhost",
+                                    headers={"Origin": "http://evil.invalid", "X-Teddy-Delete-Intent": "prepare",
+                                             "X-Forwarded-Proto": "https", "X-Forwarded-Host": "downloader.example"})
+        assert host_mismatch.status_code == 403
+        cross_site = client.post(url, json={}, base_url="http://localhost",
+                                 headers={"Origin": "http://localhost", "X-Teddy-Delete-Intent": "prepare",
+                                          "Sec-Fetch-Site": "cross-site"})
+        assert cross_site.status_code == 403
+        diagnostics = diagnostic_output.getvalue()
+        for expected in (
+            "reject=invalid_request_boundary subreason=mimetype",
+            "reject=invalid_request_boundary subreason=intent_header",
+            "reject=invalid_request_origin subreason=origin_missing",
+            "reject=invalid_request_origin subreason=scheme_mismatch",
+            "reject=invalid_request_origin subreason=host_mismatch",
+            "reject=invalid_request_origin subreason=cross_site",
+            "x_forwarded_proto=https", "x_forwarded_host=downloader.example",
+        ):
+            assert expected in diagnostics, expected
+        assert diagnostics.count("library_delete_guard reject=") == 6
+        assert "COOKIE_SECRET_MARKER" not in diagnostics
+        assert "TOKEN_SECRET_MARKER" not in diagnostics
+        assert "diagnostic_marker" not in diagnostics and "session" not in diagnostics.lower()
+
         bad_origin = client.post(url, json={}, base_url="http://localhost",
                                  headers={"Origin": "http://evil.invalid", "X-Teddy-Delete-Intent": "prepare"})
         assert bad_origin.status_code == 403
@@ -286,6 +330,17 @@ def main():
     assert "data-delete-select" not in js and 'type="file"' not in js
     assert "activeDeleteToken = null" in js and "function clearDeleteDialog()" in js
     assert "dialog.addEventListener('cancel'" in js and "ack.checked && typed.value === dvd" in js
+    for code in ("invalid_request_boundary", "invalid_request_origin", "authentication_required",
+                 "nas_inventory_unavailable", "prepare_unavailable", "manifest_changed",
+                 "validation_unavailable"):
+        assert code in js
+    assert "function safeDeleteErrorCode(payload)" in js
+    assert "payload.error && payload.error.code" in js
+    assert "SAFE_DELETE_ERROR_CODES.has(code) ? code : null" in js
+    assert "const code = _.safeCode ? ` (${_.safeCode})` : '';" in js
+    assert "삭제 준비 정보를 확인하지 못했습니다.${code}" in js
+    assert "준비 상태를 확인하지 못했습니다. 창을 닫고 다시 준비해 주세요.${code}" in js
+    assert "payload.error.message" not in js and "response.text()" not in js
     module_source = Path("teddy_library_delete_dryrun.py").read_text(encoding="utf-8")
     assert not re.search(r"\b(?:os\.)?(?:unlink|remove|rmdir)\s*\(|\.unlink\s*\(|\.rmdir\s*\(|\brm\s+-", module_source)
     assert "os.open(ent.path,os.O_RDONLY" in module_source and "follow_symlinks=False" in module_source

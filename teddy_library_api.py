@@ -7,7 +7,9 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path, PurePosixPath
+import re
 import sqlite3
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, current_app, jsonify, request, session
@@ -301,6 +303,28 @@ def _build_items(db_path, rollout_path, nas_reader, jellyfin_loader, dvd_id=None
 def _error(code,message,status): return jsonify({"status":"error","error":{"code":code,"message":message}}),status
 
 
+def _delete_guard_log_value(value, limit=128):
+    """Bound and sanitize a value before putting it in a guard diagnostic."""
+    if value is None or value == "":
+        return "missing"
+    return re.sub(r"[^A-Za-z0-9._:\-\[\],]", "_", str(value)[:limit]) or "missing"
+
+
+def _delete_origin_log_parts(origin):
+    if not origin:
+        return "missing", "missing"
+    try:
+        parsed = urlsplit(origin)
+        hostname = parsed.hostname or "missing"
+        if ":" in hostname and not hostname.startswith("["):
+            hostname = f"[{hostname}]"
+        port = parsed.port
+        host = f"{hostname}:{port}" if port is not None else hostname
+        return _delete_guard_log_value(parsed.scheme), _delete_guard_log_value(host)
+    except (TypeError, ValueError):
+        return "invalid", "invalid"
+
+
 def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=None, jellyfin_loader=None, stream_response=None, delete_manifest_reader=None, delete_token_registry=None):
     bp=Blueprint("teddy_library_api",__name__,url_prefix="/api/library")
     nas_reader=nas_reader if nas_reader is not None else (NASLibraryReader(_nas_client_from_env()) if _nas_client_from_env() else None)
@@ -357,17 +381,48 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
     def delete_intent_guard(intent):
         if session.get("teddy_authenticated") is not True:
             return _error("authentication_required", "인증이 필요합니다.", 401)
-        if request.mimetype != "application/json" or request.headers.get("X-Teddy-Delete-Intent") != intent:
+        origin = request.headers.get("Origin")
+        sec_fetch_site = request.headers.get("Sec-Fetch-Site", "same-origin")
+
+        def log_rejection(code, subreason):
+            origin_scheme, origin_host = _delete_origin_log_parts(origin)
+            current_app.logger.warning(
+                "library_delete_guard reject=%s subreason=%s intent=%s method=%s "
+                "mimetype=%s request_scheme=%s request_host=%s origin_scheme=%s "
+                "origin_host=%s x_forwarded_proto=%s x_forwarded_host=%s "
+                "sec_fetch_site=%s delete_intent=%s",
+                code, subreason, _delete_guard_log_value(intent, 16),
+                _delete_guard_log_value(request.method, 16),
+                _delete_guard_log_value(request.mimetype, 48),
+                _delete_guard_log_value(request.scheme, 16),
+                _delete_guard_log_value(request.host), origin_scheme, origin_host,
+                _delete_guard_log_value(request.headers.get("X-Forwarded-Proto")),
+                _delete_guard_log_value(request.headers.get("X-Forwarded-Host")),
+                _delete_guard_log_value(sec_fetch_site, 32),
+                _delete_guard_log_value(request.headers.get("X-Teddy-Delete-Intent"), 32),
+            )
+
+        if request.mimetype != "application/json":
+            log_rejection("invalid_request_boundary", "mimetype")
+            return _error("invalid_request_boundary", "요청을 확인할 수 없습니다.", 403)
+        if request.headers.get("X-Teddy-Delete-Intent") != intent:
+            log_rejection("invalid_request_boundary", "intent_header")
             return _error("invalid_request_boundary", "요청을 확인할 수 없습니다.", 403)
         # A browser same-origin JSON request supplies Origin; requiring it
         # blocks cross-site form posts even if an authenticated cookie exists.
-        from urllib.parse import urlsplit
-        origin = request.headers.get("Origin")
         expected = urlsplit(request.host_url)
         supplied = urlsplit(origin or "")
-        if (not origin or supplied.scheme != expected.scheme
-                or supplied.netloc.casefold() != expected.netloc.casefold()
-                or request.headers.get("Sec-Fetch-Site", "same-origin") == "cross-site"):
+        origin_subreason = None
+        if not origin:
+            origin_subreason = "origin_missing"
+        elif supplied.scheme != expected.scheme:
+            origin_subreason = "scheme_mismatch"
+        elif supplied.netloc.casefold() != expected.netloc.casefold():
+            origin_subreason = "host_mismatch"
+        elif sec_fetch_site == "cross-site":
+            origin_subreason = "cross_site"
+        if origin_subreason:
+            log_rejection("invalid_request_origin", origin_subreason)
             return _error("invalid_request_origin", "요청 출처를 확인할 수 없습니다.", 403)
         return None
 

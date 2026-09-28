@@ -15,6 +15,22 @@
     let requestSerial = 0;
     let activeDeleteDialog = null;
     let activeDeleteToken = null;
+    const SAFE_DELETE_ERROR_CODES = new Set([
+        'invalid_request_boundary', 'invalid_request_origin', 'authentication_required',
+        'nas_inventory_unavailable', 'prepare_unavailable', 'manifest_changed',
+        'validation_unavailable'
+    ]);
+
+    function safeDeleteErrorCode(payload) {
+        const code = payload && payload.error && payload.error.code;
+        return SAFE_DELETE_ERROR_CODES.has(code) ? code : null;
+    }
+
+    function deleteRequestError(payload) {
+        const error = new Error('delete request failed');
+        error.safeCode = safeDeleteErrorCode(payload);
+        return error;
+    }
 
     function escapeHtml(value) {
         return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
@@ -142,7 +158,7 @@
                 method: 'POST', credentials: 'same-origin', headers: intentHeaders('prepare'), body: '{}'
             });
             const payload = await response.json();
-            if (!response.ok || payload.status !== 'PREPARED' || !payload.prepare_token) throw new Error('prepare failed');
+            if (!response.ok || payload.status !== 'PREPARED' || !payload.prepare_token) throw deleteRequestError(payload);
             if (activeDeleteDialog !== dialog) return;
             activeDeleteToken = payload.prepare_token;
             const files = Array.isArray(payload.files) ? payload.files : [];
@@ -171,12 +187,16 @@
                     if (!checked.ok || result.status !== 'READY_FOR_COMMIT' || result.actual_delete_performed !== false) throw new Error('validation failed');
                     final.textContent = '삭제 준비 검증 완료 · 실제 삭제는 아직 비활성';
                 } catch (_) {
-                    final.textContent = '준비 상태를 확인하지 못했습니다. 창을 닫고 다시 준비해 주세요.';
+                    const code = _.safeCode ? ` (${_.safeCode})` : '';
+                    final.textContent = `준비 상태를 확인하지 못했습니다. 창을 닫고 다시 준비해 주세요.${code}`;
                     activeDeleteToken = null;
                 }
             });
         } catch (_) {
-            if (activeDeleteDialog === dialog) dialog.querySelector('.library-delete-result').textContent = '삭제 준비 정보를 확인하지 못했습니다.';
+            if (activeDeleteDialog === dialog) {
+                const code = _.safeCode ? ` (${_.safeCode})` : '';
+                dialog.querySelector('.library-delete-result').textContent = `삭제 준비 정보를 확인하지 못했습니다.${code}`;
+            }
         }
     }
 
