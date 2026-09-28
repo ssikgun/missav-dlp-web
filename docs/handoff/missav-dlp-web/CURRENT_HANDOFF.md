@@ -3434,3 +3434,59 @@ lifecycle, and partial-copy cleanup for `Exception`, `KeyboardInterrupt`, and
 deployment, Stage12 retry/batch/bulk/rollout/reconciliation smokes, compile,
 and `git diff --check` all passed. No large media fixture, Remote ASR, Whisper,
 rollout mutation, or NAS/Jellyfin write was used.
+
+## Stage13-B read-only Library backend — 2026-09-28
+
+Implemented a GET-only `/api/library` read model and runtime installation for
+the Stage13 File Manager. The list is sourced from current `jav` holdings with
+`present=1`; Stage12 rollout rows are read-only optional state. Detail and
+playback resolve a canonical DVD-ID through the current holding before using
+its canonical media identity. No delete route or new player was added.
+
+`GET /api/library` supports case-insensitive DVD-ID/title search, KO
+`present`/`absent`, unresolved and mismatch filters, and the requested six
+sort keys. `GET /api/library/<dvd_id>` validates the canonical ID.
+`GET /api/library/<dvd_id>/stream` reuses `teddy_storage`'s existing SSH
+Range response implementation with the fixed JAV root; clients cannot submit
+a path. API errors use the existing JSON `status/error.code/message` shape.
+
+Managed size reads only DB-derived canonical title folders over the existing
+dedicated NAS SSH identity and known-host boundary. One bounded inventory
+request covers the holdings in a list call (maximum 250 holdings, 512 entries
+per title, depth 5, 30,000 entries overall, 16 MiB canonical subtitle payload,
+64 MiB response). Symlinks, unexpected entry types, limits and transport
+failures produce an unknown total with a reason code. The summary reports the
+sum of known item bytes plus completeness and unknown count.
+
+KO status reuses Stage12's `_classify_subtitles`, canonical sidecar candidate
+selection and SRT parser using bounded NAS inventory/read data. Stage12
+terminal state and reason are an optional left join; Stage12 `UNRESOLVED`
+stays distinct from ordinary absence. Jellyfin uses one GET-only path inventory
+request bounded to 10,000 items; exact path matches are recognized, complete
+inventory misses are absent, and incomplete/failed requests are unknown.
+
+NAS added date never uses media filesystem timestamps. A matching
+`COMPLETED` organizer job must target the exact canonical media relative path;
+its creation and completion timestamps must resolve to the same KST date.
+That date is labeled `ORGANIZER_COMPLETION_BOUNDED_DATE` with
+`nas_added_at=null`; otherwise the value remains unknown. This is a bounded
+date claim, not an exact placement instant.
+
+The app container receives the rollout DB, NAS dedicated key/known_hosts and
+Jellyfin API key through read-only mounts. It does not mount the JAV library
+locally. A read-only API source smoke against the production Discovery and
+rollout databases returned 177 current holdings independently of the 173
+rollout rows and retained EBWH-296, MIAD-866, MIRD-258 and SKMJ-774. The
+production database files were mounted read-only for this smoke. No production
+database/NAS/Jellyfin write, NAS/Jellyfin request, refresh, Hermes or VM122 call
+occurred.
+
+The fixture smoke covers holdings absent from rollout, normalized subtitle
+states, KST same-date/cross-date behavior, no mtime fallback, bounded size and
+failure states, searches, filters, every sort mode, invalid requests,
+canonical playback identity/path traversal rejection, Jellyfin recognized /
+absent / unknown behavior, runtime route installation, auth guard, and
+byte-for-byte unchanged fixture databases. The full Docker image build and the
+Stage12 inventory, Jellyfin, Downloader API and existing stream-range smokes
+passed. `python -m py_compile` and `git diff --check` passed. Next checkpoint:
+Stage13-C File Manager UI.

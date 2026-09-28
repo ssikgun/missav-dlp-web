@@ -186,28 +186,30 @@ def _final_backend():
     )
 
 
-def _ssh_storage_config():
+def _ssh_storage_config(root_override=None):
+    library = root_override is not None
+    prefix = "TEDDY_NAS_" if library else "TEDDY_FINAL_"
     config = {
         "host": str(
-            os.environ.get("TEDDY_FINAL_SSH_HOST")
+            os.environ.get(prefix + ("HOST" if library else "SSH_HOST"))
             or ""
         ).strip(),
         "user": str(
-            os.environ.get("TEDDY_FINAL_SSH_USER")
+            os.environ.get(prefix + ("USER" if library else "SSH_USER"))
             or ""
         ).strip(),
         "key": str(
-            os.environ.get("TEDDY_FINAL_SSH_KEY")
+            os.environ.get(prefix + ("KEY" if library else "SSH_KEY"))
             or ""
         ).strip(),
         "known_hosts": str(
             os.environ.get(
-                "TEDDY_FINAL_SSH_KNOWN_HOSTS"
+                prefix + ("KNOWN_HOSTS" if library else "SSH_KNOWN_HOSTS")
             )
             or ""
         ).strip(),
         "root": str(
-            os.environ.get("TEDDY_FINAL_REMOTE_ROOT")
+            root_override or os.environ.get("TEDDY_FINAL_REMOTE_ROOT")
             or ""
         ).strip(),
     }
@@ -306,7 +308,7 @@ def _safe_remote_relative(relative):
     return "/".join(parts)
 
 
-def _ssh_remote_path(relative):
+def _ssh_remote_path(relative, config=None):
     relative = _safe_remote_relative(
         relative
     )
@@ -316,7 +318,7 @@ def _ssh_remote_path(relative):
             "잘못된 원격 완료 파일 경로입니다."
         )
 
-    config = _ssh_storage_config()
+    config = config or _ssh_storage_config()
 
     path = posixpath.normpath(
         posixpath.join(
@@ -338,8 +340,8 @@ def _ssh_remote_path(relative):
     return path
 
 
-def _ssh_run(remote_command):
-    config = _ssh_storage_config()
+def _ssh_run(remote_command, config=None):
+    config = config or _ssh_storage_config()
 
     command = (
         _ssh_base_command(config)
@@ -373,9 +375,9 @@ def _ssh_run(remote_command):
     return result
 
 
-def _ssh_remote_stat(relative):
+def _ssh_remote_stat(relative, config=None):
     path = _ssh_remote_path(
-        relative
+        relative, config=config
     )
     quoted = shlex.quote(path)
 
@@ -403,7 +405,7 @@ def _ssh_remote_stat(relative):
         + "; fi"
     )
 
-    result = _ssh_run(command)
+    result = _ssh_run(command, config=config)
 
     raw = str(
         result.stdout or ""
@@ -1291,6 +1293,8 @@ def _ssh_media_process(
     relative,
     start,
     length,
+    *,
+    config=None,
 ):
     relative = _safe_remote_public_relative(
         relative
@@ -1317,7 +1321,7 @@ def _ssh_media_process(
             )
 
     path = _ssh_remote_path(
-        relative
+        relative, config=config
     )
 
     remote_command = (
@@ -1333,7 +1337,7 @@ def _ssh_media_process(
             + str(length)
         )
 
-    config = _ssh_storage_config()
+    config = config or _ssh_storage_config()
 
     command = (
         _ssh_base_command(config)
@@ -1432,6 +1436,7 @@ def _ssh_file_response(
     filename,
     *,
     as_attachment=False,
+    remote_root=None,
 ):
     relative = _safe_remote_public_relative(
         filename
@@ -1443,8 +1448,9 @@ def _ssh_file_response(
         )
 
     try:
+        config = _ssh_storage_config(remote_root)
         stat = _ssh_remote_stat(
-            relative
+            relative, config=config
         )
     except PublishError:
         return core.Response(
@@ -1528,6 +1534,7 @@ def _ssh_file_response(
                 relative,
                 start,
                 length,
+                config=config,
             )
         except (
             PublishError,
@@ -1595,6 +1602,15 @@ def _ssh_file_response(
         )
 
     return response
+
+
+def library_stream_response(core, relative):
+    """Reuse the existing range capable SSH player for an exact JAV path."""
+    return _ssh_file_response(
+        core,
+        relative,
+        remote_root="/volume1/video/video2/JAV",
+    )
 
 
 def _recursive_files(core):

@@ -20,6 +20,7 @@ from teddy_discovery_preview_api import (
     PREVIEW_BLUEPRINT_NAME,
     create_preview_blueprint,
 )
+from teddy_library_api import create_library_blueprint
 
 
 DISCOVERY_DB_ENV = (
@@ -37,6 +38,7 @@ DISCOVERY_PREVIEW_CACHE_ENV = (
 DISCOVERY_BLUEPRINT_NAME = (
     "teddy_discovery_api"
 )
+LIBRARY_BLUEPRINT_NAME = "teddy_library_api"
 
 
 def configured_db_path() -> str:
@@ -177,6 +179,15 @@ def install(core) -> dict:
             )
         )
 
+        installed_any = True
+
+    rollout_path = os.environ.get("TEDDY_STAGE12_ROLLOUT_DB", "").strip()
+    if db_path and LIBRARY_BLUEPRINT_NAME not in app.blueprints:
+        app.register_blueprint(create_library_blueprint(
+            db_path,
+            rollout_path,
+            core=core,
+        ))
         installed_any = True
 
     if installed_any:
