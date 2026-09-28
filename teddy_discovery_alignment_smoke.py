@@ -301,6 +301,29 @@ def main():
         "JAPANESE_LEXICAL_CONTENT_PRESERVED",
     )
     require(
+        normalize_japanese_for_matching("猫です\n今日は")
+        == normalize_japanese_for_matching("猫です\r\n今日は")
+        == normalize_japanese_for_matching("猫です 今日は"),
+        "CRLF_DERIVED_WHITESPACE_NORMALIZATION",
+    )
+    multiline_bundle = hybrid_bundle_for_texts(
+        ("猫です\n今日は", "こんにちは", "さようなら"),
+        ("猫です今日は", "こんにちは", "さようなら"),
+    )
+    multiline_candidates = generate_monotonic_anchor_candidates(
+        multiline_bundle
+    )
+    require(
+        multiline_bundle.external_ja_document.cues[0].text
+        == "猫です\n今日は"
+        and any(
+            item.external_identity.source_index == 0
+            and item.comparison.external_normalized == "猫です今日は"
+            for item in multiline_candidates
+        ),
+        "MULTILINE_SRT_SOURCE_PRESERVED_MATCHING_EVIDENCE_GENERATED",
+    )
+    require(
         normalize_japanese_for_matching("ｶﾅ") == "カナ",
         "HALFWIDTH_KATAKANA_NFKC_ONLY",
     )
@@ -311,8 +334,8 @@ def main():
     )
     expect_raises(
         AlignmentValidationError,
-        lambda: normalize_japanese_for_matching("猫\nです"),
-        "CONTROL_CHARACTER_REJECTED",
+        lambda: normalize_japanese_for_matching("猫\tです"),
+        "NON_NEWLINE_CONTROL_CHARACTER_REJECTED",
     )
     expect_raises(
         AlignmentValidationError,

@@ -1,5 +1,51 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-29 FNS-247 external subtitle parser/alignment replay — PARTIAL
+
+Generic source changes completed in Stage11 subtitle parsing and alignment:
+
+- SRT parsing may drop at most one structurally valid zero-duration cue per
+  document. Cue index/text are validated, the original payload hash and byte
+  size remain bound to the parsed document, and all other timestamp/content
+  validation remains strict. Dropped source indexes are exposed as immutable
+  `SubtitleDocument.dropped_cue_indexes` metadata.
+- Alignment comparison text replaces only CR/LF with spaces in its derived
+  value. Stored cue text and timing remain unchanged; other control characters
+  still fail validation.
+- No title-specific parser, cue, acceptance, or production path was added.
+
+Offline checks:
+
+- `teddy_discovery_subtitle_text_smoke.py`: PASS, including one-drop admission
+  and rejection when more than one zero-duration cue is present.
+- `teddy_discovery_alignment_smoke.py`: PASS, including multiline cue text
+  preservation, CR/LF comparison normalization, and rejection of tab controls.
+- `teddy_discovery_alignment_acceptance_smoke.py`: PASS; frozen acceptance
+  gates are unchanged.
+- `teddy_discovery_stage11_live_adapters_smoke.py`: not run to completion;
+  this environment lacks the `numpy` dependency (`ModuleNotFoundError`).
+
+Exact supplied-input read-only replay:
+
+- JA source: `/var/tmp/FNS-247.user-external-ja.srt`, SHA-256
+  `8e645dd1e55304075b03562ae38837012d401a6cb00cb96fc8d54d9df2508598`.
+- Baseline ASR was read from the existing stage12 artifact and reconstructed
+  in memory; no NAS, Jellyfin, rollout DB, or current KO file was written.
+- Parser admitted 313 cues and recorded one dropped cue, original SRT index
+  153. All 313 cues reached lexical candidate generation (233 candidates at
+  the unchanged 0.80 score floor).
+- Alignment did not produce an affine result: strict monotonic selection
+  raised `AlignmentAmbiguityError` for equal-strength chains. The same guard
+  also fired when candidate score floors were raised to 0.90, 0.95, and 1.00.
+  No selector or acceptance threshold was bypassed or weakened.
+- Acceptance verdict: **UNRESOLVED / no ACCEPT_HYBRID or REJECT_EXTERNAL
+  decision emitted**. Anchor/inlier counts and ratio are not available because
+  affine alignment was not inferred. A future checkpoint may address generic
+  repeated-text anchor ambiguity; until then, the production external-JA path
+  remains fail-closed for this replay.
+
+Source changes and smoke checks are local pending commit/push.
+
 ## 2026-09-29 Stage13-E2B prepare-guard forensic — INCOMPLETE
 
 Production manual delete-prepare attempts for `ADN-785` returned HTTP 403

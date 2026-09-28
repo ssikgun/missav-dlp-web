@@ -98,6 +98,38 @@ def main():
         "SRT_MULTI_OVERLAP_NONCONSECUTIVE_INDEX",
     )
 
+    isolated_zero_duration = srt_payload(
+        [
+            (1, 0, 1_000, "retained before"),
+            (2, 1_000, 1_000, "malformed but isolated"),
+            (3, 2_000, 3_000, "retained after"),
+        ]
+    )
+    admitted = parse_subtitle_bytes(isolated_zero_duration, "srt")
+    require(
+        admitted.dropped_cue_indexes == (2,)
+        and [cue.text for cue in admitted.cues]
+        == ["retained before", "retained after"]
+        and [cue.start_ms for cue in admitted.cues] == [0, 2_000]
+        and admitted.source_sha256
+        == hashlib.sha256(isolated_zero_duration).hexdigest(),
+        "SRT_SINGLE_ZERO_DURATION_CUE_DROPPED_WITH_SOURCE_INTACT",
+    )
+    expect_raises(
+        SubtitleParseError,
+        lambda: parse_subtitle_bytes(
+            srt_payload(
+                [
+                    (1, 0, 0, "bad one"),
+                    (2, 1_000, 1_000, "bad two"),
+                    (3, 2_000, 3_000, "good"),
+                ]
+            ),
+            "srt",
+        ),
+        "SRT_MULTIPLE_MALFORMED_CUES_REJECTED",
+    )
+
     crlf = one_cue.replace(b"\n", b"\r\n")
     crlf_document = parse_subtitle_bytes(crlf, "srt")
     require(
@@ -166,10 +198,6 @@ def main():
         (
             b"1\n00:00:00,00 --> 00:00:01,000\nmillis\n",
             "SRT_MILLISECOND_MALFORMED_REJECTED",
-        ),
-        (
-            b"1\n00:00:01,000 --> 00:00:01,000\norder\n",
-            "SRT_END_NOT_AFTER_START_REJECTED",
         ),
         (
             srt_payload([(1, 2_000, 3_000, "first"), (2, 1_000, 2_000, "back")]),

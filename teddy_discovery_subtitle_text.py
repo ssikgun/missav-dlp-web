@@ -17,6 +17,9 @@ import unicodedata
 MAX_SUBTITLE_BYTES = 8 * 1024 * 1024
 MAX_SUBTITLE_CUES = 50_000
 MAX_CUE_TEXT_CHARS = 16_384
+# SRT readers may safely omit one individually malformed zero-duration cue.
+# This admits isolated authoring defects while bounding source loss.
+MAX_DROPPED_SRT_CUES = 1
 
 SUPPORTED_SUBTITLE_FORMATS = frozenset({"srt", "vtt"})
 
@@ -80,6 +83,7 @@ class SubtitleDocument:
     cues: tuple[SubtitleCue, ...]
     source_sha256: str
     byte_size: int
+    dropped_cue_indexes: tuple[int, ...] = ()
 
     def __post_init__(self):
         if self.format not in SUPPORTED_SUBTITLE_FORMATS:
@@ -90,6 +94,18 @@ class SubtitleDocument:
         if not isinstance(self.cues, tuple):
             raise SubtitleParseError(
                 "document cues must be an immutable tuple"
+            )
+
+        if (
+            not isinstance(self.dropped_cue_indexes, tuple)
+            or len(self.dropped_cue_indexes) > MAX_DROPPED_SRT_CUES
+            or any(
+                type(index) is not int or index <= 0
+                for index in self.dropped_cue_indexes
+            )
+        ):
+            raise SubtitleParseError(
+                "dropped cue indexes exceed the allowed bounds"
             )
 
         if not self.cues or len(self.cues) > MAX_SUBTITLE_CUES:
@@ -278,7 +294,11 @@ def _timestamp_parts_to_ms(
     )
 
 
-def _parse_srt_timestamp_line(line: str) -> tuple[int, int]:
+def _parse_srt_timestamp_line(
+    line: str,
+    *,
+    allow_zero_duration: bool = False,
+) -> tuple[int, int]:
     match = _SRT_TIMESTAMP_LINE_RE.fullmatch(line)
 
     if match is None:
@@ -289,7 +309,9 @@ def _parse_srt_timestamp_line(line: str) -> tuple[int, int]:
     start_ms = _timestamp_parts_to_ms(*match.groups()[:4])
     end_ms = _timestamp_parts_to_ms(*match.groups()[4:])
 
-    if end_ms <= start_ms:
+    if end_ms < start_ms or (
+        end_ms == start_ms and not allow_zero_duration
+    ):
         raise SubtitleParseError(
             "cue end timestamp must be after start timestamp"
         )
@@ -302,6 +324,7 @@ def _make_document(
     text_format: str,
     cues: list[SubtitleCue],
     payload: bytes,
+    dropped_cue_indexes: tuple[int, ...] = (),
 ) -> SubtitleDocument:
     if not cues:
         raise SubtitleParseError(
@@ -318,6 +341,7 @@ def _make_document(
         cues=tuple(cues),
         source_sha256=hashlib.sha256(payload).hexdigest(),
         byte_size=len(payload),
+        dropped_cue_indexes=dropped_cue_indexes,
     )
 
 
@@ -325,6 +349,7 @@ def _parse_srt(text: str, payload: bytes) -> SubtitleDocument:
     blocks = _split_nonempty_blocks(text.split("\n"))
     seen_indexes: set[int] = set()
     cues: list[SubtitleCue] = []
+    dropped_cue_indexes: list[int] = []
     previous_start_ms = None
 
     for block in blocks:
@@ -342,7 +367,10 @@ def _parse_srt(text: str, payload: bytes) -> SubtitleDocument:
 
         seen_indexes.add(index)
 
-        start_ms, end_ms = _parse_srt_timestamp_line(block[1])
+        start_ms, end_ms = _parse_srt_timestamp_line(
+            block[1],
+            allow_zero_duration=True,
+        )
 
         if (
             previous_start_ms is not None
@@ -354,6 +382,17 @@ def _parse_srt(text: str, payload: bytes) -> SubtitleDocument:
 
         previous_start_ms = start_ms
         cue_text = "\n".join(block[2:])
+
+        if end_ms == start_ms:
+            # Only a structurally isolated zero-duration cue is eligible for
+            # omission. Its index and text still receive normal validation.
+            _validate_cue_text(cue_text)
+            if len(dropped_cue_indexes) >= MAX_DROPPED_SRT_CUES:
+                raise SubtitleParseError(
+                    "SRT exceeds the bounded malformed-cue drop limit"
+                )
+            dropped_cue_indexes.append(index)
+            continue
 
         cue = SubtitleCue(
             start_ms=start_ms,
@@ -371,6 +410,7 @@ def _parse_srt(text: str, payload: bytes) -> SubtitleDocument:
         text_format="srt",
         cues=cues,
         payload=payload,
+        dropped_cue_indexes=tuple(dropped_cue_indexes),
     )
 
 

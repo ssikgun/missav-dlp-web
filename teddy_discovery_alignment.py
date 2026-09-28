@@ -110,6 +110,11 @@ def normalize_japanese_for_matching(text: str) -> str:
             "matching text must be an exact string"
         )
 
+    # Parsed subtitle cue text can contain intentional line breaks. Convert
+    # only CR/LF in this derived comparison value; the cue's source text is
+    # immutable and every other control character remains rejected below.
+    text = text.replace("\r", " ").replace("\n", " ")
+
     if len(text) > MAX_ALIGNMENT_TEXT_CHARS:
         raise AlignmentLimitError(
             "matching text exceeds MAX_ALIGNMENT_TEXT_CHARS"
