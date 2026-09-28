@@ -3516,3 +3516,65 @@ browser rendering harness is installed in the local environment. This is a
 source-only checkpoint: no production deployment/restart, database/NAS write,
 Jellyfin write/refresh, or delete request was performed. Next checkpoint:
 Stage13-C production deployment preflight and read-only canary.
+
+## Stage13-C production deployment attempt and rollback — 2026-09-28
+
+Preflight began from clean source HEAD
+`853930c05b92ec03363199eafbada1099cf033da` on
+`teddy-subtitle-stage11`; the exact GitHub branch matched. Production Compose
+was `/opt/missav-dlp-web/compose.yaml` with its existing
+`/opt/missav-dlp-web/gluetun.env`. Candidate rendering kept all four service
+definitions, unrelated services, Downloader port 58000, network, restart
+policy and existing storage mounts unchanged. The app retained its
+read-only dedicated NAS key/known_hosts and rollout DB mounts, gained the
+existing Jellyfin API key as a read-only file mount, and received the
+`TEDDY_NAS_*`, `TEDDY_JELLYFIN_*` and `TEDDY_STAGE12_ROLLOUT_DB` environment
+names required by Stage13 runtime. No local JAV mount was added. Only the
+Downloader web service was recreated; Gluetun and browser services were not
+restarted.
+
+The exact source built successfully as image
+`sha256:5b7aa9cdbe3344f541ff321ea30925aede10beda69127385409c04a510d75247`,
+tagged `ghcr.io/ssikgun/missav-dlp-web:stage13c-853930c05b92` and labeled with
+the source revision. Library API and static UI assets were present. External
+unauthenticated checks retained `/` redirect and API 401 behavior; Library
+JS/CSS returned 200.
+
+The production read-only canary reported 177 present holdings independently
+of the 173 Stage12 rows, including EBWH-296, MIAD-866, MIRD-258 and SKMJ-774.
+Counts were KO `VALID=163`, `UNRESOLVED=10`, `ABSENT=4`, mismatch 0. Known
+managed size summed to 509,297,211,868 bytes with `size_complete=true` and
+zero unknown items. Two historical bounded dates had
+`nas_added_at=null` and `ORGANIZER_COMPLETION_BOUNDED_DATE`; the unknown-date
+sample remained null/`UNKNOWN`. Two positive managed-folder sizes were
+confirmed. Jellyfin returned 177 exact recognized paths. DVD-ID/title search,
+KO present/absent and unresolved filters, plus NAS date/DVD-ID/size sorts
+passed. A canonical playback adapter request returned HTTP 206 for bytes
+0–2047 (2,048 bytes); no full media was read or saved. These requests used
+bounded exact DB-derived title paths and one bounded Jellyfin GET inventory.
+
+Canary failure: Stage12 rollout rows for HMN-899 and NHDTC-250 contained
+distinct terminal reasons `STAGE12_UNSAFE_AUDIO_TIMELINE` and
+`STAGE12_BASELINE_ASR_NO_SPEECH`, but the Library API selected the generic
+`inventory_reason=NO_CANONICAL_KO_SRT` first and returned
+`STAGE12_UNRESOLVED` / `자막 상태 확인 필요` for both. JUR-750 correctly
+returned `SUBTITLE_INVENTORY_INVALID` / `기존 자막 상태 확인 필요`. The
+distinct Stage12 reason mapping therefore did not meet the production canary
+contract. This source defect must be fixed and fixture-tested before another
+deployment attempt. No subtitle body or raw artifact was emitted.
+
+The web app alone was rolled back to the captured prior image
+`sha256:fb1e9c6dc655c3cd7044e8a8c1711414589e2c1695503e866fe178c3396e6b79`.
+It is running with the original compose configuration; the NAS key remains
+read-only and no Jellyfin key mount or Stage13 aliases remain. Other services
+remained running. A browser binary exists in the separate browser container,
+but no authenticated rendering session/harness was available; visual viewport
+verification remains pending manual review. The deployed Stage13 image did
+not pass canary and is not the active production image.
+
+Production write audit for this attempt: Discovery/rollout DB writes 0, NAS
+writes/deletes 0, Jellyfin writes/refreshes 0, Hermes calls 0, VM122 calls 0,
+subtitle generation 0, permanent deletes 0. Only the Downloader app container
+was deployed and rolled back. Next: correct terminal-reason precedence or
+normalization, run the fixture smoke and exact-source deployment preflight
+again, then repeat the read-only canary.
