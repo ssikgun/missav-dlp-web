@@ -1,5 +1,35 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-28 Stage13-C visual acceptance — CLOSED / PASS
+
+Manual authenticated browser verification by Teddy confirmed the final Stage13-C
+File Management UI in dark mode.
+
+Accepted visual state:
+
+- Sidebar exposes a single `파일 관리` destination for durable JAV holdings.
+- File Management contains `보유 라이브러리` and `자막 처리 현황` subtabs.
+- Subtitle processing status is no longer shown in Settings.
+- The subtitle status panel, metric cards, badge, labels, and footer now honor
+  the application dark theme and remain readable.
+- The visible production status panel showed idle state, current title none,
+  `PUBLISHED=163`, `PENDING=0`, `FAILED_RETRYABLE=0`,
+  `FAILED_TERMINAL=0`, and `UNRESOLVED=10`; its heartbeat was shown as
+  stale/old, matching the read-only status source rather than being hidden.
+- The manual screenshot showed no catastrophic horizontal overflow or theme
+  breakage in the accepted desktop view.
+
+Stage13-C is therefore **CLOSED / PASS**.
+
+The current production web candidate is the Stage13-C6 image built from source
+HEAD `b63bd132bc75753b8b1127cb792e42c4b33e8324`
+(image prefix previously recorded as `sha256:7f427ebf...`). No rollback is
+required.
+
+Next Stage13 work must continue from the frozen permanent-delete plan. Do not
+reopen Stage13-C unless a concrete regression is found.
+
+
 ## 2026-09-28 Stage13-C4 manual visual finding — dark-theme defect
 
 Manual authenticated visual inspection confirmed the Stage13-C3/C4 navigation
