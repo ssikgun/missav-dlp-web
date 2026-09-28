@@ -4177,3 +4177,43 @@ reconcile writes 0, Hermes 0, VM122 0, subtitle generation 0, permanent delete
 E2 is incomplete pending an authenticated same-origin prepare/validate/replay
 canary and reconciliation of the observed 182-versus-177 holdings count before
 claiming the requested production contract. Actual deletion remains disabled.
+
+## Stage13-E2C delete prepare 403 diagnostics hotfix — 2026-09-29
+
+Added bounded one-line diagnostics to the authenticated Library delete-intent
+guard. Rejections now log the exact `invalid_request_boundary` or
+`invalid_request_origin` code and a bounded subreason (`mimetype`,
+`intent_header`, `origin_missing`, `scheme_mismatch`, `host_mismatch`, or
+`cross_site`), with sanitized request/origin scheme and host, forwarded-header
+presence/value, `Sec-Fetch-Site`, content type, method, intent and header value.
+Cookie, session, authorization, token, body, query and client IP are not logged.
+All authentication, JSON, intent, same-origin and `Sec-Fetch-Site` checks are
+unchanged; no forwarded header is trusted by this change.
+
+The Library UI now displays only allowlisted safe server error codes for
+prepare and validate failures; unknown codes and raw server messages continue
+to use the generic UI text. Prepare/validate success behavior and the disabled
+actual-delete state remain unchanged.
+
+Fixture smoke exercised invalid content type, wrong intent, missing Origin,
+scheme mismatch, host mismatch, cross-site, and valid same-origin requests.
+It checked exact subreason logs and verified cookie/session/token sentinel
+values were absent. Library API/UI, delete DRY-RUN, File Management
+navigation, subtitle status, Discovery UI, Python compilation and
+`git diff --check` passed. Full Docker build passed from the isolated source
+commit `22bb71edddf638e59f98eb4c945e31f204d47100`, excluding unrelated local
+subtitle parser changes.
+
+Deployed `ghcr.io/ssikgun/missav-dlp-web:stage13e2c-22bb71e`, image
+`sha256:ab0a8281d6ecb7b81fa5851cd5e523059b44de74e3270a79cfd9c9a2e07d63dc`.
+Only `missav-dlp-web` was recreated; the prior E2 image was retained as
+rollback candidate. The app is running with restart count 0. `/login` returned
+200, unauthenticated `/` redirected to login, Library and subtitle APIs
+returned 401, and Library JS/CSS returned 200. No authenticated prepare was
+retried by Codex. Token issue = 0 and actual delete = 0; no validate request,
+Discovery reconcile, Jellyfin refresh, Hermes/VM122 call or subtitle generation
+was invoked by this checkpoint.
+
+Next: Teddy clicks `ADN-785 > 🗑️ 영구 삭제` once in the authenticated browser.
+The safe UI code and application log should now identify the rejected guard
+branch. Actual deletion remains disabled.
