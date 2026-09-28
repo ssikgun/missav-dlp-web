@@ -1,5 +1,64 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-28 Stage12 final closure after bounded staging cleanup
+
+### CURRENT STATUS — Stage12 CLOSED / PASS
+
+This top section is the canonical current status. Older handoff sections below
+are retained as historical records and do not override this closure result.
+
+- Audited production source HEAD: `9a06e17d2c954d02979660e740a65e4ecb4b835c`
+- Final rollout: 173 titles, `PUBLISHED=163`, `UNRESOLVED=10`,
+  `FAILED_RETRYABLE=0`, `RUNNING=0`, `PENDING=0`, `GENERATED=0`.
+- All 163 published artifact/report bundles passed the existing mechanical,
+  hash, and publication-provenance validators. All 163 NAS sidecars matched
+  their recorded artifact hashes. Jellyfin GET-only external subtitle
+  recognition passed for all 163; refresh and write count was zero.
+
+The bounded manifest mapped every staging entry to a terminal rollout title.
+The local Stage12 temporary staging root had 266 directories, 1,652 files, and
+126,891,026 bytes before cleanup; it has zero entries, files, and bytes now.
+The remote Stage12 bulk runtime root had 266 directories, 1,388 files, and
+114,892,516 bytes, including 988 semantic pending response files; it now has
+zero directories, files, and pending responses. Both configured roots remain
+in place. Local canonical artifact/report inodes did not overlap staging,
+remote staging contained no canonical artifact hashes, and rollout event
+provenance did not reference staging paths. Cleanup was limited to the
+manifested direct children of those two roots.
+
+The 10 unresolved titles and DB reasons are:
+
+- `STAGE12_UNSAFE_AUDIO_TIMELINE` (8): HMN-899 (sequence 7), NIMA-059,
+  PRED-889, SGKI-075, SGKI-106, SNOS-334, SVFLA-014, and SW-216 (sequence 5
+  for the latter seven).
+- `STAGE12_BASELINE_ASR_NO_SPEECH` (1): NHDTC-250 (sequence 9).
+- `SUBTITLE_INVENTORY_INVALID` (1): JUR-750 (sequence 1; final transition
+  reason `INITIALIZE_FROM_INVENTORY`).
+
+The final runtime audit found no active title, Stage11/Stage12 runner or
+controller, locked runner lock, unfinished heartbeat, active remote task,
+ASR production temp entry, or large `/tmp` media file. The persistent Hermes
+dashboard/gateway processes had no active Stage12 invocation and no working
+directory or open file under the remote staging root. Fixture-based Stage11
+controller, live runner, semantic retry-feedback, stream redaction, safe
+artifact inspector, ASR temp policy, Stage12 batch/retry/bulk/rollout and
+reconciliation smokes passed. Compile and `git diff --check` passed.
+
+Safety and privacy decisions remain frozen: deterministic unsafe source audio
+timelines and baseline no-speech outcomes are terminal `UNRESOLVED`; no numeric
+confidence-only production gate, non-VAD fallback, threshold relaxation,
+timeline repair, or title-specific exception was added. Semantic retry
+feedback uses only safe validator metadata; Hermes raw output remains
+suppressed; artifact inspection is whitelist-only; new durable reports use
+session identity fingerprints without raw values.
+
+Historical privacy limitation: 162 legacy published reports still contain
+raw session identity fields (486 fields total). The one report using the new
+schema contains three SHA-256 identity fingerprints and no raw session field.
+The legacy reports were not modified in place during closure.
+
+Stage12 is **CLOSED / PASS**. Stage13 is **NOT STARTED**.
+
 ## 2026-09-28 Stage12 rollout-summary wrapper correction
 
 The HMN-896 result-collection wrapper that exited nonzero was an inline
