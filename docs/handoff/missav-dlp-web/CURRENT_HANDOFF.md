@@ -1,5 +1,51 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-28 HMN-896 final explicit retry canary
+
+At expected HEAD `41517e57bc59d3f536644e91ad49c28fb27d26f8`, the read-only
+preflight passed: HMN-896 was `FAILED_RETRYABLE` sequence 3 with reason
+`STAGE12_SEMANTIC_OUTPUT_VALIDATION_RETRY_EXHAUSTED`, no active rollout
+title, production interpreter/dependencies passed, and the source size/mtime
+matched Discovery, rollout, baseline ASR, and targeted-evidence fingerprints.
+The safe artifact inspector reported 596 baseline segments, 559 semantic
+cues, five targeted windows/results, and five `PRESENT_UNRESOLVED` bindings.
+The targeted artifact's baseline hash and source fingerprint matched.
+
+The one authorized retry completed as `PUBLISHED` sequence 6 with reason
+`STAGE12_PUBLICATION_AND_JELLYFIN_VERIFIED`. Part 5 attempt 1 failed
+`CUE_COUNT_MISMATCH` (`expected=64`, `actual=63`), response 7,169 bytes,
+SHA-256 `8ba32b248698b661e8dbe013d71bbd1a896c49250bd4a774b865b3ca92220b20`.
+Its reconstructed prompt SHA-256 was
+`45747d407699b7eaff495b12b4c8179620c6a54c638e2a447b852c6beae4ea28`.
+Attempt 2 included machine-generated validation feedback and passed. Its
+reconstructed prompt SHA-256 was
+`285b2c2d8dd903dfb7f8cfc04237fa79ad5d5a7e9042efd4aeb6443b69a166e8`.
+The accepted response bytes were preserved as the canonical part artifact
+(5,434 bytes; SHA-256
+`f89870a2b0f1adea3f95383995f2d314c80ebb09600ff4b15e865af5ff39417a`). The
+part promotion hard-links the validated pending bytes without rewriting them.
+No subtitle or transcript content was copied here.
+
+All six Hermes invocations reported raw output suppression. The canary wrapper
+captured child stdout/stderr and emitted only allowlisted numeric/enum/hash
+diagnostics; no subtitle body, session identifier, staging path, or raw JSON
+was forwarded. The new controller report safe summary found zero raw session
+identity fields and three SHA-256 fingerprints. Its hash matched rollout
+provenance; the CLEAN artifact hash also matched. The final state counts were
+`PUBLISHED=163`, `FAILED_RETRYABLE=0`, `RUNNING=0`, `UNRESOLVED=10`, with zero
+active titles and zero non-HMN rollout events after the retry began.
+
+The exact local and remote task staging directories were removed after report
+and artifact verification; no target staging input remained. `/tmp` and
+`/var/tmp` had zero files over 50 MiB, and the Stage12 heartbeat showed
+`COMPLETE` with no active DVD. No other title changed.
+
+The outer result-collection wrapper itself exited nonzero after the production
+runner had returned exit code 0 because its post-run code imported
+`rollout_counts` from the wrong module. Final state, report/artifact hashes,
+other-title event count, and cleanup were then verified with separate
+read-only checks. No recovery or additional retry was performed.
+
 ## 2026-09-28 Safe subtitle-artifact preflight inspection
 
 The HMN-896 read-only forensic command used recursive `rg` with a title
