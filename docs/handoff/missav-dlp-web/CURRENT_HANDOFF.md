@@ -1,5 +1,38 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-29 Stage13-E2B prepare-guard forensic — INCOMPLETE
+
+Production manual delete-prepare attempts for `ADN-785` returned HTTP 403
+three times. Authentication had already succeeded; therefore the request was
+rejected inside the Library delete-intent guard before manifest inspection or
+token issuance.
+
+Confirmed safety state:
+
+- prepare HTTP status: 403
+- exact branch between `invalid_request_boundary` and
+  `invalid_request_origin`: not yet observable from current logs/UI
+- token issued: NO
+- validate reached: NO
+- NAS/DB/Jellyfin write/delete: 0
+- production restart/source change during forensic: 0
+
+Current access logs do not record response JSON or the sanitized request/proxy
+metadata needed to distinguish the two guard branches. The UI currently turns
+all non-success prepare responses into the same generic message.
+
+Next checkpoint is a diagnostics-only hotfix:
+1. keep all existing delete-intent checks unchanged;
+2. add bounded structured logging for the rejected guard branch and sanitized
+   origin/host/forwarded-header metadata;
+3. allow the UI to display only an allowlisted safe error code for
+   delete-prepare/validate failures;
+4. redeploy only the web app and reproduce once.
+
+Do not weaken Origin checking, trust arbitrary forwarded headers, or enable any
+delete/commit endpoint.
+
+
 ## 2026-09-28 Stage13-E2 manual prepare attempt — FAIL / forensic required
 
 Teddy manually opened the production File Management delete DRY-RUN for
