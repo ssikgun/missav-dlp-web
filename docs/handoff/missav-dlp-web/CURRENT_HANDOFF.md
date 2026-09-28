@@ -3823,3 +3823,41 @@ DB/NAS/Jellyfin writes, Jellyfin refresh, Hermes/VM122 calls, subtitle
 generation and delete operations were all zero. Next: deploy the CSS hotfix
 by replacing only the production web app, then Teddy verifies dark-mode status
 panel appearance.
+
+## Stage13-C6 subtitle status dark-mode production redeploy — 2026-09-28
+
+Built exact source HEAD `b63bd132bc75753b8b1127cb792e42c4b33e8324` as
+`ghcr.io/ssikgun/missav-dlp-web:stage13c6-b63bd13`. The production image ID
+is `sha256:7f427ebf957180466c7fe0d56122dd5eddfc833f3919ab9527741d8a1399df19`;
+the OCI revision label matches the source HEAD. Before replacement, the
+running C4 rollback image was recorded as
+`sha256:46b71ff6fdbc2a4d764b2fc6d62877c2e82750176b4c98f4e60641eb2d255d38`.
+The production Compose/env and existing overrides were rendered with only
+the app image changed. Only `missav-dlp-web` was recreated using
+`--no-deps`; gluetun and both browser services kept their prior container
+IDs. The new app is running with restart count 0, and `/login` returns 200.
+
+The live-served `teddy-subtitle-status.css` returned 200 and passed checks for
+the dark panel selector/surface/border, current text, metric surface/value/
+label, footer and badge override. Existing light panel/metric base values and
+the 680px two-column layout also passed. Status JS returned 200 and retained
+all six semantic status labels. No runtime/status enum, API, or navigation
+source changed.
+
+Read-only production holdings source returned 177 rows. The existing status
+snapshot builder returned normally (`idle`, 163 PUBLISHED, 10 UNRESOLVED,
+heartbeat present); unauthenticated `/api/subtitles/status` and
+`/api/library` requests returned the expected 401. No authenticated browser
+or DevTools harness was available, so API contents were checked through the
+same read-only source builders rather than bypassing auth. Deployed template
+checks confirmed File Management/Download navigation, Settings controls,
+Discovery, Library playback wiring, a single shared video element, and no
+Library delete UI/request. Static Library, Discovery and status assets
+returned 200. `VISUAL_DARK_THEME_CANARY=PENDING_TEDDY`.
+
+No rollback. Production write audit: DB writes 0, NAS writes/deletes 0,
+Jellyfin refresh/write 0, Hermes 0, VM122 0, subtitle generation 0, Library
+delete 0. The current production image remains
+`sha256:7f427ebf957180466c7fe0d56122dd5eddfc833f3919ab9527741d8a1399df19`.
+Next: Teddy opens `파일 관리 > 자막 처리 현황` with dark theme enabled and
+confirms the panel appearance in the real browser.
