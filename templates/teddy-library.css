@@ -159,6 +159,111 @@
     overflow-wrap: anywhere;
 }
 
+.library-delete-entry {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 14px;
+}
+
+.library-delete-prepare,
+.library-delete-validate,
+.library-delete-close {
+    min-height: 36px;
+    padding: 7px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #334155;
+    font: inherit;
+    cursor: pointer;
+}
+
+.library-delete-dialog {
+    width: min(620px, calc(100vw - 28px));
+    max-height: min(82vh, 760px);
+    padding: 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    background: #fff;
+    color: #1e293b;
+    box-shadow: 0 24px 70px rgb(15 23 42 / 28%);
+}
+
+.library-delete-dialog::backdrop {
+    background: rgb(15 23 42 / 58%);
+}
+
+.library-delete-dialog-body {
+    position: relative;
+    max-height: inherit;
+    overflow: auto;
+    padding: 22px;
+}
+
+.library-delete-dialog-body h2 {
+    margin: 0 0 8px;
+    font-size: 18px;
+}
+
+.library-delete-dialog-body p {
+    line-height: 1.5;
+}
+
+.library-delete-close {
+    float: right;
+}
+
+.library-delete-summary {
+    display: grid;
+    gap: 10px;
+    overflow-wrap: anywhere;
+}
+
+.library-delete-summary details {
+    max-height: 170px;
+    overflow: auto;
+    padding: 9px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+}
+
+.library-delete-summary ul {
+    margin: 8px 0 0;
+    padding-left: 22px;
+}
+
+.library-delete-warning {
+    padding: 10px;
+    border-left: 3px solid #64748b;
+    background: #f1f5f9;
+}
+
+.library-delete-ack,
+.library-delete-typed-label {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.library-delete-typed-label {
+    flex-wrap: wrap;
+}
+
+.library-delete-typed-label input {
+    flex: 1 1 200px;
+    min-width: 0;
+}
+
+.library-delete-validate:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.library-delete-final {
+    min-height: 20px;
+    font-weight: 650;
+}
+
 .library-empty,
 .library-error {
     padding: 32px 16px;
@@ -195,6 +300,25 @@ html[data-theme="dark"] .library-empty,
 html[data-theme="dark"] .library-error {
     border-color: #334155;
     color: #94a3b8;
+}
+
+html[data-theme="dark"] .library-delete-prepare,
+html[data-theme="dark"] .library-delete-validate,
+html[data-theme="dark"] .library-delete-close,
+html[data-theme="dark"] .library-delete-dialog {
+    border-color: #334155;
+    background: #1f2937;
+    color: #e2e8f0;
+}
+
+html[data-theme="dark"] .library-delete-warning {
+    border-left-color: #94a3b8;
+    background: #111827;
+    color: #cbd5e1;
+}
+
+html[data-theme="dark"] .library-delete-summary details {
+    border-color: #334155;
 }
 
 @media (max-width: 1020px) {

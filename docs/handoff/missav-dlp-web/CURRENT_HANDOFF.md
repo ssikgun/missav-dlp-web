@@ -3918,3 +3918,48 @@ delete 0. The current production image remains
 `sha256:7f427ebf957180466c7fe0d56122dd5eddfc833f3919ab9527741d8a1399df19`.
 Next: Teddy opens `파일 관리 > 자막 처리 현황` with dark theme enabled and
 confirms the panel appearance in the real browser.
+
+## Stage13-E1 Permanent Delete DRY-RUN prepare/validate — 2026-09-28
+
+Implemented read-only `POST /api/library/<dvd_id>/delete/prepare` and
+`POST /api/library/<dvd_id>/delete/validate`. Both require the existing
+authenticated session, JSON request, exact same-origin `Origin`, and the
+explicit `X-Teddy-Delete-Intent` header. The request identity accepts only the
+canonical DVD-ID; the server re-reads the current present JAV holding and
+revalidates its canonical mapping. No arbitrary path or filename is accepted.
+
+Prepare and validate use the existing hardened dedicated `CompletionSSH`
+transport and inspect one database-derived title directory only. The
+read-only `lstat` manifest rejects unsafe components, root escape, symlinks,
+special files, nested directories and entry overflow. Its SHA-256 covers
+canonical sorted manifest metadata (relative filename, size, mtime_ns, inode,
+device and regular-file type), not media contents. The holding's canonical
+media size and mtime_ns must match. Stage12 subtitle state and Jellyfin state
+are read-only summary fields; no subtitle content is returned.
+
+Prepare tokens are cryptographically random, process-memory only, DVD-ID / manifest /
+holding-identity bound, five-minute TTL and bounded to 128 entries. Validation
+re-reads the holding and exact manifest. Drift fails closed as
+`MANIFEST_CHANGED`; identical successful replay returns the same validation
+result. The Library detail UI requires both the explicit acknowledgement and
+an exact typed DVD-ID, displays the safe manifest summary, and stores the token
+only in memory. Closing the dialog clears it. Successful validation displays
+`삭제 준비 검증 완료 · 실제 삭제는 아직 비활성`; no commit endpoint exists.
+
+Added a non-persistent safe future provenance dataclass/serializer contract
+(`schema_version`, DVD-ID, manifest SHA, counts/bytes, phase, source identity
+fingerprint, timestamps and result). Fixture smoke covers valid and invalid
+identity, duplicate/missing holdings, path traversal, root/family/title and
+child symlinks, special files, nested directory, entry bound, missing/drifted
+canonical media, stable order/hash, token binding/expiry/replay, missing
+acknowledgement, subtitle/Jellyfin read-only states, query-only DB bytes, and
+the absence of a deletion primitive. Existing Library API, Library UI,
+File Management navigation, subtitle status, and Discovery smokes passed.
+Python compile and `git diff --check` passed; full Docker build
+`missav-stage13e1-smoke:874d3aa` passed.
+
+Stage13-C remains CLOSED / PASS. This E1 checkpoint did not deploy. No real
+production title was prepared. Actual delete calls = 0; DB writes = 0; NAS
+writes/deletes = 0; Jellyfin writes/refresh = 0; Discovery reconcile writes =
+0; Hermes/VM122 calls = 0; subtitle generation = 0. Next: Stage13-E2 may deploy
+the DRY-RUN endpoints for a read-only canary; actual deletion remains disabled.

@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 import sqlite3
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, session
 
 from teddy_discovery_completion_ssh import CompletionSSH
 from teddy_discovery_subtitle import validate_canonical_holding, SubtitleCandidate
@@ -18,6 +18,10 @@ from teddy_discovery_stage12_inventory import _classify_subtitles
 from teddy_discovery_jellyfin import JellyfinClient, jellyfin_media_path
 from teddy_discovery_ids import parse_dvd_id
 import teddy_storage
+from teddy_library_delete_dryrun import (
+    DeleteDryRunError, DeleteManifestReader, PrepareTokenRegistry,
+    source_identity_fingerprint,
+)
 
 LIBRARY_ROOT = "/volume1/video/video2/JAV"
 MAX_TITLES = 250
@@ -71,7 +75,7 @@ def _holding_rows(db_path, rollout_path, dvd_id=None):
     with closing(_ro(db_path)) as db:
         rows = db.execute("""
             SELECT h.holding_id,h.storage_root,h.relative_path,h.dvd_id,
-                   h.parse_status,h.present,h.size_bytes,h.discovered_by,h.first_seen_at,
+                   h.parse_status,h.present,h.size_bytes,h.mtime_ns,h.discovered_by,h.first_seen_at,
                    t.title,t.release_date,t.maker,t.cover_url,
                    j.status AS organizer_status,j.destination_path,
                    j.created_at AS organizer_created_at,
@@ -297,10 +301,13 @@ def _build_items(db_path, rollout_path, nas_reader, jellyfin_loader, dvd_id=None
 def _error(code,message,status): return jsonify({"status":"error","error":{"code":code,"message":message}}),status
 
 
-def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=None, jellyfin_loader=None, stream_response=None):
+def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=None, jellyfin_loader=None, stream_response=None, delete_manifest_reader=None, delete_token_registry=None):
     bp=Blueprint("teddy_library_api",__name__,url_prefix="/api/library")
     nas_reader=nas_reader if nas_reader is not None else (NASLibraryReader(_nas_client_from_env()) if _nas_client_from_env() else None)
     jellyfin_loader=jellyfin_loader or _jellyfin_paths
+    if delete_manifest_reader is None and nas_reader is not None and hasattr(nas_reader, "ssh"):
+        delete_manifest_reader = DeleteManifestReader(nas_reader.ssh, library_root=LIBRARY_ROOT)
+    delete_token_registry = delete_token_registry or PrepareTokenRegistry()
     def query_items(): return _build_items(db_path,rollout_path,nas_reader,jellyfin_loader)
     @bp.get("")
     def listing():
@@ -346,4 +353,125 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
         if stream_response: return stream_response(media_path)
         if core is None: return _error("playback_unavailable","재생 기능을 사용할 수 없습니다.",503)
         return teddy_storage.library_stream_response(core, media_path)
+
+    def delete_intent_guard(intent):
+        if session.get("teddy_authenticated") is not True:
+            return _error("authentication_required", "인증이 필요합니다.", 401)
+        if request.mimetype != "application/json" or request.headers.get("X-Teddy-Delete-Intent") != intent:
+            return _error("invalid_request_boundary", "요청을 확인할 수 없습니다.", 403)
+        # A browser same-origin JSON request supplies Origin; requiring it
+        # blocks cross-site form posts even if an authenticated cookie exists.
+        from urllib.parse import urlsplit
+        origin = request.headers.get("Origin")
+        expected = urlsplit(request.host_url)
+        supplied = urlsplit(origin or "")
+        if (not origin or supplied.scheme != expected.scheme
+                or supplied.netloc.casefold() != expected.netloc.casefold()
+                or request.headers.get("Sec-Fetch-Site", "same-origin") == "cross-site"):
+            return _error("invalid_request_origin", "요청 출처를 확인할 수 없습니다.", 403)
+        return None
+
+    def current_delete_identity(dvd_id):
+        rows, terminal = _holding_rows(db_path, rollout_path, dvd_id)
+        matches = [dict(row) for row in rows if row["dvd_id"] == dvd_id]
+        if not matches:
+            raise DeleteDryRunError("HOLDING_NOT_FOUND", 404)
+        if len(matches) != 1:
+            raise DeleteDryRunError("DUPLICATE_HOLDING")
+        row = matches[0]
+        if (row.get("storage_root") != "jav" or row.get("present") != 1
+                or row.get("parse_status") != "MATCHED"):
+            raise DeleteDryRunError("HOLDING_IDENTITY_MISMATCH")
+        try:
+            video = validate_canonical_holding(row, dvd_id)
+        except Exception as exc:
+            raise DeleteDryRunError("CANONICAL_PATH_MISMATCH") from exc
+        if row.get("relative_path") != video.relative_path:
+            raise DeleteDryRunError("CANONICAL_PATH_MISMATCH")
+        return row, video, terminal.get(dvd_id, {})
+
+    def current_delete_snapshot(dvd_id):
+        if delete_manifest_reader is None:
+            raise DeleteDryRunError("NAS_INSPECTION_UNAVAILABLE", 503)
+        row, video, terminal = current_delete_identity(dvd_id)
+        manifest = delete_manifest_reader.inspect(video, row)
+        inventory = {"status": "ok", "bytes": manifest["total_bytes"],
+                     "subtitle_names": manifest["subtitle_names"], "ko": manifest.get("ko")}
+        ko_state, reason_code, reason_label = _ko_state(row, video, inventory, terminal)
+        try:
+            jellyfin = jellyfin_loader()
+            jellyfin_state = ("RECOGNIZED" if jellyfin_media_path(video.relative_path) in jellyfin
+                              else "ABSENT")
+        except Exception:
+            jellyfin_state = "UNKNOWN"
+        source_fingerprint = source_identity_fingerprint(row, video.relative_path)
+        return row, video, manifest, source_fingerprint, {
+            "ko_state": ko_state, "unresolved_reason_code": reason_code,
+            "unresolved_label": reason_label, "jellyfin_state": jellyfin_state,
+        }
+
+    @bp.post("/<dvd_id>/delete/prepare")
+    def delete_prepare(dvd_id):
+        guard = delete_intent_guard("prepare")
+        if guard is not None: return guard
+        if not _is_canonical_dvd_id(dvd_id):
+            return _error("invalid_dvd_id", "DVD-ID 형식이 잘못되었습니다.", 400)
+        body = request.get_json(silent=True)
+        if body not in ({}, None):
+            return _error("invalid_request", "요청 형식이 잘못되었습니다.", 400)
+        try:
+            row, video, manifest, fingerprint, states = current_delete_snapshot(dvd_id)
+            token, expires_at = delete_token_registry.issue(
+                dvd_id=dvd_id, manifest_sha256=manifest["manifest_sha256"],
+                source_fingerprint=fingerprint,
+            )
+        except DeleteDryRunError as exc:
+            return _error(exc.code.lower(), "삭제 준비 정보를 안전하게 확인하지 못했습니다.", exc.status)
+        except Exception as exc:
+            detail = str(exc)[:120] if isinstance(exc, AttributeError) else "internal"
+            current_app.logger.warning("Library delete prepare failed (%s: %s)", type(exc).__name__, detail)
+            return _error("prepare_unavailable", "삭제 준비 정보를 안전하게 확인하지 못했습니다.", 503)
+        return jsonify({
+            "status": "PREPARED", "dvd_id": dvd_id, "title": row.get("title"),
+            "file_count": len(manifest["entries"]), "total_bytes": manifest["total_bytes"],
+            "files": [entry["relative_name"] for entry in manifest["entries"]],
+            "manifest_sha256": manifest["manifest_sha256"],
+            "ko_state": states["ko_state"], "unresolved_reason_code": states["unresolved_reason_code"],
+            "unresolved_label": states["unresolved_label"], "jellyfin_state": states["jellyfin_state"],
+            "prepare_expires_at": expires_at, "prepare_token": token,
+            "actual_delete_performed": False,
+        })
+
+    @bp.post("/<dvd_id>/delete/validate")
+    def delete_validate(dvd_id):
+        guard = delete_intent_guard("validate")
+        if guard is not None: return guard
+        if not _is_canonical_dvd_id(dvd_id):
+            return _error("invalid_dvd_id", "DVD-ID 형식이 잘못되었습니다.", 400)
+        body = request.get_json(silent=True)
+        if (not isinstance(body, dict) or set(body) != {"prepare_token", "typed_dvd_id", "acknowledge"}
+                or not isinstance(body.get("prepare_token"), str)
+                or not (20 <= len(body["prepare_token"]) <= 256)
+                or body.get("typed_dvd_id") != dvd_id
+                or body.get("acknowledge") is not True):
+            code = "WRONG_TYPED_DVD_ID" if isinstance(body, dict) and body.get("typed_dvd_id") != dvd_id else "ACKNOWLEDGEMENT_REQUIRED"
+            return _error(code.lower(), "DVD-ID 입력과 영구 삭제 확인이 필요합니다.", 400)
+        try:
+            delete_token_registry.precheck(body["prepare_token"], dvd_id=dvd_id)
+            row, video, manifest, fingerprint, _states = current_delete_snapshot(dvd_id)
+            validated_at = delete_token_registry.validate(
+                body["prepare_token"], dvd_id=dvd_id,
+                manifest_sha256=manifest["manifest_sha256"], source_fingerprint=fingerprint,
+            )
+        except DeleteDryRunError as exc:
+            if exc.code in {"CANONICAL_MEDIA_IDENTITY_MISMATCH", "CANONICAL_MEDIA_MISSING"}:
+                return _error("manifest_changed", "준비 후 작품 파일이 변경되었습니다. 다시 준비해 주세요.", 409)
+            return _error(exc.code.lower(), "삭제 준비 상태가 유효하지 않습니다. 다시 준비해 주세요.", exc.status)
+        except Exception as exc:
+            current_app.logger.warning("Library delete validation failed (%s)", type(exc).__name__)
+            return _error("validation_unavailable", "삭제 준비 상태를 다시 확인할 수 없습니다.", 503)
+        return jsonify({"status": "READY_FOR_COMMIT", "dvd_id": dvd_id,
+                        "manifest_sha256": manifest["manifest_sha256"],
+                        "validated_at": validated_at, "actual_delete_performed": False,
+                        "message": "삭제 준비 검증 완료 · 실제 삭제는 아직 비활성"})
     return bp

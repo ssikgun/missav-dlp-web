@@ -70,7 +70,10 @@ def main():
     require(HTML.count('<video ') == 1, "shared video player count")
     require("method: 'DELETE'" not in LIBRARY_JS and "method: \"DELETE\"" not in LIBRARY_JS,
             "no Library permanent-delete request")
-    require("삭제" not in LIBRARY_JS, "no Library delete UI")
+    require("/delete/prepare" in LIBRARY_JS and "/delete/validate" in LIBRARY_JS,
+            "Library has the E1 dry-run prepare/validate flow")
+    require("삭제 준비 확인" in LIBRARY_JS and "actual_delete_performed !== false" in LIBRARY_JS,
+            "Library delete flow remains validate-only")
 
     print("FILE_MANAGEMENT_NAVIGATION_SMOKE=PASS")
 

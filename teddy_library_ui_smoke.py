@@ -57,11 +57,18 @@ require("discovery-row" in js and "discovery-row-summary" in js and "discovery-d
 require("data-play-dvd" in js and "playLibraryItem" in js,
         "Library row does not use the shared playback adapter")
 
-# No destructive request or private/raw payload rendering.
+# No actual delete request or private/raw payload rendering. E1 adds only a
+# prepare + validate-only confirmation flow.
 require("method: 'DELETE'" not in js and 'method: "DELETE"' not in js and "fetch('/api/library" not in js,
         "Library UI must not call a delete endpoint")
-for marker in ("JSON.stringify", "session_id", "subtitle_body", "artifact_json", "report_json"):
+for marker in ("session_id", "subtitle_body", "artifact_json", "report_json"):
     require(marker not in js, f"raw or private payload marker present: {marker}")
+for marker in ("/delete/prepare", "/delete/validate", "data-delete-prepare",
+               "data-delete-ack", "data-delete-typed", "ack.checked && typed.value === dvd",
+               "actual_delete_performed !== false", "영구 삭제임을 이해했습니다",
+               "삭제 준비 검증 완료 · 실제 삭제는 아직 비활성"):
+    require(marker in js, f"missing dry-run delete confirmation boundary: {marker}")
+require("prepare_token</code>" not in js, "prepare token must not be rendered")
 for marker in ("라이브러리를 불러오는 중", "조건에 맞는 작품이 없습니다.",
                "라이브러리 정보를 불러오지 못했습니다."):
     require(marker in js, f"missing load/empty/error state: {marker}")

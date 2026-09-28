@@ -13,6 +13,8 @@
 
     let debounceTimer = null;
     let requestSerial = 0;
+    let activeDeleteDialog = null;
+    let activeDeleteToken = null;
 
     function escapeHtml(value) {
         return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
@@ -109,8 +111,73 @@
                 ${detailCell('출시일', release)}${detailCell('관리 경로', managedPath)}${detailCell('NAS 추가일', `${date}<br><small>${provenance}</small>`)}
                 ${detailCell('작품 전체 용량', `${size}<br><small>${rawBytes}</small>`)}${detailCell('자막 상태', subtitle)}${detailCell('Stage12 종단 상태', stage12)}
                 ${detailCell('미해결 사유', unresolved)}${detailCell('Jellyfin 상태', jellyfin)}${detailCell('경로/identity 상태', mismatch)}
-            </div></div>
+            </div><div class="library-delete-entry"><button type="button" class="library-delete-prepare" data-delete-prepare="${dvd}">🗑️ 영구 삭제</button></div></div>
         </details>`;
+    }
+
+    function clearDeleteDialog() {
+        activeDeleteToken = null;
+        if (activeDeleteDialog) activeDeleteDialog.remove();
+        activeDeleteDialog = null;
+    }
+
+    function intentHeaders(intent) {
+        return { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Teddy-Delete-Intent': intent };
+    }
+
+    async function openDeletePrepare(dvd) {
+        clearDeleteDialog();
+        const dialog = document.createElement('dialog');
+        dialog.className = 'library-delete-dialog';
+        dialog.innerHTML = `<div class="library-delete-dialog-body"><button type="button" class="library-delete-close" aria-label="닫기">닫기</button><h2>영구 삭제 준비</h2><p>작품의 현재 관리 파일 목록과 상태를 읽기 전용으로 확인합니다.</p><div class="library-delete-result">삭제 준비 정보를 확인하는 중…</div></div>`;
+        document.body.appendChild(dialog);
+        activeDeleteDialog = dialog;
+        const close = () => clearDeleteDialog();
+        dialog.querySelector('.library-delete-close').addEventListener('click', close);
+        dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
+        dialog.addEventListener('click', event => { if (event.target === dialog) close(); });
+        dialog.showModal();
+        try {
+            const response = await fetch(`/api/library/${encodeURIComponent(dvd)}/delete/prepare`, {
+                method: 'POST', credentials: 'same-origin', headers: intentHeaders('prepare'), body: '{}'
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== 'PREPARED' || !payload.prepare_token) throw new Error('prepare failed');
+            if (activeDeleteDialog !== dialog) return;
+            activeDeleteToken = payload.prepare_token;
+            const files = Array.isArray(payload.files) ? payload.files : [];
+            const state = payload.ko_state === 'VALID' ? '📝 한국어 자막' : payload.ko_state === 'ABSENT' ? '📭 자막 없음' : payload.ko_state === 'UNRESOLVED' ? `🧩 자막 미해결${payload.unresolved_label ? ` · ${escapeHtml(payload.unresolved_label)}` : ''}` : '⚠️ 자막 상태 확인 필요';
+            const jf = payload.jellyfin_state === 'RECOGNIZED' ? '🎞️ Jellyfin 인식' : payload.jellyfin_state === 'ABSENT' ? '📺 Jellyfin 미인식' : '⚠️ Jellyfin 상태 확인 필요';
+            const bytes = formatBytes(payload.total_bytes) || '용량 확인 필요';
+            const names = files.map(name => `<li>${escapeHtml(name)}</li>`).join('');
+            dialog.querySelector('.library-delete-result').innerHTML = `<section class="library-delete-summary"><div><b>${escapeHtml(payload.dvd_id)}</b> · ${escapeHtml(payload.title || '제목 정보 없음')}</div><div>파일 ${Number(payload.file_count) || 0}개 · ${escapeHtml(bytes)}</div><div>Manifest SHA-256 <code>${escapeHtml(payload.manifest_sha256.slice(0, 12))}</code></div><div>${state} · ${jf}</div><details><summary>확인된 파일 이름</summary><ul>${names}</ul></details><p class="library-delete-warning">이 작업은 휴지통을 사용하지 않는 영구 삭제를 위한 준비 단계입니다. 현재 단계에서는 실제 삭제가 비활성입니다.</p><label class="library-delete-ack"><input type="checkbox" data-delete-ack> 영구 삭제임을 이해했습니다</label><label class="library-delete-typed-label">계속하려면 <b>${escapeHtml(dvd)}</b>를 입력하세요<input type="text" autocomplete="off" spellcheck="false" data-delete-typed></label><button type="button" class="library-delete-validate" disabled>삭제 준비 확인</button><div class="library-delete-final" aria-live="polite"></div></section>`;
+            const ack = dialog.querySelector('[data-delete-ack]');
+            const typed = dialog.querySelector('[data-delete-typed]');
+            const validateButton = dialog.querySelector('.library-delete-validate');
+            const refreshEnabled = () => { validateButton.disabled = !(ack.checked && typed.value === dvd); };
+            ack.addEventListener('change', refreshEnabled);
+            typed.addEventListener('input', refreshEnabled);
+            validateButton.addEventListener('click', async () => {
+                if (!activeDeleteToken || !ack.checked || typed.value !== dvd) return;
+                validateButton.disabled = true;
+                const final = dialog.querySelector('.library-delete-final');
+                final.textContent = '현재 작품과 파일 목록을 다시 확인하는 중…';
+                try {
+                    const checked = await fetch(`/api/library/${encodeURIComponent(dvd)}/delete/validate`, {
+                        method: 'POST', credentials: 'same-origin', headers: intentHeaders('validate'),
+                        body: JSON.stringify({ prepare_token: activeDeleteToken, typed_dvd_id: typed.value, acknowledge: ack.checked })
+                    });
+                    const result = await checked.json();
+                    if (!checked.ok || result.status !== 'READY_FOR_COMMIT' || result.actual_delete_performed !== false) throw new Error('validation failed');
+                    final.textContent = '삭제 준비 검증 완료 · 실제 삭제는 아직 비활성';
+                } catch (_) {
+                    final.textContent = '준비 상태를 확인하지 못했습니다. 창을 닫고 다시 준비해 주세요.';
+                    activeDeleteToken = null;
+                }
+            });
+        } catch (_) {
+            if (activeDeleteDialog === dialog) dialog.querySelector('.library-delete-result').textContent = '삭제 준비 정보를 확인하지 못했습니다.';
+        }
     }
 
     function queryUrl() {
@@ -162,6 +229,13 @@
     filter.addEventListener('change', loadLibrary);
     sort.addEventListener('change', loadLibrary);
     list.addEventListener('click', event => {
+        const prepare = event.target.closest('[data-delete-prepare]');
+        if (prepare) {
+            event.preventDefault();
+            event.stopPropagation();
+            openDeletePrepare(prepare.dataset.deletePrepare);
+            return;
+        }
         const button = event.target.closest('[data-play-dvd]');
         if (!button) return;
         event.preventDefault();
