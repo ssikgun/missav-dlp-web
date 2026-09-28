@@ -1,5 +1,75 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-28 Stage13-A forensic / contract freeze — PASS
+
+Stage13-A read-only forensic is complete. No source, DB, NAS, Jellyfin, Hermes,
+or VM122 production write occurred during the forensic.
+
+### Repository identity
+
+- Branch: `teddy-subtitle-stage11`
+- Stage13-A final local HEAD after handoff-only fast-forward:
+  `9d6b8b8b590122051ca7c763cb9c7d0e88456795`
+- Worktree was clean.
+- The prior apparent remote mismatch was caused by a stale
+  `origin/teddy-subtitle-stage11` tracking ref; the branch is not present in the
+  configured `remote.origin.fetch` refspec. Exact `ls-remote` confirmed the
+  server branch at the expected handoff-only commit.
+
+### Stage13-B frozen read-model contract
+
+- File Manager source set is current Discovery holdings, not Stage12 rollout.
+- Current present JAV holdings: **177**.
+- Stage12 rollout rows: **173**.
+- File Manager joins current holdings with Stage12 terminal state using an
+  optional/LEFT JOIN boundary. A holding without a Stage12 row must still be
+  visible and manageable.
+- The four present holdings without a Stage12 rollout row are:
+  `EBWH-296`, `MIAD-866`, `MIRD-258`, and `SKMJ-774`. All currently record
+  `discovered_by=completion-stage9`. Do not claim they were downloaded after
+  Stage12 closure without separate evidence.
+
+### NAS addition-date contract
+
+Read-only bounded sampling used canonical DB paths only. Six sampled titles
+(two each from `library-inventory`, `organizer-apply`, and
+`completion-stage9`) were checked through the dedicated NAS SSH boundary.
+The NAS filesystem was Btrfs. Filesystem birth/creation time was unavailable
+for both title directories and media files; directory ctime was not reliable
+as final-placement time, and media mtime is not accepted by itself as download
+or placement time.
+
+Every one of the 177 current holdings has a matching COMPLETED organizer job
+for its exact canonical destination. For 176 titles, publisher job creation
+and completion fall on the same KST calendar date, which bounds final placement
+to that date and is sufficient for the Stage13 UI date display. One title
+crosses a KST date boundary, so its historical `nas_added_at` remains null and
+its UI must show `추가 날짜 확인 불가`. Do not invent an approximate date.
+
+For future newly completed titles, record the successful final JAV publication
+instant as durable `nas_added_at` provenance so this ambiguity does not recur.
+
+### NAS / mount boundary
+
+In the current CT108 shell namespace, `/mnt/nas-jav` and
+`/mnt/nas-downloads` are ordinary paths on the local ext4 root filesystem,
+not the JAV NAS mount; `/final` is absent. Therefore:
+
+- `JAV_LOCAL_MOUNT=NOT_PRESENT_IN_CURRENT_NAMESPACE`
+- Stage13 metadata/size reads use exact bounded NAS SSH operations.
+- Browser playback uses validated canonical title identity through a minimal
+  adapter over the existing player/stream behavior.
+- Future permanent delete uses a dedicated NAS SSH mutator.
+- Do not make the CT108 JAV mount writable or depend on a local RW JAV mount.
+
+### Next checkpoint
+
+Proceed to **Stage13-B — read-only backend / read model**. Implement list/detail,
+server-side search, filters, sorting, bounded per-title/library size accounting,
+KO / UNRESOLVED / Jellyfin state, NAS addition-date display contract, and the
+minimal browser-playback adapter. Do not implement permanent delete yet.
+
+
 ## 2026-09-28 Post-Stage13 next priority — automatic subtitles for newly completed downloads
 
 This requirement is intentionally **outside Stage13** so the Stage13 NAS Library
