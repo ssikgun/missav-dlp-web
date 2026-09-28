@@ -31,6 +31,14 @@ def main():
     ):
         require(token in template, token)
 
+    settings = template.split('id="page-settings"', 1)[1].split("</div>", 1)[0]
+    require('id="subtitle-status-panel"' not in settings,
+            "subtitle status panel must not remain in Settings")
+    require('data-file-management-view="subtitle-status"' in template,
+            "subtitle status tab missing from File Management")
+    require("data-file-management-panel=\"subtitle-status\"" in template,
+            "subtitle status panel must be under File Management")
+
     require(
         "/api/subtitles/status" in backend,
         "STATUS_API",
@@ -47,6 +55,14 @@ def main():
         "setInterval" in script,
         "STATUS_UI_POLL",
     )
+    require("file-management-view-subtitle-status" in script,
+            "STATUS_UI_ACTIVE_SUBTAB_GUARD")
+    require("page-library" in script and "page-settings" not in script,
+            "STATUS_UI_PAGE_LIFECYCLE")
+    for traffic_light in ("🟢", "🔴", "⚪"):
+        require(traffic_light not in script, "traffic-light status emoji remains")
+    for label in ("⚙️ 작업 중", "⏸️ 대기", "⚠️ 확인 필요", "⚠️ 실행 상태 확인 필요", "❗ 오류", "⚠️ 조회 실패"):
+        require(label in script, "missing semantic status label: " + label)
     require(
         ".subtitle-status-panel" in css,
         "STATUS_UI_STYLE",

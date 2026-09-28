@@ -3679,3 +3679,38 @@ delete 0. Production remains on image
 Next: verify existing Files playback when a remote Files media item is
 available, then perform authenticated desktop and narrow/mobile viewport
 review. The deployed candidate is retained while those checks are pending.
+
+## Stage13-C3 File Management navigation refactor — 2026-09-28
+
+Refactored the frontend navigation without changing Library, subtitle-status,
+or Files API contracts. The sidebar now has one folder-icon `파일 관리`
+entry, opening the former Library SPA page renamed for users. Its default
+subtab is `보유 라이브러리`; `자막 처리 현황` is a sibling subtab. The status
+panel was removed from Settings and placed under File Management with a note
+that pipeline job counts are separate from holdings. Status labels now use
+text-oriented emoji labels instead of traffic-light symbols. `/api/subtitles/status`
+loads on status-subtab activation and polls every 10 seconds only while both
+the File Management page and status subtab are active.
+
+The existing standalone Files content was moved under Download as the
+`정리 전 파일` tab beside default `다운로드 작업`. Existing file control IDs,
+`fetchFiles`, search/sort, actions, and `/api/files/.../stream` playback are
+retained; opening the subtab invokes `fetchFiles`. The explanatory text notes
+that files disappear from this view after organizer movement to the JAV
+library. The shared video player remains singular and no permanent Library
+delete UI/request was added. Discovery and Settings controls remain present.
+
+Updated the Library, subtitle-status, Discovery shell checks and added
+`teddy_file_management_navigation_smoke.py`. Those checks, subtitle status
+fixture smoke, Python compile, and `git diff --check` passed. The complete
+local Docker image build passed as
+`missav-stage13c3-smoke:c87500b` (`sha256:0b2622d358401fc107dab6324ce1d933f145a22933a76e758665525c6a56eaa6`).
+Its existing Browser build patcher was updated to anchor on the renamed single
+File Management route and current Discovery page position.
+
+This checkpoint did not deploy or restart production. Production app image
+remains `sha256:2ac1125af07b5f55e78daa85030a9e32c793e44eb1182a3cff0fe58e34a48566`.
+DB/NAS/Jellyfin writes, Jellyfin refreshes, subtitle generation, permanent
+delete, Hermes calls and VM122 calls were all zero. Next: deploy the new UI
+source separately, then perform authenticated manual desktop and narrow/mobile
+visual acceptance.

@@ -13,8 +13,8 @@ def replace_once(old, new, label):
     text = text.replace(old, new, 1)
 
 
-# Keep the Browser entry directly after Download and before Files.
-files_button = '''        <button class="sidebar-btn" data-page="files" title="파일 관리">
+# Keep the Browser entry beside the single File Management sidebar route.
+file_management_button = '''        <button class="sidebar-btn" data-page="library" title="파일 관리" aria-label="파일 관리">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
         </button>'''
 
@@ -23,13 +23,13 @@ browser_button = '''        <button class="sidebar-btn" data-page="browser" titl
         </button>'''
 
 replace_once(
-    files_button,
-    browser_button + '\n' + files_button,
+    file_management_button,
+    file_management_button + '\n' + browser_button,
     'browser sidebar button',
 )
 
 replace_once(
-    '''        <!-- Files Page -->''',
+    '''        <!-- Discovery Page -->''',
     '''        <!-- Browser Page -->
         <div id="page-browser" class="page">
             <div class="teddy-browser-shell">
@@ -42,7 +42,7 @@ replace_once(
             </div>
         </div>
 
-        <!-- Files Page -->''',
+        <!-- Discovery Page -->''',
     'browser page',
 )
 

@@ -12,14 +12,18 @@ js = (root / "templates/teddy-library.js").read_text()
 css = (root / "templates/teddy-library.css").read_text()
 discovery_js = (root / "templates/teddy-discovery.js").read_text()
 
-# Separate SPA page/tab while retaining the old Files page and shared modal.
+# File Management owns the Library view; transient files moved under Download.
 for marker in ('data-page="library"', 'id="page-library"', 'id="librarySummary"',
                'id="librarySearch"', 'id="libraryFilter"', 'id="librarySort"',
                'id="libraryStatus"', 'id="libraryList"'):
     require(marker in html, f"missing File Manager marker: {marker}")
-require('data-page="files"' in html and 'id="page-files"' in html,
-        "existing Files tab must remain installed")
-require('btn.dataset.page === \'files\'' in html, "existing Files SPA routing changed")
+require('data-page="files"' not in html and 'id="page-files"' not in html,
+        "old standalone Files page/sidebar must be removed")
+require('id="fileSearch"' in html and 'id="fileSort"' in html and 'id="fileList"' in html,
+        "transient Files controls must remain")
+require('data-download-view="preclean"' in html and 'data-download-panel="preclean"' in html,
+        "transient Files view must live under Download")
+require("if (view === 'preclean') fetchFiles()" in html, "pre-clean tab must fetch files on open")
 require('/static/teddy-library.css' in html and '/static/teddy-library.js' in html,
         "Library assets are not wired")
 require("/api/library/" in html and "'/stream'" in html and "openVideoStream" in html,
@@ -68,5 +72,10 @@ for breakpoint in ("max-width: 1020px", "max-width: 720px", "max-width: 420px"):
     require(breakpoint in css, f"missing responsive breakpoint: {breakpoint}")
 require("overflow-wrap: anywhere" in css, "long IDs/paths must wrap on narrow screens")
 require("discovery-row" in discovery_js, "Discovery regression source unavailable")
+require('title="파일 관리" aria-label="파일 관리"' in html,
+        "sidebar File Management label changed")
+require('data-file-management-view="library"' in html and 'data-file-management-view="subtitle-status"' in html,
+        "File Management subtabs missing")
+require('GET' not in js, "unexpected Library method marker")
 
 print("Stage13-C Library UI shell smoke: OK")

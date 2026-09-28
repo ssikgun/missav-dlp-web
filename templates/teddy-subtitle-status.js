@@ -2,12 +2,12 @@
     'use strict';
 
     const STATUS_LABELS = {
-        running: '🟢 작업 중',
-        idle: '⚪ 대기',
-        attention: '🔴 확인 필요',
-        stale: '🔴 실행 상태 확인 필요',
-        error: '🔴 오류',
-        unavailable: '🔴 조회 실패'
+        running: '⚙️ 작업 중',
+        idle: '⏸️ 대기',
+        attention: '⚠️ 확인 필요',
+        stale: '⚠️ 실행 상태 확인 필요',
+        error: '❗ 오류',
+        unavailable: '⚠️ 조회 실패'
     };
 
     function byId(id) {
@@ -130,35 +130,19 @@
     window.loadSubtitleStatus = loadSubtitleStatus;
 
     document.addEventListener('DOMContentLoaded', function () {
-        const settingsButton = document.querySelector(
-            '.sidebar-btn[data-page="settings"]'
-        );
-
-        if (settingsButton) {
-            settingsButton.addEventListener(
-                'click',
-                loadSubtitleStatus
+        function isStatusViewActive() {
+            const page = byId('page-library');
+            const panel = byId('file-management-view-subtitle-status');
+            return Boolean(
+                page && page.classList.contains('active')
+                && panel && !panel.hidden
             );
         }
 
-        const settingsPage = byId('page-settings');
-
-        if (
-            settingsPage
-            && settingsPage.classList.contains('active')
-        ) {
-            loadSubtitleStatus();
-        }
+        document.addEventListener('subtitle-status-activate', loadSubtitleStatus);
 
         setInterval(function () {
-            const page = byId('page-settings');
-
-            if (
-                page
-                && page.classList.contains('active')
-            ) {
-                loadSubtitleStatus();
-            }
+            if (isStatusViewActive()) loadSubtitleStatus();
         }, 10000);
     });
 })();

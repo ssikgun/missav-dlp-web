@@ -166,7 +166,7 @@ def main():
 
     for required_id in (
         "page-download",
-        "page-files",
+        "page-library",
         "page-settings",
         "page-discovery",
         "discoverySummary",
@@ -191,9 +191,14 @@ def main():
 
     require(
         parser.data_pages.count(
-            "files"
+            "library"
         ) == 1,
-        "files sidebar changed",
+        "single File Management sidebar changed",
+    )
+
+    require(
+        "files" not in parser.data_pages,
+        "standalone Files sidebar returned",
     )
 
     require(
