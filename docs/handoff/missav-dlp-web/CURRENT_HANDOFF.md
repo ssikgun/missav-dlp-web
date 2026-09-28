@@ -88,6 +88,52 @@ removed (remote/local cleanup PASS; 16 local files, 382,145 bytes removed).
 The published artifact and controller report remain in their durable
 artifact directory. No other title's staging or runtime data was touched.
 
+## 2026-09-28 FNS-235 retry-feedback canary — session-id report exposure
+
+At expected HEAD `42165a2100bc640042f87ec55f184cf67bf21a30`, read-only
+preflight passed with FNS-235 `FAILED_RETRYABLE` sequence 3, zero active
+titles, production Python/dependencies, and matching NAS source identity
+`FNS/FNS-235/FNS-235.mp4` (3,914,686,408 bytes; mtime_ns
+`1788081907263298717`). The retry completed all 10 semantic parts and
+publication/Jellyfin verification. Part 7 attempt 1 failed
+`SESSION_ID_MISMATCH` at `part.session_id`, response 4,896 bytes with SHA-256
+`b7a68314cf662f409ec0fea236bc44a8298661aa91db83c193d07683079cdc62`.
+The part-query UTF-8 SHA-256 values were
+`aa4ac93df846e9c230cbfd87fc06fa5717e4fef9844f965dc65274209aababba`
+(attempt 1) and
+`952d23645c6fb03bc9af77bb1ef6663b7627e41a00be09b0a1d7cd0bb414261c`
+(attempt 2, with validator feedback). Attempt 2 passed; its accepted response
+was 4,896 bytes with SHA-256
+`425b4911932e321783cf3b43e022ea1ce2f0e959571ccbba27acf018cf9a4f39`.
+
+The production runner completed `FAILED_RETRYABLE -> RUNNING -> GENERATED ->
+PUBLISHED`, sequences 3 -> 4 -> 5 -> 6, with final reason
+`STAGE12_PUBLICATION_AND_JELLYFIN_VERIFIED`. The only rollout events during
+the canary belonged to FNS-235. Final counts were `PUBLISHED=162`,
+`FAILED_RETRYABLE=1`, `RUNNING=0`, `UNRESOLVED=10`; publication and Jellyfin
+external visibility were verified.
+
+All five Hermes invocations reported `HERMES_RAW_OUTPUT_SUPPRESSED=YES`. The
+canary wrapper captured child stdout/stderr in memory and emitted only
+allowlisted fields; it suppressed the runner's session/progress lines, so no
+actual session identifier or subtitle body appeared in the user-visible
+stdout/stderr or execution stream. Heartbeat and runtime summary had no
+session identifier. However, a safe exact-value presence check found the
+actual generated session identifier in two fields of the durable Stage11
+controller report: `review_result_identity.source_translation_session_id`
+and `translation_result_identity.session_id`. The identifier is deliberately
+not recorded here. This violates the canary's session-id privacy requirement
+even though stream redaction worked. The report and rollout row were not
+rewritten; mutating a published artifact and its rollout provenance was
+outside this canary's safe completion path.
+No other title was run.
+
+The run-specific local staging directory remains (13 files, 239,697 bytes,
+zero pending files); remote staging cleanup was not verified after detecting
+the report exposure. The heartbeat reached `COMPLETE`, active rollout titles
+are zero, and `/tmp` contains no files over 50 MiB. Do not start another title
+until the report's session-id emission/storage contract is addressed.
+
 ## 2026-09-27 GDTM-091 semantic retry-feedback production canary
 
 At expected HEAD `512e8de3459d440021302674ba0feefcebef2b4b`, read-only
