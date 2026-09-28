@@ -4329,3 +4329,43 @@ production DB writes = 0, NAS writes/deletes = 0, Jellyfin writes/refresh = 0,
 Hermes/VM122 calls = 0, and subtitle generation = 0. Next: Stage13-E2F may
 configure `TEDDY_PUBLIC_ORIGIN` in the production environment, redeploy only
 the web app, and have Teddy retry the authenticated prepare/validate DRY-RUN.
+
+## Stage13-E2F trusted public origin production deployment — 2026-09-29
+
+The production environment previously had no `TEDDY_PUBLIC_ORIGIN` key.
+Added exactly one entry with value
+`https://downloader.ssikgun.com`, preserving the env file's existing owner,
+mode and LF convention. Added the corresponding environment pass-through to
+the production `missav-dlp-web` Compose service. No other env entry or
+service configuration changed.
+
+Built source HEAD `6e5fa88ce17ada4f277fcd8d4be8cc8f02cc1b6a` as
+`ghcr.io/ssikgun/missav-dlp-web:stage13e2f-6e5fa88`, image
+`sha256:9931fa76baff36984e2cef51f3de77c019236f538da1983582a8856188398cdc`.
+The image carries OCI revision label
+`6e5fa88ce17ada4f277fcd8d4be8cc8f02cc1b6a`. Only the `missav-dlp-web`
+service was recreated with `--no-deps`. Its previous image,
+`sha256:ab0a8281d6ecb7b81fa5851cd5e523059b44de74e3270a79cfd9c9a2e07d63dc`,
+was retained as rollback candidate; rollback was not needed.
+
+The app is running with restart count 0 and published port 58000 unchanged.
+Gluetun and both browser container IDs remained unchanged. Compose render
+showed the only app changes were the image and public-origin environment;
+ports, network, data mounts, read-only Discovery/rollout DBs, NAS SSH
+credential mount and Jellyfin key mount stayed unchanged. Runtime env check
+matched the exact configured value. The deployed helper parsed it as
+`scheme=https`, `host=downloader.ssikgun.com`,
+`effective_port=443`, valid=true.
+
+Unauthenticated `/login` returned 200, `/` redirected to login,
+`/api/library` and delete prepare returned 401. Library, Discovery and
+subtitle status assets returned 200. Runtime route inspection found prepare
+and validate only; no delete/commit route is registered. No authenticated
+prepare or validate was called and no session was created or copied.
+
+Production writes: DB 0, NAS write/delete 0, Jellyfin write/refresh 0,
+Discovery reconcile 0, Hermes 0, VM122 0, subtitle generation 0, permanent
+delete 0. The only production mutations were the public-origin env/config
+setting and replacement of the web app image/container. Next: Teddy performs
+the authenticated ADN-785 prepare and validate-only flow in the browser.
+Actual deletion remains disabled.
