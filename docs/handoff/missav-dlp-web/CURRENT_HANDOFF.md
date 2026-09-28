@@ -1,5 +1,34 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-28 Stage13-E2 manual prepare attempt — FAIL / forensic required
+
+Teddy manually opened the production File Management delete DRY-RUN for
+`ADN-785` from an authenticated browser session. The dialog opened, but the
+prepare request did not return a usable PREPARED payload and the UI showed:
+
+`삭제 준비 정보를 확인하지 못했습니다.`
+
+Important safety facts:
+
+- No validate request was reached.
+- No delete/commit endpoint exists.
+- No NAS/DB/Jellyfin write was performed by this manual attempt.
+- The previously bounded internal manifest for ADN-785 was readable, so the
+  failure must be narrowed at the production HTTP prepare boundary before any
+  source change.
+
+Potential but **unconfirmed** suspect: the prepare guard compares browser
+`Origin` against Flask `request.host_url`. Behind the production reverse
+proxy, scheme/host normalization may differ (for example external HTTPS versus
+internal HTTP) even for a legitimate same-origin browser request. Do not change
+this guard until the actual response status/error code and proxy header view are
+captured.
+
+Next checkpoint is read-only forensic of the exact production prepare request:
+HTTP status, safe JSON error code, relevant app/access log evidence, and
+sanitized request/proxy origin-host metadata. Actual deletion remains disabled.
+
+
 ## 2026-09-28 Stage13-E2A current-holdings delta forensic — PASS
 
 The previous Stage13-A/C value of 177 present JAV holdings was a point-in-time
