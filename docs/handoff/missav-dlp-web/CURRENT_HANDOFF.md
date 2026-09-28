@@ -1,5 +1,47 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-28 Stage11 durable-report session identity privacy fix
+
+Read-only forensic at expected HEAD `d6366666b9b26824602b7e122fb61a11b7d7f7eb`
+found raw session identifiers in three nested identity fields in all 133
+local durable Stage11 controller reports inspected. Stage11 uses the
+translation identity only when validating existing semantic staging; review
+identity values are validated for shape. Stage12, publication, Jellyfin,
+reconciliation, and rollout provenance use report/artifact paths and hashes,
+not these nested identifiers. Raw identifiers remain necessary in memory for
+exact semantic part identity validation and review binding; accepted semantic
+staging remains separate from the durable controller report.
+
+New controller reports serialize SHA-256 fingerprints for translation,
+source-translation, and review-execution session identities, never the raw
+identifiers. Existing reports with legacy raw fields remain readable. When
+validating a new fingerprint-only report against semantic staging, the
+controller finds the unique staging directory whose basename fingerprint
+matches, then performs the existing exact raw identity checks in memory.
+Validator, prompt, retry, and publication behavior are unchanged. The Stage12
+fixture using the legacy report schema remains compatible.
+
+FNS-235's already-published local controller report was left unchanged. Its
+report SHA-256 is bound by its rollout row and artifact preflight, and safely
+rewriting it would require changing rollout provenance; this task prohibited
+rollout DB writes. The report is local to the Stage12 artifact tree, not
+copied to the NAS published subtitle directory. The report hash and published
+subtitle artifact hash remain distinct. Other scanned local controller
+reports have the same legacy schema; no migration was attempted.
+
+Verification passed: controller smoke (51 checks, including fingerprint-only
+serialization and completion replay), stateful parts (65 checks), live-runner
+and retry/stream smokes, Stage12 batch/retry/bulk/rollout smokes, compile, and
+`git diff --check`. No production semantic invocation, rollout mutation,
+publication, or Jellyfin write occurred.
+
+Privacy handling note: during the initial forensic work, one tool output
+accidentally exposed the FNS session identifier inside a staging path. The
+value is intentionally not reproduced here or in source, logs, or commit
+metadata. The execution-stream exposure has been acknowledged to the user;
+subsequent inspection avoided value-bearing output. This incident does not
+change the existing FNS report or rollout provenance.
+
 ## 2026-09-27 Stage11 Hermes raw-output stream containment
 
 Forensic at HEAD `80da72bc02a8218d237760dd8d04dbadf13f7a55` found that the

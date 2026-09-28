@@ -341,7 +341,7 @@ class FakeRuntime:
 
     @staticmethod
     def _review_result(request, request_sha):
-        return QualityReviewResult(
+        result = QualityReviewResult(
             schema_version=request.schema_version,
             request_sha256=request_sha,
             cues=tuple(
@@ -355,6 +355,11 @@ class FakeRuntime:
                 )
                 for cue in request.cues
             ),
+        )
+        return replace(
+            result,
+            source_translation_session_id=request.source_translation_session_id,
+            review_execution_session_id="synthetic-review-execution-session",
         )
 
     def asr_review(self, request, *, staging_root):
@@ -564,6 +569,43 @@ def main():
             targeted_runner=False,
         )
         report = json.loads(result.report_path.read_text(encoding="utf-8"))
+        translation_session_id = stateful_session_id_for_package(
+            runtime.last_packages[V2_ROUTE_ASR_ONLY]
+        )
+        report_bytes = result.report_path.read_bytes()
+        check(
+            "durable report fingerprints session identity without raw value",
+            lambda: set(report["translation_result_identity"])
+            == {"session_id_sha256", "sha256"}
+            and report["translation_result_identity"]["session_id_sha256"]
+            == hashlib.sha256(translation_session_id.encode("utf-8")).hexdigest()
+            and "session_id" not in report["translation_result_identity"]
+            and translation_session_id.encode("utf-8") not in report_bytes,
+        )
+        check(
+            "durable review identity contains fingerprints only",
+            lambda: set(report["review_result_identity"])
+            == {
+                "request_sha256",
+                "result_sha256",
+                "source_translation_session_id_sha256",
+                "review_execution_session_id_sha256",
+            }
+            and report["review_result_identity"][
+                "source_translation_session_id_sha256"
+            ]
+            == hashlib.sha256(
+                runtime.last_asr_request.source_translation_session_id.encode("utf-8")
+            ).hexdigest()
+            and report["review_result_identity"][
+                "review_execution_session_id_sha256"
+            ]
+            == hashlib.sha256(
+                b"synthetic-review-execution-session"
+            ).hexdigest()
+            and "source_translation_session_id" not in report["review_result_identity"]
+            and "review_execution_session_id" not in report["review_result_identity"],
+        )
         check(
             "baseline valid-existing reuse calls transcriber zero times",
             lambda: result.baseline_reused

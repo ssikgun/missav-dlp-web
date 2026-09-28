@@ -1039,22 +1039,38 @@ def _parse_report(payload: bytes) -> dict[str, object]:
 
 
 def _validate_identity(value: object, *, review: bool) -> None:
-    expected = (
-        {
-            "request_sha256",
-            "result_sha256",
-            "source_translation_session_id",
-            "review_execution_session_id",
-        }
+    schemas = (
+        (
+            {
+                "request_sha256",
+                "result_sha256",
+                "source_translation_session_id",
+                "review_execution_session_id",
+            },
+            {
+                "request_sha256",
+                "result_sha256",
+                "source_translation_session_id_sha256",
+                "review_execution_session_id_sha256",
+            },
+        )
         if review
-        else {"session_id", "sha256"}
+        else ({"session_id", "sha256"}, {"session_id_sha256", "sha256"})
     )
-    if type(value) is not dict or set(value) != expected:
+    if type(value) is not dict or set(value) not in schemas:
         raise Stage11ControllerArtifactError(
             "result identity fields are not exact"
         )
     for key, item in value.items():
         if key.endswith("sha256"):
+            optional_review_fingerprint = review and key.startswith(
+                (
+                    "source_translation_session_id_",
+                    "review_execution_session_id_",
+                )
+            )
+            if optional_review_fingerprint and item is None:
+                continue
             _require_sha256(item, field_name="result identity SHA256")
         elif item is not None and (type(item) is not str or not item):
             raise Stage11ControllerArtifactError(
@@ -1075,9 +1091,31 @@ def _validate_existing_semantic_staging(
             "translation result identity is not an object"
         )
     session_id = identity.get("session_id")
+    session_id_sha256 = identity.get("session_id_sha256")
     result_sha256 = identity.get("sha256")
     try:
-        staging_directory = stateful_staging_root / session_id
+        if session_id is None:
+            if type(session_id_sha256) is not str:
+                raise Stage11ControllerArtifactError(
+                    "translation session fingerprint is invalid"
+                )
+            candidates = []
+            for child in stateful_staging_root.iterdir():
+                if child.is_symlink() or not child.is_dir():
+                    continue
+                child_fingerprint = hashlib.sha256(
+                    child.name.encode("utf-8")
+                ).hexdigest()
+                if child_fingerprint == session_id_sha256:
+                    candidates.append(child)
+            if len(candidates) != 1:
+                raise Stage11ControllerArtifactError(
+                    "completed semantic staging fingerprint is not unique"
+                )
+            staging_directory = candidates[0]
+            session_id = staging_directory.name
+        else:
+            staging_directory = stateful_staging_root / session_id
         paths = stateful_staging_paths(staging_directory)
         raw_payload = _read_private_file(
             paths.raw_input_path,
@@ -1123,6 +1161,14 @@ def _validate_existing_semantic_staging(
         if hashlib.sha256(result_payload).hexdigest() != result_sha256:
             raise Stage11ControllerArtifactError(
                 "completed semantic result bytes differ from report"
+            )
+        if (
+            session_id_sha256 is not None
+            and hashlib.sha256(session_id.encode("utf-8")).hexdigest()
+            != session_id_sha256
+        ):
+            raise Stage11ControllerArtifactError(
+                "completed semantic session fingerprint differs from report"
             )
     except Stage11ControllerError:
         raise
@@ -1595,17 +1641,27 @@ def run_one_title_stage11(
             "not_applicable" if targeted_reused is None else targeted_reused
         ),
         "translation_result_identity": {
-            "session_id": first_pass.session_id,
+            "session_id_sha256": hashlib.sha256(
+                first_pass.session_id.encode("utf-8")
+            ).hexdigest(),
             "sha256": hashlib.sha256(first_pass_raw).hexdigest(),
         },
         "review_result_identity": {
             "request_sha256": review_request_digest,
             "result_sha256": hashlib.sha256(review_raw).hexdigest(),
-            "source_translation_session_id": (
-                review_result.source_translation_session_id
+            "source_translation_session_id_sha256": (
+                hashlib.sha256(
+                    review_result.source_translation_session_id.encode("utf-8")
+                ).hexdigest()
+                if review_result.source_translation_session_id is not None
+                else None
             ),
-            "review_execution_session_id": (
-                review_result.review_execution_session_id
+            "review_execution_session_id_sha256": (
+                hashlib.sha256(
+                    review_result.review_execution_session_id.encode("utf-8")
+                ).hexdigest()
+                if review_result.review_execution_session_id is not None
+                else None
             ),
         },
         "clean_artifact_path": str(clean_path),
