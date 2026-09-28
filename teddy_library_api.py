@@ -24,6 +24,7 @@ from teddy_library_delete_dryrun import (
     DeleteDryRunError, DeleteManifestReader, PrepareTokenRegistry,
     source_identity_fingerprint,
 )
+from teddy_public_origin import PublicOriginError, parse_origin, parse_public_origin, parse_request_host
 
 LIBRARY_ROOT = "/volume1/video/video2/JAV"
 MAX_TITLES = 250
@@ -408,18 +409,34 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
         if request.headers.get("X-Teddy-Delete-Intent") != intent:
             log_rejection("invalid_request_boundary", "intent_header")
             return _error("invalid_request_boundary", "요청을 확인할 수 없습니다.", 403)
-        # A browser same-origin JSON request supplies Origin; requiring it
-        # blocks cross-site form posts even if an authenticated cookie exists.
-        expected = urlsplit(request.host_url)
-        supplied = urlsplit(origin or "")
+        # Compare against centrally configured public origin. request.scheme can
+        # describe the private HTTP hop behind TLS termination and is not trusted.
         origin_subreason = None
-        if not origin:
+        try:
+            expected = parse_public_origin(os.environ.get("TEDDY_PUBLIC_ORIGIN"))
+        except PublicOriginError as exc:
+            origin_subreason = exc.reason
+            expected = None
+        if origin_subreason is None and not origin:
             origin_subreason = "origin_missing"
-        elif supplied.scheme != expected.scheme:
-            origin_subreason = "scheme_mismatch"
-        elif supplied.netloc.casefold() != expected.netloc.casefold():
-            origin_subreason = "host_mismatch"
-        elif sec_fetch_site == "cross-site":
+        if origin_subreason is None:
+            try:
+                supplied = parse_origin(origin)
+            except PublicOriginError as exc:
+                origin_subreason = "origin_invalid"
+            if origin_subreason is None:
+                try:
+                    actual_host = parse_request_host(request.host, scheme=expected.scheme)
+                except PublicOriginError:
+                    origin_subreason = "host_mismatch"
+            if origin_subreason is None:
+                if supplied.scheme != expected.scheme:
+                    origin_subreason = "scheme_mismatch"
+                elif (supplied.hostname, supplied.effective_port) != (expected.hostname, expected.effective_port):
+                    origin_subreason = "host_mismatch"
+                elif (actual_host.hostname, actual_host.effective_port) != (expected.hostname, expected.effective_port):
+                    origin_subreason = "host_mismatch"
+        if origin_subreason is None and sec_fetch_site == "cross-site":
             origin_subreason = "cross_site"
         if origin_subreason:
             log_rejection("invalid_request_origin", origin_subreason)

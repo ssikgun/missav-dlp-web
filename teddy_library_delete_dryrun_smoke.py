@@ -23,6 +23,7 @@ from teddy_library_delete_dryrun import (
     PrepareTokenRegistry, canonical_manifest, serialize_provenance,
     source_identity_fingerprint,
 )
+from teddy_public_origin import PublicOriginError, parse_origin, parse_public_origin, parse_request_host
 from teddy_discovery_jellyfin import jellyfin_media_path
 
 
@@ -61,6 +62,7 @@ def make_fixture(tmp):
 
 
 def app_for(db_path, root, jellyfin_calls, *, recognized=False):
+    os.environ["TEDDY_PUBLIC_ORIGIN"] = "http://localhost"
     reader = DeleteManifestReader(LocalSSH(), library_root=str(root))
     jf_paths = {"/media/adult/ABCD/ABCD-123/ABCD-123.mp4"} if recognized else set()
     app = Flask("delete-dryrun-fixture")
@@ -76,9 +78,32 @@ def app_for(db_path, root, jellyfin_calls, *, recognized=False):
     return app, client
 
 
-def post(client, path, body, intent):
-    return client.post(path, json=body, base_url="http://localhost",
-                       headers={"Origin": "http://localhost", "X-Teddy-Delete-Intent": intent})
+def post(client, path, body, intent, *, base_url="http://localhost", origin="http://localhost", headers=None):
+    request_headers = {"Origin": origin, "X-Teddy-Delete-Intent": intent}
+    request_headers.update(headers or {})
+    return client.post(path, json=body, base_url=base_url, headers=request_headers)
+
+
+def post_with_origin(client, path, body, intent, configured, *, base_url="http://downloader.example.test", origin="https://downloader.example.test", headers=None):
+    previous = os.environ.get("TEDDY_PUBLIC_ORIGIN")
+    existed = "TEDDY_PUBLIC_ORIGIN" in os.environ
+    try:
+        if configured is None:
+            os.environ.pop("TEDDY_PUBLIC_ORIGIN", None)
+        else:
+            os.environ["TEDDY_PUBLIC_ORIGIN"] = configured
+        # The fixture session is minted for localhost; copy its signed test
+        # cookie to the requested test host without ever printing it.
+        session_cookie = client.get_cookie("session")
+        if session_cookie:
+            host = base_url.split("//", 1)[-1].split("/", 1)[0].split(":", 1)[0]
+            client.set_cookie("session", session_cookie.value, domain=host)
+        return post(client, path, body, intent, base_url=base_url, origin=origin, headers=headers)
+    finally:
+        if existed:
+            os.environ["TEDDY_PUBLIC_ORIGIN"] = previous
+        else:
+            os.environ.pop("TEDDY_PUBLIC_ORIGIN", None)
 
 
 def assert_inspection_error(root, relative, media_relative, size, mtime, code):
@@ -153,9 +178,75 @@ def main():
         assert "TOKEN_SECRET_MARKER" not in diagnostics
         assert "diagnostic_marker" not in diagnostics and "session" not in diagnostics.lower()
 
+        # Central public-origin parsing and reverse-proxy request contract.
+        parsed = parse_public_origin("HTTPS://Downloader.Example.Test:443/")
+        assert (parsed.scheme, parsed.hostname, parsed.effective_port, parsed.normalized_netloc) == (
+            "https", "downloader.example.test", 443, "downloader.example.test")
+        assert parse_origin("https://downloader.example.test:443").effective_port == 443
+        assert parse_request_host("downloader.example.test", scheme="https").effective_port == 443
+        for invalid in ("", "ftp://downloader.example.test", "https://", "https://*.example.test",
+                        "https://user@downloader.example.test", "https://user:pw@downloader.example.test",
+                        "https://downloader.example.test/path", "https://downloader.example.test?x=1",
+                        "https://downloader.example.test?", "https://downloader.example.test#frag",
+                        "https://downloader.example.test#", " https://downloader.example.test",
+                        "https://downloader.example.test:", "https://downloader.example.test:bad"):
+            try:
+                parse_public_origin(invalid)
+            except PublicOriginError:
+                pass
+            else:
+                raise AssertionError(f"unsafe public origin accepted: {invalid!r}")
+
+        prepare_path = f"/api/library/{dvd}/delete/prepare"
+        a = post_with_origin(client, prepare_path, {}, "prepare", "https://downloader.example.test")
+        assert a.status_code == 200 and a.get_json()["status"] == "PREPARED"
+        assert a.get_json()["actual_delete_performed"] is False
+        assert post_with_origin(client, prepare_path, {}, "prepare", "https://downloader.example.test",
+                                origin="http://downloader.example.test").get_json()["error"]["code"] == "invalid_request_origin"
+        assert post_with_origin(client, prepare_path, {}, "prepare", "https://downloader.example.test",
+                                origin="https://other.example.test").get_json()["error"]["code"] == "invalid_request_origin"
+        assert post_with_origin(client, prepare_path, {}, "prepare", "https://downloader.example.test",
+                                base_url="http://wrong.example.test").get_json()["error"]["code"] == "invalid_request_origin"
+        for bad_config in (None, "not-an-origin", "https://user@downloader.example.test",
+                           "https://downloader.example.test/path", "https://downloader.example.test?q=1",
+                           "https://downloader.example.test#f"):
+            response = post_with_origin(client, prepare_path, {}, "prepare", bad_config)
+            assert response.status_code == 403 and response.get_json()["error"]["code"] == "invalid_request_origin"
+        assert post_with_origin(client, prepare_path, {}, "prepare", "https://downloader.example.test",
+                                origin="https://downloader.example.test:443").status_code == 200
+        assert post_with_origin(client, prepare_path, {}, "prepare", "https://downloader.example.test:8443",
+                                base_url="http://downloader.example.test:8443",
+                                origin="https://downloader.example.test:8443").status_code == 200
+        assert post_with_origin(client, prepare_path, {}, "prepare", "https://downloader.example.test:8443",
+                                base_url="http://downloader.example.test:8444",
+                                origin="https://downloader.example.test:8443").status_code == 403
+        for forwarded in (
+            {"X-Forwarded-Proto": "http", "X-Forwarded-Host": "attacker.invalid"},
+            {"X-Forwarded-Proto": "https", "X-Forwarded-Host": "downloader.example.test"},
+        ):
+            response = post_with_origin(client, prepare_path, {}, "prepare", "https://downloader.example.test",
+                                        headers=forwarded)
+            assert response.status_code == 200
+        cross_site = post_with_origin(client, prepare_path, {}, "prepare", "https://downloader.example.test",
+                                      headers={"Sec-Fetch-Site": "cross-site"})
+        assert cross_site.status_code == 403
+        wrong_intent = post_with_origin(client, prepare_path, {}, "prepare", "https://downloader.example.test",
+                                        headers={"X-Teddy-Delete-Intent": "validate"})
+        assert wrong_intent.status_code == 403 and wrong_intent.get_json()["error"]["code"] == "invalid_request_boundary"
+        prepared_origin = post_with_origin(client, prepare_path, {}, "prepare", "https://downloader.example.test")
+        origin_token = prepared_origin.get_json()["prepare_token"]
+        validated_origin = post_with_origin(client, f"/api/library/{dvd}/delete/validate",
+            {"prepare_token": origin_token, "typed_dvd_id": dvd, "acknowledge": True}, "validate",
+            "https://downloader.example.test")
+        assert validated_origin.status_code == 200
+        assert validated_origin.get_json()["status"] == "READY_FOR_COMMIT"
+        assert validated_origin.get_json()["actual_delete_performed"] is False
+        assert client.post(f"/api/library/{dvd}/delete/commit", json={}).status_code == 404
+
         bad_origin = client.post(url, json={}, base_url="http://localhost",
                                  headers={"Origin": "http://evil.invalid", "X-Teddy-Delete-Intent": "prepare"})
         assert bad_origin.status_code == 403
+        calls_before_prepare = len(calls)
         prepared = post(client, url, {}, "prepare")
         assert prepared.status_code == 200, (prepared.status_code, prepared.get_json())
         payload = prepared.get_json()
@@ -182,7 +273,7 @@ def main():
         assert validated.get_json()["actual_delete_performed"] is False
         replay = post(client, f"/api/library/{dvd}/delete/validate", valid_body, "validate")
         assert replay.status_code == 200 and replay.get_json()["validated_at"] == validated.get_json()["validated_at"]
-        assert calls == ["GET", "GET", "GET"]  # prepare + validate + identical replay; GET-only
+        assert calls[calls_before_prepare:] == ["GET", "GET", "GET"]  # prepare + validate + identical replay; GET-only
         assert client.get(f"/api/library/{dvd}/stream").status_code == 503  # existing route still installed
 
         # A newly appeared direct file changes deterministic manifest identity.

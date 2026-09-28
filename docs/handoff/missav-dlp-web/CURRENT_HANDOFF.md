@@ -4291,3 +4291,41 @@ was invoked by this checkpoint.
 Next: Teddy clicks `ADN-785 > 🗑️ 영구 삭제` once in the authenticated browser.
 The safe UI code and application log should now identify the rejected guard
 branch. Actual deletion remains disabled.
+
+## Stage13-E2E trusted public-origin helper — 2026-09-29
+
+Added a strict shared parser in `teddy_public_origin.py` and configured
+`TEDDY_PUBLIC_ORIGIN` as the required app environment value in the canonical
+production Compose file. The parser accepts only HTTP(S) origins with a host
+and optional valid port; it rejects userinfo, non-root paths, query/fragment,
+wildcards, malformed authorities and unsupported schemes. Canonical values
+include scheme, normalized hostname/netloc and effective port, so default
+ports normalize consistently.
+
+The delete prepare/validate origin guard still requires authentication, JSON,
+the exact intent header, a present same-origin Origin, and non-cross-site
+`Sec-Fetch-Site`. It now compares the browser Origin to
+`TEDDY_PUBLIC_ORIGIN`, and separately verifies the app-visible request Host
+against that configured authority. The private `request.scheme` is not part
+of the decision, allowing the established HTTPS-public/HTTP-private-proxy
+shape. `X-Forwarded-Proto` and `X-Forwarded-Host` remain diagnostic only and
+are not trusted. Missing or invalid configuration rejects closed with the
+existing `invalid_request_origin` response and bounded diagnostic subreason.
+No ProxyFix or domain-specific production source constant was added.
+
+Fixture coverage passed for proxy-terminated HTTPS, scheme/host/port mismatch,
+default and explicit port handling, missing/malformed/unsafe configuration,
+forwarded-header spoofing invariance, cross-site and intent rejection, plus
+successful prepare and validate-only responses. Both phases returned
+`actual_delete_performed=false`; no delete/commit endpoint exists. Library
+API, Library UI, File Management navigation, subtitle status and Discovery UI
+smokes passed. Python compilation and `git diff --check` passed. The full
+Docker image build passed as `missav-stage13e2e-smoke:f795bec-final`,
+image `sha256:1edd1c4ea95e382bc884ff43d801695ec1ab543dc164e1d9ab33acf88be0f65b`.
+
+No production environment file was changed and no image was deployed or
+restarted. Production prepare/validate was not called. Actual delete = 0;
+production DB writes = 0, NAS writes/deletes = 0, Jellyfin writes/refresh = 0,
+Hermes/VM122 calls = 0, and subtitle generation = 0. Next: Stage13-E2F may
+configure `TEDDY_PUBLIC_ORIGIN` in the production environment, redeploy only
+the web app, and have Teddy retry the authenticated prepare/validate DRY-RUN.

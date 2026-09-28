@@ -50,6 +50,7 @@ services:
       - gluetun
     environment:
       - TEDDY_FINAL_DIR=/final
+      - TEDDY_PUBLIC_ORIGIN=${TEDDY_PUBLIC_ORIGIN:?TEDDY_PUBLIC_ORIGIN must be configured}
       - TEDDY_BROWSER_URL=https://browser.ssikgun.com
       - TEDDY_MOBILE_BROWSER_URL=https://mobile-browser.ssikgun.com
       - GLUETUN_PROXY_URL=http://gluetun:8888
