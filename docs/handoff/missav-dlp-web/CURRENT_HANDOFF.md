@@ -1,5 +1,33 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-29 Stage13-E2C manual reproduction — invalid_request_origin confirmed
+
+Teddy manually retried the authenticated production DRY-RUN prepare for
+`ADN-785` after the diagnostics-only deployment.
+
+Observed UI-safe error code:
+
+`invalid_request_origin`
+
+This confirms the request passes authentication and the JSON/intent boundary,
+then fails inside the origin/same-site portion of the delete-intent guard.
+
+The exact origin subreason is still pending app-log inspection. It must be read
+from the bounded diagnostics added in Stage13-E2C and classified as one of the
+known safe branches such as `origin_missing`, `scheme_mismatch`,
+`host_mismatch`, or `cross_site`.
+
+Safety state remains unchanged:
+
+- token issued: NO
+- validate reached: NO
+- delete/commit endpoint: absent
+- NAS/DB/Jellyfin write/delete: 0
+
+Do not change or relax the guard until the exact logged subreason and sanitized
+request/origin/forwarded-header relation are confirmed.
+
+
 ## 2026-09-29 FNS-247 external subtitle parser/alignment replay — PARTIAL
 
 Generic source changes completed in Stage11 subtitle parsing and alignment:
