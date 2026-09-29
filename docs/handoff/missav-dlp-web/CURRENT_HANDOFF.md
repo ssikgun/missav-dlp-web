@@ -1,5 +1,49 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-29 Stage13-F2M-D7 — broad-inventory ghost identified (READ-ONLY)
+
+Initial repo state was expected HEAD `48acdb52abd4dbd30ed4694f09b0c3b98eea94c8`,
+branch `teddy-subtitle-stage11`, clean worktree; `origin/teddy-subtitle-stage11`
+matched. The delete gate remained false and web `/login` GET returned 200.
+Read-only provenance check still returned `RECONCILE_PENDING`,
+`discovery_reconciled=1`, `jellyfin_reconciled=NULL` for exact operation
+`e8b5ba23-cb6d-4e5e-81f6-c1e5fdb79873`.
+
+The production Jellyfin broad inventory GET used the reconciler's configured
+`MAX_JELLYFIN_ITEMS=10000` and the requested fields/filters:
+`Recursive=true`, `Fields=Path,ParentId`, `IncludeItemTypes=Movie,Video`,
+`StartIndex=0`, `Limit=10000`. HTTP 200 returned 364/364 items and exactly one
+match for `/media/adult/VEMA/VEMA-246/VEMA-246.mp4`:
+
+- `BROAD_ITEM_ID=0fa5e1cd9743f9e30dc69054e1c12375`
+- Path `/media/adult/VEMA/VEMA-246/VEMA-246.mp4`
+- ParentId `96243f73185b587bada02c6ee68e760a`
+- Type `Movie`, LocationType `FileSystem`, IsFolder `false`
+- Name length 141 (full name omitted)
+- `BROAD_ID_EQUALS_REMOVED_ID=YES` for removed ID
+  `0fa5e1cd9743f9e30dc69054e1c12375`
+
+Using that newly returned BROAD_ITEM_ID, GET `/Items?Ids=...` with API-key
+context returned HTTP 200 and count 0. The same exact-ID query with the
+previously verified user context returned HTTP 200 and count 0. No user ID or
+secret is recorded. The exact title directory remains absent in the Jellyfin
+filesystem view. Per the prior PVE forensic evidence supplied for reuse, live
+DB is `/opt/jellyfin/config/data/jellyfin.db`, exact DB path row count is 0,
+the removal log exists, and the checked post-removal window contains no re-add
+evidence. This checkpoint did not reopen the DB or CT112 logs.
+
+Classification meets the specified condition:
+`JELLYFIN_PENDING_CLASS=BROAD_INVENTORY_GHOST`. The broad inventory retains an
+item-shaped result while exact-ID queries and the database path lookup return
+no item. This checkpoint does not change the success invariant, finalize
+provenance, or claim the operation committed; that policy decision remains for
+the next checkpoint.
+
+Mutation audit: Jellyfin 0, provenance 0, NAS 0, Discovery 0, restart 0.
+Only this canonical handoff was updated. Next: decide whether Stage13
+Jellyfin success means physical DB row absence or absence from the normal
+user-facing tree, then act only in a separate authorized checkpoint.
+
 ## 2026-09-29 Stage13-F2M-D6 — API exact-ID / user query forensic (INCOMPLETE)
 
 Initial repo state was expected HEAD `420d0d9e8a3a9526ace2f1fea7257ba477bb81d6`,
