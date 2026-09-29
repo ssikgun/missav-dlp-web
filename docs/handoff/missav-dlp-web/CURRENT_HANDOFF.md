@@ -6395,3 +6395,70 @@ and daemon-reload, one writer start, and one bounded writer stop.
 runtime proof only after authorization, using the new activation's restart
 counter baseline (zero) and waiting boundedly for the socket/host health before
 any web recreate. Keep completion inactive until a full successful E4 proof.
+
+## Stage13-F2M-E4b — writer readiness and durability proof PASS
+
+E4's early stop came from comparing the new activation's reset
+`NRestarts=0` against E2's historical value 29. That was a monitor error; the
+E4 journal showed no writer startup error or automatic restart. E4b uses the
+new activation's current counter as the baseline and waits for bounded socket
+health before proceeding.
+
+Preconditions passed at HEAD `cb3a15f9222b29159da925bd741756897fd24dcc`:
+local/remote aligned and worktree clean; writer inactive; host runtime
+directory absent; effective ExecStart pointed to the E3 release;
+`RuntimeDirectoryPreserve=restart`; web `/login` 200 and gate false;
+completion/reconcile-apply inactive. VEMA provenance was COMMITTED, holding 20
+present=0, VEMA present=0. Baseline Discovery checksums were holdings 184 rows
+`5ddc5494421d4e86a6f78bcd2268a408c5718f2e52a883fc0760090fecbcfacd`, journal
+1 row `d412d8ba7f773b0eaeeaa034ddc5705d138c32172bd729c9e38070444920e171`, and
+VEMA provenance `d7c972131cd78d1c40b663b78d8cd886b638b17bdcc91aaeb9b55a96a6792ec6`.
+
+The installed immutable release is
+`/opt/missav-dlp-web/teddy-library-discovery-writer/releases/d9e04acfe6492635ea45922ee3f65f169c5d9437/`, with exact E3 source marker and
+all source hashes verified. Effective unit retains root user, service group,
+canonical Discovery/provenance/socket arguments, `Restart=on-failure`,
+and `RuntimeDirectoryPreserve=restart`; service is enabled.
+
+Writer start was issued once. `NEW_ACTIVATION_NRESTARTS_BASELINE=0`; within the
+15-second bound the service was active with PID 1551593, `NRestarts=0`, and
+host health READY. Runtime dir/socket were mode 0750/0660, owner/group 0:988.
+
+The D10 web container was recreated exactly once with `--no-deps` to recover
+the stale bind. It remains on image
+`missav-dlp-web:stage13f2md10-52aa3f4`, image SHA
+`sha256:92104fcb5bf5c7501120b078ec0e8c778358f3b33064e77e4d89e0b6606274ff`;
+its new container ID is `e7d8e64a05c6158e2ed8c3d60478281b316d6b75e8a2ec99095ab0a4cebb1c80`,
+restart count 0. `/login` returned 200, gate=false, title-lock remains RW,
+and writer bind remains RO. Environment digest matches prior deployment.
+
+Before the proof restart, host and web runtime-directory inode were both
+`135:1531262`; host and web socket inode were both `135:1531267`. The same
+valid present JAV holding (ID 1, `FC2-PPV-4592689`) returned READY from
+`preflight_holding`; holding identity was unchanged and no mark-absent was
+called.
+
+Immediately before the single proof restart, MainPID was 1551593 and
+`PROOF_NRESTARTS_BASELINE=0`. After restart MainPID changed to 1552535,
+`NRestarts` remained 0, and host health returned READY. Host runtime-directory
+inode stayed `135:1531262`; host socket inode changed to `135:1531387`.
+
+The web container was not recreated or restarted after the proof restart. Its
+runtime-directory inode remained `135:1531262`, and its socket inode became
+`135:1531387`, matching the host's new socket. Socket type and owner/group/mode
+remain correct; web health returned READY. The same safe holding preflight
+returned READY again.
+
+After both preflights and the restart, Discovery holdings/journal and VEMA
+provenance checksums remained exactly equal to baseline. Holding 20 remains
+present=0, VEMA present=0, and current JAV holdings=183. No Discovery content
+or schema, provenance, NAS, Jellyfin, delete, completion, or gate mutation
+occurred. Production operations were limited to the already installed
+immutable release and unit configuration, one writer start, one stale-bind
+web recreate, and one writer restart.
+
+`CANARY_OPERATION_CLOSED=YES`, `WEB_WRITER_SOCKET_DURABILITY_PROVEN=YES`, and
+`STAGE13_CLOSE_READY=YES`. Completion and reconcile-apply remain inactive by
+intent. Next checkpoint E5: close Stage13 and separately resume completion to
+process pending post-download work and confirm NAS organization/Jellyfin
+registration.
