@@ -4437,3 +4437,65 @@ refresh/write = 0, Discovery reconcile writes = 0, Hermes/VM122 = 0,
 subtitle generation = 0, actual permanent deletes = 0. Next: Stage13-F2
 production deploy/preflight only; keep the gate disabled and do not perform an
 actual canary deletion without Teddy's separate explicit approval.
+
+## Stage13-F2A gated production deploy / destructive path preflight — INCOMPLETE, 2026-09-29
+
+Deployed exact source `63fc052e2ad85f75646bdb500640fcb828a561e4` as
+`ghcr.io/ssikgun/missav-dlp-web:stage13f2a-63fc052`, image ID
+`sha256:e6a5d1f428e3b745a1605017cb89fa09c14a24701fa99f50dfbe26e7abc34b3f`.
+Before deploy the rollback image was `sha256:9931fa76baff36984e2cef51f3de77c019236f538da1983582a8856188398cdc`.
+Only `missav-dlp-web` was recreated (`--no-deps`); Gluetun and browser
+container IDs remained unchanged. The app is running with restart count 0,
+port 58000 and its prior network/mount boundary. No rollback was needed.
+
+`TEDDY_LIBRARY_DELETE_ENABLED` is absent from production env, rendered Compose,
+and runtime; runtime `delete_enabled` is false. Source order gates commit,
+reconcile and resume before provenance creation, holding write or NAS/Jellyfin
+mutator calls. Existing F1 offline tests cover `delete_disabled`. No
+production authenticated prepare, validate, commit, reconcile or resume was
+called. `/login` returned 200, `/` redirected to login, `/api/library` and an
+unauthenticated commit returned 401, and Library JS/CSS returned 200.
+
+Provenance uses `/downloads/teddy-library-delete-provenance.sqlite3` (no
+production record was created). The path is on persistent host bind
+`/opt/missav-dlp-web/work:/downloads`, RW, not tmpfs; its parent exists and
+has writable capability. `TEDDY_LIBRARY_DELETE_PROVENANCE_DB` is unset.
+
+Production `TEDDY_DISCOVERY_DB=/discovery/teddy-discovery.sqlite3` maps to
+`/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3:ro`. F1 passes this
+same `db_path` into `reconcile_discovery_holding()`, which opens it with
+SQLite `mode=rw` and conditionally updates exact `holding_id`/DVD/path/
+identity from `present=1` to `present=0`. This cannot write through the
+current mount: `DISCOVERY_RECONCILE_RW_PATH=BLOCKED_BY_READ_ONLY_MOUNT`.
+
+No existing narrow writer for this exact post-delete lifecycle was found.
+Organizer publish updates holdings to `present=1`; Discovery import and the
+Stage10 JAV reconcile apply path perform broader inventory reconciliation and
+are not suitable request-time single-title writers. The live DB reports
+`journal_mode=wal` and has WAL/SHM sidecars. Therefore a second path alias to
+the same DB must not be enabled until WAL/SHM coordination is proven: SQLite
+sidecar paths are derived from the opened path. Proposed safe follow-up is a
+small host-side narrow writer over a local Unix socket, opening the one
+canonical DB path and accepting only exact holding identity/fingerprint data;
+it performs a parameterized conditional `present=0` update under the shared
+writer coordination boundary. The app's existing read DB mount stays RO and
+only the delete reconcile caller can use that writer. No helper, RW mount, or
+DB write was added in F2A.
+
+The production NAS transport is configured for host `192.168.1.201`, user
+`ssikgun`, with key and known_hosts paths under the read-only
+`/run/secrets/teddy-nas-transfer` mount. The mutator's library root remains
+`/volume1/video/video2/JAV`; F1 uses exact manifest unlink/rmdir, not `rm -rf`,
+globs or recursion. No NAS SSH mutation was invoked. Jellyfin reconciliation
+uses GET exact-path lookup, targeted API refresh and verification; its API key
+mount is RO. No Jellyfin request/write/refresh was performed.
+
+Read-only current holdings snapshot: `storage_root='jav' AND present=1` = 184.
+This is a point-in-time count, not a fixed invariant. The provenance path
+preflight passed, but safe Discovery reconciliation is a required canary
+prerequisite and remains blocked; Stage13-F2A is therefore
+`INCOMPLETE — APP_DEPLOYED / DELETE_GATE_DISABLED / DISCOVERY_RECONCILE_BLOCKED`.
+Keep this image deployed and gate disabled. Production DB/NAS/Jellyfin writes,
+provenance records, subtitle generation, Hermes/VM122 calls and actual deletes
+were all 0. Next: implement and fixture-verify the narrow canonical-path
+Discovery writer, then separately deploy/preflight it before any real canary.
