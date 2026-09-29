@@ -60,6 +60,8 @@ services:
       - TEDDY_INTERNAL_DOWNLOAD_HOST=missav-dlp-web:5000
       - TEDDY_INTERNAL_DOWNLOAD_NET=172.18.0.0/16
       - TEDDY_DISCOVERY_DB=/discovery/teddy-discovery.sqlite3
+      - TEDDY_LIBRARY_DELETE_ENABLED=${TEDDY_LIBRARY_DELETE_ENABLED:-false}
+      - TEDDY_LIBRARY_DELETE_DISCOVERY_WRITER_SOCKET=/run/teddy-library-discovery-writer/writer.sock
       - TEDDY_DISCOVERY_COVER_CACHE=/discovery/cover-cache
       - TEDDY_DISCOVERY_PREVIEW_CACHE=/discovery/preview-cache
       - TEDDY_STAGE12_ROLLOUT_DB=/discovery/stage12-rollout-state.sqlite3
@@ -69,6 +71,8 @@ services:
       - TEDDY_NAS_KNOWN_HOSTS=/run/secrets/teddy-nas/known_hosts
       - TEDDY_JELLYFIN_URL=http://192.168.1.205:8096
       - TEDDY_JELLYFIN_KEY=/run/secrets/teddy-jellyfin/api_key
+    group_add:
+      - "${TEDDY_LIBRARY_DELETE_DISCOVERY_WRITER_GID:?TEDDY_LIBRARY_DELETE_DISCOVERY_WRITER_GID must be configured}"
     ports:
       - "58000:5000/tcp"
     volumes:
@@ -77,6 +81,7 @@ services:
       - /opt/missav-dlp-web/teddy-auth:/run/secrets/teddy-auth:ro
       - /opt/missav-dlp-web/teddy-selkies-control:/run/secrets/teddy-selkies-control:ro
       - /opt/missav-dlp-web/discovery/teddy-discovery.sqlite3:/discovery/teddy-discovery.sqlite3:ro
+      - /run/teddy-library-discovery-writer:/run/teddy-library-discovery-writer:ro
       - /opt/missav-dlp-web/discovery/stage12-rollout-state.sqlite3:/discovery/stage12-rollout-state.sqlite3:ro
       - /opt/missav-dlp-web/teddy-nas-transfer/id_ed25519:/run/secrets/teddy-nas/id_ed25519:ro
       - /opt/missav-dlp-web/teddy-nas-transfer/known_hosts:/run/secrets/teddy-nas/known_hosts:ro

@@ -4605,3 +4605,66 @@ Discovery content writes = 0, provenance record writes = 0, NAS writes/deletes
 = 0, Jellyfin refresh/write = 0, subtitle generation = 0, Hermes/VM122 = 0,
 actual permanent deletes = 0. Next: Stage13-F2D final pre-canary safety
 preflight only; keep the delete gate disabled and do not delete a title.
+
+## Stage13-F2D final permanent-delete safety preflight — INCOMPLETE, 2026-09-29
+
+Source preflight started at `06a75d42ca350e069d7a87b3a45e52241923c91a` on
+`teddy-subtitle-stage11`, clean and equal to the server branch. No source code
+divergence was found. The running web app remains F2C image
+`sha256:40d68b117add00b0dfa85748780d49c3578e670af42d11aa2ae9dfda805dc787`,
+running with restart count 0; no service was recreated.
+
+F2C socket wiring had been applied to the production compose but was absent
+from the repository deployment compose. Both
+`docker-compose.gluetun.yml` and `/opt/missav-dlp-web/compose.yaml` now define
+`TEDDY_LIBRARY_DELETE_DISCOVERY_WRITER_SOCKET=/run/teddy-library-discovery-writer/writer.sock`,
+the host-to-container runtime directory bind as read-only, supplementary
+writer GID 988, and `TEDDY_LIBRARY_DELETE_ENABLED=${TEDDY_LIBRARY_DELETE_ENABLED:-false}`.
+Sanitized renders of both compose files agree: gate `false`, public origin
+`https://downloader.ssikgun.com`, Discovery DB mounted `:ro`, writer socket
+directory mounted `:ro`. The currently running container still has the gate
+variable missing; application evaluation is fail-closed (`false`). Its
+effective state was not enabled. No compose up/recreate was run.
+
+Writer release remains the immutable
+`/opt/missav-dlp-web/teddy-library-discovery-writer/releases/09a3a89bac6af910ca3543f8c076bb0f54e2cb41/`,
+service `teddy-library-discovery-writer.service` active/enabled, root-owned
+with the restricted `teddy-library-discovery-writer` socket group, PID
+978934, no restart loop. Socket is a Unix socket, root:group mode 0660;
+runtime directory is 0750. Existing F2C controlled restart evidence remains
+valid. Host and container `health` returned `READY`. The exact read-only
+probe of ADN-785 / holding 141 returned `READY`; `present=1` and current
+holdings count remained 184. This connectivity probe is not canary approval.
+
+Current Discovery snapshot: 184 present JAV holdings, 184 unique DVD-IDs,
+0 duplicates and 0 canonical/parse mismatches. Organizer job rows currently
+all report `COMPLETED` (184); Stage12 `RUNNING`/`GENERATED` rows currently
+number 0. These point-in-time counts do not replace a per-title guard.
+Source review found no commit/resume guard that checks the requested DVD-ID
+against active organizer/completion work and active subtitle generation.
+Therefore `CANARY_BLOCKER=ACTIVE_JOB_GUARD_MISSING` and
+`CANARY_READY=NO`; do not enable the gate or perform a canary until a
+source fix adds the target-specific fail-closed collision check.
+
+Static ordering review confirms the configured gate and validated token are
+checked before mutation; exact current identity/manifest and Discovery writer
+`preflight_holding` precede durable `COMMITTING` provenance and the NAS
+mutator, including partial/uncertain resume. Production reconciliation uses
+the socket writer only; direct SQLite reconciliation is available only when
+explicitly injected by offline fixtures, with no production RW fallback.
+The writer independently reads durable provenance before its exact conditional
+`present=1 -> 0` update. The NAS mutator uses exact manifest `lstat` checks,
+per-file `unlink`, then removes only the verified empty title directory; it
+does not use recursive delete, globs or arbitrary paths. Partial recovery is
+durable and scopes retries to the original manifest/remaining entries.
+Jellyfin reconciliation uses API GET by exact path and targeted item refresh
+after Discovery succeeds; it does not edit the Jellyfin database, and failure
+leaves reconciliation pending rather than reversing NAS deletion.
+
+Offline Discovery writer and F1 delete/recovery fixture smokes passed. No
+production prepare/validate/commit/resume/reconcile request was made.
+Discovery writes = 0, provenance writes = 0, NAS writes/deletes = 0,
+Jellyfin refresh/write = 0, subtitle generation = 0, Hermes/VM122 calls = 0,
+actual permanent deletes = 0. Production web image remains unchanged.
+Next: implement and fixture-test the per-DVD active-job collision guard,
+then repeat F2D preflight before Teddy selects a canary title.
