@@ -5390,3 +5390,52 @@ DB/operation is absent. `ACTUAL_DELETE=0`.
 `POST_REHEARSAL_SAFE=YES`. Gate remained false throughout. Next action is a
 separately requested short ARM only after this evidence is reviewed; do not
 prepare, validate, commit, or delete as part of this rehearsal.
+
+## Stage13-F2M-B — VEMA-246 actual-delete forensic
+
+Teddy executed the previously approved VEMA-246 permanent delete through the
+authenticated Downloader UI. This checkpoint performed read-only forensic
+inspection only; it did not call commit/reconcile/resume or any writer mutation.
+
+The single provenance operation is
+`e8b5ba23-cb6d-4e5e-81f6-c1e5fdb79873`, bound to DVD-ID VEMA-246 and holding 20.
+Its manifest SHA is
+`121aefa01eb2d6cd9ae6b99695892cf4652aa4b33d50e65a4c3208b6ef3c8677`, with four
+files and 2,844,317,586 bytes. The removed set is exactly
+`VEMA-246.ko.srt`, `VEMA-246.mp4`, `movie.nfo`, and `poster.webp`; removed count
+and bytes match, remaining entries are empty, and `nas_delete_complete=1`.
+The exact NAS title directory `/volume1/video/video2/JAV/VEMA/VEMA-246` is
+absent, and direct exact-path checks found all four files absent:
+`NAS_DELETE_COMPLETE=YES`, `ACTUAL_FILE_DELETE=YES`.
+
+Discovery row 20 remains canonical (`storage_root=jav`, `parse_status=MATCHED`)
+and `present=1`. The provenance row has `discovery_reconciled=0`,
+`jellyfin_reconciled=NULL`, and `result_state=RECONCILE_PENDING`.
+The exact Jellyfin GET lookup still finds one item at the old media path. The
+web warning at 17:05:50 KST records `Library delete Discovery reconcile pending
+(WriterError)`. This establishes that the writer call failed, but the log only
+records the exception type, not its safe writer error code. No commit access
+log line was retained; the UI reported `RECONCILE_PENDING`, which the source
+returns as HTTP 202 for a pending commit result. The source stops before
+Jellyfin reconciliation when Discovery writer reconciliation fails, so the
+Jellyfin step was not reached and the provenance flag remains NULL.
+
+Classification: `PENDING_STAGE=DISCOVERY`,
+`DISCOVERY_PROVENANCE_CRASH_WINDOW=NO` (the holding is still present, so this
+is not the present=0/provenance=0 crash window),
+`DISCOVERY_RECONCILED=NO`, `JELLYFIN_RECONCILED=NO`, and
+`DELETE_OPERATION_FINAL=NO`. The Library read model correspondingly shows the
+VEMA-246 row with unknown managed size and unresolved KO state while its stale
+Jellyfin item remains recognized. Do not mark the holding absent or alter
+provenance manually; the next recovery checkpoint should address only the
+Discovery reconciliation for this exact operation, then re-read state before
+any Jellyfin action.
+
+The F2M-A7 watchdog ran at 17:08:21 KST and completed at 17:08:37 KST with
+`DISARMED` and readiness time 15.501 seconds. Current safe state: delete gate
+false, web running on `sha256:e90c320f44b9b3249093f989979805d5ec9861663bb03af35f91b7a6a5920807`,
+restart policy `unless-stopped`, `/login` 200, writer READY, operation lock
+free, freeze-holder/watchdog inactive, completion timer/service inactive, and
+reconcile-apply inactive. No re-arm occurred. The reconcile operation remains
+pending and must not be retried until its failure is addressed in the next
+explicit checkpoint.
