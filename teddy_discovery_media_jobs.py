@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 import fcntl
 import sqlite3
+
+from teddy_title_exclusion import (
+    ACQUIRED,
+    BUSY,
+    configured_lock_dir,
+    try_acquire_title_lock,
+)
 
 
 MEDIA_SCHEMA = """
@@ -43,6 +51,10 @@ ON media_jobs(
     media_job_id
 );
 """
+
+DEFAULT_MEDIA_MAX_ATTEMPTS = 5
+DEFAULT_MEDIA_RETRY_BACKOFF_SECONDS = 3600
+DEFAULT_MEDIA_RUNNING_STALE_SECONDS = 7200
 
 
 def _utc_now() -> str:
@@ -274,16 +286,109 @@ def list_retryable_media_jobs(
         db.close()
 
 
-def _mark_running(
+def _as_utc(value):
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def _now_utc(value=None):
+    if value is None:
+        return datetime.now(timezone.utc)
+    parsed = value if hasattr(value, "tzinfo") else _as_utc(value)
+    if parsed is None or parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("now must be timezone-aware")
+    return parsed.astimezone(timezone.utc)
+
+
+def retry_eligibility(
+    job,
+    *,
+    now=None,
+    max_attempts=DEFAULT_MEDIA_MAX_ATTEMPTS,
+    retry_backoff_seconds=DEFAULT_MEDIA_RETRY_BACKOFF_SECONDS,
+    running_stale_seconds=DEFAULT_MEDIA_RUNNING_STALE_SECONDS,
+):
+    """Return ELIGIBLE or a bounded safe hold reason for one media job."""
+    now_utc = _now_utc(now)
+    try:
+        attempts = int(job.get("attempt_count"))
+        max_attempts = int(max_attempts)
+        retry_backoff_seconds = int(retry_backoff_seconds)
+        running_stale_seconds = int(running_stale_seconds)
+    except (TypeError, ValueError):
+        return "HELD_INVALID_STATE"
+    if (
+        attempts < 0
+        or max_attempts < 1
+        or retry_backoff_seconds < 0
+        or running_stale_seconds < 1
+    ):
+        return "HELD_INVALID_STATE"
+    status = job.get("status")
+    if status == "COMPLETED":
+        return "COMPLETED"
+    if status not in {"PENDING", "FAILED", "RUNNING"}:
+        return "HELD_INVALID_STATE"
+    if attempts >= max_attempts:
+        return "EXHAUSTED"
+    if status == "PENDING":
+        return "ELIGIBLE"
+    updated = _as_utc(job.get("updated_at"))
+    if updated is None:
+        return "HELD_INVALID_TIMESTAMP"
+    age = (now_utc - updated).total_seconds()
+    if status == "FAILED":
+        return "ELIGIBLE" if age >= retry_backoff_seconds else "HELD_BACKOFF"
+    if status == "RUNNING":
+        return "ELIGIBLE" if age >= running_stale_seconds else "HELD_FRESH_RUNNING"
+    return "HELD_INVALID_STATE"
+
+
+def _mark_running_if_unchanged(
     media_db_path,
     writer_lock_path,
-    media_job_id,
-) -> None:
+    candidate,
+    *,
+    now,
+    max_attempts,
+    retry_backoff_seconds,
+    running_stale_seconds,
+) -> str:
     with _media_transaction(
         media_db_path,
         writer_lock_path,
     ) as db:
-
+        current = db.execute(
+            """
+            SELECT media_job_id, dvd_id, status, attempt_count, updated_at
+            FROM media_jobs
+            WHERE media_job_id = ?
+            """,
+            (int(candidate["media_job_id"]),),
+        ).fetchone()
+        if current is None:
+            return "HELD_CONFLICT"
+        current = dict(current)
+        expected = ("media_job_id", "dvd_id", "status", "attempt_count", "updated_at")
+        if any(current[key] != candidate.get(key) for key in expected):
+            return "HELD_CONFLICT"
+        eligibility = retry_eligibility(
+            current,
+            now=now,
+            max_attempts=max_attempts,
+            retry_backoff_seconds=retry_backoff_seconds,
+            running_stale_seconds=running_stale_seconds,
+        )
+        if eligibility != "ELIGIBLE":
+            return eligibility
+        now_stamp = now.astimezone(timezone.utc).isoformat(timespec="seconds")
         cursor = db.execute(
             """
             UPDATE media_jobs
@@ -294,17 +399,21 @@ def _mark_running(
                 error = NULL,
                 updated_at = ?
             WHERE media_job_id = ?
+              AND dvd_id = ?
+              AND status = ?
+              AND attempt_count = ?
+              AND updated_at = ?
             """,
             (
-                _utc_now(),
-                int(media_job_id),
+                now_stamp,
+                int(candidate["media_job_id"]),
+                candidate["dvd_id"],
+                candidate["status"],
+                int(candidate["attempt_count"]),
+                candidate["updated_at"],
             ),
         )
-
-        if cursor.rowcount != 1:
-            raise RuntimeError(
-                "media job missing"
-            )
+        return "MARKED_RUNNING" if cursor.rowcount == 1 else "HELD_CONFLICT"
 
 
 def _finish(
@@ -357,25 +466,56 @@ def run_retryable_media_jobs(
     writer_lock_path,
     processor,
     max_items=1,
+    title_lock_dir=None,
+    now=None,
+    max_attempts=DEFAULT_MEDIA_MAX_ATTEMPTS,
+    retry_backoff_seconds=DEFAULT_MEDIA_RETRY_BACKOFF_SECONDS,
+    running_stale_seconds=DEFAULT_MEDIA_RUNNING_STALE_SECONDS,
 ) -> dict:
     if int(max_items) < 1:
         raise RuntimeError(
             "media max_items must be >= 1"
         )
 
+    now_utc = _now_utc(now)
     jobs = list_retryable_media_jobs(
         db_path
     )
-
+    states = [
+        (
+            job,
+            retry_eligibility(
+                job,
+                now=now_utc,
+                max_attempts=max_attempts,
+                retry_backoff_seconds=retry_backoff_seconds,
+                running_stale_seconds=running_stale_seconds,
+            ),
+        )
+        for job in jobs
+    ]
     result = {
-        "retryable": len(jobs),
+        # Number eligible before acquiring title locks and rechecking rows.
+        "retryable": sum(state == "ELIGIBLE" for _, state in states),
         "attempted": 0,
         "completed": 0,
         "failed": 0,
+        "held_busy": 0,
+        "held_lock_unavailable": 0,
+        "held_backoff": sum(state == "HELD_BACKOFF" for _, state in states),
+        "held_fresh_running": sum(state == "HELD_FRESH_RUNNING" for _, state in states),
+        "held_invalid_timestamp": sum(state == "HELD_INVALID_TIMESTAMP" for _, state in states),
+        "held_conflict": 0,
+        "held_invalid_state": sum(state == "HELD_INVALID_STATE" for _, state in states),
+        "exhausted": sum(state == "EXHAUSTED" for _, state in states),
         "jobs": [],
     }
-
-    for job in jobs[:int(max_items)]:
+    lock_dir = title_lock_dir if title_lock_dir is not None else configured_lock_dir()
+    for job, initial_state in states:
+        if result["attempted"] >= int(max_items):
+            break
+        if initial_state != "ELIGIBLE":
+            continue
         job_id = int(
             job["media_job_id"]
         )
@@ -384,57 +524,67 @@ def run_retryable_media_jobs(
             job["dvd_id"]
         )
 
-        _mark_running(
-            db_path,
-            writer_lock_path,
-            job_id,
-        )
+        title_lock = try_acquire_title_lock(dvd_id, lock_dir=lock_dir)
+        if title_lock.status == BUSY:
+            result["held_busy"] += 1
+            result["jobs"].append({"dvd_id": dvd_id, "status": "HELD_TITLE_BUSY"})
+            continue
+        if title_lock.status != ACQUIRED:
+            result["held_lock_unavailable"] += 1
+            result["jobs"].append({"dvd_id": dvd_id, "status": "TITLE_LOCK_UNAVAILABLE"})
+            continue
 
-        result["attempted"] += 1
-
-        try:
-            payload = processor(
-                dvd_id
+        with title_lock:
+            marked = _mark_running_if_unchanged(
+                db_path,
+                writer_lock_path,
+                job,
+                now=now_utc,
+                max_attempts=max_attempts,
+                retry_backoff_seconds=retry_backoff_seconds,
+                running_stale_seconds=running_stale_seconds,
             )
+            if marked != "MARKED_RUNNING":
+                if marked == "HELD_CONFLICT":
+                    result["held_conflict"] += 1
+                elif marked == "HELD_BACKOFF":
+                    result["held_backoff"] += 1
+                elif marked == "HELD_FRESH_RUNNING":
+                    result["held_fresh_running"] += 1
+                elif marked == "HELD_INVALID_TIMESTAMP":
+                    result["held_invalid_timestamp"] += 1
+                elif marked == "EXHAUSTED":
+                    result["exhausted"] += 1
+                else:
+                    result["held_invalid_state"] += 1
+                result["jobs"].append({"dvd_id": dvd_id, "status": marked})
+                continue
 
-        except Exception as exc:
-            message = str(exc)[:2000]
+            result["attempted"] += 1
+            try:
+                payload = processor(dvd_id)
+            except Exception as exc:
+                message = str(exc)[:2000]
+                _finish(
+                    db_path,
+                    writer_lock_path,
+                    job_id,
+                    status="FAILED",
+                    error=message,
+                )
+                result["failed"] += 1
+                result["jobs"].append({"dvd_id": dvd_id, "status": "FAILED"})
+                continue
 
             _finish(
                 db_path,
                 writer_lock_path,
                 job_id,
-                status="FAILED",
-                error=message,
+                status="COMPLETED",
             )
-
-            result["failed"] += 1
-
+            result["completed"] += 1
             result["jobs"].append(
-                {
-                    "dvd_id": dvd_id,
-                    "status": "FAILED",
-                    "error": message,
-                }
+                {"dvd_id": dvd_id, "status": "COMPLETED", "result": payload}
             )
-
-            continue
-
-        _finish(
-            db_path,
-            writer_lock_path,
-            job_id,
-            status="COMPLETED",
-        )
-
-        result["completed"] += 1
-
-        result["jobs"].append(
-            {
-                "dvd_id": dvd_id,
-                "status": "COMPLETED",
-                "result": payload,
-            }
-        )
 
     return result

@@ -4951,3 +4951,75 @@ retry behavior, and the manual reconcile-apply exclusion gap. Next: implement
 and offline-test a retry-specific title-lock boundary with bounded retry
 semantics, then define the reconcile-apply/delete exclusion and repeat a
 read-only production preflight. Do not resume the completion timer meanwhile.
+
+## Stage13-F2J media retry exclusion and bounded policy — PASS, source/fixture only, 2026-09-29
+
+F2I incident evidence remains unchanged: media job 174261 / `MFCS-085` is
+FAILED at 17,161 attempts; its exact failure stage and incident-time NAS
+metadata/Jellyfin effects remain UNKNOWN. No production retry or repair was
+performed.
+
+`teddy_discovery_media_jobs.py` now uses the existing
+`teddy_title_exclusion.try_acquire_title_lock()` with
+`TEDDY_TITLE_LOCK_DIR`. The retry acquires the title lock before conditional
+RUNNING transition and retains it through processor completion and durable
+COMPLETED/FAILED update. This covers NAS metadata publication and Jellyfin
+notification in the existing media pipeline. BUSY returns
+`HELD_TITLE_BUSY`; missing/invalid/unavailable lock infrastructure returns
+`TITLE_LOCK_UNAVAILABLE`. Either outcome leaves the media row and attempt
+count unchanged and never calls the processor.
+
+Retry policy uses existing `status`, `attempt_count`, and `updated_at`
+columns; no schema migration was added. Defaults are max attempts 5, FAILED
+backoff 3,600 seconds, and RUNNING stale threshold 7,200 seconds. PENDING is
+immediately eligible below the attempt cap. FAILED is eligible only after the
+backoff; RUNNING is eligible only after the stale threshold; malformed or
+timezone-naive required timestamps are held. COMPLETED is never retried and
+at/above-cap jobs are EXHAUSTED. Thus the known 17,161-attempt fixture maps to
+EXHAUSTED / not automatically eligible. There is no production manual retry
+override in this change.
+
+After acquiring the title lock, the runner starts the existing short media
+writer transaction, rereads the row and re-evaluates eligibility, then uses a
+conditional UPDATE on job ID, DVD-ID, expected status, attempt count, and
+updated_at. A changed/deleted row is held as `HELD_CONFLICT`; processor is not
+called. Lock order is title lock then media writer lock; no path was found
+that holds the media writer lock while acquiring a title lock. The media
+pipeline stage order itself is unchanged.
+
+Fixture coverage passed for retry eligibility/backoff/stale/exhaustion,
+malformed timestamps, title-lock BUSY/unavailable, lock held through
+processing/final state, exception release, distinct-title progress, and
+candidate row status/attempt/timestamp/removal races. Existing title-lock
+process tests confirmed same-title BUSY, different-title parallelism and
+process-exit release. Existing delete commit fixture confirmed a same-title
+holder produces `delete_target_busy` before NAS mutation.
+
+The broad `teddy-discovery-jav-reconcile-apply.service` remains unchanged.
+It is a manual one-shot using the global operation lock, which delete does
+not share. Therefore `CANARY_RECONCILE_APPLY_FREEZE_REQUIRED=YES`: during a
+future actual delete canary, verify the apply service inactive, verify no
+related process is running, and prohibit the supported apply launcher until
+the destructive window ends. The exact production freeze procedure still
+requires a read-only deployment/preflight checkpoint.
+
+Offline media jobs/pipeline/publish, completion runner/media/orchestrator,
+organizer, title exclusion, Stage12 batch/bulk/rollout/retry, F1 delete commit,
+activity guard, Discovery writer, E1 prepare/validate, Library API/UI,
+File Management navigation, subtitle status, Discovery, Python compilation,
+`git diff --check`, and full Docker image build passed. The initial system
+Python attempts for Flask-dependent smokes were rerun successfully in the
+built Docker runtime; Stage12 retry smoke passed in its required
+`/opt/stage11-stt-venv` interpreter.
+
+Production deploy = NO. Completion timer remains inactive/enabled and was not
+started; delete feature gate remains false. Production media/Discovery/
+provenance DB writes, NAS writes/deletes, Jellyfin notify/refresh, organizer
+publish, Stage12 processing, Hermes/VM122 calls, and actual delete = 0.
+`MEDIA_RETRY_TITLE_LOCK=YES`, `MEDIA_RETRY_BOUNDED=YES`,
+`MFCS085_AUTOMATIC_RETRY_ELIGIBLE=NO`,
+`CANARY_RECONCILE_APPLY_FREEZE_REQUIRED=YES`, and
+`COMPLETION_TIMER_SAFE_TO_RESUME=NO` because this change is not deployed.
+Next: deploy the new pinned completion runtime, then read-only inspect eligible,
+exhausted and backoff-held counts while leaving the timer stopped; repeat
+canary safety preflight. No canary title is approved by this result.
