@@ -8,6 +8,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 
 from flask import Flask
 
@@ -19,6 +20,10 @@ from teddy_library_delete_commit import (
 )
 from teddy_library_delete_dryrun import (DeleteManifestReader, PrepareTokenRegistry,
     source_identity_fingerprint)
+from teddy_library_discovery_writer import WriterError
+from teddy_library_discovery_writer import (
+    DiscoveryHoldingWriter, UnixSocketDiscoveryWriterClient, _UnixServer, _prepare_socket_parent,
+)
 from teddy_library_delete_dryrun_smoke import make_fixture
 from teddy_discovery_jellyfin import jellyfin_media_path
 from teddy_discovery_subtitle import validate_canonical_holding
@@ -44,7 +49,8 @@ class FixtureSSH:
         return result.stdout
 
 
-def setup_app(tmp, *, gate="true", discovery_ok=True, jellyfin_ok=True, partial_once=False):
+def setup_app(tmp, *, gate="true", discovery_ok=True, jellyfin_ok=True, partial_once=False,
+              discovery_writer_client=None):
     root, title, media, db_path, relative, dvd = make_fixture(tmp)
     (title / f"{dvd}.ko.srt").write_text("fixture subtitle", encoding="utf-8")
     sibling = title.parent / "SIBL-456"
@@ -96,13 +102,17 @@ def setup_app(tmp, *, gate="true", discovery_ok=True, jellyfin_ok=True, partial_
 
     app = Flask("delete-commit-fixture")
     app.secret_key = "fixture-only-key"
-    app.register_blueprint(create_library_blueprint(
-        str(db_path), "", nas_reader=object(), delete_manifest_reader=reader,
+    blueprint_kwargs = dict(
+        db_path=str(db_path), rollout_path="", nas_reader=object(), delete_manifest_reader=reader,
         delete_token_registry=registry, delete_mutator=PartialOnce(mutator),
         provenance_store_factory=lambda: DurableDeleteProvenanceStore(provenance_path),
-        discovery_reconciler=reconcile_discovery, jellyfin_delete_reconciler=reconcile_jellyfin,
-        jellyfin_loader=loader,
-    ))
+        jellyfin_delete_reconciler=reconcile_jellyfin, jellyfin_loader=loader,
+    )
+    if discovery_writer_client is None:
+        blueprint_kwargs["discovery_reconciler"] = reconcile_discovery
+    else:
+        blueprint_kwargs["discovery_writer_client"] = discovery_writer_client
+    app.register_blueprint(create_library_blueprint(**blueprint_kwargs))
     client = app.test_client()
     with client.session_transaction() as session:
         session["teddy_authenticated"] = True
@@ -139,7 +149,49 @@ def commit_body(ctx, token):
             "acknowledge_permanent_delete": True, "confirm_phrase": CONFIRM_PHRASE}
 
 
+class UnavailableWriter:
+    def preflight_holding(self, **_kwargs):
+        raise WriterError("WRITER_UNAVAILABLE")
+
+    def mark_absent(self, **_kwargs):
+        raise AssertionError("writer reconcile must not be reached")
+
+
 def main():
+    # Production default uses a configured writer client; failure before
+    # provenance COMMITTING guarantees the NAS mutator is never entered.
+    with tempfile.TemporaryDirectory(prefix="delete-writer-preflight-") as tmp:
+        ctx = setup_app(tmp, discovery_writer_client=UnavailableWriter())
+        token, _ = prepared_validated(ctx)
+        response = post(ctx, "commit", commit_body(ctx, token))
+        assert response.status_code == 503
+        assert response.get_json()["error"]["code"] == "discovery_writer_unavailable"
+        assert ctx["media"].exists() and ctx["ssh"].calls == 0
+        assert not Path(ctx["provenance_path"]).exists()
+
+    # Full offline path: host socket preflight precedes the fixture NAS
+    # mutator, then the writer performs exactly one Discovery transition.
+    with tempfile.TemporaryDirectory(prefix="delete-writer-integration-") as tmp:
+        socket_path = Path(tmp) / "run" / "writer.sock"
+        _prepare_socket_parent(str(socket_path))
+        server = _UnixServer(str(socket_path), DiscoveryHoldingWriter(
+            str(Path(tmp) / "discovery.sqlite3"), str(Path(tmp) / "provenance.sqlite3")))
+        thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+        try:
+            ctx = setup_app(tmp, discovery_writer_client=UnixSocketDiscoveryWriterClient(str(socket_path)))
+            token, _ = prepared_validated(ctx)
+            response = post(ctx, "commit", commit_body(ctx, token))
+            assert response.status_code == 200, response.get_json()
+            operation_id = response.get_json()["operation_id"]
+            assert response.get_json()["status"] == "COMMITTED"
+            assert sqlite3.connect(ctx["db_path"]).execute(
+                "SELECT present FROM holdings WHERE dvd_id=?", (ctx["dvd"],)).fetchone() == (0,)
+            assert DurableDeleteProvenanceStore(ctx["provenance_path"]).get(
+                operation_id)["discovery_reconciled"] == 1
+        finally:
+            server.shutdown(); server.server_close(); thread.join(timeout=2)
+            socket_path.unlink(missing_ok=True)
+
     with tempfile.TemporaryDirectory(prefix="delete-commit-fixture-") as tmp:
         ctx = setup_app(tmp, gate=None)
         dvd, title, media, db_path = ctx["dvd"], ctx["title"], ctx["media"], ctx["db_path"]

@@ -4499,3 +4499,54 @@ Keep this image deployed and gate disabled. Production DB/NAS/Jellyfin writes,
 provenance records, subtitle generation, Hermes/VM122 calls and actual deletes
 were all 0. Next: implement and fixture-verify the narrow canonical-path
 Discovery writer, then separately deploy/preflight it before any real canary.
+
+## Stage13-F2B host-side Discovery reconcile writer — PASS, 2026-09-29
+
+Implemented `teddy_library_discovery_writer.py`: a local Unix-domain socket
+server/client with only `health`, `preflight_holding` and `mark_absent` ops.
+The newline-delimited UTF-8 JSON frame is capped at 8 KiB, responses at 4 KiB,
+unknown fields/operations are rejected, and socket startup refuses a symlink
+parent or any pre-existing socket path. The runtime directory contract is
+0750 and socket mode 0660; deployment must align the app container's connect
+GID with the service group after checking actual runtime identities.
+
+The host service receives the canonical Discovery DB and persistent provenance
+DB paths only through administrator-controlled CLI configuration; requests
+cannot provide a DB/path/SQL/field value. It reads provenance in SQLite RO /
+query-only mode and requires exact operation/DVD/holding/fingerprint identity,
+`nas_delete_complete=1`, empty remaining entries, complete exact manifest
+removal counts, and a permitted reconciliation state. Discovery writes use
+the canonical host DB path, SQLite `mode=rw`, `busy_timeout`, `BEGIN IMMEDIATE`
+and one conditional `holdings.present=1 -> 0` update matching holding ID,
+DVD-ID, canonical relative path, storage root, parse status, size and mtime.
+No WAL mode change or second DB alias is introduced. Same-operation replay is
+idempotent when its durable provenance marks Discovery reconciled; another
+operation cannot claim an already-absent row.
+
+The web app now defaults to `TEDDY_LIBRARY_DELETE_DISCOVERY_WRITER_SOCKET` and
+has no direct RW fallback. Commit and partial-resume paths must receive
+`READY` from `preflight_holding` before provenance enters `COMMITTING` and
+before the NAS mutator can run. The existing injected direct reconciler remains
+available only to offline fixtures. A full fixture exercised socket preflight,
+exact fixture deletion, exact holding reconciliation and Jellyfin fixture
+completion; unavailable-writer preflight left the NAS fixture untouched and
+created no provenance record. Writer protocol, malformed/oversized requests,
+identity/provenance failures, conditional update, unrelated-row preservation,
+DB-busy behavior, socket permissions, restart replay and no-path/no-token
+responses passed. Existing F1 partial/retry, E1 prepare/validate, Library API
+and UI, File Management, subtitle status and Discovery smokes passed; Python
+compile, `git diff --check` and the full Docker image build passed.
+
+No writer service/socket was installed or created on production. The existing
+systemd deployment convention was inspected; F2C must first settle the host
+service code install path and service user/group against the web container's
+actual UID/GID, then install the unit/runtime directory and bind the socket
+directory into only the web app as connect-only/read-only. Configure
+`TEDDY_LIBRARY_DELETE_DISCOVERY_WRITER_SOCKET=/run/teddy-library-discovery-writer/writer.sock`;
+keep `/discovery/teddy-discovery.sqlite3:ro` and feature gate disabled. The
+host writer CLI requires explicit `--discovery-db`, `--provenance-db`, and
+`--socket` arguments. No production deploy, service install, feature-gate
+change, provenance record, DB write, NAS write/delete, Jellyfin refresh/write,
+subtitle generation, Hermes/VM122 call or actual delete occurred. Next:
+Stage13-F2C production writer install/socket bind and disabled-gate preflight
+only; no one-title deletion.
