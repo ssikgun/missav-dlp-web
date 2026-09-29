@@ -1,5 +1,59 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-29 Stage13-F2H pinned completion runtime — FAIL / review required
+
+The F2G blocker was addressed for the scheduled completion/organizer path. An
+immutable release was installed at
+`/opt/missav-dlp-web/stage9-runtime/releases/26c8657d4bd5c5b767f2f8eb474a80ff9121a150/`
+from exact commit `26c8657d4bd5c5b767f2f8eb474a80ff9121a150`. It contains the
+24-module local import closure of the completion runner, including
+`teddy_title_exclusion.py`, the completion orchestrator, organizer apply,
+operation lock, and DVD-ID parser. Release files are read-only; source SHA-256
+was checked against `git show` for each archived file. Core hashes:
+title exclusion `a4dd0d847cb05a20146f69f62d08ae29e626e997a49c203c1ad70d688b28e1ab`,
+completion orchestrator `41cf203b552b246f8095b8025bf281d8633f9e2d893bf886fe430de7c53b38d0`,
+organizer apply `559602f0e36f179df243072c5916ddf1009f1d2517ae83207807ae049cf3b93d`.
+
+`/usr/local/sbin/teddy-completion-stage9-runner` was atomically switched to the
+version-pinned release. It checks the release marker, sets
+`TEDDY_TITLE_LOCK_DIR=/opt/missav-dlp-web/title-locks`, pins `PYTHONPATH` to
+that release, and uses `/usr/bin/python3` (3.13.5) as root:root. The previous
+wrapper is preserved at
+`/opt/missav-dlp-web/backups/stage13-f2h-20260929-1225-teddy-completion-stage9-runner`;
+the old `42339ea7...` runtime remains untouched. Release imports and the
+completion orchestrator, organizer apply, runner, and process-flock fixture
+smokes passed offline. Source order is per-title lock before the existing
+global completion operation lock.
+
+Host runtime ↔ web cross-process checks passed in both directions:
+same-title contention returned `BUSY`, the host and container observed the
+same lock inode, holder termination released the lock, and a second canonical
+DVD-ID remained independently acquirable. The production web remains on the
+F2F image, delete gate is false, writer health is `READY`, and Discovery DB
+mount is read-only.
+
+Stage12 has no systemd/cron automatic launcher. Its documented manual command
+uses the checked-out F2F source and requires
+`TEDDY_TITLE_LOCK_DIR=/opt/missav-dlp-web/title-locks`; no Stage12 run occurred.
+The separate manual `teddy-discovery-jav-reconcile-apply.service` still points
+at the old Stage9 runtime and was not invoked; review its role/lock boundary
+before claiming broader Discovery-writer exclusion.
+
+**A timer side effect prevents a clean PASS.** During timer restoration,
+`systemctl start teddy-completion-stage9.timer` immediately triggered the
+scheduled service due to its overdue `OnUnitInactiveSec`. Its result had
+`total=0`, `eligible=0`, `applied=0`, and media reconciliation created 0 jobs;
+however, it retried one existing media job, which failed and updated that
+media-state row (`attempt_count=17161`). The stored error was not exposed. The
+failure point relative to NAS metadata publication and Jellyfin notification
+cannot be established from the safe result, so those side effects are
+**UNKNOWN**, not asserted zero. Present holdings remained 184, organizer
+active jobs 0, Stage12 active rows 0, writer health remained ready, and no
+delete/provenance operation occurred. The completion timer is currently
+inactive (still enabled) to prevent another retry pending review. The F2H
+launcher/runtime was not rolled back; its lock checks passed. Before resuming
+the timer, inspect the failed media job and decide how to handle its retry.
+
 ## 2026-09-29 Stage13-F2G shared title-lock production deployment — INCOMPLETE
 
 The exact F2F web source `26c8657d4bd5c5b767f2f8eb474a80ff9121a150` is
