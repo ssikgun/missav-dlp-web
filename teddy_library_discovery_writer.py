@@ -7,7 +7,9 @@ not accept SQL, paths, table/column names, or update values.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -29,6 +31,17 @@ DEFAULT_SOCKET_PATH = "/run/teddy-library-discovery-writer/writer.sock"
 DVD_ID_RE = re.compile(r"^[A-Z0-9]+(?:-[A-Z0-9]+)+$")
 FINGERPRINT_RE = re.compile(r"^[a-f0-9]{64}$")
 OPERATION_RE = re.compile(r"^[A-Za-z0-9-]{1,64}$")
+SAFE_ERROR_CODES = frozenset({
+    "PROTOCOL_INVALID", "DB_BUSY", "HOLDING_NOT_FOUND", "HOLDING_CHANGED",
+    "PROVENANCE_NOT_FOUND", "PROVENANCE_NOT_READY", "OPERATION_MISMATCH",
+    "WRITER_UNAVAILABLE",
+})
+JOURNAL_TABLE = "library_delete_reconcile_journal"
+JOURNAL_COLUMNS = (
+    "operation_id", "dvd_id", "holding_id", "source_identity_fingerprint",
+    "reconciled_at",
+)
+_LOG = logging.getLogger("teddy_library_discovery_writer")
 _REQUEST_FIELDS = {
     "health": {"protocol_version", "operation"},
     "preflight_holding": {"protocol_version", "operation", "dvd_id", "holding_id", "source_identity_fingerprint"},
@@ -169,6 +182,29 @@ class DiscoveryHoldingWriter:
             raise WriterError("PROVENANCE_NOT_READY")
         return value
 
+    @staticmethod
+    def _ensure_journal(db):
+        # This DDL is called only after BEGIN IMMEDIATE inside mark_absent.
+        # SQLite keeps it in the same transaction as the row transition.
+        db.execute(f"""CREATE TABLE IF NOT EXISTS {JOURNAL_TABLE} (
+            operation_id TEXT PRIMARY KEY,
+            dvd_id TEXT NOT NULL,
+            holding_id INTEGER NOT NULL,
+            source_identity_fingerprint TEXT NOT NULL,
+            reconciled_at TEXT NOT NULL
+        )""")
+        columns = tuple(row[1] for row in db.execute(
+            f"PRAGMA table_info({JOURNAL_TABLE})").fetchall())
+        if columns != JOURNAL_COLUMNS:
+            raise WriterError("WRITER_UNAVAILABLE")
+
+    @staticmethod
+    def _journal_matches(row, request):
+        return bool(row and row["operation_id"] == request["operation_id"]
+                    and row["dvd_id"] == request["dvd_id"]
+                    and int(row["holding_id"]) == request["holding_id"]
+                    and row["source_identity_fingerprint"] == request["source_identity_fingerprint"])
+
     def mark_absent(self, request: dict) -> dict:
         # Validate durable evidence before opening the mutable DB transaction.
         provenance = self._provenance(request)
@@ -176,15 +212,40 @@ class DiscoveryHoldingWriter:
         try:
             db.execute("BEGIN IMMEDIATE")
             row, relative = self._row(db, request)
+            self._ensure_journal(db)
+            journal = db.execute(
+                f"SELECT operation_id,dvd_id,holding_id,source_identity_fingerprint,reconciled_at "
+                f"FROM {JOURNAL_TABLE} WHERE operation_id=?",
+                (request["operation_id"],),
+            ).fetchone()
             if row["present"] == 0:
-                # Only a request whose own durable record already says the
-                # Discovery transition completed may receive idempotent success.
-                if provenance["discovery_reconciled"] != 1:
+                # The journal and row transition commit atomically. This also
+                # recovers a crash before the web process updates provenance.
+                if not self._journal_matches(journal, request):
                     raise WriterError("OPERATION_MISMATCH")
                 db.execute("ROLLBACK")
                 return {"protocol_version": PROTOCOL_VERSION, "status": "ALREADY_RECONCILED"}
             if row["present"] != 1:
                 raise WriterError("HOLDING_CHANGED")
+            if journal is not None:
+                # A journal for this operation with present=1, or one with a
+                # different identity, cannot be repaired by guessing.
+                raise WriterError("OPERATION_MISMATCH")
+            competing = db.execute(
+                f"SELECT operation_id,dvd_id,holding_id,source_identity_fingerprint "
+                f"FROM {JOURNAL_TABLE} WHERE holding_id=? OR dvd_id=? LIMIT 1",
+                (request["holding_id"], request["dvd_id"]),
+            ).fetchone()
+            if competing is not None:
+                raise WriterError("OPERATION_MISMATCH")
+            db.execute(
+                f"INSERT INTO {JOURNAL_TABLE} "
+                "(operation_id,dvd_id,holding_id,source_identity_fingerprint,reconciled_at) "
+                "VALUES(?,?,?,?,?)",
+                (request["operation_id"], request["dvd_id"], request["holding_id"],
+                 request["source_identity_fingerprint"],
+                 datetime.now(timezone.utc).isoformat(timespec="seconds")),
+            )
             cursor = db.execute("""UPDATE holdings SET present=0
                 WHERE holding_id=? AND storage_root='jav' AND relative_path=? AND dvd_id=?
                   AND parse_status='MATCHED' AND present=1 AND size_bytes=? AND mtime_ns=?""",
@@ -198,6 +259,14 @@ class DiscoveryHoldingWriter:
                 db.execute("ROLLBACK")
             if "locked" in str(exc).lower() or "busy" in str(exc).lower():
                 raise WriterError("DB_BUSY") from exc
+            raise WriterError("WRITER_UNAVAILABLE") from exc
+        except sqlite3.IntegrityError as exc:
+            if db.in_transaction:
+                db.execute("ROLLBACK")
+            raise WriterError("OPERATION_MISMATCH") from exc
+        except sqlite3.DatabaseError as exc:
+            if db.in_transaction:
+                db.execute("ROLLBACK")
             raise WriterError("WRITER_UNAVAILABLE") from exc
         except Exception:
             if db.in_transaction:
@@ -244,6 +313,7 @@ def _read_frame(conn: socket.socket) -> bytes:
 class _UnixHandler(socketserver.StreamRequestHandler):
     def handle(self):
         self.connection.settimeout(2.0)
+        request = None
         try:
             raw = _read_frame(self.connection)
             def unique_pairs(pairs):
@@ -256,12 +326,38 @@ class _UnixHandler(socketserver.StreamRequestHandler):
             request = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_pairs)
             response = self.server.writer.dispatch(request)
         except WriterError as exc:
+            _log_safe_writer_error(request, exc.code)
             response = {"protocol_version": PROTOCOL_VERSION, "status": "ERROR", "code": exc.code}
         except (UnicodeError, ValueError, TimeoutError, OSError):
+            _log_safe_writer_error(request, "PROTOCOL_INVALID")
             response = {"protocol_version": PROTOCOL_VERSION, "status": "ERROR", "code": "PROTOCOL_INVALID"}
         payload = json.dumps(response, separators=(",", ":")).encode("utf-8") + b"\n"
         if len(payload) <= MAX_RESPONSE_BYTES:
             self.wfile.write(payload)
+
+
+def safe_writer_error_fields(request, code):
+    """Return only bounded allowlisted diagnostics; never raw request data."""
+    request = request if isinstance(request, dict) else {}
+    operation = request.get("operation")
+    if not isinstance(operation, str) or operation not in _REQUEST_FIELDS:
+        operation = "unknown"
+    dvd_id = request.get("dvd_id")
+    if not isinstance(dvd_id, str) or not DVD_ID_RE.fullmatch(dvd_id):
+        dvd_id = "unknown"
+    holding_id = request.get("holding_id")
+    if type(holding_id) is not int or holding_id <= 0:
+        holding_id = 0
+    if not isinstance(code, str) or code not in SAFE_ERROR_CODES:
+        code = "WRITER_UNAVAILABLE"
+    return {"operation": operation, "dvd_id": dvd_id,
+            "holding_id": holding_id, "code": code}
+
+
+def _log_safe_writer_error(request, code):
+    fields = safe_writer_error_fields(request, code)
+    _LOG.warning("writer request failed operation=%s dvd_id=%s holding_id=%d code=%s",
+                 fields["operation"], fields["dvd_id"], fields["holding_id"], fields["code"])
 
 
 class _UnixServer(socketserver.ThreadingUnixStreamServer):

@@ -31,7 +31,9 @@ from teddy_library_delete_commit import (
     canonical_media_path, delete_enabled, read_holding_for_reconcile,
     reconcile_discovery_holding,
 )
-from teddy_library_discovery_writer import UnixSocketDiscoveryWriterClient, WriterError
+from teddy_library_discovery_writer import (
+    SAFE_ERROR_CODES, UnixSocketDiscoveryWriterClient, WriterError,
+)
 from teddy_library_delete_activity import (
     ACTIVITY_STATE_UNAVAILABLE, ACTIVE_ORGANIZER, ACTIVE_SUBTITLE,
     IDLE, ActivityDecision, DeleteTargetActivityGuard,
@@ -680,8 +682,15 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
                     source_identity_fingerprint=record["source_identity_fingerprint"])
                 discovery_ok = result["status"] in {"RECONCILED", "ALREADY_RECONCILED"}
         except Exception as exc:
-            current_app.logger.warning(
-                "Library delete Discovery reconcile pending (%s)", type(exc).__name__)
+            if isinstance(exc, WriterError):
+                code = exc.code if exc.code in SAFE_ERROR_CODES else "WRITER_UNAVAILABLE"
+                current_app.logger.warning(
+                    "Library delete Discovery reconcile pending operation=mark_absent "
+                    "dvd_id=%s holding_id=%s code=%s",
+                    dvd_id, record["holding_id"], code)
+            else:
+                current_app.logger.warning(
+                    "Library delete Discovery reconcile pending (%s)", type(exc).__name__)
             discovery_ok = False
             media_relative = None
         if not discovery_ok:
