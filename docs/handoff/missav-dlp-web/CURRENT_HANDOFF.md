@@ -6062,3 +6062,33 @@ D9 leaves the production image and current VEMA provenance unchanged. D10 is
 expected to deploy this source and, only after its production preconditions,
 finalize VEMA-246 through the exact-ID ghost-aware path. The separate writer
 socket restart-durability question remains for F2M-E.
+
+### D9b — production-equivalent integration smoke follow-up
+
+The earlier Flask limitation is resolved without installing packages: built
+temporary image `missav-d9b-integration:6665ff8e` from clean source HEAD
+`6665ff8e479ba404e99c6e4c53b02830e29abca5` using the repository Dockerfile.
+Image ID:
+`sha256:008ced8d484a599713a4fe184cd5dd6b173ad8f9d8542ab6726f6c56a6c5df1d`.
+The Dockerfile build's Stage13 delete commit smoke also passed. In a separate
+ephemeral container, the three required smokes passed with `--network none`, a
+read-only container root, `/tmp` tmpfs only, and no host mounts or secrets:
+
+- `teddy_library_delete_commit_smoke.py` — `Stage13-F1 offline delete commit safety smoke: OK`
+- `teddy_library_delete_jellyfin_smoke.py` — `Stage13-F2M-D9 durable at-most-once Jellyfin smoke: OK`
+- `deploy/stage13-f2m/reconcile_jellyfin_pending_smoke.py` — `Stage13-F2M-D9 ghost-aware Jellyfin recovery helper smoke: OK`
+
+The existing integration fixture covered prepare/validate/commit, activity and
+title-lock guards, Discovery writer preflight/reconcile boundaries, exact
+manifest NAS mutation fixtures, provenance flow, and delete gate behavior.
+All 3/3 required container smokes passed. The temporary image and ephemeral
+container were removed after execution. Read-only post-check confirmed the
+production web container remained on its prior image, running with gate=false,
+`/login` 200 and restart count unchanged; completion and reconcile-apply units
+remain inactive. No production service, database, NAS, Discovery, Jellyfin, or
+gate mutation occurred.
+
+`D9_DURABLE_NOTIFICATION_CONTRACT_VALIDATED=YES`
+`INTEGRATION_SMOKE_PASS=YES`
+`D10_DEPLOY_READY=YES` (source/integration validation only; production deploy
+and VEMA finalization remain for D10 after its own preconditions).
