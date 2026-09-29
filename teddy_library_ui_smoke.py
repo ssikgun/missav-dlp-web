@@ -70,7 +70,8 @@ for marker in ("/delete/prepare", "/delete/validate", "data-delete-prepare",
     require(marker in js, f"missing dry-run delete confirmation boundary: {marker}")
 for marker in ("/delete/commit", "data-delete-final-ack", "data-delete-final-typed",
                "data-delete-final-phrase", "영구 삭제 실행", "payload.commit_enabled === true",
-               "deleteCommitInFlight", "activeDeleteToken = null"):
+               "deleteCommitInFlight", "activeDeleteToken = null",
+               "delete_target_active", "delete_activity_unavailable"):
     require(marker in js, f"missing gated final confirmation boundary: {marker}")
 require("? '' : 'disabled'" in js and "서버 feature gate가 비활성이라" in js,
         "commit controls must remain disabled while the server feature gate is off")

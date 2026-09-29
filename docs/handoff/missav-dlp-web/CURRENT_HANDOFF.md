@@ -4668,3 +4668,59 @@ Jellyfin refresh/write = 0, subtitle generation = 0, Hermes/VM122 calls = 0,
 actual permanent deletes = 0. Production web image remains unchanged.
 Next: implement and fixture-test the per-DVD active-job collision guard,
 then repeat F2D preflight before Teddy selects a canary title.
+
+## Stage13-F2E target activity guard — INCOMPLETE FOR CANARY, 2026-09-29
+
+F2D identified `ACTIVE_JOB_GUARD_MISSING`. This checkpoint adds a generic,
+read-only target activity guard in `teddy_library_delete_activity.py`; no
+production deploy or restart was performed. The F2C production app remains on
+its prior image with `TEDDY_LIBRARY_DELETE_ENABLED` missing/effectively false.
+Actual delete remains disabled.
+
+Organizer source evidence: `organizer_jobs` has no schema CHECK constraint;
+`organizer_apply` creates `RUNNING`, records `PUBLISHED` after publishing the
+holding and before source cleanup, then records `COMPLETED`. Failed operations
+record `FAILED`; known incomplete recovery states include `CLEANUP_PENDING`
+and `DB_FAILED_AFTER_PUBLISH`. The guard treats `RUNNING` and `PUBLISHED` as
+active, `COMPLETED` and `FAILED` as terminal, and incomplete/unknown values as
+`ACTIVITY_STATE_UNAVAILABLE` (fail-closed). Queries are exact `WHERE dvd_id=?`
+against the read-only Discovery DB.
+
+Subtitle source reuses `teddy_subtitle_status.py` active statuses and heartbeat
+parser/freshness contract. A target rollout row in `RUNNING` or `GENERATED`
+blocks even if heartbeat is stale. A fresh `RUNNING` heartbeat blocks only
+when `current_dvd_id` matches the target; a fresh heartbeat naming another
+DVD-ID does not. A stale valid heartbeat alone does not block. Missing
+heartbeat is allowed when durable state is readable; unreadable/malformed
+heartbeat, invalid fresh state, or rollout DB failure returns
+`ACTIVITY_STATE_UNAVAILABLE`. Future subtitle controllers can be added as
+providers without changing delete-route logic.
+
+Commit performs target checks after final holding/manifest validation and
+again after writer preflight, before provenance `COMMITTING` and NAS mutation.
+Partial commit retry and incomplete resume use the same two checks before
+resuming provenance/mutator work. `RECONCILE_PENDING` recovery remains outside
+the activity guard so completed NAS deletion can reconcile. Safe API outcomes
+are `delete_target_active` and `delete_activity_unavailable`; no job/session
+or heartbeat details are returned. Fixture checks confirmed active/unavailable
+before the first check or between checks causes zero NAS mutator calls and no
+new provenance operation; idle controls continue through the existing fixture
+path; active partial resume is blocked; already-completed reconciliation is
+not blocked.
+
+`SHARED_PER_TITLE_LOCK=UNAVAILABLE`. Organizer has a database writer flock,
+completion orchestration has a separate global operation lock, and Stage12
+has its own singleton runner lock. None is a shared per-title lock held by
+these producers and the web deletion route. Double activity checks close the
+writer-preflight interval but leave a TOCTOU window after the second check and
+before the first exact unlink. Therefore `CANARY_READY=NO`; do not enable the
+gate or select/delete a canary until this cross-worker race is closed or a
+separately verifiable operational exclusion is approved.
+
+Offline target-activity, writer, prepare/validate, commit/partial-recovery,
+Library API/UI, File Management navigation, subtitle status and Discovery
+smokes passed. Python compile, `git diff --check`, and full local Docker build
+passed. Production deploy = NO; production gate remains false/effectively
+disabled; production DB/NAS/provenance/Jellyfin mutations = 0, subtitle
+generation/Hermes/VM122 = 0, actual delete = 0. Next: resolve the shared
+per-title exclusion/race, then repeat F2D final preflight before any canary.

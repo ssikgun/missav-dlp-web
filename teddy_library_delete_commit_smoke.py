@@ -24,6 +24,10 @@ from teddy_library_discovery_writer import WriterError
 from teddy_library_discovery_writer import (
     DiscoveryHoldingWriter, UnixSocketDiscoveryWriterClient, _UnixServer, _prepare_socket_parent,
 )
+from teddy_library_delete_activity import (
+    ACTIVITY_STATE_UNAVAILABLE, ACTIVE_ORGANIZER, ACTIVE_SUBTITLE, IDLE,
+    ActivityDecision,
+)
 from teddy_library_delete_dryrun_smoke import make_fixture
 from teddy_discovery_jellyfin import jellyfin_media_path
 from teddy_discovery_subtitle import validate_canonical_holding
@@ -50,7 +54,7 @@ class FixtureSSH:
 
 
 def setup_app(tmp, *, gate="true", discovery_ok=True, jellyfin_ok=True, partial_once=False,
-              discovery_writer_client=None):
+              discovery_writer_client=None, activity_decisions=None):
     root, title, media, db_path, relative, dvd = make_fixture(tmp)
     (title / f"{dvd}.ko.srt").write_text("fixture subtitle", encoding="utf-8")
     sibling = title.parent / "SIBL-456"
@@ -100,6 +104,18 @@ def setup_app(tmp, *, gate="true", discovery_ok=True, jellyfin_ok=True, partial_
                         "retryable": True, "removed_total_bytes": first["size_bytes"]}
             return self.delegate.delete(**kwargs)
 
+    class FixtureActivityGuard:
+        def __init__(self, decisions):
+            self.decisions = list(decisions or [IDLE])
+            self.calls = []
+
+        def check(self, dvd_id):
+            self.calls.append(dvd_id)
+            value = self.decisions.pop(0) if len(self.decisions) > 1 else self.decisions[0]
+            return ActivityDecision(value)
+
+    activity_guard = FixtureActivityGuard(activity_decisions)
+
     app = Flask("delete-commit-fixture")
     app.secret_key = "fixture-only-key"
     blueprint_kwargs = dict(
@@ -107,6 +123,7 @@ def setup_app(tmp, *, gate="true", discovery_ok=True, jellyfin_ok=True, partial_
         delete_token_registry=registry, delete_mutator=PartialOnce(mutator),
         provenance_store_factory=lambda: DurableDeleteProvenanceStore(provenance_path),
         jellyfin_delete_reconciler=reconcile_jellyfin, jellyfin_loader=loader,
+        delete_activity_guard=activity_guard,
     )
     if discovery_writer_client is None:
         blueprint_kwargs["discovery_reconciler"] = reconcile_discovery
@@ -157,7 +174,56 @@ class UnavailableWriter:
         raise AssertionError("writer reconcile must not be reached")
 
 
+class CountingPreflightWriter:
+    def __init__(self):
+        self.preflight_calls = 0
+
+    def preflight_holding(self, **_kwargs):
+        self.preflight_calls += 1
+        return {"status": "READY"}
+
+    def mark_absent(self, **_kwargs):
+        raise AssertionError("activity rejection must occur before reconcile")
+
+
 def main():
+    # A target already active fails before writer preflight and before NAS.
+    with tempfile.TemporaryDirectory(prefix="delete-activity-early-") as tmp:
+        writer = CountingPreflightWriter()
+        ctx = setup_app(tmp, discovery_writer_client=writer,
+                        activity_decisions=[ACTIVE_ORGANIZER])
+        token, _ = prepared_validated(ctx)
+        response = post(ctx, "commit", commit_body(ctx, token))
+        assert response.status_code == 409
+        assert response.get_json()["error"]["code"] == "delete_target_active"
+        assert "job_id" not in response.get_data(as_text=True)
+        assert writer.preflight_calls == 0 and ctx["ssh"].calls == 0
+        assert not Path(ctx["provenance_path"]).exists()
+        assert ctx["registry"].snapshot(token, dvd_id=ctx["dvd"])["state"] == "VALIDATED"
+
+    # If activity appears across the writer preflight, the second exact check
+    # still prevents provenance COMMITTING and NAS mutation.
+    with tempfile.TemporaryDirectory(prefix="delete-activity-race-") as tmp:
+        writer = CountingPreflightWriter()
+        ctx = setup_app(tmp, discovery_writer_client=writer,
+                        activity_decisions=[IDLE, ACTIVE_SUBTITLE])
+        token, _ = prepared_validated(ctx)
+        response = post(ctx, "commit", commit_body(ctx, token))
+        assert response.status_code == 409
+        assert response.get_json()["error"]["code"] == "delete_target_active"
+        assert writer.preflight_calls == 1 and ctx["ssh"].calls == 0
+        assert not Path(ctx["provenance_path"]).exists()
+        assert ctx["registry"].snapshot(token, dvd_id=ctx["dvd"])["state"] == "VALIDATED"
+
+    # An unavailable source is not treated as idle.
+    with tempfile.TemporaryDirectory(prefix="delete-activity-unavailable-") as tmp:
+        ctx = setup_app(tmp, activity_decisions=[ACTIVITY_STATE_UNAVAILABLE])
+        token, _ = prepared_validated(ctx)
+        response = post(ctx, "commit", commit_body(ctx, token))
+        assert response.status_code == 503
+        assert response.get_json()["error"]["code"] == "delete_activity_unavailable"
+        assert ctx["ssh"].calls == 0 and not Path(ctx["provenance_path"]).exists()
+
     # Production default uses a configured writer client; failure before
     # provenance COMMITTING guarantees the NAS mutator is never entered.
     with tempfile.TemporaryDirectory(prefix="delete-writer-preflight-") as tmp:
@@ -294,9 +360,20 @@ def main():
         operation_id = first.get_json()["operation_id"]
         record = DurableDeleteProvenanceStore(ctx["provenance_path"]).get(operation_id)
         assert record["removed_file_count"] == 1 and record["result_state"] == "PARTIAL_DELETE"
+        calls_before_resume = ctx["ssh"].calls
+        ctx["activity_guard"].decisions = [ACTIVE_SUBTITLE]
+        blocked = ctx["client"].post(f"/api/library/{dvd}/delete/resume", json={
+            "operation_id": operation_id, "typed_dvd_id": dvd,
+            "acknowledge_permanent_delete": True, "confirm_phrase": CONFIRM_PHRASE,
+        }, base_url="http://localhost", headers={
+            "Origin": "http://localhost", "X-Teddy-Delete-Intent": "resume"})
+        assert blocked.status_code == 409
+        assert blocked.get_json()["error"]["code"] == "delete_target_active"
+        assert ctx["ssh"].calls == calls_before_resume
         # Simulate a web process restart: the durable operation survives while
         # the in-memory prepare-token registry is irrelevant to recovery.
         ctx["registry"] = PrepareTokenRegistry()
+        ctx["activity_guard"].decisions = [IDLE]
         second = ctx["client"].post(f"/api/library/{dvd}/delete/resume", json={
             "operation_id": operation_id, "typed_dvd_id": dvd,
             "acknowledge_permanent_delete": True, "confirm_phrase": CONFIRM_PHRASE,
@@ -339,11 +416,13 @@ def main():
         response = post(ctx, "commit", commit_body(ctx, token))
         assert response.status_code == 202 and response.get_json()["status"] == "RECONCILE_PENDING"
         assert response.get_json()["actual_delete_performed"] is True
+        activity_checks_before_reconcile = len(ctx["activity_guard"].calls)
         ctx["flags"]["discovery_ok"] = True
         retry = ctx["client"].post(f"/api/library/{ctx['dvd']}/delete/reconcile",
             json={"operation_id": response.get_json()["operation_id"], "typed_dvd_id": ctx["dvd"]},
             base_url="http://localhost", headers={"Origin":"http://localhost", "X-Teddy-Delete-Intent":"reconcile"})
         assert retry.status_code == 200 and retry.get_json()["status"] == "COMMITTED"
+        assert len(ctx["activity_guard"].calls) == activity_checks_before_reconcile
 
     # Jellyfin failure records pending without reversing NAS or Discovery result.
     with tempfile.TemporaryDirectory(prefix="delete-jellyfin-fixture-") as tmp:

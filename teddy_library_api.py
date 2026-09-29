@@ -32,6 +32,11 @@ from teddy_library_delete_commit import (
     reconcile_discovery_holding,
 )
 from teddy_library_discovery_writer import UnixSocketDiscoveryWriterClient, WriterError
+from teddy_library_delete_activity import (
+    ACTIVITY_STATE_UNAVAILABLE, ACTIVE_ORGANIZER, ACTIVE_SUBTITLE,
+    IDLE, ActivityDecision, DeleteTargetActivityGuard,
+    OrganizerActivitySource, SubtitleActivitySource,
+)
 
 LIBRARY_ROOT = "/volume1/video/video2/JAV"
 MAX_TITLES = 250
@@ -337,7 +342,8 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
                              jellyfin_loader=None, stream_response=None, delete_manifest_reader=None,
                              delete_token_registry=None, delete_mutator=None,
                              provenance_store_factory=None, discovery_reconciler=None,
-                             jellyfin_delete_reconciler=None, discovery_writer_client=None):
+                             jellyfin_delete_reconciler=None, discovery_writer_client=None,
+                             delete_activity_guard=None):
     bp=Blueprint("teddy_library_api",__name__,url_prefix="/api/library")
     nas_reader=nas_reader if nas_reader is not None else (NASLibraryReader(_nas_client_from_env()) if _nas_client_from_env() else None)
     jellyfin_loader=jellyfin_loader or _jellyfin_paths
@@ -356,6 +362,13 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
     if discovery_writer_client is None and fixture_discovery_reconciler is None:
         discovery_writer_client = UnixSocketDiscoveryWriterClient(
             os.environ.get("TEDDY_LIBRARY_DELETE_DISCOVERY_WRITER_SOCKET"))
+    activity_rollout_path = (os.environ.get("TEDDY_SUBTITLE_STATE_PATH") or rollout_path)
+    activity_heartbeat_path = os.environ.get("TEDDY_SUBTITLE_HEARTBEAT_PATH")
+    if delete_activity_guard is None:
+        delete_activity_guard = DeleteTargetActivityGuard(
+            OrganizerActivitySource(db_path),
+            SubtitleActivitySource(activity_rollout_path, activity_heartbeat_path),
+        )
 
     def preflight_discovery(row, dvd_id, fingerprint):
         if fixture_discovery_reconciler is not None:
@@ -366,6 +379,29 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
         if not isinstance(result, dict) or result.get("status") != "READY":
             raise WriterError("WRITER_UNAVAILABLE")
         return result
+
+    def check_delete_activity(dvd_id):
+        try:
+            decision = delete_activity_guard.check(dvd_id)
+        except Exception:
+            decision = ActivityDecision(ACTIVITY_STATE_UNAVAILABLE)
+        if not isinstance(decision, ActivityDecision):
+            return _error("delete_activity_unavailable",
+                          "작품의 작업 상태를 확인할 수 없어 삭제를 중단했습니다.", 503)
+        if decision.status == IDLE:
+            return None
+        if decision.status in {ACTIVE_ORGANIZER, ACTIVE_SUBTITLE}:
+            return _error("delete_target_active",
+                          "현재 이 작품의 다운로드 정리 또는 자막 작업이 진행 중이라 삭제할 수 없습니다.", 409)
+        return _error("delete_activity_unavailable",
+                      "작품의 작업 상태를 확인할 수 없어 삭제를 중단했습니다.", 503)
+
+    def restore_token_after_activity_rejection(token, entry):
+        previous = entry.get("previous_state") or "VALIDATED"
+        delete_token_registry.finish_commit(
+            token, state=previous,
+            retryable_partial=bool(entry.get("retryable_partial")),
+        )
 
     def reconcile_jellyfin(media_relative):
         if jellyfin_delete_reconciler is not None:
@@ -695,12 +731,20 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
                 if fingerprint != entry["source_fingerprint"]:
                     delete_token_registry.finish_commit(token, state="PARTIAL_DELETE", retryable_partial=False)
                     return _error("holding_changed", "보유 작품 identity가 변경되어 중단했습니다.", 409)
+                activity_error = check_delete_activity(dvd_id)
+                if activity_error is not None:
+                    restore_token_after_activity_rejection(token, entry)
+                    return activity_error
                 try:
                     preflight_discovery(row, dvd_id, fingerprint)
                 except Exception as exc:
                     delete_token_registry.finish_commit(token, state="PARTIAL_DELETE", retryable_partial=True)
                     current_app.logger.warning("Library delete Discovery preflight unavailable (%s)", type(exc).__name__)
                     return _error("discovery_writer_unavailable", "삭제 전 보유 상태 기록기를 확인할 수 없습니다.", 503)
+                activity_error = check_delete_activity(dvd_id)
+                if activity_error is not None:
+                    restore_token_after_activity_rejection(token, entry)
+                    return activity_error
                 store = provenance_store_factory()
                 record = store.get(entry["operation_id"], dvd_id=dvd_id)
                 if (record is None or record["manifest_sha256"] != entry["manifest_sha256"]
@@ -721,12 +765,20 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
                         or manifest["manifest_sha256"] != entry["manifest_sha256"]):
                     delete_token_registry.finish_commit(token, state="FAILED_BEFORE_DELETE")
                     return _error("manifest_changed", "검증 이후 작품 또는 파일이 변경되었습니다.", 409)
+                activity_error = check_delete_activity(dvd_id)
+                if activity_error is not None:
+                    restore_token_after_activity_rejection(token, entry)
+                    return activity_error
                 try:
                     preflight_discovery(row, dvd_id, fingerprint)
                 except Exception as exc:
                     delete_token_registry.finish_commit(token, state="FAILED_BEFORE_DELETE")
                     current_app.logger.warning("Library delete Discovery preflight unavailable (%s)", type(exc).__name__)
                     return _error("discovery_writer_unavailable", "삭제 전 보유 상태 기록기를 확인할 수 없습니다.", 503)
+                activity_error = check_delete_activity(dvd_id)
+                if activity_error is not None:
+                    restore_token_after_activity_rejection(token, entry)
+                    return activity_error
                 store = provenance_store_factory()
                 record = store.begin(
                     operation_id=entry["operation_id"], dvd_id=dvd_id,
@@ -851,11 +903,17 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
             if (int(row["holding_id"]) != int(record["holding_id"])
                     or fingerprint != record["source_identity_fingerprint"]):
                 return _error("holding_changed", "보유 작품 identity가 달라 재개를 중단했습니다.", 409)
+            activity_error = check_delete_activity(dvd_id)
+            if activity_error is not None:
+                return activity_error
             try:
                 preflight_discovery(row, dvd_id, fingerprint)
             except Exception as exc:
                 current_app.logger.warning("Library delete Discovery preflight unavailable (%s)", type(exc).__name__)
                 return _error("discovery_writer_unavailable", "삭제 전 보유 상태 기록기를 확인할 수 없습니다.", 503)
+            activity_error = check_delete_activity(dvd_id)
+            if activity_error is not None:
+                return activity_error
             recovering_uncertain = record["result_state"] == "COMMITTING"
             record = (store.resume_uncertain(body["operation_id"]) if recovering_uncertain
                       else store.resume_partial(body["operation_id"]))
