@@ -1,5 +1,87 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-29 Stage13-F2M-D4 — CT112 console forensic access blocked (INCOMPLETE)
+
+Initial repo check passed at expected HEAD `7539a2a1cb966b9f2f32beaa4d0f6abf63fc07e8`,
+branch `teddy-subtitle-stage11`, clean worktree; `origin/teddy-subtitle-stage11`
+matched. The existing `ssh pve` route failed before authentication with
+`Could not resolve hostname pve`. Per checkpoint instructions, no alternate
+address, SSH setting, or CT112 SSH service was changed or tried.
+`PVE_CONSOLE_REQUIRED=YES`. No `pct` command ran and no new CT112 identity,
+mount, service, or D/D2 journal evidence was collected.
+
+The prior D3 GET-only evidence remains the latest: Jellyfin 10.11.11; exact
+item count 1 at `/media/adult/VEMA/VEMA-246/VEMA-246.mp4`; exact
+`/Environment/DirectoryContents` query for `/media/adult/VEMA/VEMA-246`
+returned 404; Adult library root `/media/adult`; `LibraryMonitorDelay=60`;
+background scan task Idle. D2 had one successful client-side notification
+request followed by a 120-second poll with the item still present. Refresher
+creation/execution, target, actual CT112 mount source/options, and bounded
+server logs remain unknown. Current provenance remains
+`RECONCILE_PENDING`, NAS delete complete, Discovery reconciled, Jellyfin flag
+NULL. No recovery operation was performed or selected from incomplete evidence.
+
+Next proposed action is **wait-only for production** while Teddy runs the
+following read-only bundle in Proxmox web shell (`root@pve`). It prints only
+the `mpX` line associated with `/media/adult`; environment output is reduced to
+variable names so secrets are not displayed. Then record the results here and
+select one recovery action from the evidence.
+
+```sh
+# PVE host — status and only the adult media mapping from CT112 config
+pct status 112
+pct config 112 | awk '/^mp[0-9]+:/ && /\/media\/adult/ {print}'
+
+# PVE host -> CT112 — exact lstat of four paths only
+pct exec 112 -- python3 -c 'import os,stat; ps=["/media/adult","/media/adult/VEMA","/media/adult/VEMA/VEMA-246","/media/adult/VEMA/VEMA-246/VEMA-246.mp4"];
+for p in ps:
+ try:
+  s=os.lstat(p); t="symlink" if stat.S_ISLNK(s.st_mode) else "directory" if stat.S_ISDIR(s.st_mode) else "regular_file" if stat.S_ISREG(s.st_mode) else "other"; print(p,"EXISTS",t,"symlink="+str(stat.S_ISLNK(s.st_mode)))
+ except FileNotFoundError: print(p,"ABSENT")'
+
+# PVE host -> CT112 — exact mount records
+pct exec 112 -- findmnt -T /media/adult -n -o TARGET,SOURCE,FSTYPE,OPTIONS
+pct exec 112 -- findmnt -T /media/adult/VEMA -n -o TARGET,SOURCE,FSTYPE,OPTIONS
+
+# PVE host -> CT112 — service identity and version
+pct exec 112 -- hostname
+pct exec 112 -- systemctl is-active jellyfin
+pct exec 112 -- systemctl show jellyfin -p FragmentPath -p User -p Group
+pct exec 112 -- sh -lc 'p=$(pgrep -xo jellyfin); test -n "$p" && readlink -f "/proc/$p/exe"'
+pct exec 112 -- jellyfin --version
+
+# PVE host -> CT112 — only environment variable names, never values
+pct exec 112 -- python3 -c 'import shlex,subprocess; s=subprocess.check_output(["systemctl","show","jellyfin","-p","Environment","--value"],text=True); print("\n".join(sorted({x.partition("=")[0] for x in shlex.split(s) if "=" in x})))'
+
+# If systemd does not own Jellyfin, identify its existing container, then use
+# the printed ID in the exact mount/log commands below.
+pct exec 112 -- docker ps --format '{{.ID}} {{.Names}} {{.Image}}' | grep -i jellyfin
+# PVE host -> CT112 — only /media and /media/adult container mount records
+pct exec 112 -- docker inspect --format '{{range .Mounts}}{{if or (eq .Destination "/media") (eq .Destination "/media/adult")}}{{println .Destination .Source .Type .RW}}{{end}}{{end}}' <JELLYFIN_CONTAINER_ID>
+pct exec 112 -- docker exec <JELLYFIN_CONTAINER_ID> jellyfin --version
+pct exec 112 -- docker exec <JELLYFIN_CONTAINER_ID> python3 -c 'import os,stat; ps=["/media/adult","/media/adult/VEMA","/media/adult/VEMA/VEMA-246","/media/adult/VEMA/VEMA-246/VEMA-246.mp4"];
+for p in ps:
+ try:
+  s=os.lstat(p); t="symlink" if stat.S_ISLNK(s.st_mode) else "directory" if stat.S_ISDIR(s.st_mode) else "regular_file" if stat.S_ISREG(s.st_mode) else "other"; print(p,"EXISTS",t,"symlink="+str(stat.S_ISLNK(s.st_mode)))
+ except FileNotFoundError: print(p,"ABSENT")'
+
+# PVE host -> CT112 — D window; bounded to the incident timestamps
+pct exec 112 -- sh -lc 'journalctl -u jellyfin --since "2026-09-29 18:00:00 KST" --until "2026-09-29 18:16:30 KST" --no-pager -o short-iso | grep -Ei "VEMA-246|/media/adult/VEMA|FileRefresher|will be refreshed|ReportFileSystemChanged|Error processing directory changes|Error finding the item affected|Error refreshing|LibraryMonitor" | sed -E "s/((api.?key|token)[=: ]+)[^ ]+/\\1[REDACTED]/Ig"'
+
+# PVE host -> CT112 — D2 window; bounded to the incident timestamps
+pct exec 112 -- sh -lc 'journalctl -u jellyfin --since "2026-09-29 19:50:00 KST" --until "2026-09-29 20:06:30 KST" --no-pager -o short-iso | grep -Ei "VEMA-246|/media/adult/VEMA|FileRefresher|will be refreshed|ReportFileSystemChanged|Error processing directory changes|Error finding the item affected|Error refreshing|LibraryMonitor" | sed -E "s/((api.?key|token)[=: ]+)[^ ]+/\\1[REDACTED]/Ig"'
+
+# For a Jellyfin container instead of systemd, run each bounded log query
+# against its existing ID (PVE host; the range remains bounded at docker logs).
+pct exec 112 -- docker logs --since '2026-09-29T18:00:00+09:00' --until '2026-09-29T18:16:30+09:00' <JELLYFIN_CONTAINER_ID> 2>&1 | grep -Ei 'VEMA-246|/media/adult/VEMA|FileRefresher|will be refreshed|ReportFileSystemChanged|Error processing directory changes|Error finding the item affected|Error refreshing|LibraryMonitor' | sed -E 's/((api.?key|token)[=: ]+)[^ ]+/\1[REDACTED]/Ig'
+pct exec 112 -- docker logs --since '2026-09-29T19:50:00+09:00' --until '2026-09-29T20:06:30+09:00' <JELLYFIN_CONTAINER_ID> 2>&1 | grep -Ei 'VEMA-246|/media/adult/VEMA|FileRefresher|will be refreshed|ReportFileSystemChanged|Error processing directory changes|Error finding the item affected|Error refreshing|LibraryMonitor' | sed -E 's/((api.?key|token)[=: ]+)[^ ]+/\1[REDACTED]/Ig'
+```
+
+Do not run the bounded journal commands if Jellyfin is a container rather than
+a systemd service; first identify its existing container and inspect only that
+container's exact `/media/adult` mount. Do not start services, attach disks,
+refresh libraries, or alter mounts as part of this access checkpoint.
+
 ## 2026-09-29 Stage13-F2M-D3 — exact Jellyfin stale-item forensic (INCOMPLETE)
 
 This checkpoint was read-only apart from this handoff. Initial repository state
