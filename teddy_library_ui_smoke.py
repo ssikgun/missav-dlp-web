@@ -68,6 +68,12 @@ for marker in ("/delete/prepare", "/delete/validate", "data-delete-prepare",
                "actual_delete_performed !== false", "영구 삭제임을 이해했습니다",
                "삭제 준비 검증 완료 · 실제 삭제는 아직 비활성"):
     require(marker in js, f"missing dry-run delete confirmation boundary: {marker}")
+for marker in ("/delete/commit", "data-delete-final-ack", "data-delete-final-typed",
+               "data-delete-final-phrase", "영구 삭제 실행", "payload.commit_enabled === true",
+               "deleteCommitInFlight", "activeDeleteToken = null"):
+    require(marker in js, f"missing gated final confirmation boundary: {marker}")
+require("? '' : 'disabled'" in js and "서버 feature gate가 비활성이라" in js,
+        "commit controls must remain disabled while the server feature gate is off")
 require("prepare_token</code>" not in js, "prepare token must not be rendered")
 for marker in ("라이브러리를 불러오는 중", "조건에 맞는 작품이 없습니다.",
                "라이브러리 정보를 불러오지 못했습니다."):

@@ -25,6 +25,12 @@ from teddy_library_delete_dryrun import (
     source_identity_fingerprint,
 )
 from teddy_public_origin import PublicOriginError, parse_origin, parse_public_origin, parse_request_host
+from teddy_library_delete_commit import (
+    CONFIRM_PHRASE, PROVENANCE_DEFAULT_PATH, DeleteCommitError,
+    DeleteManifestMutator, DurableDeleteProvenanceStore, JellyfinDeleteReconciler,
+    canonical_media_path, delete_enabled, read_holding_for_reconcile,
+    reconcile_discovery_holding,
+)
 
 LIBRARY_ROOT = "/volume1/video/video2/JAV"
 MAX_TITLES = 250
@@ -326,13 +332,35 @@ def _delete_origin_log_parts(origin):
         return "invalid", "invalid"
 
 
-def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=None, jellyfin_loader=None, stream_response=None, delete_manifest_reader=None, delete_token_registry=None):
+def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=None,
+                             jellyfin_loader=None, stream_response=None, delete_manifest_reader=None,
+                             delete_token_registry=None, delete_mutator=None,
+                             provenance_store_factory=None, discovery_reconciler=None,
+                             jellyfin_delete_reconciler=None):
     bp=Blueprint("teddy_library_api",__name__,url_prefix="/api/library")
     nas_reader=nas_reader if nas_reader is not None else (NASLibraryReader(_nas_client_from_env()) if _nas_client_from_env() else None)
     jellyfin_loader=jellyfin_loader or _jellyfin_paths
     if delete_manifest_reader is None and nas_reader is not None and hasattr(nas_reader, "ssh"):
         delete_manifest_reader = DeleteManifestReader(nas_reader.ssh, library_root=LIBRARY_ROOT)
+    if delete_mutator is None and nas_reader is not None and hasattr(nas_reader, "ssh"):
+        delete_mutator = DeleteManifestMutator(nas_reader.ssh, library_root=LIBRARY_ROOT)
     delete_token_registry = delete_token_registry or PrepareTokenRegistry()
+    provenance_path = (os.environ.get("TEDDY_LIBRARY_DELETE_PROVENANCE_DB")
+                       or PROVENANCE_DEFAULT_PATH)
+    provenance_store_factory = provenance_store_factory or (
+        lambda: DurableDeleteProvenanceStore(provenance_path))
+    discovery_reconciler = discovery_reconciler or reconcile_discovery_holding
+
+    def reconcile_jellyfin(media_relative):
+        if jellyfin_delete_reconciler is not None:
+            return jellyfin_delete_reconciler(media_relative)
+        url = os.environ.get("TEDDY_JELLYFIN_URL", "")
+        key = os.environ.get("TEDDY_JELLYFIN_KEY", "")
+        if not url or not key:
+            raise DeleteCommitError("JELLYFIN_CONFIG_UNAVAILABLE")
+        return JellyfinDeleteReconciler(
+            JellyfinClient(base_url=url, api_key_path=key)
+        )(media_relative)
     def query_items(): return _build_items(db_path,rollout_path,nas_reader,jellyfin_loader)
     @bp.get("")
     def listing():
@@ -495,7 +523,7 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
             row, video, manifest, fingerprint, states = current_delete_snapshot(dvd_id)
             token, expires_at = delete_token_registry.issue(
                 dvd_id=dvd_id, manifest_sha256=manifest["manifest_sha256"],
-                source_fingerprint=fingerprint,
+                source_fingerprint=fingerprint, manifest_entries=manifest["entries"],
             )
         except DeleteDryRunError as exc:
             return _error(exc.code.lower(), "삭제 준비 정보를 안전하게 확인하지 못했습니다.", exc.status)
@@ -511,6 +539,7 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
             "ko_state": states["ko_state"], "unresolved_reason_code": states["unresolved_reason_code"],
             "unresolved_label": states["unresolved_label"], "jellyfin_state": states["jellyfin_state"],
             "prepare_expires_at": expires_at, "prepare_token": token,
+            "commit_enabled": delete_enabled(os.environ.get("TEDDY_LIBRARY_DELETE_ENABLED")),
             "actual_delete_performed": False,
         })
 
@@ -546,4 +575,273 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
                         "manifest_sha256": manifest["manifest_sha256"],
                         "validated_at": validated_at, "actual_delete_performed": False,
                         "message": "삭제 준비 검증 완료 · 실제 삭제는 아직 비활성"})
+
+    def commit_result(record, *, actual_delete=True):
+        return {
+            "operation_id": record["operation_id"],
+            "dvd_id": record["dvd_id"],
+            "status": record["result_state"],
+            "removed_file_count": int(record["removed_file_count"]),
+            "removed_total_bytes": int(record["removed_total_bytes"]),
+            "discovery_reconciled": record["discovery_reconciled"] == 1,
+            "jellyfin_reconciled": record["jellyfin_reconciled"] == 1,
+            "actual_delete_performed": bool(actual_delete and record["removed_file_count"]),
+        }
+
+    def finish_reconciliation(store, record, *, token=None):
+        dvd_id = record["dvd_id"]
+        try:
+            holding = read_holding_for_reconcile(
+                db_path, holding_id=record["holding_id"], dvd_id=dvd_id)
+            media_relative = canonical_media_path(holding, dvd_id)
+            discovery_ok = bool(discovery_reconciler(
+                db_path, holding_id=record["holding_id"], dvd_id=dvd_id,
+                source_fingerprint=record["source_identity_fingerprint"]))
+        except Exception as exc:
+            current_app.logger.warning(
+                "Library delete Discovery reconcile pending (%s)", type(exc).__name__)
+            discovery_ok = False
+            media_relative = None
+        if not discovery_ok:
+            pending = store.finish(
+                record["operation_id"], result_state="RECONCILE_PENDING",
+                removed_entries=record["removed_entries"],
+                remaining_entries=record["remaining_entries"],
+                nas_delete_complete=True, discovery_reconciled=False,
+                jellyfin_reconciled=None)
+            if token:
+                delete_token_registry.finish_commit(
+                    token, state="RECONCILE_PENDING", result=commit_result(pending))
+            return pending
+        try:
+            jellyfin_ok = bool(reconcile_jellyfin(media_relative))
+        except Exception as exc:
+            current_app.logger.warning(
+                "Library delete Jellyfin reconcile pending (%s)", type(exc).__name__)
+            jellyfin_ok = False
+        result_state = "COMMITTED" if jellyfin_ok else "RECONCILE_PENDING"
+        completed = store.finish(
+            record["operation_id"], result_state=result_state,
+            removed_entries=record["removed_entries"],
+            remaining_entries=record["remaining_entries"],
+            nas_delete_complete=True, discovery_reconciled=True,
+            jellyfin_reconciled=jellyfin_ok)
+        if token:
+            delete_token_registry.finish_commit(
+                token, state=result_state, result=commit_result(completed))
+        return completed
+
+    @bp.post("/<dvd_id>/delete/commit")
+    def delete_commit(dvd_id):
+        guard = delete_intent_guard("commit")
+        if guard is not None: return guard
+        if not _is_canonical_dvd_id(dvd_id):
+            return _error("invalid_dvd_id", "DVD-ID 형식이 잘못되었습니다.", 400)
+        if not delete_enabled(os.environ.get("TEDDY_LIBRARY_DELETE_ENABLED")):
+            return _error("delete_disabled", "실제 영구 삭제 기능이 비활성 상태입니다.", 403)
+        if delete_manifest_reader is None or delete_mutator is None:
+            return _error("delete_unavailable", "삭제 경로를 안전하게 확인할 수 없습니다.", 503)
+        body = request.get_json(silent=True)
+        expected_fields = {"prepare_token", "typed_dvd_id", "acknowledge_permanent_delete", "confirm_phrase"}
+        if (not isinstance(body, dict) or set(body) != expected_fields
+                or not isinstance(body.get("prepare_token"), str)
+                or not (20 <= len(body["prepare_token"]) <= 256)
+                or body.get("typed_dvd_id") != dvd_id
+                or body.get("acknowledge_permanent_delete") is not True
+                or body.get("confirm_phrase") != CONFIRM_PHRASE):
+            return _error("final_confirmation_required", "DVD-ID와 최종 영구 삭제 확인이 필요합니다.", 400)
+        token = body["prepare_token"]
+        mutation_started = False
+        try:
+            entry = delete_token_registry.begin_commit(token, dvd_id=dvd_id)
+            if entry["state"] in {"COMMITTED", "RECONCILE_PENDING"}:
+                store = provenance_store_factory()
+                record = store.get(entry["operation_id"], dvd_id=dvd_id)
+                if record is None:
+                    return _error("provenance_unavailable", "삭제 처리 기록을 확인할 수 없습니다.", 503)
+                if not record["nas_delete_complete"]:
+                    return _error("delete_in_progress", "삭제 처리 상태를 확인하고 있습니다.", 409)
+                if record["result_state"] != "COMMITTED":
+                    record = finish_reconciliation(store, record, token=token)
+                return jsonify(commit_result(record)), (200 if record["result_state"] == "COMMITTED" else 202)
+
+            partial_retry = entry.get("previous_state") == "PARTIAL_DELETE"
+            if partial_retry:
+                row, video, _terminal = current_delete_identity(dvd_id)
+                fingerprint = source_identity_fingerprint(row, video.relative_path)
+                if fingerprint != entry["source_fingerprint"]:
+                    delete_token_registry.finish_commit(token, state="PARTIAL_DELETE", retryable_partial=False)
+                    return _error("holding_changed", "보유 작품 identity가 변경되어 중단했습니다.", 409)
+                store = provenance_store_factory()
+                record = store.get(entry["operation_id"], dvd_id=dvd_id)
+                if (record is None or record["manifest_sha256"] != entry["manifest_sha256"]
+                        or record["source_identity_fingerprint"] != fingerprint
+                        or record["result_state"] != "PARTIAL_DELETE"):
+                    delete_token_registry.finish_commit(token, state="PARTIAL_DELETE", retryable_partial=False)
+                    return _error("partial_operation_unavailable", "부분 처리 상태를 안전하게 확인할 수 없습니다.", 409)
+                record = store.resume_partial(entry["operation_id"])
+                entries = record["manifest_entries"]
+                already_removed = record["removed_entries"]
+            else:
+                try:
+                    row, video, manifest, fingerprint, _states = current_delete_snapshot(dvd_id)
+                except DeleteDryRunError as exc:
+                    delete_token_registry.finish_commit(token, state="FAILED_BEFORE_DELETE")
+                    return _error(exc.code.lower(), "작품과 관리 파일을 다시 확인할 수 없습니다.", exc.status)
+                if (fingerprint != entry["source_fingerprint"]
+                        or manifest["manifest_sha256"] != entry["manifest_sha256"]):
+                    delete_token_registry.finish_commit(token, state="FAILED_BEFORE_DELETE")
+                    return _error("manifest_changed", "검증 이후 작품 또는 파일이 변경되었습니다.", 409)
+                store = provenance_store_factory()
+                record = store.begin(
+                    operation_id=entry["operation_id"], dvd_id=dvd_id,
+                    holding_id=row["holding_id"], source_fingerprint=fingerprint,
+                    manifest_sha256=manifest["manifest_sha256"], entries=manifest["entries"],
+                    created_at=entry["created_at"], validated_at=entry["validated_at"])
+                entries = manifest["entries"]
+                already_removed = []
+
+            mutation_started = True
+            try:
+                deletion = delete_mutator.delete(
+                    dvd_id=dvd_id, media_relative=video.relative_path,
+                    entries=entries, manifest_sha256=entry["manifest_sha256"],
+                    already_removed=already_removed)
+            except Exception as exc:
+                current_app.logger.error("Library delete mutator outcome uncertain (%s)", type(exc).__name__)
+                removed = list(already_removed)
+                remaining = [item["relative_name"] for item in entries if item["relative_name"] not in set(removed)]
+                uncertain = store.finish(
+                    entry["operation_id"], result_state="PARTIAL_DELETE",
+                    removed_entries=removed, remaining_entries=remaining,
+                    nas_delete_complete=False)
+                delete_token_registry.finish_commit(
+                    token, state="PARTIAL_DELETE", removed_entries=removed,
+                    retryable_partial=False)
+                return jsonify(commit_result(uncertain)), 409
+
+            removed = deletion["removed_entries"]
+            remaining = deletion["remaining_entries"]
+            if deletion["status"] == "FAILED_BEFORE_DELETE":
+                failed = store.finish(
+                    entry["operation_id"], result_state="FAILED_BEFORE_DELETE",
+                    removed_entries=removed, remaining_entries=remaining,
+                    nas_delete_complete=False)
+                delete_token_registry.finish_commit(token, state="FAILED_BEFORE_DELETE", removed_entries=removed)
+                return jsonify(commit_result(failed, actual_delete=False)), 409
+            if deletion["status"] == "PARTIAL_DELETE":
+                partial = store.finish(
+                    entry["operation_id"], result_state="PARTIAL_DELETE",
+                    removed_entries=removed, remaining_entries=remaining,
+                    nas_delete_complete=False)
+                delete_token_registry.finish_commit(
+                    token, state="PARTIAL_DELETE", removed_entries=removed,
+                    retryable_partial=bool(deletion.get("retryable")))
+                return jsonify(commit_result(partial)), 409
+
+            completed_nas = store.finish(
+                entry["operation_id"], result_state="RECONCILE_PENDING",
+                removed_entries=removed, remaining_entries=[],
+                nas_delete_complete=True)
+            delete_token_registry.finish_commit(
+                token, state="RECONCILE_PENDING", removed_entries=removed)
+            final = finish_reconciliation(store, completed_nas, token=token)
+            return jsonify(commit_result(final)), (200 if final["result_state"] == "COMMITTED" else 202)
+        except DeleteDryRunError as exc:
+            delete_token_registry.finish_commit(token, state="FAILED_BEFORE_DELETE")
+            return _error(exc.code.lower(), "검증된 삭제 token을 확인할 수 없습니다.", exc.status)
+        except Exception as exc:
+            if not mutation_started:
+                delete_token_registry.finish_commit(token, state="FAILED_BEFORE_DELETE")
+            current_app.logger.error("Library delete commit failed (%s)", type(exc).__name__)
+            return _error("delete_commit_unavailable", "영구 삭제 결과를 확인할 수 없습니다.", 503)
+
+    @bp.post("/<dvd_id>/delete/reconcile")
+    def delete_reconcile(dvd_id):
+        guard = delete_intent_guard("reconcile")
+        if guard is not None: return guard
+        if not _is_canonical_dvd_id(dvd_id):
+            return _error("invalid_dvd_id", "DVD-ID 형식이 잘못되었습니다.", 400)
+        if not delete_enabled(os.environ.get("TEDDY_LIBRARY_DELETE_ENABLED")):
+            return _error("delete_disabled", "삭제 후 상태 조정 기능이 비활성 상태입니다.", 403)
+        body = request.get_json(silent=True)
+        if (not isinstance(body, dict) or set(body) != {"operation_id", "typed_dvd_id"}
+                or body.get("typed_dvd_id") != dvd_id or not isinstance(body.get("operation_id"), str)):
+            return _error("invalid_request", "재조정 요청을 확인할 수 없습니다.", 400)
+        try:
+            store = provenance_store_factory()
+            record = store.get(body["operation_id"], dvd_id=dvd_id)
+            if record is None or not record["nas_delete_complete"]:
+                return _error("reconcile_not_ready", "완료된 NAS 삭제 기록이 없습니다.", 409)
+            if record["result_state"] == "COMMITTED":
+                return jsonify(commit_result(record))
+            if record["result_state"] not in {"RECONCILE_PENDING"}:
+                return _error("reconcile_not_ready", "재조정 가능한 상태가 아닙니다.", 409)
+            record = finish_reconciliation(store, record)
+            return jsonify(commit_result(record)), (200 if record["result_state"] == "COMMITTED" else 202)
+        except Exception as exc:
+            current_app.logger.warning("Library delete retry reconciliation failed (%s)", type(exc).__name__)
+            return _error("reconcile_unavailable", "삭제 후 상태를 조정할 수 없습니다.", 503)
+
+    @bp.post("/<dvd_id>/delete/resume")
+    def delete_resume_partial(dvd_id):
+        """Resume a durably recorded partial operation after process restart.
+
+        The operation id is useful only for an existing validated provenance
+        row. It cannot create a new delete authorization or change its manifest.
+        """
+        guard = delete_intent_guard("resume")
+        if guard is not None: return guard
+        if not _is_canonical_dvd_id(dvd_id):
+            return _error("invalid_dvd_id", "DVD-ID 형식이 잘못되었습니다.", 400)
+        if not delete_enabled(os.environ.get("TEDDY_LIBRARY_DELETE_ENABLED")):
+            return _error("delete_disabled", "삭제 재개 기능이 비활성 상태입니다.", 403)
+        body = request.get_json(silent=True)
+        expected_fields = {"operation_id", "typed_dvd_id", "acknowledge_permanent_delete", "confirm_phrase"}
+        if (not isinstance(body, dict) or set(body) != expected_fields
+                or not isinstance(body.get("operation_id"), str)
+                or body.get("typed_dvd_id") != dvd_id
+                or body.get("acknowledge_permanent_delete") is not True
+                or body.get("confirm_phrase") != CONFIRM_PHRASE):
+            return _error("final_confirmation_required", "작품 ID와 최종 확인이 필요합니다.", 400)
+        try:
+            store = provenance_store_factory()
+            record = store.get(body["operation_id"], dvd_id=dvd_id)
+            if (record is None or not record["validated_at"]
+                    or record["nas_delete_complete"]
+                    or record["result_state"] not in {"PARTIAL_DELETE", "COMMITTING"}):
+                return _error("partial_operation_not_resumable", "재개 가능한 부분 처리 기록이 없습니다.", 409)
+            row, video, _terminal = current_delete_identity(dvd_id)
+            fingerprint = source_identity_fingerprint(row, video.relative_path)
+            if (int(row["holding_id"]) != int(record["holding_id"])
+                    or fingerprint != record["source_identity_fingerprint"]):
+                return _error("holding_changed", "보유 작품 identity가 달라 재개를 중단했습니다.", 409)
+            recovering_uncertain = record["result_state"] == "COMMITTING"
+            record = (store.resume_uncertain(body["operation_id"]) if recovering_uncertain
+                      else store.resume_partial(body["operation_id"]))
+            deletion = delete_mutator.delete(
+                dvd_id=dvd_id, media_relative=video.relative_path,
+                entries=record["manifest_entries"], manifest_sha256=record["manifest_sha256"],
+                already_removed=record["removed_entries"], recover_unknown=recovering_uncertain)
+            if deletion["status"] == "FAILED_BEFORE_DELETE":
+                record = store.finish(
+                    body["operation_id"], result_state="PARTIAL_DELETE",
+                    removed_entries=deletion["removed_entries"],
+                    remaining_entries=deletion["remaining_entries"], nas_delete_complete=False)
+                return jsonify(commit_result(record)), 409
+            if deletion["status"] == "PARTIAL_DELETE":
+                record = store.finish(
+                    body["operation_id"], result_state="PARTIAL_DELETE",
+                    removed_entries=deletion["removed_entries"],
+                    remaining_entries=deletion["remaining_entries"], nas_delete_complete=False)
+                return jsonify(commit_result(record)), 409
+            record = store.finish(
+                body["operation_id"], result_state="RECONCILE_PENDING",
+                removed_entries=deletion["removed_entries"], remaining_entries=[],
+                nas_delete_complete=True)
+            record = finish_reconciliation(store, record)
+            return jsonify(commit_result(record)), (200 if record["result_state"] == "COMMITTED" else 202)
+        except Exception as exc:
+            current_app.logger.error("Library delete partial recovery failed (%s)", type(exc).__name__)
+            return _error("partial_recovery_unavailable", "부분 삭제 상태를 안전하게 재개할 수 없습니다.", 503)
     return bp

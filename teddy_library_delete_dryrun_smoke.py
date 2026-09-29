@@ -241,7 +241,14 @@ def main():
         assert validated_origin.status_code == 200
         assert validated_origin.get_json()["status"] == "READY_FOR_COMMIT"
         assert validated_origin.get_json()["actual_delete_performed"] is False
-        assert client.post(f"/api/library/{dvd}/delete/commit", json={}).status_code == 404
+        previous_gate = os.environ.pop("TEDDY_LIBRARY_DELETE_ENABLED", None)
+        try:
+            disabled_commit = post(client, f"/api/library/{dvd}/delete/commit", {}, "commit")
+            assert disabled_commit.status_code == 403
+            assert disabled_commit.get_json()["error"]["code"] == "delete_disabled"
+        finally:
+            if previous_gate is not None:
+                os.environ["TEDDY_LIBRARY_DELETE_ENABLED"] = previous_gate
 
         bad_origin = client.post(url, json={}, base_url="http://localhost",
                                  headers={"Origin": "http://evil.invalid", "X-Teddy-Delete-Intent": "prepare"})

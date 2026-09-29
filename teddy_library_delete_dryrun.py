@@ -13,6 +13,8 @@ import json
 import secrets
 import threading
 import time
+import copy
+import uuid
 
 
 MAX_MANIFEST_ENTRIES = 512
@@ -109,15 +111,20 @@ class PrepareTokenRegistry:
 
     def _cleanup(self, now):
         for token in list(self._entries):
-            if self._entries[token]["expires_mono"] <= now:
+            if (self._entries[token]["expires_mono"] <= now
+                    and self._entries[token]["state"] != "COMMITTING"):
                 del self._entries[token]
 
-    def issue(self, *, dvd_id, manifest_sha256, source_fingerprint):
+    def issue(self, *, dvd_id, manifest_sha256, source_fingerprint, manifest_entries=None):
         now = self.clock()
         with self._lock:
             self._cleanup(now)
             while len(self._entries) >= self.max_entries:
-                self._entries.popitem(last=False)
+                evictable = next((key for key, value in self._entries.items()
+                                  if value["state"] != "COMMITTING"), None)
+                if evictable is None:
+                    raise DeleteDryRunError("TOKEN_REGISTRY_BUSY", 503)
+                del self._entries[evictable]
             token = self.token_factory()
             while token in self._entries:
                 token = self.token_factory()
@@ -125,9 +132,13 @@ class PrepareTokenRegistry:
             self._entries[token] = {
                 "dvd_id": dvd_id, "manifest_sha256": manifest_sha256,
                 "source_fingerprint": source_fingerprint,
+                "manifest_entries": copy.deepcopy(manifest_entries or []),
                 "expires_mono": expiry, "expires_at": datetime.fromtimestamp(
                     time.time() + self.ttl_seconds, timezone.utc).isoformat(),
-                "validated": False, "validated_at": None,
+                "state": "PREPARED", "validated": False, "validated_at": None,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "operation_id": None, "removed_entries": [], "result": None,
+                "retryable_partial": False,
             }
             return token, self._entries[token]["expires_at"]
 
@@ -158,9 +169,60 @@ class PrepareTokenRegistry:
             if not entry["validated"]:
                 entry["validated"] = True
                 entry["validated_at"] = datetime.now(timezone.utc).isoformat()
+                entry["state"] = "VALIDATED"
             self._entries.move_to_end(token)
             return entry["validated_at"]
 
+    def snapshot(self, token, *, dvd_id):
+        with self._lock:
+            now = self.clock()
+            self._cleanup(now)
+            entry = self._entries.get(token)
+            if not entry:
+                raise DeleteDryRunError("TOKEN_EXPIRED_OR_INVALID", 410)
+            if entry["dvd_id"] != dvd_id:
+                raise DeleteDryRunError("TOKEN_DVD_ID_MISMATCH")
+            return copy.deepcopy(self._entries[token])
+
+    def begin_commit(self, token, *, dvd_id):
+        with self._lock:
+            now = self.clock()
+            self._cleanup(now)
+            entry = self._entries.get(token)
+            if not entry:
+                raise DeleteDryRunError("TOKEN_EXPIRED_OR_INVALID", 410)
+            if entry["dvd_id"] != dvd_id:
+                raise DeleteDryRunError("TOKEN_DVD_ID_MISMATCH")
+            state = entry["state"]
+            if state == "PREPARED":
+                raise DeleteDryRunError("TOKEN_NOT_VALIDATED")
+            if state == "COMMITTING":
+                raise DeleteDryRunError("COMMIT_IN_PROGRESS")
+            if state in {"COMMITTED", "RECONCILE_PENDING"}:
+                return copy.deepcopy(entry)
+            if state == "PARTIAL_DELETE" and not entry.get("retryable_partial"):
+                raise DeleteDryRunError("PARTIAL_DELETE_REQUIRES_REVIEW")
+            if state not in {"VALIDATED", "PARTIAL_DELETE"}:
+                raise DeleteDryRunError("TOKEN_STATE_INVALID")
+            previous_state = state
+            entry["state"] = "COMMITTING"
+            entry["operation_id"] = entry.get("operation_id") or str(uuid.uuid4())
+            snapshot = copy.deepcopy(entry)
+            snapshot["previous_state"] = previous_state
+            return snapshot
+
+    def finish_commit(self, token, *, state, removed_entries=None, result=None,
+                      retryable_partial=False):
+        with self._lock:
+            entry = self._entries.get(token)
+            if not entry:
+                return
+            entry["state"] = state
+            if removed_entries is not None:
+                entry["removed_entries"] = list(removed_entries)
+            if result is not None:
+                entry["result"] = copy.deepcopy(result)
+            entry["retryable_partial"] = bool(retryable_partial)
 
 # Executed only by the existing hardened CompletionSSH._run_python transport.
 # It checks exact components with lstat and inventories direct regular files;

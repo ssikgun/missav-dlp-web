@@ -15,6 +15,7 @@
     let requestSerial = 0;
     let activeDeleteDialog = null;
     let activeDeleteToken = null;
+    let deleteCommitInFlight = false;
     const SAFE_DELETE_ERROR_CODES = new Set([
         'invalid_request_boundary', 'invalid_request_origin', 'authentication_required',
         'nas_inventory_unavailable', 'prepare_unavailable', 'manifest_changed',
@@ -186,6 +187,45 @@
                     const result = await checked.json();
                     if (!checked.ok || result.status !== 'READY_FOR_COMMIT' || result.actual_delete_performed !== false) throw new Error('validation failed');
                     final.textContent = '삭제 준비 검증 완료 · 실제 삭제는 아직 비활성';
+                    const commitEnabled = payload.commit_enabled === true;
+                    const phrase = '영구 삭제 확인';
+                    final.innerHTML = `<section class="library-delete-final-confirm"><h3>⚠️ 마지막 확인</h3><p>${commitEnabled ? '기능이 활성화된 환경에서는 다음 확인 뒤 삭제 요청을 보냅니다.' : '실제 삭제 기능은 서버 feature gate가 비활성이라 사용할 수 없습니다.'}</p><label class="library-delete-ack"><input type="checkbox" data-delete-final-ack ${commitEnabled ? '' : 'disabled'}> 영구 삭제를 최종 확인합니다</label><label class="library-delete-typed-label">작품 DVD-ID를 다시 입력하세요<input type="text" autocomplete="off" spellcheck="false" data-delete-final-typed ${commitEnabled ? '' : 'disabled'}></label><label class="library-delete-typed-label">확인 문구 <b>${phrase}</b><input type="text" autocomplete="off" spellcheck="false" data-delete-final-phrase ${commitEnabled ? '' : 'disabled'}></label><button type="button" class="library-delete-commit" disabled>영구 삭제 실행</button><div class="library-delete-commit-status" aria-live="polite">${commitEnabled ? '최종 확인 정보를 입력하세요.' : '실제 삭제는 비활성 상태입니다.'}</div></section>`;
+                    const finalAck = final.querySelector('[data-delete-final-ack]');
+                    const finalTyped = final.querySelector('[data-delete-final-typed]');
+                    const finalPhrase = final.querySelector('[data-delete-final-phrase]');
+                    const commitButton = final.querySelector('.library-delete-commit');
+                    const commitStatus = final.querySelector('.library-delete-commit-status');
+                    const refreshCommit = () => {
+                        commitButton.disabled = !commitEnabled || deleteCommitInFlight || !(finalAck.checked && finalTyped.value === dvd && finalPhrase.value === phrase);
+                    };
+                    [finalAck, finalTyped, finalPhrase].forEach(control => control.addEventListener(control.type === 'checkbox' ? 'change' : 'input', refreshCommit));
+                    commitButton.addEventListener('click', async () => {
+                        if (deleteCommitInFlight || !activeDeleteToken || !commitEnabled || commitButton.disabled) return;
+                        deleteCommitInFlight = true;
+                        commitButton.disabled = true;
+                        commitStatus.textContent = '최종 상태를 다시 확인하고 요청을 처리하고 있습니다…';
+                        try {
+                            const committed = await fetch(`/api/library/${encodeURIComponent(dvd)}/delete/commit`, {
+                                method: 'POST', credentials: 'same-origin', headers: intentHeaders('commit'),
+                                body: JSON.stringify({ prepare_token: activeDeleteToken, typed_dvd_id: finalTyped.value,
+                                    acknowledge_permanent_delete: finalAck.checked, confirm_phrase: finalPhrase.value })
+                            });
+                            const outcome = await committed.json();
+                            if (!committed.ok) throw deleteRequestError(outcome);
+                            activeDeleteToken = null;
+                            const safeStatuses = new Set(['COMMITTED', 'PARTIAL_DELETE', 'RECONCILE_PENDING', 'FAILED_BEFORE_DELETE']);
+                            const safeStatus = safeStatuses.has(outcome.status) ? outcome.status : '확인 필요';
+                            commitStatus.textContent = `처리 상태: ${safeStatus} · 제거 ${Number(outcome.removed_file_count) || 0}개`;
+                            commitButton.disabled = true;
+                        } catch (error) {
+                            const code = error.safeCode ? ` (${error.safeCode})` : '';
+                            commitStatus.textContent = `삭제 결과를 확인하지 못했습니다.${code}`;
+                            activeDeleteToken = null;
+                            commitButton.disabled = true;
+                        } finally {
+                            deleteCommitInFlight = false;
+                        }
+                    });
                 } catch (_) {
                     const code = _.safeCode ? ` (${_.safeCode})` : '';
                     final.textContent = `준비 상태를 확인하지 못했습니다. 창을 닫고 다시 준비해 주세요.${code}`;

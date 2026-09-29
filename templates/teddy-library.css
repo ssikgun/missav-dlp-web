@@ -167,6 +167,7 @@
 
 .library-delete-prepare,
 .library-delete-validate,
+.library-delete-commit,
 .library-delete-close {
     min-height: 36px;
     padding: 7px 12px;
@@ -259,6 +260,31 @@
     cursor: not-allowed;
 }
 
+.library-delete-commit {
+    justify-self: start;
+    border-color: #b91c1c;
+    color: #991b1b;
+    font-weight: 700;
+}
+
+.library-delete-commit:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.library-delete-final-confirm {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 9px;
+}
+
+.library-delete-final-confirm h3,
+.library-delete-final-confirm p {
+    margin: 0;
+}
+
 .library-delete-final {
     min-height: 20px;
     font-weight: 650;
@@ -304,6 +330,7 @@ html[data-theme="dark"] .library-error {
 
 html[data-theme="dark"] .library-delete-prepare,
 html[data-theme="dark"] .library-delete-validate,
+html[data-theme="dark"] .library-delete-commit,
 html[data-theme="dark"] .library-delete-close,
 html[data-theme="dark"] .library-delete-dialog {
     border-color: #334155;
@@ -319,6 +346,17 @@ html[data-theme="dark"] .library-delete-warning {
 
 html[data-theme="dark"] .library-delete-summary details {
     border-color: #334155;
+}
+
+html[data-theme="dark"] .library-delete-final-confirm {
+    border-color: #334155;
+    background: #111827;
+}
+
+html[data-theme="dark"] .library-delete-commit {
+    border-color: #7f1d1d;
+    background: #3f1d24;
+    color: #fecaca;
 }
 
 @media (max-width: 1020px) {

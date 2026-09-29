@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import base64
 import shlex
 import subprocess
 from pathlib import PurePosixPath
@@ -69,6 +70,32 @@ class CompletionSSH:
                 or "remote SSH command failed"
             )
 
+        return str(result.stdout or "")
+
+    def _run_python_json(self, script, payload, *args):
+        """Run a bounded helper with JSON data on stdin, not in shell argv."""
+        encoded = base64.b64encode(str(script).encode("utf-8")).decode("ascii")
+        bootstrap = (
+            "import base64; exec(compile(base64.b64decode('"
+            + encoded
+            + "'), '<teddy-remote-helper>', 'exec'))"
+        )
+        command = self._base() + [
+            "python3 -c "
+            + shlex.quote(bootstrap)
+            + (" " + " ".join(shlex.quote(str(arg)) for arg in args) if args else "")
+        ]
+        result = self.runner(
+            command,
+            input=json.dumps(payload, separators=(",", ":"), ensure_ascii=True),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise CompletionSSHError(
+                str(result.stderr or "").strip() or "remote SSH command failed"
+            )
         return str(result.stdout or "")
 
     def list_downloads(self):

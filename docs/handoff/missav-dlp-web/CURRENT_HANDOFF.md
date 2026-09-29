@@ -4383,3 +4383,57 @@ ADN-785 was only the DRY-RUN subject; this outcome does not approve it or any
 other title for a future real deletion canary. Stage13-F1 implementation
 continues offline with its feature gate disabled and production delete count
 remaining zero.
+
+## Stage13-F1 one-title permanent delete implementation — offline PASS, 2026-09-29
+
+Stage13-E2 remains CLOSED / PASS for authenticated prepare/validate DRY-RUN.
+Teddy's ADN-785 observation (4 managed files, approximately 3.3 GB,
+manifest prefix `646a207fa39f`, KO present, Jellyfin recognized,
+`READY_FOR_COMMIT`) did not approve ADN-785 or any other work for actual
+deletion.
+
+F1 adds `POST /api/library/<dvd_id>/delete/commit`, plus durable
+`/delete/reconcile` and `/delete/resume` recovery paths. Actual mutation is
+fail-closed behind `TEDDY_LIBRARY_DELETE_ENABLED`; missing/false disables it.
+Commit requires authenticated JSON, the existing destructive intent and
+trusted public-origin guard, a validated short-lived DVD-bound token, exact
+typed DVD-ID, acknowledgement and the final phrase, then a fresh canonical
+holding/source fingerprint and exact manifest match.
+
+The mutator uses the existing hardened dedicated NAS SSH transport and sends
+bounded JSON to a fixed Python helper. It lstat-checks the JAV root, family,
+title directory and direct entries; permits only exact regular-file entries
+matching type, device, inode, size and mtime; unlinks those entries one by
+one; and rmdirs only the now-empty exact title directory. It never recurses,
+uses a glob, removes a family parent, or uses a CT108 JAV mount. Manifest SHA
+identifies canonical manifest metadata, not file contents.
+
+Durable audit/recovery state is SQLite at
+`/downloads/teddy-library-delete-provenance.sqlite3`, on the existing
+persistent `/downloads` storage. It records operation/DVD identity,
+source fingerprint, manifest metadata, timestamps, removed/remaining entry
+names, bytes/counts and result/reconciliation states; no token, session,
+secret, subtitle body or absolute NAS path is stored. Partial operations can
+resume only against the original manifest; post-restart recovery re-inventories
+the exact title folder and accepts only the exact expected remaining subset.
+After NAS completion, Discovery marks that exact holding `present=0`; then
+Jellyfin is reconciled by exact-path GET, targeted item refresh, and GET
+verification. Failures remain `RECONCILE_PENDING` without reversing deletion.
+
+The UI requires the existing prepare/validate sequence followed by a separate
+exact DVD-ID, acknowledgement, fixed phrase and explicit commit action. The
+commit controls remain disabled unless prepare reports the server feature gate
+enabled, and the button disables on first click. API replay does not repeat a
+completed mutation. Offline fixtures cover gate/auth/origin/token/identity
+failures, manifest and filesystem drift, symlink/special/nested rejection,
+exact delete boundaries, partial and process-restart recovery, provenance,
+Discovery/Jellyfin success and pending recovery, response secrecy and UI
+confirmation. Library/API, delete DRY-RUN, File Management, subtitle status,
+Discovery and full Docker build checks passed.
+
+Production deploy = NO; production `TEDDY_LIBRARY_DELETE_ENABLED` was not set
+or changed. Production DB writes = 0, NAS writes/deletes = 0, Jellyfin
+refresh/write = 0, Discovery reconcile writes = 0, Hermes/VM122 = 0,
+subtitle generation = 0, actual permanent deletes = 0. Next: Stage13-F2
+production deploy/preflight only; keep the gate disabled and do not perform an
+actual canary deletion without Teddy's separate explicit approval.
