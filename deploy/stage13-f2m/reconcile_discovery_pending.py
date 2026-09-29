@@ -46,33 +46,6 @@ def _ro(path: str | Path) -> sqlite3.Connection:
     return db
 
 
-def _check_journal(db: sqlite3.Connection, *, operation_id: str,
-                   dvd_id: str, holding_id: int, fingerprint: str) -> None:
-    exists = db.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
-        (JOURNAL_TABLE,),
-    ).fetchone()
-    if not exists:
-        return
-    columns = tuple(row[1] for row in db.execute(
-        f"PRAGMA table_info({JOURNAL_TABLE})").fetchall())
-    if columns != JOURNAL_COLUMNS:
-        raise CheckError("JOURNAL_SCHEMA_INVALID")
-    rows = db.execute(
-        f"SELECT operation_id,dvd_id,holding_id,source_identity_fingerprint "
-        f"FROM {JOURNAL_TABLE} WHERE operation_id=? OR holding_id=? OR dvd_id=?",
-        (operation_id, holding_id, dvd_id),
-    ).fetchall()
-    if rows:
-        # present=1 with any journal row is inconsistent; no state is inferred.
-        if (len(rows) != 1 or rows[0]["operation_id"] != operation_id
-                or rows[0]["dvd_id"] != dvd_id
-                or int(rows[0]["holding_id"]) != holding_id
-                or rows[0]["source_identity_fingerprint"] != fingerprint):
-            raise CheckError("JOURNAL_STATE_CONFLICT")
-        raise CheckError("JOURNAL_STATE_CONFLICT")
-
-
 def check_operation(operation_id: str, expected_dvd_id: str, *,
                     discovery_db: str | Path = DISCOVERY_DB,
                     provenance_db: str | Path = PROVENANCE_DB,
@@ -148,10 +121,15 @@ def check_operation(operation_id: str, expected_dvd_id: str, *,
                 raise CheckError("HOLDING_NOT_FOUND")
             holding = dict(held)
             if (holding["dvd_id"] != expected_dvd_id or holding["storage_root"] != "jav"
-                    or holding["parse_status"] != "MATCHED" or holding["present"] != 1):
+                    or holding["parse_status"] != "MATCHED"
+                    or holding["present"] not in (0, 1)):
                 raise CheckError("HOLDING_CHANGED")
             relative = canonical_media_path(holding, expected_dvd_id)
-            current_fingerprint = source_identity_fingerprint(holding, relative)
+            fingerprint_identity = dict(holding)
+            # The delete fingerprint is bound to the pre-delete present holding;
+            # preserve that identity when inspecting the journal recovery phase.
+            fingerprint_identity["present"] = 1
+            current_fingerprint = source_identity_fingerprint(fingerprint_identity, relative)
             if (relative != holding["relative_path"]
                     or current_fingerprint != provenance["source_identity_fingerprint"]):
                 raise CheckError("HOLDING_CHANGED")
@@ -159,11 +137,39 @@ def check_operation(operation_id: str, expected_dvd_id: str, *,
                 "SELECT COUNT(*) FROM holdings WHERE dvd_id=? AND storage_root='jav' AND present=1",
                 (expected_dvd_id,),
             ).fetchone()[0]
-            if count != 1:
+            if ((holding["present"] == 1 and count != 1)
+                    or (holding["present"] == 0 and count != 0)):
                 raise CheckError("DUPLICATE_HOLDING")
-            _check_journal(db, operation_id=operation_id, dvd_id=expected_dvd_id,
-                           holding_id=int(provenance["holding_id"]),
-                           fingerprint=current_fingerprint)
+            journal_rows = []
+            exists = db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                (JOURNAL_TABLE,),
+            ).fetchone()
+            if exists:
+                columns = tuple(row[1] for row in db.execute(
+                    f"PRAGMA table_info({JOURNAL_TABLE})").fetchall())
+                if columns != JOURNAL_COLUMNS:
+                    raise CheckError("JOURNAL_SCHEMA_INVALID")
+                journal_rows = db.execute(
+                    f"SELECT operation_id,dvd_id,holding_id,source_identity_fingerprint "
+                    f"FROM {JOURNAL_TABLE} WHERE operation_id=? OR holding_id=? OR dvd_id=?",
+                    (operation_id, int(provenance["holding_id"]), expected_dvd_id),
+                ).fetchall()
+            exact_journal = (
+                len(journal_rows) == 1
+                and journal_rows[0]["operation_id"] == operation_id
+                and journal_rows[0]["dvd_id"] == expected_dvd_id
+                and int(journal_rows[0]["holding_id"]) == int(provenance["holding_id"])
+                and journal_rows[0]["source_identity_fingerprint"] == current_fingerprint
+            )
+            if holding["present"] == 1:
+                if journal_rows:
+                    raise CheckError("JOURNAL_STATE_CONFLICT")
+                phase = "READY_TO_MARK_ABSENT"
+            else:
+                if not exact_journal:
+                    raise CheckError("JOURNAL_STATE_CONFLICT")
+                phase = "WRITER_DONE_PROVENANCE_PENDING"
     except CheckError:
         raise
     except Exception as exc:
@@ -203,6 +209,8 @@ def check_operation(operation_id: str, expected_dvd_id: str, *,
         "file_count": len(names),
         "total_bytes": total,
         "relative_path": relative,
+        "source_identity_fingerprint": current_fingerprint,
+        "recovery_phase": phase,
     }
 
 
@@ -244,6 +252,7 @@ def main(argv=None) -> int:
             nas_directory_absent=lambda dvd, relative: _nas_absent_probe(ssh, relative),
         )
         print("RECOVERY_ELIGIBLE=YES")
+        print("RECOVERY_PHASE=" + result["recovery_phase"])
         print("OPERATION_ID=" + result["operation_id"])
         print("DVD_ID=" + result["dvd_id"])
         print("HOLDING_ID=" + str(result["holding_id"]))

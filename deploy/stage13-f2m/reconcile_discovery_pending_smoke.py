@@ -51,12 +51,38 @@ def main():
             "SELECT holding_id,present FROM holdings ORDER BY holding_id").fetchall()
         result=_check(f)
         assert result["status"] == "RECOVERY_ELIGIBLE"
+        assert result["recovery_phase"] == "READY_TO_MARK_ABSENT"
         assert result["operation_id"] == OPERATION_ID and result["dvd_id"] == DVD_ID
         assert result["holding_id"] == f["mark"]["holding_id"]
         db=sqlite3.connect(f["db_path"])
         assert db.execute("SELECT holding_id,present FROM holdings ORDER BY holding_id").fetchall() == before
         assert db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='library_delete_reconcile_journal'").fetchone() is None
         db.close()
+
+        # Phase B is recognized only with the exact same operation journal.
+        f["writer"].dispatch(f["mark"])
+        db=sqlite3.connect(f["db_path"])
+        assert db.execute("SELECT present FROM holdings WHERE holding_id=?",(f["mark"]["holding_id"],)).fetchone()[0] == 0
+        db.close()
+        result=_check(f)
+        assert result["recovery_phase"] == "WRITER_DONE_PROVENANCE_PENDING"
+
+    with tempfile.TemporaryDirectory(prefix="pending-check-absent-no-journal-") as tmp:
+        f=fixture(tmp); f["store"].finish(OPERATION_ID, result_state="RECONCILE_PENDING",
+            removed_entries=[f["media"].name], remaining_entries=[], nas_delete_complete=True,
+            discovery_reconciled=False, jellyfin_reconciled=None)
+        db=sqlite3.connect(f["db_path"]); db.execute("UPDATE holdings SET present=0 WHERE holding_id=?",(f["mark"]["holding_id"],)); db.commit(); db.close()
+        _expect(f,"JOURNAL_STATE_CONFLICT")
+
+    with tempfile.TemporaryDirectory(prefix="pending-check-absent-foreign-journal-") as tmp:
+        f=fixture(tmp); f["store"].finish(OPERATION_ID, result_state="RECONCILE_PENDING",
+            removed_entries=[f["media"].name], remaining_entries=[], nas_delete_complete=True,
+            discovery_reconciled=False, jellyfin_reconciled=None)
+        f["writer"].dispatch(f["mark"])
+        db=sqlite3.connect(f["db_path"])
+        db.execute("UPDATE library_delete_reconcile_journal SET operation_id='foreign-op'")
+        db.commit(); db.close()
+        _expect(f,"JOURNAL_STATE_CONFLICT")
 
     with tempfile.TemporaryDirectory(prefix="pending-check-activity-") as tmp:
         f=fixture(tmp); f["store"].finish(OPERATION_ID, result_state="RECONCILE_PENDING",
@@ -85,7 +111,7 @@ def main():
             removed_entries=[f["media"].name], remaining_entries=[], nas_delete_complete=True,
             discovery_reconciled=False, jellyfin_reconciled=None)
         db=sqlite3.connect(f["db_path"]); db.execute("UPDATE holdings SET present=0 WHERE holding_id=?",(f["mark"]["holding_id"],)); db.commit(); db.close()
-        _expect(f,"HOLDING_CHANGED")
+        _expect(f,"JOURNAL_STATE_CONFLICT")
 
     with tempfile.TemporaryDirectory(prefix="pending-check-state-") as tmp:
         f=fixture(tmp); f["store"].finish(OPERATION_ID, result_state="COMMITTED",

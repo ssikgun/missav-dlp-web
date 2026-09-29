@@ -5538,3 +5538,53 @@ nor service was started or changed in this checkpoint.
 `DISCOVERY_RECONCILED=NO` intentionally: do not call `mark_absent` in this
 checkpoint. Next is F2M-C3, applying only this exact operation's Discovery
 reconciliation. Jellyfin remains a separate F2M-D step.
+
+## Stage13-F2M-C3 — exact pending Discovery apply
+
+The check-only helper remains read-only and reports one of two exact phases:
+`READY_TO_MARK_ABSENT` requires the original present holding and no journal;
+`WRITER_DONE_PROVENANCE_PENDING` requires `present=0` and the exact matching
+operation journal. No unjournaled absent holding is treated as success.
+The separate `deploy/stage13-f2m/reconcile_discovery_apply.py` acquires the
+target title lock before the existing global JAV operation lock, rechecks the
+operation while both are held, calls only the narrow Unix-socket writer,
+verifies the exact Discovery row and journal, then conditionally changes only
+the matching provenance `discovery_reconciled` flag. It has no NAS delete or
+Jellyfin call path. Offline helper fixtures cover Phase A, crash recovery in
+Phase B, missing/foreign journal refusal, title/global lock contention,
+writer failure, post-writer verification failure, and provenance conflict.
+
+For exact operation
+`e8b5ba23-cb6d-4e5e-81f6-c1e5fdb79873` / VEMA-246 / holding 20, the fresh
+production `--check-only` result immediately before apply was
+`RECOVERY_ELIGIBLE=YES`, `RECOVERY_PHASE=READY_TO_MARK_ABSENT`. The apply helper
+held both locks in title-then-global order and the writer returned
+`RECONCILED`. Writer journal insertion and holding transition were atomic.
+Read-only verification found holding 20 `present=0`, zero present VEMA-246
+holdings, one exact matching journal row, and 183 current present JAV holdings.
+The exact provenance operation is still `RECONCILE_PENDING`, with
+`nas_delete_complete=1`, `discovery_reconciled=1`, `jellyfin_reconciled=NULL`,
+four removed files / 2,844,317,586 bytes, and no remaining entries. Library's
+Discovery-backed present-holdings projection now returns zero VEMA-246 rows.
+No authenticated browser/API session was used for a UI request. Jellyfin was
+not changed; its exact GET lookup still returns one item, intentionally pending
+F2M-D. NAS title directory remains absent.
+
+Production state remains gate=false, web healthy, writer service active and
+host socket health `READY`; completion timer/service and reconcile-apply remain
+inactive. The separate scheduled report-only reconcile timer remains
+active/waiting and its paired report service is failed/not running; its source
+uses the report path and emits `APPLY=0`, and neither unit was changed. During
+this checkpoint the host writer socket was healthy, but the existing web
+container's read-only bind directory did not show `writer.sock`; no web API was
+used and no web recreate was performed. This does not affect the host-side
+exact recovery just completed, but web-container writer connectivity should be
+rechecked before any future delete flow.
+
+`DISCOVERY_APPLY_HELPER_SAFE=YES`, `DISCOVERY_RECONCILED=YES`, and
+`JELLYFIN_RECONCILED=NO` intentionally. This operation created exactly one
+Discovery journal row and changed only holding 20 `present=1 -> 0` plus its
+matching provenance discovery flag. NAS, Jellyfin, media state, completion,
+Stage12, delete API, and new-operation counts remain untouched. Next is F2M-D:
+reconcile only the exact stale Jellyfin item, then close the same provenance
+operation to `COMMITTED` after exact verification.
