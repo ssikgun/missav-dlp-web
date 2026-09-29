@@ -5023,3 +5023,108 @@ publish, Stage12 processing, Hermes/VM122 calls, and actual delete = 0.
 Next: deploy the new pinned completion runtime, then read-only inspect eligible,
 exhausted and backoff-held counts while leaving the timer stopped; repeat
 canary safety preflight. No canary title is approved by this result.
+
+## Stage13-F2K bounded media runtime rollout and read-only canary preflight — PASS / CANARY_READY=YES, 2026-09-29
+
+The exact source commit `705bf9e700156d88523babfad15861a5faee9ff2` is
+installed at immutable, root-owned mode-0555 release
+`/opt/missav-dlp-web/stage9-runtime/releases/705bf9e700156d88523babfad15861a5faee9ff2/`.
+It contains the 24 project-local Python modules in the prior completion runtime
+closure, not a repository copy. Every installed module was SHA-256 compared
+against `git show 705bf9e...:<path>`; all matched. The release marker identifies
+the exact commit. The required media jobs, title exclusion, completion runner,
+and completion orchestrator blobs matched. Offline imports and media jobs,
+completion runner, and process-level title-lock smoke ran with the new release
+and `/usr/bin/python3`; all passed.
+
+The old completion wrapper was preserved byte-for-byte at
+`/usr/local/sbin/teddy-completion-stage9-runner.backup-26c8657d4bd5c5b767f2f8eb474a80ff9121a150`.
+The wrapper was atomically switched to the new release without executing it.
+It sets `TEDDY_TITLE_LOCK_DIR=/opt/missav-dlp-web/title-locks`, sets
+`PYTHONPATH` only to the new release, and retains the existing runner arguments.
+`bash -n` passed. The systemd completion service defaults to root:root
+(uid/gid 0:0), `/usr/bin/python3`, and imports from the exact 705 release.
+The source tree `/opt/missav-pwa-subtitle-stage11` is not the runtime import
+path; no old release path is added to `PYTHONPATH`.
+
+Production media state was opened with SQLite `mode=ro` and
+`PRAGMA query_only=ON`; no initializer or runner was called. Across the 20
+PENDING/FAILED/RUNNING rows, the new pure policy classifies ELIGIBLE=19,
+HELD_BACKOFF=0, HELD_FRESH_RUNNING=0, HELD_INVALID_TIMESTAMP=0,
+HELD_INVALID_STATE=0, EXHAUSTED=1. Overall media statuses are COMPLETED=34,
+PENDING=19, FAILED=1, RUNNING=0. The exact `MFCS-085` row remains job 174261,
+FAILED, attempt_count=17161, and classifies EXHAUSTED. Source/fixture semantics
+skip EXHAUSTED rows before lock acquisition, conditional RUNNING update, or
+processor call. `MFCS085_AUTOMATIC_RETRY_ELIGIBLE=NO`.
+
+Runtime title-lock verification used the pinned release Python on host and the
+running web container at `/run/teddy-title-locks`. The host path is
+`/opt/missav-dlp-web/title-locks`; the bind mount is the same host-backed
+RW directory. For `ADN-785`, web-held → pinned-host attempt returned BUSY and
+pinned-host-held → web attempt returned BUSY. After release both sides
+acquired successfully. While the host held `ADN-785`, the web acquired
+`MFCS-085`, confirming per-title concurrency. Host and container observed the
+same regular lock-file device/inode (1796:548311), mode 0600. The shared root
+is mode 0750 root:root. These are connectivity probes only, not a canary-title
+selection.
+
+Static audit confirms retry policy eligibility is evaluated before lock
+acquisition; title lock is acquired before conditional RUNNING transition;
+processor and final durable state update remain inside the title-lock scope.
+The processor calls the unchanged media pipeline, whose metadata publish and
+Jellyfin notify stages therefore remain locked. The title lock is outer to the
+media-state writer transaction; no media writer-lock-held path was found that
+then acquires a title lock. Organizer/completion still acquires title lock
+before the global operation lock. `MEDIA_RETRY_LOCK_ORDER=PASS`.
+The web container still has `TEDDY_TITLE_LOCK_DIR=/run/teddy-title-locks`,
+`TEDDY_LIBRARY_DELETE_ENABLED=false`, Discovery DB mounted read-only, and
+writer health READY. The existing delete commit/resume path uses the same
+per-title primitive; no delete endpoint was called.
+
+The completion timer is enabled but inactive; completion service is inactive.
+No start/restart, service run, timer restoration, or daemon reload occurred.
+`COMPLETION_TIMER_POLICY_READY=YES`; `COMPLETION_TIMER_RESUMED=NO`.
+The separate `teddy-discovery-jav-reconcile-apply.service` is inactive and is
+a manual one-shot with no apply timer. Its current wrapper/runtime target is
+the old `/opt/missav-dlp-web/stage9-runtime` tree; its reconciliation source
+uses the global operation lock
+`/run/lock/teddy-discovery-jav-library-operation.lock`. The scheduled
+`teddy-discovery-jav-reconcile.timer` points to report-only service, not apply.
+Using the exact new runtime `operation_lock()` primitive in separate processes,
+a short lock-only probe returned ACQUIRED for the holder, BUSY for a second
+process while held, and ACQUIRED after release. No reconcile service ran.
+Therefore `CANARY_RECONCILE_FREEZE_READY=YES`.
+
+Frozen actual-canary operational procedure: (1) confirm completion timer
+inactive; (2) confirm reconcile-apply service inactive and no related process;
+(3) hold the global operation lock with a no-I/O freeze holder; (4) verify the
+holder; (5) run target-specific activity and title-lock preflight; (6) keep the
+freeze holder through the delete/reconciliation window; (7) confirm Discovery
+and Jellyfin reconciliation, gate false, then release the holder; (8) decide
+timer resumption separately. The lock holder performs no DB/NAS/Jellyfin I/O
+and is short-lived in this checkpoint. This canary-only freeze does not change
+normal global serialization.
+
+Current read-only activity snapshot: organizer active=0; Stage12
+RUNNING/GENERATED=0; heartbeat is present but stale (`COMPLETE`, no current
+DVD-ID). No Stage12 systemd/cron automatic launcher was found. Current present
+JAV holdings=184, unique DVD-ID=184, duplicates=0, canonical/parse mismatches=0.
+No active conflicting job was observed. Eligible pending media jobs remain
+stopped with the completion timer.
+
+The F2I incident remains historically unresolved: its failure stage,
+NAS metadata side effect, and Jellyfin side effect are still UNKNOWN, not
+silently cleared. Per the F2K decision rule, that historical uncertainty does
+not itself block a different future canary now that the failed row is
+EXHAUSTED and bounded runtime/lock/freeze controls are verified.
+
+`CANARY_READY=YES`. The deployed web app image remains
+`sha256:bac75af6716cd7a0e33aa671b90f9386926d8dc93f64dba201caa6494283e404`;
+delete feature gate=false. Production mutation was limited to the immutable
+completion runtime install, wrapper backup/atomic switch, and lock-only
+probes. Media/Discovery/provenance DB writes, NAS metadata/delete, organizer
+publish, Jellyfin notify/refresh, Stage12 work, delete commit/resume/reconcile,
+Hermes/VM122 calls, and actual permanent delete = 0. Next: stop code changes
+and ask Teddy to select one intended canary title. Require separate final
+irreversible confirmation immediately before any actual delete; do not enable
+the gate before that approval.
