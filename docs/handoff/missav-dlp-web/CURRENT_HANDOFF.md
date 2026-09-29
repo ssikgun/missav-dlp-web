@@ -5589,53 +5589,58 @@ Stage12, delete API, and new-operation counts remain untouched. Next is F2M-D:
 reconcile only the exact stale Jellyfin item, then close the same provenance
 operation to `COMMITTED` after exact verification.
 
-## Stage13-F2M-D — exact Jellyfin reconciliation (PENDING)
+## Stage13-F2M-D — previous exact Refresh attempt (PENDING)
 
-Source commit `7a5d0d2` adds 60-second / 2-second bounded polling to
-`JellyfinDeleteReconciler`: GET the exact path, send at most one Refresh POST
-for a single exact item, then poll until absent or timeout. Exact zero skips
-the POST; duplicate paths, missing IDs, incomplete/invalid inventory, and POST
-errors fail closed. Fixture coverage includes immediate absence, first and
-later poll success, timeout, ambiguity, invalid responses, and one-POST-only.
-The exact operator helper
-`deploy/stage13-f2m/reconcile_jellyfin_pending.py` is allowlisted to the existing
-VEMA-246 operation and supports separate `--check-only` / `--apply` modes. It
-rechecks under title-lock then global operation lock and conditionally changes
-only the exact provenance row after exact path absence.
+Source commit `7a5d0d2` added exact path polling around a single item Refresh.
+Production check-only found one VEMA-246 item; the helper sent one Refresh POST
+and polled for 60 seconds, but the exact item remained. This historical attempt
+is retained as evidence. It was not repeated in D2.
 
-Image `missav-dlp-web:stage13f2md-7a5d0d2` was built from source commit
-`7a5d0d2`; image ID is
-`sha256:0439b293e7219d2c5e02a8d1772184103e2797d710e727a70867e1fa276ca7e0`.
-Only `missav-dlp-web` was recreated, with gate false. `/login` returned 200;
+## Stage13-F2M-D2 — exact Deleted notification (PENDING)
+
+Source commit `0fb6a59` adds `JellyfinClient.notify_deleted(media_path)`, using
+the existing canonical `jellyfin_media_path(relative_path)` and the exact
+`POST /Library/Media/Updated` payload with `UpdateType=Deleted`. The delete
+reconciler now skips POST when exact count is zero, rejects more than one exact
+path, and otherwise sends one Deleted notification then polls every 2 seconds
+for at most 120 seconds. It no longer Refreshes items or requires an item ID.
+Created notification behavior remains unchanged. Offline fixtures verify the
+exact path/payload, one POST, initial absence, delayed disappearance, timeout,
+ambiguity, malformed inventory, notification error, crash/re-run with zero
+POST, and Created-vs-Deleted payloads.
+
+The exact operation helper remains allowlisted to operation
+`e8b5ba23-cb6d-4e5e-81f6-c1e5fdb79873` / VEMA-246. Check-only immediately before
+apply returned `JELLYFIN_RECOVERY_ELIGIBLE=YES`, exact item count 1. Under the
+per-title then global lock, the helper issued one exact Deleted notification
+POST (no item Refresh POST and no Jellyfin item DELETE) and completed the
+120-second bounded polling window. The exact item remained at count 1 after
+polling, so no provenance finalization occurred and no further notification was
+sent. Provenance remains `RECONCILE_PENDING`, `discovery_reconciled=1`,
+`jellyfin_reconciled=NULL`.
+
+Image `missav-dlp-web:stage13f2md2-0fb6a59` was built from source commit
+`0fb6a59`; image ID is
+`sha256:3187d0c7c5572d0b948199dd421bbe7bed2459efafdd295e020a6770be5d8814`.
+Only `missav-dlp-web` was recreated with gate false. `/login` returned 200;
 container restart count is zero; Discovery DB and writer socket mounts are RO,
-title lock mount is RW, NAS/Jellyfin configuration and secret mounts are
-present/readable. Host writer health is READY. After recreation the web
-container sees the socket and container writer health is READY. Socket
-durability across a subsequent writer restart remains unproven:
-`WEB_WRITER_SOCKET_VISIBLE=YES`,
+title lock mount is RW, and NAS/Jellyfin secret mounts are present. Host and web
+container writer health are READY, and the web socket remains visible after
+this web recreation: `WEB_WRITER_SOCKET_VISIBLE=YES`. No writer restart
+occurred, so socket restart durability is not proven:
 `WEB_WRITER_SOCKET_DURABILITY_PROVEN=NO`.
 
-Immediately before apply, exact check-only returned
-`JELLYFIN_RECOVERY_ELIGIBLE=YES`, exact item count 1. The operator helper held
-both locks in the required order and sent exactly one exact-item Refresh POST.
-Bounded polling timed out with the exact Jellyfin item still present; the helper
-returned `RECONCILE_PENDING`, `REFRESH_POSTS=1`, `POLL_COMPLETE=False`. A
-subsequent GET-only check still found one exact item. No second apply or
-refresh was attempted. Provenance remains `RECONCILE_PENDING`,
-`discovery_reconciled=1`, `jellyfin_reconciled=NULL`; no provenance finalization
-occurred.
+Read-only final checks confirm holding 20 remains `present=0`, VEMA-246 present
+count is zero, current JAV holdings are 183, and the exact NAS title directory
+is absent. Jellyfin exact item count remains 1. Gate is false, web is healthy,
+completion timer/service and reconcile-apply are inactive, and title/global
+locks are free. No authenticated Library UI/API read was made in D2; the
+Discovery present-holdings projection contains no VEMA-246 row.
 
-Discovery and NAS were not changed in this step: holding 20 remains
-`present=0`, VEMA-246 present count is zero, current JAV holdings remain 183,
-and the NAS title directory remains absent. The Library's present-holdings
-projection therefore has zero VEMA-246 rows; no authenticated UI/API session
-was used. Jellyfin exact item count remains 1. Gate is false, web is healthy,
-completion timer/service and reconcile-apply are inactive, and both locks are
-free.
-
-`JELLYFIN_RECONCILED=NO`, `DELETE_OPERATION_FINAL=NO`,
-`CANARY_OPERATION_CLOSED=NO`, and `STAGE13_CLOSE_READY=NO`. The safe blocker is
-`JELLYFIN_EXACT_REFRESH_TIMEOUT_ITEM_STILL_PRESENT`. The VEMA-246 delete is
-still durably pending and must not be treated as fully closed. The container
-writer socket is currently visible/connectable after web recreation, but its
+`JELLYFIN_DELETED_NOTIFICATION=INCOMPLETE`, `JELLYFIN_RECONCILED=NO`,
+`DELETE_OPERATION_FINAL=NO`, `CANARY_OPERATION_CLOSED=NO`, and
+`STAGE13_CLOSE_READY=NO`. The current blocker is
+`JELLYFIN_DELETED_NOTIFICATION_TIMEOUT_ITEM_STILL_PRESENT`. Do not send another
+Deleted notification until a separate read-only investigation establishes why
+the exact notification did not remove the stale item. The web writer socket's
 restart durability remains a separate F2M-E verification.
