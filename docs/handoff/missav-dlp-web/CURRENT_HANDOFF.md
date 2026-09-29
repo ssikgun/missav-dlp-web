@@ -4888,3 +4888,66 @@ passed. Production deploy = NO; production gate remains false/effectively
 disabled; production DB/NAS/provenance/Jellyfin mutations = 0, subtitle
 generation/Hermes/VM122 = 0, actual delete = 0. Next: resolve the shared
 per-title exclusion/race, then repeat F2D final preflight before any canary.
+
+## Stage13-F2I unexpected media retry forensic — INCOMPLETE / CANARY BLOCKED, 2026-09-29
+
+Source/runtime identity was checked read-only: checkout and remote branch are
+both `807d400999febdb8e13a5d70a624f75477785d16`; production web image remains
+`sha256:bac75af6716cd7a0e33aa671b90f9386926d8dc93f64dba201caa6494283e404`.
+The web app is running with delete gate false. The completion timer remains
+enabled but inactive; its last trigger was 2026-09-29 12:31:56 KST and its
+one-shot service exited successfully at 12:31:57 KST. No timer/service action
+was performed during this forensic.
+
+The bounded incident journal reports completion `total=0`, `eligible=0`,
+`applied=0`, media reconciliation `0`, and one retry attempted, zero completed,
+one failed. The exact media state row is `media_job_id=174261`,
+`dvd_id=MFCS-085`, status `FAILED`, `attempt_count=17161`, updated at
+`2026-09-29T03:31:57Z`. The stored error was examined without printing its
+contents; it did not match the pinned runtime's known safe error literals, so
+the safe classification remains `UNCLASSIFIED_ERROR` and
+`FAILURE_STAGE=FAILURE_STAGE_UNKNOWN`.
+
+The current exact Discovery holding is holding 165, `MFCS-085`,
+`MFCS/MFCS-085/MFCS-085.mp4`, present=1, discovered by `completion-stage9`,
+size 1,467,881,427 bytes and mtime_ns 1788865655288182673. A bounded direct
+listing of only that canonical title directory found the regular media file
+and `MFCS-085.ko.srt`; the media size/mtime matches the holding. No current
+NFO/poster sidecar or `.teddy-stage9-meta-*.partial` entry was found. This is
+current-state evidence only, without an incident-time baseline; therefore
+`NAS_METADATA_SIDE_EFFECT=UNKNOWN`.
+
+Jellyfin was queried GET-only. One current item matches the exact canonical
+media path. This does not establish whether this invocation sent its notify
+POST, so `JELLYFIN_SIDE_EFFECT=UNKNOWN`.
+
+Pinned F2F source audit: `run_retryable_media_jobs()` marks each selected job
+RUNNING/increments attempts, invokes its processor, then records FAILED on an
+exception. The completion runner calls this retry path after the separately
+locked completion `process_one()` loop. The retry path does not acquire the
+shared title lock; neither `run_media_pipeline()` nor its NAS metadata publish
+and Jellyfin notify stages are within that per-title lock. Thus
+`MEDIA_RETRY_TITLE_LOCK=NO`. FAILED rows remain retryable and the runner has no
+per-job retry ceiling/backoff, so resuming the timer risks repeatedly running
+this same row. `COMPLETION_TIMER_SAFE_TO_RESUME=NO`.
+
+The separate `teddy-discovery-jav-reconcile-apply.service` is an inactive,
+manual one-shot with no apply timer attached (the scheduled reconcile unit is
+report-only). Its pinned launcher currently targets the old mutable
+`/opt/missav-dlp-web/stage9-runtime`; apply performs a bounded remote library
+reconciliation and can update Discovery holdings under the global
+`teddy-discovery-jav-library-operation.lock`. It has no per-title lock. The
+delete path does not take that global lock, so it is not mutual exclusion with
+delete. Freeze manual apply around any future delete canary until an explicit
+exclusion contract is implemented:
+`RECONCILE_APPLY_LOCK_VERDICT=NEEDS_SEPARATE_OPERATIONAL_FREEZE`.
+
+No retry, repair, reconcile apply, prepare/validate/commit/resume, NAS action,
+Discovery write, provenance write, Jellyfin write/refresh, subtitle work,
+Hermes/VM122 call, or delete occurred in this checkpoint. Current completion
+timer is still inactive. `CANARY_READY=NO`; blockers are missing shared title
+exclusion on media retries, unknown incident side-effect stage, unbounded
+retry behavior, and the manual reconcile-apply exclusion gap. Next: implement
+and offline-test a retry-specific title-lock boundary with bounded retry
+semantics, then define the reconcile-apply/delete exclusion and repeat a
+read-only production preflight. Do not resume the completion timer meanwhile.
