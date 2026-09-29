@@ -6462,3 +6462,67 @@ web recreate, and one writer restart.
 intent. Next checkpoint E5: close Stage13 and separately resume completion to
 process pending post-download work and confirm NAS organization/Jellyfin
 registration.
+
+## Stage13-F2M-E5 — Stage13 closed; completion resumed, Jellyfin pending
+
+At HEAD `e84c669581260090fa2acc7aaeed70b244337594`, the Stage13 file-manager
+and delete scope is closed: `STAGE13_STATUS=CLOSED`,
+`STAGE13_RESULT=PASS`, `CANARY_OPERATION_CLOSED=YES`,
+`WEB_WRITER_SOCKET_DURABILITY_PROVEN=YES`, and `STAGE13_CLOSE_READY=YES`.
+The VEMA-246 operation remains COMMITTED (NAS, Discovery, and Jellyfin flags
+all set); holding 20 remains absent. The delete gate stayed false.
+
+Before completion resumed, the pinned systemd wrapper still selected runtime
+`705bf9e700156d88523babfad15861a5faee9ff2`, with
+`TEDDY_TITLE_LOCK_DIR=/opt/missav-dlp-web/title-locks`. The timer and service
+were inactive and the reconcile-apply service was inactive. The read-only
+completion planner found 34 downloads, one eligible organizer candidate
+(`HMN-904`), and 33 held candidates. Organizer active count was zero. Media
+jobs were COMPLETED=34, PENDING=19, FAILED=1, RUNNING=0. The sole failed row,
+MFCS-085 / job 174261, was FAILED at attempt 17161 and EXHAUSTED, so it was not
+retry eligible. Stage12 had no RUNNING or GENERATED rows; its counts were
+PUBLISHED=163 and UNRESOLVED=10. JAV present holdings were 183.
+
+The pinned `teddy-completion-stage9.service` was manually started once before
+the timer. It ran 2026-09-30 08:16:10–08:16:31 KST and exited 0. Its result was
+total=34, eligible=1, held=33, applied=1. HMN-904 completed organizer job 185:
+the exact source file was removed from the downloads root and the canonical
+NAS file `HMN/HMN-904/HMN-904.mp4` was created as a regular file, size
+3,315,951,470 bytes. Discovery holding 185 is present=1 with the same path,
+size, and mtime; parse status is MATCHED. The media stage reconciled one job
+and completed NOSKN-104 (attempted=1, completed=1, failed=0); metadata recovery
+recovered MARR-014 (attempted=1, failed=0). NOSKN-104 has one exact live
+Jellyfin path match at `/media/adult/NOSKN/NOSKN-104/NOSKN-104.mp4`.
+
+Only after the successful manual service run, the completion timer was
+enabled and started with `systemctl enable --now` at 08:19:36 KST. It became
+active/waiting with its first elapse 60 seconds later; an 8-second observation
+found the service inactive and no immediate trigger. Subsequent service runs
+followed the timer schedule and exited 0. By the 08:48 KST snapshot, organizer
+jobs for 21 titles had completed, including HMN-904; JAV present holdings were
+204. There were no duplicate present DVD IDs, parse mismatches, active
+organizer jobs, or RUNNING media jobs. Current media counts were
+COMPLETED=40, FAILED=16, PENDING=19, RUNNING=0. MFCS-085 remains FAILED at
+attempt 17161 and was not rerun. Other pending-media failures entered their
+configured backoff; the timer did not issue immediate retries.
+
+The timer advanced HMN-904's pending media job 1386103, but that job failed
+once at attempt 1 with a connection reset while fetching media metadata. The
+job is now FAILED and subject to the configured one-hour backoff. A bounded
+GET-only Jellyfin inventory check found zero exact-path items for HMN-904 and
+for the 21 newly organized titles in the snapshot. No manual Jellyfin refresh
+or scan was sent. The exact HMN-904 canonical NAS file and matching Discovery
+holding remain present, but Jellyfin registration is not verified.
+
+At the final runtime check, web `/login` returned 200, delete gate=false,
+writer host/web health was READY, writer remained active/enabled,
+Stage12 RUNNING/GENERATED remained zero, reconcile-apply was inactive, the
+completion service was inactive, and the completion timer was enabled and
+active/waiting with its next elapse in the future. Thus
+`COMPLETION_TIMER_RESUMED=YES`. This E5 checkpoint remains INCOMPLETE because
+Jellyfin did not register HMN-904; the bounded media job failed with a network
+connection reset. The timer remains on its normal schedule, and HMN-904 is
+protected by media retry backoff. No additional manual service run or
+Jellyfin mutation was made. Follow-up should inspect the metadata-fetch
+connection failure and verify the exact HMN-904 Jellyfin path after the
+existing retry policy permits another attempt.
