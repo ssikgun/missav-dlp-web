@@ -1,5 +1,52 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-29 Stage13-F2M-D5 — item-removal log/API mismatch (INCOMPLETE)
+
+Initial repo state was expected HEAD `503a660aab6c64b71c8cf2fd572d7387069d7554`,
+branch `teddy-subtitle-stage11`, clean worktree; remote branch matched. Gate
+check remained false, `missav-dlp-web` was Up, `/login` GET returned 200, and
+completion timer/service plus reconcile-apply service were inactive. The exact
+operation's read-only state still met the pending values: operation
+`e8b5ba23-cb6d-4e5e-81f6-c1e5fdb79873`, VEMA-246 / holding 20,
+`RECONCILE_PENDING`, `nas_delete_complete=1`, `discovery_reconciled=1`,
+`jellyfin_reconciled=NULL`, manifest SHA
+`121aefa01eb2d6cd9ae6b99695892cf4652aa4b33d50e65a4c3208b6ef3c8677`, four
+removed files / 2,844,317,586 bytes, and `remaining_entries=[]`. Holding 20 is
+`present=0`, VEMA-246 present count 0, current JAV holdings 183. All these
+database checks were read-only.
+
+The exact-path Jellyfin inventory GET returned HTTP 200, 364/364 items, and
+`CURRENT_EXACT_ITEM_COUNT=1` for
+`/media/adult/VEMA/VEMA-246/VEMA-246.mp4`, Id
+`0fa5e1cd9743f9e30dc69054e1c12375`. Direct `GET /Items/{id}` returned HTTP 400
+without a user ID and HTTP 404 when queried with the current user ID. The
+exact path inventory still has a matching item despite the direct GET 404.
+Therefore no provenance finalization was attempted:
+`JELLYFIN_PENDING_CLASS=REMOVE_LOGGED_BUT_API_STILL_PRESENT`,
+`JELLYFIN_RECONCILED=NO`, `DELETE_OPERATION_FINAL=NO`,
+`CANARY_OPERATION_CLOSED=NO`.
+
+Teddy supplied the following CT112 evidence for this checkpoint: Jellyfin runs
+in Docker with read-only mount `/mnt/nas/video/video2/JAV -> /media/adult`; the
+exact VEMA-246 title directory and movie are absent; D's direct item refresh
+failed with `DirectoryNotFoundException`; D2's parent refresh executed at
+`2026-09-29 20:00:12 KST` for `/media/adult/VEMA`; and the Jellyfin log says
+Movie item `0fa5e1cd-9743-f9e3-0dc6-9054e1c12375` was removed. These operator
+evidence items were not independently re-read in D5. They conflict with the
+current API inventory result, so the database must remain pending. No attempt
+was made to reconcile the mismatch with another Jellyfin request.
+
+The direct NAS lstat probe did not return a result during this checkpoint; the
+known prior exact state is absent. The API mismatch is the active blocker.
+Next checkpoint: resolve the GET inventory vs direct item GET/log discrepancy
+using GET-only API evidence before selecting any reconciliation step. Do not
+send another notification, refresh, scan, or item DELETE. Writer socket
+durability remains unproven (`WEB_WRITER_SOCKET_DURABILITY_PROVEN=NO`), so
+`STAGE13_CLOSE_READY=NO` even after the canary is eventually closed.
+
+Mutation audit: Jellyfin 0, NAS 0, Discovery 0, provenance 0, service restart
+0, mount change 0. Only this canonical handoff was updated.
+
 ## 2026-09-29 Stage13-F2M-D4 — CT112 console forensic access blocked (INCOMPLETE)
 
 Initial repo check passed at expected HEAD `7539a2a1cb966b9f2f32beaa4d0f6abf63fc07e8`,
