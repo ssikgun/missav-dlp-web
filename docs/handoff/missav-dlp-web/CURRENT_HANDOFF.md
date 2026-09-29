@@ -6526,3 +6526,13 @@ protected by media retry backoff. No additional manual service run or
 Jellyfin mutation was made. Follow-up should inspect the metadata-fetch
 connection failure and verify the exact HMN-904 Jellyfin path after the
 existing retry policy permits another attempt.
+
+Follow-up snapshot at 2026-09-30 08:50:55 KST: normal timer processing had
+organized 24 newly present completion-stage9 titles, bringing current JAV
+holdings to 207 unique IDs. A complete Jellyfin inventory GET still returned
+zero exact path matches for those 24 titles, including HMN-904. Media state
+was COMPLETED=40, FAILED=19, PENDING=19, RUNNING=0; MFCS-085 stayed at
+attempt 17161 and HMN-904 stayed FAILED at attempt 1. The timer was enabled
+and active/waiting with next elapse 08:51:48 KST; service was inactive after
+its latest exit 0. The E5 Jellyfin-registration blocker remains open while
+the timer continues its normal schedule.
