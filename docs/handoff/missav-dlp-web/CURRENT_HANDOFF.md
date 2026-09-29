@@ -5281,3 +5281,53 @@ this handoff update occurred. Next checkpoint should repair canonical NAS/
 Jellyfin env and mounts and the UI safe-code allowlist, verify from the actual
 gate-off web container, and keep the gate false until a separately requested
 ARM. Do not resume the completion timer automatically.
+
+## Stage13-F2M-A3 — repair production NAS/Jellyfin wiring drift
+
+The repository's canonical `docker-compose.gluetun.yml` already defined all
+six `TEDDY_NAS_*`/`TEDDY_JELLYFIN_*` variables and the dedicated read-only NAS
+key, known_hosts, and Jellyfin key mounts. Production
+`/opt/missav-dlp-web/compose.yaml` had omitted those runtime variables and file
+mounts; it also retained the old Stage12 rollout DB container target. Therefore
+`PRODUCTION_COMPOSE_DRIFT=YES`. The production web service stanza was minimally
+repaired to match the canonical NAS/Jellyfin values and mounts and to use the
+canonical `/discovery/stage12-rollout-state.sqlite3` target. The previous
+production Compose file is retained at
+`/opt/missav-dlp-web/compose.yaml.pre-f2ma3-20260929-1453`. No other service
+was recreated.
+
+The web-only image was built from source commit
+`3dc801a9b9c9f6be9210fbb2b15045cc12ee4fa3`, image ID
+`sha256:e90c320f44b9b3249093f989979805d5ec9861663bb03af35f91b7a6a5920807`,
+and deployed with the gate false. In-container checks confirmed the six
+variables are present; all three secret files are regular/readable and mounted
+read-only. Discovery remains `:ro`, writer socket `:ro`, title-lock directory
+`:rw`, and Stage12 DB `:ro`. Writer health is READY, login is HTTP 200,
+unauthenticated `/api/library` is HTTP 401, and Library JS is HTTP 200.
+
+Using the production container's configured NAS code for the exact target,
+VEMA-246 still has four direct files (`VEMA-246.ko.srt`, `VEMA-246.mp4`,
+`movie.nfo`, `poster.webp`), total 2,844,317,586 bytes, and manifest SHA
+`121aefa01eb2d6cd9ae6b99695892cf4652aa4b33d50e65a4c3208b6ef3c8677`.
+The exact Jellyfin GET lookup finds one item. Production blueprint construction
+has both `delete_manifest_reader` and `delete_mutator` configured; no prepare
+route was called and no token was issued.
+
+The production Library read model now reports 184/184 known sizes, 0 unknown,
+163 valid KO subtitles, 10 unresolved, 11 absent, 0 mismatch, and 545,315,128,474
+known bytes. VEMA-246 reports size 2,844,317,586, KO `VALID`, Jellyfin
+`RECOGNIZED`, and mismatch false. The UI safe-code allowlist now includes
+`nas_inspection_unavailable` while retaining `nas_inventory_unavailable`;
+the UI smoke fixture and full Docker build passed.
+
+Final state: `TEDDY_LIBRARY_DELETE_ENABLED=false`; completion timer/service and
+reconcile-apply remain inactive; no freeze-holder or watchdog remains. The
+provenance DB/operation record is absent, holding 20 remains present=1, and
+the four NAS manifest entries remain present. No prepare/validate/commit,
+Discovery/media/provenance write, NAS mutation, Jellyfin mutation, completion,
+Stage12, or reconcile apply occurred. `ACTUAL_DELETE=0`.
+
+F2M-A3 verdict: PASS for the configuration repair and gate-off runtime
+regression. Next, Teddy should verify the restored Library screen and, with
+the gate still false, click `영구 삭제 준비` once to confirm the manifest is
+shown. Do not re-arm until that gate-off prepare display is confirmed.
