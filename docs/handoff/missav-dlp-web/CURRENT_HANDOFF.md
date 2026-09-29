@@ -5128,3 +5128,75 @@ Hermes/VM122 calls, and actual permanent delete = 0. Next: stop code changes
 and ask Teddy to select one intended canary title. Require separate final
 irreversible confirmation immediately before any actual delete; do not enable
 the gate before that approval.
+
+## Stage13-F2L — VEMA-246 read-only target preflight
+
+Teddy selected `VEMA-246` as a canary candidate. This selection is not
+authorization to permanently delete it. This checkpoint performed no prepare
+or validate HTTP request because no safe authenticated browser session was
+available for reuse (`AUTHENTICATED_PREPARE=NOT_REPLAYED`). No token was issued.
+
+Git preflight was clean at source HEAD
+`c06f83ab2af2fa9495663fc9f4e93bbb8cce2ca1`, branch
+`teddy-subtitle-stage11`, equal to the exact remote branch head. Production web
+was running the F2F image
+`sha256:bac75af6716cd7a0e33aa671b90f9386926d8dc93f64dba201caa6494283e404`
+with restart count 0. `TEDDY_LIBRARY_DELETE_ENABLED=false`, title-lock config
+was `/run/teddy-title-locks`, and the Discovery writer health operation
+returned READY. Completion runtime marker remained
+`705bf9e700156d88523babfad15861a5faee9ff2`; completion timer and service and
+the reconcile-apply service were inactive. The reconcile-apply path remains a
+manual one-shot with no automatic apply timer; F2K's short global-lock
+contention evidence keeps `CANARY_RECONCILE_FREEZE_READY=YES`.
+
+The Discovery DB was opened `mode=ro` with `PRAGMA query_only=ON`. Exactly one
+present JAV holding matched: holding_id=20, DVD-ID `VEMA-246`,
+`VEMA/VEMA-246/VEMA-246.mp4`, `MATCHED`, size 2,844,299,563 bytes,
+mtime_ns=1788054184863651608, discovered_by `library-inventory`. The deployed
+canonical mapping agreed on family `VEMA`, directory `VEMA/VEMA-246`, media
+filename `VEMA-246.mp4`, and extension `.mp4`.
+
+The exact title directory was inspected over the hardened NAS SSH transport
+using lstat on root/family/title and direct entries only. All four entries
+were regular files; there were no symlinks, nested directories, special files,
+unsafe names, or path normalization/containment failures. Canonical manifest
+identity SHA-256 (metadata identity, not content hash) was
+`121aefa01eb2d6cd9ae6b99695892cf4652aa4b33d50e65a4c3208b6ef3c8677`, with
+4 files totaling 2,844,317,586 bytes. The canonical media size and mtime_ns
+matched the holding. Filenames: `VEMA-246.ko.srt` (KO subtitle),
+`VEMA-246.mp4` (video), `movie.nfo`, and `poster.webp`; no JA/EN subtitle was
+present. Subtitle file contents were not read or output. No absolute NAS path
+was included in the manifest report.
+
+Target state was read by exact DVD-ID. The latest organizer job (job_id=56)
+was `COMPLETED`; the Stage12 rollout row was `PUBLISHED`, which is terminal
+under the current status contract (active states are RUNNING/GENERATED). The
+heartbeat was stale `COMPLETE` with no current DVD-ID. No media job row
+existed, so `TARGET_MEDIA_JOB=NONE`. The production activity guard returned
+IDLE. `TARGET_MEDIA_READY=YES`.
+
+The production Jellyfin reconciler's bounded read-only GET path returned
+exactly one item matching `/media/adult/VEMA/VEMA-246/VEMA-246.mp4`.
+No Jellyfin mutation was called. The host writer's `preflight_holding`
+returned READY; this is the writer's BEGIN IMMEDIATE / exact validation /
+ROLLBACK preflight. The target title lock returned ACQUIRED on both host and
+web container and was immediately released. Host and container observed the
+same lock-file device/inode (1796:548375); the file was regular, mode 0600.
+
+Before/after read-only snapshots were unchanged: VEMA-246 remained present=1
+with the same holding identity; current present JAV holdings remained 184,
+unique DVD-ID count 184, duplicate count 0, and canonical/parse mismatch count
+0. No conflicting completion/reconcile/Stage12/subtitle process was observed.
+Completion timer remained inactive (enabled, not started); reconcile-apply
+remained inactive; delete gate remained false. The production web app received
+no prepare, validate, commit, resume, or reconcile request. Discovery content,
+media state, durable provenance, NAS, and Jellyfin were not mutated; actual
+delete=0.
+
+`TARGET_CANARY_READY=YES`, subject to a separate final irreversible approval.
+This means only that the read-only preflight passed. It does not authorize
+enabling the feature gate, performing a fresh prepare/validate, or deleting
+VEMA-246. Next: present this evidence to Teddy and obtain explicit final
+confirmation for VEMA-246 immediately before a separate actual-delete
+checkpoint. Until then, keep the gate false and do not prepare, validate, or
+commit.
