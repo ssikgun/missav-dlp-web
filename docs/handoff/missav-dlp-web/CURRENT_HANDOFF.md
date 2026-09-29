@@ -1,5 +1,54 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-29 Stage13-F2M-D6 — API exact-ID / user query forensic (INCOMPLETE)
+
+Initial repo state was expected HEAD `420d0d9e8a3a9526ace2f1fea7257ba477bb81d6`,
+branch `teddy-subtitle-stage11`, clean worktree; `origin/teddy-subtitle-stage11`
+matched. The existing `ssh pve` route still fails DNS resolution
+(`Could not resolve hostname pve`), so no CT112 `pct exec`, Docker console, log,
+or DB command ran. No SSH settings changed.
+
+Current invariants were rechecked read-only: the exact NAS title directory is
+absent; holding 20 is `present=0`; VEMA-246 present JAV holdings=0; current JAV
+holdings=183; exact provenance remains `RECONCILE_PENDING`,
+`nas_delete_complete=1`, `discovery_reconciled=1`, `jellyfin_reconciled=NULL`;
+delete gate is false; web `/login` GET returned 200.
+
+Production Jellyfin GET-only results:
+
+- API-key `GET /Items?Ids=0fa5e1cd-9743-f9e3-0dc6-9054e1c12375&Fields=Path,ParentId&EnableImages=false&EnableUserData=false`: HTTP 200, `TotalRecordCount=0`, returned items=0.
+- User-scoped direct item GET using the already-known valid user context: HTTP 404 (`USER_DIRECT_STATUS=404`). The user ID is intentionally not recorded here.
+- User-scoped exact ID query: HTTP 200, `USER_EXACT_QUERY_COUNT=0`.
+- General movie/video inventory: HTTP 200, 364/364 items and still one exact path match (`CURRENT_EXACT_PATH_COUNT=1`) at `/media/adult/VEMA/VEMA-246/VEMA-246.mp4`.
+- Exact Jellyfin process-side `DirectoryContents` GET for `/media/adult/VEMA/VEMA-246`: HTTP 404. The title directory is absent in the Jellyfin filesystem view; the video cannot exist beneath that missing parent.
+
+The D5/D4 handoff records operator-supplied CT112 evidence that the D2 removal
+log exists at `/media/adult/VEMA` and names item
+`0fa5e1cd-9743-f9e3-0dc6-9054e1c12375` as removed. D6 could not read bounded
+post-removal Docker logs because the PVE route is unavailable:
+`READD_AFTER_REMOVE=UNKNOWN`. The API exact-ID queries are both empty, while
+the broader path inventory still returns one item. This does not meet the
+criteria for API_KEY_ORPHAN_DB_ROW, IN_MEMORY_QUERY_STALE, or another specific
+class without runtime DB evidence:
+`JELLYFIN_PENDING_CLASS=UNKNOWN`.
+
+The configured host mount `/opt/jellyfin/config -> /config` and the two
+approved candidates imply container DB paths `/config/data/jellyfin.db` and
+`/config/data/library.db`, but D6 could not inspect their existence from CT112.
+Thus `JELLYFIN_DB=UNKNOWN`, `DB_EXACT_ID_ROW_COUNT=UNKNOWN`,
+`DB_EXACT_PATH_ROW_COUNT=UNKNOWN`, and parent row/path state=UNKNOWN. No SQLite
+connection to an unrelated CT108 path was attempted; no database write or
+metadata mutation occurred.
+
+Provenance remains unchanged and pending; no recovery/finalization is
+recommended from incomplete evidence. Next checkpoint: use Proxmox web shell
+read-only `pct exec 112` access to check only the exact Jellyfin container
+paths, the two named DB candidates in SQLite `mode=ro`, parent relation for a
+matching row, and Docker logs from 20:00 KST onward filtered to the exact
+target. Then decide whether API success requires DB row absence or normal
+user-tree absence. Production mutation audit: Jellyfin 0, Jellyfin DB 0, NAS
+0, Discovery 0, provenance 0, restart 0. Only this canonical handoff changed.
+
 ## 2026-09-29 Stage13-F2M-D5 — item-removal log/API mismatch (INCOMPLETE)
 
 Initial repo state was expected HEAD `503a660aab6c64b71c8cf2fd572d7387069d7554`,
