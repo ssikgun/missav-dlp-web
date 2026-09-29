@@ -4550,3 +4550,58 @@ change, provenance record, DB write, NAS write/delete, Jellyfin refresh/write,
 subtitle generation, Hermes/VM122 call or actual delete occurred. Next:
 Stage13-F2C production writer install/socket bind and disabled-gate preflight
 only; no one-title deletion.
+
+## Stage13-F2C host-side Discovery writer install and disabled-gate preflight — PASS, 2026-09-29
+
+Exact source `09a3a89bac6af910ca3543f8c076bb0f54e2cb41` was exported to the
+immutable host release directory
+`/opt/missav-dlp-web/teddy-library-discovery-writer/releases/09a3a89bac6af910ca3543f8c076bb0f54e2cb41/`.
+The snapshot contains only the writer and its import dependencies, is
+root-owned/read-only, and includes a `SOURCE_COMMIT` marker matching the
+expected revision. Host Python is `/usr/bin/python3` (3.13.5); import passed.
+
+The host Discovery directory and DB/WAL/SHM are root-owned mode 0700/0600;
+web app also runs as UID 0. A non-root writer cannot safely access them without
+changing existing ownership/modes, so F2C retained root and applied a dedicated
+primary group `teddy-library-discovery-writer` (GID 988) for the socket. The
+systemd unit is `teddy-library-discovery-writer.service`, active/enabled,
+`NRestarts=0`, running as root:that group. Sandbox has `NoNewPrivileges`,
+`PrivateTmp`, `ProtectSystem=strict`, only the Discovery directory writable,
+the provenance work directory read-only, `RestrictAddressFamilies=AF_UNIX`,
+and an empty capability set. RuntimeDirectory is systemd-managed at
+`/run/teddy-library-discovery-writer`, mode 0750; socket is root:group mode
+0660. Controlled restart removed/recreated the runtime socket, changed the
+service PID, and host health returned `READY` before and after restart.
+
+Production Compose now passes the socket path, adds supplementary GID 988 to
+only the web app, and bind-mounts the socket directory read-only at the same
+container path. Rendered config retains port 58000, default network, existing
+storage mounts, and `/discovery/teddy-discovery.sqlite3:ro`. The running web
+container confirms the socket and Discovery mounts are both read-only and its
+supplementary group includes 988; container-side Unix socket health returned
+`READY`, proving connect works over the read-only bind. Only
+`missav-dlp-web` was recreated; Gluetun and both browser container IDs stayed
+unchanged.
+
+Exact F2B image built and deployed: source
+`09a3a89bac6af910ca3543f8c076bb0f54e2cb41`, tag
+`stage13f2c-09a3a89`, image ID
+`sha256:40d68b117add00b0dfa85748780d49c3578e670af42d11aa2ae9dfda805dc787`.
+App is running, restart count 0. `/login` and Library JS/CSS returned 200,
+unauthenticated `/` redirects to login and `/api/library` returns 401.
+`TEDDY_LIBRARY_DELETE_ENABLED` remains missing/disabled in Compose and runtime.
+
+Read-only exact holding probe used ADN-785 / holding 141, canonical MATCHED
+identity and its source fingerprint. Container-side `preflight_holding`
+returned `READY`; the writer performed `BEGIN IMMEDIATE`, exact SELECT and
+ROLLBACK. Before/after current `jav AND present=1` count remained 184 and the
+target row identity remained unchanged. No provenance DB/file existed before
+the probe and none was created. Its parent `/opt/missav-dlp-web/work` is
+root-owned 0755; a future container-created root:root 0600 provenance DB is
+readable by the root writer, while systemd exposes the work path read-only.
+
+No `mark_absent`, authenticated commit, reconcile or resume call was issued.
+Discovery content writes = 0, provenance record writes = 0, NAS writes/deletes
+= 0, Jellyfin refresh/write = 0, subtitle generation = 0, Hermes/VM122 = 0,
+actual permanent deletes = 0. Next: Stage13-F2D final pre-canary safety
+preflight only; keep the delete gate disabled and do not delete a title.
