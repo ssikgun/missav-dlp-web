@@ -5200,3 +5200,84 @@ VEMA-246. Next: present this evidence to Teddy and obtain explicit final
 confirmation for VEMA-246 immediately before a separate actual-delete
 checkpoint. Until then, keep the gate false and do not prepare, validate, or
 commit.
+
+## Stage13-F2M-A / F2M-A2 — ARM withdrawn after UI prepare failure
+
+F2M-A received Teddy's explicit final confirmation for VEMA-246, with actual
+commit reserved for the authenticated user UI. Fresh holding/manifest/activity/
+writer/title-lock checks matched F2L. A transient Compose override enabled the
+gate on the unchanged F2F image; a supervised global operation lock holder and
+10-minute watchdog were started. The completion timer was disabled without
+starting it. Web restart policy was temporarily `no`; base Compose/env stayed
+gate=false. No authenticated request or actual deletion was performed by Codex.
+
+Teddy's UI prepare then failed. F2M-A2 immediately stopped the watchdog timer
+and executed its disarm procedure, before its planned 14:51:08 KST expiry.
+DISARM returned PASS. The override was removed and only web was recreated from
+base production Compose. Gate=false, expected image
+`sha256:bac75af6716cd7a0e33aa671b90f9386926d8dc93f64dba201caa6494283e404`,
+running, restart policy `unless-stopped`, login HTTP 200, writer READY, and
+Discovery mount RO were verified. Freeze-holder/watchdog are inactive; the
+global lock has zero holders and all three ARM temporary files are gone.
+Completion timer remains inactive/disabled; completion service and
+reconcile-apply remain inactive. No re-ARM or timer resumption occurred.
+
+The bounded ARM-container access log showed VEMA-246 prepare POST HTTP 503 at
+2026-09-29 14:46:25 and 14:46:42 KST. No guard-rejection line was found in the
+captured window. The response body was not retained, so a wire-observed JSON
+error code or logged exception cannot be claimed. Deployed source and runtime
+configuration establish the precise failure branch: all four `TEDDY_NAS_*`
+variables are absent, `_nas_client_from_env()` returns None, and the production
+blueprint receives no injected NAS reader. Thus `delete_manifest_reader` is
+None and `current_delete_snapshot()` raises
+`DeleteDryRunError("NAS_INSPECTION_UNAVAILABLE", 503)` before holding inventory
+or token issuance. Its caught response code is `nas_inspection_unavailable`;
+this caught branch does not log an exception. This code is source/config-derived
+evidence, not a captured response body. No prepare/validate/commit was replayed.
+
+Canonical Compose and both ARM/gate-off runtime lack `TEDDY_NAS_HOST`,
+`TEDDY_NAS_USER`, `TEDDY_NAS_KEY`, `TEDDY_NAS_KNOWN_HOSTS`,
+`TEDDY_JELLYFIN_URL`, and `TEDDY_JELLYFIN_KEY`. NAS key/known_hosts files exist
+and are readable by web uid/gid 0:0 at `/run/secrets/teddy-nas-transfer/`;
+the suggested `/run/secrets/teddy-nas/` paths do not exist. The missing NAS env
+prevents use of the existing readable key mount. The Jellyfin key mount at
+`/run/secrets/teddy-jellyfin/api_key` is absent. No secret contents were printed.
+
+Normalized mount source/target/mode/type sets, env-name sets, image, network
+mode/attachments and supplementary groups match between ARM and gate-off.
+Only the intended gate value and temporary restart policy differ.
+`ARM_CONTAINER_CONFIG_MATCH=YES` for the canonical deployment configuration;
+that configuration itself is incomplete for Library NAS/Jellyfin dependencies.
+There is no evidence that the ARM override removed those dependencies, or that
+they existed in the pre-ARM web container. F2L's successful NAS/Jellyfin checks
+used explicitly configured host helpers, so they did not prove web runtime
+dependency wiring. The earlier readiness claim was too broad.
+
+`ROOT_CAUSE=CANONICAL_WEB_NAS_JELLYFIN_CONFIG_MISSING`.
+Gate-off configured container probes remain unavailable (NAS client None,
+Jellyfin LibraryError before HTTP). Its actual read model still returns 184
+titles, known bytes=0, size-unknown=184, KO-valid=0; VEMA-246 managed size is
+unknown, KO UNRESOLVED, Jellyfin UNKNOWN. Configuration was intentionally not
+repaired in this forensic checkpoint. `UI_SAFE_CODE_MISMATCH=YES`: frontend
+allows `nas_inventory_unavailable` but omits `nas_inspection_unavailable`,
+explaining the generic UI message independently of the missing configuration.
+
+Independent exact-target read-only safety evidence: holding 20 remains
+present=1/MATCHED at `VEMA/VEMA-246/VEMA-246.mp4`, size=2844299563,
+mtime_ns=1788054184863651608; present JAV count remains 184. Dedicated host
+NAS SSH lstat confirms all four original regular files (`VEMA-246.mp4`,
+`VEMA-246.ko.srt`, `movie.nfo`, `poster.webp`), total 2844317586 bytes, and
+unchanged manifest SHA
+`121aefa01eb2d6cd9ae6b99695892cf4652aa4b33d50e65a4c3208b6ef3c8677`.
+Host GET-only Jellyfin lookup still finds one exact canonical item. No
+provenance-path override is configured and the default persistent provenance
+DB does not exist, so no target operation record was created. `ACTUAL_DELETE=0`.
+
+F2M-A2 verdict: INCOMPLETE; safely disarmed, root cause established, Library
+runtime regression persists pending an authorized config/source fix. No NAS,
+Discovery/media DB, provenance, Jellyfin, completion, Stage12, or delete
+mutation was performed. Only fail-safe web recreation, transient cleanup, and
+this handoff update occurred. Next checkpoint should repair canonical NAS/
+Jellyfin env and mounts and the UI safe-code allowlist, verify from the actual
+gate-off web container, and keep the gate false until a separately requested
+ARM. Do not resume the completion timer automatically.
