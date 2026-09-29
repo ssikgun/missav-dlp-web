@@ -6015,3 +6015,50 @@ Discovery present-holdings projection contains no VEMA-246 row.
 Deleted notification until a separate read-only investigation establishes why
 the exact notification did not remove the stale item. The web writer socket's
 restart durability remains a separate F2M-E verification.
+
+## Stage13-F2M-D9 — durable Jellyfin notification contract (SOURCE ONLY)
+
+The notifier uses `DURABLE_AT_MOST_ONCE`; exactly-once delivery cannot be made
+atomic across a SQLite commit and an HTTP request. For a live exact Jellyfin
+item, the reconciler first commits a row in
+`library_delete_jellyfin_notification_attempts` inside the existing provenance
+database, bound to operation ID, DVD ID, holding ID, source identity
+fingerprint, manifest SHA-256, and Jellyfin item ID. It stores no media path.
+Only a new claim permits one `UpdateType=Deleted` POST. An existing claim
+prohibits another POST; retries perform GET-only verification. A crash after
+claim but before POST, a POST timeout, or a POST exception with the item still
+live remains pending as `JELLYFIN_NOTIFICATION_OUTCOME_UNKNOWN`. If the exact
+item ID is absent, reconciliation can succeed. This preserves the unavoidable
+uncertain crash window rather than risking a duplicate POST.
+
+The ledger table is created lazily only by the transactional claim path. Read
+checks and GET-only recovery do not create it. The claim transaction uses
+`BEGIN IMMEDIATE`, revalidates the exact pending provenance row, and commits
+before the network request. Normal delete, commit retry, reconcile endpoint,
+and the exact-operation recovery helper use the same reconciler/claim contract.
+Repository search finds only the reconciler's production `notify_deleted`
+call; direct Created notification behavior remains unchanged.
+
+Broad inventory path matches are candidates only. A single candidate must have
+a non-empty ID and pass `/Items?Ids=...` verification with the same ID and
+exact path. Exact-ID count zero is `BROAD_INVENTORY_GHOST`: success without a
+claim or POST, even when that same old ID/path remains in broad inventory.
+After a notification, polling uses the captured ID. A different live ID at
+the same path fails closed as `JELLYFIN_PATH_REAPPEARED_DIFFERENT_ID`.
+
+Offline D9 fixtures passed for broad absence, initial and post-removal ghosts,
+claim-before-POST, crash before POST and after server acceptance, timeout and
+exception retries, repeated apply, claim conflict, ambiguity, missing ID,
+malformed/wrong-path exact-ID replies, different-ID re-addition, and unchanged
+Created payload behavior. The ghost recovery-helper fixture committed only its
+temporary provenance DB with zero POST and no ledger table creation. The
+existing `teddy_library_delete_commit_smoke.py` regression could not start in
+this workspace because neither `python3` nor `/opt/stage11-stt-venv/bin/python`
+has Flask installed; no package was installed. Syntax compilation and
+`git diff --check` passed. Production deploy, provenance finalization, Jellyfin
+POST, NAS/Discovery mutation, restart, and gate change were all zero.
+
+D9 leaves the production image and current VEMA provenance unchanged. D10 is
+expected to deploy this source and, only after its production preconditions,
+finalize VEMA-246 through the exact-ID ghost-aware path. The separate writer
+socket restart-durability question remains for F2M-E.

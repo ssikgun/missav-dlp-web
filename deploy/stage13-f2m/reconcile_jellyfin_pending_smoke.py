@@ -63,11 +63,12 @@ class SSH:
 
 
 class Jellyfin:
-    def __init__(self,gets): self.gets=list(gets);self.posts=[]
+    def __init__(self,gets,exact_gets=()): self.gets=list(gets);self.exact_gets=list(exact_gets);self.posts=[]
     def _request(self,method,path):
         if method=="POST": self.posts.append(path);return None
-        if not self.gets: raise AssertionError("unexpected GET")
-        value=self.gets.pop(0)
+        queue=self.exact_gets if "Ids=" in path else self.gets
+        if not queue: raise AssertionError("unexpected GET: "+path)
+        value=queue.pop(0)
         if isinstance(value,Exception): raise value
         return value
     def notify_deleted(self,path):
@@ -75,7 +76,7 @@ class Jellyfin:
 
 
 def inv(items):return {"Items":items,"TotalRecordCount":len(items)}
-def exact():return {"Id":"jf-42","Path":PATH}
+def exact():return {"Id":"jf-42","Path":PATH,"ParentId":"parent"}
 
 
 class Lock:
@@ -108,16 +109,29 @@ def state(f):
 def main():
     # Check-only accepts only the exact pending operation and reports the GET count.
     with tempfile.TemporaryDirectory(prefix="jf-pending-check-") as tmp:
-        f=fixture(tmp);j=Jellyfin([inv([exact()])]);r=run_check(f,j)
-        assert r["jellyfin_item_count"]==1 and state(f)==("RECONCILE_PENDING",None,1) and not j.posts
+        f=fixture(tmp);j=Jellyfin([inv([exact()])],[inv([exact()])]);r=run_check(f,j)
+        assert r["jellyfin_item_count"]==1 and r["broad_item_count"]==1 and state(f)==("RECONCILE_PENDING",None,1) and not j.posts
 
     # One exact Deleted notification, bounded poll to zero, then strict provenance commit.
     with tempfile.TemporaryDirectory(prefix="jf-apply-post-") as tmp:
-        f=fixture(tmp);j=Jellyfin([inv([exact()]),inv([exact()]),inv([exact()]),inv([]),inv([])])
+        f=fixture(tmp);j=Jellyfin([inv([exact()]),inv([exact()]),inv([exact()]),inv([]),inv([])],
+          [inv([exact()]),inv([exact()]),inv([exact()]),inv([])])
         result=run_apply(f,j)
-        assert result=={"status":"COMMITTED","deleted_notifications":1,"poll_complete":True}
+        assert result=={"status":"COMMITTED","deleted_notifications":1,
+          "poll_complete":True,"jellyfin_classification":None}
         assert j.posts==[{"endpoint":"/Library/Media/Updated","payload":{"Updates":[{"Path":PATH,"UpdateType":"Deleted"}]}}]
         assert state(f)==("COMMITTED",1,1)
+
+    # Broad inventory ghost is exact-ID absent: commit without claim or notification.
+    with tempfile.TemporaryDirectory(prefix="jf-apply-ghost-") as tmp:
+        f=fixture(tmp);ghost=exact()
+        j=Jellyfin([inv([ghost])]*7,[inv([])]*4)
+        result=run_apply(f,j)
+        assert result=={"status":"COMMITTED","deleted_notifications":0,
+          "poll_complete":True,"jellyfin_classification":"BROAD_INVENTORY_GHOST"}
+        assert not j.posts and state(f)==("COMMITTED",1,1)
+        with sqlite3.connect(f["provenance"]) as db:
+            assert db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='library_delete_jellyfin_notification_attempts'").fetchone() is None
 
     # Already gone (including a crash after notification, before provenance commit): no POST, finalize.
     with tempfile.TemporaryDirectory(prefix="jf-apply-crash-retry-") as tmp:
@@ -128,13 +142,14 @@ def main():
 
     # Deleted notification timeout leaves the exact operation pending and does not update provenance.
     with tempfile.TemporaryDirectory(prefix="jf-apply-timeout-") as tmp:
-        f=fixture(tmp);one=inv([exact()]);j=Jellyfin([one,one,one]+[one]*32)
+        f=fixture(tmp);one=inv([exact()]);j=Jellyfin([one,one,one],[one,one,one]+[one]*32)
         class Clock:
             value=0.0
             def now(self):return self.value
             def sleep(self,n):self.value+=n
         clock=Clock()
-        factory=lambda client:JellyfinDeleteReconciler(client,timeout=6,interval=2,clock=clock.now,sleep=clock.sleep)
+        factory=lambda client,**kw:JellyfinDeleteReconciler(client,timeout=6,interval=2,
+            clock=clock.now,sleep=clock.sleep,**kw)
         result=run_apply(f,j,reconciler_factory=factory)
         assert result["status"]=="RECONCILE_PENDING" and result["deleted_notifications"]==1
         assert len(j.posts)==1 and state(f)==("RECONCILE_PENDING",None,1)
@@ -155,7 +170,7 @@ def main():
         else:raise AssertionError("busy title accepted")
         assert not j.posts and state(f)==("RECONCILE_PENDING",None,1)
 
-    print("Stage13-F2M-D2 exact Jellyfin recovery helper smoke: OK")
+    print("Stage13-F2M-D9 ghost-aware Jellyfin recovery helper smoke: OK")
 
 
 if __name__=="__main__":main()

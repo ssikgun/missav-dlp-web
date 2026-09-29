@@ -428,15 +428,25 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
             503,
         )
 
-    def reconcile_jellyfin(media_relative):
+    def reconcile_jellyfin(media_relative, record=None):
         if jellyfin_delete_reconciler is not None:
             return jellyfin_delete_reconciler(media_relative)
         url = os.environ.get("TEDDY_JELLYFIN_URL", "")
         key = os.environ.get("TEDDY_JELLYFIN_KEY", "")
         if not url or not key:
             raise DeleteCommitError("JELLYFIN_CONFIG_UNAVAILABLE")
+        if record is None:
+            raise DeleteCommitError("JELLYFIN_NOTIFICATION_CLAIM_UNAVAILABLE")
         return JellyfinDeleteReconciler(
-            JellyfinClient(base_url=url, api_key_path=key)
+            JellyfinClient(base_url=url, api_key_path=key),
+            provenance_db=provenance_path,
+            operation_identity={
+                "operation_id": record["operation_id"],
+                "dvd_id": record["dvd_id"],
+                "holding_id": record["holding_id"],
+                "source_identity_fingerprint": record["source_identity_fingerprint"],
+                "manifest_sha256": record["manifest_sha256"],
+            },
         )(media_relative)
     def query_items(): return _build_items(db_path,rollout_path,nas_reader,jellyfin_loader)
     @bp.get("")
@@ -705,7 +715,7 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
                     token, state="RECONCILE_PENDING", result=commit_result(pending))
             return pending
         try:
-            jellyfin_ok = bool(reconcile_jellyfin(media_relative))
+            jellyfin_ok = bool(reconcile_jellyfin(media_relative, record))
         except Exception as exc:
             current_app.logger.warning(
                 "Library delete Jellyfin reconcile pending (%s)", type(exc).__name__)
@@ -747,6 +757,9 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
         try:
             entry = delete_token_registry.begin_commit(token, dvd_id=dvd_id)
             if entry["state"] in {"COMMITTED", "RECONCILE_PENDING"}:
+                title_lock, lock_error = acquire_delete_title_lock(dvd_id)
+                if lock_error is not None:
+                    return lock_error
                 store = provenance_store_factory()
                 record = store.get(entry["operation_id"], dvd_id=dvd_id)
                 if record is None:
@@ -914,6 +927,9 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
                 or body.get("typed_dvd_id") != dvd_id or not isinstance(body.get("operation_id"), str)):
             return _error("invalid_request", "재조정 요청을 확인할 수 없습니다.", 400)
         try:
+            title_lock, lock_error = acquire_delete_title_lock(dvd_id)
+            if lock_error is not None:
+                return lock_error
             store = provenance_store_factory()
             record = store.get(body["operation_id"], dvd_id=dvd_id)
             if record is None or not record["nas_delete_complete"]:
@@ -927,6 +943,9 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
         except Exception as exc:
             current_app.logger.warning("Library delete retry reconciliation failed (%s)", type(exc).__name__)
             return _error("reconcile_unavailable", "삭제 후 상태를 조정할 수 없습니다.", 503)
+        finally:
+            if 'title_lock' in locals() and title_lock is not None:
+                title_lock.release()
 
     @bp.post("/<dvd_id>/delete/resume")
     def delete_resume_partial(dvd_id):

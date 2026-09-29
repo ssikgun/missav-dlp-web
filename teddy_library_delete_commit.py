@@ -42,6 +42,99 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+NOTIFICATION_ATTEMPTS_TABLE = "library_delete_jellyfin_notification_attempts"
+
+
+def _notification_identity(*, operation_id, dvd_id, holding_id,
+                           source_identity_fingerprint, manifest_sha256,
+                           jellyfin_item_id):
+    values = (operation_id, dvd_id, source_identity_fingerprint, manifest_sha256,
+              jellyfin_item_id)
+    if any(not isinstance(value, str) or not value for value in values):
+        raise DeleteCommitError("JELLYFIN_NOTIFICATION_CLAIM_CONFLICT")
+    try:
+        holding_id = int(holding_id)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise DeleteCommitError("JELLYFIN_NOTIFICATION_CLAIM_CONFLICT") from exc
+    if holding_id <= 0:
+        raise DeleteCommitError("JELLYFIN_NOTIFICATION_CLAIM_CONFLICT")
+    return (operation_id, dvd_id, holding_id, source_identity_fingerprint,
+            manifest_sha256, jellyfin_item_id)
+
+
+def claim_jellyfin_notification_attempt(provenance_db, *, operation_id, dvd_id,
+        holding_id, source_identity_fingerprint, manifest_sha256, jellyfin_item_id):
+    """Durably claim one Deleted POST. The attempt table is created only here."""
+    identity = _notification_identity(operation_id=operation_id, dvd_id=dvd_id,
+        holding_id=holding_id, source_identity_fingerprint=source_identity_fingerprint,
+        manifest_sha256=manifest_sha256, jellyfin_item_id=jellyfin_item_id)
+    uri = Path(provenance_db).resolve().as_uri() + "?mode=rw"
+    db = None
+    try:
+        db = sqlite3.connect(uri, uri=True, timeout=10, isolation_level=None)
+        db.execute("PRAGMA busy_timeout=10000")
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute("""SELECT dvd_id,holding_id,source_identity_fingerprint,
+              manifest_sha256,nas_delete_complete,result_state FROM library_deletions
+              WHERE operation_id=?""", (operation_id,)).fetchone()
+        if (row is None or row[:4] != identity[1:5] or int(row[4]) != 1
+                or row[5] != "RECONCILE_PENDING"):
+            raise DeleteCommitError("JELLYFIN_NOTIFICATION_CLAIM_CONFLICT")
+        db.execute(f"""CREATE TABLE IF NOT EXISTS {NOTIFICATION_ATTEMPTS_TABLE} (
+            operation_id TEXT PRIMARY KEY,
+            dvd_id TEXT NOT NULL,
+            holding_id INTEGER NOT NULL,
+            source_identity_fingerprint TEXT NOT NULL,
+            manifest_sha256 TEXT NOT NULL,
+            jellyfin_item_id TEXT NOT NULL,
+            attempted_at TEXT NOT NULL,
+            accepted_at TEXT NULL
+        )""")
+        existing = db.execute(f"""SELECT dvd_id,holding_id,source_identity_fingerprint,
+              manifest_sha256,jellyfin_item_id FROM {NOTIFICATION_ATTEMPTS_TABLE}
+              WHERE operation_id=?""", (operation_id,)).fetchone()
+        if existing is not None:
+            if tuple(existing) != identity[1:]:
+                raise DeleteCommitError("JELLYFIN_NOTIFICATION_CLAIM_CONFLICT")
+            db.execute("COMMIT")
+            return "ALREADY_CLAIMED"
+        db.execute(f"""INSERT INTO {NOTIFICATION_ATTEMPTS_TABLE}(
+              operation_id,dvd_id,holding_id,source_identity_fingerprint,
+              manifest_sha256,jellyfin_item_id,attempted_at,accepted_at)
+              VALUES(?,?,?,?,?,?,?,NULL)""", (*identity, utc_now()))
+        db.execute("COMMIT")
+        return "CLAIMED_NEW"
+    except DeleteCommitError:
+        if db is not None and db.in_transaction: db.execute("ROLLBACK")
+        raise
+    except Exception as exc:
+        if db is not None and db.in_transaction: db.execute("ROLLBACK")
+        raise DeleteCommitError("JELLYFIN_NOTIFICATION_CLAIM_UNAVAILABLE") from exc
+    finally:
+        if db is not None: db.close()
+
+
+def mark_jellyfin_notification_accepted(provenance_db, *, operation_id,
+        dvd_id, holding_id, source_identity_fingerprint, manifest_sha256,
+        jellyfin_item_id):
+    identity = _notification_identity(operation_id=operation_id, dvd_id=dvd_id,
+        holding_id=holding_id, source_identity_fingerprint=source_identity_fingerprint,
+        manifest_sha256=manifest_sha256, jellyfin_item_id=jellyfin_item_id)
+    uri = Path(provenance_db).resolve().as_uri() + "?mode=rw"
+    try:
+        with closing(sqlite3.connect(uri, uri=True, timeout=10)) as db:
+            db.execute("PRAGMA busy_timeout=10000")
+            cursor = db.execute(f"""UPDATE {NOTIFICATION_ATTEMPTS_TABLE}
+                SET accepted_at=COALESCE(accepted_at,?) WHERE operation_id=? AND dvd_id=?
+                AND holding_id=? AND source_identity_fingerprint=? AND manifest_sha256=?
+                AND jellyfin_item_id=?""", (utc_now(), *identity))
+            db.commit()
+            if cursor.rowcount != 1:
+                raise DeleteCommitError("JELLYFIN_NOTIFICATION_CLAIM_CONFLICT")
+    except DeleteCommitError: raise
+    except Exception as exc: raise DeleteCommitError("JELLYFIN_NOTIFICATION_CLAIM_UNAVAILABLE") from exc
+
+
 def canonical_media_path(row: dict, dvd_id: str) -> str:
     relative = row.get("relative_path")
     if (row.get("storage_root") != "jav" or row.get("dvd_id") != dvd_id
@@ -428,18 +521,23 @@ def reconcile_discovery_holding(db_path: str, *, holding_id: int, dvd_id: str,
 
 
 class JellyfinDeleteReconciler:
-    """Notify Jellyfin once about one exact external deletion, then poll boundedly."""
-    def __init__(self, client: JellyfinClient, *, timeout=120.0, interval=2.0,
+    """Reconcile one deleted path with durable at-most-once notification."""
+    def __init__(self, client: JellyfinClient, *, provenance_db=None,
+                 operation_identity=None, timeout=120.0, interval=2.0,
                  clock=time.monotonic, sleep=time.sleep):
         self.client = client
+        self.provenance_db = provenance_db
+        self.operation_identity = dict(operation_identity or {})
         self.timeout = max(0.0, min(float(timeout), 120.0))
         self.interval = max(0.01, min(float(interval), 2.0))
         self.clock = clock
         self.sleep = sleep
+        self.last_code = None
+        self.last_post_count = 0
 
     def _matches(self, expected_path):
         query = urlencode({
-            "Recursive": "true", "Fields": "Path", "IncludeItemTypes": "Movie,Video",
+            "Recursive": "true", "Fields": "Path,ParentId", "IncludeItemTypes": "Movie,Video",
             "StartIndex": "0", "Limit": str(MAX_JELLYFIN_ITEMS),
         })
         value = self.client._request("GET", "/Items?" + query)
@@ -452,31 +550,102 @@ class JellyfinDeleteReconciler:
         if total > MAX_JELLYFIN_ITEMS or len(value["Items"]) != total:
             raise DeleteCommitError("JELLYFIN_INVENTORY_INCOMPLETE")
         for item in value["Items"]:
-            if not isinstance(item, dict) or not isinstance(item.get("Path"), str):
+            if (not isinstance(item, dict) or not isinstance(item.get("Path"), str)
+                    or not isinstance(item.get("Id"), str) or not item["Id"]):
                 raise DeleteCommitError("JELLYFIN_RESPONSE_INVALID")
         return [item for item in value["Items"] if isinstance(item, dict) and item.get("Path") == expected_path]
 
+    def _exact_id_matches(self, item_id, expected_path):
+        if not isinstance(item_id, str) or not item_id:
+            raise DeleteCommitError("JELLYFIN_RESPONSE_INVALID")
+        query = urlencode({"Ids": item_id, "Fields": "Path",
+                           "EnableImages": "false", "EnableUserData": "false"})
+        value = self.client._request("GET", "/Items?" + query)
+        if not isinstance(value, dict) or not isinstance(value.get("Items"), list):
+            raise DeleteCommitError("JELLYFIN_RESPONSE_INVALID")
+        items = value["Items"]
+        try: total = int(value.get("TotalRecordCount", len(items)))
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise DeleteCommitError("JELLYFIN_RESPONSE_INVALID") from exc
+        if total != len(items) or total > 1:
+            raise DeleteCommitError("JELLYFIN_RESPONSE_INVALID")
+        if total == 0: return []
+        item = items[0]
+        if (not isinstance(item, dict) or item.get("Id") != item_id
+                or item.get("Path") != expected_path):
+            raise DeleteCommitError("JELLYFIN_RESPONSE_INVALID")
+        return [item]
+
+    def _verify_different_live_id(self, expected_path, captured_id):
+        matches = self._matches(expected_path)
+        for candidate in matches:
+            candidate_id = candidate["Id"]
+            if candidate_id != captured_id and self._exact_id_matches(candidate_id, expected_path):
+                raise DeleteCommitError("JELLYFIN_PATH_REAPPEARED_DIFFERENT_ID")
+
+    def exact_path_state(self, expected_path):
+        """Return broad candidates and authoritative live exact-ID candidates."""
+        matches = self._matches(expected_path)
+        if len(matches) > 1:
+            raise DeleteCommitError("JELLYFIN_PATH_AMBIGUOUS")
+        if not matches:
+            return matches, []
+        item_id = matches[0]["Id"]
+        live = self._exact_id_matches(item_id, expected_path)
+        if not live:
+            # An old candidate can remain in the broad response as a ghost.
+            self._verify_different_live_id(expected_path, item_id)
+        return matches, live
+
+    def _claim(self, item_id):
+        if not self.provenance_db or not self.operation_identity:
+            raise DeleteCommitError("JELLYFIN_NOTIFICATION_CLAIM_UNAVAILABLE")
+        required = {"operation_id", "dvd_id", "holding_id", "source_identity_fingerprint", "manifest_sha256"}
+        if not required.issubset(self.operation_identity):
+            raise DeleteCommitError("JELLYFIN_NOTIFICATION_CLAIM_UNAVAILABLE")
+        return claim_jellyfin_notification_attempt(self.provenance_db,
+            **self.operation_identity, jellyfin_item_id=item_id)
+
     def __call__(self, media_relative: str) -> bool:
+        self.last_code = None
+        self.last_post_count = 0
         expected = jellyfin_media_path(media_relative)
         matches = self._matches(expected)
         if not matches:
             return True
         if len(matches) != 1:
             raise DeleteCommitError("JELLYFIN_PATH_AMBIGUOUS")
-        try:
-            self.client.notify_deleted(expected)
-        except Exception as exc:
-            raise DeleteCommitError("JELLYFIN_DELETE_NOTIFICATION_FAILED") from exc
+        item_id = matches[0]["Id"]
+        exact = self._exact_id_matches(item_id, expected)
+        if not exact:
+            self.last_code = "BROAD_INVENTORY_GHOST"
+            return True
+        claim = self._claim(item_id)
+        if claim == "CLAIMED_NEW":
+            try:
+                self.last_post_count = 1
+                self.client.notify_deleted(expected)
+                mark_jellyfin_notification_accepted(self.provenance_db,
+                    **self.operation_identity, jellyfin_item_id=item_id)
+            except Exception as exc:
+                raise DeleteCommitError("JELLYFIN_DELETE_NOTIFICATION_FAILED") from exc
+        elif claim != "ALREADY_CLAIMED":
+            raise DeleteCommitError("JELLYFIN_NOTIFICATION_CLAIM_CONFLICT")
+        else:
+            # A previous caller may have crashed on either side of the POST.
+            # Reconcile by GET only; the durable claim forbids a retry POST.
+            if self._exact_id_matches(item_id, expected):
+                self.last_code = "JELLYFIN_NOTIFICATION_OUTCOME_UNKNOWN"
+                return False
+            return True
         deadline = self.clock() + self.timeout
         while True:
+            current = self._exact_id_matches(item_id, expected)
+            if not current:
+                self._verify_different_live_id(expected, item_id)
+                return True
             remaining = deadline - self.clock()
             if remaining <= 0:
-                return not self._matches(expected)
-            self.sleep(min(self.interval, remaining))
-            matches = self._matches(expected)
-            if not matches:
-                return True
-            if len(matches) != 1:
-                raise DeleteCommitError("JELLYFIN_PATH_AMBIGUOUS")
-            if self.clock() >= deadline:
+                self.last_code = "JELLYFIN_NOTIFICATION_OUTCOME_UNKNOWN"
                 return False
+            self.sleep(min(self.interval, remaining))

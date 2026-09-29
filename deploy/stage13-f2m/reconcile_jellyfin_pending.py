@@ -19,7 +19,7 @@ from teddy_library_delete_activity import (
     ACTIVE_ORGANIZER, ACTIVE_SUBTITLE, IDLE, DeleteTargetActivityGuard,
     OrganizerActivitySource, SubtitleActivitySource,
 )
-from teddy_library_delete_commit import JellyfinDeleteReconciler, canonical_media_path, utc_now
+from teddy_library_delete_commit import DeleteCommitError, JellyfinDeleteReconciler, canonical_media_path, utc_now
 from teddy_library_delete_dryrun import canonical_manifest, source_identity_fingerprint
 from teddy_library_discovery_writer import JOURNAL_COLUMNS, JOURNAL_TABLE
 from teddy_title_exclusion import ACQUIRED, BUSY, try_acquire_title_lock
@@ -145,12 +145,16 @@ def check_operation(operation_id, expected_dvd_id, *, discovery_db=DISCOVERY_DB,
     media_path=jellyfin_media_path(relative)
     try:
         reconciler=JellyfinDeleteReconciler(jellyfin_client,timeout=0)
-        matches=reconciler._matches(media_path)
+        matches,live_matches=reconciler.exact_path_state(media_path)
+    except DeleteCommitError as exc: raise RecoveryError(exc.code) from exc
     except Exception as exc: raise RecoveryError("JELLYFIN_QUERY_FAILED") from exc
-    if len(matches)>1: raise RecoveryError("JELLYFIN_PATH_AMBIGUOUS")
+    exact_item_id=matches[0]["Id"] if matches else None
+    classification="BROAD_INVENTORY_GHOST" if matches and not live_matches else None
     return {"operation_id":operation_id,"dvd_id":EXPECTED_DVD,"holding_id":EXPECTED_HOLDING,
         "source_identity_fingerprint":fingerprint,"manifest_sha256":digest,"file_count":4,
-        "total_bytes":total,"relative_path":relative,"jellyfin_item_count":len(matches)}
+        "total_bytes":total,"relative_path":relative,"jellyfin_item_count":len(live_matches),
+        "broad_item_count":len(matches),"broad_item_id":exact_item_id,
+        "jellyfin_classification":classification}
 
 
 def _finalize_provenance(provenance_db,checked):
@@ -200,24 +204,40 @@ def apply_operation(operation_id, expected_dvd_id, *, discovery_db=DISCOVERY_DB,
                 try: checked=check_fn(operation_id,expected_dvd_id,discovery_db=discovery_db,provenance_db=provenance_db,**kwargs)
                 except RecoveryError: raise
                 except Exception as exc: raise RecoveryError("CHECK_UNAVAILABLE") from exc
-                if checked["manifest_sha256"]!=before["manifest_sha256"] or checked["jellyfin_item_count"]!=before["jellyfin_item_count"]:
+                if (checked["manifest_sha256"]!=before["manifest_sha256"]
+                    or checked["jellyfin_item_count"]!=before["jellyfin_item_count"]
+                    or checked["broad_item_id"]!=before["broad_item_id"]):
                     raise RecoveryError("OPERATION_STATE_CHANGED")
                 client=jellyfin_client
                 if client is None: _,client=_dependencies()
                 try:
-                    reconciler=reconciler_factory(client)
+                    identity={key:checked[key] for key in (
+                        "operation_id","dvd_id","holding_id",
+                        "source_identity_fingerprint","manifest_sha256")}
+                    reconciler=reconciler_factory(client,provenance_db=provenance_db,
+                        operation_identity=identity)
                     if checked["jellyfin_item_count"]==1:
                         if not reconciler(checked["relative_path"]):
-                            return {"status":"RECONCILE_PENDING","deleted_notifications":1,"poll_complete":False}
-                    # Re-read exact path after notification, or skip POST when already absent.
-                    final_matches=reconciler._matches(jellyfin_media_path(checked["relative_path"]))
+                            return {"status":"RECONCILE_PENDING",
+                                "deleted_notifications":reconciler.last_post_count,
+                                "poll_complete":False,
+                                "safe_code":reconciler.last_code or "JELLYFIN_NOTIFICATION_OUTCOME_UNKNOWN"}
+                    # Exact-ID state is authoritative; a same-ID broad ghost is tolerated.
+                    final_broad,final_live=reconciler.exact_path_state(
+                        jellyfin_media_path(checked["relative_path"]))
                 except Exception as exc:
+                    if isinstance(exc,DeleteCommitError):
+                        raise RecoveryError(exc.code) from exc
                     raise RecoveryError("JELLYFIN_RECONCILE_FAILED") from exc
-                if final_matches:
-                    if len(final_matches)>1: raise RecoveryError("JELLYFIN_PATH_AMBIGUOUS")
-                    return {"status":"RECONCILE_PENDING","deleted_notifications":checked["jellyfin_item_count"],"poll_complete":False}
+                if final_live:
+                    return {"status":"RECONCILE_PENDING",
+                        "deleted_notifications":reconciler.last_post_count,
+                        "poll_complete":False,
+                        "safe_code":"JELLYFIN_NOTIFICATION_OUTCOME_UNKNOWN"}
                 _finalize_provenance(provenance_db,checked)
-                return {"status":"COMMITTED","deleted_notifications":checked["jellyfin_item_count"],"poll_complete":True}
+                return {"status":"COMMITTED",
+                    "deleted_notifications":reconciler.last_post_count,"poll_complete":True,
+                    "jellyfin_classification":("BROAD_INVENTORY_GHOST" if final_broad else None)}
         except OperationLockBusy as exc: raise RecoveryError("GLOBAL_LOCK_BUSY") from exc
         except OperationLockError as exc: raise RecoveryError("GLOBAL_LOCK_UNAVAILABLE") from exc
     finally:
@@ -238,12 +258,15 @@ def main(argv=None):
             checked=check_operation(args.operation_id,args.expected_dvd_id,ssh=ssh,jellyfin_client=client)
             print("JELLYFIN_RECOVERY_ELIGIBLE=YES")
             print("EXACT_ITEM_COUNT="+str(checked["jellyfin_item_count"]))
+            print("BROAD_ITEM_COUNT="+str(checked["broad_item_count"]))
+            print("JELLYFIN_CLASSIFICATION="+(checked["jellyfin_classification"] or "LIVE_OR_ABSENT"))
             return 0
         lock_dir=os.environ.get("TEDDY_TITLE_LOCK_DIR") or TITLE_LOCK_DIR
         result=apply_operation(args.operation_id,args.expected_dvd_id,title_lock_dir=lock_dir,ssh=ssh,jellyfin_client=client)
         print("JELLYFIN_APPLY="+result["status"])
         print("DELETED_NOTIFICATION_POSTS="+str(result["deleted_notifications"]))
         print("POLL_COMPLETE="+str(result["poll_complete"]))
+        if result.get("safe_code"): print("SAFE_CODE="+result["safe_code"])
         return 0 if result["status"]=="COMMITTED" else 3
     except RecoveryError as exc:
         print("JELLYFIN_RECOVERY_ELIGIBLE=NO" if args.check_only else "JELLYFIN_APPLY=REFUSED")
