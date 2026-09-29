@@ -1,5 +1,63 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-29 Stage13-F2G shared title-lock production deployment — INCOMPLETE
+
+The exact F2F web source `26c8657d4bd5c5b767f2f8eb474a80ff9121a150` is
+deployed as image `sha256:bac75af6716cd7a0e33aa671b90f9386926d8dc93f64dba201caa6494283e404`
+(`missav-dlp-web:stage13f2g-26c8657`). The previous running image
+`sha256:40d68b117add00b0dfa85748780d49c3578e670af42d11aa2ae9dfda805dc787`
+was retained locally as `missav-dlp-web:rollback-f2g`. Only
+`missav-dlp-web` was recreated. It is running with restart count 0; `/login`
+and static Library assets return 200, `/` redirects unauthenticated users,
+and unauthenticated Library and delete-prepare API requests return 401.
+
+Production Compose/env now persist the host lock root
+`/opt/missav-dlp-web/title-locks` at container path `/run/teddy-title-locks`,
+with `TEDDY_TITLE_LOCK_DIR=/run/teddy-title-locks` in the web container.
+The host directory is root:root mode 0750; lock files are regular files mode
+0600. Host completion/systemd, the documented host Stage12 runner, and the web
+container currently execute as UID/GID 0; the web container additionally has
+GID 988. The host and container saw the same lock device/inode for the
+`ADN-785` connectivity probe. Host-held to container and container-held to
+host contention both returned `BUSY`; killing the container-side holder
+released the kernel lock; a different canonical DVD-ID remained acquirable
+while `ADN-785` was held. These were lock-only probes; empty lock files are
+left in place by design.
+
+The web feature gate is explicitly `TEDDY_LIBRARY_DELETE_ENABLED=false`.
+The Discovery database remains mounted read-only and the writer socket remains
+read-only. Writer health is `READY` on host and container. Exact
+`ADN-785` `preflight_holding` returned `READY` using a rollback-only
+`BEGIN IMMEDIATE`; `present=1`, holding identity, and the current holding count
+were unchanged.
+
+Current read-only snapshot: 184 present JAV holdings, 184 unique DVD-IDs, no
+duplicates, and no canonical/parse mismatches. Organizer active jobs: 0;
+Stage12 `RUNNING`/`GENERATED`: 0; heartbeat: stale `COMPLETE` with no active
+title inference.
+
+**Canary remains blocked.** The active production completion wrapper
+`/usr/local/sbin/teddy-completion-stage9-runner` pins
+`/opt/missav-dlp-web/stage9-runtime` at commit
+`42339ea7fb01f62f798baa04d5e774f644b7f46f`; its completion orchestrator and
+organizer apply module differ from the F2F integrated source and do not use
+the per-title lock. The reconcile apply launcher also points at that old
+runtime. Their configured execution UID is root, but setting the lock env
+alone cannot provide exclusion while this old source remains active. No host
+runner or writer service was run or restarted for this checkpoint.
+
+Stage12 has no persistent systemd service; its documented manual runner uses
+the checked-out F2F-integrated module. Any future invocation must explicitly
+set `TEDDY_TITLE_LOCK_DIR=/opt/missav-dlp-web/title-locks` in that command's
+environment. Do not treat current idle counts as a substitute for this lock.
+The next checkpoint must install/activate an exact, version-pinned F2F
+completion/organizer runtime and persistent lock-root configuration, then
+repeat cross-runtime exclusion. Until that is done:
+`SHARED_PER_TITLE_LOCK=NO` for production participants and
+`CANARY_READY=NO`. Delete gate stays false; actual delete, Discovery content
+write, provenance write, NAS write, Jellyfin refresh, and subtitle generation
+remain 0.
+
 ## 2026-09-29 Stage13-F2F shared per-title exclusion — PASS (offline/source)
 
 The F2E remaining `SHARED_PER_TITLE_LOCK_UNAVAILABLE` race boundary is closed
