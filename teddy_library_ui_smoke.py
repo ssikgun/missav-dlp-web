@@ -76,6 +76,16 @@ for marker in ("/delete/commit", "data-delete-final-ack", "data-delete-final-typ
 require("? '' : 'disabled'" in js and "서버 feature gate가 비활성이라" in js,
         "commit controls must remain disabled while the server feature gate is off")
 require("prepare_token</code>" not in js, "prepare token must not be rendered")
+nas_error_fixture = {"error": {"code": "nas_inspection_unavailable",
+                               "message": "internal NAS detail must stay hidden"}}
+require(nas_error_fixture["error"]["code"] == "nas_inspection_unavailable",
+        "NAS inspection failure fixture is invalid")
+for marker in ("'nas_inspection_unavailable'", "function safeDeleteErrorCode(payload)",
+               "SAFE_DELETE_ERROR_CODES.has(code)",
+               "error.safeCode = safeDeleteErrorCode(payload)"):
+    require(marker in js, f"safe NAS inspection error handling missing: {marker}")
+require("internal NAS detail must stay hidden" not in js,
+        "backend error detail must not be rendered")
 for marker in ("라이브러리를 불러오는 중", "조건에 맞는 작품이 없습니다.",
                "라이브러리 정보를 불러오지 못했습니다."):
     require(marker in js, f"missing load/empty/error state: {marker}")

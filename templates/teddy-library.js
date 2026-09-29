@@ -18,7 +18,8 @@
     let deleteCommitInFlight = false;
     const SAFE_DELETE_ERROR_CODES = new Set([
         'invalid_request_boundary', 'invalid_request_origin', 'authentication_required',
-        'nas_inventory_unavailable', 'prepare_unavailable', 'manifest_changed',
+        'nas_inventory_unavailable', 'nas_inspection_unavailable',
+        'prepare_unavailable', 'manifest_changed',
         'validation_unavailable', 'delete_target_active', 'delete_activity_unavailable'
     ]);
 
