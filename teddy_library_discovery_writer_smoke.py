@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
+import errno
 import io
 import logging
+import os
 from pathlib import Path
 import socket
 import sqlite3
@@ -11,6 +13,7 @@ import stat
 import tempfile
 import threading
 import time
+from unittest import mock
 
 from teddy_library_delete_commit import DurableDeleteProvenanceStore
 from teddy_library_delete_dryrun import canonical_manifest, source_identity_fingerprint
@@ -77,6 +80,36 @@ def raw_request(path, raw):
             if not part: break
             data.extend(part)
     return json.loads(bytes(data).split(b"\n", 1)[0])
+
+
+def socket_identity(path):
+    info = Path(path).lstat()
+    return info.st_dev, info.st_ino, stat.S_IFMT(info.st_mode), info.st_uid, info.st_gid
+
+
+def expect_writer_unavailable(callback, message):
+    try:
+        callback()
+    except WriterError as exc:
+        assert exc.code == "WRITER_UNAVAILABLE", (message, exc.code)
+    else:
+        raise AssertionError(message)
+
+
+def database_restart_snapshot(db_path):
+    db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        db.execute("PRAGMA query_only=ON")
+        snapshot = {}
+        for table in ("holdings", JOURNAL_TABLE, "unrelated"):
+            exists = db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            ).fetchone()
+            if exists:
+                snapshot[table] = db.execute(f' SELECT * FROM "{table}" ORDER BY rowid').fetchall()
+        return snapshot
+    finally:
+        db.close()
 
 
 def main():
@@ -167,6 +200,13 @@ def main():
         thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
         client = UnixSocketDiscoveryWriterClient(str(sock_path))
         assert client.request("health")["status"] == "READY"
+        active_identity = socket_identity(sock_path)
+        expect_writer_unavailable(
+            lambda: _prepare_socket_parent(str(sock_path)),
+            "active Unix listener was treated as stale",
+        )
+        assert socket_identity(sock_path) == active_identity
+        assert client.request("health")["status"] == "READY"
         assert client.preflight_holding(dvd_id=f["dvd"], holding_id=f["request"]["holding_id"],
             source_identity_fingerprint=f["fingerprint"])["status"] == "READY"
         bad_extra = raw_request(sock_path, b'{"protocol_version":1,"operation":"health","x":1}\n')
@@ -189,9 +229,21 @@ def main():
         assert sqlite3.connect(f["db_path"]).execute("SELECT * FROM unrelated").fetchall() == [("keep", "same")]
         # Simulate web process crash after writer commit, before provenance
         # discovery_reconciled=1. Restart replay is safe for this operation.
-        server.shutdown(); server.server_close(); thread.join(timeout=2); sock_path.unlink()
+        # The listening fd closes but the pathname survives as systemd's
+        # RuntimeDirectoryPreserve=restart leaves it between restarts.
+        restart_db_before = database_restart_snapshot(f["db_path"])
+        parent_identity_before = (sock_path.parent.stat().st_dev, sock_path.parent.stat().st_ino)
+        socket_identity_before = socket_identity(sock_path)
+        server.shutdown(); server.server_close(); thread.join(timeout=2)
+        assert sock_path.exists() and socket_identity(sock_path) == socket_identity_before
+        _prepare_socket_parent(str(sock_path))
+        assert (sock_path.parent.stat().st_dev, sock_path.parent.stat().st_ino) == parent_identity_before
+        assert not sock_path.exists()
         server2 = _UnixServer(str(sock_path), DiscoveryHoldingWriter(f["db_path"], str(f["provenance_path"])))
+        assert socket_identity(sock_path) != socket_identity_before
         thread2 = threading.Thread(target=server2.serve_forever, daemon=True); thread2.start()
+        assert UnixSocketDiscoveryWriterClient(str(sock_path)).request("health")["status"] == "READY"
+        assert database_restart_snapshot(f["db_path"]) == restart_db_before
         assert UnixSocketDiscoveryWriterClient(str(sock_path)).mark_absent(
             operation_id="op-fixture-1", dvd_id=f["dvd"], holding_id=f["request"]["holding_id"],
             source_identity_fingerprint=f["fingerprint"])["status"] == "ALREADY_RECONCILED"
@@ -211,7 +263,7 @@ def main():
         try: server2.writer.dispatch(wrong_op)
         except WriterError as exc: assert exc.code == "OPERATION_MISMATCH"
         else: raise AssertionError("different operation claimed absent holding")
-        server2.shutdown(); server2.server_close(); thread2.join(timeout=2); sock_path.unlink()
+        server2.shutdown(); server2.server_close(); thread2.join(timeout=2)
 
         # Provenance identity mismatch cannot mutate; DB busy is bounded.
         altered = dict(f["mark"], source_identity_fingerprint="f" * 64)
@@ -229,17 +281,131 @@ def main():
         finally:
             lock.execute("ROLLBACK"); lock.close()
 
-        # Socket startup rejects symlink and unexpected pre-existing file.
+        # Existing paths are handled by type and liveness, never by a broad
+        # cleanup. Symlinks and non-sockets remain byte-for-byte in place.
         unsafe = Path(tmp) / "unsafe"; unsafe.mkdir()
-        target = Path(tmp) / "target"; target.touch()
+        target = Path(tmp) / "target"; target.write_text("keep-target")
         link = unsafe / "writer.sock"; link.symlink_to(target)
-        try: _prepare_socket_parent(str(link))
-        except WriterError: pass
-        else: raise AssertionError("socket symlink accepted")
-        link.unlink(); link.touch()
-        try: _prepare_socket_parent(str(link))
-        except WriterError: pass
-        else: raise AssertionError("existing socket path accepted")
+        link_identity = (link.lstat().st_dev, link.lstat().st_ino)
+        expect_writer_unavailable(lambda: _prepare_socket_parent(str(link)), "socket symlink accepted")
+        assert link.is_symlink() and (link.lstat().st_dev, link.lstat().st_ino) == link_identity
+        assert target.read_text() == "keep-target"
+        regular = unsafe / "regular.sock"; regular.write_text("keep-file")
+        regular_identity = (regular.stat().st_dev, regular.stat().st_ino)
+        expect_writer_unavailable(lambda: _prepare_socket_parent(str(regular)), "regular file accepted as socket")
+        assert regular.read_text() == "keep-file"
+        assert (regular.stat().st_dev, regular.stat().st_ino) == regular_identity
+        directory_socket = unsafe / "directory.sock"; directory_socket.mkdir()
+        expect_writer_unavailable(
+            lambda: _prepare_socket_parent(str(directory_socket)),
+            "directory accepted at socket path",
+        )
+        assert directory_socket.is_dir()
+        parent_target = Path(tmp) / "real-parent"; parent_target.mkdir()
+        parent_link = Path(tmp) / "parent-link"; parent_link.symlink_to(parent_target, target_is_directory=True)
+        expect_writer_unavailable(
+            lambda: _prepare_socket_parent(str(parent_link / "writer.sock")),
+            "symlink parent accepted",
+        )
+
+        # An unlinked listener pathname is stale only when connect reports
+        # ECONNREFUSED. Reclaim exactly that path, preserve its parent, and
+        # bind a fresh server on the same pathname.
+        stale_path = unsafe / "stale.sock"
+        stale = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        stale.bind(str(stale_path)); stale.close()
+        stale_identity = socket_identity(stale_path)
+        parent_identity = (unsafe.stat().st_dev, unsafe.stat().st_ino)
+        _prepare_socket_parent(str(stale_path))
+        assert not stale_path.exists()
+        assert (unsafe.stat().st_dev, unsafe.stat().st_ino) == parent_identity
+        stale_server = _UnixServer(str(stale_path), f["writer"])
+        assert socket_identity(stale_path) != stale_identity
+        stale_thread = threading.Thread(target=stale_server.serve_forever, daemon=True); stale_thread.start()
+        assert UnixSocketDiscoveryWriterClient(str(stale_path)).request("health")["status"] == "READY"
+        stale_server.shutdown(); stale_server.server_close(); stale_thread.join(timeout=2)
+
+        # ENOENT is accepted only when a second lstat confirms the path is gone.
+        gone_path = unsafe / "gone.sock"
+        gone = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        gone.bind(str(gone_path)); gone.close()
+        def disappear_during_probe(path):
+            Path(path).unlink()
+            return errno.ENOENT
+        with mock.patch("teddy_library_discovery_writer._probe_socket", side_effect=disappear_during_probe):
+            _prepare_socket_parent(str(gone_path))
+        assert not gone_path.exists()
+
+        # Timeout, permission, would-block, and other errors are inconclusive;
+        # none may authorize unlinking a candidate socket.
+        for probe_errno in (errno.EACCES, errno.EAGAIN, errno.ETIMEDOUT, errno.EIO):
+            candidate = unsafe / f"error-{probe_errno}.sock"
+            raw = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            raw.bind(str(candidate)); raw.close()
+            before_identity = socket_identity(candidate)
+            with mock.patch("teddy_library_discovery_writer._probe_socket", return_value=probe_errno):
+                expect_writer_unavailable(
+                    lambda: _prepare_socket_parent(str(candidate)),
+                    f"probe errno {probe_errno} was treated as stale",
+                )
+            assert socket_identity(candidate) == before_identity
+
+        wrong_owner = unsafe / "wrong-owner.sock"
+        raw = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        raw.bind(str(wrong_owner)); raw.close()
+        wrong_owner_identity = socket_identity(wrong_owner)
+        with mock.patch("teddy_library_discovery_writer.os.geteuid", return_value=os.geteuid() + 1), \
+                mock.patch("teddy_library_discovery_writer._probe_socket", return_value=errno.ECONNREFUSED):
+            expect_writer_unavailable(
+                lambda: _prepare_socket_parent(str(wrong_owner)),
+                "socket not owned by service euid was reclaimed",
+            )
+        assert socket_identity(wrong_owner) == wrong_owner_identity
+
+        # Deterministically replace the stale pathname after ECONNREFUSED but
+        # before the final lstat. The replacement must remain untouched.
+        race_path = unsafe / "race.sock"
+        stale = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        stale.bind(str(race_path)); stale.close()
+        stale_race_identity = socket_identity(race_path)
+        replacement = []
+        def replace_during_probe(path):
+            Path(path).unlink()
+            listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            listener.bind(str(path)); listener.listen(1)
+            replacement.append(listener)
+            return errno.ECONNREFUSED
+        with mock.patch("teddy_library_discovery_writer._probe_socket", side_effect=replace_during_probe):
+            expect_writer_unavailable(
+                lambda: _prepare_socket_parent(str(race_path)),
+                "replacement socket passed the identity recheck",
+            )
+        replacement_identity = socket_identity(race_path)
+        assert replacement_identity != stale_race_identity
+        probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); probe.settimeout(1)
+        probe.connect(str(race_path)); accepted, _ = replacement[0].accept(); accepted.close(); probe.close()
+        assert socket_identity(race_path) == replacement_identity
+        replacement[0].close()
+
+        # Replacing the parent directory during the probe is also detected;
+        # the stale socket in the original directory is left untouched.
+        parent_race = Path(tmp) / "parent-race"; parent_race.mkdir()
+        parent_race_path = parent_race / "writer.sock"
+        stale = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        stale.bind(str(parent_race_path)); stale.close()
+        old_parent = Path(tmp) / "parent-race-old"
+        def replace_parent_during_probe(path):
+            Path(path).parent.rename(old_parent)
+            Path(path).parent.mkdir()
+            return errno.ECONNREFUSED
+        with mock.patch("teddy_library_discovery_writer._probe_socket", side_effect=replace_parent_during_probe):
+            expect_writer_unavailable(
+                lambda: _prepare_socket_parent(str(parent_race_path)),
+                "replacement parent passed the identity recheck",
+            )
+        assert (old_parent / "writer.sock").exists()
+        assert not parent_race_path.exists()
+
         try:
             UnixSocketDiscoveryWriterClient(str(Path(tmp)/"missing.sock")).request("health")
         except WriterError as exc: assert exc.code == "WRITER_UNAVAILABLE"

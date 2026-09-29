@@ -7,6 +7,7 @@ not accept SQL, paths, table/column names, or update values.
 from __future__ import annotations
 
 import argparse
+import errno
 from datetime import datetime, timezone
 import json
 import logging
@@ -385,12 +386,112 @@ def _prepare_socket_parent(path: str) -> None:
         os.chmod(parent, 0o750)
     except OSError as exc:
         raise WriterError("WRITER_UNAVAILABLE") from exc
+    parent_identity = _directory_identity(parent)
     try:
-        target.lstat()
+        original = target.lstat()
     except FileNotFoundError:
         return
-    # Do not unlink an unexpected/stale path at startup.
-    raise WriterError("WRITER_UNAVAILABLE")
+    if stat.S_ISLNK(original.st_mode) or not stat.S_ISSOCK(original.st_mode):
+        raise WriterError("WRITER_UNAVAILABLE")
+
+    original_identity = _socket_identity(original)
+    probe_errno = _probe_socket(target)
+    if probe_errno not in {errno.ECONNREFUSED, errno.ENOENT}:
+        # A successful connection means a live listener. All errors other
+        # than ECONNREFUSED/ENOENT are inconclusive and must fail closed.
+        raise WriterError("WRITER_UNAVAILABLE")
+
+    current_parent = _directory_identity(parent)
+    if current_parent != parent_identity:
+        raise WriterError("WRITER_UNAVAILABLE")
+    if probe_errno == errno.ENOENT:
+        try:
+            target.lstat()
+        except FileNotFoundError:
+            return
+        raise WriterError("WRITER_UNAVAILABLE")
+    try:
+        current = target.lstat()
+    except FileNotFoundError:
+        # The socket disappeared during the probe. The unchanged parent and
+        # absent target are sufficient to continue without unlinking.
+        return
+    if (stat.S_ISLNK(current.st_mode) or not stat.S_ISSOCK(current.st_mode)
+            or _socket_identity(current) != original_identity
+            or current.st_uid != os.geteuid()):
+        raise WriterError("WRITER_UNAVAILABLE")
+
+    # Pin the checked parent directory and repeat the identity check relative
+    # to its fd immediately before unlinking only this socket pathname.
+    parent_fd = None
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        parent_fd = os.open(parent, flags)
+        parent_stat = os.fstat(parent_fd)
+        if (not stat.S_ISDIR(parent_stat.st_mode)
+                or (parent_stat.st_dev, parent_stat.st_ino) != parent_identity):
+            raise WriterError("WRITER_UNAVAILABLE")
+        try:
+            final = os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        if (stat.S_ISLNK(final.st_mode) or not stat.S_ISSOCK(final.st_mode)
+                or _socket_identity(final) != original_identity
+                or final.st_uid != os.geteuid()):
+            raise WriterError("WRITER_UNAVAILABLE")
+        os.unlink(target.name, dir_fd=parent_fd)
+    except WriterError:
+        raise
+    except OSError as exc:
+        raise WriterError("WRITER_UNAVAILABLE") from exc
+    finally:
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+
+def _directory_identity(parent: Path) -> tuple[int, int]:
+    try:
+        info = parent.lstat()
+    except OSError as exc:
+        raise WriterError("WRITER_UNAVAILABLE") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+        raise WriterError("WRITER_UNAVAILABLE")
+    return info.st_dev, info.st_ino
+
+
+def _socket_identity(info: os.stat_result) -> tuple[int, int, int, int, int]:
+    return (info.st_dev, info.st_ino, stat.S_IFMT(info.st_mode), info.st_uid, info.st_gid)
+
+
+def _probe_socket(path: Path) -> int | None:
+    """Return ECONNREFUSED/ENOENT for candidates; None means listener accepted."""
+    probe = None
+    try:
+        probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        probe.settimeout(0.25)
+        try:
+            probe.connect(str(path))
+        except OSError as exc:
+            return exc.errno
+        # A health-only frame lets this writer answer cleanly instead of
+        # logging a malformed empty connection. Successful connect already
+        # proves an active listener, even if its response is delayed.
+        try:
+            probe.sendall(b'{"protocol_version":1,"operation":"health"}\n')
+            received = 0
+            while received <= MAX_RESPONSE_BYTES:
+                response = probe.recv(min(1024, MAX_RESPONSE_BYTES + 1 - received))
+                if not response or b"\n" in response:
+                    break
+                received += len(response)
+        except OSError:
+            pass
+        return None
+    except OSError as exc:
+        return exc.errno
+    finally:
+        if probe is not None:
+            probe.close()
 
 
 def serve(discovery_db: str, provenance_db: str, socket_path: str = DEFAULT_SOCKET_PATH):

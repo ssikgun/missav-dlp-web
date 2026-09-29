@@ -6274,3 +6274,64 @@ Completion remains inactive. Next checkpoint must address the writer's
 fail-closed stale socket startup behavior and its lifecycle safely; do not
 resume completion until a successful proof shows the existing web bind sees a
 new usable socket after one writer restart.
+
+## Stage13-F2M-E3 — safe stale Unix socket reclaim
+
+E2's frozen root cause is `STALE_SOCKET_STARTUP_REJECTED`: the effective
+`RuntimeDirectoryPreserve=restart` keeps the runtime directory (and old socket
+pathname) during a restart, while `_prepare_socket_parent()` rejected every
+existing target. The `RuntimeDirectoryPreserve=restart` drop-in remains
+installed and effective.
+
+`teddy_library_discovery_writer.py` now reclaims an existing target only when
+it is a real Unix socket and the bounded connect probe returns
+`ECONNREFUSED`. A successful connect is treated as an active listener and
+fails closed. `ENOENT` proceeds only after a second check confirms the target
+is absent. `EACCES`, timeout, `EAGAIN`, and all other results fail closed. A
+symlink, regular file, directory, or other non-socket is rejected without
+unlink. Before unlink, the code rechecks that the parent remains the same real
+directory and that the socket remains the same device/inode/type/uid/gid and
+is owned by the service euid. It then pins the parent with an `O_NOFOLLOW`
+dirfd, checks the parent and exact basename again relative to that fd, and
+unlinks only that single socket pathname. The writer then binds the same path
+with the existing 0660 socket mode; the parent remains 0750. No glob or
+recursive cleanup is used.
+
+The expanded `teddy_library_discovery_writer_smoke.py` covers absent path,
+regular file, symlink and symlink parent, directory at socket path, active
+listener preservation/usability, stale socket reclaim, restart simulation,
+ENOENT disappearance, inconclusive connect errors, socket replacement race,
+and parent replacement race. In the restart fixture, the parent inode stays
+the same, the new socket gets a different inode, health returns READY, and
+Discovery fixture rows/journal remain unchanged across restart and health.
+The replacement-race fixture confirms a new active socket is not unlinked.
+
+Regression smokes passed 8/8 in an ephemeral container using the existing
+production-equivalent D10 image
+`missav-dlp-web:stage13f2md10-52aa3f4`
+(image ID `sha256:92104fcb5bf5c7501120b078ec0e8c778358f3b33064e77e4d89e0b6606274ff`).
+The repo was a read-only bind, network was disabled, root filesystem was
+read-only, and only `/tmp` was writable. Passed:
+
+- `teddy_library_discovery_writer_smoke.py`
+- `teddy_library_delete_dryrun_smoke.py`
+- `teddy_library_delete_commit_smoke.py`
+- `teddy_library_delete_activity_smoke.py`
+- `teddy_library_delete_jellyfin_smoke.py`
+- `reconcile_discovery_pending_smoke.py`
+- `reconcile_discovery_apply_smoke.py`
+- `reconcile_jellyfin_pending_smoke.py`
+
+Production writer was not started or restarted; it remains inactive, with
+`RuntimeDirectoryPreserve=restart` effective and host runtime directory still
+absent from the E2 stop. Production web was not recreated and remains on its
+D10 image; `/login` is 200 and gate remains false. Completion and
+reconcile-apply remain inactive. No production source install, writer start,
+Discovery/provenance write, NAS/Jellyfin mutation, completion, or gate change
+occurred.
+
+`ACTIVE_SOCKET_UNLINK_POSSIBLE=NO`, `NON_SOCKET_UNLINK_POSSIBLE=NO`, and
+`TOCTOU_IDENTITY_RECHECK=YES`. Next checkpoint E4: deploy the validated writer
+source, start the production writer once, and repeat the web-bind durability
+proof. Until then writer connectivity remains unavailable and completion stays
+inactive.
