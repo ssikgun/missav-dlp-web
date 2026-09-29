@@ -6202,3 +6202,75 @@ remains pending.
 `STAGE13_CLOSE_READY=NO`. Next checkpoint E2: change the writer
 RuntimeDirectory/bind persistence contract safely, then repeat the durability
 proof. Do not resume completion before a passing proof.
+
+## Stage13-F2M-E2 — runtime directory preserved, writer restart proof failed
+
+Started from clean HEAD `bed69faaf93a0e186dd5cf535426570425574318`, with the
+remote branch aligned. Production web was on the expected D10 image with
+restart count 0, `/login` returned 200, delete gate was false, completion and
+reconcile-apply units/timers were inactive, and the writer was active. The
+E1 state was reproduced: host runtime directory/socket inodes were
+`135:1511947` / `135:1511952`, while web retained the prior directory inode
+`135:1488725` and had no socket; host writer health was READY and web health
+failed.
+
+The canonical repo-managed artifact is
+`deploy/systemd/teddy-library-discovery-writer.service.d/10-runtime-directory-preserve.conf`:
+`[Service] RuntimeDirectoryPreserve=restart`. It was installed as the matching
+systemd drop-in and `daemon-reload` applied. Effective value is
+`RuntimeDirectoryPreserve=restart`; the writer unit remains the existing
+`/etc/systemd/system/teddy-library-discovery-writer.service` with
+`RuntimeDirectory=teddy-library-discovery-writer`, mode 0750, root user,
+`teddy-library-discovery-writer` group, and `Restart=on-failure`.
+
+The stale web bind was recovered with exactly one web-only recreate using the
+same immutable D10 image (`sha256:92104fcb5bf5c7501120b078ec0e8c778358f3b33064e77e4d89e0b6606274ff`),
+`--no-deps`. Container ID changed once to `97b316c9ff44`; restart count is 0.
+`/login` returned 200, gate remained false, title-lock remained a writable
+bind, writer mount remained a read-only bind, and environment digest remained
+`e76f155985392d403044f833e4ea9bd5276862a5102b5ba1ab2218fe6855b032`.
+Before the proof restart, host and web runtime-directory inode were both
+`135:1511947`; host and web socket inode were both `135:1511952`; host and web
+health returned READY.
+
+Exactly one explicit `systemctl restart teddy-library-discovery-writer.service`
+was issued. The runtime-directory inode remained `135:1511947`, confirming the
+new policy preserved the directory. However, the socket inode also remained
+`135:1511952`: the previous socket pathname persisted. Writer startup failed
+and systemd's `Restart=on-failure` generated 29 automatic failed starts
+(`NRestarts=29`). The writer implementation's `_prepare_socket_parent()`
+explicitly rejects an existing socket path and does not unlink it, so no new
+socket was created. During these retries the unchanged web container still
+saw the old socket inode, but connect/health failed. To stop the automatic
+failure loop, the writer service was stopped once; systemd then cleaned the
+host runtime directory/socket. No further restart, web recreate, or socket
+unlink was attempted. Current writer service is inactive, the old web bind
+still points at its prior directory inode, and web writer health is
+unavailable. `/login` remains 200 and gate remains false.
+
+`HOST_RUNTIME_DIR_PRESERVED=YES`, `HOST_SOCKET_RECREATED=NO`, and the required
+proof failed with classification
+`SOCKET_NOT_VISIBLE_THROUGH_PRESERVED_BIND` (the old path was visible briefly,
+but it was not a new usable socket). Safe `preflight_holding` after the
+restart returned `WRITER_UNAVAILABLE`; it performed no Discovery transition.
+
+Read-only before/after checks match exactly: Discovery `holdings` has 184 rows
+and SHA-256 `5ddc5494421d4e86a6f78bcd2268a408c5718f2e52a883fc0760090fecbcfacd`;
+`library_delete_reconcile_journal` has 1 row and SHA-256
+`d412d8ba7f773b0eaeeaa034ddc5705d138c32172bd729c9e38070444920e171`;
+holding 20 remains absent, VEMA-246 present count is 0, JAV present holdings
+remain 183. The exact VEMA provenance row remains COMMITTED with
+`jellyfin_reconciled=1` and unchanged checksum
+`d7c972131cd78d1c40b663b78d8cd886b638b17bdcc91aaeb9b55a96a6792ec6`.
+Production Discovery content/schema, provenance, NAS, Jellyfin, delete
+operation, completion, and gate mutations were zero. The only production
+changes were the authorized drop-in install/daemon-reload, one web recreate,
+one explicit writer restart, and one writer stop to halt systemd's automatic
+failure loop.
+
+`CANARY_OPERATION_CLOSED=YES`, but
+`WEB_WRITER_SOCKET_DURABILITY_PROVEN=NO` and `STAGE13_CLOSE_READY=NO`.
+Completion remains inactive. Next checkpoint must address the writer's
+fail-closed stale socket startup behavior and its lifecycle safely; do not
+resume completion until a successful proof shows the existing web bind sees a
+new usable socket after one writer restart.
