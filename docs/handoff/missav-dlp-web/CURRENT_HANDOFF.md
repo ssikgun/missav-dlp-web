@@ -5477,3 +5477,64 @@ operation, add the requested atomic Discovery journal recovery and safe writer
 error-code observability, validate fixtures, then use only that exact
 operation if the recovery preconditions pass. Jellyfin remains a separate
 later action.
+
+## Stage13-F2M-C2 — crash-safe writer hardening and exact check-only
+
+`HISTORICAL_WRITER_ERROR_CODE=UNKNOWN` remains unchanged. The earlier log
+recorded only the `WriterError` class; current successful validation does not
+identify the historical failure, and no cause is inferred.
+
+The exact operation remains
+`e8b5ba23-cb6d-4e5e-81f6-c1e5fdb79873` for VEMA-246 / holding 20. Source commit
+`3daac14029ad049416373fa2c452a47a64c9b732` adds the narrow
+`library_delete_reconcile_journal` contract. Its table is created only inside
+`mark_absent`'s `BEGIN IMMEDIATE` transaction. Journal insertion and the exact
+conditional `present=1 -> 0` update commit atomically. A repeated exact
+operation with `present=0` and a matching journal returns
+`ALREADY_RECONCILED`; absent rows without a matching journal, foreign
+operations, or identity drift fail with `OPERATION_MISMATCH`. Health and
+preflight do not create the table. Fixture coverage includes crash-after-writer
+commit recovery, mismatched/no journal, provenance flag still zero, rollback
+on journal/holding failure, and repeat after provenance is marked.
+
+Writer/client error logging now preserves only bounded safe fields: operation,
+DVD-ID, holding ID, and allowlisted `WriterError.code`. It omits fingerprints,
+tokens, raw request JSON, and sensitive paths. Fixtures cover provenance,
+identity, busy, unavailable, and protocol codes and verify sensitive values do
+not appear in logs.
+
+The immutable production writer release is
+`/opt/missav-dlp-web/teddy-library-discovery-writer/releases/3daac14029ad049416373fa2c452a47a64c9b732/`,
+verified against source commit `3daac14029ad049416373fa2c452a47a64c9b732`.
+The writer service alone was updated and restarted; it is active/enabled and
+uses the canonical Discovery/provenance files. Health and exact holding
+preflight return READY. After restart and health/preflight, the journal table
+was still absent, confirming startup/readiness caused no Discovery schema
+write.
+
+The strict read-only helper
+`deploy/stage13-f2m/reconcile_discovery_pending.py --check-only` returned
+`RECOVERY_ELIGIBLE=YES` for the exact operation, VEMA-246, holding 20, four
+removed files, and 2,844,317,586 bytes. It confirmed exact durable provenance,
+current holding identity and `present=1`, no duplicate present holding, target
+activity IDLE, and absent exact NAS title directory. It has no apply mode and
+does not call the writer. The historical exact manifest SHA remains
+`121aefa01eb2d6cd9ae6b99695892cf4652aa4b33d50e65a4c3208b6ef3c8677`.
+
+At checkpoint end, production mutation counts for Discovery content/schema,
+journal, provenance, NAS, and Jellyfin were all zero. Holding 20 remains
+`present=1`; provenance remains `RECONCILE_PENDING`,
+`discovery_reconciled=0`, `jellyfin_reconciled=NULL`; NAS title directory is
+absent; Jellyfin exact GET count remains one. Delete gate is false, web is
+healthy, writer READY, completion timer/service inactive, and
+`teddy-discovery-jav-reconcile-apply.service` inactive. The separate
+`teddy-discovery-jav-reconcile.timer` is active/waiting for a report-only
+service; source routes it through `reconcile_remote`, emits `APPLY=0`, and does
+not invoke apply. Its service is currently failed/not running; neither timer
+nor service was started or changed in this checkpoint.
+
+`DISCOVERY_CRASH_RECOVERY_HARDENED=YES`,
+`WRITER_ERROR_LOGGING_HARDENED=YES`, and `RECOVERY_ELIGIBLE=YES`.
+`DISCOVERY_RECONCILED=NO` intentionally: do not call `mark_absent` in this
+checkpoint. Next is F2M-C3, applying only this exact operation's Discovery
+reconciliation. Jellyfin remains a separate F2M-D step.
