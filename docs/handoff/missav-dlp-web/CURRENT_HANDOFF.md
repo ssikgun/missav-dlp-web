@@ -6335,3 +6335,63 @@ occurred.
 source, start the production writer once, and repeat the web-bind durability
 proof. Until then writer connectivity remains unavailable and completion stays
 inactive.
+
+## Stage13-F2M-E4 — E3 release installed; durability proof incomplete
+
+Preconditions passed at clean, remote-aligned HEAD
+`d9e04acfe6492635ea45922ee3f65f169c5d9437`: web `/login` was 200, the D10
+image was running with gate=false, completion/reconcile-apply were inactive,
+writer was inactive, and the host writer runtime directory was absent. VEMA-246
+provenance was COMMITTED; holding 20 present=0 and VEMA-246 present=0.
+Before/after read-only checks match: Discovery `holdings` has 184 rows and
+SHA-256 `5ddc5494421d4e86a6f78bcd2268a408c5718f2e52a883fc0760090fecbcfacd`;
+`library_delete_reconcile_journal` has 1 row and SHA-256
+`d412d8ba7f773b0eaeeaa034ddc5705d138c32172bd729c9e38070444920e171`; the
+exact COMMITTED VEMA provenance row SHA-256 is
+`d7c972131cd78d1c40b663b78d8cd886b638b17bdcc91aaeb9b55a96a6792ec6`.
+
+Installed the validated E3 writer and its five import dependencies from exact
+source commit `d9e04acfe6492635ea45922ee3f65f169c5d9437` into
+`/opt/missav-dlp-web/teddy-library-discovery-writer/releases/d9e04acfe6492635ea45922ee3f65f169c5d9437/`.
+The release has a matching `SOURCE_COMMIT`, `SHA256SUMS` verified for all six
+Python files, root:root ownership, files mode 0444, and release directory mode
+0555. The writer source SHA-256 is
+`8898087c4830a6e2729c5593377224a9cfa518147aa0ec40bdc554cba392410e`;
+imports were verified with host Python without writing bytecode.
+
+Added and installed repo-managed drop-in
+`deploy/systemd/teddy-library-discovery-writer.service.d/20-execstart-d9e04ac.conf`.
+After `daemon-reload`, effective ExecStart points to the new release and
+retains the same Discovery DB, provenance DB, socket, root user, service group,
+RuntimeDirectory and mode, and `Restart=on-failure`. The E3
+`RuntimeDirectoryPreserve=restart` drop-in remains effective.
+
+One writer `systemctl start` was issued at 23:56:33 KST. Its first status sample
+showed an active process (PID 1374809), but no socket yet. The monitor compared
+new activation `NRestarts=0` to the prior E2 value 29 and incorrectly treated
+the reset as an automatic restart. It then issued the bounded stop before a
+proper readiness wait. Journal shows only Started then Stopping/Stopped, with
+no writer startup error and no automatic restart event. The stop ended with
+SIGTERM; host runtime directory was cleaned. Current writer service is
+inactive, `NRestarts=0` for that activation, and the service has not been
+started again. Therefore initial start/host health is **unverified**, not a
+confirmed release failure.
+
+Because readiness was not verified, web recovery recreate was not attempted.
+Web remains container `97b316c9ff44` on the D10 image with restart count 0;
+`/login` remains 200 and gate=false. No post-recreate inode baseline, writer
+preflight, writer durability restart, or web-after-restart proof was performed.
+Host runtime directory is currently absent and writer connectivity remains
+unavailable. Completion and reconcile-apply remain inactive.
+
+Discovery holdings, reconcile journal, and exact VEMA provenance checksums are
+unchanged. No Discovery content/schema, provenance, NAS, Jellyfin, delete,
+completion, or gate mutation occurred. Production changes were limited to the
+validated immutable writer release install, service ExecStart drop-in install
+and daemon-reload, one writer start, and one bounded writer stop.
+
+`CANARY_OPERATION_CLOSED=YES`; `WEB_WRITER_SOCKET_DURABILITY_PROVEN=NO` and
+`STAGE13_CLOSE_READY=NO`. E4 is `INCOMPLETE`. Next checkpoint must retry the
+runtime proof only after authorization, using the new activation's restart
+counter baseline (zero) and waiting boundedly for the socket/host health before
+any web recreate. Keep completion inactive until a full successful E4 proof.
