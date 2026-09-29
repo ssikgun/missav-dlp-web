@@ -5331,3 +5331,62 @@ F2M-A3 verdict: PASS for the configuration repair and gate-off runtime
 regression. Next, Teddy should verify the restored Library screen and, with
 the gate still false, click `영구 삭제 준비` once to confirm the manifest is
 shown. Do not re-arm until that gate-off prepare display is confirmed.
+
+## Stage13-F2M-A5 / A6 — watchdog hardening and gate-false rehearsal
+
+F2M-A5 verified the 10-minute watchdog triggered at 2026-09-29 15:33:51 KST
+and exited 1 at 15:34:12 KST. Its base Compose gate-off recreation completed,
+but it treated container state `running` as sufficient to issue only one
+immediate `/login` request. That request got connection-reset while Flask was
+still starting. The fail-safe branch then stopped web and retained the global
+freeze. Gate-off configuration had been applied; the failed readiness check,
+not a delete path, caused the watchdog failure. Web was subsequently started
+from the base gate-false Compose, `/login` returned 200, and only then was the
+freeze released. Gate was never re-armed and no delete request was sent.
+
+Added reusable deployment helper
+`deploy/stage13-f2m/canary_disarm.py` and deterministic fixtures in
+`deploy/stage13-f2m/canary_disarm_smoke.py`. It verifies canonical Compose
+gate=false/image/restart policy, recreates only `missav-dlp-web`, and polls
+container-running plus local `/login` HTTP 200 every 2 seconds for at most 120
+seconds. It then checks writer READY, required read/write mount modes, runtime
+gate=false, and restart policy `unless-stopped`. Only after all checks does it
+release an active freeze-holder and stop the transient watchdog timer. When
+freeze is absent it remains idempotent for watchdog recovery; a rehearsal may
+explicitly require a holder. Any pre-release failure stops web, sets restart
+policy `no`, returns nonzero with a bounded safe reason, and never releases an
+active freeze. It does not inspect or print secret values and issues no delete
+API request.
+
+Offline fixtures passed for immediate readiness, 24-second delayed readiness,
+transient connection/HTTP errors followed by 200, timeout fail-safe, writer
+failure, gate mismatch, restart-policy mismatch, exception ordering, all
+idempotent gate/web/freeze states, and safe error output. Python compile,
+`git diff --check`, Compose render, Library UI smoke, Library API fixture smoke,
+and Discovery writer fixture smoke passed. The API/writer fixture smokes were
+run inside the production image because host Python has no Flask dependency.
+
+Gate-false production rehearsal used a supervised holder with the pinned
+completion `operation_lock()` primitive. An independent contender observed
+BUSY. A 30-second transient systemd timer invoked the new helper while gate
+remained false. The helper recreated only the web app, observed local
+readiness after 15.767 seconds, verified writer/mount/gate/restart policy, and
+then released the freeze. Its systemd service completed successfully; the
+timer and service are now inactive/collected. No completion/reconcile service
+was run.
+
+Post-rehearsal: gate=false, web running on image
+`sha256:e90c320f44b9b3249093f989979805d5ec9861663bb03af35f91b7a6a5920807`,
+restart count 0, policy `unless-stopped`, login 200, writer READY, Discovery
+and writer mounts RO, title-lock RW. Freeze-holder is inactive and the global
+operation lock probe acquired/released. Completion timer remains inactive and
+disabled; completion service and reconcile-apply are inactive. VEMA-246
+holding 20 remains present=1; four files, 2,844,317,586 bytes, manifest SHA
+`121aefa01eb2d6cd9ae6b99695892cf4652aa4b33d50e65a4c3208b6ef3c8677`, Jellyfin
+exact count 1, and Library size/KO/Jellyfin state remain unchanged. Provenance
+DB/operation is absent. `ACTUAL_DELETE=0`.
+
+`DISARM_WATCHDOG_HARDENED=YES`, `GATE_FALSE_REHEARSAL=PASS`,
+`POST_REHEARSAL_SAFE=YES`. Gate remained false throughout. Next action is a
+separately requested short ARM only after this evidence is reviewed; do not
+prepare, validate, commit, or delete as part of this rehearsal.
