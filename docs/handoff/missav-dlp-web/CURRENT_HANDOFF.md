@@ -5439,3 +5439,41 @@ free, freeze-holder/watchdog inactive, completion timer/service inactive, and
 reconcile-apply inactive. No re-arm occurred. The reconcile operation remains
 pending and must not be retried until its failure is addressed in the next
 explicit checkpoint.
+
+## Stage13-F2M-C — exact Discovery recovery preflight (INCOMPLETE)
+
+Read-only investigation confirmed the writer service runs as `root` in group
+`teddy-library-discovery-writer`, from the immutable F2B release
+`09a3a89bac6af910ca3543f8c076bb0f54e2cb41`. Its configured Discovery and
+provenance paths are the canonical host files. Device/inode checks matched
+web `/discovery/teddy-discovery.sqlite3` to the host Discovery DB and web
+`/downloads/teddy-library-delete-provenance.sqlite3` to the host provenance
+DB. Both databases report WAL mode. The service is active; web gate is false
+and writer health is READY.
+
+For operation `e8b5ba23-cb6d-4e5e-81f6-c1e5fdb79873`, the writer's current
+read-only `_provenance()` validation passes against the durable operation,
+and its read-only `_row()` identity check passes for holding 20 / VEMA-246
+with `present=1`. A current `preflight_holding` returns READY. The retained
+17:05:50 KST web log records only `WriterError` for Discovery reconciliation;
+it does not record `WriterError.code`, and the commit access-log line is not
+retained. Therefore `WRITER_ERROR_CODE=UNKNOWN_NOT_RETAINED` and the original
+failure cannot be assigned an exact root cause from available evidence.
+Possible transient transport/database causes are not asserted as fact.
+
+Per the fail-closed requirement, no writer `mark_absent`, recovery helper,
+HTTP reconciliation endpoint, or production database mutation was run. The
+crash-window journal hardening was not deployed, and the exact operation is
+still pending: holding 20 `present=1`, provenance `discovery_reconciled=0`,
+NAS deletion complete, Jellyfin flag NULL and exact GET item count 1.
+`WRITER_ROOT_CAUSE_RESOLVED=NO`,
+`DISCOVERY_CRASH_RECOVERY_HARDENED=NO`, `DISCOVERY_RECONCILED=NO`.
+
+Production remains safe: gate false, web healthy on the repaired image, writer
+READY, completion timer/service and reconcile-apply inactive, no title/global
+lock held, NAS title directory absent. The next checkpoint must not claim the
+original error code without evidence. It should preserve the original
+operation, add the requested atomic Discovery journal recovery and safe writer
+error-code observability, validate fixtures, then use only that exact
+operation if the recovery preconditions pass. Jellyfin remains a separate
+later action.
