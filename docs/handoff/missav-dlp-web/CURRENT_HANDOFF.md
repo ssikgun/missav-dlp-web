@@ -6092,3 +6092,56 @@ gate mutation occurred.
 `INTEGRATION_SMOKE_PASS=YES`
 `D10_DEPLOY_READY=YES` (source/integration validation only; production deploy
 and VEMA finalization remain for D10 after its own preconditions).
+
+## Stage13-F2M-D10 — deploy and close VEMA-246 canary
+
+Preconditions passed at source HEAD
+`52aa3f40f3bee3b70f62f859d71f8dfcf7e9ad07`, with validated source commit
+`6665ff8e479ba404e99c6e4c53b02830e29abca5` in its ancestry, remote aligned,
+and worktree clean. Before deploy, the exact VEMA provenance row was
+`RECONCILE_PENDING` with NAS complete, Discovery reconciled, Jellyfin NULL,
+four removed files / 2,844,317,586 bytes, empty remainder, and the expected
+manifest digest. NAS title directory was absent; holding 20 and VEMA present
+counts were zero; current JAV holdings were 183. Organizer and Stage12 activity
+checks reported idle. Gate was false, production web was healthy, and
+completion/reconcile-apply units were inactive.
+
+Built the immutable local image from that HEAD with the existing Dockerfile:
+`missav-dlp-web:stage13f2md10-52aa3f4`, image ID / SHA
+`sha256:92104fcb5bf5c7501120b078ec0e8c778358f3b33064e77e4d89e0b6606274ff`.
+All Dockerfile embedded checks passed, including the Stage13 delete commit,
+D9 Jellyfin, and recovery-helper smokes. Rendered Compose config retained
+gate=false, restart policy `unless-stopped`, and the existing title-lock bind.
+Only `missav-dlp-web` was recreated with `--no-deps`; no writer or completion
+service was restarted. Post-deploy the expected image is running, restart count
+0, `/login` is 200, the environment digest and mount map match the prior
+container, title-lock remains RW, writer socket is visible and health is READY,
+and completion/reconcile-apply remain inactive. Writer socket restart
+durability was not tested.
+
+The deployed helper files' SHA-256 values matched the validated repository
+source. Its production-configured check-only returned eligible YES with broad
+exact-path count 1, candidate ID
+`0fa5e1cd9743f9e30dc69054e1c12375`, exact-ID count 0, and
+`BROAD_INVENTORY_GHOST`. The exact-operation apply returned
+`JELLYFIN_APPLY=COMMITTED`, `DELETED_NOTIFICATION_POSTS=0`, and
+`POLL_COMPLETE=True`. It finalized only the exact provenance transition; it
+created no notification claim.
+
+Read-only post-verification confirms provenance `COMMITTED`, NAS complete,
+Discovery reconciled, Jellyfin reconciled, finish timestamp set, four files /
+2,844,317,586 bytes removed, and empty remainder. The notification ledger has
+zero rows for this operation. NAS title directory remains absent; holding 20
+present=0; VEMA present=0; current JAV holdings=183. Jellyfin broad inventory
+still returns the same old ID/path ghost, while exact-ID count is 0. No
+user-scoped ID was available for an additional user-scoped GET. D10 Jellyfin
+POST/Refresh/Scan/DELETE counts are all zero; NAS and Discovery writes are
+zero. Completion remains intentionally inactive, so any newly downloaded
+post-processing work stays queued for later.
+
+`JELLYFIN_RECONCILED=YES`, `DELETE_OPERATION_FINAL=YES`, and
+`CANARY_OPERATION_CLOSED=YES`. The broader Stage13 close remains pending:
+`WEB_WRITER_SOCKET_DURABILITY_PROVEN=NO` and
+`STAGE13_CLOSE_READY=NO`. Next checkpoint: F2M-E writer socket restart
+durability only; do not resume completion until that checkpoint closes the
+remaining Stage13 gate.
