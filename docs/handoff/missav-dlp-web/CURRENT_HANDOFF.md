@@ -1,5 +1,47 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-29 Stage13-F2M-D8 — stopped on duplicate-notification retry gap (INCOMPLETE)
+
+Initial repo state was expected HEAD `df8bec646f736855e975849bbd993db68f5bd19b`,
+branch `teddy-subtitle-stage11`, clean worktree; `origin/teddy-subtitle-stage11`
+matched. The success-invariant/reconciler implementation and deployment were
+not started after source inspection confirmed the explicitly prohibited
+crash/retry gap. No implementation smoke was run.
+
+Production preconditions were rechecked GET/read-only: gate false, web `/login`
+HTTP 200, completion timer/service and reconcile-apply inactive. The exact
+operation remains `RECONCILE_PENDING`, `nas_delete_complete=1`,
+`discovery_reconciled=1`, `jellyfin_reconciled=NULL`; holding 20 is present=0,
+VEMA-246 present count=0, current JAV holdings=183. Jellyfin broad inventory
+returned 364/364 with one exact path candidate and the old ID
+`0fa5e1cd9743f9e30dc69054e1c12375`; API-key exact-ID query returned 0. No
+Jellyfin notification was sent.
+
+The concrete retry gap is in current source: `JellyfinDeleteReconciler.__call__`
+calls `notify_deleted()` whenever the broad path lookup returns one candidate,
+then polls the broad inventory. A timeout returns false. The recovery
+`apply_operation()` returns `RECONCILE_PENDING` without persisting that the
+notification was sent. A later retry again sees the broad candidate and calls
+`notify_deleted()` again, even when the candidate's exact ID query would now
+return zero. The existing provenance schema has only `jellyfin_reconciled` and
+`result_state` for Jellyfin status; it has no durable notification-sent marker.
+
+The offline recovery smoke's “crash after notification” case only models the
+item already absent on retry, which avoids a POST. The timeout case confirms
+the operation remains pending after one POST, but it does not retry while the
+same exact ID is still live. That leaves the short-window duplicate-POST case
+uncovered. Per the explicit stop condition, no schema expansion or workaround
+was attempted and no source/test file changed.
+
+Classification for the current exact item remains
+`BROAD_INVENTORY_GHOST` (broad=1, exact-ID=0). The exact operation is not
+finalized because implementation work stopped before a safe retry contract
+could be designed and validated. Production mutation audit: Jellyfin 0,
+provenance 0, NAS 0, Discovery 0, restart 0. Only this canonical handoff was
+updated. Next: separately design a durable, idempotent notification/retry
+contract before resuming the ghost-aware reconciler change; do not simply
+repeat `notify_deleted()` when an earlier attempt may already have sent it.
+
 ## 2026-09-29 Stage13-F2M-D7 — broad-inventory ghost identified (READ-ONLY)
 
 Initial repo state was expected HEAD `48acdb52abd4dbd30ed4694f09b0c3b98eea94c8`,
