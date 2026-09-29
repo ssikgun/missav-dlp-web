@@ -8,7 +8,7 @@ from pathlib import Path, PurePosixPath
 import sqlite3
 import stat
 import time
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 import uuid
 from contextlib import closing
 
@@ -428,11 +428,11 @@ def reconcile_discovery_holding(db_path: str, *, holding_id: int, dvd_id: str,
 
 
 class JellyfinDeleteReconciler:
-    """Refresh one exact stale item once, then poll boundedly for its removal."""
-    def __init__(self, client: JellyfinClient, *, timeout=60.0, interval=2.0,
+    """Notify Jellyfin once about one exact external deletion, then poll boundedly."""
+    def __init__(self, client: JellyfinClient, *, timeout=120.0, interval=2.0,
                  clock=time.monotonic, sleep=time.sleep):
         self.client = client
-        self.timeout = max(0.0, min(float(timeout), 60.0))
+        self.timeout = max(0.0, min(float(timeout), 120.0))
         self.interval = max(0.01, min(float(interval), 2.0))
         self.clock = clock
         self.sleep = sleep
@@ -463,15 +463,10 @@ class JellyfinDeleteReconciler:
             return True
         if len(matches) != 1:
             raise DeleteCommitError("JELLYFIN_PATH_AMBIGUOUS")
-        item_id = str(matches[0].get("Id") or "").strip()
-        if not item_id:
-            raise DeleteCommitError("JELLYFIN_ITEM_ID_MISSING")
-        query = urlencode({
-            "MetadataRefreshMode": "Default", "ImageRefreshMode": "Default",
-            "ReplaceAllImages": "false", "ReplaceMetadata": "false",
-            "RegenerateThumbnail": "false",
-        })
-        self.client._request("POST", "/Items/" + quote(item_id, safe="") + "/Refresh?" + query)
+        try:
+            self.client.notify_deleted(expected)
+        except Exception as exc:
+            raise DeleteCommitError("JELLYFIN_DELETE_NOTIFICATION_FAILED") from exc
         deadline = self.clock() + self.timeout
         while True:
             remaining = deadline - self.clock()

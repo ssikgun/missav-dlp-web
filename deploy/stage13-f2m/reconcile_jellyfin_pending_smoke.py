@@ -70,6 +70,8 @@ class Jellyfin:
         value=self.gets.pop(0)
         if isinstance(value,Exception): raise value
         return value
+    def notify_deleted(self,path):
+        self.posts.append({"endpoint":"/Library/Media/Updated","payload":{"Updates":[{"Path":path,"UpdateType":"Deleted"}]}})
 
 
 def inv(items):return {"Items":items,"TotalRecordCount":len(items)}
@@ -109,22 +111,22 @@ def main():
         f=fixture(tmp);j=Jellyfin([inv([exact()])]);r=run_check(f,j)
         assert r["jellyfin_item_count"]==1 and state(f)==("RECONCILE_PENDING",None,1) and not j.posts
 
-    # One exact Refresh POST, bounded poll to zero, then strict provenance commit.
+    # One exact Deleted notification, bounded poll to zero, then strict provenance commit.
     with tempfile.TemporaryDirectory(prefix="jf-apply-post-") as tmp:
         f=fixture(tmp);j=Jellyfin([inv([exact()]),inv([exact()]),inv([exact()]),inv([]),inv([])])
         result=run_apply(f,j)
-        assert result=={"status":"COMMITTED","refresh_posts":1,"poll_complete":True}
-        assert len(j.posts)==1 and "/Items/jf-42/Refresh?" in j.posts[0]
+        assert result=={"status":"COMMITTED","deleted_notifications":1,"poll_complete":True}
+        assert j.posts==[{"endpoint":"/Library/Media/Updated","payload":{"Updates":[{"Path":PATH,"UpdateType":"Deleted"}]}}]
         assert state(f)==("COMMITTED",1,1)
 
-    # Already gone (including a crash after refresh, before provenance commit): no POST, finalize.
+    # Already gone (including a crash after notification, before provenance commit): no POST, finalize.
     with tempfile.TemporaryDirectory(prefix="jf-apply-crash-retry-") as tmp:
         f=fixture(tmp);j=Jellyfin([inv([]),inv([]),inv([])])
         result=run_apply(f,j)
-        assert result["status"]=="COMMITTED" and result["refresh_posts"]==0 and not j.posts
+        assert result["status"]=="COMMITTED" and result["deleted_notifications"]==0 and not j.posts
         assert state(f)==("COMMITTED",1,1)
 
-    # Refresh timeout leaves the exact operation pending and does not update provenance.
+    # Deleted notification timeout leaves the exact operation pending and does not update provenance.
     with tempfile.TemporaryDirectory(prefix="jf-apply-timeout-") as tmp:
         f=fixture(tmp);one=inv([exact()]);j=Jellyfin([one,one,one]+[one]*32)
         class Clock:
@@ -134,7 +136,7 @@ def main():
         clock=Clock()
         factory=lambda client:JellyfinDeleteReconciler(client,timeout=6,interval=2,clock=clock.now,sleep=clock.sleep)
         result=run_apply(f,j,reconciler_factory=factory)
-        assert result["status"]=="RECONCILE_PENDING" and result["refresh_posts"]==1
+        assert result["status"]=="RECONCILE_PENDING" and result["deleted_notifications"]==1
         assert len(j.posts)==1 and state(f)==("RECONCILE_PENDING",None,1)
 
     # Ambiguity and lock contention fail before refresh or provenance update.
@@ -153,7 +155,7 @@ def main():
         else:raise AssertionError("busy title accepted")
         assert not j.posts and state(f)==("RECONCILE_PENDING",None,1)
 
-    print("Stage13-F2M-D exact Jellyfin recovery helper smoke: OK")
+    print("Stage13-F2M-D2 exact Jellyfin recovery helper smoke: OK")
 
 
 if __name__=="__main__":main()

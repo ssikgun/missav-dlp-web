@@ -291,3 +291,27 @@ class JellyfinClient:
             "path":
                 path.as_posix(),
         }
+
+    def notify_deleted(
+        self,
+        media_path: str,
+    ):
+        """Tell Jellyfin that one exact external media path was deleted."""
+        path = PurePosixPath(str(media_path or ""))
+        adult = PurePosixPath("/media/adult")
+        if (
+            not path.is_absolute()
+            or path == adult
+            or adult not in path.parents
+            or ".." in path.parts
+            or "*" in path.name
+            or path.name in {"", "."}
+        ):
+            raise JellyfinError("media path outside Adult library")
+
+        self._request(
+            "POST",
+            "/Library/Media/Updated",
+            payload={"Updates": [{"Path": path.as_posix(), "UpdateType": "Deleted"}]},
+        )
+        return {"status": "JELLYFIN_DELETE_NOTIFIED", "path": path.as_posix()}

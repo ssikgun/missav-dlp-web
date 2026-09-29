@@ -148,7 +148,6 @@ def check_operation(operation_id, expected_dvd_id, *, discovery_db=DISCOVERY_DB,
         matches=reconciler._matches(media_path)
     except Exception as exc: raise RecoveryError("JELLYFIN_QUERY_FAILED") from exc
     if len(matches)>1: raise RecoveryError("JELLYFIN_PATH_AMBIGUOUS")
-    if matches and not str(matches[0].get("Id") or "").strip(): raise RecoveryError("JELLYFIN_ITEM_ID_MISSING")
     return {"operation_id":operation_id,"dvd_id":EXPECTED_DVD,"holding_id":EXPECTED_HOLDING,
         "source_identity_fingerprint":fingerprint,"manifest_sha256":digest,"file_count":4,
         "total_bytes":total,"relative_path":relative,"jellyfin_item_count":len(matches)}
@@ -209,16 +208,16 @@ def apply_operation(operation_id, expected_dvd_id, *, discovery_db=DISCOVERY_DB,
                     reconciler=reconciler_factory(client)
                     if checked["jellyfin_item_count"]==1:
                         if not reconciler(checked["relative_path"]):
-                            return {"status":"RECONCILE_PENDING","refresh_posts":1,"poll_complete":False}
-                    # Re-read exact path after refresh, or skip POST when already absent.
+                            return {"status":"RECONCILE_PENDING","deleted_notifications":1,"poll_complete":False}
+                    # Re-read exact path after notification, or skip POST when already absent.
                     final_matches=reconciler._matches(jellyfin_media_path(checked["relative_path"]))
                 except Exception as exc:
                     raise RecoveryError("JELLYFIN_RECONCILE_FAILED") from exc
                 if final_matches:
                     if len(final_matches)>1: raise RecoveryError("JELLYFIN_PATH_AMBIGUOUS")
-                    return {"status":"RECONCILE_PENDING","refresh_posts":checked["jellyfin_item_count"],"poll_complete":False}
+                    return {"status":"RECONCILE_PENDING","deleted_notifications":checked["jellyfin_item_count"],"poll_complete":False}
                 _finalize_provenance(provenance_db,checked)
-                return {"status":"COMMITTED","refresh_posts":checked["jellyfin_item_count"],"poll_complete":True}
+                return {"status":"COMMITTED","deleted_notifications":checked["jellyfin_item_count"],"poll_complete":True}
         except OperationLockBusy as exc: raise RecoveryError("GLOBAL_LOCK_BUSY") from exc
         except OperationLockError as exc: raise RecoveryError("GLOBAL_LOCK_UNAVAILABLE") from exc
     finally:
@@ -243,7 +242,7 @@ def main(argv=None):
         lock_dir=os.environ.get("TEDDY_TITLE_LOCK_DIR") or TITLE_LOCK_DIR
         result=apply_operation(args.operation_id,args.expected_dvd_id,title_lock_dir=lock_dir,ssh=ssh,jellyfin_client=client)
         print("JELLYFIN_APPLY="+result["status"])
-        print("REFRESH_POSTS="+str(result["refresh_posts"]))
+        print("DELETED_NOTIFICATION_POSTS="+str(result["deleted_notifications"]))
         print("POLL_COMPLETE="+str(result["poll_complete"]))
         return 0 if result["status"]=="COMMITTED" else 3
     except RecoveryError as exc:
