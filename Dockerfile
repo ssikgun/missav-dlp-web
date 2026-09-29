@@ -27,9 +27,10 @@ COPY . .
 RUN python -m py_compile \
     app.py teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py teddy_subtitle_status.py \
     teddy_routing.py teddy_duplicates.py teddy_ownership.py teddy_ownership_smoke.py teddy_logging.py teddy_storage.py teddy_browser_config.py teddy_auth.py \
-    teddy_discovery_runtime.py teddy_discovery_download_api.py teddy_discovery_runtime_smoke.py teddy_library_api.py teddy_public_origin.py teddy_title_exclusion.py teddy_title_exclusion_smoke.py teddy_library_delete_dryrun.py teddy_library_delete_commit.py teddy_library_discovery_writer.py teddy_library_delete_activity.py teddy_library_delete_dryrun_smoke.py teddy_library_delete_commit_smoke.py teddy_library_discovery_writer_smoke.py teddy_library_delete_activity_smoke.py teddy_discovery_ui_shell_smoke.py teddy_library_ui_smoke.py teddy_file_management_navigation_smoke.py teddy_subtitle_status_ui_smoke.py teddy_discovery_download_api_smoke.py \
+    teddy_discovery_runtime.py teddy_discovery_download_api.py teddy_discovery_runtime_smoke.py teddy_library_api.py teddy_public_origin.py teddy_title_exclusion.py teddy_title_exclusion_smoke.py teddy_library_delete_dryrun.py teddy_library_delete_commit.py teddy_library_discovery_writer.py teddy_library_delete_activity.py teddy_library_delete_dryrun_smoke.py teddy_library_delete_commit_smoke.py teddy_library_discovery_writer_smoke.py teddy_library_delete_activity_smoke.py teddy_library_delete_jellyfin_smoke.py teddy_discovery_ui_shell_smoke.py teddy_library_ui_smoke.py teddy_file_management_navigation_smoke.py teddy_subtitle_status_ui_smoke.py teddy_discovery_download_api_smoke.py \
     deploy/stage13-f2m/reconcile_discovery_pending.py deploy/stage13-f2m/reconcile_discovery_pending_smoke.py \
     deploy/stage13-f2m/reconcile_discovery_apply.py deploy/stage13-f2m/reconcile_discovery_apply_smoke.py \
+    deploy/stage13-f2m/reconcile_jellyfin_pending.py deploy/stage13-f2m/reconcile_jellyfin_pending_smoke.py \
     teddy_generic.py teddy_123av.py teddy_bootstrap.py teddy_verify_build.py teddy_hls_transport.py teddy_hls_benchmark.py \
     teddy_patch_vpn_health.py teddy_patch_proxy_pool.py teddy_patch_proxy_speed.py \
     teddy_patch_proxy_learning.py teddy_patch_proxy_task_sync.py \
@@ -53,9 +54,11 @@ RUN python teddy_discovery_download_api_smoke.py
 RUN python teddy_library_api_smoke.py
 RUN python teddy_library_delete_dryrun_smoke.py
 RUN python teddy_library_delete_commit_smoke.py
+RUN python teddy_library_delete_jellyfin_smoke.py
 RUN python teddy_library_discovery_writer_smoke.py
 RUN python deploy/stage13-f2m/reconcile_discovery_pending_smoke.py
 RUN python deploy/stage13-f2m/reconcile_discovery_apply_smoke.py
+RUN python deploy/stage13-f2m/reconcile_jellyfin_pending_smoke.py
 RUN python teddy_library_ui_smoke.py
 RUN python teddy_title_exclusion_smoke.py
 RUN python -c "import teddy_logging as l; assert l._clean_for_viewer('\\x1b[31mRED\\x1b[0m') == 'RED'; assert l._clean_for_viewer(b'hello') == 'hello'; print('web log cleanup smoke test: OK')"

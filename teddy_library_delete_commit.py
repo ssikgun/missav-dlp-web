@@ -7,6 +7,7 @@ import os
 from pathlib import Path, PurePosixPath
 import sqlite3
 import stat
+import time
 from urllib.parse import quote, urlencode
 import uuid
 from contextlib import closing
@@ -427,9 +428,14 @@ def reconcile_discovery_holding(db_path: str, *, holding_id: int, dvd_id: str,
 
 
 class JellyfinDeleteReconciler:
-    """GET exact path inventory, refresh only its item, then verify absence."""
-    def __init__(self, client: JellyfinClient):
+    """Refresh one exact stale item once, then poll boundedly for its removal."""
+    def __init__(self, client: JellyfinClient, *, timeout=60.0, interval=2.0,
+                 clock=time.monotonic, sleep=time.sleep):
         self.client = client
+        self.timeout = max(0.0, min(float(timeout), 60.0))
+        self.interval = max(0.01, min(float(interval), 2.0))
+        self.clock = clock
+        self.sleep = sleep
 
     def _matches(self, expected_path):
         query = urlencode({
@@ -439,9 +445,15 @@ class JellyfinDeleteReconciler:
         value = self.client._request("GET", "/Items?" + query)
         if not isinstance(value, dict) or not isinstance(value.get("Items"), list):
             raise DeleteCommitError("JELLYFIN_RESPONSE_INVALID")
-        total = int(value.get("TotalRecordCount", len(value["Items"])))
+        try:
+            total = int(value.get("TotalRecordCount", len(value["Items"])))
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise DeleteCommitError("JELLYFIN_RESPONSE_INVALID") from exc
         if total > MAX_JELLYFIN_ITEMS or len(value["Items"]) != total:
             raise DeleteCommitError("JELLYFIN_INVENTORY_INCOMPLETE")
+        for item in value["Items"]:
+            if not isinstance(item, dict) or not isinstance(item.get("Path"), str):
+                raise DeleteCommitError("JELLYFIN_RESPONSE_INVALID")
         return [item for item in value["Items"] if isinstance(item, dict) and item.get("Path") == expected_path]
 
     def __call__(self, media_relative: str) -> bool:
@@ -460,4 +472,16 @@ class JellyfinDeleteReconciler:
             "RegenerateThumbnail": "false",
         })
         self.client._request("POST", "/Items/" + quote(item_id, safe="") + "/Refresh?" + query)
-        return not self._matches(expected)
+        deadline = self.clock() + self.timeout
+        while True:
+            remaining = deadline - self.clock()
+            if remaining <= 0:
+                return not self._matches(expected)
+            self.sleep(min(self.interval, remaining))
+            matches = self._matches(expected)
+            if not matches:
+                return True
+            if len(matches) != 1:
+                raise DeleteCommitError("JELLYFIN_PATH_AMBIGUOUS")
+            if self.clock() >= deadline:
+                return False
