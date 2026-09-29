@@ -5588,3 +5588,54 @@ matching provenance discovery flag. NAS, Jellyfin, media state, completion,
 Stage12, delete API, and new-operation counts remain untouched. Next is F2M-D:
 reconcile only the exact stale Jellyfin item, then close the same provenance
 operation to `COMMITTED` after exact verification.
+
+## Stage13-F2M-D — exact Jellyfin reconciliation (PENDING)
+
+Source commit `7a5d0d2` adds 60-second / 2-second bounded polling to
+`JellyfinDeleteReconciler`: GET the exact path, send at most one Refresh POST
+for a single exact item, then poll until absent or timeout. Exact zero skips
+the POST; duplicate paths, missing IDs, incomplete/invalid inventory, and POST
+errors fail closed. Fixture coverage includes immediate absence, first and
+later poll success, timeout, ambiguity, invalid responses, and one-POST-only.
+The exact operator helper
+`deploy/stage13-f2m/reconcile_jellyfin_pending.py` is allowlisted to the existing
+VEMA-246 operation and supports separate `--check-only` / `--apply` modes. It
+rechecks under title-lock then global operation lock and conditionally changes
+only the exact provenance row after exact path absence.
+
+Image `missav-dlp-web:stage13f2md-7a5d0d2` was built from source commit
+`7a5d0d2`; image ID is
+`sha256:0439b293e7219d2c5e02a8d1772184103e2797d710e727a70867e1fa276ca7e0`.
+Only `missav-dlp-web` was recreated, with gate false. `/login` returned 200;
+container restart count is zero; Discovery DB and writer socket mounts are RO,
+title lock mount is RW, NAS/Jellyfin configuration and secret mounts are
+present/readable. Host writer health is READY. After recreation the web
+container sees the socket and container writer health is READY. Socket
+durability across a subsequent writer restart remains unproven:
+`WEB_WRITER_SOCKET_VISIBLE=YES`,
+`WEB_WRITER_SOCKET_DURABILITY_PROVEN=NO`.
+
+Immediately before apply, exact check-only returned
+`JELLYFIN_RECOVERY_ELIGIBLE=YES`, exact item count 1. The operator helper held
+both locks in the required order and sent exactly one exact-item Refresh POST.
+Bounded polling timed out with the exact Jellyfin item still present; the helper
+returned `RECONCILE_PENDING`, `REFRESH_POSTS=1`, `POLL_COMPLETE=False`. A
+subsequent GET-only check still found one exact item. No second apply or
+refresh was attempted. Provenance remains `RECONCILE_PENDING`,
+`discovery_reconciled=1`, `jellyfin_reconciled=NULL`; no provenance finalization
+occurred.
+
+Discovery and NAS were not changed in this step: holding 20 remains
+`present=0`, VEMA-246 present count is zero, current JAV holdings remain 183,
+and the NAS title directory remains absent. The Library's present-holdings
+projection therefore has zero VEMA-246 rows; no authenticated UI/API session
+was used. Jellyfin exact item count remains 1. Gate is false, web is healthy,
+completion timer/service and reconcile-apply are inactive, and both locks are
+free.
+
+`JELLYFIN_RECONCILED=NO`, `DELETE_OPERATION_FINAL=NO`,
+`CANARY_OPERATION_CLOSED=NO`, and `STAGE13_CLOSE_READY=NO`. The safe blocker is
+`JELLYFIN_EXACT_REFRESH_TIMEOUT_ITEM_STILL_PRESENT`. The VEMA-246 delete is
+still durably pending and must not be treated as fully closed. The container
+writer socket is currently visible/connectable after web recreation, but its
+restart durability remains a separate F2M-E verification.
