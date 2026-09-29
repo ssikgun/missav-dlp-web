@@ -1,5 +1,112 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-29 Stage13-F2M-D3 — exact Jellyfin stale-item forensic (INCOMPLETE)
+
+This checkpoint was read-only apart from this handoff. Initial repository state
+was clean at expected HEAD `fc7ebec68e0700da4f18a62e747af2a2bc9ddcaf`, branch
+`teddy-subtitle-stage11`; `git ls-remote origin refs/heads/teddy-subtitle-stage11`
+matched that exact commit. This checkout has no stored remote-tracking ref or
+upstream config for the branch, so `@{u}` itself is unavailable.
+
+The exact operation `e8b5ba23-cb6d-4e5e-81f6-c1e5fdb79873` still matches the
+known state on CT108: provenance is `RECONCILE_PENDING`,
+`nas_delete_complete=1`, `discovery_reconciled=1`, `jellyfin_reconciled=NULL`;
+holding 20 is `present=0`, zero VEMA-246 JAV holdings are present, and current
+JAV holdings are 183. The provenance and Discovery SQLite reads used
+`mode=ro`. The current exact NAS lstat could not be completed: the configured
+SSH probe from the web container exited before returning a path result. The
+prior confirmed NAS state remains absent, but this checkpoint cannot attest a
+fresh NAS probe.
+
+Production Jellyfin GET `/System/Info` returned:
+
+- `Version=10.11.11`
+- `ProductName=Jellyfin Server`
+- `OperatingSystem=""` and `Architecture=null` as exposed by this endpoint
+- `ServerName=Jellyfin-Sernver`
+
+The exact movie inventory query (`Recursive=true`, `Fields=Path`,
+`IncludeItemTypes=Movie,Video`, `StartIndex=0`, `Limit=50000`) returned 364 of
+364 items and one exact path match:
+
+- Id `0fa5e1cd9743f9e30dc69054e1c12375`
+- Name `My wife, the CEO's secretary, who works at the same company as me, was getting creampied in the CEO's office while I was at work. Ruu Totsuka`
+- Path `/media/adult/VEMA/VEMA-246/VEMA-246.mp4`
+- Type `Movie`, MediaType `Video`, LocationType `FileSystem`, IsFolder `false`
+- ParentId was null in the inventory DTO; DateCreated/DateLastSaved were not
+  exposed in that query
+
+Direct GET `/Items/{id}` returned HTTP 400 without UserId and HTTP 404 with the
+only user ID returned by `/Users`; `/Items/{id}/Ancestors` also returned 404.
+Therefore the exact item identity is visible in the inventory, but direct item
+lookup and its ancestor chain (title folder, VEMA, Adult/JAV root) remain
+unverified. No item ID or ancestor path was inferred from a failed direct GET.
+
+GET `/Library/VirtualFolders` returned Adult with `Locations=["/media/adult"]`,
+`ItemId=0a7fd8175719d8f7ebfb93874e55a2d5`, and `EnableRealtimeMonitor=null`
+(not exposed). The Movie library maps to `/media/movie`. The Adult virtual
+folder agrees with the item's `/media/adult` prefix; no mapping mismatch is
+indicated by API configuration. CT112's actual mount mapping was not verified.
+SSH to `root@192.168.1.205` was denied by public-key authentication. A bounded
+GET to Jellyfin's `/Environment/DirectoryContents` for only the exact title
+directory `/media/adult/VEMA/VEMA-246` returned HTTP 404. The Jellyfin process
+therefore reports the exact title directory absent, and the movie file cannot
+be visible below that absent directory:
+`JELLYFIN_FS_TITLE_DIR_VISIBLE=NO`, `JELLYFIN_FS_FILE_VISIBLE=NO`.
+Given the known NAS-absent state, `MOUNT_VIEW_STALE=NO`. CT112's family/root
+lstat details, filesystem type/source/options/read-only status, and mount
+identity remain UNKNOWN because SSH was denied; the exact title-directory API
+check does not establish them. No recursive scan, broad listing, or `du` was
+run.
+
+GET `/System/Configuration` returned `LibraryMonitorDelay=60` seconds.
+GET `/ScheduledTasks` showed “미디어 라이브러리 스캔” (`RefreshLibrary`) as
+`Idle`; its last execution completed at `2026-09-29T06:46:36.5822535Z`
+(`15:46:36 KST`), before the D2 window. No current long-running scan is
+evidenced by that task API response.
+
+The D and D2 Jellyfin log checks are incomplete. The D2 report from the prior
+checkpoint records one `/Library/Media/Updated` POST followed by its full
+120-second poll, and the item remained. That control flow means the client
+did not record a request exception, so `D2_EVENT_ACCEPTED=YES` at the client
+level; the HTTP status was not preserved. The current web container started at
+`2026-09-29T10:58:27Z` with restart count 0, and its bounded D (17:55–18:20 KST)
+and D2 (19:55–20:30 KST) docker-log windows contain no matching item/Jellyfin
+lines. CT112 journal/container logs were not available because SSH was denied.
+Thus `D2_REFRESHER_CREATED=UNKNOWN`, `D2_REFRESHER_EXECUTED=UNKNOWN`, and
+`REFRESH_TARGET_PATH=UNKNOWN`; no production target is inferred.
+
+The production-version source tag `v10.11.11` was checked read-only. Its
+`LibraryController.PostUpdatedMedia` passes each DTO item's Path to
+`ReportFileSystemChanged` and does not branch on UpdateType; `FileRefresher`
+waits `LibraryMonitorDelay`, then walks toward a library item and up through
+owner/parent items while the item's path does not exist. It calls
+`ChangedExternally()` on the resolved item. This confirms that `Deleted` is not
+a direct delete command. It does not establish which target was reached in
+production. Source references:
+`https://github.com/jellyfin/jellyfin/blob/v10.11.11/Jellyfin.Api/Controllers/LibraryController.cs`
+and
+`https://github.com/jellyfin/jellyfin/blob/v10.11.11/Emby.Server.Implementations/IO/FileRefresher.cs`.
+
+Current exact path count is 1 (`CURRENT_EXACT_ITEM_COUNT=1`); the item did not
+disappear in this checkpoint. Classification is
+`JELLYFIN_PENDING_CLASS=UNKNOWN`: exact title dir/file are absent from the
+Jellyfin API filesystem view and the API root mapping agrees, but the CT112
+mount identity and server refresher logs are unavailable. The available
+evidence rules out a visible stale title mount, but cannot distinguish an
+unprocessed event from a completed parent refresh that left the item record.
+No single production recovery action is selected until the bounded D/D2 logs
+show whether the expected parent refresh executed. Next checkpoint: obtain
+read-only CT112 access, inspect only the exact file/family/root paths and
+`/media/adult` mount record, then read only the D/D2 journal windows and choose
+one recovery action. Do not send another notification or refresh before that
+classification.
+
+Mutation counts for this checkpoint: source code 0, Jellyfin 0, NAS 0,
+Discovery 0, provenance 0, runtime restart 0. Delete gate remains false.
+Writer socket durability remains unproven; its known state remains host READY,
+web visible/connectable, durability unproven.
+
 ## 2026-09-29 Stage13-F2H pinned completion runtime — FAIL / review required
 
 The F2G blocker was addressed for the scheduled completion/organizer path. An
