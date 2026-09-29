@@ -1,5 +1,57 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-29 Stage13-F2F shared per-title exclusion — PASS (offline/source)
+
+The F2E remaining `SHARED_PER_TITLE_LOCK_UNAVAILABLE` race boundary is closed
+for the current organizer/completion, Stage12 batch, and Library delete paths.
+They now share `teddy_title_exclusion.try_acquire_title_lock()` and a
+non-blocking `fcntl.flock(LOCK_EX | LOCK_NB)` keyed by canonical DVD-ID.
+
+Execution paths are on CT108 `downloader` (the same host namespace documented
+in the Stage12 runtime contract). The canonical deployment binds host
+`/opt/missav-dlp-web/title-locks` to the web container at
+`/run/teddy-title-locks`; host runners use the host path and the web app uses
+the container path, which refer to the same bind-backed directory/inodes.
+`TEDDY_TITLE_LOCK_DIR` is required by all callers; missing/unsafe lock roots
+fail closed. Lock files contain no payload. Future automatic subtitle runners
+MUST acquire this same per-title lock.
+
+Lock order is per-title lock before the existing organizer apply lock or
+completion `operation_lock`. Stage12's singleton runner lock remains outside
+the per-title scope; it does not participate in the opposing delete/completion
+lock order. The Stage12 rollout writer lock is acquired only briefly inside
+the per-title lock. No StateStore-writer-to-title-lock path was found.
+
+- Organizer apply holds the title lock from before its existing apply lock
+  through publish, holding/job updates, source cleanup, and terminal job state.
+- Completion `process_one` takes title lock, then `operation_lock`, and holds
+  both through canonical publish, holding/job update, and cleanup.
+- Stage12 obtains the title lock before durable RUNNING and holds it through
+  controller work, publication, Jellyfin recognition, and terminal rollout
+  transition. BUSY returns `HELD_TITLE_BUSY` without changing durable state.
+- Delete commit and partial mutation resume acquire the same lock after the
+  first activity check and Discovery writer preflight. While held they repeat
+  activity and identity/manifest validation, then retain the lock through NAS
+  mutation, Discovery/Jellyfin reconciliation, provenance finalization, and
+  token finalization. Reconcile-only recovery remains available without the
+  lock. Busy returns `delete_target_busy`; unavailable lock infrastructure
+  returns `delete_exclusion_unavailable`, both before mutation.
+- The F2E durable activity guard remains in place as a state sanity check;
+  shared flock supplies cross-process exclusion.
+
+Separate-process flock fixtures prove same-title BUSY, different-title
+parallelism, release after normal exit, and kernel lock release after process
+termination while the empty lock file remains. Organizer, Stage12, and delete
+fixtures verify their lock scope and no-work-on-BUSY behavior. Regression
+smokes and the full Docker image build passed.
+
+`SHARED_PER_TITLE_LOCK=AVAILABLE` and `TOCTOU_CLOSED=YES` for these integrated
+source paths when the canonical host-backed mount/env is deployed. This is
+source/fixture evidence only; production deployment has not occurred. Feature
+gate remains false, production deploy/restart = NO, actual delete = 0. Stage13
+F2G must deploy the shared lock mount/env and verify runtime wiring before any
+canary readiness decision.
+
 ## 2026-09-29 Stage13-E2D origin forensic — PASS
 
 The exact production rejection for the authenticated ADN-785 delete DRY-RUN

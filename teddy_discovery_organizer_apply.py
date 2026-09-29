@@ -14,6 +14,11 @@ import time
 import uuid
 
 from teddy_discovery_ids import parse_dvd_id
+from teddy_title_exclusion import (
+    ACQUIRED as TITLE_LOCK_ACQUIRED,
+    configured_lock_dir,
+    try_acquire_title_lock,
+)
 from teddy_discovery_organizer import (
     OrganizerPlan,
     plan,
@@ -857,6 +862,7 @@ def apply_one(
     db_path: Path,
     apply_lock_path: Path,
     writer_lock_path: Path,
+    title_lock_dir: str | Path | None = None,
     stability_seconds: float = 3.0,
 ) -> ApplyResult:
 
@@ -892,9 +898,21 @@ def apply_one(
         )
     )
 
-    with exclusive_lock(
-        apply_lock_path
-    ):
+    title_lock = try_acquire_title_lock(
+        item.dvd_id,
+        title_lock_dir if title_lock_dir is not None else configured_lock_dir(),
+    )
+    if title_lock.status != TITLE_LOCK_ACQUIRED:
+        reason = "busy" if title_lock.status == "BUSY" else "unavailable"
+        raise ApplyError("title exclusion " + reason)
+
+    # Lock order is shared per-title exclusion, then this existing global
+    # apply lock. Keep both through publish, holding/job transitions, and
+    # source cleanup so delete/subtitle cannot observe a half-published title.
+    with title_lock:
+      with exclusive_lock(
+          apply_lock_path
+      ):
 
         source, source_stat = (
             validate_source(

@@ -54,6 +54,7 @@ from teddy_discovery_stage12_rollout import (
     Stage12InvalidTransitionError,
     Stage12RolloutStateStore,
 )
+from teddy_title_exclusion import ACQUIRED, try_acquire_title_lock
 from teddy_discovery_stage12_rollout_smoke import write_valid_bundle
 from teddy_discovery_subtitle import (
     derive_target_ko_relative,
@@ -302,6 +303,32 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
                 whisper_error_ids=(),
                 deployment_transport_error_ids=(),
                 jellyfin=recognition_for):
+    title_locks = root.parent / "title-locks"
+    title_locks.mkdir(mode=0o750, exist_ok=True)
+    controller = controller_for(
+        root,
+        records,
+        controller_calls,
+        fail_ids=fail_ids,
+        systemic_ids=systemic_ids,
+        validation_retry_exhausted_ids=validation_retry_exhausted_ids,
+        timeout_ids=timeout_ids,
+        runner_error_ids=runner_error_ids,
+        pending_artifact_error_ids=pending_artifact_error_ids,
+        audio_error_ids=audio_error_ids,
+        unsafe_timeline_error_ids=unsafe_timeline_error_ids,
+        no_speech_ids=no_speech_ids,
+        source_error_ids=source_error_ids,
+        whisper_error_ids=whisper_error_ids,
+        deployment_transport_error_ids=deployment_transport_error_ids,
+        unexpected_ids=unexpected_ids,
+    )
+
+    def controller_with_lock_assertion(dvd_id):
+        probe = try_acquire_title_lock(dvd_id, title_locks)
+        require(probe.status == "BUSY", "STAGE12_LOCK_HELD_DURING_TITLE_PROCESSING")
+        return controller(dvd_id)
+
     return Stage12BatchRunner(
         store=store,
         inventory=Stage12HoldingsInventoryReport(tuple(records)),
@@ -309,25 +336,9 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
         nas_filesystem=nas,
         subtitle_reader=FakeSubtitleReader(nas),
         publisher=publisher,
-        controller_runner=controller_for(
-            root,
-            records,
-            controller_calls,
-            fail_ids=fail_ids,
-            systemic_ids=systemic_ids,
-            validation_retry_exhausted_ids=validation_retry_exhausted_ids,
-            timeout_ids=timeout_ids,
-            runner_error_ids=runner_error_ids,
-            pending_artifact_error_ids=pending_artifact_error_ids,
-            audio_error_ids=audio_error_ids,
-            unsafe_timeline_error_ids=unsafe_timeline_error_ids,
-            no_speech_ids=no_speech_ids,
-            source_error_ids=source_error_ids,
-            whisper_error_ids=whisper_error_ids,
-            deployment_transport_error_ids=deployment_transport_error_ids,
-            unexpected_ids=unexpected_ids,
-        ),
+        controller_runner=controller_with_lock_assertion,
         jellyfin_recognizer=jellyfin,
+        title_lock_dir=title_locks,
     )
 
 
@@ -560,6 +571,33 @@ def main():
         root.mkdir()
         store = Stage12RolloutStateStore(Path(temp) / "state.sqlite3")
         store.initialize_from_inventory(report)
+
+        # Busy same-title exclusion leaves durable state untouched and skips
+        # the controller/publisher. A different title can still proceed.
+        title_locks = Path(temp) / "title-locks"
+        title_locks.mkdir(mode=0o750)
+        busy_lock = try_acquire_title_lock("AAA-001", title_locks)
+        require(busy_lock.status == ACQUIRED, "TITLE_LOCK_FIXTURE_ACQUIRED")
+        busy_nas = FakeNAS(records)
+        busy_publisher = FakePublisher(busy_nas)
+        busy_calls: list[str] = []
+        busy_artifacts = Path(temp) / "busy-artifacts"
+        busy_artifacts.mkdir()
+        busy_runner = make_runner(
+            busy_artifacts, records[:4], store, controller_calls=busy_calls,
+            nas=busy_nas, publisher=busy_publisher,
+        )
+        busy_result = busy_runner.run(Stage12BatchSelection(1, ("AAA-001",)))
+        require(
+            busy_result.titles[0].final_state == "HELD_TITLE_BUSY"
+            and store.get("AAA-001").status == STATE_PENDING
+            and not busy_calls and not busy_publisher.calls,
+            "TITLE_BUSY_NO_RUNNING_TRANSITION",
+        )
+        other_lock = try_acquire_title_lock("AAA-004", title_locks)
+        require(other_lock.status == ACQUIRED, "OTHER_TITLE_NOT_BLOCKED")
+        other_lock.release()
+        busy_lock.release()
 
         selection = select_pending_batch(store, batch_size=3)
         require(

@@ -72,6 +72,11 @@ from teddy_discovery_subtitle import (
     SubtitleCandidate,
     derive_target_ko_relative,
 )
+from teddy_title_exclusion import (
+    ACQUIRED as TITLE_LOCK_ACQUIRED,
+    configured_lock_dir,
+    try_acquire_title_lock,
+)
 from teddy_discovery_subtitle_publish import (
     SUBTITLE_PUBLISHED,
     SubtitlePublishCollisionError,
@@ -321,6 +326,10 @@ class Stage12BatchResult:
             ),
             "skipped": sum(
                 item.final_state == "SKIPPED_EXISTING_KO"
+                for item in self.titles
+            ),
+            "held_title_busy": sum(
+                item.final_state == "HELD_TITLE_BUSY"
                 for item in self.titles
             ),
             "unresolved": sum(
@@ -741,6 +750,7 @@ class Stage12BatchRunner:
             [str, CanonicalVideoHolding, str], Stage12JellyfinRecognition
         ],
         retry_authorization: Stage12ExplicitRetryAuthorization | None = None,
+        title_lock_dir: str | Path | None = None,
     ):
         if not isinstance(store, Stage12RolloutStateStore):
             raise Stage12BatchSystemicError("invalid rollout state store")
@@ -805,6 +815,13 @@ class Stage12BatchRunner:
         self.controller_runner = controller_runner
         self.jellyfin_recognizer = jellyfin_recognizer
         self.retry_authorization = retry_authorization
+        self.title_lock_dir = (
+            title_lock_dir if title_lock_dir is not None else configured_lock_dir()
+        )
+
+    def _title_lock_acquired(self, dvd_id: str) -> None:
+        """Hook for runner heartbeat only after the shared title lock exists."""
+        return None
 
     def _fail_title(
         self,
@@ -945,6 +962,30 @@ class Stage12BatchRunner:
         )
 
     def _run_one(self, dvd_id: str) -> Stage12BatchTitleResult:
+        title_lock = try_acquire_title_lock(dvd_id, self.title_lock_dir)
+        if title_lock.status == "BUSY":
+            # Leave PENDING / FAILED_RETRYABLE untouched. The selection may
+            # be retried after the competing identity-sensitive operation.
+            return Stage12BatchTitleResult(
+                dvd_id=dvd_id,
+                stage11_result="NOT_RUN",
+                route=None,
+                clean_sha256=None,
+                publication_result="BLOCKED",
+                destination=None,
+                jellyfin_recognition="NOT_RUN",
+                final_state="HELD_TITLE_BUSY",
+                error="title exclusion busy; retry later",
+            )
+        if title_lock.status != TITLE_LOCK_ACQUIRED:
+            raise Stage12BatchSystemicError(
+                "title exclusion unavailable; durable title state was not changed"
+            )
+        with title_lock:
+            self._title_lock_acquired(dvd_id)
+            return self._run_one_locked(dvd_id)
+
+    def _run_one_locked(self, dvd_id: str) -> Stage12BatchTitleResult:
         state = self.store.get(dvd_id)
         retry = self.retry_authorization
         explicit_retry = retry is not None

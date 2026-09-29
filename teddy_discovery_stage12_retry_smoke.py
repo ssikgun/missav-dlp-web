@@ -151,6 +151,9 @@ def build_runner(root, store, record, *, fail=False):
     )
     from teddy_discovery_stage12_batch_smoke import FakeSubtitleReader
 
+    title_locks = artifact_root.parent / "title-locks"
+    title_locks.mkdir(mode=0o750, exist_ok=True)
+
     runner = Stage12BatchRunner(
         store=store,
         inventory=Stage12HoldingsInventoryReport((record,)),
@@ -164,6 +167,7 @@ def build_runner(root, store, record, *, fail=False):
             record.dvd_id,
             store.get(record.dvd_id).transition_sequence,
         ),
+        title_lock_dir=title_locks,
     )
     return runner, nas, publisher, calls
 

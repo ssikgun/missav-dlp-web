@@ -16,6 +16,11 @@ from teddy_discovery_operation_lock import (
     DEFAULT_OPERATION_LOCK_PATH,
     operation_lock,
 )
+from teddy_title_exclusion import (
+    ACQUIRED as TITLE_LOCK_ACQUIRED,
+    configured_lock_dir,
+    try_acquire_title_lock,
+)
 
 
 class CompletionOrchestratorError(RuntimeError):
@@ -514,14 +519,23 @@ def process_one(
     db_path: Path,
     writer_lock_path: Path,
     operation_lock_path=DEFAULT_OPERATION_LOCK_PATH,
+    title_lock_dir: str | Path | None = None,
 ) -> int:
-    with operation_lock(
-        operation_lock_path
-    ):
-        return _process_one(
-            plan,
-            ssh=ssh,
-            mutator=mutator,
-            db_path=db_path,
-            writer_lock_path=writer_lock_path,
-        )
+    title_lock = try_acquire_title_lock(
+        plan.dvd_id,
+        title_lock_dir if title_lock_dir is not None else configured_lock_dir(),
+    )
+    if title_lock.status != TITLE_LOCK_ACQUIRED:
+        reason = "busy" if title_lock.status == "BUSY" else "unavailable"
+        raise CompletionOrchestratorError("title exclusion " + reason)
+    # Freeze lock ordering: title-specific exclusion always precedes the
+    # pre-existing global completion operation lock.
+    with title_lock:
+        with operation_lock(operation_lock_path):
+            return _process_one(
+                plan,
+                ssh=ssh,
+                mutator=mutator,
+                db_path=db_path,
+                writer_lock_path=writer_lock_path,
+            )

@@ -31,6 +31,7 @@ from teddy_library_delete_activity import (
 from teddy_library_delete_dryrun_smoke import make_fixture
 from teddy_discovery_jellyfin import jellyfin_media_path
 from teddy_discovery_subtitle import validate_canonical_holding
+from teddy_title_exclusion import ACQUIRED, BUSY, try_acquire_title_lock
 
 
 class FixtureSSH:
@@ -64,6 +65,8 @@ def setup_app(tmp, *, gate="true", discovery_ok=True, jellyfin_ok=True, partial_
     reader = DeleteManifestReader(ssh, library_root=str(root))
     mutator = DeleteManifestMutator(ssh, library_root=str(root))
     provenance_path = Path(tmp) / "provenance.sqlite3"
+    title_lock_dir = Path(tmp) / "title-locks"
+    title_lock_dir.mkdir(mode=0o750)
     registry = PrepareTokenRegistry()
     flags = {"discovery_ok": discovery_ok, "jellyfin_ok": jellyfin_ok}
     expected_media = jellyfin_media_path(relative)
@@ -94,6 +97,8 @@ def setup_app(tmp, *, gate="true", discovery_ok=True, jellyfin_ok=True, partial_
             self.failed = False
 
         def delete(self, **kwargs):
+            probe = try_acquire_title_lock(dvd, title_lock_dir)
+            assert probe.status == BUSY, "delete mutation must remain under title lock"
             if partial_once and not self.failed:
                 self.failed = True
                 entries = kwargs["entries"]
@@ -105,16 +110,21 @@ def setup_app(tmp, *, gate="true", discovery_ok=True, jellyfin_ok=True, partial_
             return self.delegate.delete(**kwargs)
 
     class FixtureActivityGuard:
-        def __init__(self, decisions):
+        def __init__(self, decisions, lock_dir):
             self.decisions = list(decisions or [IDLE])
             self.calls = []
+            self.lock_dir = lock_dir
+            self.lock_states = []
 
         def check(self, dvd_id):
             self.calls.append(dvd_id)
+            probe = try_acquire_title_lock(dvd_id, self.lock_dir)
+            self.lock_states.append(probe.status)
+            probe.release()
             value = self.decisions.pop(0) if len(self.decisions) > 1 else self.decisions[0]
             return ActivityDecision(value)
 
-    activity_guard = FixtureActivityGuard(activity_decisions)
+    activity_guard = FixtureActivityGuard(activity_decisions, title_lock_dir)
 
     app = Flask("delete-commit-fixture")
     app.secret_key = "fixture-only-key"
@@ -135,6 +145,7 @@ def setup_app(tmp, *, gate="true", discovery_ok=True, jellyfin_ok=True, partial_
         session["teddy_authenticated"] = True
     previous = os.environ.get("TEDDY_PUBLIC_ORIGIN")
     os.environ["TEDDY_PUBLIC_ORIGIN"] = "http://localhost"
+    os.environ["TEDDY_TITLE_LOCK_DIR"] = str(title_lock_dir)
     if gate is None:
         os.environ.pop("TEDDY_LIBRARY_DELETE_ENABLED", None)
     else:
@@ -201,6 +212,29 @@ def main():
         assert not Path(ctx["provenance_path"]).exists()
         assert ctx["registry"].snapshot(token, dvd_id=ctx["dvd"])["state"] == "VALIDATED"
 
+    # A same-title lock held by another process/operation blocks before
+    # provenance COMMITTING and before the NAS mutator. Other titles do not.
+    with tempfile.TemporaryDirectory(prefix="delete-title-busy-") as tmp:
+        ctx = setup_app(tmp)
+        token, _ = prepared_validated(ctx)
+        held = try_acquire_title_lock(ctx["dvd"], ctx["title_lock_dir"])
+        assert held.status == ACQUIRED
+        response = post(ctx, "commit", commit_body(ctx, token))
+        assert response.status_code == 409
+        assert response.get_json()["error"]["code"] == "delete_target_busy"
+        assert ctx["ssh"].calls == 0 and not Path(ctx["provenance_path"]).exists()
+        assert ctx["registry"].snapshot(token, dvd_id=ctx["dvd"])["state"] == "VALIDATED"
+        held.release()
+
+    with tempfile.TemporaryDirectory(prefix="delete-other-title-lock-") as tmp:
+        ctx = setup_app(tmp)
+        token, _ = prepared_validated(ctx)
+        other = try_acquire_title_lock("SONE-978", ctx["title_lock_dir"])
+        assert other.status == ACQUIRED
+        response = post(ctx, "commit", commit_body(ctx, token))
+        assert response.status_code in (200, 202), response.get_json()
+        other.release()
+
     # If activity appears across the writer preflight, the second exact check
     # still prevents provenance COMMITTING and NAS mutation.
     with tempfile.TemporaryDirectory(prefix="delete-activity-race-") as tmp:
@@ -212,8 +246,31 @@ def main():
         assert response.status_code == 409
         assert response.get_json()["error"]["code"] == "delete_target_active"
         assert writer.preflight_calls == 1 and ctx["ssh"].calls == 0
+        assert ctx["activity_guard"].lock_states == [ACQUIRED, BUSY]
         assert not Path(ctx["provenance_path"]).exists()
         assert ctx["registry"].snapshot(token, dvd_id=ctx["dvd"])["state"] == "VALIDATED"
+
+    # The exact manifest is read again after acquiring the title lock; drift
+    # introduced during writer preflight is rejected before COMMITTING/NAS.
+    with tempfile.TemporaryDirectory(prefix="delete-manifest-lock-race-") as tmp:
+        class DriftWriter(CountingPreflightWriter):
+            target = None
+
+            def preflight_holding(self, **kwargs):
+                result = super().preflight_holding(**kwargs)
+                self.target.write_text("post-prepare drift", encoding="utf-8")
+                return result
+
+        writer = DriftWriter()
+        ctx = setup_app(tmp, discovery_writer_client=writer)
+        writer.target = ctx["title"] / "extra.txt"
+        token, _ = prepared_validated(ctx)
+        response = post(ctx, "commit", commit_body(ctx, token))
+        assert response.status_code == 409
+        assert response.get_json()["error"]["code"] == "manifest_changed"
+        assert ctx["ssh"].calls == 0  # no NAS mutator call
+        assert not Path(ctx["provenance_path"]).exists()
+        assert ctx["media"].exists()
 
     # An unavailable source is not treated as idle.
     with tempfile.TemporaryDirectory(prefix="delete-activity-unavailable-") as tmp:
@@ -361,6 +418,17 @@ def main():
         record = DurableDeleteProvenanceStore(ctx["provenance_path"]).get(operation_id)
         assert record["removed_file_count"] == 1 and record["result_state"] == "PARTIAL_DELETE"
         calls_before_resume = ctx["ssh"].calls
+        held = try_acquire_title_lock(dvd, ctx["title_lock_dir"])
+        assert held.status == ACQUIRED
+        lock_blocked = ctx["client"].post(f"/api/library/{dvd}/delete/resume", json={
+            "operation_id": operation_id, "typed_dvd_id": dvd,
+            "acknowledge_permanent_delete": True, "confirm_phrase": CONFIRM_PHRASE,
+        }, base_url="http://localhost", headers={
+            "Origin": "http://localhost", "X-Teddy-Delete-Intent": "resume"})
+        assert lock_blocked.status_code == 409
+        assert lock_blocked.get_json()["error"]["code"] == "delete_target_busy"
+        assert ctx["ssh"].calls == calls_before_resume
+        held.release()
         ctx["activity_guard"].decisions = [ACTIVE_SUBTITLE]
         blocked = ctx["client"].post(f"/api/library/{dvd}/delete/resume", json={
             "operation_id": operation_id, "typed_dvd_id": dvd,

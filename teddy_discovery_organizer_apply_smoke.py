@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import os
 import sqlite3
 
 import teddy_discovery_organizer_apply as apply_mod
+from teddy_title_exclusion import ACQUIRED, try_acquire_title_lock
 
 from teddy_discovery_db import (
     connect,
@@ -222,6 +224,9 @@ def main():
     #
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
+        title_locks = root / "title-locks"
+        title_locks.mkdir(mode=0o750)
+        os.environ["TEDDY_TITLE_LOCK_DIR"] = str(title_locks)
 
         downloads = (
             root / "downloads"
@@ -268,18 +273,52 @@ def main():
             "downloads",
         )
 
-        result = apply_mod.apply_one(
-            item,
-            mode="downloads",
-            source_root=downloads,
-            library_root=library,
-            db_path=db_path,
-            apply_lock_path=
-                apply_lock,
-            writer_lock_path=
-                writer_lock,
-            stability_seconds=0,
-        )
+        title_lock = try_acquire_title_lock(item.dvd_id, title_locks)
+        require(title_lock.status == ACQUIRED, "TITLE_LOCK_FIXTURE_ACQUIRED")
+        try:
+            try:
+                apply_mod.apply_one(
+                    item,
+                    mode="downloads",
+                    source_root=downloads,
+                    library_root=library,
+                    db_path=db_path,
+                    apply_lock_path=apply_lock,
+                    writer_lock_path=writer_lock,
+                )
+            except apply_mod.ApplyError as error:
+                require("busy" in str(error), "TITLE_BUSY_SAFE_ERROR")
+            else:
+                raise AssertionError("same-title busy lock must block organizer publish")
+            require(source.is_file(), "TITLE_BUSY_SOURCE_PRESERVED")
+            require(not (library / "JUR" / "JUR-821").exists(), "TITLE_BUSY_NO_PUBLISH")
+        finally:
+            title_lock.release()
+
+        original_publish_copy = apply_mod.publish_copy
+
+        def observe_title_lock(*args, **kwargs):
+            probe = try_acquire_title_lock(item.dvd_id, title_locks)
+            require(probe.status == "BUSY", "ORGANIZER_LOCK_HELD_DURING_PUBLISH")
+            return original_publish_copy(*args, **kwargs)
+
+        apply_mod.publish_copy = observe_title_lock
+        try:
+            result = apply_mod.apply_one(
+                item,
+                mode="downloads",
+                source_root=downloads,
+                library_root=library,
+                db_path=db_path,
+                apply_lock_path=apply_lock,
+                writer_lock_path=writer_lock,
+                stability_seconds=0,
+            )
+        finally:
+            apply_mod.publish_copy = original_publish_copy
+        released = try_acquire_title_lock(item.dvd_id, title_locks)
+        require(released.status == ACQUIRED, "ORGANIZER_LOCK_RELEASED_AFTER_COMPLETE")
+        released.release()
 
         final = (
             library
@@ -345,6 +384,9 @@ def main():
     #
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
+        title_locks = root / "title-locks"
+        title_locks.mkdir(mode=0o750)
+        os.environ["TEDDY_TITLE_LOCK_DIR"] = str(title_locks)
 
         downloads = (
             root / "downloads"
@@ -466,6 +508,9 @@ def main():
     #
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
+        title_locks = root / "title-locks"
+        title_locks.mkdir(mode=0o750)
+        os.environ["TEDDY_TITLE_LOCK_DIR"] = str(title_locks)
 
         downloads = (
             root / "downloads"
@@ -563,6 +608,9 @@ def main():
     #
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
+        title_locks = root / "title-locks"
+        title_locks.mkdir(mode=0o750)
+        os.environ["TEDDY_TITLE_LOCK_DIR"] = str(title_locks)
 
         downloads = (
             root / "downloads"
@@ -654,6 +702,9 @@ def main():
     #
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
+        title_locks = root / "title-locks"
+        title_locks.mkdir(mode=0o750)
+        os.environ["TEDDY_TITLE_LOCK_DIR"] = str(title_locks)
 
         downloads = (
             root / "downloads"

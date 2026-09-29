@@ -589,14 +589,18 @@ def contract_check() -> None:
                 "exact-process Hermes cleanup contract changed"
             )
 
-    batch_source = inspect.getsource(
-        Stage12BatchRunner._run_one
+    batch_source = (
+        inspect.getsource(Stage12BatchRunner._run_one)
+        + inspect.getsource(Stage12BatchRunner._run_one_locked)
     )
     serial_source = inspect.getsource(
         Stage12BatchRunner.run
     )
 
     for token in (
+        "try_acquire_title_lock",
+        "HELD_TITLE_BUSY",
+        "_run_one_locked",
         "self.nas_filesystem.lstat(destination)",
         "self.publisher.publish_korean_srt(",
         "self.jellyfin_recognizer(",
@@ -1738,7 +1742,7 @@ def run_live(
                 class HeartbeatStage12BatchRunner(
                     Stage12BatchRunner
                 ):
-                    def _run_one(
+                    def _title_lock_acquired(
                         self,
                         dvd_id: str,
                     ):
@@ -1750,10 +1754,6 @@ def run_live(
                                 batch_number,
                             processed_titles=
                                 processed,
-                        )
-
-                        return super()._run_one(
-                            dvd_id
                         )
 
                 def controller_runner(

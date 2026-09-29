@@ -6,8 +6,10 @@ from teddy_discovery_completion import (
     CompletionPlan,
 )
 from teddy_discovery_completion_orchestrator import (
+    CompletionOrchestratorError,
     process_one,
 )
+from teddy_title_exclusion import ACQUIRED, try_acquire_title_lock
 
 
 class FakeSSH:
@@ -110,12 +112,35 @@ with tempfile.TemporaryDirectory() as temp:
     root = Path(temp)
     db_path = root / "test.sqlite3"
     lock = root / "writer.lock"
+    title_locks = root / "title-locks"
+    title_locks.mkdir(mode=0o750)
 
     create_db(
         db_path
     )
 
     mutator = FakeMutator()
+
+    held = try_acquire_title_lock("ABC-123", title_locks)
+    assert held.status == ACQUIRED
+    try:
+        try:
+            process_one(
+                plan,
+                ssh=FakeSSH(),
+                mutator=mutator,
+                db_path=db_path,
+                writer_lock_path=lock,
+                operation_lock_path=root / "operation.lock",
+                title_lock_dir=title_locks,
+            )
+        except CompletionOrchestratorError as error:
+            assert "busy" in str(error)
+        else:
+            raise AssertionError("busy title lock must block completion")
+        assert mutator.calls == []
+    finally:
+        held.release()
 
     job_id = process_one(
         plan,
@@ -124,6 +149,7 @@ with tempfile.TemporaryDirectory() as temp:
         db_path=db_path,
         writer_lock_path=lock,
         operation_lock_path=root / "operation.lock",
+        title_lock_dir=title_locks,
     )
 
     assert mutator.calls == [
