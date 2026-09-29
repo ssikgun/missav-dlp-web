@@ -6145,3 +6145,60 @@ post-processing work stays queued for later.
 `STAGE13_CLOSE_READY=NO`. Next checkpoint: F2M-E writer socket restart
 durability only; do not resume completion until that checkpoint closes the
 remaining Stage13 gate.
+
+## Stage13-F2M-E1 — writer socket restart durability (FAIL)
+
+Preconditions passed at HEAD `42578ee5df419aac38ddbbde4a6a24676513dd0a`,
+with local and remote equal and a clean worktree. Production web was running on
+the D10 image, `/login` returned 200, gate was false, completion and
+reconcile-apply units were inactive, and writer service plus host/web health
+were READY. The web container was not recreated during this checkpoint.
+
+Effective writer unit `/etc/systemd/system/teddy-library-discovery-writer.service`
+has no drop-ins. `ExecStart` runs
+`/usr/bin/python3 /opt/missav-dlp-web/teddy-library-discovery-writer/releases/3daac14029ad049416373fa2c452a47a64c9b732/teddy_library_discovery_writer.py`
+with the Discovery DB, provenance DB, and
+`/run/teddy-library-discovery-writer/writer.sock` arguments. Effective values:
+User=root, Group=teddy-library-discovery-writer,
+RuntimeDirectory=teddy-library-discovery-writer,
+RuntimeDirectoryMode=0750, RuntimeDirectoryPreserve=no, Restart=on-failure.
+The web mount is a read-only bind from host
+`/run/teddy-library-discovery-writer` to the same container path.
+
+Before the single controlled writer restart, MainPID was `1184596`, NRestarts
+0, host and web runtime-directory inode `135:1488725`, and host and web socket
+inode `135:1488730`. The socket was a UNIX socket owned by `0:988`, mode 0660;
+the runtime directory was owned by `0:988`, mode 0750. Host and web writer
+health both returned READY.
+
+After `systemctl restart teddy-library-discovery-writer.service`, MainPID is
+`1357596`, NRestarts remains 0, service is active, and host runtime-directory
+and socket inodes are `135:1511947` and `135:1511952`. The new host socket is
+type socket, owner/group `0:988`, mode 0660, and host health is READY. The
+existing web container ID is unchanged and its restart count remains 0. Its
+runtime directory still has the old inode `135:1488725`; its socket is absent
+(`WEB_SOCKET_DEV_INO_AFTER=ABSENT`) and a writer health request fails. `/login`
+still returns 200 and gate remains false.
+
+`HOST_RUNTIME_DIR_REPLACED=YES`, `HOST_SOCKET_REPLACED=YES`, and
+`WEB_WRITER_SOCKET_VISIBLE_AFTER_RESTART=NO`.
+`WEB_WRITER_HEALTH_AFTER_RESTART=FAIL`.
+Classification: `RUNTIME_DIRECTORY_REPLACED_BIND_STALE`. systemd removed and
+recreated the runtime directory while the existing directory bind remained
+attached to the old inode. Web recreate/restart count is 0. No recovery or
+web recreate was performed, so this remains a valid durability failure.
+
+Read-only before/after comparison confirms the entire Discovery `holdings`
+table checksum and reconcile-journal checksum are unchanged, holding 20 stays
+present=0, VEMA present=0, current JAV holdings=183, and the exact committed
+VEMA provenance row checksum is unchanged. Production data mutations,
+Jellyfin/NAS changes, completion processing, and gate changes are zero; the
+only production mutation was the authorized single writer-service restart.
+Completion remains intentionally inactive, and new-download post-processing
+remains pending.
+
+`CANARY_OPERATION_CLOSED=YES`,
+`WEB_WRITER_SOCKET_DURABILITY_PROVEN=NO`,
+`STAGE13_CLOSE_READY=NO`. Next checkpoint E2: change the writer
+RuntimeDirectory/bind persistence contract safely, then repeat the durability
+proof. Do not resume completion before a passing proof.
