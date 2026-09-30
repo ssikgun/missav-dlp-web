@@ -5,6 +5,7 @@ import json
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 
 
 class JellyfinError(RuntimeError):
@@ -325,6 +326,41 @@ class JellyfinClient:
                 raise JellyfinResponseError("malformed Jellyfin child item")
         return items
 
+    def item_by_id(self, item_id: str) -> dict:
+        """GET one exact item, accepting only Jellyfin's canonical GUID forms."""
+        try:
+            parsed_id = uuid.UUID(item_id) if isinstance(item_id, str) else None
+        except (ValueError, AttributeError):
+            parsed_id = None
+        if parsed_id is None or item_id not in {parsed_id.hex, str(parsed_id)}:
+            raise JellyfinResponseError("invalid Jellyfin item ID")
+        query = urllib.parse.urlencode({
+            "Ids": parsed_id.hex,
+            "Fields": "Path,ParentId",
+            "StartIndex": 0,
+            "Limit": 1,
+            "EnableImages": "false",
+            "EnableUserData": "false",
+        })
+        value = self._request("GET", "/Items?" + query)
+        if not isinstance(value, dict):
+            raise JellyfinResponseError("invalid Jellyfin exact item response")
+        items = value.get("Items")
+        total = value.get("TotalRecordCount")
+        if type(total) is not int or total != 1 or not isinstance(items, list) or len(items) != 1:
+            raise JellyfinResponseError("Jellyfin exact item count != 1")
+        item = items[0]
+        if (
+            not isinstance(item, dict)
+            or item.get("Id") not in (parsed_id.hex, str(parsed_id))
+            or not isinstance(item.get("Type"), str)
+            or not item["Type"].strip()
+            or not isinstance(item.get("Path"), str)
+            or not item["Path"].strip()
+        ):
+            raise JellyfinResponseError("malformed Jellyfin exact item")
+        return item
+
     def exact_media_visibility(self, media_path: str) -> dict:
         """Read-only, bounded lookup of one exact Adult Movie path."""
         path = validate_adult_media_path(media_path)
@@ -346,7 +382,15 @@ class JellyfinClient:
         family = family_matches[0]
         if family.get("Type") != "Folder" or not str(family.get("Id") or "").strip():
             return {"status": "ATTENTION", "reason": "INVALID_FAMILY_FOLDER"}
-        if str(family.get("ParentId") or "") != root_id:
+        if not family.get("ParentId"):
+            return {"status": "ATTENTION", "reason": "AMBIGUOUS_FAMILY_PARENT"}
+        # CollectionFolder queries expose children of a separate filesystem
+        # root. Validate that actual parent rather than equating the two IDs.
+        try:
+            parent = self.item_by_id(family["ParentId"])
+        except JellyfinResponseError:
+            return {"status": "ATTENTION", "reason": "INVALID_FAMILY_PARENT_RESPONSE"}
+        if parent["Type"] != "Folder" or parent["Path"] != "/media/adult":
             return {"status": "ATTENTION", "reason": "AMBIGUOUS_FAMILY_PARENT"}
 
         children = self.items_by_parent(str(family["Id"]), limit=1000)

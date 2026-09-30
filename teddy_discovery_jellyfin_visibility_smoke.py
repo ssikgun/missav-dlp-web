@@ -17,7 +17,9 @@ from teddy_discovery_jellyfin_visibility import (
 from teddy_discovery_media_jobs import MEDIA_SCHEMA
 
 
-ROOT_ID = "adult-root"
+ROOT_ID = "virtual-adult"
+# Canonical GUID for the separate filesystem-adult Folder.
+FILESYSTEM_ID = "d59216ecad5753389303717a879b33ad"
 FAMILY_ID = "family-folder"
 RELATIVE = "ABC/ABC-123/ABC-123.mp4"
 MEDIA_PATH = "/media/adult/" + RELATIVE
@@ -132,7 +134,10 @@ def actual_client_smoke(temp):
     key.write_text("fixture-key", encoding="utf-8")
     calls = []
 
-    def exercise(title_items, *, family_items=None):
+    def exercise(title_items, *, family_items=None, parent_item=None, parent_response=None, reconcile_root=None):
+        parent_item = parent_item if parent_item is not None else {
+            "Id": FILESYSTEM_ID, "Type": "Folder", "Path": "/media/adult",
+        }
         def opener(request, timeout=None):
             assert request.get_method() == "GET", "visibility lookup must be GET-only"
             calls.append((request.get_method(), request.full_url, timeout))
@@ -141,12 +146,20 @@ def actual_client_smoke(temp):
                 payload = [{"Name": "Adult", "ItemId": ROOT_ID, "Locations": ["/media/adult"]}]
             elif parsed.path == "/Items":
                 params = urllib.parse.parse_qs(parsed.query)
+                if "Ids" in params:
+                    assert params["Ids"] == [FILESYSTEM_ID]
+                    assert params["Limit"] == ["1"]
+                    assert params["EnableImages"] == ["false"]
+                    assert params["EnableUserData"] == ["false"]
+                    return FakeResponse(parent_response if parent_response is not None else {
+                        "Items": [parent_item], "TotalRecordCount": 1,
+                    })
                 assert params.get("Recursive") == ["false"]
                 assert params.get("Limit") == ["1000"]
                 assert params.get("StartIndex") == ["0"]
                 parent = params.get("ParentId", [None])[0]
                 rows = family_items if parent == ROOT_ID and family_items is not None else (
-                    [{"Id": FAMILY_ID, "Type": "Folder", "Path": "/media/adult/ABC", "ParentId": ROOT_ID}]
+                    [{"Id": FAMILY_ID, "Type": "Folder", "Path": "/media/adult/ABC", "ParentId": FILESYSTEM_ID}]
                     if parent == ROOT_ID else title_items
                 )
                 payload = {"Items": rows, "TotalRecordCount": len(rows)}
@@ -157,6 +170,11 @@ def actual_client_smoke(temp):
         client = JellyfinClient(
             base_url="http://fixture.invalid", api_key_path=key, opener=opener
         )
+        if reconcile_root is not None:
+            return run(reconcile_root, {
+                "rows": [("ABC-123", "COMPLETED", 1)],
+                "holdings": {"ABC-123": RELATIVE},
+            }, client)
         return client.exact_media_visibility(MEDIA_PATH)
 
     movie = {"Id": "movie-1", "Type": "Movie", "Path": MEDIA_PATH, "ParentId": FAMILY_ID}
@@ -165,13 +183,63 @@ def actual_client_smoke(temp):
     assert exercise([movie, movie])["reason"] == "DUPLICATE_EXACT_PATH"
     assert exercise([{**movie, "Type": "Video"}])["reason"] == "WRONG_ITEM_TYPE"
     assert exercise([{**movie, "ParentId": "unexpected-parent"}])["reason"] == "AMBIGUOUS_MOVIE_PARENT"
-    bad_family = [{"Id": FAMILY_ID, "Type": "Folder", "Path": "/media/adult/ABC", "ParentId": "unexpected-root"}]
+    bad_family = [{"Id": FAMILY_ID, "Type": "Folder", "Path": "/media/adult/ABC", "ParentId": ""}]
     assert exercise([movie], family_items=bad_family)["reason"] == "AMBIGUOUS_FAMILY_PARENT"
     ambiguous = [
-        {"Id": "family-1", "Type": "Folder", "Path": "/media/adult/ABC", "ParentId": ROOT_ID},
-        {"Id": "family-2", "Type": "Folder", "Path": "/media/adult/ABC", "ParentId": ROOT_ID},
+        {"Id": "family-1", "Type": "Folder", "Path": "/media/adult/ABC", "ParentId": FILESYSTEM_ID},
+        {"Id": "family-2", "Type": "Folder", "Path": "/media/adult/ABC", "ParentId": FILESYSTEM_ID},
     ]
     assert exercise([movie], family_items=ambiguous)["reason"] == "AMBIGUOUS_FAMILY_FOLDER"
+
+    # Virtual CollectionFolder != filesystem Folder is the normal production shape.
+    assert ROOT_ID != FILESYSTEM_ID
+    assert exercise([movie])["status"] == "VISIBLE"
+    state, _, media, _ = exercise([movie], reconcile_root=temp / "alias-integrated")
+    assert state["visible"] == 1 and visibility_row(media, "ABC-123")["status"] == "VISIBLE"
+    state, _, media, _ = exercise([movie], family_items=[{
+        "Id": FAMILY_ID, "Type": "Folder", "Path": "/media/adult/ABC",
+    }], reconcile_root=temp / "missing-parent-integrated")
+    assert state["attention"] == 1 and visibility_row(media, "ABC-123")["status"] == "ATTENTION"
+    for parent in (
+        {"Id": FILESYSTEM_ID, "Type": "CollectionFolder", "Path": "/media/adult"},
+        {"Id": FILESYSTEM_ID, "Type": "Folder", "Path": "/media/other"},
+    ):
+        assert exercise([movie], parent_item=parent)["reason"] == "AMBIGUOUS_FAMILY_PARENT"
+    assert exercise([movie], family_items=[])["status"] == "PENDING"
+    for response in (
+        [], {}, {"Items": [], "TotalRecordCount": 0},
+        {"Items": [{}], "TotalRecordCount": 1},
+        {"Items": [{"Id": FILESYSTEM_ID, "Type": "Folder"}], "TotalRecordCount": 1},
+        {"Items": [{"Id": FILESYSTEM_ID, "Type": None, "Path": "/media/adult"}], "TotalRecordCount": 1},
+        {"Items": [{"Id": FILESYSTEM_ID, "Type": "Folder", "Path": 42}], "TotalRecordCount": 1},
+        {"Items": [{"Id": "wrong-id", "Type": "Folder", "Path": "/media/adult"}], "TotalRecordCount": 1},
+        {"Items": [], "TotalRecordCount": 2},
+        {"Items": [], "TotalRecordCount": True},
+    ):
+        assert exercise([movie], parent_response=response)["reason"] == "INVALID_FAMILY_PARENT_RESPONSE"
+
+    # Invalid exact IDs fail before any network request. Canonical GUID forms work.
+    exact_calls = []
+    def exact_opener(request, timeout=None):
+        assert request.get_method() == "GET"
+        exact_calls.append(request.full_url)
+        params = urllib.parse.parse_qs(urllib.parse.urlsplit(request.full_url).query)
+        assert params["Ids"] == [FILESYSTEM_ID] and params["Limit"] == ["1"]
+        return FakeResponse({"Items": [{
+            "Id": FILESYSTEM_ID, "Type": "Folder", "Path": "/media/adult",
+        }], "TotalRecordCount": 1})
+    exact_client = JellyfinClient(base_url="http://fixture.invalid", api_key_path=key, opener=exact_opener)
+    for invalid in (None, "", " ", "../Items", "not-a-guid", FILESYSTEM_ID + "?x=1", 123):
+        try:
+            exact_client.item_by_id(invalid)
+        except JellyfinResponseError:
+            pass
+        else:
+            raise AssertionError("invalid item ID accepted")
+    assert exact_calls == []
+    assert exact_client.item_by_id(FILESYSTEM_ID)["Path"] == "/media/adult"
+    assert exact_client.item_by_id("d59216ec-ad57-5338-9303-717a879b33ad")["Path"] == "/media/adult"
+    print("VIRTUAL_FILESYSTEM_ALIAS_FIXTURE=PASS NEGATIVE_HIERARCHY_FIXTURES=PASS GET_ONLY=YES")
 
     # A truncated bounded response is malformed/incomplete, never absence.
     def overflow_opener(request, timeout=None):
@@ -243,11 +311,11 @@ def main():
         # E/F: duplicates and wrong type are terminal ATTENTION, no automatic mutation.
         for reason in ("DUPLICATE_EXACT_PATH", "WRONG_ITEM_TYPE"):
             root = temp / ("attention-" + reason.lower())
-        state, _, media, _ = run(
-            root, jobs,
-            FakeJellyfin({"status": "ATTENTION", "reason": reason}),
-        )
-        assert state["attention"] == 1 and visibility_row(media, "ABC-123")["status"] == "ATTENTION"
+            state, _, media, _ = run(
+                root, jobs,
+                FakeJellyfin({"status": "ATTENTION", "reason": reason}),
+            )
+            assert state["attention"] == 1 and visibility_row(media, "ABC-123")["status"] == "ATTENTION"
 
         root = temp / "malformed-response"
         state, _, media, _ = run(

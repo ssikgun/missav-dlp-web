@@ -7380,3 +7380,84 @@ timer. Next checkpoint should correct the Adult `CollectionFolder` versus
 filesystem `Folder` parent resolution, prove the corrected direct-child chain
 offline, then separately review how to conditionally return these
 `AMBIGUOUS_FAMILY_PARENT` rows to `PENDING` before a new bounded GET-only pass.
+
+## Post-Stage13 Media-F11b — virtual/filesystem root alias fix (PASS, source only)
+
+Starting HEAD was `cc61ab0fafa0db9f2a1993b714e67b1729f506a0`; local and
+remote matched on `teddy-subtitle-stage11`, with a clean worktree. F11's
+41 ATTENTION rows are retained without reset or production GET recheck.
+Stage13 remains CLOSED/PASS. Completion timer and service were checked
+read-only and remain inactive.
+
+### Corrected hierarchy contract
+
+F11 showed that Adult's virtual CollectionFolder
+`0a7fd8175719d8f7ebfb93874e55a2d5` (`/config/root/default/Adult`) exposes
+family children whose real parent is filesystem Folder
+`d59216ecad5753389303717a879b33ad` (`/media/adult`). Comparing the family
+ParentId directly with the virtual ItemId incorrectly rejected that normal
+hierarchy.
+
+`teddy_discovery_jellyfin.py` now follows the family's actual ParentId with
+`item_by_id()`: a bounded GET `/Items?Ids=...&Fields=Path,ParentId` with
+StartIndex=0, Limit=1, images/user data disabled. The input must be a canonical
+lowercase compact or hyphenated GUID. The response must contain exactly one
+item with the requested ID and valid nonempty Type/Path fields. The parent
+must be Type=Folder and Path exactly `/media/adult`. Only then are the
+family's direct children checked for an exact Movie with ParentId=family.Id.
+Virtual and filesystem IDs may differ; no server-specific ID is embedded
+in production logic.
+
+Missing family or Movie remains PENDING. Duplicate family/Movie, wrong type,
+missing parent, malformed exact-parent response, wrong root path/type, and
+wrong Movie parent remain ATTENTION (including the existing malformed-response
+mapping). Transport/API errors retain the existing PENDING behavior. No
+POST, refresh, scan, retry, or repair fallback was introduced.
+
+### Offline validation
+
+PASS: Jellyfin, Jellyfin visibility, completion runner, completion-media,
+media jobs, media pipeline, and title-exclusion smokes (7/7), plus Python
+compile and `git diff --check`. Tests used injected HTTP responses and
+temporary SQLite databases; no production Jellyfin requests were made.
+
+The alias fixture uses virtual-adult and a separate canonical GUID for
+filesystem-adult, with a Folder at `/media/adult`. It proves VISIBLE both at
+the client and through the actual reconciler writing a temporary DB. Negative
+fixtures cover wrong root type/path, empty or missing family ParentId,
+malformed parent response/identity/count/fields, missing family/Movie,
+duplicate Movie/family, and wrong Movie parent. The opener rejects every
+non-GET request. Invalid exact IDs fail before network access. Existing
+Created-notification smoke behavior is unchanged. The existing visibility
+smoke's duplicate/wrong-type loop indentation was corrected so both cases
+exercise their temporary DB state transition.
+
+### F11c repair plan — not executed
+
+1. Keep timer and completion service inactive. Verify the new source commit,
+   deploy using the existing immutable runtime convention, and verify the
+   corrected runtime before any reset. Do not run normal completion apply.
+2. Take a fresh read-only production snapshot and consistent SQLite backup.
+   Match the exact 41 DVD-IDs recorded in F11, media_job_id, jellyfin_path,
+   media_completed_at and F11 check timestamps to the F11 cohort. Verify
+   completed media identities/present holdings and unchanged media_jobs
+   digest. Any unexplained cohort drift stops repair.
+3. Under the existing media writer lock and a single transaction, recheck each
+   captured row's full identity and allow only rows with status=ATTENTION,
+   check_count=1, and last_error exactly
+   `ATTENTION:AMBIGUOUS_FAMILY_PARENT`. Update only status to PENDING;
+   preserve check_count, timestamps and error until the reconciler records
+   its next observation. Require exactly the approved 41 rows affected;
+   rollback the entire transaction on any mismatch. No other ATTENTION
+   reason is eligible. Do not use an unrestricted status-only reset.
+4. Run only bounded GET-only visibility reconciliation (max_items=50) from
+   the corrected release. Confirm HMN-904 and NOSKN-104 VISIBLE, inspect
+   remaining PENDING/ATTENTION, and compare media_jobs/Discovery digests.
+   Leave timer inactive and report before deciding F12.
+
+This checkpoint executed no production SQL, visibility reset, Jellyfin GET
+recheck/POST, refresh/scan, media retry, runtime deployment, wrapper update,
+or service/timer start. Production visibility rows remain untouched; the
+last verified production state is the F11 cohort of 41 ATTENTION rows.
+F11b has no blocker; F11c conditional repair design is ready for its own
+checkpoint. Source changes here are not yet installed in production.
