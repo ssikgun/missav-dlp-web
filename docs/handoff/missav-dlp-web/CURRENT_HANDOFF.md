@@ -6536,3 +6536,55 @@ attempt 17161 and HMN-904 stayed FAILED at attempt 1. The timer was enabled
 and active/waiting with next elapse 08:51:48 KST; service was inactive after
 its latest exit 0. The E5 Jellyfin-registration blocker remains open while
 the timer continues its normal schedule.
+
+## Post-Stage13 Media-F1 — metadata fetch failure forensic
+
+At source HEAD `5c3269d1f86e0d4c7434b0911e43d4aa01315a30`, the completion timer
+was stopped once and left enabled but inactive to prevent additional media
+attempts. At the end of the checkpoint, `teddy-completion-stage9.timer` and
+`teddy-completion-stage9.service` were both inactive; the writer remained
+active and host/web READY, the delete gate remained false, and
+reconcile-apply remained inactive. Stage13 remains CLOSED/PASS with the
+canary closed and writer socket durability proven.
+
+The read-only media DB snapshot was COMPLETED=40, FAILED=37, PENDING=11,
+RUNNING=0. In the 34-title recent completion-stage9 cohort, 23 jobs were
+FAILED at attempt 1 and 11 were PENDING at attempt 0. Recent failure classes
+were CONNECTION_RESET=20 and COVER_URL_MISSING=3. Across all failed jobs the
+corresponding counts were CONNECTION_RESET=31 and COVER_URL_MISSING=6.
+MFCS-085 remains exhausted and is not eligible for automatic retry.
+
+HMN-904 job 1386103 is FAILED at attempt 1, updated
+`2026-09-29T23:45:35+00:00`, with a connection reset. Its stored cover host is
+`www.javdatabase.com`; the URL itself is intentionally omitted. The pinned
+runtime pipeline calls `build_media_bundle()` before `publish_bundle()`,
+`resolve_library()`, and `notify_created()`. `build_media_bundle()` fetches
+the poster through urllib before returning the bundle. Therefore HMN-904
+failed at `MEDIA_FAILURE_STAGE=POSTER_FETCH`, before sidecar publish and before
+any Jellyfin call. Its exact canonical title directory contains the MP4 but
+no NFO or poster, matching this pre-publish failure. The same MP4-only state
+was confirmed for bounded comparison titles MARR-014 and MAAN-945; MAAN-945
+was classified COVER_URL_MISSING.
+
+Jellyfin GET-only correlation found all 23 recent FAILED titles and all 11
+PENDING titles at exact item count 0. The six recent COMPLETED titles
+NOSKN-104, MILK-306, STSK-242, NHDTC-247, NHDTC-250, and STSK-243 each had
+one exact Jellyfin item. No recent COMPLETED title was missing from Jellyfin,
+so these observations point to a pre-notification media failure rather than
+a Jellyfin registration failure.
+
+From the production completion host namespace, a bounded probe of the stored
+HMN-904 cover URL (hostname only retained) returned DNS_OK=YES and TCP_OK=YES,
+but TLS_OK=NO with `ConnectionResetError`/errno 104. The same urllib stack
+returned URL_OPEN_OK=NO with `URLError` caused by `ConnectionResetError`.
+The systemd completion service has no proxy environment or EnvironmentFiles;
+the host manager and interactive environment also expose no proxy variables.
+Together with repeated resets across recent titles, classify this as
+`SYSTEMIC_METADATA_FETCH_CONNECTIVITY_FAILURE` on the observed cover-fetch
+route, with a separate COVER_URL_MISSING subset. No media retry, source
+change, Jellyfin request, or Discovery/provenance/NAS data write was made.
+The only production runtime change was the requested timer stop.
+
+Next checkpoint: diagnose the outbound TLS reset/route for
+`www.javdatabase.com` and decide on retry policy before resuming the timer.
+Do not manually retry HMN-904 until that decision; MFCS-085 remains excluded.
