@@ -241,6 +241,26 @@ try:
             "failed": 0,
         }
 
+    def visibility_fixture(
+        discovery_db,
+        media_db,
+        writer_lock,
+        jellyfin_client,
+        *,
+        max_items,
+        target_dvd_id=None,
+    ):
+        media_only_events.append((
+            "visibility",
+            discovery_db,
+            media_db,
+            writer_lock,
+            jellyfin_client,
+            max_items,
+            target_dvd_id,
+        ))
+        return {"seeded": 1, "checked": 1, "visible": 0, "pending": 1, "attention": 0}
+
     media_only_result = run_once(
         items=None,
         db_path="fixture-discovery.db",
@@ -251,6 +271,9 @@ try:
         confirm=CONFIRMATION,
         media_processor=media_processor,
         media_runner=media_runner_fixture,
+        jellyfin_visibility_reconciler=visibility_fixture,
+        jellyfin_client=fake_jellyfin,
+        jellyfin_visibility_max_items=7,
         media_db_path="fixture-media.db",
         media_writer_lock_path="fixture-media.lock",
         media_target_dvd_id="hmn-904",
@@ -277,7 +300,19 @@ assert media_only_result["applied"] == 0
 assert media_only_result["organizer_status"] == "SKIPPED_MEDIA_ONLY"
 assert media_only_result["metadata_recovery"]["attempted"] == 0
 assert media_only_result["media"]["target_dvd_id"] == "HMN-904"
-assert media_only_events == [("target", "HMN-904")]
+assert media_only_events == [
+    ("target", "HMN-904"),
+    (
+        "visibility",
+        "fixture-discovery.db",
+        "fixture-media.db",
+        "fixture-media.lock",
+        fake_jellyfin,
+        7,
+        "HMN-904",
+    ),
+]
+assert media_only_result["media"]["jellyfin_visibility"]["pending"] == 1
 assert len(media_only_pipeline_calls) == 1
 assert media_only_pipeline_calls[0]["dvd_id"] == "HMN-904"
 assert media_only_pipeline_calls[0]["fetcher"] is proxy_fetcher

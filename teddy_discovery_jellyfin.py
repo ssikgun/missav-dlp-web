@@ -3,11 +3,35 @@ from __future__ import annotations
 from pathlib import Path, PurePosixPath
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
 class JellyfinError(RuntimeError):
     pass
+
+
+class JellyfinResponseError(JellyfinError):
+    """Jellyfin returned a successful but malformed response."""
+
+
+class JellyfinPathError(JellyfinError):
+    """A path is outside the canonical Adult media tree."""
+
+
+def validate_adult_media_path(media_path: str) -> PurePosixPath:
+    raw = str(media_path or "")
+    path = PurePosixPath(raw)
+    if (
+        not path.is_absolute()
+        or path.as_posix() != raw
+        or path.parts[:3] != ("/", "media", "adult")
+        or len(path.parts) != 6
+        or any(part in {"", ".", ".."} for part in path.parts[1:])
+        or "\\" in raw
+    ):
+        raise JellyfinPathError("invalid canonical Adult media path")
+    return path
 
 
 def jellyfin_media_path(
@@ -175,7 +199,7 @@ class JellyfinClient:
                 body.decode("utf-8")
             )
         except Exception as exc:
-            raise JellyfinError(
+            raise JellyfinResponseError(
                 "invalid Jellyfin response"
             ) from exc
 
@@ -195,7 +219,7 @@ class JellyfinClient:
             value,
             list,
         ):
-            raise JellyfinError(
+            raise JellyfinResponseError(
                 "invalid virtual folders response"
             )
 
@@ -214,11 +238,20 @@ class JellyfinClient:
                 item,
                 dict,
             ):
-                continue
+                raise JellyfinResponseError(
+                    "invalid virtual folder entry"
+                )
 
             locations = item.get(
                 "Locations"
             ) or []
+            if (
+                not isinstance(locations, list)
+                or any(not isinstance(path, str) for path in locations)
+            ):
+                raise JellyfinResponseError(
+                    "invalid virtual folder locations"
+                )
 
             if (
                 item.get("Name") == name
@@ -229,7 +262,7 @@ class JellyfinClient:
                 )
 
         if len(matches) != 1:
-            raise JellyfinError(
+            raise JellyfinResponseError(
                 "Jellyfin library match count != 1"
             )
 
@@ -241,11 +274,95 @@ class JellyfinClient:
         ).strip()
 
         if not item_id:
-            raise JellyfinError(
+            raise JellyfinResponseError(
                 "Jellyfin library ItemId missing"
             )
 
         return matches[0]
+
+    def items_by_parent(
+        self,
+        parent_id: str,
+        *,
+        limit: int = 1000,
+    ):
+        parent_id = str(parent_id or "").strip()
+        limit = int(limit)
+        if not parent_id or limit < 1 or limit > 1000:
+            raise JellyfinError("invalid Jellyfin child query")
+        query = urllib.parse.urlencode({
+            "ParentId": parent_id,
+            "Recursive": "false",
+            "Fields": "Path,ParentId",
+            "StartIndex": 0,
+            "Limit": limit,
+            "EnableImages": "false",
+            "EnableUserData": "false",
+        })
+        value = self._request("GET", "/Items?" + query)
+        if not isinstance(value, dict):
+            raise JellyfinResponseError("invalid Jellyfin items response")
+        items = value.get("Items")
+        total = value.get("TotalRecordCount")
+        if (
+            not isinstance(items, list)
+            or isinstance(total, bool)
+            or not isinstance(total, int)
+            or total < 0
+            or len(items) > limit
+            or total != len(items)
+            or any(not isinstance(item, dict) for item in items)
+        ):
+            raise JellyfinResponseError("incomplete Jellyfin child response")
+        for item in items:
+            if (
+                not isinstance(item.get("Id"), str)
+                or not item["Id"].strip()
+                or not isinstance(item.get("Type"), str)
+                or not isinstance(item.get("Path"), str)
+                or not isinstance(item.get("ParentId"), str)
+            ):
+                raise JellyfinResponseError("malformed Jellyfin child item")
+        return items
+
+    def exact_media_visibility(self, media_path: str) -> dict:
+        """Read-only, bounded lookup of one exact Adult Movie path."""
+        path = validate_adult_media_path(media_path)
+        library = self.resolve_library(
+            name="Adult",
+            location="/media/adult",
+        )
+        root_id = str(library.get("ItemId") or "").strip()
+        if not root_id:
+            raise JellyfinResponseError("Adult library ItemId missing")
+
+        family_path = path.parents[1].as_posix()
+        family_items = self.items_by_parent(root_id, limit=1000)
+        family_matches = [item for item in family_items if item.get("Path") == family_path]
+        if len(family_matches) > 1:
+            return {"status": "ATTENTION", "reason": "AMBIGUOUS_FAMILY_FOLDER"}
+        if not family_matches:
+            return {"status": "PENDING", "reason": None}
+        family = family_matches[0]
+        if family.get("Type") != "Folder" or not str(family.get("Id") or "").strip():
+            return {"status": "ATTENTION", "reason": "INVALID_FAMILY_FOLDER"}
+        if str(family.get("ParentId") or "") != root_id:
+            return {"status": "ATTENTION", "reason": "AMBIGUOUS_FAMILY_PARENT"}
+
+        children = self.items_by_parent(str(family["Id"]), limit=1000)
+        exact = [item for item in children if item.get("Path") == path.as_posix()]
+        if len(exact) > 1:
+            return {"status": "ATTENTION", "reason": "DUPLICATE_EXACT_PATH"}
+        if not exact:
+            return {"status": "PENDING", "reason": None}
+        item = exact[0]
+        if item.get("Type") != "Movie":
+            return {"status": "ATTENTION", "reason": "WRONG_ITEM_TYPE"}
+        if not str(item.get("Id") or "").strip():
+            return {"status": "ATTENTION", "reason": "MOVIE_ID_MISSING"}
+        if str(item.get("ParentId") or "") != str(family["Id"]):
+            return {"status": "ATTENTION", "reason": "AMBIGUOUS_MOVIE_PARENT"}
+        return {"status": "VISIBLE", "reason": None, "item_id": str(item["Id"])}
 
     def notify_created(
         self,

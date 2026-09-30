@@ -35,6 +35,9 @@ from teddy_discovery_media_metadata import (
 from teddy_discovery_media_pipeline import (
     run_media_pipeline,
 )
+from teddy_discovery_jellyfin_visibility import (
+    reconcile_jellyfin_visibility,
+)
 from teddy_discovery_media_publish import (
     MediaMetadataSSHMutator,
 )
@@ -88,7 +91,10 @@ def run_once(
     media_processor=None,
     media_reconciler=reconcile_media_jobs,
     media_runner=run_retryable_media_jobs,
+    jellyfin_visibility_reconciler=reconcile_jellyfin_visibility,
+    jellyfin_client=None,
     media_max_items=1,
+    jellyfin_visibility_max_items=5,
     media_db_path=None,
     media_writer_lock_path=None,
     media_target_dvd_id=None,
@@ -250,9 +256,21 @@ def run_once(
             **media_runner_kwargs
         )
 
+        visibility_result = None
+        if jellyfin_client is not None:
+            visibility_result = jellyfin_visibility_reconciler(
+                db_path,
+                media_db_path,
+                media_writer_lock_path,
+                jellyfin_client,
+                max_items=jellyfin_visibility_max_items,
+                target_dvd_id=target_dvd_id,
+            )
+
         result["media"] = {
             "reconciled": reconciled,
             **media_result,
+            "jellyfin_visibility": visibility_result,
         }
 
     if media_only:
@@ -351,6 +369,12 @@ def main():
         default=1,
     )
     parser.add_argument(
+        "--jellyfin-visibility-max-items",
+        type=int,
+        default=5,
+        help="maximum completed media titles to check by Jellyfin GET per run",
+    )
+    parser.add_argument(
         "--media-target-dvd-id",
         help="exact canonical DVD-ID for the media job selector",
     )
@@ -409,6 +433,10 @@ def main():
     if args.media_target_dvd_id is not None and not args.apply:
         parser.error(
             "--media-target-dvd-id requires --apply"
+        )
+    if not 1 <= args.jellyfin_visibility_max_items <= 1000:
+        parser.error(
+            "--jellyfin-visibility-max-items must be between 1 and 1000"
         )
     if args.media_only:
         if not args.apply:
@@ -538,6 +566,9 @@ def main():
             media_processor,
         media_max_items=
             args.media_max_items,
+        jellyfin_visibility_max_items=(
+            args.jellyfin_visibility_max_items
+        ),
         media_db_path=
             args.media_db,
         media_writer_lock_path=
@@ -545,6 +576,9 @@ def main():
         media_target_dvd_id=
             args.media_target_dvd_id,
         media_only=args.media_only,
+        jellyfin_client=(
+            jellyfin if args.apply else None
+        ),
     )
 
     print(

@@ -91,6 +91,19 @@ def main():
             "jobs": [],
         }
 
+    visibility_calls = []
+    def visibility_reconciler(
+        discovery_db,
+        media_db,
+        writer_lock,
+        jellyfin,
+        *,
+        max_items,
+        target_dvd_id=None,
+    ):
+        visibility_calls.append((discovery_db, media_db, writer_lock, jellyfin, max_items, target_dvd_id))
+        return {"seeded": 1, "checked": 1, "visible": 1, "pending": 0, "attention": 0}
+
     dry = run_once(
         items=[],
         db_path="fake.db",
@@ -132,11 +145,15 @@ def main():
         media_db_path="media.db",
         media_writer_lock_path=
             "media.lock",
+        jellyfin_visibility_reconciler=visibility_reconciler,
+        jellyfin_client=object(),
     )
 
     assert applied["applied"] == 1
     assert applied["media"]["reconciled"] == 1
     assert applied["media"]["completed"] == 1
+    assert applied["media"]["jellyfin_visibility"]["visible"] == 1
+    assert len(visibility_calls) == 1
 
     assert calls == [
         "organizer",

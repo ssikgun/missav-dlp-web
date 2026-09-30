@@ -7200,3 +7200,86 @@ timer start=0, source change=0, restart=0. Timer remains enabled but inactive;
 completion service remains inactive; Stage13 remains CLOSED/PASS. Next:
 design eventual Jellyfin visibility reconciliation without changing this
 read-only forensic result or retrying HMN-904.
+
+## Post-Stage13 Media-F10 — asynchronous Jellyfin visibility reconciliation
+
+Implemented offline source support at starting HEAD
+`2cf1768bd0d03e985a76405d2aa9ecd643341f5f`. The media job status contract is
+unchanged: `COMPLETED` still means metadata/NFO/poster publication succeeded
+and Jellyfin accepted the Created notification with 2xx. It does not mean the
+Movie is yet visible. HMN-904 is only a generic fixture label; there is no
+HMN-specific production branch.
+
+### Separate visibility state
+
+New module `teddy_discovery_jellyfin_visibility.py` lazily creates
+`media_jellyfin_visibility` in the existing media DB during apply-time
+reconciliation. Columns are `dvd_id` (unique), `media_job_id`,
+`jellyfin_path`, `status`, `check_count`, `media_completed_at`, `created_at`,
+`updated_at`, nullable `last_checked_at`, nullable `visible_at`, and nullable
+`last_error`. Status is constrained to `PENDING`, `VISIBLE`, or `ATTENTION`.
+The table is not created by dry-run/check-only code; no production migration
+was applied in F10.
+
+Each reconciliation idempotently seeds visibility only for `media_jobs`
+already `COMPLETED` and exactly one current `storage_root='jav', present=1`
+Discovery holding. It records the canonical `jellyfin_media_path(relative_path)`;
+invalid paths become `ATTENTION`, and missing/ambiguous current holdings are
+skipped for a later seed attempt. Failed, pending, and running media jobs do
+not seed visibility. Crash recovery is by reseeding a completed job whose
+visibility row is still absent.
+
+### GET-only check and runner behavior
+
+`JellyfinClient.exact_media_visibility()` validates canonical Adult path depth,
+resolves the exact Adult library root, reads bounded direct root children to
+find the family Folder, then reads only that family's direct children and
+exact-matches the path. Each child query uses `StartIndex=0`, `Limit=1000`, and
+fails closed if its returned count is malformed or incomplete. One exact
+Movie is `VISIBLE`; no exact Movie is `PENDING`; duplicate path, wrong type,
+ambiguous family/movie parent, malformed response, or invalid path is
+`ATTENTION`. GET timeout/connection/HTTP/API failures stay `PENDING`, increment
+`check_count`, and store only a bounded error class. `VISIBLE` is terminal.
+This flow has no notify, refresh, scan, or other Jellyfin mutation fallback.
+
+The normal apply runner calls visibility reconciliation after its media stage
+with independent source default `--jellyfin-visibility-max-items=5`. The
+existing `--media-only --media-target-dvd-id` mode passes the same exact target
+to visibility reconciliation, so unrelated titles are neither seeded nor
+checked in that mode. Runner JSON nests separate `jellyfin_visibility`
+`seeded/checked/visible/pending/attention` counters under media; visibility
+state never changes the media job's `COMPLETED` status or retry counters.
+
+### Offline verification and production boundary
+
+`teddy_discovery_jellyfin_visibility_smoke.py` covers completed-only seeding,
+absent-to-visible eventual discovery, duplicate/wrong-type/parent ambiguity,
+malformed and overflow responses, invalid paths, GET timeout handling,
+terminal idempotence, media row preservation, exact target isolation, missing
+holding, crash-safe seeding, and GET-only request methods. PASS:
+
+- Python compile for the changed modules and smoke fixtures.
+- `teddy_discovery_media_jobs_smoke.py`
+- `teddy_discovery_media_pipeline_smoke.py`
+- `teddy_discovery_media_metadata_smoke.py`
+- `teddy_discovery_completion_runner_smoke.py`
+- `teddy_discovery_completion_media_smoke.py`
+- `teddy_discovery_completion_orchestrator_smoke.py`
+- `teddy_discovery_jellyfin_smoke.py`
+- `teddy_discovery_jellyfin_visibility_smoke.py`
+- `teddy_title_exclusion_smoke.py`
+- `teddy_library_delete_jellyfin_smoke.py`
+
+An additional `teddy_library_delete_commit_smoke.py` attempt could not start
+because the host Python has no Flask module; no dependency was installed.
+F10 made no production deployment, media DB/schema write, media retry,
+Jellyfin POST/refresh/scan, wrapper change, or service/timer start. Timer stays
+enabled but inactive; completion service remains inactive; Stage13 remains
+CLOSED/PASS.
+
+F11 plan: deploy an immutable runtime only after review; keep the timer stopped;
+allow the normal apply path to create the visibility table and reconcile the
+existing completed cohort using bounded GET-only checks; verify HMN-904 and
+known-good completed titles; record any persistent `ATTENTION` states without
+Jellyfin mutation; then separately decide remaining media recovery and timer
+resumption.
