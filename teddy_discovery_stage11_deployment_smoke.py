@@ -7,6 +7,7 @@ smoke cannot send Hermes/Whisper requests or create a remote session.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -138,7 +139,8 @@ class FakeRemoteBridge:
         input_path = remote_task + "/" + QUALITY_REVIEW_INPUT_FILENAME
         output_path = remote_task + "/" + QUALITY_REVIEW_RESULT_FILENAME
         self.files[output_path] = self.review_payload_to_result(
-            self.files[input_path]
+            self.files[input_path],
+            review_session=command[command.index("--resume") + 1],
         )
         return SimpleNamespace(returncode=0)
 
@@ -193,11 +195,14 @@ def _provider(asr_result):
     )
 
 
-def _asr_executor(runtime):
+def _asr_executor(runtime, fresh_db):
     def execute(request, payload, digest, remote_task, timeout):
         del payload, digest, remote_task, timeout
         return serialize_asr_quality_review_result(
-            runtime._review_result(request, asr_quality_review_request_sha256(request)),
+            replace(
+                runtime._review_result(request, asr_quality_review_request_sha256(request)),
+                review_execution_session_id=fresh_db.calls[-1][0],
+            ),
             request,
         )
 
@@ -227,7 +232,7 @@ def _native_first_pass(runtime):
 
 
 def _install_fake_hybrid_result(bridge, deps, runtime):
-    def result_from_payload(payload):
+    def result_from_payload(payload, *, review_session):
         request = review._parse(
             payload,
             review.QualityReviewRequest,
@@ -235,7 +240,10 @@ def _install_fake_hybrid_result(bridge, deps, runtime):
         )
         originals = deps.originals_provider(request)
         request = review.parse_review_request(payload, **originals)
-        result = runtime._review_result(request, review.review_request_sha256(request))
+        result = replace(
+            runtime._review_result(request, review.review_request_sha256(request)),
+            review_execution_session_id=review_session,
+        )
         return review.serialize_review_result(result, request)
 
     bridge.review_payload_to_result = result_from_payload
@@ -301,7 +309,7 @@ def _build_deps_with_asr_fake(root, *, candidate, bridge=None, baseline=None, ru
         remote_bridge=bridge,
         native_first_pass_run=_native_first_pass(runtime),
         asr_review_options={
-            "executor": _asr_executor(runtime),
+            "executor": _asr_executor(runtime, fresh_db),
             "fresh_session_preparer": prepare_review_session,
         },
     )
@@ -445,7 +453,7 @@ def main():
             native_first_pass_run=lambda args: 1,
             audio_chunk_iterator=live_fixture.audio,
             asr_review_options={
-                "executor": _asr_executor(runtime),
+                "executor": _asr_executor(runtime, fresh_db),
                 "fresh_session_preparer": lambda sid: None,
             },
         )
@@ -495,7 +503,7 @@ def main():
             remote_bridge=FakeRemoteBridge(),
             native_first_pass_run=lambda args: 1,
             asr_review_options={
-                "executor": _asr_executor(runtime),
+                "executor": _asr_executor(runtime, fresh_db),
                 "fresh_session_preparer": lambda sid: None,
             },
         )
@@ -514,7 +522,7 @@ def main():
             remote_bridge=FakeRemoteBridge(),
             native_first_pass_run=lambda args: 1,
             asr_review_options={
-                "executor": _asr_executor(runtime),
+                "executor": _asr_executor(runtime, fresh_db),
                 "fresh_session_preparer": lambda sid: None,
             },
         )
@@ -601,7 +609,7 @@ def main():
             remote_bridge=FakeRemoteBridge(),
             native_first_pass_run=lambda args: 1,
             asr_review_options={
-                "executor": _asr_executor(runtime),
+                "executor": _asr_executor(runtime, fresh_db),
                 "fresh_session_preparer": lambda sid: None,
             },
         )
@@ -633,7 +641,7 @@ def main():
             remote_bridge=FakeRemoteBridge(),
             native_first_pass_run=lambda args: 1,
             asr_review_options={
-                "executor": _asr_executor(runtime),
+                "executor": _asr_executor(runtime, fresh_db),
                 "fresh_session_preparer": lambda sid: None,
             },
         )

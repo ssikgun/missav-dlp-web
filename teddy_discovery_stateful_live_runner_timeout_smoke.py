@@ -314,7 +314,8 @@ def main():
             absolute_timeout=2.0,
         )
     check(
-        "STDOUT_ACTIVITY_TICK" in stdout_activity_output.getvalue()
+        "STDOUT_ACTIVITY_TICK" not in stdout_activity_output.getvalue()
+        and int(diagnostic_value(stdout_activity_output.getvalue(), "HERMES_REMOTE_STDOUT_BYTES")) > 0
         and "HERMES_INVOCATION_RESULT=PASS" in stdout_activity_output.getvalue()
         and float(
             diagnostic_value(
@@ -325,23 +326,17 @@ def main():
         "PERIODIC_STDOUT_RESETS_SCALED_INACTIVITY_TIMEOUT",
     )
 
-    class ChildAwareOutput(io.StringIO):
-        def __init__(self, child_processes):
-            super().__init__()
-            self.child_processes = child_processes
-            self.child_was_running_at_output = False
-
-        def write(self, value):
-            if (
-                "LIVE_CHILD_OUTPUT" in value
-                and self.child_processes
-                and self.child_processes[0].poll() is None
-            ):
-                self.child_was_running_at_output = True
-            return super().write(value)
-
+    # Raw streams remain private, but must be consumed while the child runs.
     child_processes = []
-    live_output = ChildAwareOutput(child_processes)
+    consumed_while_running = []
+    live_output = io.StringIO()
+    original_consume = live_runner._HermesOutputCapture.consume
+
+    def observe_consume(capture, stream_name, payload):
+        if b"LIVE_CHILD_OUTPUT" in payload and child_processes:
+            consumed_while_running.append(child_processes[0].poll() is None)
+        return original_consume(capture, stream_name, payload)
+
     real_popen = subprocess.Popen
 
     def capture_child(*args, **kwargs):
@@ -350,6 +345,7 @@ def main():
         return child
 
     with (
+        patch.object(live_runner._HermesOutputCapture, "consume", observe_consume),
         redirect_stdout(live_output),
         redirect_stderr(io.StringIO()),
         patch.object(
@@ -379,9 +375,10 @@ def main():
             absolute_timeout=2.0,
         )
     check(
-        live_output.child_was_running_at_output
-        and "LIVE_CHILD_OUTPUT" in live_output.getvalue(),
-        "CHILD_OUTPUT_IS_FORWARDED_BEFORE_INVOCATION_COMPLETES",
+        any(consumed_while_running)
+        and "LIVE_CHILD_OUTPUT" not in live_output.getvalue()
+        and int(diagnostic_value(live_output.getvalue(), "HERMES_REMOTE_STDOUT_BYTES")) > 0,
+        "CHILD_OUTPUT_IS_CONSUMED_PRIVATELY_BEFORE_INVOCATION_COMPLETES",
     )
 
     stderr_activity_output = io.StringIO()
@@ -395,7 +392,8 @@ def main():
             absolute_timeout=2.0,
         )
     check(
-        "STDERR_ACTIVITY_TICK" in stderr_activity_output.getvalue()
+        "STDERR_ACTIVITY_TICK" not in stderr_activity_output.getvalue()
+        and int(diagnostic_value(stderr_activity_log.getvalue(), "HERMES_REMOTE_STDERR_BYTES")) > 0
         and "HERMES_INVOCATION_RESULT=PASS" in stderr_activity_log.getvalue()
         and float(
             diagnostic_value(
@@ -427,7 +425,8 @@ def main():
         and absolute_error.absolute_timeout_seconds == 0.35
         and absolute_error.seconds_since_last_output_activity is not None
         and absolute_error.seconds_since_last_output_activity < 0.2
-        and "ABSOLUTE_CAP_ACTIVITY" in absolute_timeout_output.getvalue()
+        and "ABSOLUTE_CAP_ACTIVITY" not in absolute_timeout_output.getvalue()
+        and int(diagnostic_value(absolute_timeout_output.getvalue(), "HERMES_REMOTE_STDOUT_BYTES")) > 0
         and "HERMES_INVOCATION_TIMEOUT_REASON=ABSOLUTE_TIMEOUT"
         in absolute_timeout_output.getvalue(),
         "ENDLESS_ACTIVITY_IS_STOPPED_BY_NONRESETTING_ABSOLUTE_CAP",
@@ -458,7 +457,8 @@ def main():
             absolute_timeout=2.0,
         )
     check(
-        "SYNTHETIC_SUCCESS" in pass_output.getvalue()
+        "SYNTHETIC_SUCCESS" not in pass_output.getvalue()
+        and int(diagnostic_value(pass_output.getvalue(), "HERMES_REMOTE_STDOUT_BYTES")) > 0
         and "HERMES_INVOCATION_RESULT=PASS" in pass_output.getvalue(),
         "PASS_INVOCATION_EMITS_PASS_RESULT",
     )
