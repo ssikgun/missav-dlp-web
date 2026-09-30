@@ -6956,3 +6956,104 @@ Stage13 remains CLOSED/PASS. Next checkpoint: read-only forensic comparison of
 HMN versus a successful family for Jellyfin child resolution/parser inputs;
 do not send another refresh or Created notification until separately
 authorized.
+
+## Post-Stage13 Media-F7 — HMN-904 vs NOSKN-104 resolver-input forensic
+
+Read-only checks ran at source HEAD `ef687e2a8ff4382e9e76caa66797b150fbe1ce5d`.
+The completion timer remained enabled but inactive; completion and
+reconcile-apply remained inactive; writer was active and host/web READY; web
+`/login` returned 200; gate remained false. No source or production data was
+changed. Stage13 remains CLOSED/PASS.
+
+### Exact filesystem and metadata
+
+Jellyfin's exact directory-listing API returned the required children for
+both `/media/adult/HMN/HMN-904` and `/media/adult/NOSKN/NOSKN-104`; each has
+one regular MP4, one NFO, and one poster. The exact full listing differs:
+NOSKN also has `NOSKN-104.ko.srt`; HMN's poster is `poster.webp`, NOSKN's is
+`poster.jpg`. `FS_SHAPE_MATCH=YES` for the resolver-relevant movie/NFO/poster
+roles, with those full-list differences recorded.
+
+The Jellyfin filesystem endpoint exposes names/types but not mode, uid/gid,
+size, or mtime. Exact NAS source stats (on the previously confirmed
+read-only Jellyfin media mount) show both title directories and all listed
+files are mode 0777, uid 1026, gid 100. HMN sizes are MP4 3,315,951,470 bytes,
+NFO 793 bytes, poster 10,128 bytes; NOSKN sizes are MP4 3,669,076,339 bytes,
+NFO 810 bytes, poster 26,700 bytes, subtitle 13,519 bytes. Their mtimes differ
+by file as expected for separate titles. No filesystem permission difference
+was found. Jellyfin-container lstat/stat was unavailable through the existing
+read-only interface, so NAS source stat is recorded separately from the
+Jellyfin API visibility evidence.
+
+### Jellyfin hierarchy and library settings
+
+GET inventory showed Adult library root `/media/adult`, `CollectionType=movies`,
+enabled, and `EnableRealtimeMonitor=true`. Its only `PathInfos` entry is
+`/media/adult`; there is no HMN- or NOSKN-specific path override. The library
+has `LocalMetadataReaderOrder=[Nfo]` and internet metadata providers disabled.
+
+Both family items are `Folder` children of the same Adult root item
+`d59216ecad5753389303717a879b33ad`:
+
+- HMN: ID `7aed4f1993e9a282c851f3f6da9cf930`, path `/media/adult/HMN`.
+- NOSKN: ID `cca74790b4eefebea88f53bfc1342327`, path `/media/adult/NOSKN`.
+
+For both titles the title-directory path has no API Folder item. NOSKN has one
+Movie at `/media/adult/NOSKN/NOSKN-104/NOSKN-104.mp4`, ID
+`99fbfbd848703e747abdb2d8daac1c11`, `MediaType=Video`, `IsFolder=false`,
+ParentId `cca74790b4eefebea88f53bfc1342327`. HMN has no Movie at its exact
+MP4 path. Therefore the library and parent-folder classifications match;
+the inventory difference is the missing HMN Movie child.
+
+### NFO structure
+
+Both exact NFOs parse as XML with root `movie`, one title, one `<id>` equal to
+the DVD-ID, and one `<uniqueid type="dvd_id" default="true">` with the same
+DVD-ID. Both have one premiered/year, one studio, and one actor; HMN has 7
+genres and NOSKN 8. No duplicate or conflicting IDs were found. Both are
+`NFO_XML_VALID=YES` and `NFO_STRUCTURE_CLASS=STANDARD_MOVIE_XML`; these
+structural differences do not explain why only HMN lacks a Movie item.
+
+### Resolver and ignore-rule comparison
+
+The deployed Jellyfin version is 10.11.11. Its tagged `VideoResolver`
+recognizes `.mp4` and runs clean-name/year parsing; `MovieResolver` resolves
+movie-library children and its `ResolveMultiple` path filters filenames
+matching the whole word `sample`, then passes supported videos to
+`VideoListResolver`. The two names `HMN-904.mp4` and `NOSKN-104.mp4` both have
+the same plain DVD-ID naming shape, no year token, no `sample` token, and no
+CD/DVD/Part/Disc stack suffix. They do not match the resolver's trailer,
+sample, or other-extra naming patterns. Static source-based result:
+`HMN_VIDEO_RESOLVER_ACCEPTED=YES`,
+`NOSKN_VIDEO_RESOLVER_ACCEPTED=YES`; this means the filename/extension rules
+do not reject either candidate, not that the full production resolver was
+executed in a separate probe.
+
+No `.ignore` exists in the Adult root, either exact family directory, or
+either exact title directory; neither exact title listing has a hidden entry
+or nested extras directory. The 10.11.11 global ignore patterns include
+hidden paths and sample names, but neither exact candidate matches them.
+`HMN_IGNORE_RULE_MATCH=NO`; `NOSKN_IGNORE_RULE_MATCH=NO`.
+
+The NOSKN Movie `DateCreated` is 2026-09-08; current Jellyfin log retention
+contains only 2026-09-28 through 2026-09-30, so a bounded first-registration
+log comparison is `UNKNOWN`. F5 already recorded an HMN family refresh target;
+F6's exact parent refresh returned 204 but did not produce the Movie within
+180 seconds, with no refresh error in its bounded log window.
+
+Classification: `JELLYFIN_CHILD_RESOLUTION_STATE_ANOMALY`. The resolver-relevant
+inputs are equivalent and appear valid, yet only HMN remains unindexed. The
+extra NOSKN subtitle and poster extension/content, and expected per-file size
+and mtime differences, do not establish a generic rejection rule. No
+HMN-specific workaround is recommended. Current media counts are
+COMPLETED=41, FAILED=36, PENDING=11, RUNNING=0; failed classes are
+CONNECTION_RESET=30 and COVER_URL_MISSING=6. Timer remains inactive. Production
+mutation is 0. Next step: investigate the generic child-enumeration/resolver
+execution path using server logs or a safe reproduction, without another
+refresh, notification, retry, or library scan.
+
+Version-matched source references: [VideoResolver](https://raw.githubusercontent.com/jellyfin/jellyfin/v10.11.11/Emby.Naming/Video/VideoResolver.cs),
+[MovieResolver](https://raw.githubusercontent.com/jellyfin/jellyfin/v10.11.11/Emby.Server.Implementations/Library/Resolvers/Movies/MovieResolver.cs),
+[NamingOptions](https://raw.githubusercontent.com/jellyfin/jellyfin/v10.11.11/Emby.Naming/Common/NamingOptions.cs),
+[IgnorePatterns](https://raw.githubusercontent.com/jellyfin/jellyfin/v10.11.11/Emby.Server.Implementations/Library/IgnorePatterns.cs),
+and [Jellyfin `.ignore` documentation](https://jellyfin.org/docs/general/server/media/excluding-directory/).
