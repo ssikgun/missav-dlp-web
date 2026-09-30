@@ -6802,3 +6802,104 @@ the exact item within 120 seconds. Next F5 must investigate the normal Created
 notification/library registration path and define the remaining failed/pending
 cohort policy. Keep the completion timer stopped; do not retry HMN-904 or send
 another Jellyfin notification/refresh/scan until separately authorized.
+
+## Post-Stage13 Media-F5 — Created notification reached HMN parent refresh; no Movie indexed (READ-ONLY)
+
+Preconditions passed at HEAD `c4cc82a0c6aaaa5f1c9e92393b494865f6cb64a5`,
+with local and remote equal and a clean worktree. The completion timer remained
+enabled but inactive, completion and reconcile-apply services were inactive,
+writer remained active/host+web READY, `/login` returned 200, and the delete
+gate remained false. Stage13 remains CLOSED/PASS. HMN-904 is still
+`COMPLETED / attempt=2`; its Discovery holding 185 remains present=1 at
+`HMN/HMN-904/HMN-904.mp4`, size 3,315,951,470 bytes. NAS exact-title contents
+are the MP4 (3,315,951,470 bytes), `HMN-904.nfo` (793 bytes), and
+`poster.webp` (10,128 bytes). Jellyfin exact Movie path count remains 0.
+MFCS-085 remains `FAILED / attempt=17161 / EXHAUSTED`.
+
+Jellyfin GET `/System/Info` returned version `10.11.11`. In the tagged
+[v10.11.11 LibraryController](https://github.com/jellyfin/jellyfin/blob/v10.11.11/Jellyfin.Api/Controllers/LibraryController.cs),
+`POST /Library/Media/Updated` iterates `dto.Updates` and passes each `item.Path`
+to `ReportFileSystemChanged`; the controller does not branch on `UpdateType`.
+The F4 pipeline returned complete, and its `JellyfinClient` treats any
+non-2xx response as an error, so the Created request reached the client-side
+success path (the actual HTTP status was not persisted). The success therefore
+means notification accepted, not item indexed.
+
+The F4 media row `updated_at=2026-09-30T02:15:36+00:00` anchors the notify
+window at approximately 11:15:36 KST. The bounded log window was
+11:12:36–11:18:36 KST (02:12:36–02:18:36 UTC). GET `/System/Logs` returned
+200 and listed `log_20260930.log`; its bounded relevant result was:
+`[2026-09-30 02:16:36.958 +00:00] [INF] ... LibraryMonitor: "HMN"
+("/media/adult/HMN") will be refreshed.` No `New file refresher created`
+message or error/exception appeared in that window. The explicit creation log
+is therefore `REFRESHER_CREATED_EVIDENCE=UNKNOWN`; the `will be refreshed`
+message proves the timer callback reached the refresh target, so
+`REFRESH_EXECUTED_EVIDENCE=YES`, with
+`REFRESH_TARGET_PATH=/media/adult/HMN` and
+`REFRESH_ERROR_EVIDENCE=NO` in the checked window. Notification evidence is
+`NOTIFICATION_RECEIVED_EVIDENCE=YES` from the pipeline's 2xx-success path and
+the resulting LibraryMonitor record.
+
+The tagged [v10.11.11 FileRefresher source](https://github.com/jellyfin/jellyfin/blob/v10.11.11/Emby.Server.Implementations/IO/FileRefresher.cs)
+sets its one-shot timer from `LibraryMonitorDelay`, resolves the changed path
+with `FindByPath` while ascending parent paths, logs the item that will be
+refreshed, then calls `ChangedExternally()`. The tagged
+[LibraryMonitor source](https://github.com/jellyfin/jellyfin/blob/v10.11.11/Emby.Server.Implementations/IO/LibraryMonitor.cs)
+shows the path being handed to the refresher. These sources agree with the
+observed HMN family-folder refresh; Created versus Modified was not tested or
+changed.
+
+GET `/Environment/DirectoryContents` with both `includeFiles=true` and
+`includeDirectories=true` confirms Jellyfin's own filesystem view sees
+`/media/adult/HMN/HMN-904` and its exact MP4, NFO, and poster entries. The HMN
+family directory returns three entries and the title directory returns three.
+The API's `FileSystemEntryInfo` returns only Name/Path/Type, not file sizes;
+container-side sizes therefore remain unverified. NAS exact MP4 size matches
+the Discovery holding. `JELLYFIN_FS_HMN904_VISIBLE=YES` for existence/type.
+
+A bounded GET inventory with `Recursive=true`,
+`IncludeItemTypes=Folder,Movie,Video`, `Fields=Path,ParentId`,
+`StartIndex=0`, `Limit=10000` returned 473/473 items:
+
+- `/media/adult`: one Folder, ID `d59216ecad5753389303717a879b33ad`, parent `f27caa37e5142225cceded48f6553502`.
+- `/media/adult/HMN`: one Folder, ID `7aed4f1993e9a282c851f3f6da9cf930`, parent `/media/adult`.
+- `/media/adult/HMN/HMN-904`: no API folder item.
+- `/media/adult/HMN/HMN-904/HMN-904.mp4`: no Movie item.
+
+Comparison title NOSKN-104 is visible in the filesystem endpoint under
+`/media/adult/NOSKN/NOSKN-104` (including its MP4 and NFO). Its API hierarchy
+also has no title-directory item, but has one Movie at
+`/media/adult/NOSKN/NOSKN-104/NOSKN-104.mp4`, ID
+`99fbfbd848703e747abdb2d8daac1c11`, parent folder
+`/media/adult/NOSKN` (ID `cca74790b4eefebea88f53bfc1342327`). Thus the physical
+and API ancestor shape is comparable; HMN's family folder exists and the
+refresh targeted it, but no HMN Movie BaseItem appeared.
+
+`JELLYFIN_DB_HIERARCHY=UNKNOWN`: the known host DB path
+`/opt/jellyfin/config/data/jellyfin.db` is not present in this execution
+host, and the existing `pve` name does not resolve. No alternate access path
+was created or attempted. No Jellyfin DB was opened or changed.
+
+Source audit confirms `run_media_pipeline()` builds metadata, publishes the
+sidecars, resolves the Adult library, calls `notify_created()`, and immediately
+returns `MEDIA_PIPELINE_COMPLETE`; it does not wait for exact item visibility.
+Therefore `MEDIA_COMPLETED_MEANS_NOTIFICATION_ACCEPTED_ONLY=YES`.
+Classification is `JELLYFIN_PENDING_CLASS=REFRESH_COMPLETED_WITHOUT_ITEM_DISCOVERY`:
+the endpoint saw the files, LibraryMonitor logged the HMN parent refresh, no
+error was present in the bounded log, yet the exact Movie remained absent
+through F4's 120-second GET poll and F5's current GET inventory. No explicit
+scan-completion marker exists, so the result identifies the failed discovery
+outcome, not a lower-level parser cause.
+
+Current media jobs are COMPLETED=41, FAILED=36, PENDING=11, RUNNING=0. Failed
+error classes are CONNECTION_RESET=30 and COVER_URL_MISSING=6. There has been
+one proxy-era completed media job: HMN-904. HMN-904 remains COMPLETED/2 and
+MFCS-085 remains exhausted/17161.
+
+Production mutation audit: media DB 0, Discovery 0, NAS 0, Jellyfin POST/
+refresh/scan/delete 0, Jellyfin DB write 0, completion run 0, timer start 0,
+container restart 0, source change 0. Only this canonical handoff is updated.
+Keep the timer inactive. Next checkpoint: select one safe Jellyfin indexing
+recovery based on the observed HMN parent refresh, then verify by GET; do not
+repeat the Created notification or start bulk media recovery in this forensic
+checkpoint.
