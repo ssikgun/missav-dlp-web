@@ -7057,3 +7057,71 @@ Version-matched source references: [VideoResolver](https://raw.githubusercontent
 [NamingOptions](https://raw.githubusercontent.com/jellyfin/jellyfin/v10.11.11/Emby.Naming/Common/NamingOptions.cs),
 [IgnorePatterns](https://raw.githubusercontent.com/jellyfin/jellyfin/v10.11.11/Emby.Server.Implementations/Library/IgnorePatterns.cs),
 and [Jellyfin `.ignore` documentation](https://jellyfin.org/docs/general/server/media/excluding-directory/).
+
+## Post-Stage13 Media-F8 — deterministic item ID now resolves to visible HMN Movie
+
+Read-only preconditions at starting HEAD
+`6dfaa08ba0be548d6199c2e88367233f2dc5d935` were verified: the worktree was
+clean and origin matched; completion timer/service and reconcile-apply were
+inactive; writer was active and web health `READY`; `/login` returned 200;
+gate was false; HMN-904 media job remained `COMPLETED / attempt=2`. During this
+checkpoint's API checks, however, the expected exact Movie count was no longer
+zero. The current exact path returned one Movie, so the stipulated count=0
+precondition had drifted by the time candidate verification ran.
+
+GET `/System/Configuration` returned
+`EnableCaseSensitiveItemIds=true`; `/System/Info` confirmed Jellyfin
+10.11.11. The version-matched `LibraryManager.GetNewItemId()` implementation
+normalizes a key beneath ProgramData only, lowercases the key only when IDs
+are case-insensitive, prepends `type.FullName`, then returns the MD5 digest
+as a Guid. `GetMD5()` hashes UTF-16LE bytes and constructs a Guid from the
+digest bytes. The tested media paths are outside ProgramData, so no path
+normalization applies. Source references: [LibraryManager](https://raw.githubusercontent.com/jellyfin/jellyfin/v10.11.11/Emby.Server.Implementations/Library/LibraryManager.cs)
+and [BaseExtensions.GetMD5](https://raw.githubusercontent.com/jellyfin/jellyfin/v10.11.11/MediaBrowser.Common/Extensions/BaseExtensions.cs).
+
+The source-derived algorithm was validated against both known-good IDs:
+
+- NOSKN-104 Movie calculated ID equals actual:
+  `99fbfbd848703e747abdb2d8daac1c11` (`YES`).
+- NOSKN family `Folder` calculated ID equals actual:
+  `cca74790b4eefebea88f53bfc1342327` (`YES`).
+
+Calculated HMN candidates:
+
+- `Movie` `/media/adult/HMN/HMN-904/HMN-904.mp4`:
+  `ad4c0d7134580158d7b656f7f53f8223`.
+- Generic `Video` at the same path:
+  `791780d2df49c2f597139bc68ba459f5`.
+- `Folder` `/media/adult/HMN/HMN-904`:
+  `338a3896277b25272292e68a54838aef`.
+
+Exact-ID GET results: expected Movie candidate present=YES; generic Video
+candidate present=NO; title Folder candidate present=NO. The Movie candidate
+is one exact `Movie` at the expected path, parented to HMN family Folder
+`7aed4f1993e9a282c851f3f6da9cf930`; `MediaType=Video`, `IsFolder=false`, and
+`ProviderIds` has key `dvd_id` with value `HMN-904`. `IsVirtualItem` and
+`IsMissing` were not exposed in the response.
+
+Adult-root recursive inventory returned 274 items. The HMN identity search
+found one item total: Name exactly `HMN-904` matched 0, exact path matched 1,
+and `ProviderIds` value `HMN-904` matched 1. No alternate path/type duplicate
+was found. The current exact HMN Movie count is 1 and the item appears in
+ordinary Adult inventory, so this is not an item-hidden-from-inventory case.
+
+Direct family child comparison: HMN has three children, all `Movie`, including
+the one HMN-904 Movie; NOSKN has one child, a `Movie`, its NOSKN-104 control.
+Current API child queries are returning the expected items. The deterministic
+ID evidence rules out a stale generic Video ID, stale title Folder ID, and
+identity collision. The listed F8 classifications A–F do not apply: the
+expected Movie exists at the exact path and is visible. Record
+`F8_RESULT=INCOMPLETE_PRECONDITION_DRIFT` and
+`CURRENT_ITEM_STATE=EXPECTED_MOVIE_PRESENT_AND_VISIBLE`; do not infer which
+earlier event caused it to appear.
+
+Production mutation audit: Jellyfin POST/refresh/scan=0; Jellyfin DB write=0;
+media DB=0; Discovery=0; NAS=0; completion run=0; timer start=0; source
+change=0; restart=0. Timer remains enabled but inactive, service inactive,
+writer READY, gate false, and Stage13 CLOSED/PASS. Next checkpoint should
+establish the read-only appearance timeline or update the recovery state from
+the newly visible item; no additional Jellyfin mutation is indicated by this
+forensic result.
