@@ -2,12 +2,13 @@
 
 ## 2026-10-01 Stage11 — status-aware HYBRID targeted evidence projection
 
-Current checkpoint Git outcome: implementation and verification are complete,
-but staging this new change failed because worktree Git metadata is read only
-(`index.lock` creation denied). HEAD is still `2332ba8`; only the five related
-source/test/handoff files are modified. This checkpoint is uncommitted and has
-not been pushed. The earlier `5ebecf2` / `2332ba8` commits remain committed and
-remotely pushed. No Git metadata workaround was used.
+Current checkpoint Git outcome: implementation and verification are complete.
+The targeted-evidence policy change was committed as
+`622243ef2f58700f402f111abae4750b148ec539`
+(`preserve hybrid route for optional targeted evidence`) and pushed to
+`teddy-subtitle-stage11`. The checkpoint started from clean HEAD `2332ba8`;
+the earlier `5ebecf2` / `2332ba8` commits remain in history. The worktree was
+clean after the commit/push. No Git metadata workaround was used.
 
 The shared `requires_hybrid_targeted_projection` predicate in the targeted
 second-evidence module requires complete HYBRID semantic/review coverage for
