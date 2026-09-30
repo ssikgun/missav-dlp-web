@@ -71,10 +71,12 @@ def main():
     def media_runner(
         *,
         db_path,
+        discovery_db_path,
         writer_lock_path,
         processor,
         max_items,
     ):
+        assert discovery_db_path == "fake.db"
         calls.append(
             "media-runner"
         )

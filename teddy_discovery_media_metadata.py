@@ -57,6 +57,44 @@ def _normalize_dvd_id(value: str) -> str:
     return dvd_id
 
 
+def media_input_eligibility(db_path: str | Path, dvd_id: str) -> str:
+    """Read the current cover input without fetching it or changing Discovery."""
+    dvd_id = _normalize_dvd_id(dvd_id)
+    db = sqlite3.connect(
+        "file:" + str(Path(db_path).resolve()) + "?mode=ro",
+        uri=True,
+    )
+    try:
+        db.execute("PRAGMA query_only=ON")
+        row = db.execute(
+            "SELECT cover_url FROM titles WHERE dvd_id=?", (dvd_id,)
+        ).fetchone()
+    finally:
+        db.close()
+    if row is None:
+        return "HELD_METADATA_NOT_FOUND"
+    url = str(row[0] or "").strip()
+    if not url:
+        return "HELD_COVER_URL_MISSING"
+    try:
+        url.encode("ascii")
+        parsed = urlsplit(url)
+        host, port = parsed.hostname, parsed.port
+    except (UnicodeError, ValueError):
+        return "HELD_COVER_URL_INVALID"
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not host
+        or parsed.username is not None
+        or parsed.password is not None
+        or any(ord(char) <= 32 or ord(char) == 127 for char in url)
+        or re.search(r"%(?![0-9A-Fa-f]{2})", url)
+        or (port is not None and port < 1)
+    ):
+        return "HELD_COVER_URL_INVALID"
+    return "READY"
+
+
 def _extract_original_title(
     raw_metadata: str,
 ) -> str:

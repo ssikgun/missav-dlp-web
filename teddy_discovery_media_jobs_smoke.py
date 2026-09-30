@@ -404,6 +404,143 @@ def exact_target_selector_smoke(root):
     assert read_job(db, "AAA-111")["attempt_count"] == 0
 
 
+
+def current_input_guard_smoke(root):
+    from teddy_discovery_media_metadata import media_input_eligibility
+
+    now = datetime.now(timezone.utc)
+    old = (now - timedelta(seconds=3601)).isoformat()
+    current = now.isoformat()
+
+    def setup(name, status, cover, *, error=None, attempts=1, other=False):
+        case = root / ("input-" + name)
+        case.mkdir()
+        discovery = case / "discovery.sqlite3"
+        media = case / "media.sqlite3"
+        locks = case / "title-locks"
+        locks.mkdir()
+        db = sqlite3.connect(discovery)
+        db.execute("CREATE TABLE titles(dvd_id TEXT PRIMARY KEY, cover_url TEXT)")
+        if cover != "NO_TITLE":
+            db.execute("INSERT INTO titles VALUES(?,?)", ("HMN-904", cover))
+        if other:
+            db.execute("INSERT INTO titles VALUES(?,?)", ("AAA-111", "https://cover.example/a.jpg"))
+        db.commit()
+        db.close()
+        add_job(media, "HMN-904", status, attempts, old if status == "FAILED" else current)
+        if other:
+            add_job(media, "AAA-111", "PENDING", 0, current)
+        if error:
+            db = sqlite3.connect(media)
+            db.execute("UPDATE media_jobs SET error=? WHERE dvd_id='HMN-904'", (error,))
+            db.commit()
+            db.close()
+        return discovery, media, case / "media.lock", locks
+
+    def run_case(name, status, cover, expected, *, error=None, attempts=1, other=False):
+        discovery, media, writer, locks = setup(name, status, cover, error=error, attempts=attempts, other=other)
+        before = read_job(media, "HMN-904")
+        unrelated = read_job(media, "AAA-111") if other else None
+        called = []
+        result = run_retryable_media_jobs(
+            db_path=media, discovery_db_path=discovery, writer_lock_path=writer,
+            title_lock_dir=locks, target_dvd_id="HMN-904", max_items=1,
+            processor=lambda dvd_id: called.append(dvd_id) or {"ok": True}, now=now,
+        )
+        assert media_input_eligibility(discovery, "HMN-904") == expected
+        assert result["jobs"][0]["status"] == ("COMPLETED" if expected == "READY" else expected)
+        if expected == "READY":
+            assert result["attempted"] == 1 and called == ["HMN-904"]
+            assert read_job(media, "HMN-904")["attempt_count"] == attempts + 1
+        else:
+            assert result["attempted"] == 0 and called == []
+            assert read_job(media, "HMN-904") == before
+            assert result[{
+                "HELD_METADATA_NOT_FOUND": "held_metadata_not_found",
+                "HELD_COVER_URL_MISSING": "held_cover_url_missing",
+                "HELD_COVER_URL_INVALID": "held_cover_url_invalid",
+            }[expected]] == 1
+        if other:
+            assert read_job(media, "AAA-111") == unrelated
+        return discovery, media, writer, locks
+
+    # Old error text is never used for current input decisions.
+    discovery, media, writer, locks = run_case(
+        "old-missing-still-missing", "FAILED", None, "HELD_COVER_URL_MISSING",
+        error="cover_url missing: HMN-904", other=True,
+    )
+    db = sqlite3.connect(discovery)
+    db.execute("UPDATE titles SET cover_url=? WHERE dvd_id='HMN-904'", ("https://cover.example/now.jpg",))
+    db.commit()
+    db.close()
+    assert media_input_eligibility(discovery, "HMN-904") == "READY"
+    result = run_retryable_media_jobs(
+        db_path=media, discovery_db_path=discovery, writer_lock_path=writer,
+        title_lock_dir=locks, target_dvd_id="HMN-904", max_items=1,
+        processor=lambda dvd_id: {"ok": dvd_id}, now=now,
+    )
+    assert result["completed"] == 1 and read_job(media, "HMN-904")["attempt_count"] == 2
+    assert read_job(media, "AAA-111")["attempt_count"] == 0
+
+    run_case("reset-ready", "FAILED", "https://cover.example/poster.jpg", "READY", error="Connection reset by peer")
+    run_case("reset-missing", "FAILED", None, "HELD_COVER_URL_MISSING", error="Connection reset by peer")
+    run_case("pending-missing", "PENDING", "", "HELD_COVER_URL_MISSING", attempts=0)
+    run_case("pending-ready", "PENDING", "http://cover.example/poster.png", "READY", attempts=0)
+    for index, value in enumerate(("ftp://cover.example/a", "https:///a", "https://cover.example:bad/a", "https://cover.example/a b", "https://user:pass@cover.example/a", "https://cover.example/%ZZ")):
+        run_case("invalid-" + str(index), "FAILED", value, "HELD_COVER_URL_INVALID", other=True)
+    run_case("metadata-missing", "PENDING", "NO_TITLE", "HELD_METADATA_NOT_FOUND", attempts=0, other=True)
+
+    # Normal selection skips an input hold and reaches the next eligible job.
+    discovery, media, writer, locks = setup("normal-selection", "PENDING", None, attempts=0, other=True)
+    called = []
+    result = run_retryable_media_jobs(
+        db_path=media, discovery_db_path=discovery, writer_lock_path=writer,
+        title_lock_dir=locks, processor=lambda dvd_id: called.append(dvd_id), max_items=1, now=now,
+    )
+    assert result["held_cover_url_missing"] == 1 and result["attempted"] == 1
+    assert called == ["AAA-111"] and read_job(media, "HMN-904")["attempt_count"] == 0
+
+    # The current input is read under the title lock, after retry eligibility.
+    import teddy_discovery_media_jobs as media_module
+    discovery, media, writer, locks = setup("guard-order", "FAILED", "https://cover.example/a")
+    real_guard = media_module.media_input_eligibility
+    observed = []
+    def locked_guard(path, dvd_id):
+        contender = try_acquire_title_lock(dvd_id, lock_dir=locks)
+        observed.append(contender.status)
+        contender.release()
+        return real_guard(path, dvd_id)
+    media_module.media_input_eligibility = locked_guard
+    try:
+        result = run_retryable_media_jobs(
+            db_path=media, discovery_db_path=discovery, writer_lock_path=writer,
+            title_lock_dir=locks, target_dvd_id="HMN-904",
+            processor=lambda dvd_id: {"ok": dvd_id}, now=now,
+        )
+    finally:
+        media_module.media_input_eligibility = real_guard
+    assert observed == [BUSY] and result["completed"] == 1
+
+    discovery, media, writer, locks = setup("backoff-before-input", "FAILED", None)
+    db = sqlite3.connect(media)
+    db.execute("UPDATE media_jobs SET updated_at=? WHERE dvd_id='HMN-904'", (current,))
+    db.commit()
+    db.close()
+    media_module.media_input_eligibility = lambda *_args: (_ for _ in ()).throw(
+        AssertionError("backoff bypassed before current-input guard")
+    )
+    try:
+        result = run_retryable_media_jobs(
+            db_path=media, discovery_db_path=discovery, writer_lock_path=writer,
+            title_lock_dir=locks, target_dvd_id="HMN-904",
+            processor=lambda dvd_id: {"unexpected": dvd_id}, now=now,
+        )
+    finally:
+        media_module.media_input_eligibility = real_guard
+    assert result["held_backoff"] == 1 and result["attempted"] == 0
+    print("CURRENT_INPUT_GUARD_SMOKE=PASS")
+
+
 def main():
     with tempfile.TemporaryDirectory(
         prefix="teddy-stage9-media-db-"
@@ -609,6 +746,7 @@ def main():
         title_lock_smoke(root)
         conditional_race_smoke(root)
         exact_target_selector_smoke(root)
+        current_input_guard_smoke(root)
 
     print(
         "STAGE9_SEPARATE_MEDIA_DB_SMOKE=PASS"

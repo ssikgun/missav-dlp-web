@@ -8,6 +8,7 @@ import sqlite3
 
 from teddy_discovery_media_metadata import (
     DVD_ID_RE,
+    media_input_eligibility,
 )
 from teddy_title_exclusion import (
     ACQUIRED,
@@ -520,6 +521,7 @@ def _finish(
 def run_retryable_media_jobs(
     *,
     db_path,
+    discovery_db_path=None,
     writer_lock_path,
     processor,
     max_items=1,
@@ -568,6 +570,9 @@ def run_retryable_media_jobs(
                 "held_invalid_timestamp": 0,
                 "held_conflict": 0,
                 "held_invalid_state": 0,
+                "held_metadata_not_found": 0,
+                "held_cover_url_missing": 0,
+                "held_cover_url_invalid": 0,
                 "exhausted": 0,
                 "jobs": [
                     {
@@ -604,6 +609,9 @@ def run_retryable_media_jobs(
         "held_invalid_timestamp": sum(state == "HELD_INVALID_TIMESTAMP" for _, state in states),
         "held_conflict": 0,
         "held_invalid_state": sum(state == "HELD_INVALID_STATE" for _, state in states),
+        "held_metadata_not_found": 0,
+        "held_cover_url_missing": 0,
+        "held_cover_url_invalid": 0,
         "exhausted": sum(state == "EXHAUSTED" for _, state in states),
         "jobs": [],
     }
@@ -642,6 +650,17 @@ def run_retryable_media_jobs(
             continue
 
         with title_lock:
+            if discovery_db_path is not None:
+                input_state = media_input_eligibility(discovery_db_path, dvd_id)
+                if input_state != "READY":
+                    counters = {
+                        "HELD_METADATA_NOT_FOUND": "held_metadata_not_found",
+                        "HELD_COVER_URL_MISSING": "held_cover_url_missing",
+                        "HELD_COVER_URL_INVALID": "held_cover_url_invalid",
+                    }
+                    result[counters[input_state]] += 1
+                    result["jobs"].append({"dvd_id": dvd_id, "status": input_state})
+                    continue
             marked = _mark_running_if_unchanged(
                 db_path,
                 writer_lock_path,

@@ -7551,3 +7551,123 @@ restart count 0, `/login` 200, gate=false. F11c PASS, no blocker.
 Next F12: review remaining CONNECTION_RESET recovery separately from
 COVER_URL_MISSING, plan bounded media recovery, and decide timer resumption
 only after that checkpoint's safety/results checks. Timer remains inactive.
+
+
+## Post-Stage13 Media-F12 — current-input retry guard (PASS, source only)
+
+Starting HEAD `c0f7939fb73583e201a3bf7baf5e550f10ec589c` matched remote and
+the worktree was clean. The current production runtime remains the F11c
+`494134bf50d58db7d2eb148ec1a870f6526b5d11` release. F11c visibility
+remains VISIBLE=41, PENDING=0, ATTENTION=0; Stage13 remains CLOSED/PASS.
+The production completion timer stays enabled/inactive; the service and
+reconcile-apply stay inactive. The audit opened media and Discovery SQLite
+read-only with query_only and did no filesystem/NAS scan or network fetch.
+
+### Current remaining cohort
+
+At audit `2026-09-30T04:47:49.366643+00:00`, FAILED=36 and PENDING=11; RUNNING=0.
+FAILED old CONNECTION_RESET=30: current cover READY=30, MISSING=0.
+FAILED old COVER_URL_MISSING=6: still MISSING=6, now READY=0.
+PENDING=11: current cover READY=10, MISSING=1, INVALID=0.
+All 47 have exactly one present JAV holding. Existing retry policy
+(max attempts=5, FAILED backoff=3600 seconds, stale RUNNING=7200 seconds)
+returns ELIGIBLE=46 and EXHAUSTED=1 at the audit time. FAILED attempts:
+35 at 1, one at 17161; PENDING attempts: all 11 at 0. The exhausted
+MFCS-085 also has a missing cover URL, so raw missing-input count=7, while
+the mutually exclusive recovery cohort HELD_INPUT_MISSING has 6.
+
+| DVD-ID | Job | Attempts | Old error class | Updated UTC | Current input | Present JAV | Old eligibility | New cohort |
+| --- | --- | ---: | --- | --- | --- | ---: | --- | --- |
+| MFCS-085 | FAILED | 17161 | COVER_URL_MISSING | 2026-09-29T03:31:57+00:00 | HELD_COVER_URL_MISSING | 1 | EXHAUSTED | EXHAUSTED |
+| FNS-244 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:20:55+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| MAAN-945 | FAILED | 1 | COVER_URL_MISSING | 2026-09-29T23:22:25+00:00 | HELD_COVER_URL_MISSING | 1 | ELIGIBLE | HELD_INPUT_MISSING |
+| MIAD-866 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:30:45+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| EBWH-296 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:32:22+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| MIRD-258 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:33:57+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| SKMJ-774 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:35:17+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| EROFV-313 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:36:40+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| SVVRT-086 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:37:54+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| NTR-102 | FAILED | 1 | COVER_URL_MISSING | 2026-09-29T23:39:11+00:00 | HELD_COVER_URL_MISSING | 1 | ELIGIBLE | HELD_INPUT_MISSING |
+| DAL-012 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:40:24+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| FTHT-361 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:41:40+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| FTHTD-219 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:43:03+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| FTHTD-228 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:44:19+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| MARR-014 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:47:07+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| FTKD-045 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:48:27+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| KNMB-133 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:49:39+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| VDD-209 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:50:47+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| DLDSS-557 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:52:09+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| YSN-665 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:53:26+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| NPJS-264 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:54:49+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| FC2-PPV-4983582 | FAILED | 1 | COVER_URL_MISSING | 2026-09-29T23:56:11+00:00 | HELD_COVER_URL_MISSING | 1 | ELIGIBLE | HELD_INPUT_MISSING |
+| SKMJ-426 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:57:38+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| DVMM-015 | FAILED | 1 | CONNECTION_RESET | 2026-09-29T23:59:04+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| DLDSS-555 | FAILED | 1 | CONNECTION_RESET | 2026-09-30T00:00:31+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| DLDSS-559 | FAILED | 1 | CONNECTION_RESET | 2026-09-30T00:02:02+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| ROYD-353 | FAILED | 1 | CONNECTION_RESET | 2026-09-30T00:03:15+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| HUNTC-623 | FAILED | 1 | CONNECTION_RESET | 2026-09-30T00:04:41+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| HODV-22113 | FAILED | 1 | CONNECTION_RESET | 2026-09-30T00:05:43+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| HODV-22114 | FAILED | 1 | CONNECTION_RESET | 2026-09-30T00:06:48+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| HODV-22116 | FAILED | 1 | CONNECTION_RESET | 2026-09-30T00:07:50+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| HODV-22112 | FAILED | 1 | CONNECTION_RESET | 2026-09-30T00:08:56+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| PRIAN-060 | FAILED | 1 | COVER_URL_MISSING | 2026-09-30T00:10:00+00:00 | HELD_COVER_URL_MISSING | 1 | ELIGIBLE | HELD_INPUT_MISSING |
+| WA-576 | FAILED | 1 | CONNECTION_RESET | 2026-09-30T00:11:05+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| SKMJ-790 | FAILED | 1 | CONNECTION_RESET | 2026-09-30T00:12:10+00:00 | READY | 1 | ELIGIBLE | READY_TRANSIENT_RECOVERY |
+| PRIAN-059 | FAILED | 1 | COVER_URL_MISSING | 2026-09-30T00:13:15+00:00 | HELD_COVER_URL_MISSING | 1 | ELIGIBLE | HELD_INPUT_MISSING |
+| FC2-PPV-4982148 | PENDING | 0 | NONE | 2026-09-29T23:50:46+00:00 | HELD_COVER_URL_MISSING | 1 | ELIGIBLE | HELD_INPUT_MISSING |
+| DSOD-046 | PENDING | 0 | NONE | 2026-09-29T23:52:09+00:00 | READY | 1 | ELIGIBLE | READY_PENDING_FIRST_ATTEMPT |
+| CAWB-039 | PENDING | 0 | NONE | 2026-09-29T23:53:25+00:00 | READY | 1 | ELIGIBLE | READY_PENDING_FIRST_ATTEMPT |
+| MFYD-181 | PENDING | 0 | NONE | 2026-09-29T23:54:49+00:00 | READY | 1 | ELIGIBLE | READY_PENDING_FIRST_ATTEMPT |
+| NIMA-086 | PENDING | 0 | NONE | 2026-09-29T23:56:11+00:00 | READY | 1 | ELIGIBLE | READY_PENDING_FIRST_ATTEMPT |
+| MIDA-705 | PENDING | 0 | NONE | 2026-09-29T23:57:37+00:00 | READY | 1 | ELIGIBLE | READY_PENDING_FIRST_ATTEMPT |
+| MIDA-746 | PENDING | 0 | NONE | 2026-09-29T23:59:04+00:00 | READY | 1 | ELIGIBLE | READY_PENDING_FIRST_ATTEMPT |
+| MIDV-822 | PENDING | 0 | NONE | 2026-09-30T00:00:31+00:00 | READY | 1 | ELIGIBLE | READY_PENDING_FIRST_ATTEMPT |
+| MIDA-445 | PENDING | 0 | NONE | 2026-09-30T00:02:01+00:00 | READY | 1 | ELIGIBLE | READY_PENDING_FIRST_ATTEMPT |
+| MIDV-372 | PENDING | 0 | NONE | 2026-09-30T00:03:14+00:00 | READY | 1 | ELIGIBLE | READY_PENDING_FIRST_ATTEMPT |
+| MIDV-925 | PENDING | 0 | NONE | 2026-09-30T00:04:40+00:00 | READY | 1 | ELIGIBLE | READY_PENDING_FIRST_ATTEMPT |
+
+Recovery cohorts, mutually exclusive:
+
+- `EXHAUSTED` (1): MFCS-085.
+- `HELD_INPUT_MISSING` (6): FC2-PPV-4982148, FC2-PPV-4983582, MAAN-945, NTR-102, PRIAN-059, PRIAN-060.
+- `READY_PENDING_FIRST_ATTEMPT` (10): CAWB-039, DSOD-046, MFYD-181, MIDA-445, MIDA-705, MIDA-746, MIDV-372, MIDV-822, MIDV-925, NIMA-086.
+- `READY_TRANSIENT_RECOVERY` (30): DAL-012, DLDSS-555, DLDSS-557, DLDSS-559, DVMM-015, EBWH-296, EROFV-313, FNS-244, FTHT-361, FTHTD-219, FTHTD-228, FTKD-045, HODV-22112, HODV-22113, HODV-22114, HODV-22116, HUNTC-623, KNMB-133, MARR-014, MIAD-866, MIRD-258, NPJS-264, ROYD-353, SKMJ-426, SKMJ-774, SKMJ-790, SVVRT-086, VDD-209, WA-576, YSN-665.
+
+### Source behavior and offline proof
+
+`teddy_discovery_media_metadata.media_input_eligibility()` reads only the
+current `titles.cover_url` for a canonical DVD-ID. It returns READY or
+HELD_METADATA_NOT_FOUND / HELD_COVER_URL_MISSING / HELD_COVER_URL_INVALID.
+READY requires a nonempty ASCII http(s) URL with host, usable port and
+percent escapes, no credentials or whitespace. It does no network probe
+and never uses the historical media-job error as the decision source.
+Thus an old COVER_URL_MISSING row becomes READY when current input is valid;
+an old CONNECTION_RESET row holds if current input disappears.
+
+The normal completion runner passes its Discovery DB path into
+`run_retryable_media_jobs()`. The runner retains the existing eligibility,
+backoff, max-attempt and title-lock policies; after an eligible job has the
+title lock, it rechecks current input before marking RUNNING. A HOLD leaves
+status, attempt_count, error and updated_at unchanged and calls no processor.
+Exact `--media-only --media-target-dvd-id` uses the same guard, with no
+unrelated fallback. The direct media-runner argument is optional for
+legacy/offline callers; the normal production runner always supplies it.
+New result counters identify each input HOLD reason.
+
+Offline fixtures prove missing/invalid/not-found input, old-error
+self-healing, transient retry, first attempt, exact-target isolation, no
+attempt/processor on HOLD, ordering under the title lock, and backoff before
+the guard. PASS: media metadata, media jobs, media pipeline, completion
+runner, completion-media, Jellyfin, Jellyfin visibility and title-lock
+smokes (8/8); Python compile and diff check PASS. These tests used only
+temporary databases and injected responses.
+
+F12 production mutation=0: no runtime deployment, wrapper change, media
+retry, poster fetch, Jellyfin POST/refresh/scan, Discovery/NAS write,
+completion/timer start or visibility update. Stage13 remains CLOSED/PASS.
+Next F12b: keep timer stopped; select exactly one READY_TRANSIENT_RECOVERY
+job (the earliest is FNS-244), revalidate proxy/input/backoff and run one
+controlled exact-target media-only retry. If that succeeds, separately
+consider one READY_PENDING_FIRST_ATTEMPT job (earliest DSOD-046). Keep the
+COVER_URL_MISSING and EXHAUSTED cohorts held under their existing policies.
+Timer resumption requires a later checkpoint.

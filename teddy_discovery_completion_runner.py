@@ -244,6 +244,7 @@ def run_once(
 
         media_runner_kwargs = {
             "db_path": media_db_path,
+            "discovery_db_path": db_path,
             "writer_lock_path": media_writer_lock_path,
             "processor": media_processor,
             "max_items": media_max_items,
