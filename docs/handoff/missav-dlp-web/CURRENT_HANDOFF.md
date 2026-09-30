@@ -7907,3 +7907,77 @@ proved. Next checkpoint: design and validate a timer re-arm policy that
 cannot replay a stale unit-inactive deadline; keep the timer inactive during
 that work, then repeat the bounded immediate-trigger check before leaving
 normal automation active.
+
+## Post-Stage13 Media-F12e — fresh-inactive timer re-arm (INCOMPLETE)
+
+Starting HEAD `4b2f040bde6dc232de80df0442e2a704cf2a377a` matched the remote
+branch and the worktree was clean. The production wrapper remained pinned to
+runtime `7e2b32ea8b70d6b678a95dacd03ec44ba093afba`. Before the run, the
+completion timer was enabled/inactive, the completion service and
+reconcile-apply were inactive, writer host/web health was READY, `/login`
+returned 200, and the delete gate was false. The timer contract is unchanged:
+`OnActiveSec=60s`, `OnUnitInactiveSec=60s`, `AccuracySec=5s`,
+`RandomizedDelaySec=0`, `Persistent=false`.
+
+### Read-only preflight and baseline
+
+The production planner found zero downloads/plans, zero organizer work, and
+zero metadata recovery candidates (normal metadata bound=1). Media retry
+policy found 32 FAILED jobs ELIGIBLE, one EXHAUSTED, and ten PENDING ELIGIBLE.
+The six current-input-missing rows were
+`FC2-PPV-4982148`, `FC2-PPV-4983582`, `MAAN-945`, `NTR-102`, `PRIAN-059`,
+and `PRIAN-060`; the ten PENDING rows were
+`CAWB-039`, `FC2-PPV-4982148`, `MFYD-181`, `MIDA-445`, `MIDA-705`,
+`MIDA-746`, `MIDV-372`, `MIDV-822`, `MIDV-925`, and `NIMA-086`.
+MFCS-085 was FAILED/17161.
+
+Before the manual service run, media counts were 45/33/10/0
+(COMPLETED/FAILED/PENDING/RUNNING), all 45 visibility rows were VISIBLE, and
+ATTENTION=0. Baseline digests were media_jobs
+`ebbbc109b8ec9ae02bfde2fe394f3847a1558edb6e41ccda41979ff80921fb86`,
+visibility `cdcaf72d305859d3445348414b1ca63ed1eb0c14fbe5af411448558ca8ce2882`,
+and Discovery holdings `87ac2a009759f7ffd03ae95b03cc3caef455f1a58ce44e110f25999de577bdea`
+(218 rows).
+
+### One manual normal service run
+
+With the timer still inactive, started `teddy-completion-stage9.service`
+exactly once at `2026-09-30 14:33:08 KST`. It exited at `14:33:09 KST` with
+`Result=success` and `ExecMainStatus=0`. The bounded run had no organizer
+plans/applies and no metadata recovery attempts. Media reconciled=0 and
+attempted=1/completed=1/failed=0; MIRD-258 moved from FAILED/1 to
+COMPLETED/2. One missing-cover job was held without consuming an attempt and
+the exhausted count remained one. Visibility seeded=1 and checked=1, ending
+VISIBLE=46/PENDING=0/ATTENTION=0; MIRD-258 is VISIBLE with check_count=1.
+
+Final media counts are COMPLETED=46, FAILED=32, PENDING=10, RUNNING=0; the
+only changed media row is MIRD-258. All six HELD_INPUT_MISSING rows, all ten
+PENDING rows, and MFCS-085 FAILED/17161 are unchanged. Discovery holdings
+digest is unchanged. The full media_jobs digest is now
+`ebf0af2e9c19a242e3559d04247c75399125c2142fd5fafbb7fb450463637fc5`.
+The visibility table has 46 VISIBLE rows and no PENDING/ATTENTION rows.
+
+### Fresh timer re-arm was safely skipped
+
+The orchestration helper raised a local `TypeError` while formatting the
+integer `media_job_id` in its post-run safety report. This happened after the
+manual service completed and before the timer-start section. A read-only
+recheck confirmed RUNNING=0, the six held-input rows and MFCS-085 unchanged,
+visibility ATTENTION=0, and the Discovery holdings digest unchanged. The
+service's fresh inactive timestamp was `2026-09-30 14:33:09 KST`. When the
+recheck then measured elapsed time, 45.117 seconds had passed, exceeding the
+required 10-second re-arm window. Therefore `systemctl start
+teddy-completion-stage9.timer` was not issued; timer start count=0,
+`TIMER_IMMEDIATE_TRIGGER=NOT_RUN`, and the first scheduled run was not
+observed. The timer remains enabled but inactive with no next elapse; the
+completion service and reconcile-apply remain inactive. Writer host/web are
+READY, `/login`=200, and gate=false.
+
+`COMPLETION_AUTOMATION_RESUMED=NO`. F12e is INCOMPLETE because the fresh
+inactive deadline was not re-armed within 10 seconds and no timer-triggered
+run was observed. Stage13 remains CLOSED/PASS. Do not infer an immediate
+trigger result from this run. Next checkpoint: perform one fresh normal
+service run and, in the same bounded orchestration, capture its inactive
+timestamp and start the already-enabled timer within 10 seconds; retain the
+10-second immediate-trigger guard and verify the first scheduled run before
+leaving automation active.
