@@ -6588,3 +6588,39 @@ The only production runtime change was the requested timer stop.
 Next checkpoint: diagnose the outbound TLS reset/route for
 `www.javdatabase.com` and decide on retry policy before resuming the timer.
 Do not manually retry HMN-904 until that decision; MFCS-085 remains excluded.
+
+## Post-Stage13 Media-F2 — direct vs Gluetun TLS route forensic
+
+At expected HEAD `a15738bc74c85112de78f50943457a494a0d7367`, the completion
+timer and service remained inactive; the timer remained enabled. Writer
+service remained active. Stage13 remains CLOSED/PASS. Probes used the exact
+HMN-904 stored cover URL from the Discovery DB, but only the `https` scheme
+and `www.javdatabase.com` hostname were retained in output.
+
+The host general TLS control to `example.com` passed DNS, TCP/443, TLS 1.3,
+and HTTPS GET (200), so general host TLS was healthy. HMN-904 host resolution
+returned four addresses (two IPv4 and two IPv6). On the host direct route,
+Python urllib failed with `ConnectionResetError` errno 104; `curl -4` exited
+35 with HTTP 000; and `openssl s_client` with SNI also observed a reset.
+
+The existing `missav-dlp-web` container was probed in place, with proxy
+handling explicitly disabled for the direct comparison. Its direct urllib
+request also failed with `ConnectionResetError` errno 104. The existing
+`GLUETUN_PROXY_URL` was read without printing its raw value and resolved to
+the expected logical target `http://gluetun:8888`. The proxy was reachable;
+Python urllib HTTPS CONNECT/open through it succeeded with HTTP 200 and
+`Content-Type: image/webp`, and a one-byte read succeeded. No second title
+was probed.
+
+Classification: `DIRECT_EGRESS_BLOCKED_OR_RESET_PROXY_ROUTE_OK`. The result
+shows that both host and web-container direct routes reset this target while
+the existing Gluetun proxy route succeeds; this is consistent with a direct
+egress route/IP-path issue and does not establish that the target itself
+blocks all clients. `COVER_URL_MISSING` remains a separate metadata quality
+class. No service/timer start, media retry, source/config change, container
+restart/recreate, Jellyfin operation, or media/Discovery/NAS/provenance write
+occurred. Production mutation count was zero. The timer remains stopped.
+
+Next checkpoint: design and validate a bounded production completion poster
+fetch route using the existing Gluetun proxy, preserving fail-closed behavior
+and leaving media jobs untouched until an explicit controlled retry plan.
