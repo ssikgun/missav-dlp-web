@@ -7125,3 +7125,78 @@ writer READY, gate false, and Stage13 CLOSED/PASS. Next checkpoint should
 establish the read-only appearance timeline or update the recovery state from
 the newly visible item; no additional Jellyfin mutation is indicated by this
 forensic result.
+
+## Post-Stage13 Media-F9 — HMN-904 appearance timeline forensic
+
+Read-only preconditions were rechecked at starting HEAD
+`e683f4d895a4c3d8bab75bc5d634c7d4d481b5ad`; origin matched and the worktree
+was clean. Completion timer was enabled but inactive, completion service and
+reconcile-apply were inactive, writer was active, web `/login` returned 200,
+delete gate was false, and host writer health was `READY`. HMN-904 remains
+`COMPLETED / attempt=2`; Stage13 remains CLOSED/PASS.
+
+### Appearance bounds
+
+F7's last exact Movie-absent inventory is recorded immediately before its
+handoff commit at `2026-09-30 12:06:40 KST`; the exact GET wall time was not
+retained. F8's first confirmed exact Movie-present GET occurred before its
+handoff commit at `2026-09-30 12:17:33 KST`; its exact GET wall time was also
+not retained. Therefore the checkpoint-bounded appearance interval is
+approximately `2026-09-30 12:06:40–12:17:33 KST`, not an exact event timestamp:
+`LAST_KNOWN_ABSENT_KST≈12:06:40`,
+`FIRST_KNOWN_PRESENT_KST≤12:17:33`.
+
+GET-only exact-ID lookup returned one `Movie` with ID
+`ad4c0d7134580158d7b656f7f53f8223`, exact path
+`/media/adult/HMN/HMN-904/HMN-904.mp4`, and parent
+`7aed4f1993e9a282c851f3f6da9cf930`. Safe date/identity fields were
+`DateCreated=2026-09-29T23:16:25Z` (`2026-09-30 08:16:25 KST`),
+`PremiereDate=2026-09-25`, `ProductionYear=2026`, and `ProviderIds.dvd_id=HMN-904`.
+`DateLastSaved` was not exposed. `UseFileCreationTimeForDateAdded` was not
+exposed by GET `/System/Configuration`; the two known host-side config
+candidates were absent, so the effective value is UNKNOWN. Since the reported
+DateCreated predates the last-absent checkpoint and the setting is unknown,
+DateCreated is not treated as proof of item creation time.
+
+### Event correlation
+
+The bounded Jellyfin log interval was `2026-09-30 03:04:40–03:19:33 UTC`
+(`12:04:40–12:19:33 KST`), with the requested two-minute margins around the
+checkpoint-bounded appearance interval. The retained log covered through
+`03:27:46 UTC`. No matching HMN/HMN-904 refresh, scan, resolver, or error lines
+were found: `HMN_REFRESH_EVENT_IN_WINDOW=NO`,
+`LIBRARY_SCAN_EVENT_IN_WINDOW=NO`, `RESOLVER_ERROR_IN_WINDOW=NO`.
+GET `/ScheduledTasks` showed no execution overlapping the interval; the
+`RefreshLibrary` task was Idle with its last completion on September 29, and
+the September 30 trickplay task last completed at `03:00 UTC`, before the
+interval. Thus no scheduled full-library scan correlates with the appearance.
+
+GET `/Library/VirtualFolders` confirmed Adult root `/media/adult`,
+`CollectionType=movies`, and `EnableRealtimeMonitor=true`. Jellyfin 10.11.11
+source shows the monitor watches created/changed/renamed/deleted events and
+reports changed paths to the refresher; `FileRefresher` uses the configured
+`LibraryMonitorDelay` (previously confirmed as 60 seconds). This makes a
+realtime watcher a possible natural trigger, but no watcher event or HMN
+refresh was evidenced in this appearance window. Version-matched sources:
+[LibraryMonitor.cs](https://github.com/jellyfin/jellyfin/blob/v10.11.11/Emby.Server.Implementations/IO/LibraryMonitor.cs)
+and [FileRefresher.cs](https://github.com/jellyfin/jellyfin/blob/v10.11.11/Emby.Server.Implementations/IO/FileRefresher.cs).
+
+Two exact-ID GET samples at `12:29:13` and `12:29:23 KST` both returned one
+exact Movie: `HMN904_VISIBILITY_STABLE=YES`. Current media counts are
+COMPLETED=41, FAILED=36, PENDING=11, RUNNING=0; failure classes remain
+CONNECTION_RESET=30 and COVER_URL_MISSING=6. HMN-904 is visible=1. The event
+classification is `EVENTUAL_DISCOVERY_TRIGGER_UNATTRIBUTED`: item appearance
+is established, but no triggering refresh/scan event was attributable from
+available bounded evidence. The Adult realtime watcher remains a source-based
+possibility only.
+
+The pipeline contract remains
+`MEDIA_COMPLETED_MEANS_NOTIFICATION_ACCEPTED_ONLY=YES`; eventual appearance
+does not establish that the prior 120-second wait was sufficient. A future
+pipeline design may track Jellyfin visibility in a separate asynchronous
+pending/reconciliation state. No source change or production data mutation was
+made in F9: Jellyfin writes=0, media DB=0, Discovery=0, NAS=0, completion run=0,
+timer start=0, source change=0, restart=0. Timer remains enabled but inactive;
+completion service remains inactive; Stage13 remains CLOSED/PASS. Next:
+design eventual Jellyfin visibility reconciliation without changing this
+read-only forensic result or retrying HMN-904.
