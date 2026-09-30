@@ -7671,3 +7671,85 @@ controlled exact-target media-only retry. If that succeeds, separately
 consider one READY_PENDING_FIRST_ATTEMPT job (earliest DSOD-046). Keep the
 COVER_URL_MISSING and EXHAUSTED cohorts held under their existing policies.
 Timer resumption requires a later checkpoint.
+
+## Post-Stage13 Media-F12b — FNS-244 transient recovery canary (PASS)
+
+Starting HEAD `7e2b32ea8b70d6b678a95dacd03ec44ba093afba` matched remote on
+`teddy-subtitle-stage11` with a clean worktree. Completion timer enabled but
+inactive, completion and reconcile-apply services inactive, writer host/web
+READY, web `/login` 200, gate=false. Stage13 remains CLOSED/PASS.
+
+### Runtime and exact preflight
+
+FNS-244 was FAILED, attempt_count=1, current input guard READY, existing
+retry_eligibility ELIGIBLE. It had one present JAV holding (holding_id=167,
+`FNS/FNS-244/FNS-244.mp4`, size 3646558138). The exact NAS directory
+contained only `FNS-244.mp4` and `FNS-244.ko.srt`; NFO/poster were absent.
+Existing Jellyfin visibility cohort was 41 VISIBLE, 0 PENDING, 0 ATTENTION,
+with no FNS-244 visibility row.
+
+Immutable release installed at
+`/opt/missav-dlp-web/stage9-runtime/releases/7e2b32ea8b70d6b678a95dacd03ec44ba093afba`.
+All 25 runtime modules match the exact repository blobs and compile/import;
+`SOURCE_COMMIT` and runtime marker match. Root ownership/read-only release
+policy retained, old releases retained. Production wrapper backed up to
+`/opt/missav-dlp-web/backups/stage9-f12b-20260930-wrapper.before` and
+atomically repinned to this release. All other wrapper options stayed
+byte-for-byte unchanged, including poster proxy
+`http://127.0.0.1:58888`, visibility max-items=5, DB/SSH/Jellyfin paths,
+locks and confirmation. `bash -n` passed. No normal service/timer run.
+
+The exact stored cover URL was read from Discovery without printing it;
+scheme=https, hostname=`www.javdatabase.com`. Running Gluetun maps
+`127.0.0.1:58888 -> 8888/tcp`. A poster-only proxy opener returned HTTP 200,
+`image/webp`, and a successful 64-byte bounded read. No direct fallback or
+full poster download was used for this probe.
+
+### One exact media-only run
+
+Immediate precheck still found FAILED/1, READY input and ELIGIBLE backoff.
+Invoked the pinned runner once with the production paths and options plus
+`--media-only --media-target-dvd-id FNS-244 --media-max-items 1`.
+Result: `attempted=1`, `completed=1`, `failed=0`, target=FNS-244,
+organizer=SKIPPED_MEDIA_ONLY, metadata recovery=SKIPPED_MEDIA_ONLY.
+Media pipeline returned MEDIA_PIPELINE_COMPLETE and one normal
+`JELLYFIN_NOTIFIED` Created response; no manual notification, refresh,
+scan or retry occurred. FNS media job is now COMPLETED/2 with error NULL.
+
+The exact NAS title directory now has the original MP4 (same 3646558138
+bytes), one `FNS-244.nfo` (621 bytes), one `poster.webp` (10290 bytes), and
+the preexisting subtitle. Temp/partial count=0. No unrelated title path was
+used by the media-only pipeline.
+
+The run seeded and checked only FNS-244 visibility: VISIBLE=1, PENDING=0,
+ATTENTION=0, check_count=1. A later separate GET-only exact visibility check
+also returned VISIBLE, Jellyfin Movie ID
+`0791d23c738f72763c6390aeb3db49fa`. The existing 41 visibility rows
+are byte-for-byte identical to the protected snapshot, so the table now
+contains 42 VISIBLE rows. This respects the async visibility contract even
+though this canary happened to become visible immediately.
+
+### Protected-state comparison
+
+Unrelated media_jobs digest before and after:
+`667573c1608a95dc1cddb583a61d276fb11f4a89710d11e3c2eed3d18c397abc`.
+Existing visibility-41 digest:
+`dc8228a87b5906e321f547d66f2b857b804996992200362bfbfea13d87044762`
+(before/after full rows identical). Discovery holdings digest:
+`87ac2a009759f7ffd03ae95b03cc3caef455f1a58ce44e110f25999de577bdea`
+(before/after); Discovery DB file SHA-256 also unchanged from baseline.
+MFCS-085 remains FAILED/17161. The six other HELD_INPUT_MISSING rows and
+all 11 PENDING rows retain their exact status, attempt, error and updated_at.
+New media counts are COMPLETED=42, FAILED=35, PENDING=11, RUNNING=0.
+
+Authorized production mutations were limited to immutable runtime install,
+wrapper repin, FNS-244 media row transition, FNS-244 sidecar publish, its one
+normal Jellyfin Created notification and FNS-244 visibility seed/check.
+Discovery write=0; unrelated media/visibility/NAS mutation=0. Completion
+timer remains enabled/inactive, completion service and reconcile-apply
+inactive, writer host/web READY, web running with restart count 0, `/login`
+200, delete gate=false. F12b PASS, no blocker.
+
+Next F12c: review this successful transient canary and decide whether one
+READY_PENDING_FIRST_ATTEMPT title should be run as a separate exact
+media-only canary. Timer resumption remains a separate decision after that.
