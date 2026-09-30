@@ -8034,7 +8034,7 @@ It held MAAN-945 without an attempt, retained exhausted=1, and seeded/checked
 one visibility row. The pipeline reported `JELLYFIN_NOTIFIED`; EROFV-313 is
 VISIBLE. No explicit refresh or scan was sent.
 
-Because the timer intentionally remained active, four further normal
+Because the timer intentionally remained active, six further normal
 scheduled cycles occurred while the handoff was being finalized:
 
 | Scheduled start (KST) | Media completed | Exit | Visibility |
@@ -8043,24 +8043,27 @@ scheduled cycles occurred while the handoff was being finalized:
 | 14:47:36 | DAL-012 | 0 | VISIBLE; ATTENTION=0 |
 | 14:48:40 | FTHT-361 | 0 | VISIBLE; ATTENTION=0 |
 | 14:49:46 | FTHTD-219 | 0 | VISIBLE; ATTENTION=0 |
+| 14:50:50 | FTHTD-228 | 0 | VISIBLE; ATTENTION=0 |
+| 14:51:56 | MARR-014 | 0 | VISIBLE; ATTENTION=0 |
 
 Each cycle had planner total=0, organizer applied=0, metadata recovery=0,
-media attempted=1/completed=1/failed=0, held-missing=1, and exhausted=1.
+media attempted=1/completed=1/failed=0, exhausted=1, and one or two
+current-input missing-cover HOLDs depending on candidates encountered.
 Each normal media pipeline reported `JELLYFIN_NOTIFIED`; the visibility
 reconciler seeded/checked one item and found no PENDING or ATTENTION item.
 
-At the latest read-only audit, media counts were COMPLETED=52, FAILED=26,
+At the latest read-only audit, media counts were COMPLETED=54, FAILED=24,
 PENDING=10, RUNNING=0; the changed media rows from baseline were
-SKMJ-774, EROFV-313, SVVRT-086, DAL-012, FTHT-361, and FTHTD-219, each
-FAILED/1 to COMPLETED/2. All six input-HOLD rows, all ten PENDING rows, and
+SKMJ-774, EROFV-313, SVVRT-086, DAL-012, FTHT-361, FTHTD-219, FTHTD-228,
+and MARR-014, each FAILED/1 to COMPLETED/2. All six input-HOLD rows, all ten PENDING rows, and
 MFCS-085 FAILED/17161 are unchanged. Discovery holdings digest is unchanged.
-Visibility was 52 VISIBLE, 0 PENDING, 0 ATTENTION. The preceding audit's media digest was
-`9ff3f4fa98deac85bbdfb30ca7ff1ab87a49c9d9551083856888893130e77cfd`.
+Visibility was 54 VISIBLE, 0 PENDING, 0 ATTENTION. Media jobs digest at this
+audit was `b1d258e2580dc8ff7e471a17da20d5425aff6832735c9e3be5e3a6967374fc2c`.
 Writer host/web remain READY, `/login`=200, and gate=false.
 
 The completion timer remains enabled and active/waiting; completion service
 and reconcile-apply are inactive. At the latest timer query, last trigger was
-`2026-09-30 14:49:46 KST` and next elapse was `14:50:48 KST`. No timer stop,
+`2026-09-30 14:51:56 KST` and next elapse was `14:52:57 KST`. No timer stop,
 unit edit, daemon-reload, web restart, or writer restart occurred.
 `COMPLETION_AUTOMATION_RESUMED=YES`; Stage13 remains CLOSED/PASS. Normal
 bounded completion automation is resumed with the existing HOLD, exhausted,
