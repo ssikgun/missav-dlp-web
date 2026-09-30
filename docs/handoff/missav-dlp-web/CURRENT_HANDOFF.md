@@ -6903,3 +6903,56 @@ Keep the timer inactive. Next checkpoint: select one safe Jellyfin indexing
 recovery based on the observed HMN parent refresh, then verify by GET; do not
 repeat the Created notification or start bulk media recovery in this forensic
 checkpoint.
+
+## Post-Stage13 Media-F6 — exact HMN parent refresh did not discover Movie
+
+At source HEAD `c7936dce5ac2a28742a0fbf5ecb93ffb734fc359`, preconditions were
+rechecked: completion timer, completion service, and reconcile-apply were
+inactive; writer was active with host and web health `READY`; web `/login`
+returned 200; delete gate was false. HMN-904 media job 1386103 remained
+`COMPLETED / attempt=2`; MFCS-085 remained `FAILED / attempt=17161`. Media
+counts remained COMPLETED=41, FAILED=36, PENDING=11, RUNNING=0.
+
+GET `/Items?Ids=7aed4f1993e9a282c851f3f6da9cf930&Fields=Path,ParentId` returned
+exactly one item: ID `7aed4f1993e9a282c851f3f6da9cf930`, type `Folder`, path
+`/media/adult/HMN`, parent `d59216ecad5753389303717a879b33ad`. The exact HMN-904
+Movie path count was 0 before refresh. Jellyfin's filesystem directory listing
+for `/media/adult/HMN/HMN-904` showed `HMN-904.mp4`, `HMN-904.nfo`, and
+`poster.webp`. Discovery holding 185 remained present=1 at
+`HMN/HMN-904/HMN-904.mp4`, size 3,315,951,470 bytes, mtime
+1790723785795253379. NAS retained the same MP4 (3,315,951,470 bytes), NFO
+(793 bytes), and poster (10,128 bytes).
+
+Exactly one targeted request was sent:
+`POST /Items/7aed4f1993e9a282c851f3f6da9cf930/Refresh` with
+`metadataRefreshMode=None`, `imageRefreshMode=None`,
+`replaceAllMetadata=false`, `replaceAllImages=false`, and
+`regenerateTrickplay=false`. It returned HTTP 204 at
+2026-09-30 02:50:53 UTC (11:50:53 KST). No library refresh, Created resend,
+second refresh, scan, or restart was sent. Exact Movie path polling ran every
+two seconds for the 180-second bound (91 GET polls) and remained count 0.
+
+The bounded Jellyfin log window was 02:45:53–02:55:53 UTC (11:45:53–11:55:53
+KST). It contained no target refresh execution line, child-discovery evidence,
+or refresh error. The only entries were four failed GET probes made during
+this checkpoint's preflight (three direct item-route ID format attempts and
+one file path passed to the directory-listing endpoint). Thus
+`TARGETED_REFRESH_ACCEPTED=YES`,
+`TARGETED_REFRESH_EXECUTED=UNKNOWN`, and
+`TARGETED_REFRESH_ERROR=NO` for the checked window. Final exact Movie count is
+0; parent Folder remains the same single item. Classification:
+`TARGETED_PARENT_REFRESH_NO_ITEM_DISCOVERY`,
+`TARGETED_PARENT_REFRESH_RECOVERY=FAIL`,
+`HMN904_JELLYFIN_VISIBLE=NO`.
+
+After-state checks matched the pre-state: HMN-904 media remained
+`COMPLETED / attempt=2`; MFCS-085 remained exhausted; media counts, Discovery
+holding identity, and exact NAS sidecars were unchanged. Jellyfin's indexing
+was the only production change attempted (one exact parent-refresh POST); no
+media DB, Discovery, NAS, completion, timer, or other Jellyfin mutation was
+made. The timer remains enabled but inactive, completion service and
+reconcile-apply remain inactive, writer remains READY, gate remains false, and
+Stage13 remains CLOSED/PASS. Next checkpoint: read-only forensic comparison of
+HMN versus a successful family for Jellyfin child resolution/parser inputs;
+do not send another refresh or Created notification until separately
+authorized.
