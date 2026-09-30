@@ -6727,3 +6727,78 @@ the existing wrapper with `--apply`,
 normal backoff/exhaustion holds without bypass. If eligible, permit exactly
 that one media attempt, verify NFO/poster publish and exact Jellyfin item,
 then decide whether to resume the timer.
+
+## Post-Stage13 Media-F4 — exact HMN-904 proxy retry; Jellyfin item not visible (INCOMPLETE)
+
+At source HEAD `496043fcd03655b893584f9803f5aaba926a3ff3`, the completion timer
+was enabled but inactive; the completion service and reconcile-apply were
+inactive. The writer service was active and host/web health returned READY;
+web `/login` returned 200, delete gate was false, and the web container stayed
+on image `missav-dlp-web:stage13f2md10-52aa3f4` with restart count 0. Stage13
+remains CLOSED/PASS. No completion service, timer, web, or writer restart was
+performed.
+
+Before applying the retry, the wrapper pointed at pinned runtime
+`705bf9e700156d88523babfad15861a5faee9ff2`. Its existing DB, media DB, writer
+locks, NAS SSH key/known-host paths, Jellyfin URL/key path, library paths, and
+title-lock root were retained. HMN-904 media job 1386103 was `FAILED`,
+attempt 1, and the source `retry_eligibility()` returned `ELIGIBLE` under the
+existing max-attempt/backoff/stale-running policy. MFCS-085 remained `FAILED`,
+attempt 17161, `EXHAUSTED`. HMN-904 Discovery holding 185 was present and
+matched `HMN/HMN-904/HMN-904.mp4`, size 3,315,951,470 bytes. The exact NAS
+title directory contained only that MP4; NFO and poster were absent. Jellyfin
+GET-only exact-path count was 0.
+
+The host mapping is loopback-only: `127.0.0.1:58888 -> Gluetun:8888`. A
+bounded request to the stored cover host `www.javdatabase.com` through that
+proxy returned HTTP 200, `image/webp`, and a 64-byte read:
+`POSTER_PROXY_READY=YES`.
+
+Installed immutable runtime
+`/opt/missav-dlp-web/stage9-runtime/releases/496043fcd03655b893584f9803f5aaba926a3ff3`
+from exact source commit `496043fcd03655b893584f9803f5aaba926a3ff3`. It reuses
+the prior 24-module runtime closure; all 24 file SHA-256 hashes matched the
+repo blobs, the source marker is exact, the release is root-owned/read-only,
+and host Python compiled the closure and imported the runner successfully.
+The normal completion wrapper was backed up to
+`/opt/missav-dlp-web/backups/stage9-f4-20260930-111424/teddy-completion-stage9-runner`
+and atomically switched to this release. `bash -n` passed. The wrapper keeps
+the existing arguments and title-lock root, adds only
+`--media-poster-proxy-url http://127.0.0.1:58888`, and sets no global proxy
+environment variables. The timer remained stopped.
+
+Immediately before execution, HMN-904 remained `ELIGIBLE`; a deterministic
+safe-field digest covered all 88 media rows. The exact media-only command
+used `--apply --media-only --media-target-dvd-id HMN-904 --media-max-items 1`
+with the production DB/NAS/Jellyfin configuration and poster proxy. It ran
+directly from the immutable runtime, not through systemd. Result:
+`attempted=1`, `completed=1`, `failed=0`; HMN-904 moved from `FAILED / 1` to
+`COMPLETED / 2`. Organizer, media reconciliation, and metadata recovery were
+skipped. Comparing every non-HMN media row's job ID, DVD-ID, status, attempt
+count, and updated time found zero changes. MFCS-085 remained unchanged. The
+Discovery holding identity also remained unchanged.
+
+The exact NAS directory now contains the original MP4 at the same size,
+one `HMN-904.nfo` (793 bytes), and exactly one poster, `poster.webp` (10,128
+bytes), with zero temp/partial files. The pipeline completed its normal
+Created-notification path; no manual Jellyfin refresh, scan, or notification
+was sent. Jellyfin exact-path GET polling ran every 2 seconds for the full
+120-second bound (60 polls) and still returned count 0. Classification:
+`MEDIA_JOB_COMPLETED_BUT_JELLYFIN_NOT_VISIBLE`. No second retry or Jellyfin
+mutation is authorized by this result.
+
+The production completion timer remains enabled but inactive; service and
+reconcile-apply remain inactive. Writer remains active with host/web READY,
+web login remains 200, and the gate remains false. Production changes were
+limited to the immutable runtime install, wrapper backup/atomic update, the
+single HMN-904 media attempt and state transition, the NFO/poster publish, and
+the pipeline's normal Created notification. Unrelated media rows, Discovery
+identity, and HMN-904 MP4 were unchanged. No delete/provenance, broad NAS,
+manual Jellyfin, or timer operation occurred.
+
+`POSTER_PROXY_PRODUCTION_VALIDATED=YES` for the poster fetch and sidecar
+publish. `HMN904_CONTROLLED_RETRY=INCOMPLETE` because Jellyfin did not expose
+the exact item within 120 seconds. Next F5 must investigate the normal Created
+notification/library registration path and define the remaining failed/pending
+cohort policy. Keep the completion timer stopped; do not retry HMN-904 or send
+another Jellyfin notification/refresh/scan until separately authorized.
