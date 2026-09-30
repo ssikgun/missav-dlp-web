@@ -11,6 +11,7 @@ import hashlib
 import inspect
 import json
 from pathlib import Path
+from types import SimpleNamespace
 import tempfile
 from unittest.mock import patch
 
@@ -43,6 +44,8 @@ from teddy_discovery_stateful_quality_review import (
     QualityReviewRequest,
     QualityReviewResult,
     QualityReviewResultCue,
+    QualityReviewError,
+    build_review_request,
     review_request_sha256,
 )
 from teddy_discovery_stateful_translator import (
@@ -82,6 +85,7 @@ from teddy_discovery_targeted_second_evidence import (
     TargetedSecondEvidenceWindowResult,
     bind_targeted_second_evidence,
     build_targeted_second_evidence_plan_with_policy,
+    requires_hybrid_targeted_projection,
 )
 from teddy_discovery_targeted_second_evidence_artifact import (
     TargetedSecondEvidenceArtifactValidationError,
@@ -93,6 +97,8 @@ from teddy_discovery_targeted_second_evidence_runner import (
 )
 import teddy_discovery_stage11_controller as controller
 import teddy_discovery_subtitle_v2_pipeline_smoke as fixture
+from teddy_discovery_stateful_hybrid_smoke import semantic_result
+from teddy_discovery_subtitle_source_quality import classify_source_document
 
 
 TITLE = fixture.DVD_ID
@@ -220,26 +226,33 @@ def _application(verdict: str, asr_result, *, bundle=None):
     )
 
 
-def _targeted_execution(asr_result, decisions):
+def _targeted_execution(asr_result, decisions, *, statuses=None):
     plan = build_targeted_second_evidence_plan_with_policy(
         asr_result,
         decisions,
         policy=STAGE11_TARGETED_SECOND_EVIDENCE_WINDOW_POLICY_V1,
     )
     results = []
-    for window in plan.windows:
+    for ordinal, window in enumerate(plan.windows):
         source = asr_result.segments[window.source_indices[0]]
         start_ms = source.start_ms
         end_ms = min(source.end_ms, start_ms + 100)
         if end_ms <= start_ms:
             raise AssertionError("synthetic targeted window has no duration")
+        status = statuses[ordinal] if statuses is not None else "PRESENT"
+        segments = (() if status == "EMPTY" else (ASRSegment(
+            start_ms, end_ms,
+            "一旦、" * 64 if status == "NOISY" else "補助証拠"),))
+        if status == "NOISY_MIXED":
+            segments = (ASRSegment(start_ms, end_ms, "補助証拠"),
+                        ASRSegment(source.end_ms + 100, source.end_ms + 200, "一旦、" * 64))
         results.append(
             TargetedSecondEvidenceWindowResult(
                 source_snapshot=plan.source_snapshot,
                 window_id=window.window_id,
                 window_start_ms=window.start_ms,
                 window_end_ms=window.end_ms,
-                segments=(ASRSegment(start_ms, end_ms, "補助証拠"),),
+                segments=segments,
                 plan_binding_sha256=plan.binding_sha256,
             )
         )
@@ -421,9 +434,9 @@ def _prepopulate_baseline(artifact_root: Path, asr_result):
     return path
 
 
-def _prepopulate_targeted(artifact_root: Path, asr_result, *, baseline_sha=None):
+def _prepopulate_targeted(artifact_root: Path, asr_result, *, baseline_sha=None, statuses=None):
     decisions = classify_asr_result_source_quality(asr_result)
-    execution = _targeted_execution(asr_result, decisions)
+    execution = _targeted_execution(asr_result, decisions, statuses=statuses)
     path = artifact_root / TITLE / controller.TARGETED_SECOND_EVIDENCE_FILENAME
     persist_targeted_second_evidence(
         path,
@@ -954,6 +967,131 @@ def main():
             "partial Hybrid projection does not drop any targeted source",
             lambda: len(projected) == len(artifact.bindings) == 2,
         )
+
+    # Missing optional evidence preserves accepted external JA. Source-stable
+    # baseline identity safely attaches EMPTY/runaway evidence in review too.
+    policy_cases = (
+        ("noisy-unprojectable", _unprojectable_require_asr, ("NOISY",), V2_ROUTE_HYBRID, 0),
+        ("empty-unprojectable", _unprojectable_require_asr, ("EMPTY",), V2_ROUTE_HYBRID, 0),
+        ("noisy-target-only-projectable", _nonresidual_require_asr, ("NOISY_MIXED",), V2_ROUTE_HYBRID, 1),
+        ("noisy-ambiguous-provenance", lambda: replace(
+            _partially_projectable_require_asr(),
+            segments=_partially_projectable_require_asr().segments[:-1] + (
+                ASRSegment(6_000, 6_500, "一旦、一旦、一旦、一旦"),
+            )), ("NOISY_MIXED",), V2_ROUTE_HYBRID, 0),
+        ("noisy-projectable", _require_asr, ("NOISY",), V2_ROUTE_HYBRID, 1),
+        ("empty-projectable", _require_asr, ("EMPTY",), V2_ROUTE_HYBRID, 1),
+        ("present-plus-noisy", _partially_projectable_require_asr, ("PRESENT", "NOISY"), V2_ROUTE_HYBRID, 1),
+        ("present-missing-plus-noisy", lambda: replace(
+            _partially_projectable_require_asr(),
+            segments=_partially_projectable_require_asr().segments[:3] + (
+                ASRSegment(20_000, 20_500, "一旦、一旦、一旦、一旦"),
+                ASRSegment(60_000, 60_500, "一旦、一旦、一旦、一旦"),
+            )), ("PRESENT", "NOISY"), V2_ROUTE_ASR_ONLY, 2),
+    )
+    for name, make_asr, statuses, expected_route, expected_attached in policy_cases:
+        with tempfile.TemporaryDirectory(prefix="stage11-controller-policy-") as raw:
+            artifact_root, staging_root = _roots(Path(raw))
+            asr_result = make_asr()
+            _prepopulate_baseline(artifact_root, asr_result)
+            targeted_path = _prepopulate_targeted(artifact_root, asr_result, statuses=statuses)
+            before = targeted_path.read_bytes()
+            artifact = parse_targeted_second_evidence_artifact_bytes(before)
+            runtime = FakeRuntime(asr_result)
+
+            def exact_application(_canonical, asr, owner=runtime):
+                owner.external_calls += 1
+                return _nonresidual_hybrid_application(asr)
+
+            runtime.external_attempt = exact_application
+            captured = {}
+            native_prepare = controller.prepare_stateful_hybrid
+
+            def capture_prepare(*args, **kwargs):
+                preparation = native_prepare(*args, **kwargs)
+                captured["preparation"] = preparation
+                return preparation
+
+            with patch.object(controller, "prepare_stateful_hybrid", side_effect=capture_prepare):
+                result = _run(artifact_root, staging_root, runtime)
+            request = (runtime.last_hybrid_request if expected_route == V2_ROUTE_HYBRID
+                       else runtime.last_asr_request)
+            attached = tuple(cue.targeted_second_evidence for cue in request.cues
+                             if cue.targeted_second_evidence is not None)
+            check(name + " route and first-pass/review", lambda:
+                  result.route == expected_route and result.alignment_outcome == ACCEPT_HYBRID
+                  and runtime.first_pass_routes == [expected_route]
+                  and len(attached) == expected_attached)
+            original_projections = controller.project_targeted_second_evidence_artifact(
+                artifact, asr_result=asr_result, require_source_indexes=tuple(
+                    binding.source.source_index for binding in artifact.bindings))
+            check(name + " artifact bytes/status/provenance preserved", lambda:
+                  before == targeted_path.read_bytes()
+                  and tuple(result.status for result in artifact.results)
+                      == tuple(status.split("_MIXED")[0] + "_UNRESOLVED" for status in statuses)
+                  and all(any(
+                      projection.status == original.status
+                      and projection.provenance_digest == original.provenance_digest
+                      and projection.text_evidence == original.text_evidence
+                      for original in original_projections.values())
+                          for projection in attached))
+            check(name + " shared completeness predicate", lambda:
+                  tuple(requires_hybrid_targeted_projection(binding)
+                        for binding in artifact.bindings)
+                  == tuple(binding.status == "PRESENT_UNRESOLVED"
+                           for binding in artifact.bindings))
+            preparation = captured["preparation"]
+            originals = dict(
+                preparation=preparation, package=preparation.package,
+                result=semantic_result(preparation.package),
+                source_quality=classify_source_document(
+                    preparation.route_decision.alignment_application.bundle.external_ja_document),
+                targeted_second_evidence_artifact=artifact,
+            )
+            if expected_route == V2_ROUTE_ASR_ONLY:
+                reject(name + " review independently requires missing PRESENT",
+                       QualityReviewError, lambda: build_review_request(**originals))
+            else:
+                request = build_review_request(**originals)
+                check(name + " independent review status policy", lambda:
+                      sum(c.targeted_second_evidence is not None for c in request.cues)
+                      == expected_attached)
+                target_bindings = tuple(binding for binding in preparation.semantic_bindings
+                                        if binding.targeted_asr_evidence is not None)
+                if target_bindings:
+                    changed_result = replace(artifact.results[0], segments=(
+                        replace(artifact.results[0].segments[0], text="変更証拠"),
+                    ) + artifact.results[0].segments[1:])
+                    changed_artifact = replace(artifact, results=(changed_result,) + artifact.results[1:])
+                    reject(name + " mismatched attached evidence rejected by review", QualityReviewError,
+                           lambda: build_review_request(**dict(
+                               originals, targeted_second_evidence_artifact=changed_artifact)))
+                    reject(name + " mismatched attached evidence rejected by controller",
+                           controller.Stage11ControllerTargetedEvidenceUnprojectable,
+                           lambda: controller._validate_complete_hybrid_targeted_projection(
+                               changed_artifact, preparation))
+                    reject(name + " duplicate semantic source rejected by controller",
+                           controller.Stage11ControllerTargetedEvidenceUnprojectable,
+                           lambda: controller._validate_complete_hybrid_targeted_projection(
+                               artifact, SimpleNamespace(semantic_bindings=(
+                                   preparation.semantic_bindings + target_bindings))))
+                # The optional-source policy cannot admit tampered provenance.
+                detached = replace(artifact)
+                object.__setattr__(detached, "sources", artifact.sources + artifact.sources)
+                reject(name + " duplicate artifact provenance rejected", QualityReviewError,
+                       lambda: build_review_request(**dict(
+                           originals, targeted_second_evidence_artifact=detached)))
+                bad_result = replace(artifact.bindings[0].result,
+                                     plan_binding_sha256="0" * 64)
+                detached = replace(artifact)
+                object.__setattr__(detached, "results", (bad_result,) + artifact.results[1:])
+                reject(name + " detached artifact provenance rejected", QualityReviewError,
+                       lambda: build_review_request(**dict(
+                           originals, targeted_second_evidence_artifact=detached)))
+            if expected_route == V2_ROUTE_HYBRID and expected_attached == 0:
+                check(name + " no invented semantic attachment", lambda:
+                      all(binding.targeted_asr_evidence is None
+                          for binding in captured["preparation"].semantic_bindings))
 
     # HYBRID without a targeted artifact retains the existing empty-binding
     # path and does not require the targeted runner.

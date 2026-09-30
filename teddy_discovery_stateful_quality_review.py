@@ -35,6 +35,7 @@ from teddy_discovery_targeted_asr_artifact import (
 from teddy_discovery_targeted_second_evidence_artifact import (
     TargetedSecondEvidenceArtifact,
 )
+from teddy_discovery_targeted_second_evidence import requires_hybrid_targeted_projection
 from teddy_discovery_targeted_second_evidence_projection import (
     TargetedSecondEvidenceProjectionError,
     TargetedSecondEvidenceReviewProjection,
@@ -606,7 +607,18 @@ def build_review_request(*, preparation: StatefulHybridPreparation,
                 asr_source_quality,
                 targeted_second_evidence,
             ))
-        if mapped_targeted_source_ids != set(targeted_by_source_id):
+        required_targeted_source_ids = {
+            binding.source_id
+            for binding in (
+                targeted_second_evidence_artifact.bindings
+                if targeted_second_evidence_artifact is not None else ()
+            )
+            if requires_hybrid_targeted_projection(binding)
+        }
+        if (
+            not required_targeted_source_ids <= mapped_targeted_source_ids
+            or not mapped_targeted_source_ids <= set(targeted_by_source_id)
+        ):
             raise QualityReviewError(
                 "targeted second-evidence binding is detached from Hybrid review cues"
             )

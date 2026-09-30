@@ -1,5 +1,57 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-01 Stage11 — status-aware HYBRID targeted evidence projection
+
+Current checkpoint Git outcome: implementation and verification are complete,
+but staging this new change failed because worktree Git metadata is read only
+(`index.lock` creation denied). HEAD is still `2332ba8`; only the five related
+source/test/handoff files are modified. This checkpoint is uncommitted and has
+not been pushed. The earlier `5ebecf2` / `2332ba8` commits remain committed and
+remotely pushed. No Git metadata workaround was used.
+
+The shared `requires_hybrid_targeted_projection` predicate in the targeted
+second-evidence module requires complete HYBRID semantic/review coverage for
+PRESENT_UNRESOLVED sources. The controller and review request builder both use
+it. A missing PRESENT source still triggers the existing fail-closed ASR_ONLY
+fallback before HYBRID first-pass; review independently rejects incomplete
+PRESENT coverage.
+
+Unprojectable NOISY_UNRESOLVED / EMPTY_UNRESOLVED sources no longer discard an
+accepted external JA route. They are omitted from model/review attachments
+while the complete authoritative artifact is retained unchanged. Safely
+projectable optional evidence remains attached with its original status,
+segments, and provenance. An exact baseline ASR identity can attach its
+artifact evidence at the review boundary even when target-only semantic text
+is empty or rejected as runaway repetition.
+
+A shared targeted window with multiple artifact source identities cannot
+identify a unique target-only review source, so no target-only attachment is
+created for it. Baseline identities may still supply exact review mappings.
+There is no arbitrary source selection, new timing/text heuristic, source
+identity mutation, status/serialization change, or acceptance threshold change.
+All artifact/source coverage validation remains active. Attached evidence
+still requires exact window/snapshot/segment provenance; duplicate, detached,
+and mismatched bindings remain rejected.
+
+Production venv verification: controller smoke PASS (106 assertions), all 34
+related Stage11, Hermes v2, stateful, subtitle v2, targeted window/artifact/
+policy/runner/projection regression scripts PASS. New coverage includes missing
+PRESENT fallback, missing NOISY/EMPTY HYBRID preservation, safely projectable
+NOISY/EMPTY review attachments, target-only projectable NOISY, mixed PRESENT +
+NOISY paths, multi-source ambiguity without invented mapping, independent
+review completeness, duplicate/detached artifact provenance and mismatched
+attached evidence rejection. ASR_ONLY regressions remain PASS.
+
+Exact supplied FNS-247 offline canary: alignment ACCEPT_HYBRID, route HYBRID,
+313 admitted external cues, targeted artifact bindings 1, required PRESENT
+sources 0, unprojectable NOISY sources 1, targeted semantic bindings 0,
+HYBRID preparation PASS. The real controller reused byte-identical private
+baseline/targeted copies in temporary roots and reached an injected HYBRID
+first-pass boundary; the probe stopped before any model call. Production
+artifacts and supplied JA were read only. No live Hermes/Whisper calls,
+subtitle bodies/raw JSON/session output, NAS/Jellyfin/rollout DB writes,
+current KO overwrite, or Stage13 changes occurred.
+
 ## 2026-09-30 Stage11 — semantic line-break projection and preparation diagnostics
 
 The semantic input boundary now projects each CRLF pair, standalone CR, or
@@ -48,12 +100,10 @@ printed. No live Hermes/Whisper, publication, NAS/Jellyfin/rollout DB writes,
 current KO overwrite, or Stage13 changes were performed.
 
 
-Checkpoint Git status: commit/push could not be completed in this environment.
-`git add` and `git commit` were rejected because the worktree Git metadata
-under `/opt/missav-pwa-src/.git/worktrees/missav-pwa-subtitle-stage11` is on a
-read-only filesystem (`index.lock` creation denied). HEAD remains a50a46f;
-the eight related implementation/test/handoff files remain uncommitted.
-Push was not attempted without a commit. No Git metadata workaround was used.
+Checkpoint Git status resolved: semantic projection was committed as
+`5ebecf2` and the regression fixture corrections as `2332ba8`.
+Both commits were pushed to the remote. The targeted-projection checkpoint
+below started from clean HEAD `2332ba8dea014ec465e397cb3e013681eee5d67f`.
 
 ## 2026-09-30 Stage11 — bounded affine-consensus alignment and numeric contract
 

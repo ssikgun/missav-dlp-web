@@ -590,6 +590,19 @@ class TargetedSecondEvidenceBinding:
         return self.result.status
 
 
+def requires_hybrid_targeted_projection(binding: TargetedSecondEvidenceBinding) -> bool:
+    """Require complete HYBRID coverage only for meaningful PRESENT evidence.
+
+    Unmapped NOISY/EMPTY evidence remains in the authoritative artifact. Any
+    evidence that is attached still needs exact identity/provenance validation.
+    This predicate changes no artifact status or serialization contract.
+    """
+    if type(binding) is not TargetedSecondEvidenceBinding:
+        raise TargetedSecondEvidenceError("HYBRID projection policy requires a binding")
+    binding.__post_init__()
+    return binding.status == TARGETED_SECOND_EVIDENCE_STATUS_PRESENT_UNRESOLVED
+
+
 def _make_plan(
     source_snapshot: ASRSourceSnapshot,
     sources: tuple[TargetedSecondEvidenceSource, ...],
@@ -854,6 +867,7 @@ def validate_targeted_second_evidence_binding(
 
 
 __all__ = [
+    "requires_hybrid_targeted_projection",
     "MAX_TARGETED_SECOND_EVIDENCE_WINDOWS",
     "TARGETED_SECOND_EVIDENCE_STATUS_EMPTY_UNRESOLVED",
     "TARGETED_SECOND_EVIDENCE_STATUS_NOISY_UNRESOLVED",

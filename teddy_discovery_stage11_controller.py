@@ -140,6 +140,7 @@ from teddy_discovery_targeted_hybrid_evidence import (
 )
 from teddy_discovery_targeted_second_evidence import (
     build_targeted_second_evidence_plan_with_policy,
+    requires_hybrid_targeted_projection,
 )
 from teddy_discovery_targeted_second_evidence_artifact import (
     MAX_TARGETED_SECOND_EVIDENCE_ARTIFACT_BYTES,
@@ -677,12 +678,24 @@ def _build_hybrid_targeted_bindings(
 
         bindings = []
         external_cues = tuple(document.cues)
+        artifact_bindings = tuple(targeted_artifact.bindings)
         for window in targeted_artifact.windows:
             result = results_by_window_id.get(window.window_id)
             if result is None:
                 raise Stage11ControllerArtifactError(
                     "HYBRID targeted artifact is missing a window result"
                 )
+            # A window shared by multiple artifact sources cannot identify a
+            # target-only review source. Do not create an attachment that the
+            # exact provenance boundary would have to disambiguate. Baseline
+            # identities may still map those sources independently in review;
+            # missing PRESENT coverage is checked after preparation.
+            window_sources = tuple(
+                binding for binding in artifact_bindings
+                if binding.window.window_id == window.window_id
+            )
+            if len(window_sources) != 1:
+                continue
             external_cue_ids = tuple(
                 HybridCueIdentity.for_external_ja(external_index).cue_id
                 for external_index, cue in enumerate(external_cues)
@@ -728,14 +741,15 @@ def _validate_complete_hybrid_targeted_projection(
     targeted_artifact: TargetedSecondEvidenceArtifact | None,
     preparation,
 ) -> None:
-    """Require every validated target source to survive Hybrid semantic binding.
+    """Require PRESENT sources and validate every attached Hybrid binding.
 
     ``build_targeted_asr_bindings`` remains the only timing association
     authority.  This check only compares its resulting semantic evidence with
     the already validated artifact bindings using the same immutable window,
     source-snapshot, and segment identity that the review boundary consumes.
-    It therefore rejects an incomplete or ambiguous projection without
-    inventing an association or weakening the review guard.
+    Unmapped NOISY/EMPTY sources stay in the artifact without forcing fallback.
+    Attached evidence still must identify one exact source; no ambiguity is
+    resolved by choosing an ordinal or by inventing an association.
     """
 
     if targeted_artifact is None:
@@ -747,7 +761,15 @@ def _validate_complete_hybrid_targeted_projection(
         for binding in preparation.semantic_bindings
         if binding.targeted_asr_evidence is not None
     )
-    mapped_source_ids = []
+    artifact_source_ids = {binding.source_id for binding in artifact_bindings}
+    # A source-stable baseline identity also safely attaches the corresponding
+    # artifact projection at the review boundary, without target-only STT.
+    mapped_source_ids = [
+        binding.asr_identity.cue_id
+        for binding in preparation.semantic_bindings
+        if binding.asr_identity is not None
+        and binding.asr_identity.cue_id in artifact_source_ids
+    ]
     for semantic_binding in targeted_semantic_bindings:
         evidence = semantic_binding.targeted_asr_evidence.evidence
         candidates = tuple(
@@ -767,13 +789,14 @@ def _validate_complete_hybrid_targeted_projection(
             )
         mapped_source_ids.append(candidates[0].source_id)
 
-    artifact_source_ids = tuple(
-        artifact_binding.source_id for artifact_binding in artifact_bindings
-    )
+    required_source_ids = {
+        binding.source_id for binding in artifact_bindings
+        if requires_hybrid_targeted_projection(binding)
+    }
     if (
-        len(mapped_source_ids) != len(artifact_source_ids)
-        or len(set(mapped_source_ids)) != len(mapped_source_ids)
-        or set(mapped_source_ids) != set(artifact_source_ids)
+        len(set(mapped_source_ids)) != len(mapped_source_ids)
+        or not set(mapped_source_ids) <= artifact_source_ids
+        or not required_source_ids <= set(mapped_source_ids)
     ):
         raise Stage11ControllerTargetedEvidenceUnprojectable(
             "validated targeted evidence is not completely projectable into Hybrid"
