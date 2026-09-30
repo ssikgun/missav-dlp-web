@@ -7461,3 +7461,93 @@ or service/timer start. Production visibility rows remain untouched; the
 last verified production state is the F11 cohort of 41 ATTENTION rows.
 F11b has no blocker; F11c conditional repair design is ready for its own
 checkpoint. Source changes here are not yet installed in production.
+
+## Post-Stage13 Media-F11c — conditional visibility repair (PASS)
+
+Starting HEAD was `494134bf50d58db7d2eb148ec1a870f6526b5d11`, equal to remote
+on `teddy-subtitle-stage11`, with a clean worktree. Completion timer/service
+and reconcile-apply were inactive, writer host/web health READY, `/login`
+200, delete gate false. Stage13 remains CLOSED/PASS.
+
+### Backup and corrected production runtime
+
+SQLite backup API snapshot:
+`/opt/missav-dlp-web/backups/stage9-f11c-20260930-visibility/teddy-stage9-media.before-conditional-reset.sqlite3`.
+It opens read-only, passes integrity_check, matches the media_jobs digest,
+and contains exactly the preflight 41 ATTENTION rows. The F11 backup was not
+overwritten. The same backup directory retains the preflight snapshot,
+old wrapper, reset result, reconciler result, and post-verification record.
+
+Installed immutable release:
+`/opt/missav-dlp-web/stage9-runtime/releases/494134bf50d58db7d2eb148ec1a870f6526b5d11`.
+All 25 module hashes match that exact Git commit; SOURCE_COMMIT and the
+existing runtime marker match; compile and all module imports pass. Release
+ownership is root:root with read-only files/directory, and old releases remain.
+The normal wrapper was backed up and atomically repinned from 45a99c4 to
+494134bf. All other arguments remain byte-for-byte unchanged, including
+poster proxy `http://127.0.0.1:58888`, visibility max-items=5, DB paths and
+locks. `bash -n` passes; no global proxy environment was added and the
+completion service was not run.
+
+### Exact cohort and transaction
+
+Before mutation: media jobs COMPLETED=41, FAILED=36, PENDING=11, RUNNING=0;
+visibility rows=41, all ATTENTION. All 41 match the DVD-ID list recorded in
+F11, status=ATTENTION, check_count=1,
+last_error=`ATTENTION:AMBIGUOUS_FAMILY_PARENT`, visible_at=NULL, and non-null
+jellyfin_path. Every row matches its completed media_job_id/completion time
+and one exact present JAV holding. created_at, updated_at and last_checked_at
+all span the same single timestamp `2026-09-30T04:08:36+00:00`
+(`2026-09-30 13:08:36 KST`), identifying the F11 pass.
+
+Using only the corrected pinned runtime's media writer lock/transaction
+helper, the full 41-row snapshot and media_jobs digest were rechecked inside
+the transaction. The UPDATE additionally restricted DVD-ID to that exact
+cohort, status=ATTENTION, check_count=1, the exact error above, visible_at=NULL
+and non-null jellyfin_path. Only status=PENDING and updated_at=current UTC
+were changed; other fields were verified unchanged before commit.
+`RESET_CANDIDATES=41`, `RESET_ROWCOUNT=41`. Any snapshot or rowcount mismatch
+would have rolled back the transaction. Reset/recheck occurred at
+`2026-09-30 13:37:50 KST`.
+
+### One corrected GET-only pass
+
+Called only `reconcile_jellyfin_visibility(..., max_items=50,
+target_dvd_id=None)` once. The injected request guard rejects non-GETs and
+unexpected endpoints; it observed 164 GETs and zero non-GETs. The production
+chain is now virtual Adult root -> exact family -> exact actual parent
+Folder at `/media/adult` -> family direct Movie children.
+
+Result: seeded=0, checked=41, VISIBLE=41, PENDING=0, ATTENTION=0,
+skipped_no_present_holding=0. All original rows retain identity/creation
+fields, have check_count=2, visible_at set, and last_error=NULL.
+HMN-904 is VISIBLE at `/media/adult/HMN/HMN-904/HMN-904.mp4`;
+NOSKN-104 is VISIBLE at `/media/adult/NOSKN/NOSKN-104/NOSKN-104.mp4`.
+Both visible_at values are `2026-09-30T04:37:50+00:00`.
+Residual PENDING title list: empty. No further check/reset/refresh was run.
+
+### Protected-state verification and next step
+
+The media_jobs digest uses compact JSON arrays of media_job_id, dvd_id,
+status, attempt_count, error, created_at, updated_at ordered by media_job_id.
+Baseline and after SHA-256 both equal the F11 digest:
+`c15b4e145bc8007f63398e90153e49885f62ea0d2c12fc28e746c94ce03b6e6c`.
+Counts remain 41/36/11/0. HMN-904 remains COMPLETED/2; MFCS-085 remains
+FAILED/17161.
+
+Discovery holdings compact-array digest, ordered by holding_id, is unchanged:
+`79daee7af1192905ad1a2730a704a8c23a17559efd96b227d73d3eb266606fe8`.
+The Discovery database file SHA-256 is also unchanged:
+`883145a2db1d9f17624b32742217d4509a2aa965555fa82277d45752c4a226d3`.
+NAS writes=0; Jellyfin mutations=0; media_jobs writes=0. The authorized
+visibility reset/check state updates, runtime install and wrapper replacement
+are the only production changes made by this checkpoint (plus backup files).
+No normal completion run, media retry, organizer, metadata recovery,
+container restart, timer start, or gate change occurred.
+
+Final runtime: completion timer enabled/inactive, completion service inactive,
+reconcile-apply inactive, writer active with host/web READY, web running with
+restart count 0, `/login` 200, gate=false. F11c PASS, no blocker.
+Next F12: review remaining CONNECTION_RESET recovery separately from
+COVER_URL_MISSING, plan bounded media recovery, and decide timer resumption
+only after that checkpoint's safety/results checks. Timer remains inactive.
