@@ -16,7 +16,10 @@ from types import MappingProxyType
 from typing import Final
 
 from teddy_discovery_alignment import (
+    AffineConsensusAlignment,
+    AlignmentAmbiguityError,
     MAX_AFFINE_ANCHORS,
+    MAX_AFFINE_CONSENSUS_UNIQUE_CHAINS,
     MIN_AFFINE_ANCHORS,
     RobustAffineAlignment,
 )
@@ -481,6 +484,81 @@ def decide_alignment_acceptance(
     )
 
 
+def select_affine_consensus_alignment(
+    alternatives: tuple[AffineConsensusAlignment, ...],
+    policy: AlignmentAcceptancePolicy,
+) -> tuple[AffineConsensusAlignment, AlignmentAcceptanceDecision]:
+    """Choose consensus by unchanged acceptance and measured evidence.
+
+    Acceptance is the first criterion, followed by inlier count, exact ratio,
+    lower median residual, balanced evidence span, and lexical score sum. If
+    distinct anchor mappings remain equal on every criterion, the selector
+    fails closed instead of resolving the tie by ordinal order.
+    """
+
+    if type(alternatives) is not tuple or not alternatives:
+        raise AlignmentAcceptanceValidationError(
+            "alternatives must be a nonempty immutable tuple"
+        )
+    if len(alternatives) > MAX_AFFINE_CONSENSUS_UNIQUE_CHAINS:
+        raise AlignmentAcceptanceValidationError(
+            "alternatives exceed the affine-consensus result bound"
+        )
+    validated_policy = _validated_policy(policy)
+    ranked = []
+    for alternative in alternatives:
+        if not isinstance(alternative, AffineConsensusAlignment):
+            raise AlignmentAcceptanceValidationError(
+                "alternatives must contain AffineConsensusAlignment values"
+            )
+        decision = decide_alignment_acceptance(
+            alternative.alignment,
+            validated_policy,
+        )
+        alignment = alternative.alignment
+        inlier_ratio = Fraction(
+            alignment.inlier_count,
+            alignment.anchor_count,
+        )
+        median_residual = Fraction(
+            str(alignment.median_absolute_residual_ms)
+        )
+        balanced_span = min(
+            Fraction(str(decision.external_evidence_span_ms)),
+            Fraction(str(decision.asr_evidence_span_ms)),
+        )
+        external_span = Fraction(str(decision.external_evidence_span_ms))
+        asr_span = Fraction(str(decision.asr_evidence_span_ms))
+        lexical_strength = sum(
+            (Fraction(str(anchor.score)) for anchor in alternative.anchors),
+            Fraction(0),
+        )
+        rank = (
+            decision.verdict == ACCEPT_HYBRID,
+            alignment.inlier_count,
+            inlier_ratio,
+            -median_residual,
+            balanced_span,
+            external_span,
+            asr_span,
+            lexical_strength,
+        )
+        identity_key = tuple(
+            (anchor.external_identity.cue_id, anchor.asr_identity.cue_id)
+            for anchor in alternative.anchors
+        )
+        ranked.append((rank, identity_key, alternative, decision))
+
+    best_rank = max(item[0] for item in ranked)
+    best = [item for item in ranked if item[0] == best_rank]
+    if len(best) != 1:
+        raise AlignmentAmbiguityError(
+            "equally supported affine-consensus mappings remain ambiguous"
+        )
+    _, _, alternative, decision = best[0]
+    return alternative, decision
+
+
 __all__ = [
     "ACCEPT_HYBRID",
     "ALIGNMENT_POLICY_SATISFIED",
@@ -499,4 +577,5 @@ __all__ = [
     "SCALE_BELOW_POLICY",
     "UNRESOLVED",
     "decide_alignment_acceptance",
+    "select_affine_consensus_alignment",
 ]

@@ -232,12 +232,19 @@ def main():
             def asr_executor(request, payload, digest, remote_task, timeout):
                 calls.append("asr")
                 state['asr_request'] = request
-                return serialize_asr_quality_review_result(fake._review_result(
-                    request, asr_quality_review_request_sha256(request)), request)
+                result = replace(
+                    fake._review_result(
+                        request,
+                        asr_quality_review_request_sha256(request),
+                    ),
+                    review_execution_session_id=state['fresh_asr_session_id'],
+                )
+                return serialize_asr_quality_review_result(result, request)
 
             def prepare_asr_session(sid):
                 ensure_fresh_review_execution_session(sessions, sid,
                     expected_profile_name='subtitle-translator')
+                state['fresh_asr_session_id'] = sid
                 calls.append(('fresh', sid))
 
             def launcher(command, *, cwd, timeout):
@@ -246,9 +253,12 @@ def main():
                 # Originals captured by the provider are independent of the wire.
                 request = build_review_request(**originals(state['request']))
                 assert parse_review_request(payload, **originals(request)) == request
+                result = replace(
+                    fake._review_result(request, review_request_sha256(request)),
+                    review_execution_session_id=sessions.create_calls[-1][0],
+                )
                 _atomic_private_write(directory / QUALITY_REVIEW_RESULT_FILENAME,
-                    serialize_review_result(fake._review_result(request,
-                        review_request_sha256(request)), request))
+                    serialize_review_result(result, request))
                 calls.append("hybrid")
                 return SimpleNamespace(returncode=0)
 

@@ -8,6 +8,7 @@ Whisper/Hermes, or writes an artifact.
 from __future__ import annotations
 
 import hashlib
+from fractions import Fraction
 from pathlib import Path
 
 from teddy_discovery_alignment import (
@@ -60,14 +61,25 @@ def jur_alignment() -> RobustAffineAlignment:
 
     scale = 1.0173232835064605
     intercept_ms = -181.3896630352166
+    scale_fraction = Fraction.from_float(scale)
+    intercept_fraction = Fraction.from_float(intercept_ms)
     midpoint_x2_values = (200_000, 2_000_000, 6_000_000)
     residuals = []
+    absolute_residuals = []
     for index, external_midpoint_x2 in enumerate(midpoint_x2_values):
-        external_midpoint_ms = external_midpoint_x2 / 2
-        predicted = scale * external_midpoint_ms + intercept_ms
-        asr_midpoint_x2 = round(predicted * 2)
-        asr_midpoint_ms = asr_midpoint_x2 / 2
-        signed = asr_midpoint_ms - predicted
+        external_midpoint = Fraction(external_midpoint_x2, 2)
+        predicted_fraction = (
+            scale_fraction * external_midpoint + intercept_fraction
+        )
+        asr_midpoint_x2 = round(float(predicted_fraction) * 2)
+        signed_fraction = (
+            Fraction(asr_midpoint_x2, 2) - predicted_fraction
+        )
+        absolute_fraction = abs(signed_fraction)
+        predicted = float(predicted_fraction)
+        signed = float(signed_fraction)
+        absolute = float(absolute_fraction)
+        absolute_residuals.append(absolute_fraction)
         residuals.append(
             AffineAnchorResidual(
                 external_identity=HybridCueIdentity.for_external_ja(index),
@@ -76,11 +88,11 @@ def jur_alignment() -> RobustAffineAlignment:
                 asr_midpoint_x2=asr_midpoint_x2,
                 predicted_asr_midpoint_ms=predicted,
                 signed_residual_ms=signed,
-                absolute_residual_ms=abs(signed),
-                is_inlier=abs(signed) <= 1_000,
+                absolute_residual_ms=absolute,
+                is_inlier=absolute_fraction <= 1_000,
             )
         )
-    absolute = sorted(item.absolute_residual_ms for item in residuals)
+    absolute_residuals.sort()
     return RobustAffineAlignment(
         scale=scale,
         intercept_ms=intercept_ms,
@@ -88,7 +100,9 @@ def jur_alignment() -> RobustAffineAlignment:
         inlier_count=sum(item.is_inlier for item in residuals),
         residual_threshold_ms=1_000,
         residuals=tuple(residuals),
-        median_absolute_residual_ms=absolute[len(absolute) // 2],
+        median_absolute_residual_ms=float(
+            absolute_residuals[len(absolute_residuals) // 2]
+        ),
     )
 
 

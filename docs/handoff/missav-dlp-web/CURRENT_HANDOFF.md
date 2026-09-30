@@ -1,5 +1,64 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-30 Stage11 — bounded affine-consensus alignment and numeric contract
+
+Implemented the two generic FNS-247 forensic findings in the Stage11
+alignment path. The preceding bounded malformed-cue admission and derived-text
+CR/LF normalization remain in place: authoritative external cue text and
+timestamps are unchanged, and other control characters remain rejected.
+
+The affine fit now converts exact Fraction slope/intercept to the public float
+representation once, then rehydrates those float values as their exact binary
+Fractions. Fit and immutable-result validation derive predicted midpoints,
+residuals, inlier classification, and the median from that same canonical
+line; public residual values are converted to float for storage. No broad
+floating tolerance was added.
+
+The live external-JA adapter now searches pair-derived affine hypotheses from
+the existing lexical candidate tuple. It preserves the configured lexical
+threshold and uses the established 0.95–1.05 hypothesis scale range, 1,000 ms
+consensus residual bound, and strict external/ASR ordinal monotonicity. Each
+hypothesis uses a bounded maximum-cardinality monotonic consensus. The final
+choice ranks existing acceptance first, then inlier count, ratio, lower median
+residual, evidence span, and summed lexical evidence. Mappings tied on every
+evidence metric fail closed. Fixed pair, hypothesis, candidate-evaluation,
+dynamic-program, path, unique-chain, and fit-work bounds reject pathological
+inputs without sampling or ordinal tie-breaking.
+
+Acceptance policy is unchanged: minimum 40 anchors, minimum 40 inliers,
+minimum inlier ratio 0.90, maximum median residual 250 ms, minimum evidence
+span 1,800,000 ms on both timelines, scale 0.95–1.05, with the existing
+1,000 ms residual threshold.
+
+The exact supplied external-JA SRT and baseline ASR artifact were replayed
+read-only through the production parser, candidate generator, affine consensus
+selector, fit validator, and acceptance policy. Result: 313 admitted cues,
+one malformed cue dropped, 233 lexical candidates, 40 selected anchors, 40
+inliers, ratio 1.000000, median residual 219.160878 ms, scale 1.014157100548,
+intercept 239.121464 ms, external evidence span 8,711,060 ms, ASR evidence
+span 8,833,938 ms, verdict `ACCEPT_HYBRID`. This is computed from the supplied
+evidence; no FNS-247, cue, or candidate counts are hardcoded in production.
+
+Added `teddy_discovery_affine_consensus_smoke.py` for the near-1e-9
+exact-to-float round-trip, rejection of a 1e-10 detached residual, polluted
+lexical maximum recovery, repeated-key affine support, indistinguishable
+consensus ambiguity, and insufficient/out-of-range consensus rejection. The
+existing live-adapter smoke double was corrected to return the fresh execution
+session supplied by its fake session preparer; it had been returning a static
+session value and therefore failed its own provenance contract.
+Offline v2-pipeline and targeted-evidence policy fixtures that construct
+alignment values directly now compute their residuals from the same canonical
+binary-float Fraction representation.
+
+Production-venv smoke/regression results: affine-consensus, alignment,
+acceptance, acceptance application, subtitle text, external subtitle, subtitle
+v2 pipeline/orchestrator, targeted hybrid evidence, targeted evidence policy,
+targeted ASR window, bounded alignment fallback, 51-case Stage11 controller,
+and live-adapter ASR_ONLY/HYBRID checks all PASS. The production venv includes
+NumPy, and the live-adapter smoke passed there. No NAS, Jellyfin, rollout DB,
+Hermes, or Whisper action was run; no current KO artifact was read for update
+or overwritten. No external writes occurred.
+
 ## 2026-09-29 Stage13-F2M-D8 — stopped on duplicate-notification retry gap (INCOMPLETE)
 
 Initial repo state was expected HEAD `df8bec646f736855e975849bbd993db68f5bd19b`,

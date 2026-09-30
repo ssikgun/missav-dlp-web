@@ -21,10 +21,15 @@ from teddy_discovery_asr_audio import iter_audio_chunks
 from teddy_discovery_alignment import (
     AlignmentLimitError,
     AlignmentValidationError,
-    generate_monotonic_anchor_candidates, select_monotonic_anchors,
-    infer_robust_affine_alignment,
+    MAX_AFFINE_CONSENSUS_SCALE,
+    MIN_AFFINE_CONSENSUS_SCALE,
+    generate_monotonic_anchor_candidates,
+    infer_affine_consensus_alignments,
 )
-from teddy_discovery_alignment_acceptance import ACCEPT_HYBRID, decide_alignment_acceptance
+from teddy_discovery_alignment_acceptance import (
+    ACCEPT_HYBRID,
+    select_affine_consensus_alignment,
+)
 from teddy_discovery_alignment_application import apply_alignment_acceptance
 from teddy_discovery_hybrid_evidence import (
     HybridEvidenceBundle, HybridAlignmentProvenance,
@@ -176,24 +181,37 @@ def build_external_ja_adapter(*, discovery, provider, acceptance_policy,
                 "external subtitle immutable payload validation failed"
             ) from error
         try:
-            alignment = infer_robust_affine_alignment(
-                select_monotonic_anchors(
-                    generate_monotonic_anchor_candidates(bundle)
-                ),
+            candidates = generate_monotonic_anchor_candidates(bundle)
+            alternatives = infer_affine_consensus_alignments(
+                candidates,
                 residual_threshold_ms=residual_threshold_ms,
+                minimum_scale=MIN_AFFINE_CONSENSUS_SCALE,
+                maximum_scale=MAX_AFFINE_CONSENSUS_SCALE,
+            )
+            if not alternatives:
+                raise AlignmentValidationError(
+                    "no affine-consistent monotonic anchor chain was found"
+                )
+            selected, decision = select_affine_consensus_alignment(
+                alternatives,
+                acceptance_policy,
             )
         except AlignmentLimitError as error:
             raise ExternalSubtitleValidationError(
-                "external subtitle alignment exceeded bounded lexical comparison limit"
+                "external subtitle alignment exceeded a fixed "
+                "lexical/affine analysis limit"
             ) from error
         except AlignmentValidationError as error:
             raise ExternalSubtitleValidationError(
                 "external subtitle alignment validation failed"
             ) from error
-        decision = decide_alignment_acceptance(alignment, acceptance_policy)
         return apply_alignment_acceptance(
             bundle, decision,
-            alignment=alignment if decision.verdict == ACCEPT_HYBRID else None,
+            alignment=(
+                selected.alignment
+                if decision.verdict == ACCEPT_HYBRID
+                else None
+            ),
         )
     return external
 

@@ -2,6 +2,7 @@
 
 from dataclasses import FrozenInstanceError, fields, is_dataclass
 import ast
+from fractions import Fraction
 import inspect
 from pathlib import Path
 
@@ -219,31 +220,42 @@ def hybrid_alignment() -> RobustAffineAlignment:
 
 
 def affine_fixture(scale: float, intercept_ms: float) -> RobustAffineAlignment:
-    residuals = tuple(
-        AffineAnchorResidual(
-            external_identity=HybridCueIdentity.for_external_ja(index),
-            asr_identity=HybridCueIdentity.for_asr_segment(index),
-            external_midpoint_x2=external_midpoint_x2,
-            asr_midpoint_x2=int(
-                scale * external_midpoint_x2 + 2 * intercept_ms
-            ),
-            predicted_asr_midpoint_ms=(
-                scale * (external_midpoint_x2 / 2) + intercept_ms
-            ),
-            signed_residual_ms=0.0,
-            absolute_residual_ms=0.0,
-            is_inlier=True,
+    scale_fraction = Fraction.from_float(scale)
+    intercept_fraction = Fraction.from_float(intercept_ms)
+    residuals = []
+    absolute_residuals = []
+    for index, external_midpoint_x2 in enumerate((2_300, 4_300, 6_300)):
+        external_midpoint = Fraction(external_midpoint_x2, 2)
+        predicted_fraction = (
+            scale_fraction * external_midpoint + intercept_fraction
         )
-        for index, external_midpoint_x2 in enumerate((2_300, 4_300, 6_300))
-    )
+        asr_midpoint_x2 = round(float(predicted_fraction) * 2)
+        signed_fraction = (
+            Fraction(asr_midpoint_x2, 2) - predicted_fraction
+        )
+        absolute_fraction = abs(signed_fraction)
+        absolute_residuals.append(absolute_fraction)
+        residuals.append(
+            AffineAnchorResidual(
+                external_identity=HybridCueIdentity.for_external_ja(index),
+                asr_identity=HybridCueIdentity.for_asr_segment(index),
+                external_midpoint_x2=external_midpoint_x2,
+                asr_midpoint_x2=asr_midpoint_x2,
+                predicted_asr_midpoint_ms=float(predicted_fraction),
+                signed_residual_ms=float(signed_fraction),
+                absolute_residual_ms=float(absolute_fraction),
+                is_inlier=absolute_fraction <= 1,
+            )
+        )
+    median_absolute_residual = sorted(absolute_residuals)[1]
     return RobustAffineAlignment(
         scale=scale,
         intercept_ms=intercept_ms,
         anchor_count=3,
-        inlier_count=3,
+        inlier_count=sum(residual.is_inlier for residual in residuals),
         residual_threshold_ms=1,
-        residuals=residuals,
-        median_absolute_residual_ms=0.0,
+        residuals=tuple(residuals),
+        median_absolute_residual_ms=float(median_absolute_residual),
     )
 
 

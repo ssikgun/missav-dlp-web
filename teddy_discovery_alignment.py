@@ -14,6 +14,7 @@ stage.
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from fractions import Fraction
@@ -40,6 +41,8 @@ MAX_ALIGNMENT_TEXT_CHARS: Final = min(
     MAX_ASR_SEGMENT_TEXT_CHARS,
 )
 DEFAULT_MINIMUM_LEXICAL_SCORE: Final[float] = 0.80
+MIN_AFFINE_CONSENSUS_SCALE: Final[float] = 0.95
+MAX_AFFINE_CONSENSUS_SCALE: Final[float] = 1.05
 MAX_ANCHOR_CANDIDATES: Final[int] = 4_096
 # This fixed CPU-safety cap is a generic power-of-two bound, not a
 # matching-quality threshold.
@@ -48,6 +51,18 @@ MIN_AFFINE_ANCHORS: Final[int] = 3
 # Pairwise slope generation is quadratic; this fixed bound protects CPU and
 # memory while still covering ordinary selected-anchor evidence sets.
 MAX_AFFINE_ANCHORS: Final[int] = 512
+# Consensus search considers every valid lexical-candidate pair, then uses
+# fixed work caps for hypothesis evaluation and tied-path reconstruction.
+MAX_AFFINE_CONSENSUS_HYPOTHESES: Final[int] = 65_536
+MAX_AFFINE_CONSENSUS_CANDIDATE_EVALUATIONS: Final[int] = 16_777_216
+MAX_AFFINE_CONSENSUS_DP_OPERATIONS: Final[int] = 16_777_216
+MAX_AFFINE_CONSENSUS_CHAINS_PER_HYPOTHESIS: Final[int] = 64
+MAX_AFFINE_CONSENSUS_PATHS_EVALUATED: Final[int] = 65_536
+MAX_AFFINE_CONSENSUS_UNIQUE_CHAINS: Final[int] = 2_048
+MAX_AFFINE_CONSENSUS_FIT_PAIR_EVALUATIONS: Final[int] = 16_777_216
+MAX_AFFINE_CONSENSUS_PAIR_COMPARISONS: Final[int] = (
+    MAX_ANCHOR_CANDIDATES * (MAX_ANCHOR_CANDIDATES - 1) // 2
+)
 
 
 class AlignmentError(ValueError):
@@ -811,12 +826,7 @@ class AffineAnchorResidual:
             raise AlignmentValidationError(
                 "absolute_residual_ms must be nonnegative"
             )
-        if not math.isclose(
-            absolute_residual_ms,
-            abs(signed_residual_ms),
-            rel_tol=1e-12,
-            abs_tol=1e-9,
-        ):
+        if absolute_residual_ms != abs(signed_residual_ms):
             raise AlignmentValidationError(
                 "absolute_residual_ms must equal the signed residual magnitude"
             )
@@ -907,6 +917,8 @@ class RobustAffineAlignment:
         previous_asr_index = None
         absolute_residuals = []
         actual_inlier_count = 0
+        canonical_scale = Fraction.from_float(self.scale)
+        canonical_intercept = Fraction.from_float(self.intercept_ms)
         for position, residual in enumerate(self.residuals):
             if not isinstance(residual, AffineAnchorResidual):
                 raise AlignmentValidationError(
@@ -938,12 +950,28 @@ class RobustAffineAlignment:
                     "residual ASR indexes must increase strictly"
                 )
 
-            expected_predicted = (
-                self.scale * residual.external_midpoint_ms
-                + self.intercept_ms
+            external_midpoint = Fraction(residual.external_midpoint_x2, 2)
+            asr_midpoint = Fraction(residual.asr_midpoint_x2, 2)
+            expected_predicted_fraction = (
+                canonical_scale * external_midpoint
+                + canonical_intercept
             )
-            expected_signed = residual.asr_midpoint_ms - expected_predicted
-            expected_absolute = abs(expected_signed)
+            expected_signed_fraction = (
+                asr_midpoint - expected_predicted_fraction
+            )
+            expected_absolute_fraction = abs(expected_signed_fraction)
+            expected_predicted = _fraction_to_finite_float(
+                expected_predicted_fraction,
+                field_name="predicted_asr_midpoint_ms",
+            )
+            expected_signed = _fraction_to_finite_float(
+                expected_signed_fraction,
+                field_name="signed_residual_ms",
+            )
+            expected_absolute = _fraction_to_finite_float(
+                expected_absolute_fraction,
+                field_name="absolute_residual_ms",
+            )
             if not all(
                 math.isfinite(value)
                 for value in (
@@ -955,31 +983,19 @@ class RobustAffineAlignment:
                 raise AlignmentValidationError(
                     "residual validation produced a nonfinite value"
                 )
-            if not math.isclose(
-                residual.predicted_asr_midpoint_ms,
-                expected_predicted,
-                rel_tol=1e-12,
-                abs_tol=1e-9,
-            ):
+            if residual.predicted_asr_midpoint_ms != expected_predicted:
                 raise AlignmentValidationError(
                     "residual predicted midpoint is detached from fit"
                 )
-            if not math.isclose(
-                residual.signed_residual_ms,
-                expected_signed,
-                rel_tol=1e-12,
-                abs_tol=1e-9,
-            ) or not math.isclose(
-                residual.absolute_residual_ms,
-                expected_absolute,
-                rel_tol=1e-12,
-                abs_tol=1e-9,
+            if (
+                residual.signed_residual_ms != expected_signed
+                or residual.absolute_residual_ms != expected_absolute
             ):
                 raise AlignmentValidationError(
                     "residual values are detached from fit"
                 )
             expected_inlier = (
-                residual.absolute_residual_ms <= residual_threshold_ms
+                expected_absolute_fraction <= residual_threshold_ms
             )
             if residual.is_inlier != expected_inlier:
                 raise AlignmentValidationError(
@@ -990,7 +1006,7 @@ class RobustAffineAlignment:
             seen_asr.add(asr_identity.cue_id)
             previous_external_index = external_identity.source_index
             previous_asr_index = asr_identity.source_index
-            absolute_residuals.append(residual.absolute_residual_ms)
+            absolute_residuals.append(expected_absolute_fraction)
             if residual.is_inlier:
                 actual_inlier_count += 1
 
@@ -998,22 +1014,12 @@ class RobustAffineAlignment:
             raise AlignmentValidationError(
                 "inlier_count does not match residual classifications"
             )
-        median_absolute_residual = _median_fraction(
-            [
-                Fraction(str(value))
-                for value in absolute_residuals
-            ]
-        )
+        median_absolute_residual = _median_fraction(absolute_residuals)
         median_absolute_residual_float = _fraction_to_finite_float(
             median_absolute_residual,
             field_name="median_absolute_residual_ms",
         )
-        if not math.isclose(
-            self.median_absolute_residual_ms,
-            median_absolute_residual_float,
-            rel_tol=1e-12,
-            abs_tol=1e-9,
-        ):
+        if self.median_absolute_residual_ms != median_absolute_residual_float:
             raise AlignmentValidationError(
                 "median_absolute_residual_ms does not match residuals"
             )
@@ -1103,8 +1109,13 @@ def infer_robust_affine_alignment(
         field_name="intercept_ms",
     )
 
+    # The float conversion above is the single exact-fit-to-public boundary.
+    # Rehydrate those binary float values as exact Fractions and use that same
+    # canonical line for residuals and validator checks.
+    canonical_scale = Fraction.from_float(scale)
+    canonical_intercept = Fraction.from_float(intercept_ms)
     residuals = []
-    absolute_residuals = []
+    absolute_residuals: list[Fraction] = []
     inlier_count = 0
     for anchor, (external_x2, asr_x2) in zip(
         validated_anchors,
@@ -1112,10 +1123,12 @@ def infer_robust_affine_alignment(
     ):
         external_midpoint = Fraction(external_x2, 2)
         asr_midpoint = Fraction(asr_x2, 2)
-        predicted_fraction = scale_fraction * external_midpoint + intercept_fraction
+        predicted_fraction = (
+            canonical_scale * external_midpoint
+            + canonical_intercept
+        )
         signed_fraction = asr_midpoint - predicted_fraction
         absolute_fraction = abs(signed_fraction)
-
         predicted = _fraction_to_finite_float(
             predicted_fraction,
             field_name="predicted_asr_midpoint_ms",
@@ -1160,7 +1173,366 @@ def infer_robust_affine_alignment(
     )
 
 
+@dataclass(frozen=True)
+class AffineConsensusAlignment:
+    """One bounded affine-consistent monotonic candidate chain and its fit."""
+
+    anchors: tuple[MonotonicAnchorCandidate, ...]
+    alignment: RobustAffineAlignment
+
+    def __post_init__(self):
+        validated = _validate_affine_anchors(self.anchors)
+        if not isinstance(self.alignment, RobustAffineAlignment):
+            raise AlignmentValidationError(
+                "alignment must be a RobustAffineAlignment"
+            )
+        if self.alignment.anchor_count != len(validated):
+            raise AlignmentValidationError(
+                "alignment anchor count does not match consensus anchors"
+            )
+        if tuple(
+            (anchor.external_identity, anchor.asr_identity)
+            for anchor in validated
+        ) != tuple(
+            (residual.external_identity, residual.asr_identity)
+            for residual in self.alignment.residuals
+        ):
+            raise AlignmentValidationError(
+                "alignment residual identities do not match consensus anchors"
+            )
+
+
+def _merge_chain_states(left, right, *, path_limit: int):
+    """Merge Fenwick states as (length, endpoints, path_count)."""
+
+    if left[0] > right[0]:
+        return left
+    if right[0] > left[0]:
+        return right
+    if left[0] == 0:
+        return (0, (), 1)
+    endpoints = tuple(sorted(set(left[1]).union(right[1])))
+    path_count = min(path_limit + 1, left[2] + right[2])
+    if len(endpoints) > path_limit + 1:
+        endpoints = endpoints[:path_limit + 1]
+    return (left[0], endpoints, path_count)
+
+
+def _maximum_monotonic_consensus_paths(
+    candidates: tuple[MonotonicAnchorCandidate, ...],
+    *,
+    work_counter: list[int],
+) -> tuple[tuple[MonotonicAnchorCandidate, ...], ...]:
+    """Return all maximum-cardinality strict chains, within a fixed path cap."""
+
+    if not candidates:
+        return ()
+    ordered = tuple(sorted(candidates, key=_candidate_order_key))
+    asr_ordinals = sorted({item.asr_segment_index for item in ordered})
+    fenwick = [(0, (), 1) for _ in range(len(asr_ordinals) + 1)]
+    chain_lengths: list[int] = [0] * len(ordered)
+    chain_counts: list[int] = [0] * len(ordered)
+    parents: list[tuple[int, ...]] = [()] * len(ordered)
+    path_limit = MAX_AFFINE_CONSENSUS_CHAINS_PER_HYPOTHESIS
+
+    def merge(left, right):
+        work_counter[0] += 1 + len(left[1]) + len(right[1])
+        if work_counter[0] > MAX_AFFINE_CONSENSUS_DP_OPERATIONS:
+            raise AlignmentLimitError(
+                "affine-consensus dynamic-program work exceeds its fixed bound"
+            )
+        return _merge_chain_states(
+            left,
+            right,
+            path_limit=path_limit,
+        )
+
+    def query(exclusive_rank: int):
+        result = (0, (), 1)
+        position = exclusive_rank
+        while position > 0:
+            result = merge(result, fenwick[position])
+            position -= position & -position
+        return result
+
+    def update(rank: int, endpoint: int):
+        position = rank + 1
+        state = (
+            chain_lengths[endpoint],
+            (endpoint,),
+            chain_counts[endpoint],
+        )
+        while position < len(fenwick):
+            fenwick[position] = merge(fenwick[position], state)
+            position += position & -position
+
+    start = 0
+    while start < len(ordered):
+        external_ordinal = ordered[start].external_cue_index
+        end = start + 1
+        while (
+            end < len(ordered)
+            and ordered[end].external_cue_index == external_ordinal
+        ):
+            end += 1
+
+        # Query the whole external-ordinal group before updates so external
+        # identities also increase strictly.
+        for candidate_index in range(start, end):
+            candidate = ordered[candidate_index]
+            asr_rank = bisect_left(asr_ordinals, candidate.asr_segment_index)
+            (
+                previous_length,
+                previous_endpoints,
+                previous_count,
+            ) = query(asr_rank)
+            if previous_length == 0:
+                chain_lengths[candidate_index] = 1
+                chain_counts[candidate_index] = 1
+                parents[candidate_index] = ()
+            else:
+                chain_lengths[candidate_index] = previous_length + 1
+                chain_counts[candidate_index] = min(
+                    path_limit + 1,
+                    previous_count,
+                )
+                parents[candidate_index] = previous_endpoints
+
+        for candidate_index in range(start, end):
+            candidate = ordered[candidate_index]
+            asr_rank = bisect_left(asr_ordinals, candidate.asr_segment_index)
+            update(asr_rank, candidate_index)
+        start = end
+
+    best_length, best_endpoints, best_path_count = query(len(asr_ordinals))
+    if best_length == 0:
+        return ()
+    if best_path_count > path_limit:
+        raise AlignmentLimitError(
+            "maximum affine-consensus chain ambiguity exceeds its bounded path limit"
+        )
+
+    paths: list[tuple[int, ...]] = []
+
+    def append_paths(endpoint: int, suffix: tuple[int, ...]):
+        if len(paths) > path_limit:
+            return
+        parent_endpoints = parents[endpoint]
+        if not parent_endpoints:
+            paths.append((endpoint,) + suffix)
+            return
+        for parent in parent_endpoints:
+            append_paths(parent, (endpoint,) + suffix)
+            if len(paths) > path_limit:
+                return
+
+    for endpoint in best_endpoints:
+        append_paths(endpoint, ())
+        if len(paths) > path_limit:
+            break
+    if len(paths) != best_path_count:
+        raise AlignmentValidationError(
+            "bounded monotonic path reconstruction detached from dynamic program"
+        )
+    return tuple(
+        tuple(ordered[index] for index in path)
+        for path in paths
+    )
+
+
+def infer_affine_consensus_alignments(
+    candidates: tuple[MonotonicAnchorCandidate, ...],
+    *,
+    residual_threshold_ms: int,
+    minimum_scale: float,
+    maximum_scale: float,
+) -> tuple[AffineConsensusAlignment, ...]:
+    """Search bounded pair-derived affine hypotheses over existing candidates.
+
+    Each hypothesis admits candidates whose exact midpoint residual is within
+    ``residual_threshold_ms``. A Fenwick dynamic program then enumerates every
+    maximum-cardinality strict monotonic chain up to a fixed ambiguity cap.
+    Returned chains are deduplicated by source identities and fitted through
+    :func:`infer_robust_affine_alignment`; no lexical candidate is synthesized.
+    """
+
+    residual_threshold_ms = _require_exact_positive_int(
+        residual_threshold_ms,
+        field_name="residual_threshold_ms",
+    )
+    minimum_scale = _require_finite_float(
+        minimum_scale,
+        field_name="minimum_scale",
+        strictly_positive=True,
+    )
+    maximum_scale = _require_finite_float(
+        maximum_scale,
+        field_name="maximum_scale",
+        strictly_positive=True,
+    )
+    if minimum_scale > maximum_scale:
+        raise AlignmentValidationError(
+            "minimum_scale cannot exceed maximum_scale"
+        )
+    if type(candidates) is not tuple:
+        raise AlignmentValidationError(
+            "candidates must be an immutable tuple"
+        )
+    if len(candidates) > MAX_ANCHOR_CANDIDATES:
+        raise AlignmentLimitError(
+            "candidates exceeds MAX_ANCHOR_CANDIDATES"
+        )
+
+    seen_pairs = set()
+    candidate_points = []
+    for candidate in candidates:
+        if not isinstance(candidate, MonotonicAnchorCandidate):
+            raise AlignmentValidationError(
+                "candidates must contain MonotonicAnchorCandidate values"
+            )
+        pair = (candidate.external_cue_index, candidate.asr_segment_index)
+        if pair in seen_pairs:
+            raise AlignmentValidationError(
+                "duplicate external/ASR candidate pair is not allowed"
+            )
+        seen_pairs.add(pair)
+        candidate_points.append(
+            (
+                candidate,
+                _midpoint_x2(
+                    candidate.timing,
+                    source=EVIDENCE_SOURCE_EXTERNAL_JA,
+                ),
+                _midpoint_x2(
+                    candidate.timing,
+                    source=EVIDENCE_SOURCE_ASR_SEGMENT,
+                ),
+            )
+        )
+
+    if len(candidate_points) < 2:
+        return ()
+
+    minimum_scale_fraction = Fraction(str(minimum_scale))
+    maximum_scale_fraction = Fraction(str(maximum_scale))
+    hypotheses = set()
+    ordered_points = sorted(
+        candidate_points,
+        key=lambda item: _candidate_order_key(item[0]),
+    )
+    pair_comparisons = len(ordered_points) * (len(ordered_points) - 1) // 2
+    if pair_comparisons > MAX_AFFINE_CONSENSUS_PAIR_COMPARISONS:
+        raise AlignmentLimitError(
+            "affine-consensus pair count exceeds its fixed bound"
+        )
+    for left_index, (left, left_external_x2, left_asr_x2) in enumerate(
+        ordered_points
+    ):
+        for right_index in range(left_index + 1, len(ordered_points)):
+            (
+                right,
+                right_external_x2,
+                right_asr_x2,
+            ) = ordered_points[right_index]
+            if left.external_cue_index >= right.external_cue_index:
+                continue
+            if left.asr_segment_index >= right.asr_segment_index:
+                continue
+            external_delta_x2 = right_external_x2 - left_external_x2
+            if external_delta_x2 <= 0:
+                continue
+            scale = Fraction(
+                right_asr_x2 - left_asr_x2,
+                external_delta_x2,
+            )
+            if not minimum_scale_fraction <= scale <= maximum_scale_fraction:
+                continue
+            intercept = (
+                Fraction(left_asr_x2, 2)
+                - scale * Fraction(left_external_x2, 2)
+            )
+            hypotheses.add((scale, intercept))
+            if len(hypotheses) > MAX_AFFINE_CONSENSUS_HYPOTHESES:
+                raise AlignmentLimitError(
+                    "affine-consensus hypothesis count exceeds its fixed bound"
+                )
+
+    if not hypotheses:
+        return ()
+    work = len(hypotheses) * len(candidate_points)
+    if work > MAX_AFFINE_CONSENSUS_CANDIDATE_EVALUATIONS:
+        raise AlignmentLimitError(
+            "affine-consensus candidate evaluation exceeds its fixed work bound"
+        )
+
+    unique_chains: dict[
+        tuple[tuple[str, str], ...],
+        tuple[MonotonicAnchorCandidate, ...],
+    ] = {}
+    dynamic_program_work = [0]
+    paths_evaluated = 0
+    for scale, intercept in sorted(hypotheses):
+        affine_candidates = []
+        for candidate, external_x2, asr_x2 in ordered_points:
+            residual = abs(
+                Fraction(asr_x2, 2)
+                - (scale * Fraction(external_x2, 2) + intercept)
+            )
+            if residual <= residual_threshold_ms:
+                affine_candidates.append(candidate)
+        paths = _maximum_monotonic_consensus_paths(
+            tuple(affine_candidates),
+            work_counter=dynamic_program_work,
+        )
+        paths_evaluated += len(paths)
+        if paths_evaluated > MAX_AFFINE_CONSENSUS_PATHS_EVALUATED:
+            raise AlignmentLimitError(
+                "affine-consensus path evaluation exceeds its fixed bound"
+            )
+        for anchors in paths:
+            if len(anchors) < MIN_AFFINE_ANCHORS:
+                continue
+            if len(anchors) > MAX_AFFINE_ANCHORS:
+                raise AlignmentLimitError(
+                    "affine-consensus chain exceeds MAX_AFFINE_ANCHORS"
+                )
+            identity_key = tuple(
+                (anchor.external_identity.cue_id, anchor.asr_identity.cue_id)
+                for anchor in anchors
+            )
+            unique_chains[identity_key] = anchors
+            if len(unique_chains) > MAX_AFFINE_CONSENSUS_UNIQUE_CHAINS:
+                raise AlignmentLimitError(
+                    "unique affine-consensus chain count exceeds its fixed bound"
+                )
+
+    fit_pair_evaluations = sum(
+        len(anchors) * (len(anchors) - 1) // 2
+        for anchors in unique_chains.values()
+    )
+    if fit_pair_evaluations > MAX_AFFINE_CONSENSUS_FIT_PAIR_EVALUATIONS:
+        raise AlignmentLimitError(
+            "affine-consensus fit work exceeds its fixed pairwise bound"
+        )
+
+    results = []
+    for identity_key in sorted(unique_chains):
+        anchors = unique_chains[identity_key]
+        alignment = infer_robust_affine_alignment(
+            anchors,
+            residual_threshold_ms=residual_threshold_ms,
+        )
+        results.append(
+            AffineConsensusAlignment(
+                anchors=anchors,
+                alignment=alignment,
+            )
+        )
+    return tuple(results)
+
+
 __all__ = [
+    "AffineConsensusAlignment",
     "AlignmentAmbiguityError",
     "AlignmentError",
     "AlignmentLimitError",
@@ -1172,7 +1544,17 @@ __all__ = [
     "JapaneseComparisonEvidence",
     "MAX_ANCHOR_CANDIDATES",
     "MAX_ALIGNMENT_TEXT_CHARS",
+    "MAX_AFFINE_CONSENSUS_SCALE",
     "MAX_AFFINE_ANCHORS",
+    "MAX_AFFINE_CONSENSUS_CANDIDATE_EVALUATIONS",
+    "MAX_AFFINE_CONSENSUS_CHAINS_PER_HYPOTHESIS",
+    "MAX_AFFINE_CONSENSUS_DP_OPERATIONS",
+    "MAX_AFFINE_CONSENSUS_FIT_PAIR_EVALUATIONS",
+    "MAX_AFFINE_CONSENSUS_HYPOTHESES",
+    "MAX_AFFINE_CONSENSUS_PAIR_COMPARISONS",
+    "MAX_AFFINE_CONSENSUS_PATHS_EVALUATED",
+    "MAX_AFFINE_CONSENSUS_UNIQUE_CHAINS",
+    "MIN_AFFINE_CONSENSUS_SCALE",
     "MAX_LEXICAL_PAIR_COMPARISONS",
     "MIN_AFFINE_ANCHORS",
     "MonotonicAnchorCandidate",
@@ -1181,6 +1563,7 @@ __all__ = [
     "generate_monotonic_anchor_candidates",
     "RobustAffineAlignment",
     "infer_robust_affine_alignment",
+    "infer_affine_consensus_alignments",
     "japanese_lexical_similarity",
     "normalize_japanese_for_matching",
     "select_monotonic_anchors",

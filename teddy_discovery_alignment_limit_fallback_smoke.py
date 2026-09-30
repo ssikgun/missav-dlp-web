@@ -110,7 +110,7 @@ def main():
     assert type(mapped) is ExternalSubtitleValidationError
     assert isinstance(mapped.__cause__, AlignmentLimitError)
     assert str(mapped) == (
-        "external subtitle alignment exceeded bounded lexical comparison limit"
+        "external subtitle alignment exceeded a fixed lexical/affine analysis limit"
     )
     print("PASS adapter maps AlignmentLimitError to validation failure")
 
