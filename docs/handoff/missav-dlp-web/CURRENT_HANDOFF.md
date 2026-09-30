@@ -7283,3 +7283,100 @@ existing completed cohort using bounded GET-only checks; verify HMN-904 and
 known-good completed titles; record any persistent `ATTENTION` states without
 Jellyfin mutation; then separately decide remaining media recovery and timer
 resumption.
+
+## Post-Stage13 Media-F11 — visibility-state rollout (INCOMPLETE)
+
+Preconditions passed at starting HEAD
+`45a99c4cf9d20409ff7ce2cbad83dc8934eb4a66`: local/remote matched and worktree
+was clean; completion timer was enabled but inactive; completion and
+reconcile-apply services were inactive; writer host/web health was `READY`;
+web `/login` returned 200 and delete gate was false. Existing production
+runtime was `496043fcd03655b893584f9803f5aaba926a3ff3` at
+`/opt/missav-dlp-web/stage9-runtime/releases/496043fcd03655b893584f9803f5aaba926a3ff3`.
+Production paths retained from the wrapper are Discovery DB
+`/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3`, media DB
+`/opt/missav-dlp-web/discovery/teddy-stage9-media.sqlite3`, media writer lock
+`/run/lock/teddy-stage9-media-writer.lock`, Jellyfin
+`http://192.168.1.205:8096`, and API key path
+`/opt/missav-dlp-web/teddy-jellyfin/jellyfin_api_key` (secret not displayed).
+
+### Backup, runtime, and wrapper
+
+Before the visibility DB write, a SQLite backup-API snapshot was created at
+`/opt/missav-dlp-web/backups/stage9-f11-20260930-visibility/teddy-stage9-media.before-visibility.sqlite3`.
+It opens read-only, `integrity_check=ok`, has the same 88 media rows, counts,
+and baseline digest as the source.
+
+Installed immutable runtime
+`/opt/missav-dlp-web/stage9-runtime/releases/45a99c4cf9d20409ff7ce2cbad83dc8934eb4a66`
+from exact source commit `45a99c4cf9d20409ff7ce2cbad83dc8934eb4a66`. It has 25
+Python modules, root ownership, read-only release permissions, exact
+`SOURCE_COMMIT` and `.teddy-stage9-commit` markers, and every module SHA-256
+matches the repository blob. Compile/import passed.
+
+The previous wrapper was backed up to
+`/opt/missav-dlp-web/backups/stage9-f11-20260930-visibility/teddy-completion-stage9-runner.before`
+and atomically replaced. It now pins the 45a99c4 runtime and explicitly passes
+`--media-poster-proxy-url http://127.0.0.1:58888` and
+`--jellyfin-visibility-max-items 5`, retaining the previous production paths,
+locks, SSH/Jellyfin options, confirmation, and title-lock root. Inspection
+found the old proxy option had been on a shell line after the `exec`; the new
+wrapper attaches it to the runner invocation. `bash -n` and runner `--help`
+passed. No global proxy environment variables were added. No completion
+service was run.
+
+### Baseline and one-off reconciliation
+
+Before reconciliation, `media_jellyfin_visibility` did not exist.
+`MEDIA_JOBS_BASELINE_SHA256=c15b4e145bc8007f63398e90153e49885f62ea0d2c12fc28e746c94ce03b6e6c`;
+counts were COMPLETED=41, FAILED=36, PENDING=11, RUNNING=0. HMN-904 was
+COMPLETED/2 and MFCS-085 was FAILED/17161. `COMPLETED_TOTAL=41`,
+`COMPLETED_SEEDABLE=41`, and `COMPLETED_NO_PRESENT_OR_AMBIGUOUS=0`; all 41 had
+exactly one present JAV holding, so the preflight target was under the 50-item
+bound.
+
+Using only the pinned release, the one-off called
+`reconcile_jellyfin_visibility(..., max_items=50, target_dvd_id=None)` directly.
+It did not run the normal completion runner, media processor, organizer, or
+metadata recovery. A GET-only request guard allowed 82 reconciliation GETs
+and would have rejected any non-GET. Result: seeded=41, checked=41,
+`VISIBLE=0`, `PENDING=0`, `ATTENTION=41`,
+`skipped_no_present_holding=0`; table row count is 41. Every row has
+`check_count=1` and reason class `AMBIGUOUS_FAMILY_PARENT`. The attention DVD-ID
+list is: ADN-785, ADN-799, AVSA-455, AVSA-456, BAGR-093, DOKI-037, DOKS-689,
+DROP-141, DVAJ-754, DVAJ-757, EKDV-826, EROFV-366, EROFV-387, EROFV-390,
+FC2-PPV-4973050, GANA-3432, HMN-904, HNBR-014, IESP-765, JUR-750, KIR-079,
+MAAN-1193, MILK-306, MIUM-1327, MREC-010, MSFH-048, NAMH-074, NHDTC-247,
+NHDTC-250, NLD-033, NOSKN-104, NXGS-025, PRED-054, PRED-451, SDAM-181,
+SGKI-106, SIRO-5722, SIRO-5731, START-636, STSK-242, STSK-243.
+
+The guarded reconciler stopped at the family-parent check, before querying any
+title's direct children; therefore its zero `VISIBLE` count is not evidence
+that those Movie items are absent. A bounded GET-only diagnosis showed the
+Adult virtual-folder `ItemId` is a `CollectionFolder` at
+`/config/root/default/Adult` (`0a7fd8175719d8f7ebfb93874e55a2d5`), while the
+filesystem root `/media/adult` is a separate `Folder`
+(`d59216ecad5753389303717a879b33ad`). Adult-root child queries return the
+family folders, but their `ParentId` points to the separate `/media/adult`
+Folder, not the virtual `CollectionFolder` ID. The current source's strict
+comparison treats this Jellyfin hierarchy alias as ambiguous. This is a
+resolver assumption to fix and retest before any ATTENTION row is reset or
+rechecked; no production visibility status was changed after this diagnosis.
+
+### Protected state and verdict
+
+`MEDIA_JOBS_AFTER_SHA256` equals the baseline exactly; counts remain 41/36/11/0;
+HMN-904 remains COMPLETED/2 and MFCS-085 FAILED/17161. Discovery holdings
+digest remains
+`1d84e3e176a5de3094039a8b049b4924ee475f369c44c4c6fbeff05197c427b7`. NAS was
+not accessed for writing. Jellyfin mutations=0. Timer, completion service,
+and reconcile-apply remain inactive; writer remains active/READY; web login
+remains 200; gate remains false. The expected schema and 41 visibility rows
+were the only media-DB changes. No source file, retry, or timer state changed
+during F11.
+
+Because `ATTENTION=41`, F11 is `INCOMPLETE`; do not proceed to F12 or resume the
+timer. Next checkpoint should correct the Adult `CollectionFolder` versus
+filesystem `Folder` parent resolution, prove the corrected direct-child chain
+offline, then separately review how to conditionally return these
+`AMBIGUOUS_FAMILY_PARENT` rows to `PENDING` before a new bounded GET-only pass.
