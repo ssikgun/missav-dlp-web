@@ -1,5 +1,60 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-09-30 Stage11 — semantic line-break projection and preparation diagnostics
+
+The semantic input boundary now projects each CRLF pair, standalone CR, or
+standalone LF to one ASCII space. Consecutive logical line breaks produce
+one space each; ordinary single-line text and existing spaces are unchanged.
+The shared `project_semantic_text` function is used when constructing Hermes
+cue input (external JA, supporting EN, STT, before/after context) and when
+revalidating source-to-semantic plan bindings. Hermes validators still reject
+TAB, NUL, DEL, all other C0 controls, and C1 controls; no validator or alignment
+acceptance threshold was weakened.
+
+Projection creates model input only. Immutable external payload bytes,
+SubtitleDocument/cue text (including LF), cue identity/source index, accepted
+alignment, and StatefulHybridPreparation route proof remain authoritative.
+Preparation reconstructs the projected package from that proof. Final timing
+continues to come from external JA timestamps through the accepted affine
+projection, never from the projected text or ASR supporting evidence.
+
+The controller now catches generation/model-input/policy identity binding
+errors separately from HYBRID semantic preparation/evidence validation errors.
+Both boundaries remain fail closed and preserve the original exception as
+`__cause__`; a HermesV2ValidationError is no longer labelled a policy error.
+
+Production-venv validation: new semantic-projection smoke PASS and all 28
+existing Hermes v2, subtitle v2, Stage11 controller/live/deployment, and
+stateful smoke scripts PASS. New coverage includes CR/LF sequences in every
+semantic text field, exhaustive remaining C0/C1 control rejection, unchanged
+single-line evidence, original multiline JA/EN proof, stable identity/index
+and final timing, one-shot plan/stateful revalidation, detached package
+rejection, and controller diagnostic/cause separation before model staging.
+Two pre-existing smoke failures were independently reproduced against
+unchanged HEAD a50a46f: deployment fakes returned a static review execution
+identity, and timeout smoke expected raw output that the current privacy
+boundary suppresses. Only those test fixtures were corrected: bind returned
+review identities to the requested execution and verify private stream
+consumption/byte diagnostics while retaining timeout/activity assertions.
+
+Exact supplied FNS-247 offline canary through production external adapter,
+parser, consensus/acceptance, durable baseline/targeted evidence reuse, and
+prepare_stateful_hybrid PASS: ACCEPT_HYBRID, 313 admitted external cues,
+1 malformed cue dropped, 313 semantic package cues, 53 multiline cues
+projected, 53 authoritative multiline cues retained, source text mutation NO,
+unsafe controls remaining in semantic package 0. The preparation was also
+revalidated against its immutable source proof. No subtitle bodies were
+printed. No live Hermes/Whisper, publication, NAS/Jellyfin/rollout DB writes,
+current KO overwrite, or Stage13 changes were performed.
+
+
+Checkpoint Git status: commit/push could not be completed in this environment.
+`git add` and `git commit` were rejected because the worktree Git metadata
+under `/opt/missav-pwa-src/.git/worktrees/missav-pwa-subtitle-stage11` is on a
+read-only filesystem (`index.lock` creation denied). HEAD remains a50a46f;
+the eight related implementation/test/handoff files remain uncommitted.
+Push was not attempted without a commit. No Git metadata workaround was used.
+
 ## 2026-09-30 Stage11 — bounded affine-consensus alignment and numeric contract
 
 Implemented the two generic FNS-247 forensic findings in the Stage11

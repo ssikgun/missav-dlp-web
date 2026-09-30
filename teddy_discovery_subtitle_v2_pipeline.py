@@ -73,6 +73,8 @@ from teddy_discovery_targeted_hybrid_evidence import (
     validate_targeted_asr_binding,
 )
 
+from teddy_discovery_semantic_text import project_semantic_text
+
 
 class SubtitleV2PipelineError(ValueError):
     """Base class for v2 execution-boundary failures."""
@@ -84,6 +86,32 @@ class SubtitleV2PipelineValidationError(SubtitleV2PipelineError):
 
 class SubtitleV2PipelineBoundaryError(SubtitleV2PipelineError):
     """Raised when an injected semantic boundary violates its contract."""
+
+
+def _semantic_cue_input(
+    *,
+    cue_id: str,
+    external_ja: str | None,
+    stt_ja: str | None,
+    en: str | None,
+    before_context: tuple[str, ...],
+    after_context: tuple[str, ...],
+) -> HermesV2CueInput:
+    """Keep derived semantic text separate from caller-retained source proof."""
+    return HermesV2CueInput(
+        cue_id=cue_id,
+        external_ja=project_semantic_text(external_ja),
+        stt_ja=project_semantic_text(stt_ja),
+        en=project_semantic_text(en),
+        before_context=(
+            tuple(project_semantic_text(text) for text in before_context)
+            if type(before_context) is tuple else before_context
+        ),
+        after_context=(
+            tuple(project_semantic_text(text) for text in after_context)
+            if type(after_context) is tuple else after_context
+        ),
+    )
 
 
 def _validated_route(value: object) -> SubtitleV2RouteDecision:
@@ -318,7 +346,7 @@ def _build_local_plan(
         cue_id = stable_cue_id(EVIDENCE_SOURCE_EXTERNAL_JA, index)
         before_context, after_context = _local_context(document.cues, index)
         request_cues.append(
-            HermesV2CueInput(
+            _semantic_cue_input(
                 cue_id=cue_id,
                 external_ja=source_cue.text,
                 stt_ja=None,
@@ -406,7 +434,7 @@ def build_asr_only_cue_sequence(
 
         segment = bundle.asr_result.segments[index]
         request_cues.append(
-            HermesV2CueInput(
+            _semantic_cue_input(
                 cue_id=evidence.identity.cue_id,
                 external_ja=None,
                 stt_ja=segment.text,
@@ -534,7 +562,7 @@ def _build_hybrid_cues(
             stt_ja = targeted.segment.text
             semantic_targeted = targeted
         request_cues.append(
-            HermesV2CueInput(
+            _semantic_cue_input(
                 cue_id=evidence.identity.cue_id,
                 external_ja=document.cues[external_index].text,
                 stt_ja=stt_ja,

@@ -68,7 +68,10 @@ from teddy_discovery_stateful_asr_quality_review import (
 from teddy_discovery_stateful_asr_quality_review_clean import (
     materialize_stateful_asr_quality_review_clean,
 )
-from teddy_discovery_stateful_hybrid import prepare_stateful_hybrid
+from teddy_discovery_stateful_hybrid import (
+    StatefulHybridValidationError,
+    prepare_stateful_hybrid,
+)
 from teddy_discovery_stateful_quality_review import (
     build_review_request,
     review_request_sha256,
@@ -1465,15 +1468,20 @@ def run_one_title_stage11(
                 hybrid_generation_base,
                 selected_semantic_policy,
             )
+        except (StatefulSemanticPolicyError, ValueError) as error:
+            raise Stage11ControllerValidationError(
+                "HYBRID generation/model-input/policy identity binding failed"
+            ) from error
+        try:
             hybrid_preparation = prepare_stateful_hybrid(
                 route,
                 targeted_bindings=targeted_bindings,
                 generation_key=hybrid_generation_key,
                 claim_token=claim_token,
             )
-        except (StatefulSemanticPolicyError, ValueError) as error:
+        except (StatefulHybridValidationError, ValueError) as error:
             raise Stage11ControllerValidationError(
-                "HYBRID generation identity could not bind its semantic policy"
+                "HYBRID semantic preparation/evidence validation failed"
             ) from error
         try:
             _validate_complete_hybrid_targeted_projection(

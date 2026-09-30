@@ -22,6 +22,7 @@ from pathlib import PurePosixPath
 import unicodedata
 from typing import Final
 
+from teddy_discovery_semantic_text import project_semantic_text
 from teddy_discovery_alignment import RobustAffineAlignment
 from teddy_discovery_alignment_acceptance import (
     ACCEPT_HYBRID,
@@ -622,7 +623,9 @@ def _validate_semantic_bindings(
                 raise SubtitleV2OrchestratorValidationError(
                     "local JA binding is not a direct source ordinal"
                 )
-            if request_cue.external_ja != source_document.cues[index].text:
+            if request_cue.external_ja != project_semantic_text(
+                source_document.cues[index].text
+            ):
                 raise SubtitleV2OrchestratorValidationError(
                     "local JA request text is detached from its source cue"
                 )
@@ -665,7 +668,9 @@ def _validate_semantic_bindings(
                 or identity.source_index != index
                 or request_cue.cue_id != identity.cue_id
                 or request_cue.external_ja is not None
-                or request_cue.stt_ja != asr_result.segments[index].text
+                or request_cue.stt_ja != project_semantic_text(
+                    asr_result.segments[index].text
+                )
             ):
                 raise SubtitleV2OrchestratorValidationError(
                     "ASR-only semantic evidence is detached"
@@ -705,7 +710,9 @@ def _validate_semantic_bindings(
             or binding.source_index != index
             or external_identity.source_index != index
             or request_cue.cue_id != external_identity.cue_id
-            or request_cue.external_ja != external_document.cues[index].text
+            or request_cue.external_ja != project_semantic_text(
+                external_document.cues[index].text
+            )
         ):
             raise SubtitleV2OrchestratorValidationError(
                 "hybrid external JA evidence is detached"
@@ -729,7 +736,9 @@ def _validate_semantic_bindings(
                     asr_identity.source_index
                 )
                 or request_cue.stt_ja
-                != asr_result.segments[asr_identity.source_index].text
+                != project_semantic_text(
+                    asr_result.segments[asr_identity.source_index].text
+                )
             ):
                 raise SubtitleV2OrchestratorValidationError(
                     "hybrid baseline STT evidence is detached"
@@ -752,7 +761,7 @@ def _validate_semantic_bindings(
                 targeted_evidence.external_identity != external_identity
                 or targeted_evidence.evidence.source_snapshot
                 != asr_result.source_snapshot
-                or request_cue.stt_ja != targeted_evidence.segment.text
+                or request_cue.stt_ja != project_semantic_text(targeted_evidence.segment.text)
                 or not set(
                     targeted_evidence.evidence.external_cue_ids
                 ).issubset(bundle_external_ids)
