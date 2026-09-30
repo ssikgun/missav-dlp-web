@@ -6678,3 +6678,52 @@ the validated immutable completion runtime; pass only
 `--media-poster-proxy-url http://127.0.0.1:58888` from the host wrapper; keep
 the timer stopped; perform one controlled HMN-904 retry; verify poster/NFO
 publish and the exact Jellyfin item; then decide whether to resume the timer.
+
+## Post-Stage13 Media-F3b — exact one-title media retry selector
+
+F3b source work started at `a09abec545419954aa4a06b6a0dcd4d186cc66a0`.
+`run_retryable_media_jobs()` now accepts `target_dvd_id`; unset preserves the
+existing ordered generic behavior. A supplied ID is normalized with the
+existing canonical DVD-ID regex and read by exact uppercase ID before
+eligibility calculation. Only that row can be evaluated, locked, marked
+RUNNING, attempted, or finalized. Missing targets return `TARGET_NOT_FOUND`
+without generic fallback. Backoff, max attempts, stale-running, title-lock,
+and conditional state-recheck rules remain in force; a held target never
+falls through to another eligible job.
+
+The runner adds `--media-target-dvd-id` and explicit `--media-only` mode.
+Media-only requires `--apply`, an exact target, media DB/lock, Jellyfin
+configuration, and the poster-only `--media-poster-proxy-url`. It skips the
+download listing/planner, organizer processor, media-job reconciliation, and
+metadata recovery, then invokes the media runner once with the exact target.
+This keeps unrelated newly downloaded titles out of the controlled retry.
+The poster fetcher continues through the existing poster-only injection point;
+Jellyfin and NAS/SSH interfaces receive no proxy configuration.
+
+Offline selector fixtures passed: unset ordering, exact eligible target,
+backoff hold, exhausted target, missing target/no fallback, invalid target
+before DB/lock creation, invalid timestamp hold, busy title lock, successful
+target attempt, and failed target attempt. Runner fixtures confirm media-only
+skips planner/organizer/reconcile/metadata recovery, forwards HMN-904 as the
+only media target, retains the poster fetcher injection, and rejects
+media-only CLI use without proxy configuration before creating an SSH
+client. Existing retry policy and lock-race fixtures still pass.
+
+The full requested regression set also passed: media jobs, completion runner,
+media metadata (including proxy fail-closed and COVER_URL_MISSING), media
+pipeline, completion-media, completion orchestrator, title-lock, and Python
+compilation.
+
+F3b changed source and offline tests only. No production release/wrapper or
+Compose was applied; completion timer/service remained stopped; no media
+retry or media DB, Discovery, provenance, NAS, or Jellyfin mutation occurred.
+Stage13 remains CLOSED/PASS. HMN-904 controlled retry is not yet performed.
+
+F4 plan: bounded-probe the existing host loopback proxy; install the
+immutable F3/F3b completion release; while the timer remains stopped, invoke
+the existing wrapper with `--apply`,
+`--media-only --media-target-dvd-id HMN-904 --media-max-items 1`, and
+`--media-poster-proxy-url http://127.0.0.1:58888`. The selector must report
+normal backoff/exhaustion holds without bypass. If eligible, permit exactly
+that one media attempt, verify NFO/poster publish and exact Jellyfin item,
+then decide whether to resume the timer.

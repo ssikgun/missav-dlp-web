@@ -1,6 +1,7 @@
 from pathlib import Path
 from contextlib import redirect_stderr
 import io
+import os
 import sys
 import tempfile
 
@@ -197,6 +198,96 @@ assert pipeline_calls[0] == {
     "fetcher": poster_fetcher,
 }
 
+# media-only mode skips the planner, organizer, discovery-to-media reconcile,
+# and metadata recovery while passing the exact target into the media selector.
+media_only_events = []
+media_only_pipeline_calls = []
+original_run_media_pipeline = (
+    completion_runner.run_media_pipeline
+)
+original_recover_held_metadata = (
+    completion_runner.recover_held_metadata
+)
+proxy_environment_before = {
+    name: os.environ.get(name)
+    for name in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY")
+}
+try:
+    completion_runner.run_media_pipeline = (
+        lambda **kwargs: media_only_pipeline_calls.append(kwargs)
+        or {"status": "fixture"}
+    )
+    completion_runner.recover_held_metadata = (
+        lambda *_args, **_kwargs: media_only_events.append("metadata-recovery")
+    )
+    proxy_fetcher = object()
+    media_processor = _make_media_processor(
+        db_path="fixture-discovery.db",
+        ssh=fake_ssh,
+        metadata_mutator=fake_mutator,
+        jellyfin=fake_jellyfin,
+        poster_fetcher=proxy_fetcher,
+    )
+
+    def media_runner_fixture(**kwargs):
+        media_only_events.append(
+            ("target", kwargs["target_dvd_id"])
+        )
+        kwargs["processor"](kwargs["target_dvd_id"])
+        return {
+            "target_dvd_id": kwargs["target_dvd_id"],
+            "attempted": 1,
+            "completed": 1,
+            "failed": 0,
+        }
+
+    media_only_result = run_once(
+        items=None,
+        db_path="fixture-discovery.db",
+        ssh=fake_ssh,
+        mutator=None,
+        writer_lock_path="fixture-writer.lock",
+        apply=True,
+        confirm=CONFIRMATION,
+        media_processor=media_processor,
+        media_runner=media_runner_fixture,
+        media_db_path="fixture-media.db",
+        media_writer_lock_path="fixture-media.lock",
+        media_target_dvd_id="hmn-904",
+        media_only=True,
+        planner=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("media-only invoked planner")
+        ),
+        processor=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("media-only invoked organizer")
+        ),
+        media_reconciler=lambda *_args: (_ for _ in ()).throw(
+            AssertionError("media-only reconciled/created jobs")
+        ),
+    )
+finally:
+    completion_runner.run_media_pipeline = (
+        original_run_media_pipeline
+    )
+    completion_runner.recover_held_metadata = (
+        original_recover_held_metadata
+    )
+
+assert media_only_result["applied"] == 0
+assert media_only_result["organizer_status"] == "SKIPPED_MEDIA_ONLY"
+assert media_only_result["metadata_recovery"]["attempted"] == 0
+assert media_only_result["media"]["target_dvd_id"] == "HMN-904"
+assert media_only_events == [("target", "HMN-904")]
+assert len(media_only_pipeline_calls) == 1
+assert media_only_pipeline_calls[0]["dvd_id"] == "HMN-904"
+assert media_only_pipeline_calls[0]["fetcher"] is proxy_fetcher
+assert media_only_pipeline_calls[0]["jellyfin"] is fake_jellyfin
+assert media_only_pipeline_calls[0]["ssh"] is fake_ssh
+assert {
+    name: os.environ.get(name)
+    for name in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY")
+} == proxy_environment_before
+
 # The CLI validates proxy configuration before constructing the SSH client or
 # listing downloads, so malformed admin input fails before external I/O.
 main_calls = []
@@ -229,6 +320,40 @@ try:
 finally:
     sys.argv = original_argv
     completion_runner.CompletionSSH = original_completion_ssh
+
+assert main_calls == []
+
+# The future exact media-only CLI must require the poster proxy before it
+# creates SSH/network clients.
+try:
+    sys.argv = [
+        "teddy_discovery_completion_runner.py",
+        "--db", "fixture.db",
+        "--writer-lock", "fixture.lock",
+        "--host", "host.invalid",
+        "--user", "fixture",
+        "--key", "fixture.key",
+        "--known-hosts", "fixture.known_hosts",
+        "--downloads-root", "/downloads",
+        "--library-root", "/library",
+        "--media-db", "fixture-media.db",
+        "--media-writer-lock", "fixture-media.lock",
+        "--jellyfin-base-url", "http://jellyfin.invalid",
+        "--jellyfin-key", "fixture-jellyfin.key",
+        "--media-target-dvd-id", "HMN-904",
+        "--media-only",
+        "--apply",
+        "--confirm", CONFIRMATION,
+    ]
+    with redirect_stderr(io.StringIO()):
+        try:
+            main()
+        except SystemExit as exc:
+            assert exc.code == 2
+        else:
+            raise AssertionError("media-only without proxy was accepted")
+finally:
+    sys.argv = original_argv
 
 assert main_calls == []
 

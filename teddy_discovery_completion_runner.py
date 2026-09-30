@@ -25,6 +25,7 @@ from teddy_discovery_jellyfin import (
     JellyfinClient,
 )
 from teddy_discovery_media_jobs import (
+    normalize_media_target_dvd_id,
     reconcile_media_jobs,
     run_retryable_media_jobs,
 )
@@ -90,6 +91,8 @@ def run_once(
     media_max_items=1,
     media_db_path=None,
     media_writer_lock_path=None,
+    media_target_dvd_id=None,
+    media_only=False,
     operation_lock_path=DEFAULT_OPERATION_LOCK_PATH,
     metadata_recovery_max_items=(
         DEFAULT_METADATA_RECOVERY_MAX_ITEMS
@@ -98,10 +101,42 @@ def run_once(
     metadata_collector=None,
     metadata_applier=None,
 ):
-    plans = planner(
-        items,
-        db_path=db_path,
+    target_dvd_id = (
+        normalize_media_target_dvd_id(
+            media_target_dvd_id
+        )
+        if media_target_dvd_id is not None
+        else None
     )
+
+    if target_dvd_id is not None and not apply:
+        raise RuntimeError(
+            "exact media target requires apply"
+        )
+    if target_dvd_id is not None and media_processor is None:
+        raise RuntimeError(
+            "exact media target requires media processor"
+        )
+
+    if media_only:
+        if not apply:
+            raise RuntimeError(
+                "media-only mode requires apply"
+            )
+        if target_dvd_id is None:
+            raise RuntimeError(
+                "media-only mode requires exact target DVD-ID"
+            )
+        if int(media_max_items) != 1:
+            raise RuntimeError(
+                "media-only mode requires media_max_items=1"
+            )
+        plans = []
+    else:
+        plans = planner(
+            items,
+            db_path=db_path,
+        )
 
     eligible = [
         plan
@@ -128,6 +163,14 @@ def run_once(
             for plan in plans
         ],
     }
+
+    if media_only:
+        result["media_only"] = True
+        result["organizer_status"] = "SKIPPED_MEDIA_ONLY"
+        result["metadata_recovery"] = {
+            "status": "SKIPPED_MEDIA_ONLY",
+            "attempted": 0,
+        }
 
     if not apply:
         result["metadata_recovery"] = (
@@ -184,24 +227,36 @@ def run_once(
                 "media_writer_lock_path required"
             )
 
-        reconciled = media_reconciler(
-            db_path,
-            media_db_path,
-            media_writer_lock_path,
-        )
-
-        media_result = media_runner(
-            db_path=media_db_path,
-            writer_lock_path=
+        if media_only:
+            reconciled = None
+        else:
+            reconciled = media_reconciler(
+                db_path,
+                media_db_path,
                 media_writer_lock_path,
-            processor=media_processor,
-            max_items=media_max_items,
+            )
+
+        media_runner_kwargs = {
+            "db_path": media_db_path,
+            "writer_lock_path": media_writer_lock_path,
+            "processor": media_processor,
+            "max_items": media_max_items,
+        }
+        if target_dvd_id is not None:
+            media_runner_kwargs[
+                "target_dvd_id"
+            ] = target_dvd_id
+        media_result = media_runner(
+            **media_runner_kwargs
         )
 
         result["media"] = {
             "reconciled": reconciled,
             **media_result,
         }
+
+    if media_only:
+        return result
 
     recovery_kwargs = {}
 
@@ -296,6 +351,18 @@ def main():
         default=1,
     )
     parser.add_argument(
+        "--media-target-dvd-id",
+        help="exact canonical DVD-ID for the media job selector",
+    )
+    parser.add_argument(
+        "--media-only",
+        action="store_true",
+        help=(
+            "run only the media job stage; requires --apply "
+            "and --media-target-dvd-id"
+        ),
+    )
+    parser.add_argument(
         "--media-db",
         type=Path,
     )
@@ -330,6 +397,50 @@ def main():
     args = parser.parse_args()
 
     try:
+        if args.media_target_dvd_id is not None:
+            args.media_target_dvd_id = (
+                normalize_media_target_dvd_id(
+                    args.media_target_dvd_id
+                )
+            )
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    if args.media_target_dvd_id is not None and not args.apply:
+        parser.error(
+            "--media-target-dvd-id requires --apply"
+        )
+    if args.media_only:
+        if not args.apply:
+            parser.error(
+                "--media-only requires --apply"
+            )
+        if args.media_target_dvd_id is None:
+            parser.error(
+                "--media-only requires --media-target-dvd-id"
+            )
+        if args.media_max_items != 1:
+            parser.error(
+                "--media-only requires --media-max-items 1"
+            )
+        if args.media_db is None:
+            parser.error(
+                "--media-only requires --media-db"
+            )
+        if args.media_writer_lock is None:
+            parser.error(
+                "--media-only requires --media-writer-lock"
+            )
+        if not args.media_poster_proxy_url:
+            parser.error(
+                "--media-only requires --media-poster-proxy-url"
+            )
+        if not args.jellyfin_base_url or args.jellyfin_key is None:
+            parser.error(
+                "--media-only requires Jellyfin configuration"
+            )
+
+    try:
         poster_fetcher = make_poster_fetcher(
             args.media_poster_proxy_url
         )
@@ -347,7 +458,11 @@ def main():
             args.library_root,
     )
 
-    items = ssh.list_downloads()
+    items = (
+        []
+        if args.media_only
+        else ssh.list_downloads()
+    )
 
     media_processor = None
 
@@ -401,8 +516,10 @@ def main():
         items=items,
         db_path=args.db,
         ssh=ssh,
-        mutator=CompletionSSHMutator(
-            ssh
+        mutator=(
+            None
+            if args.media_only
+            else CompletionSSHMutator(ssh)
         ),
         writer_lock_path=
             args.writer_lock,
@@ -425,6 +542,9 @@ def main():
             args.media_db,
         media_writer_lock_path=
             args.media_writer_lock,
+        media_target_dvd_id=
+            args.media_target_dvd_id,
+        media_only=args.media_only,
     )
 
     print(

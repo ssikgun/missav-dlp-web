@@ -6,6 +6,9 @@ from pathlib import Path
 import fcntl
 import sqlite3
 
+from teddy_discovery_media_metadata import (
+    DVD_ID_RE,
+)
 from teddy_title_exclusion import (
     ACQUIRED,
     BUSY,
@@ -55,6 +58,23 @@ ON media_jobs(
 DEFAULT_MEDIA_MAX_ATTEMPTS = 5
 DEFAULT_MEDIA_RETRY_BACKOFF_SECONDS = 3600
 DEFAULT_MEDIA_RUNNING_STALE_SECONDS = 7200
+
+
+def normalize_media_target_dvd_id(
+    value,
+) -> str:
+    if not isinstance(value, str):
+        raise ValueError(
+            "invalid media target DVD-ID"
+        )
+
+    normalized = value.strip().upper()
+    if not normalized or not DVD_ID_RE.fullmatch(normalized):
+        raise ValueError(
+            "invalid media target DVD-ID"
+        )
+
+    return normalized
 
 
 def _utc_now() -> str:
@@ -286,6 +306,43 @@ def list_retryable_media_jobs(
         db.close()
 
 
+def _get_media_job_for_target(
+    media_db_path: str | Path,
+    target_dvd_id: str,
+) -> dict | None:
+    path = Path(media_db_path).resolve()
+    db = sqlite3.connect(
+        "file:"
+        + str(path)
+        + "?mode=ro",
+        uri=True,
+    )
+
+    db.row_factory = sqlite3.Row
+
+    try:
+        row = db.execute(
+            """
+            SELECT
+                media_job_id,
+                dvd_id,
+                status,
+                attempt_count,
+                error,
+                created_at,
+                updated_at
+            FROM media_jobs
+            WHERE dvd_id = ?
+            """,
+            (target_dvd_id,),
+        ).fetchone()
+
+        return dict(row) if row is not None else None
+
+    finally:
+        db.close()
+
+
 def _as_utc(value):
     if not isinstance(value, str) or not value.strip():
         return None
@@ -471,16 +528,56 @@ def run_retryable_media_jobs(
     max_attempts=DEFAULT_MEDIA_MAX_ATTEMPTS,
     retry_backoff_seconds=DEFAULT_MEDIA_RETRY_BACKOFF_SECONDS,
     running_stale_seconds=DEFAULT_MEDIA_RUNNING_STALE_SECONDS,
+    target_dvd_id=None,
 ) -> dict:
     if int(max_items) < 1:
         raise RuntimeError(
             "media max_items must be >= 1"
         )
 
-    now_utc = _now_utc(now)
-    jobs = list_retryable_media_jobs(
-        db_path
+    target = (
+        normalize_media_target_dvd_id(
+            target_dvd_id
+        )
+        if target_dvd_id is not None
+        else None
     )
+
+    now_utc = _now_utc(now)
+    if target is None:
+        jobs = list_retryable_media_jobs(
+            db_path
+        )
+    else:
+        target_job = _get_media_job_for_target(
+            db_path,
+            target,
+        )
+        if target_job is None:
+            return {
+                "target_dvd_id": target,
+                "target_status": "TARGET_NOT_FOUND",
+                "retryable": 0,
+                "attempted": 0,
+                "completed": 0,
+                "failed": 0,
+                "held_busy": 0,
+                "held_lock_unavailable": 0,
+                "held_backoff": 0,
+                "held_fresh_running": 0,
+                "held_invalid_timestamp": 0,
+                "held_conflict": 0,
+                "held_invalid_state": 0,
+                "exhausted": 0,
+                "jobs": [
+                    {
+                        "dvd_id": target,
+                        "status": "TARGET_NOT_FOUND",
+                    }
+                ],
+            }
+        jobs = [target_job]
+
     states = [
         (
             job,
@@ -510,11 +607,21 @@ def run_retryable_media_jobs(
         "exhausted": sum(state == "EXHAUSTED" for _, state in states),
         "jobs": [],
     }
+    if target is not None:
+        result["target_dvd_id"] = target
+
     lock_dir = title_lock_dir if title_lock_dir is not None else configured_lock_dir()
     for job, initial_state in states:
         if result["attempted"] >= int(max_items):
             break
         if initial_state != "ELIGIBLE":
+            if target is not None:
+                result["jobs"].append(
+                    {
+                        "dvd_id": target,
+                        "status": initial_state,
+                    }
+                )
             continue
         job_id = int(
             job["media_job_id"]

@@ -10,6 +10,7 @@ from teddy_discovery_db import (
 from teddy_discovery_media_jobs import (
     MEDIA_SCHEMA,
     list_retryable_media_jobs,
+    normalize_media_target_dvd_id,
     reconcile_media_jobs,
     run_retryable_media_jobs,
     retry_eligibility,
@@ -194,6 +195,213 @@ def conditional_race_smoke(root):
             media_jobs.list_retryable_media_jobs = original
         assert result["held_conflict"] == 1
         assert result["attempted"] == 0 and called == []
+
+
+def exact_target_selector_smoke(root):
+    now = datetime.now(timezone.utc)
+    current = now.isoformat()
+    backoff_age = (now - timedelta(seconds=3601)).isoformat()
+    fresh_failure = (now - timedelta(seconds=30)).isoformat()
+
+    def setup(case, rows):
+        db = root / f"target-{case}.sqlite3"
+        writer = root / f"target-{case}.writer.lock"
+        lock_dir = root / f"target-{case}.title-locks"
+        lock_dir.mkdir()
+        for dvd_id, status, attempts, updated in rows:
+            add_job(db, dvd_id, status, attempts, updated)
+        return db, writer, lock_dir
+
+    assert normalize_media_target_dvd_id("hmn-904") == "HMN-904"
+
+    # An earlier eligible unrelated row is neither locked nor changed.
+    db, writer, locks = setup(
+        "eligible",
+        [
+            ("AAA-111", "PENDING", 0, current),
+            ("HMN-904", "PENDING", 0, current),
+        ],
+    )
+    attempted = []
+    result = run_retryable_media_jobs(
+        db_path=db,
+        writer_lock_path=writer,
+        title_lock_dir=locks,
+        processor=lambda dvd_id: attempted.append(dvd_id) or {"ok": True},
+        max_items=1,
+        target_dvd_id="hmn-904",
+        now=now,
+    )
+    assert result["target_dvd_id"] == "HMN-904"
+    assert result["attempted"] == 1 and attempted == ["HMN-904"]
+    assert read_job(db, "HMN-904")["status"] == "COMPLETED"
+    assert read_job(db, "HMN-904")["attempt_count"] == 1
+    assert read_job(db, "AAA-111")["status"] == "PENDING"
+    assert read_job(db, "AAA-111")["attempt_count"] == 0
+
+    # A target inside backoff holds the whole selected operation; unrelated
+    # eligible work is not used as a fallback.
+    db, writer, locks = setup(
+        "backoff",
+        [
+            ("AAA-111", "PENDING", 0, current),
+            ("HMN-904", "FAILED", 1, fresh_failure),
+        ],
+    )
+    attempted = []
+    result = run_retryable_media_jobs(
+        db_path=db,
+        writer_lock_path=writer,
+        title_lock_dir=locks,
+        processor=lambda dvd_id: attempted.append(dvd_id),
+        target_dvd_id="HMN-904",
+        now=now,
+    )
+    assert result["attempted"] == 0
+    assert result["held_backoff"] == 1
+    assert result["jobs"] == [
+        {"dvd_id": "HMN-904", "status": "HELD_BACKOFF"}
+    ]
+    assert attempted == []
+    assert read_job(db, "HMN-904")["attempt_count"] == 1
+    assert read_job(db, "AAA-111")["attempt_count"] == 0
+
+    # Exhaustion is not bypassed and cannot fall back to an unrelated row.
+    db, writer, locks = setup(
+        "exhausted",
+        [
+            ("AAA-111", "PENDING", 0, current),
+            ("HMN-904", "FAILED", 5, backoff_age),
+        ],
+    )
+    result = run_retryable_media_jobs(
+        db_path=db,
+        writer_lock_path=writer,
+        title_lock_dir=locks,
+        processor=lambda _dvd_id: (_ for _ in ()).throw(
+            AssertionError("exhausted target was processed")
+        ),
+        target_dvd_id="HMN-904",
+        now=now,
+    )
+    assert result["attempted"] == 0 and result["exhausted"] == 1
+    assert result["jobs"][0]["status"] == "EXHAUSTED"
+    assert read_job(db, "HMN-904")["attempt_count"] == 5
+    assert read_job(db, "AAA-111")["attempt_count"] == 0
+
+    db, writer, locks = setup(
+        "invalid-state",
+        [
+            ("AAA-111", "PENDING", 0, current),
+            ("HMN-904", "FAILED", 1, "invalid-time"),
+        ],
+    )
+    result = run_retryable_media_jobs(
+        db_path=db,
+        writer_lock_path=writer,
+        title_lock_dir=locks,
+        processor=lambda _dvd_id: (_ for _ in ()).throw(
+            AssertionError("invalid target state was processed")
+        ),
+        target_dvd_id="HMN-904",
+        now=now,
+    )
+    assert result["held_invalid_timestamp"] == 1
+    assert result["jobs"][0]["status"] == "HELD_INVALID_TIMESTAMP"
+    assert read_job(db, "HMN-904")["attempt_count"] == 1
+    assert read_job(db, "AAA-111")["attempt_count"] == 0
+
+    # Missing target returns an explicit result and never selects a fallback.
+    db, writer, locks = setup(
+        "missing",
+        [("AAA-111", "PENDING", 0, current)],
+    )
+    result = run_retryable_media_jobs(
+        db_path=db,
+        writer_lock_path=writer,
+        title_lock_dir=locks,
+        processor=lambda _dvd_id: (_ for _ in ()).throw(
+            AssertionError("missing target fell back")
+        ),
+        target_dvd_id="HMN-904",
+        now=now,
+    )
+    assert result["target_status"] == "TARGET_NOT_FOUND"
+    assert result["attempted"] == 0
+    assert read_job(db, "AAA-111")["attempt_count"] == 0
+    assert not writer.exists()
+
+    # Invalid identifiers fail before any database or lock mutation.
+    invalid_db = root / "target-invalid.sqlite3"
+    invalid_writer = root / "target-invalid.writer.lock"
+    try:
+        run_retryable_media_jobs(
+            db_path=invalid_db,
+            writer_lock_path=invalid_writer,
+            processor=lambda _dvd_id: None,
+            target_dvd_id="HMN_904",
+            now=now,
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("invalid exact target accepted")
+    assert not invalid_db.exists()
+    assert not invalid_writer.exists()
+
+    # A busy target lock holds only that target and leaves attempt accounting
+    # untouched; it cannot select an unrelated eligible job.
+    db, writer, locks = setup(
+        "busy",
+        [
+            ("AAA-111", "PENDING", 0, current),
+            ("HMN-904", "PENDING", 0, current),
+        ],
+    )
+    held_lock = try_acquire_title_lock("HMN-904", lock_dir=locks)
+    assert held_lock.status == ACQUIRED
+    attempted = []
+    try:
+        result = run_retryable_media_jobs(
+            db_path=db,
+            writer_lock_path=writer,
+            title_lock_dir=locks,
+            processor=lambda dvd_id: attempted.append(dvd_id),
+            target_dvd_id="HMN-904",
+            now=now,
+        )
+    finally:
+        held_lock.release()
+    assert result["held_busy"] == 1 and result["attempted"] == 0
+    assert result["jobs"][0]["status"] == "HELD_TITLE_BUSY"
+    assert attempted == []
+    assert read_job(db, "HMN-904")["attempt_count"] == 0
+    assert read_job(db, "AAA-111")["attempt_count"] == 0
+
+    # Processor failure records exactly one target attempt and does not alter
+    # any unrelated media row.
+    db, writer, locks = setup(
+        "failed",
+        [
+            ("AAA-111", "PENDING", 0, current),
+            ("HMN-904", "PENDING", 0, current),
+        ],
+    )
+    result = run_retryable_media_jobs(
+        db_path=db,
+        writer_lock_path=writer,
+        title_lock_dir=locks,
+        processor=lambda _dvd_id: (_ for _ in ()).throw(
+            RuntimeError("poster failure")
+        ),
+        target_dvd_id="HMN-904",
+        now=now,
+    )
+    assert result["attempted"] == 1 and result["failed"] == 1
+    assert read_job(db, "HMN-904")["status"] == "FAILED"
+    assert read_job(db, "HMN-904")["attempt_count"] == 1
+    assert read_job(db, "AAA-111")["status"] == "PENDING"
+    assert read_job(db, "AAA-111")["attempt_count"] == 0
 
 
 def main():
@@ -400,6 +608,7 @@ def main():
         retry_policy_smoke(root)
         title_lock_smoke(root)
         conditional_race_smoke(root)
+        exact_target_selector_smoke(root)
 
     print(
         "STAGE9_SEPARATE_MEDIA_DB_SMOKE=PASS"
