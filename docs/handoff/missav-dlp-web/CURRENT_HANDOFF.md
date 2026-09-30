@@ -7981,3 +7981,69 @@ service run and, in the same bounded orchestration, capture its inactive
 timestamp and start the already-enabled timer within 10 seconds; retain the
 10-second immediate-trigger guard and verify the first scheduled run before
 leaving automation active.
+
+## Post-Stage13 Media-F12f — atomic fresh timer re-arm (PASS)
+
+Starting HEAD `5daa5bf935451ddd99e2bdb5e074bbdfac1df99d` matched the remote
+branch and the worktree was clean. The normal completion wrapper remained
+pinned to runtime `7e2b32ea8b70d6b678a95dacd03ec44ba093afba`, with
+poster-only proxy `http://127.0.0.1:58888` and visibility bound=5. Before
+execution, timer and completion service were inactive, reconcile-apply was
+inactive, writer host/web health was READY, `/login`=200, gate=false, and
+RUNNING=0. The timer remained enabled and its unit was unchanged
+(`OnActiveSec=60s`, `OnUnitInactiveSec=60s`, `AccuracySec=5s`,
+`RandomizedDelaySec=0`, `Persistent=false`).
+
+### Baseline and fresh re-arm
+
+Read-only baseline: media COMPLETED/FAILED/PENDING/RUNNING=46/32/10/0;
+visibility=46 VISIBLE, 0 PENDING, 0 ATTENTION. The six
+HELD_INPUT_MISSING rows were `FC2-PPV-4982148`, `FC2-PPV-4983582`, `MAAN-945`,
+`NTR-102`, `PRIAN-059`, and `PRIAN-060`; the ten PENDING IDs were
+`CAWB-039`, `FC2-PPV-4982148`, `MFYD-181`, `MIDA-445`, `MIDA-705`,
+`MIDA-746`, `MIDV-372`, `MIDV-822`, `MIDV-925`, and `NIMA-086`.
+MFCS-085 was FAILED/17161. Baseline digests: media_jobs
+`ebf0af2e9c19a242e3559d04247c75399125c2142fd5fafbb7fb450463637fc5`,
+visibility `421ce357e3748aa08f7136036790b66dc13bb36be2a595bd2e1c2d72e26e6413`,
+Discovery holdings (218 rows)
+`87ac2a009759f7ffd03ae95b03cc3caef455f1a58ce44e110f25999de577bdea`.
+
+Started the normal systemd completion service exactly once at
+`2026-09-30 14:44:24 KST`; it returned success, `ExecMainStatus=0`, and became
+inactive at `14:44:28 KST`. Without a report parser, database query, or JSON
+formatting between service completion and timer activation, started the
+already-enabled timer at `14:44:28 KST`. The service inactive timestamp was
+`Wed 2026-09-30 14:44:28 KST`; measured
+`REARM_DELAY_SECONDS=0.022`. Timer entered active/waiting with a future next
+elapse. The full 10-second guard passed:
+`TIMER_IMMEDIATE_TRIGGER=NO`.
+
+### First scheduled run and protected state
+
+The first scheduled trigger occurred at `14:45:28 KST`; its service
+invocation exited successfully at `14:45:29 KST` (`ExecMainStatus=0`). The
+manual run had organizer applied=0, metadata recovery attempted=0, media
+attempted=1/completed=1/failed=0, held-missing=1, exhausted=1, and visibility
+seeded=1/checked=1/ATTENTION=0. It completed SKMJ-774 from FAILED/1 to
+COMPLETED/2; the normal media pipeline reported `JELLYFIN_NOTIFIED` and
+visibility recorded the exact title VISIBLE.
+
+The scheduled run likewise applied no organizer or metadata recovery work and
+attempted one media job, completing EROFV-313 from FAILED/1 to COMPLETED/2.
+It held MAAN-945 without an attempt, retained exhausted=1, and seeded/checked
+one visibility row. The pipeline reported `JELLYFIN_NOTIFIED`; EROFV-313 is
+VISIBLE. No explicit refresh or scan was sent.
+
+Final media counts are COMPLETED=48, FAILED=30, PENDING=10, RUNNING=0; the
+only changed media rows are SKMJ-774 and EROFV-313. All six input-HOLD rows,
+all ten PENDING rows, and MFCS-085 FAILED/17161 are unchanged. Discovery
+holdings digest is unchanged. Visibility is 48 VISIBLE, 0 PENDING, 0
+ATTENTION. Writer host/web remain READY, `/login`=200, and gate=false.
+
+The completion timer remains enabled and active/waiting, completion service
+and reconcile-apply are inactive, and the next elapse was
+`2026-09-30 14:47:31 KST` at final verification. No timer stop, unit edit,
+daemon-reload, web restart, or writer restart occurred.
+`COMPLETION_AUTOMATION_RESUMED=YES`; Stage13 remains CLOSED/PASS. Normal
+bounded completion automation is resumed with the existing HOLD, exhausted,
+and visibility policies.
