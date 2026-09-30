@@ -8072,3 +8072,72 @@ unit edit, daemon-reload, web restart, or writer restart occurred.
 `COMPLETION_AUTOMATION_RESUMED=YES`; Stage13 remains CLOSED/PASS. Normal
 bounded completion automation is resumed with the existing HOLD, exhausted,
 and visibility policies; subsequent timer cycles are normal operation.
+
+## Post-Stage13 Media-F13 — natural automation drain / steady-state closure (PASS)
+
+F13 began at `2026-09-30 15:02:50 KST` with the completion timer enabled and
+active/waiting, the completion service inactive, and the normal production
+wrapper still pinned to runtime
+`7e2b32ea8b70d6b678a95dacd03ec44ba093afba`. No manual service run, timer
+operation, runtime/wrapper change, DB edit, Jellyfin refresh/scan, or other
+operational intervention was made. The observation ended naturally at
+`15:20:36 KST` when current-input READY plus retry-policy ELIGIBLE reached zero
+and the service was inactive. Snapshot-to-drain duration was 17m46s; the
+continuous 2-second read-only poll covered the final 15m49s, and the one
+preceding successful invocation was recovered from its exact systemd journal
+window.
+
+Initial media counts were COMPLETED=64, FAILED=14, PENDING=10, RUNNING=0;
+visibility was VISIBLE=64, PENDING=0, ATTENTION=0. Current-input and retry
+classification found READY+ELIGIBLE=17, HELD_COVER_URL_MISSING=6,
+HELD_COVER_URL_INVALID=0, HELD_METADATA_NOT_FOUND=0, EXHAUSTED=1
+(`MFCS-085`), BACKOFF=0. Invalid input, metadata-missing, and backoff cohorts
+were empty.
+
+The natural drain comprised 17 systemd completion invocations, all Result
+`success` / exit status 0. Every invocation applied organizer=0 and completed
+one media job: attempted=17, completed=17, failed=0. Visibility reconciliation
+reported no PENDING or ATTENTION item in any cycle. The completed titles were
+`ROYD-353`, `HUNTC-623`, `HODV-22113`, `HODV-22114`, `HODV-22116`,
+`HODV-22112`, `WA-576`, `SKMJ-790`, `CAWB-039`, `MFYD-181`, `NIMA-086`,
+`MIDA-705`, `MIDA-746`, `MIDV-822`, `MIDA-445`, `MIDV-372`, and `MIDV-925`.
+
+At natural drain, media counts were COMPLETED=81, FAILED=6, PENDING=1,
+RUNNING=0; visibility was VISIBLE=81, PENDING=0, ATTENTION=0. The current
+input/retry classes were READY+ELIGIBLE=0, HELD_COVER_URL_MISSING=6,
+HELD_COVER_URL_INVALID=0, HELD_METADATA_NOT_FOUND=0, EXHAUSTED=1
+(`MFCS-085`), BACKOFF=0. The sole PENDING media row remains among the six
+missing-cover holds and consumes no attempt. The six held rows
+(`MAAN-945`, `NTR-102`, `FC2-PPV-4983582`, `PRIAN-060`, `PRIAN-059`,
+`FC2-PPV-4982148`) retained status, attempt_count, error, and updated_at from
+the initial snapshot. `MFCS-085` remained FAILED/17161 with its full row
+unchanged and retry eligibility EXHAUSTED.
+
+Discovery organizer applied=0 in every drain cycle. Holdings digest remained
+`87ac2a009759f7ffd03ae95b03cc3caef455f1a58ce44e110f25999de577bdea`.
+After the queue drained, four further normal timer invocations were observed
+through `15:24:45 KST`; each had organizer applied=0, media
+attempted/completed/failed=0/0/0, and visibility PENDING=0/ATTENTION=0. They
+confirm the timer continues operating normally with only protected HOLD and
+exhausted work remaining.
+
+Final read-only checks at `15:24:37 KST` showed media
+COMPLETED=81/FAILED=6/PENDING=1/RUNNING=0 and visibility
+VISIBLE=81/PENDING=0/ATTENTION=0. Media-jobs digest was
+`e1d148f280af5654f4f1f24a3bbaa7c07875c2dca675c28f9006a4da2356c161`;
+visibility digest was
+`c5aa3e5b8687a6e98db2985cc033b7e4822fd1bfb3f0ee58025849e78bc27605`.
+The Discovery holdings digest was unchanged. Writer host and web socket health
+were both READY, `/login` returned 200, the delete gate remained false, and
+reconcile-apply was inactive. The completion timer remained enabled and
+active/waiting; completion service was inactive with Result=success and exit
+status 0. At the final timer check its last trigger was `15:24:45 KST` and its
+next scheduled elapse was `15:25:45 KST`.
+
+`MEDIA_AUTOMATION_STEADY_STATE=YES` and
+`POST_STAGE13_MEDIA_RECOVERY_CLOSED=YES`: no current READY+ELIGIBLE media
+queue remains; the remaining six current-input holds and the one exhausted
+job are protected by the existing policy; RUNNING=0; visibility ATTENTION=0;
+and bounded automatic service cycles are healthy. Stage13 remains
+CLOSED/PASS. No further media-recovery-specific checkpoint is required; next
+work is normal project operations and monitoring.
