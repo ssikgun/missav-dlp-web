@@ -7753,3 +7753,74 @@ inactive, writer host/web READY, web running with restart count 0, `/login`
 Next F12c: review this successful transient canary and decide whether one
 READY_PENDING_FIRST_ATTEMPT title should be run as a separate exact
 media-only canary. Timer resumption remains a separate decision after that.
+
+## Post-Stage13 Media-F12c — DSOD-046 first-attempt canary (PASS)
+
+Starting HEAD `7f4d5cdeb42af7ba2a91527a0890d1ff055154b3` matched origin on
+`teddy-subtitle-stage11` with a clean worktree. The production wrapper was
+pinned to immutable runtime `7e2b32ea8b70d6b678a95dacd03ec44ba093afba`.
+Completion timer was enabled but inactive; completion and reconcile-apply
+services inactive; writer host/web READY; web `/login` 200; gate=false.
+Stage13 remains CLOSED/PASS.
+
+### Preflight and proxy
+
+DSOD-046 was PENDING/attempt=0/error NULL, current-input guard READY and
+existing retry eligibility ELIGIBLE, with exactly one present JAV holding:
+holding_id=209, `DSOD/DSOD-046/DSOD-046.mp4`, 4105052908 bytes.
+It had no visibility row. Before run, the existing 42 visibility rows were
+all VISIBLE. Protected media rows, visibility rows and Discovery holdings
+were saved as exact snapshots and digests.
+
+The stored cover URL was read without printing it. The explicit poster-only
+opener used `http://127.0.0.1:58888`; Gluetun mapping remained
+`127.0.0.1:58888 -> 8888/tcp`. Probe returned HTTP 200,
+`image/webp`, and a 64-byte bounded read. No direct fallback/full poster
+probe was used.
+
+### One exact first attempt
+
+Immediately before execution, DSOD-046 still passed status, input and
+backoff preflight. Ran the pinned production runner directly once with
+production paths/options and `--media-only --media-target-dvd-id DSOD-046
+--media-max-items 1`, apply and the existing confirmation. Result:
+attempted=1, completed=1, failed=0; organizer and metadata recovery were
+both `SKIPPED_MEDIA_ONLY`. The title lock/current-input guard was on the
+production runner path. Transition: PENDING/0/error NULL to
+COMPLETED/1/error NULL. Pipeline returned MEDIA_PIPELINE_COMPLETE and one
+normal Created notification result `JELLYFIN_NOTIFIED`.
+
+The exact NAS title directory contains the original MP4, one
+`DSOD-046.nfo` (888 bytes) and one `poster.webp` (13782 bytes), with no
+partial/temp files. MP4 size remains 4105052908 and remote mtime_ns exactly
+matches the Discovery holding baseline `1790725928629214263`.
+
+The run seeded and checked only DSOD-046 visibility. Result:
+VISIBLE=0, PENDING=1, ATTENTION=0, check_count=1,
+last_error=`EXACT_MOVIE_NOT_VISIBLE`, exact canonical path
+`/media/adult/DSOD/DSOD-046/DSOD-046.mp4`. This is an allowed eventual
+visibility state; no further notify, refresh, scan or media retry was sent.
+
+### Protected-state comparison and readiness
+
+DSOD-046-excluded media_jobs digest stayed
+`dbffea89e44ab1fb5c7b8414b141b686d53a93416733fb3d9ec562c962391d7a`.
+All existing 42 visibility rows exactly match their pre-run snapshot
+(digest `3c23d33aacb6272b66d0f5db0653e5906d984bb62ca6c4ea726717a4221d1ec9`);
+the only visibility addition is DSOD-046 PENDING/1. Discovery holdings
+digest stayed
+`87ac2a009759f7ffd03ae95b03cc3caef455f1a58ce44e110f25999de577bdea`, and
+its database file SHA-256 stayed unchanged. FNS-244 remains COMPLETED/2,
+HMN-904 COMPLETED/2, MFCS-085 FAILED/17161; the six HELD_INPUT_MISSING rows
+and all other PENDING rows retain their pre-run state. Unrelated Discovery,
+NAS and Jellyfin changes=0. No timer/service start or container restart.
+
+`TIMER_RESUME_READY=YES`: F12b transient retry passed; F12c first attempt
+passed; the current-input HOLD contract and poster-only proxy passed offline
+and through this canary; visibility reconciler recorded the expected
+PENDING state without ATTENTION; protected state stayed unchanged. Timer
+remains enabled/inactive, completion service inactive, writer READY,
+`/login` 200, gate=false. F12c PASS, no blocker.
+
+Next F12d: perform the separate timer-resume decision and controlled
+observation of queued work. The first timer start is not part of F12c.
