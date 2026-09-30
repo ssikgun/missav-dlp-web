@@ -8115,13 +8115,14 @@ unchanged and retry eligibility EXHAUSTED.
 
 Discovery organizer applied=0 in every drain cycle. Holdings digest remained
 `87ac2a009759f7ffd03ae95b03cc3caef455f1a58ce44e110f25999de577bdea`.
-After the queue drained, four further normal timer invocations were observed
-through `15:24:45 KST`; each had organizer applied=0, media
+After the queue drained, eight further normal timer invocations were observed
+through `15:29:05 KST`; each had organizer applied=0, media
 attempted/completed/failed=0/0/0, and visibility PENDING=0/ATTENTION=0. They
 confirm the timer continues operating normally with only protected HOLD and
 exhausted work remaining.
 
-Final read-only checks at `15:24:37 KST` showed media
+Final read-only checks at `15:29:38 KST`, after the latest idle invocation had
+exited, showed media
 COMPLETED=81/FAILED=6/PENDING=1/RUNNING=0 and visibility
 VISIBLE=81/PENDING=0/ATTENTION=0. Media-jobs digest was
 `e1d148f280af5654f4f1f24a3bbaa7c07875c2dca675c28f9006a4da2356c161`;
@@ -8131,8 +8132,8 @@ The Discovery holdings digest was unchanged. Writer host and web socket health
 were both READY, `/login` returned 200, the delete gate remained false, and
 reconcile-apply was inactive. The completion timer remained enabled and
 active/waiting; completion service was inactive with Result=success and exit
-status 0. At the final timer check its last trigger was `15:24:45 KST` and its
-next scheduled elapse was `15:25:45 KST`.
+status 0. At the final timer check its last trigger was `15:29:05 KST` and its
+next scheduled elapse was `15:30:05 KST`.
 
 `MEDIA_AUTOMATION_STEADY_STATE=YES` and
 `POST_STAGE13_MEDIA_RECOVERY_CLOSED=YES`: no current READY+ELIGIBLE media
