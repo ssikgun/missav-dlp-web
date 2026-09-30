@@ -28,6 +28,9 @@ from teddy_discovery_media_jobs import (
     reconcile_media_jobs,
     run_retryable_media_jobs,
 )
+from teddy_discovery_media_metadata import (
+    make_poster_fetcher,
+)
 from teddy_discovery_media_pipeline import (
     run_media_pipeline,
 )
@@ -43,6 +46,30 @@ from teddy_discovery_operation_lock import (
 CONFIRMATION = (
     "APPLY_STAGE9_COMPLETION_PIPELINE"
 )
+
+
+def _make_media_processor(
+    *,
+    db_path,
+    ssh,
+    metadata_mutator,
+    jellyfin,
+    poster_fetcher,
+):
+    def media_processor(
+        dvd_id,
+    ):
+        return run_media_pipeline(
+            db_path=db_path,
+            dvd_id=dvd_id,
+            ssh=ssh,
+            metadata_mutator=
+                metadata_mutator,
+            jellyfin=jellyfin,
+            fetcher=poster_fetcher,
+        )
+
+    return media_processor
 
 
 def run_once(
@@ -277,6 +304,13 @@ def main():
         type=Path,
     )
     parser.add_argument(
+        "--media-poster-proxy-url",
+        help=(
+            "optional loopback HTTP proxy used only "
+            "for poster fetches"
+        ),
+    )
+    parser.add_argument(
         "--jellyfin-base-url",
         default="",
     )
@@ -294,6 +328,13 @@ def main():
     )
 
     args = parser.parse_args()
+
+    try:
+        poster_fetcher = make_poster_fetcher(
+            args.media_poster_proxy_url
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
 
     ssh = CompletionSSH(
         host=args.host,
@@ -348,17 +389,13 @@ def main():
                 args.jellyfin_key,
         )
 
-        def media_processor(
-            dvd_id,
-        ):
-            return run_media_pipeline(
-                db_path=args.db,
-                dvd_id=dvd_id,
-                ssh=ssh,
-                metadata_mutator=
-                    metadata_mutator,
-                jellyfin=jellyfin,
-            )
+        media_processor = _make_media_processor(
+            db_path=args.db,
+            ssh=ssh,
+            metadata_mutator=metadata_mutator,
+            jellyfin=jellyfin,
+            poster_fetcher=poster_fetcher,
+        )
 
     result = run_once(
         items=items,

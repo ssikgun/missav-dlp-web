@@ -1,4 +1,7 @@
 from pathlib import Path
+from contextlib import redirect_stderr
+import io
+import sys
 import tempfile
 
 from teddy_discovery_completion import (
@@ -6,8 +9,11 @@ from teddy_discovery_completion import (
 )
 from teddy_discovery_completion_runner import (
     CONFIRMATION,
+    _make_media_processor,
+    main,
     run_once,
 )
+import teddy_discovery_completion_runner as completion_runner
 
 
 ready = CompletionPlan(
@@ -154,6 +160,77 @@ assert result["applied"] == 1
 assert calls == [
     "ABC-123",
 ]
+
+pipeline_calls = []
+original_run_media_pipeline = (
+    completion_runner.run_media_pipeline
+)
+try:
+    completion_runner.run_media_pipeline = (
+        lambda **kwargs: pipeline_calls.append(kwargs)
+        or {"status": "fixture"}
+    )
+    fake_ssh = object()
+    fake_mutator = object()
+    fake_jellyfin = object()
+    poster_fetcher = object()
+    processor = _make_media_processor(
+        db_path="fixture-discovery.db",
+        ssh=fake_ssh,
+        metadata_mutator=fake_mutator,
+        jellyfin=fake_jellyfin,
+        poster_fetcher=poster_fetcher,
+    )
+    assert processor("ABC-123") == {"status": "fixture"}
+finally:
+    completion_runner.run_media_pipeline = (
+        original_run_media_pipeline
+    )
+
+assert len(pipeline_calls) == 1
+assert pipeline_calls[0] == {
+    "db_path": "fixture-discovery.db",
+    "dvd_id": "ABC-123",
+    "ssh": fake_ssh,
+    "metadata_mutator": fake_mutator,
+    "jellyfin": fake_jellyfin,
+    "fetcher": poster_fetcher,
+}
+
+# The CLI validates proxy configuration before constructing the SSH client or
+# listing downloads, so malformed admin input fails before external I/O.
+main_calls = []
+original_argv = sys.argv
+original_completion_ssh = completion_runner.CompletionSSH
+try:
+    sys.argv = [
+        "teddy_discovery_completion_runner.py",
+        "--db", "fixture.db",
+        "--writer-lock", "fixture.lock",
+        "--host", "host.invalid",
+        "--user", "fixture",
+        "--key", "fixture.key",
+        "--known-hosts", "fixture.known_hosts",
+        "--downloads-root", "/downloads",
+        "--library-root", "/library",
+        "--media-poster-proxy-url",
+        "http://proxy.invalid:8888",
+    ]
+    completion_runner.CompletionSSH = (
+        lambda **_kwargs: main_calls.append("ssh-created")
+    )
+    with redirect_stderr(io.StringIO()):
+        try:
+            main()
+        except SystemExit as exc:
+            assert exc.code == 2
+        else:
+            raise AssertionError("malformed CLI proxy was accepted")
+finally:
+    sys.argv = original_argv
+    completion_runner.CompletionSSH = original_completion_ssh
+
+assert main_calls == []
 
 state_temp.cleanup()
 

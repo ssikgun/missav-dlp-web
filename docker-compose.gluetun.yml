@@ -39,6 +39,8 @@ services:
       - TZ=Asia/Seoul
     ports:
       - "58001:5800/tcp"
+      # Host completion uses this loopback-only HTTP proxy endpoint.
+      - "127.0.0.1:58888:8888/tcp"
     volumes:
       - ./gluetun-control-auth.toml:/gluetun/auth/config.toml:ro
 

@@ -6624,3 +6624,57 @@ occurred. Production mutation count was zero. The timer remains stopped.
 Next checkpoint: design and validate a bounded production completion poster
 fetch route using the existing Gluetun proxy, preserving fail-closed behavior
 and leaving media jobs untouched until an explicit controlled retry plan.
+
+## Post-Stage13 Media-F3 — bounded poster-only Gluetun proxy support
+
+F3 source work started at `932bf88c197cc0ec1237788babae05f39a971f1f`. The
+previous direct-vs-proxy evidence remains: host and web-container direct TLS
+to `www.javdatabase.com` reset, while the Gluetun HTTP proxy fetch succeeded.
+Stage13 remains CLOSED/PASS. During F3 the completion timer stayed enabled
+but inactive, the completion service stayed inactive, the delete gate stayed
+false, and writer host/web health returned READY. Web `/login` returned 200.
+
+Poster fetching now has an explicit `--media-poster-proxy-url` runner option.
+The runner creates one poster fetcher and passes it only through
+`run_media_pipeline(..., fetcher=...)` to `build_media_bundle()` and
+`fetch_poster()`. Jellyfin receives no proxy setting; SSH/NAS code is
+unchanged. No global HTTP_PROXY/HTTPS_PROXY/ALL_PROXY value is read or set,
+and no process-wide urllib opener is installed. Unset configuration keeps
+the existing direct urllib fetch behavior. Configured proxy requests use a
+local opener only; the explicit proxy handler ignores urllib's `no_proxy`
+bypass so a configured request cannot silently go direct. Proxy/CONNECT
+errors propagate with no fallback and no added fetch retry.
+
+Proxy validation accepts only `http://127.0.0.1:<explicit-port>` (optionally
+with a root slash); it rejects non-loopback and remote hosts, other schemes,
+credentials, missing/invalid ports, paths, queries, and fragments. The
+existing User-Agent, Accept header, 20-second timeout, bounded poster read,
+content-type/format checks, and 25 MiB size limit are unchanged. Missing
+cover URLs still fail as `COVER_URL_MISSING` before any fetch.
+
+The running Gluetun container already had host mapping
+`127.0.0.1:58888 -> container:8888`; container inspection confirmed it is
+loopback-only. The repository Gluetun Compose source now records the same
+`127.0.0.1:58888:8888/tcp` mapping. This source edit was not applied to
+production. The F4 host-runner value is
+`--media-poster-proxy-url http://127.0.0.1:58888`.
+
+Offline checks passed under `/usr/bin/python3` 3.13.5, the same interpreter
+used by the current completion wrapper: media metadata, media pipeline,
+media jobs, completion runner, completion orchestrator, completion-media,
+and title-lock smokes; Python compilation; and Compose config validation in
+a temporary directory with a placeholder empty `gluetun.env`. The poster
+smoke includes a local HTTP CONNECT proxy fixture, verifies direct mode and
+proxy headers/timeout, forces proxy failure without direct fallback, checks
+malformed proxy validation before opener/network construction, checks
+missing-cover behavior, and preserves format/size validation.
+
+F3 made source and offline-test changes only. Production image/release and
+Compose were not applied; timer/service were not started; no media job or
+Discovery/provenance/NAS/Jellyfin data was changed; no retry was run.
+
+F4 plan: confirm the host loopback proxy endpoint with a bounded probe; install
+the validated immutable completion runtime; pass only
+`--media-poster-proxy-url http://127.0.0.1:58888` from the host wrapper; keep
+the timer stopped; perform one controlled HMN-904 retry; verify poster/NFO
+publish and the exact Jellyfin item; then decide whether to resume the timer.

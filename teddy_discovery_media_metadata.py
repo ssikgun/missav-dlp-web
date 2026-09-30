@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import ipaddress
 import json
 import re
 import sqlite3
+from urllib.parse import urlsplit
 import urllib.request
 import xml.etree.ElementTree as ET
 
@@ -334,8 +336,10 @@ def build_nfo_bytes(
     )
 
 
-def _default_fetcher(
+def _fetch_response(
     url: str,
+    *,
+    opener=None,
 ) -> tuple[str, bytes]:
     request = urllib.request.Request(
         url,
@@ -349,10 +353,18 @@ def _default_fetcher(
         },
     )
 
-    with urllib.request.urlopen(
-        request,
-        timeout=20,
-    ) as response:
+    if opener is None:
+        response = urllib.request.urlopen(
+            request,
+            timeout=20,
+        )
+    else:
+        response = opener.open(
+            request,
+            timeout=20,
+        )
+
+    with response:
         content_type = str(
             response.headers.get(
                 "Content-Type",
@@ -368,6 +380,138 @@ def _default_fetcher(
         )
 
     return content_type, data
+
+
+def _validate_poster_proxy_url(
+    proxy_url: str,
+) -> str:
+    if not isinstance(proxy_url, str):
+        raise ValueError(
+            "media poster proxy URL must be a loopback HTTP URL"
+        )
+
+    value = proxy_url.strip()
+
+    if not value or value != proxy_url:
+        raise ValueError(
+            "media poster proxy URL must be a loopback HTTP URL"
+        )
+
+    try:
+        parsed = urlsplit(value)
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError(
+            "media poster proxy URL must be a loopback HTTP URL"
+        ) from exc
+
+    if (
+        parsed.scheme != "http"
+        or hostname is None
+        or "@" in parsed.netloc
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in ("", "/")
+        or parsed.query
+        or parsed.fragment
+        or "?" in value
+        or "#" in value
+        or port is None
+        or not 1 <= port <= 65535
+    ):
+        raise ValueError(
+            "media poster proxy URL must be a loopback HTTP URL"
+        )
+
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError as exc:
+        raise ValueError(
+            "media poster proxy URL must use 127.0.0.1"
+        ) from exc
+
+    if address != ipaddress.IPv4Address("127.0.0.1"):
+        raise ValueError(
+            "media poster proxy URL must use 127.0.0.1"
+        )
+
+    return value
+
+
+class _PosterOnlyProxyHandler(
+    urllib.request.ProxyHandler
+):
+    def proxy_open(
+        self,
+        request,
+        proxy,
+        _proxy_protocol,
+    ):
+        # urllib's standard ProxyHandler may bypass configured proxies when
+        # HTTP(S)_PROXY bypass settings match the target. Poster mode must be
+        # proxy-only, so apply the explicit proxy without consulting bypass env.
+        original_type = request.type
+        parsed_proxy = urlsplit(proxy)
+        proxy_type = parsed_proxy.scheme
+        proxy_host = parsed_proxy.netloc
+        request.set_proxy(
+            proxy_host,
+            proxy_type,
+        )
+
+        if (
+            original_type == proxy_type
+            or original_type == "https"
+        ):
+            return None
+
+        return self.parent.open(
+            request,
+            timeout=request.timeout,
+        )
+
+
+def make_poster_fetcher(
+    proxy_url: str | None = None,
+):
+    """Build a fetcher scoped to poster requests only.
+
+    An omitted proxy preserves the legacy direct urllib behavior. A configured
+    proxy is validated as a host-loopback HTTP endpoint and is used exclusively
+    for this fetcher; failures are allowed to propagate without direct fallback.
+    """
+    if proxy_url is None:
+        return None
+
+    validated_url = _validate_poster_proxy_url(
+        proxy_url
+    )
+    proxy_handler = _PosterOnlyProxyHandler(
+        {
+            "http": validated_url,
+            "https": validated_url,
+        }
+    )
+    opener = urllib.request.build_opener(
+        proxy_handler
+    )
+
+    def fetcher(
+        url: str,
+    ) -> tuple[str, bytes]:
+        return _fetch_response(
+            url,
+            opener=opener,
+        )
+
+    return fetcher
+
+
+def _default_fetcher(
+    url: str,
+) -> tuple[str, bytes]:
+    return _fetch_response(url)
 
 
 def _detect_image_extension(
