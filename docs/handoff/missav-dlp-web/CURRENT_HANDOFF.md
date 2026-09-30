@@ -7824,3 +7824,86 @@ remains enabled/inactive, completion service inactive, writer READY,
 
 Next F12d: perform the separate timer-resume decision and controlled
 observation of queued work. The first timer start is not part of F12c.
+
+## Post-Stage13 Media-F12d — normal service canary / timer resume (INCOMPLETE)
+
+Starting HEAD `b3a64b56f689ceb0e793f5dad59054b4e86afac5` matched remote on
+`teddy-subtitle-stage11` with a clean worktree. Runtime wrapper pinned to
+`7e2b32ea8b70d6b678a95dacd03ec44ba093afba`, poster proxy
+`http://127.0.0.1:58888`, visibility bound=5. Before service execution the
+timer was enabled/inactive, completion and reconcile-apply inactive, writer
+host/web READY, login=200, gate=false.
+
+### Actual timer contract
+
+`/etc/systemd/system/teddy-completion-stage9.timer` is enabled and defines
+`OnActiveSec=60s`, `OnUnitInactiveSec=60s`, `AccuracySec=5s`,
+`RandomizedDelaySec=0`, `Persistent=false`, Unit=`teddy-completion-stage9.service`.
+While inactive its realtime next elapse is empty. At checkpoint start its
+last trigger was `2026-09-30 09:13:15 KST`.
+
+The completion service is Type=oneshot, runs the installed normal wrapper,
+and has `TimeoutStartSec=3600`. The bounded normal planner read-only
+preflight found downloads=0, organizer eligible=0/held=0, metadata recovery
+candidates=0 (bound=1). Normal wrapper bounds were organizer=1,
+media=1, visibility GET=5; no separate planner item was available to apply.
+
+### Manual normal service run
+
+Started `teddy-completion-stage9.service` exactly once while the timer was
+inactive at `14:13:56 KST`. It exited successfully at `14:13:58 KST`
+(exit status 0, duration about 2 seconds). Organizer applied=0; media
+reconciliation created=0; metadata recovery attempted=0. Media runner
+attempted=1/completed=1/failed=0 and completed MIAD-866 from FAILED/1 to
+COMPLETED/2. MAAN-945 was held as HELD_COVER_URL_MISSING without consuming
+an attempt; exhausted=1 remained MFCS-085. Visibility seeded=1, checked=2,
+visible=44, pending=0, attention=0. DSOD-046 moved from visibility
+PENDING to VISIBLE in that GET-only reconciliation. MIAD-866 received one
+normal Created notification; its exact NAS directory has its MP4, one NFO
+and one poster, without temp/partial files.
+
+### Timer start and immediate-trigger guard
+
+After verifying the manual result, started the already-enabled timer at
+`14:16:33 KST`. The associated service had entered inactive at
+`14:13:58 KST`, so its `OnUnitInactiveSec=60s` deadline was already overdue
+by more than a minute. The timer immediately activated the service at
+`14:16:33 KST`. The monitor detected the new ExecMainStartTimestamp and
+stopped the timer immediately. This is
+`TIMER_IMMEDIATE_TRIGGER=YES` / `OVERDUE_TIMER_IMMEDIATE_TRIGGER`.
+
+The timer-triggered normal service completed at `14:16:35 KST` with exit
+status 0. Its normal bounds again applied: organizer=0, metadata recovery=0,
+media attempted=1/completed=1/failed=0, visibility GET checked=1 and
+attention=0. It completed EBWH-296 from FAILED/1 to COMPLETED/2, held
+MAAN-945 as HELD_COVER_URL_MISSING without an attempt, and preserved the
+MFCS-085 exhausted state. Visibility seeded EBWH-296 and completed with
+VISIBLE=45/PENDING=0/ATTENTION=0. This was the one timer-triggered run caught
+by the guard; no additional timer run occurred.
+
+### Protected state and final state
+
+Final media counts are COMPLETED=45, FAILED=33, PENDING=10, RUNNING=0.
+The only media rows changed from the pre-canary snapshot were MIAD-866 and
+EBWH-296, both FAILED/1 to COMPLETED/2 with error NULL. The six
+HELD_INPUT_MISSING rows and all ten PENDING rows exactly match their
+pre-run snapshots. MFCS-085 remains FAILED/17161. FNS-244 and HMN-904 remain
+COMPLETED/2.
+
+All 45 visibility rows are VISIBLE; ATTENTION=0. DSOD-046 is VISIBLE.
+Discovery holdings digest and entire Discovery DB file hash match the
+pre-run snapshot. Organizer applied=0, so no new Discovery/NAS holding was
+created. The only NAS paths written were the two normal bounded media titles
+MIAD-866 and EBWH-296, each with one NFO and one poster; their MP4s remain.
+No Jellyfin refresh/scan or container restart occurred.
+
+The completion timer remains enabled but inactive; completion service and
+reconcile-apply are inactive; no next timer elapse is scheduled while stopped.
+Writer remains READY, web login=200, gate=false. Stage13 remains CLOSED/PASS.
+The service canary passed, but F12d is INCOMPLETE because the overdue
+`OnUnitInactiveSec` event caused an immediate run. Timer resumption readiness
+is NO until the timer restart contract is corrected or otherwise safely
+proved. Next checkpoint: design and validate a timer re-arm policy that
+cannot replay a stale unit-inactive deadline; keep the timer inactive during
+that work, then repeat the bounded immediate-trigger check before leaving
+normal automation active.
