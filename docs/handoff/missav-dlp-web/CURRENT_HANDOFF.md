@@ -1,5 +1,38 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-01 Stage12 — existing replacement lock permission hardening
+
+Operator-supplied CT108/NAS read-only forensic: the first FNS-247 production
+replacement attempt reached FINAL_EXECUTION_PREFLIGHT=PASS, then the NAS worker
+rejected before atomic exchange. Durable phases are INTENT_RECORDED ->
+NAS_PENDING -> FAILED_RETRYABLE. Original publication, effective publication
+and current NAS subtitle all remain the exact old SHA. No replacement temp or
+displaced backup exists; renameat2 is available. The existing lock is regular,
+non-symlink, single-link, current remote-user-owned, empty, with mode 0777.
+O_CREAT mode 0600 only applies on creation, so the previous exact-mode guard
+rejected this existing safe lock without replacing the subtitle.
+
+Generic worker fix: open no-follow/nonblocking (FIFO cannot hang), validate
+regular type, nlink=1, effective-user ownership and exact fd/no-follow path
+(device,inode) identity before narrowing permissions with fd fchmod(0600).
+Revalidate exact 0600, ownership, link count and both identities afterward,
+and again after flock acquisition. Ineffective chmod, foreign ownership,
+hardlinks, nonregular paths and inode replacement fail closed. Subtitle temp
+creation and atomic exchange occur only after these checks. Existing new-lock
+0600 and normal publisher different-existing-file COLLISION contracts remain.
+
+Validation with /opt/stage11-stt-venv/bin/python: replacement smoke PASS
+(50 case groups: existing 34 plus 16 lock/resume groups); all 47 related
+Stage12/Stage11/stateful/Hermes/subtitle/targeted regression scripts PASS.
+Owned 0777/0666/0644 locks narrow to 0600. Symlink/directory/FIFO/hardlink,
+foreign-owner simulation, ineffective/failed chmod, pre/post-hardening and
+post-flock inode races reject before subtitle mutation. The existing
+FAILED_RETRYABLE operation with NAS old SHA resumes with one original intent
+and unchanged operation identity; publication history remains preserved.
+
+Production retry NOT PERFORMED by Codex. Production NAS write=0,
+Jellyfin write=0, rollout DB write=0; only local fixture mutations occurred.
+
 ## 2026-10-01 Stage12 — explicit operator-approved subtitle replacement
 
 FNS-247 HYBRID comparison CLEAN/report are durable and finalized; structural

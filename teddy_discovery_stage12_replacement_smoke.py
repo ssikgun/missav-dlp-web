@@ -339,6 +339,90 @@ def main():
                 'replace',f.old,f.new,operation,f.artifact.payload,checkpoint=hook))
             if fault=='temp-corrupt': assert f.target.read_bytes()==f.old_bytes
             print('PASS=NATIVE_'+fault)
+    # Existing lock hardening runs before temp creation or atomic exchange.
+    for mode in (None, 0o777, 0o666, 0o644, 0o600):
+        with tempfile.TemporaryDirectory() as raw:
+            f=Fixture(Path(raw))
+            lock=f.target.parent/('.'+f.target.name+'.replacement.lock')
+            if mode is not None:
+                lock.write_bytes(b'')
+                lock.chmod(mode)
+            f.run(execute=True)
+            assert (lock.stat().st_mode & 0o7777)==0o600
+            assert lock.stat().st_uid==os.geteuid() and lock.stat().st_nlink==1
+            assert f.target.read_bytes()==f.artifact.payload
+            print('PASS=LOCK_HARDEN_'+('NEW' if mode is None else oct(mode)))
+
+    for fault in ('symlink','directory','fifo','hardlink','foreign-owner',
+                  'chmod-ineffective','chmod-error','path-before-hardening','path-after-hardening',
+                  'path-after-flock'):
+        with tempfile.TemporaryDirectory() as raw:
+            f=Fixture(Path(raw))
+            lock=f.target.parent/('.'+f.target.name+'.replacement.lock')
+            if fault=='symlink': lock.symlink_to(f.target)
+            elif fault=='directory': lock.mkdir()
+            elif fault=='fifo': os.mkfifo(lock)
+            else:
+                lock.write_bytes(b'')
+                lock.chmod(0o777)
+                if fault=='hardlink': os.link(lock,lock.with_name('other-link'))
+            operation='d'*64
+            chmod_calls=[]
+            flock_calls=[]
+            real_chmod=os.fchmod
+            real_open=os.open
+            real_uid=os.geteuid()
+            import fcntl
+            real_flock=fcntl.flock
+            def replace_lock_path():
+                lock.rename(lock.with_name('detached-owned-lock'))
+                lock.write_bytes(b'')
+                lock.chmod(0o600)
+            def chmod(fd,mode):
+                chmod_calls.append(mode)
+                if fault=='chmod-ineffective': return
+                if fault=='chmod-error': raise OSError('fixture chmod failure')
+                real_chmod(fd,mode)
+                if fault=='path-after-hardening': replace_lock_path()
+            def opened(path,flags,*args,**kwargs):
+                descriptor=real_open(path,flags,*args,**kwargs)
+                if fault=='path-before-hardening' and path==lock.name:
+                    replace_lock_path()
+                return descriptor
+            def flock(fd,operation):
+                flock_calls.append(operation)
+                real_flock(fd,operation)
+                if fault=='path-after-flock': replace_lock_path()
+            with patch('os.fchmod',side_effect=chmod), patch('os.open',side_effect=opened), \
+                 patch('os.geteuid',return_value=real_uid+1 if fault=='foreign-owner' else real_uid), \
+                 patch('fcntl.flock',side_effect=flock):
+                reject(lambda:replacement_worker(str(f.library),f.video.relative_path,f.destination,
+                    'replace',f.old,f.new,operation,f.artifact.payload))
+            assert f.target.read_bytes()==f.old_bytes
+            assert not list(f.target.parent.glob('*.replacement-'+operation))
+            assert len(flock_calls)==(1 if fault=='path-after-flock' else 0)
+            if fault in ('foreign-owner','hardlink','path-before-hardening'):
+                assert chmod_calls==[]
+            print('PASS=LOCK_REJECT_'+fault+'_BEFORE_SUBTITLE_MUTATION')
+
+    with tempfile.TemporaryDirectory() as raw:
+        f=Fixture(Path(raw))
+        checked=f.run()
+        sequence=0
+        for phase in ('INTENT_RECORDED','NAS_PENDING','FAILED_RETRYABLE'):
+            f.store.append_replacement(checked.plan,phase,expected_sequence=sequence,authorization=f.auth)
+            sequence+=1
+        before=f.history()
+        lock=f.target.parent/('.'+f.target.name+'.replacement.lock')
+        lock.write_bytes(b''); lock.chmod(0o777)
+        f.run(execute=True)
+        after=f.history()
+        assert after[:len(before)]==before and after[-1]['phase']=='COMPLETED'
+        assert {e['operation_id'] for e in after}=={checked.plan['operation_id']}
+        assert sum(e['phase']=='INTENT_RECORDED' for e in after)==1
+        assert f.nas_calls==1 and (lock.stat().st_mode & 0o7777)==0o600
+        print('PASS=EXISTING_FAILED_RETRYABLE_OLD_SHA_SAME_OPERATION_RESUME')
+
     print('STAGE12_REPLACEMENT_SMOKE=PASS')
 
 

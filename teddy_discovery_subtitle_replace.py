@@ -148,11 +148,31 @@ def replacement_worker(root, video_relative, target_relative, action, old_sha, n
         # This independent boundary verifies exact UTF-8 and payload identity.
         payload.decode('utf-8', errors='strict')
         lock_name = '.' + target.name + '.replacement.lock'
-        lock_fd = os.open(lock_name, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600, dir_fd=parent)
+        lock_fd = os.open(lock_name, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK,
+                          0o600, dir_fd=parent)
         lock_info = os.fstat(lock_fd)
-        if not stat.S_ISREG(lock_info.st_mode) or lock_info.st_nlink != 1 or stat.S_IMODE(lock_info.st_mode) != 0o600:
-            fail()
+        lock_identity = (lock_info.st_dev, lock_info.st_ino)
+
+        def validate_lock(require_private):
+            descriptor_info = os.fstat(lock_fd)
+            path_info = os.stat(lock_name, dir_fd=parent, follow_symlinks=False)
+            for info in (descriptor_info, path_info):
+                if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                        or info.st_uid != os.geteuid()
+                        or (info.st_dev, info.st_ino) != lock_identity
+                        or (require_private and stat.S_IMODE(info.st_mode) != 0o600)):
+                    fail()
+            return descriptor_info
+
+        # O_CREAT's mode does not change existing files. Narrow permissions only
+        # after exact owned, single-link, regular fd/path identity is proven.
+        lock_info = validate_lock(False)
+        if stat.S_IMODE(lock_info.st_mode) != 0o600:
+            os.fchmod(lock_fd, 0o600)
+        validate_lock(True)
         fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        # Waiting for another holder must not make an obsolete inode the lock.
+        validate_lock(True)
         current, old_info = read(target.name, parent, 8 * 1024 * 1024)
         temp = '.' + target.name + '.replacement-' + operation_id
         def finish_permissions(expected_inode, old_mode):
