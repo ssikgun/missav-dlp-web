@@ -2,10 +2,12 @@
 
 ## 2026-10-01 Stage11 — HYBRID review semantic projection boundary
 
-Checkpoint Git outcome: staging failed because worktree Git metadata is read
-only (`index.lock` creation denied). The three related source/smoke/handoff
-files remain uncommitted; HEAD remains `adc9922`. This checkpoint has not been
-pushed. No Git metadata workaround was used.
+Checkpoint Git outcome: implementation and verification are complete.
+The HYBRID review semantic-projection boundary fix was committed as
+`1bfadcf63c21885b54b8f38c1b39b6441cf95e77`
+(`fix hybrid review semantic text validation`) and pushed to
+`teddy-subtitle-stage11`. The checkpoint started from clean HEAD `adc9922`;
+the worktree was clean after commit/push. No Git metadata workaround was used.
 
 The real FNS-247 HYBRID comparison reached and completed Hermes first-pass
 with ACCEPT_HYBRID alignment and the optional targeted-evidence policy intact.
