@@ -2,10 +2,12 @@
 
 ## 2026-10-01 Stage11 — HYBRID CLEAN semantic projection boundary
 
-Checkpoint Git outcome: staging was rejected because worktree Git metadata is
-read only (`index.lock` creation denied). HEAD remains `6a188f3`; only the
-related CLEAN source/new smoke/canonical handoff are changed. This checkpoint
-is uncommitted and not pushed. No Git metadata workaround was used.
+Checkpoint Git outcome: implementation and verification are complete.
+The HYBRID CLEAN semantic-projection boundary fix was committed as
+`e932449ec2a50912608e3236a672b03f2197cfdb`
+(`fix hybrid clean semantic text validation`) and pushed to
+`teddy-subtitle-stage11`. The checkpoint started from clean HEAD `6a188f3`;
+the worktree was clean after commit/push. No Git metadata workaround was used.
 
 The real FNS-247 resume passed CT108 -> CT120 SSH native transport, reused
 baseline/targeted/first-pass evidence, created the fresh review session, and
