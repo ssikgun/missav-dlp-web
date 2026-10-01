@@ -1,5 +1,37 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-01 Stage11 — FNS-247 HYBRID structural comparison
+
+Durable comparison CLEAN/report verification is complete. Read-only structural
+comparison against the currently published ASR_ONLY subtitle also passed.
+
+Current ASR_ONLY:
+- cues: 477
+- active subtitle time: 754140 ms
+- >=30 s gaps: 64
+- maximum gap: 583844 ms
+
+New HYBRID:
+- cues: 313
+- active subtitle time: 1206085 ms
+- >=30 s gaps: 67
+- maximum gap: 853768 ms
+
+Cross-coverage:
+- shared active time: 397979 ms
+- current-only active time: 356161 ms
+- HYBRID-only active time: 808106 ms
+- 30 of the current subtitle's 64 >=30 s gaps contain HYBRID coverage
+- HYBRID contributes 451813 ms of subtitle coverage inside those current gaps
+
+The structural result strongly confirms recovery of substantial subtitle
+coverage that ASR_ONLY lacked, but it does not by itself authorize publication.
+A small set of improvement and regression-candidate time windows should be
+spot-checked against the video before replacing the current KO subtitle.
+
+No NAS/Jellyfin/current KO/rollout DB write was performed.
+
+
 ## 2026-10-01 Stage11 — HYBRID CLEAN semantic projection boundary
 
 Checkpoint Git outcome: implementation and verification are complete.
@@ -46,9 +78,9 @@ results were reused unchanged. No new Hermes/Whisper calls, staging artifact
 writes, NAS/Jellyfin/current KO/rollout DB writes or Stage13 changes occurred.
 No subtitle/review bodies, raw JSON or session/staging identities were printed.
 
-The comparison remains INCOMPLETE until CLEAN/report artifacts are confirmed.
-This checkpoint validates in-memory materialization only and does not publish
-or overwrite current KO.
+A later FNS-247 checkpoint finalized durable CLEAN/report artifacts; this
+earlier in-memory-only state is retained here for history. No publication was
+performed by this checkpoint.
 
 ## 2026-10-01 Stage11 — CT120 native fresh review-session creation
 
