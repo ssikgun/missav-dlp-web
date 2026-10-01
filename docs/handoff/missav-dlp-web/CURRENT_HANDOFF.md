@@ -1,5 +1,50 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-01 Stage11 — CT120 native fresh review-session creation
+
+Checkpoint Git outcome: staging failed because worktree Git metadata is read
+only (`index.lock` creation denied). Only the related deployment source,
+new native smoke and canonical handoff are changed. HEAD remains `82c7493`;
+this checkpoint is uncommitted and not pushed. No metadata workaround used.
+
+FNS-247 real HYBRID review resume reused baseline, targeted artifact and the
+completed first-pass, and built the review request successfully. It then
+failed at native fresh review-session preparation. The deployment bridge
+rejected existing fresh sessions correctly but only called `create_session`
+for missing `ensure` sessions. Missing `fresh` sessions therefore always
+reached exit 24 without being created.
+
+The shared missing-session branch now creates both fresh and ensure sessions
+using only the native SessionDB API. Fresh still rejects any existing session
+before creation (exit 22). Returned ID, read-back ID/source/profile/parent
+validation and exit codes remain unchanged. Fresh history must be exactly an
+empty list from `get_messages(..., include_inactive=True)` before success.
+Ensure continues to reuse only exactly bound existing sessions. No SQL
+fallback, direct state.db edits or validator weakening was introduced.
+
+New native-session smoke executes the actual production remote script with an
+in-memory SessionDB: missing fresh creates once, existing fresh creates zero
+and rejects, wrong returned ID/missing read-back/detached identity/source/
+profile/parent/nonempty or non-list history reject, ensure missing/existing
+and detached metadata regressions pass. The shared production fresh-review
+preparer and remote error privacy boundary are exercised without revealing
+session IDs or native stdout/stderr. Production venv: all 36 related regression
+scripts PASS, plus quality-review session smoke PASS (37 scripts total).
+
+FNS-247 offline first-pass reuse and review request construction PASS. The
+existing authoritative input exactly matches recreated preparation, and the
+completed result is strictly parsed against it. No first-pass or Whisper was
+rerun. An actual native review-session boundary canary was attempted through
+RemoteNativeSessionDB and the shared production fresh-review preparer; SSH
+returned 255 with network access blocked before the existence check completed.
+Thus live native creation remains unverified in this environment; mock/native
+script validation is PASS. No remote session creation was reached and no raw
+session contents, subtitle bodies or raw JSON were printed.
+
+No NAS/Jellyfin/current KO/rollout DB writes or Stage13 changes occurred. No
+publication occurred. The comparison remains incomplete until real quality
+review succeeds; this checkpoint does not claim a completed comparison.
+
 ## 2026-10-01 Stage11 — HYBRID review semantic projection boundary
 
 Checkpoint Git outcome: implementation and verification are complete.

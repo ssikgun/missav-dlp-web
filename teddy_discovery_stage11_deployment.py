@@ -799,7 +799,7 @@ try:
         existing = db.get_session(session_id)
         if operation == "fresh" and existing is not None:
             raise SystemExit(22)
-        if operation == "ensure" and existing is None:
+        if existing is None:
             returned_id = db.create_session(
                 session_id=session_id,
                 source=expected_source,
@@ -817,7 +817,7 @@ try:
             raise SystemExit(25)
         if operation == "fresh":
             messages = db.get_messages(session_id, include_inactive=True)
-            if not isinstance(messages, list) or messages:
+            if type(messages) is not list or messages:
                 raise SystemExit(26)
         print(session_id)
     else:
