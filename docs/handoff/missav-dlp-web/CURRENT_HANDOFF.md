@@ -1,5 +1,33 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-01 Stage11 — SubtitleCat canonical detail redirect
+
+Operator-supplied read-only forensic: all 13 UNIQUE_CHAINS diagnostic refetch
+subjects stopped with ExternalSubtitleTransportError before detail body fetch.
+All 13 returned HTTP 301 from subtitlecat.com to www.subtitlecat.com, with exact
+same path/query (OFFICIAL_HOST_VARIANT_SAME_TARGET). Forensic body reads=0,
+redirects followed=0, production writes=0. This is an official canonical host
+redirect blocker, not new alignment evidence.
+
+Deployment now has a separate bounded DETAIL fetch boundary. The initial GET
+never auto-follows. Only status 301 from HTTPS subtitlecat.com to HTTPS
+www.subtitlecat.com with unchanged path/query may trigger one explicit second
+GET. Both endpoints require no credentials, default HTTPS port and no fragment;
+Location must be unique. The 301 body is not read. The final response must be
+2xx at the exact validated target URL and is read with the existing byte bound.
+The actual final URL is stored in SubtitleCatDetailPage and relative JA SRT
+hrefs resolve against it. Cross-site, downgrade, path/query changes, credentials,
+fragments, other redirect statuses and second redirects fail closed.
+Generic _http_bytes, search discovery and payload redirect policies remain
+unchanged; no title/DVD-specific branches or validator relaxation were added.
+
+Offline validation using /opt/stage11-stt-venv/bin/python: deployment smoke
+PASS (47 checks), external subtitle smoke PASS, SubtitleCat discovery smoke
+PASS (63 checks), proxy smoke PASS (6 checks); existing 47-script related
+Stage11/Stage12 regression suite PASS. git diff --check PASS.
+No live SubtitleCat/Hermes/Whisper calls or production NAS/Jellyfin/rollout DB
+writes occurred. The 4096 alignment diagnostic has NOT been rerun.
+
 ## 2026-10-01 Stage12 — FNS-247 production HYBRID replacement completed
 
 FNS-247 operator-approved production subtitle replacement is complete: PASS.

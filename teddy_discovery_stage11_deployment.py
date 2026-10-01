@@ -387,13 +387,80 @@ def _http_bytes(
     return payload
 
 
+class _DetailNoRedirectHandler(urllib_request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        # Expose status/Location as HTTPError; never follow or read its body.
+        return None
+
+
+def _detail_http_bytes(
+    url: str,
+    *,
+    timeout: int | float,
+    max_bytes: int,
+    proxy_url: str | None = None,
+) -> tuple[bytes, str]:
+    """Bounded detail GET with only the exact official one-hop 301 exception."""
+    def canonical_host(value, host):
+        try:
+            parsed = urlsplit(value)
+            if (type(value) is not str or any(ord(c) <= 32 or ord(c) == 127 for c in value)
+                    or "#" in value or parsed.scheme != "https"
+                    or parsed.hostname != host or parsed.username is not None
+                    or parsed.password is not None or parsed.port not in (None, 443)):
+                raise ValueError()
+            return parsed
+        except (TypeError, ValueError) as error:
+            raise ExternalSubtitleTransportError("SubtitleCat canonical detail URL is invalid") from error
+
+    handlers = [_DetailNoRedirectHandler()]
+    if proxy_url is not None:
+        handlers.append(urllib_request.ProxyHandler({"http": proxy_url, "https": proxy_url}))
+    opener = urllib_request.build_opener(*handlers)
+    current = url
+    try:
+        for hop in range(2):
+            request = urllib_request.Request(current, headers={
+                "User-Agent": "Mozilla/5.0 Teddy-Downloader-SubtitleDiscovery/1.0",
+                "Accept": "text/html,application/x-subrip,text/plain,*/*",
+            }, method="GET")
+            try:
+                response = opener.open(request, timeout=timeout)
+            except urllib_error.HTTPError as error:
+                response = error
+            with response:
+                status = response.getcode()
+                if response.geturl() != current:
+                    raise ExternalSubtitleTransportError("SubtitleCat detail response URL is detached")
+                if type(status) is int and 200 <= status < 300:
+                    payload = response.read(max_bytes + 1)
+                    if type(payload) is not bytes or not 0 < len(payload) <= max_bytes:
+                        raise ExternalSubtitleTransportError("SubtitleCat response exceeded its bounded byte limit")
+                    return payload, current
+                if status != 301 or hop != 0:
+                    raise ExternalSubtitleTransportError("SubtitleCat detail redirect/status is not permitted")
+                source = canonical_host(current, "subtitlecat.com")
+                locations = response.headers.get_all("Location", [])
+                if len(locations) != 1:
+                    raise ExternalSubtitleTransportError("SubtitleCat canonical detail Location is invalid")
+                target_url = locations[0]
+                target = canonical_host(target_url, "www.subtitlecat.com")
+                if (source.path, source.query) != (target.path, target.query):
+                    raise ExternalSubtitleTransportError("SubtitleCat canonical detail target is detached")
+                current = target_url
+    except ExternalSubtitleTransportError:
+        raise
+    except (OSError, TimeoutError, urllib_error.URLError, ValueError) as error:
+        raise ExternalSubtitleTransportError("SubtitleCat detail HTTP transport failed") from error
+
+
 def _default_detail_fetcher(
     timeout: int | float,
     *,
     proxy_url: str | None = None,
 ) -> Callable[[str], SubtitleCatDetailPage]:
     def fetch_detail(url: str) -> SubtitleCatDetailPage:
-        raw = _http_bytes(
+        raw, final_url = _detail_http_bytes(
             url,
             timeout=timeout,
             max_bytes=MAX_SUBTITLECAT_DETAIL_HTML_BYTES,
@@ -401,7 +468,7 @@ def _default_detail_fetcher(
         )
         try:
             html = raw.decode("utf-8", errors="strict")
-            return SubtitleCatDetailPage(final_url=url, html=html)
+            return SubtitleCatDetailPage(final_url=final_url, html=html)
         except (UnicodeError, SubtitleCatDetailError):
             raise
         except (TypeError, ValueError) as error:

@@ -332,6 +332,116 @@ def _controller_run(deps, root, baseline):
     )
 
 
+def detail_redirect_smoke(check):
+    from email.message import Message
+    from io import BytesIO
+    from urllib.error import HTTPError
+    from teddy_discovery_subtitle_external import find_subtitlecat_original_japanese_srt_url
+    import teddy_discovery_subtitlecat_discovery as discovery
+
+    original = "https://subtitlecat.com/subs/1/generic.html?q=1"
+    canonical = "https://www.subtitlecat.com/subs/1/generic.html?q=1"
+    body = b'<html><a href="generic-ja.srt">Japanese</a></html>'
+
+    class Response:
+        def __init__(self, url, status=200, payload=body, location=None):
+            self.url, self.status, self.payload = url, status, payload
+            self.reads = []
+            self.headers = Message()
+            if location is not None:
+                self.headers['Location'] = location
+        def geturl(self): return self.url
+        def getcode(self): return self.status
+        def read(self, limit):
+            self.reads.append(limit)
+            return self.payload[:limit]
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+
+    def run(responses, url=original):
+        calls = []
+        def opened(request, **kwargs):
+            calls.append(request.full_url)
+            response = responses[len(calls)-1]
+            if isinstance(response, Exception): raise response
+            return response
+        with patch.object(deployment.urllib_request, 'build_opener',
+                          return_value=SimpleNamespace(open=opened)):
+            page = deployment._default_detail_fetcher(1)(url)
+        return page, calls
+
+    direct = Response(original)
+    page, calls = run([direct])
+    check('DETAIL_DIRECT_200_EXACT', page.final_url == original and calls == [original])
+    first, final = Response(original, 301, location=canonical), Response(canonical)
+    page, calls = run([first, final])
+    check('DETAIL_CANONICAL_ONE_HOP_FINAL_URL', page.final_url == canonical
+          and calls == [original, canonical] and not first.reads)
+    check('DETAIL_RELATIVE_JA_CANONICAL_BASE',
+          find_subtitlecat_original_japanese_srt_url(page.html, page.final_url)
+          == 'https://www.subtitlecat.com/subs/1/generic-ja.srt')
+    headers = Message(); headers['Location'] = canonical
+    redirect_error = HTTPError(original, 301, 'Moved', headers, BytesIO(b'ignored'))
+    page, calls = run([redirect_error, Response(canonical)])
+    check('DETAIL_URLLIB_HTTPERROR_301', page.final_url == canonical)
+
+    cases = {
+        'CROSS_SITE': ('https://example.org/subs/1/generic.html?q=1', original),
+        'WWW_SOURCE': ('https://example.org/subs/1/generic.html?q=1', canonical),
+        'PATH': (canonical.replace('generic.html', 'other.html'), original),
+        'QUERY': (canonical.replace('q=1', 'q=2'), original),
+        'DOWNGRADE': (canonical.replace('https:', 'http:'), original),
+        'CREDENTIALS': (canonical.replace('www.', 'user@www.'), original),
+        'FRAGMENT': (canonical + '#part', original),
+        'EMPTY_FRAGMENT': (canonical + '#', original),
+        'PORT': (canonical.replace('.com/', '.com:444/'), original),
+        'MISSING_LOCATION': (None, original),
+        'SOURCE_CREDENTIALS': (canonical, original.replace('subtitlecat.com', 'user@subtitlecat.com')),
+        'SOURCE_FRAGMENT': (canonical, original + '#part'),
+        'SOURCE_HTTP': (canonical, original.replace('https:', 'http:')),
+    }
+    for name, (target, source) in cases.items():
+        first = Response(source, 301, location=target)
+        try: run([first], source)
+        except ExternalSubtitleTransportError: pass
+        else: raise AssertionError(name)
+        check('DETAIL_REJECT_' + name, not first.reads)
+    for status in (302, 303, 307, 308):
+        first = Response(original, status, location=canonical)
+        try: run([first])
+        except ExternalSubtitleTransportError: pass
+        else: raise AssertionError(status)
+        check('DETAIL_REJECT_STATUS_' + str(status), not first.reads)
+    for name, final in (
+        ('SECOND_REDIRECT', Response(canonical, 301, location=canonical)),
+        ('NON_2XX', Response(canonical, 404)),
+        ('FINAL_URL_DETACHED', Response(original)),
+        ('OVERSIZED', Response(canonical, payload=b'x'*(deployment.MAX_SUBTITLECAT_DETAIL_HTML_BYTES+1))),
+    ):
+        first = Response(original, 301, location=canonical)
+        try: run([first, final])
+        except ExternalSubtitleTransportError: pass
+        else: raise AssertionError(name)
+        check('DETAIL_REJECT_' + name, not first.reads)
+    # Generic transports still reject redirects; the detail handler never follows.
+    check('DETAIL_AUTOFOLLOW_DISABLED', deployment._DetailNoRedirectHandler().redirect_request(
+        None, None, 301, '', Message(), canonical) is None)
+    for name, handler, error_type in (
+        ('PAYLOAD', deployment._NoRedirectHandler(), ExternalSubtitleTransportError),
+        ('SEARCH', discovery._NoRedirectHandler(), discovery.SubtitleCatSearchTransportError),
+    ):
+        try: handler.redirect_request(None, None, 301, '', Message(), canonical)
+        except error_type: pass
+        else: raise AssertionError(name)
+        check(name + '_REDIRECT_POLICY_UNCHANGED', True)
+    with patch.object(deployment.urllib_request, 'build_opener',
+                      return_value=SimpleNamespace(open=lambda *a, **k: Response(canonical))):
+        try: deployment._default_payload_fetcher(1)(SimpleNamespace(external_source_id=original))
+        except ExternalSubtitleTransportError: pass
+        else: raise AssertionError('payload response URL')
+    check('PAYLOAD_FINAL_URL_EXACT_REQUIRED', True)
+
+
 def main():
     passed = 0
 
@@ -341,6 +451,8 @@ def main():
             raise AssertionError(label)
         passed += 1
         print("PASS=" + label)
+
+    detail_redirect_smoke(check)
 
     with tempfile.TemporaryDirectory(prefix="stage11-deployment-smoke-") as raw:
         root = Path(raw)
