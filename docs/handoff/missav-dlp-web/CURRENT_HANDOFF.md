@@ -8450,3 +8450,32 @@ job are protected by the existing policy; RUNNING=0; visibility ATTENTION=0;
 and bounded automatic service cycles are healthy. Stage13 remains
 CLOSED/PASS. No further media-recovery-specific checkpoint is required; next
 work is normal project operations and monitoring.
+
+## 2026-10-01 Stage11 — FNS-247 HYBRID comparison artifact finalized
+
+FNS-247 comparison completed successfully without any new Hermes or Whisper
+model execution. The existing baseline ASR, targeted artifact, completed
+HYBRID first-pass result and completed real HYBRID quality-review result were
+strictly reused.
+
+Final comparison result:
+- route: HYBRID
+- external admitted cues: 313
+- external dropped cues: 1
+- alignment: ACCEPT_HYBRID
+- selected anchors: 40
+- inliers: 40
+- inlier ratio: 1.0
+- median absolute residual: 219.160878 ms
+- affine scale: 1.014157101
+- CLEAN cues: 313
+- CLEAN SHA256:
+  ebed3bc9d195038f5f8be2e6cf54be77fef024cb94f7680aa8b50b4b369fc86f
+
+The durable comparison CLEAN and mechanical report were created and verified.
+No NAS/Jellyfin/current Korean subtitle/rollout DB publication was performed.
+
+The next task is a read-only structural comparison against the currently
+published FNS-247 ASR_ONLY subtitle. Cue count alone is not a quality metric;
+compare timeline coverage, long subtitle gaps and coverage of the previously
+missing-dialogue regions before any publication decision.
