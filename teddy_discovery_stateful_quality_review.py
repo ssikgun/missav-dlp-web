@@ -17,6 +17,7 @@ import re
 import unicodedata
 
 from teddy_discovery_stateful_hybrid import StatefulHybridPreparation
+from teddy_discovery_semantic_text import project_semantic_text
 from teddy_discovery_stateful_parts import has_runaway_repetition
 from teddy_discovery_asr_source_quality import (
     ASR_SOURCE_REQUIRE_SECOND_EVIDENCE,
@@ -548,8 +549,9 @@ def build_review_request(*, preparation: StatefulHybridPreparation,
         cues = []
         for source, first, binding, hint in zip(package.cues, validated_result.cues,
                                                preparation.semantic_bindings, source_quality, strict=True):
+            # Hints retain authoritative raw text; package text is model input.
             if (binding.source_index != hint.source_index or binding.request_cue_id != source.cue_id
-                    or source.external_ja != hint.source_text):
+                    or source.external_ja != project_semantic_text(hint.source_text)):
                 raise QualityReviewError("source index/text detached")
             asr_source_quality = None
             targeted_second_evidence = None

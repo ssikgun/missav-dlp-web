@@ -1,5 +1,49 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-01 Stage11 — HYBRID review semantic projection boundary
+
+Checkpoint Git outcome: staging failed because worktree Git metadata is read
+only (`index.lock` creation denied). The three related source/smoke/handoff
+files remain uncommitted; HEAD remains `adc9922`. This checkpoint has not been
+pushed. No Git metadata workaround was used.
+
+The real FNS-247 HYBRID comparison reached and completed Hermes first-pass
+with ACCEPT_HYBRID alignment and the optional targeted-evidence policy intact.
+Review request construction then failed with `source index/text detached`:
+it compared projected semantic external JA with authoritative multiline source
+text directly. This was a generic raw-source versus model-input contract error.
+
+`build_review_request` now reuses the existing `project_semantic_text` helper
+and requires exact equality between semantic external JA and projected
+`hint.source_text`. The comparison is retained. Source quality is still
+recomputed from the authoritative document with exact equality; package,
+preparation, source index, cue identity and targeted provenance validation are
+unchanged. Authoritative text/payload, timing and identities remain unchanged.
+Unsafe TAB/NUL/DEL/other C0/C1 rejection and alignment acceptance thresholds
+are unchanged; no additional normalization or title-specific policy was added.
+
+Production-venv semantic projection smoke PASS, including single-line,
+LF/CRLF/standalone CR SRT inputs, unchanged source proof, projected review
+input, and rejection of detached hints/package/index/identity. Existing unsafe
+control coverage remains PASS. All 35 related semantic, Stage11, Hermes v2,
+subtitle v2, stateful review, ASR_ONLY, and targeted-evidence regression
+scripts PASS. Required PRESENT coverage, optional NOISY/EMPTY attachments and
+all duplicate/detached provenance rejection remain covered.
+
+FNS-247 offline reuse canary PASS: ACCEPT_HYBRID, HYBRID, 313 external cues,
+53 authoritative multiline cues, semantic projection match PASS, review
+request build PASS. The existing completed first-pass result was strictly
+parsed against its original authoritative input, which exactly equalled the
+recreated production preparation package. Request construction/serialization
+succeeded with the original targeted artifact. Existing input/result bytes
+and authoritative source text remained unchanged. No new Hermes/Whisper
+calls or NAS/Jellyfin/current KO/rollout DB writes occurred; no Stage13 files
+were changed. No subtitle bodies or raw model responses were printed.
+
+The comparison is still incomplete until a real quality review succeeds;
+this checkpoint only validates construction and does not publish subtitles
+or overwrite the current KO.
+
 ## 2026-10-01 Stage11 — status-aware HYBRID targeted evidence projection
 
 Current checkpoint Git outcome: implementation and verification are complete.
