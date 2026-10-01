@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from teddy_discovery_semantic_text import project_semantic_text
 from teddy_discovery_hybrid_evidence import HybridCueIdentity
 from teddy_discovery_ko_srt import GeneratedKoreanSRT, generate_korean_srt
 from teddy_discovery_stateful_hybrid import StatefulHybridPreparation
@@ -240,7 +241,7 @@ def materialize_stateful_quality_review_clean(
                 or review_input.cue_id != identity.cue_id
                 or review_input.source_index != source_index
                 or decision.cue_id != identity.cue_id
-                or source.external_ja != external.text
+                or source.external_ja != project_semantic_text(external.text)
                 or review_input.external_ja != source.external_ja
                 or review_input.accepted_stt_ja != source.stt_ja
                 or review_input.first_pass_repaired_ja != first.repaired_ja

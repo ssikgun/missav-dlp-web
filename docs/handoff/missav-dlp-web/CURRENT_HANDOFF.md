@@ -1,5 +1,53 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-01 Stage11 — HYBRID CLEAN semantic projection boundary
+
+Checkpoint Git outcome: staging was rejected because worktree Git metadata is
+read only (`index.lock` creation denied). HEAD remains `6a188f3`; only the
+related CLEAN source/new smoke/canonical handoff are changed. This checkpoint
+is uncommitted and not pushed. No Git metadata workaround was used.
+
+The real FNS-247 resume passed CT108 -> CT120 SSH native transport, reused
+baseline/targeted/first-pass evidence, created the fresh review session, and
+completed real HYBRID quality review. The review result validated successfully.
+CLEAN materialization then rejected `FULL, review, and source cue identity
+differ` because its evidence guard still compared projected semantic JA with
+raw authoritative multiline text.
+
+Before any source edit, read-only replay strictly parsed the unique completed
+first-pass and review artifacts against recreated production preparation.
+Condition-by-condition forensic: direct raw text comparison failed on 53 cues
+(first source index 0), all multiline; shared projected comparison passed on
+all 313 cues. Every other identity/evidence condition passed with zero
+mismatches: source/first-pass/binding/review cue IDs, external identity, source
+indexes, review external JA, accepted STT, first-pass repaired JA and Korean.
+
+CLEAN now reuses `project_semantic_text(external.text)` in the existing exact
+equality guard. No guard was removed or weakened. Only the established CRLF,
+CR and LF projection applies; no strip/whitespace collapse/new normalization,
+source mutation, timing/identity change, unsafe-control allowance or
+DVD/cue-specific logic was added.
+
+Production venv validation: new CLEAN projection smoke PASS for single-line,
+LF/CRLF/standalone CR, original bytes/text/timestamps preservation, unsafe
+control rejection and detached semantic text/cue identities/source indexes/
+accepted STT/first-pass repaired JA/Korean evidence rejection. All 37 related
+Stage11/stateful/Hermes v2/subtitle v2/targeted regressions plus quality-review
+session smoke PASS (38 scripts total). Targeted required PRESENT and optional
+NOISY/EMPTY policy, ASR_ONLY and existing CLEAN action/timing regressions PASS.
+
+FNS-247 offline continuation PASS: first-pass package exactly matches
+recreated preparation; completed review request exactly matches reconstructed
+request; completed review result strictly parses/validates; in-memory CLEAN
+materialization passes with 313 cues. Existing completed first-pass and review
+results were reused unchanged. No new Hermes/Whisper calls, staging artifact
+writes, NAS/Jellyfin/current KO/rollout DB writes or Stage13 changes occurred.
+No subtitle/review bodies, raw JSON or session/staging identities were printed.
+
+The comparison remains INCOMPLETE until CLEAN/report artifacts are confirmed.
+This checkpoint validates in-memory materialization only and does not publish
+or overwrite current KO.
+
 ## 2026-10-01 Stage11 — CT120 native fresh review-session creation
 
 Checkpoint Git outcome: implementation and verification are complete.
