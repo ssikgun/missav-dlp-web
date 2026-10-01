@@ -22,6 +22,9 @@ from teddy_discovery_alignment import (
     MAX_AFFINE_CONSENSUS_UNIQUE_CHAINS,
     MIN_AFFINE_ANCHORS,
     RobustAffineAlignment,
+    MonotonicAnchorCandidate,
+    infer_robust_affine_alignment,
+    iter_unique_affine_consensus_anchor_chains,
 )
 from teddy_discovery_hybrid_evidence import (
     ALIGNMENT_PROVENANCE_ASR_ONLY,
@@ -484,6 +487,42 @@ def decide_alignment_acceptance(
     )
 
 
+def _affine_consensus_rank(
+    alternative: AffineConsensusAlignment,
+    decision: AlignmentAcceptanceDecision,
+):
+    """Exact shared evidence rank; identity and traversal order never rank."""
+    alignment = alternative.alignment
+    inlier_ratio = Fraction(
+        alignment.inlier_count,
+        alignment.anchor_count,
+    )
+    median_residual = Fraction(
+        str(alignment.median_absolute_residual_ms)
+    )
+    balanced_span = min(
+        Fraction(str(decision.external_evidence_span_ms)),
+        Fraction(str(decision.asr_evidence_span_ms)),
+    )
+    external_span = Fraction(str(decision.external_evidence_span_ms))
+    asr_span = Fraction(str(decision.asr_evidence_span_ms))
+    lexical_strength = sum(
+        (Fraction(str(anchor.score)) for anchor in alternative.anchors),
+        Fraction(0),
+    )
+    rank = (
+        decision.verdict == ACCEPT_HYBRID,
+        alignment.inlier_count,
+        inlier_ratio,
+        -median_residual,
+        balanced_span,
+        external_span,
+        asr_span,
+        lexical_strength,
+    )
+    return rank
+
+
 def select_affine_consensus_alignment(
     alternatives: tuple[AffineConsensusAlignment, ...],
     policy: AlignmentAcceptancePolicy,
@@ -515,34 +554,7 @@ def select_affine_consensus_alignment(
             alternative.alignment,
             validated_policy,
         )
-        alignment = alternative.alignment
-        inlier_ratio = Fraction(
-            alignment.inlier_count,
-            alignment.anchor_count,
-        )
-        median_residual = Fraction(
-            str(alignment.median_absolute_residual_ms)
-        )
-        balanced_span = min(
-            Fraction(str(decision.external_evidence_span_ms)),
-            Fraction(str(decision.asr_evidence_span_ms)),
-        )
-        external_span = Fraction(str(decision.external_evidence_span_ms))
-        asr_span = Fraction(str(decision.asr_evidence_span_ms))
-        lexical_strength = sum(
-            (Fraction(str(anchor.score)) for anchor in alternative.anchors),
-            Fraction(0),
-        )
-        rank = (
-            decision.verdict == ACCEPT_HYBRID,
-            alignment.inlier_count,
-            inlier_ratio,
-            -median_residual,
-            balanced_span,
-            external_span,
-            asr_span,
-            lexical_strength,
-        )
+        rank = _affine_consensus_rank(alternative, decision)
         identity_key = tuple(
             (anchor.external_identity.cue_id, anchor.asr_identity.cue_id)
             for anchor in alternative.anchors
@@ -557,6 +569,57 @@ def select_affine_consensus_alignment(
         )
     _, _, alternative, decision = best[0]
     return alternative, decision
+
+
+def select_affine_consensus_from_candidates(
+    candidates: tuple[MonotonicAnchorCandidate, ...],
+    policy: AlignmentAcceptancePolicy,
+    *,
+    residual_threshold_ms: int,
+    minimum_scale: float,
+    maximum_scale: float,
+) -> tuple[AffineConsensusAlignment, AlignmentAcceptanceDecision] | None:
+    """Exhaust bounded chains, retaining only the best fit and its tie state.
+
+    None means completed empty consensus. Limit/validation failures propagate
+    even after an accepted provisional best; ambiguity is decided only after
+    exhaustion, since a later better rank clears earlier equal-rank ties.
+    """
+    validated_policy = _validated_policy(policy)
+    best = None
+    best_rank = None
+    best_identity = None
+    ambiguous = False
+    for anchors in iter_unique_affine_consensus_anchor_chains(
+        candidates,
+        residual_threshold_ms=residual_threshold_ms,
+        minimum_scale=minimum_scale,
+        maximum_scale=maximum_scale,
+    ):
+        alternative = AffineConsensusAlignment(
+            anchors=anchors,
+            alignment=infer_robust_affine_alignment(
+                anchors, residual_threshold_ms=residual_threshold_ms,
+            ),
+        )
+        decision = decide_alignment_acceptance(alternative.alignment, validated_policy)
+        rank = _affine_consensus_rank(alternative, decision)
+        identity = tuple(
+            (anchor.external_cue_index, anchor.asr_segment_index)
+            for anchor in anchors
+        )
+        if best_rank is None or rank > best_rank:
+            best = (alternative, decision)
+            best_rank = rank
+            best_identity = identity
+            ambiguous = False
+        elif rank == best_rank and identity != best_identity:
+            ambiguous = True
+    if ambiguous:
+        raise AlignmentAmbiguityError(
+            "equally supported affine-consensus mappings remain ambiguous"
+        )
+    return best
 
 
 __all__ = [
@@ -578,4 +641,5 @@ __all__ = [
     "UNRESOLVED",
     "decide_alignment_acceptance",
     "select_affine_consensus_alignment",
+    "select_affine_consensus_from_candidates",
 ]

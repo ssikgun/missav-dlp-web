@@ -1,5 +1,135 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-01 Stage11 — exact streaming affine-consensus selection (PASS)
+
+Started from clean expected HEAD
+`c7d2300a74b9b62e78bd26aedd4f61e0d57712c2`. The old inference retained every
+unique full anchor chain, capped that storage at 2048, and only then fitted all
+chains. The 4096 diagnostic proved this storage cap excluded useful evidence;
+4096 remains historical diagnostic evidence, never a production cap increase.
+
+Production now shares `iter_unique_affine_consensus_anchor_chains` and
+`select_affine_consensus_from_candidates`. Hypothesis generation, maximum
+monotonic paths, lexical matching, robust fit, residual thresholds and acceptance
+policy are unchanged. Deduplication retains only immutable tuples of exact
+(external cue ordinal, ASR segment ordinal) pairs across hypotheses. At most
+64 full chains are temporarily reconstructed for one hypothesis; all unique
+full chains/fits are never accumulated by the production selector. It fits and
+decides each unique chain in turn and retains the best fit/decision plus its
+identity and an ambiguity flag. A better rank replaces the best and clears the
+flag; a distinct mapping with equal best rank sets it. Final equal-best mappings
+raise AlignmentAmbiguityError. No identity/order tie-breaker is used. The entire
+iterator must finish before any result is returned; later work-limit failures
+invalidate even an earlier ACCEPT. Completed empty consensus retains the
+existing conclusive non-accept contract.
+
+Both tuple and streaming selectors share the unchanged exact rank:
+ACCEPT_HYBRID first, inlier count, Fraction(inliers, anchors), lower median
+residual, balanced evidence span, external span, ASR span, lexical score sum.
+Single and multi-candidate Stage11 execution both use `_align_external_payload`
+with the streaming owner. Multi-candidate content selection is unchanged:
+multiple distinct accepted SHAs or any indeterminate candidate fail closed;
+exactly one accepted SHA with no indeterminate candidate selects; conclusive
+non-accepts remain non-accepts. All returned application/bundle/SHA validation
+and official URL/detail/payload policies remain. No title-specific production
+branches, threshold changes, hypothesis changes or validator relaxation exist.
+
+The legacy `infer_affine_consensus_alignments` tuple API and tuple selector keep
+their 2048 storage/result contract and stable cue-ID tuple ordering. Streaming
+has no 2048 full-chain storage gate; it remains bounded by the original caps:
+- hypotheses: 65,536
+- candidate evaluations: 16,777,216 (hypotheses times candidates preflight)
+- DP operations: 16,777,216 (same cumulative Fenwick operation counter)
+- chains per hypothesis: 64
+- paths evaluated: 65,536 (includes duplicates and short paths)
+- fit pair evaluations: 16,777,216, cumulatively charged once per unique chain
+  as len(chain) * (len(chain)-1) // 2 before fit
+- hypothesis pair comparisons: 8,386,560
+- anchors per chain: 512
+
+Compact seen identities cannot outgrow 65,536 because each identity consumes an
+already-counted path. The lexical candidate bound 4096 and lexical pair bound
+1,048,576 are unchanged too. PRWF-014 candidate 3 below demonstrates that the
+existing fit-work bound still limits actual production streaming work.
+
+Offline validation: alignment, acceptance, new streaming equivalence, alignment
+application, limit fallback, live adapters, external subtitle, SubtitleCat
+discovery/proxy and deployment smoke PASS. Existing related 47-script
+Stage11/Stage12 regression suite PASS; git diff --check PASS. The new smoke checks
+unique best ACCEPT/UNRESOLVED/REJECT; multiple alternatives; exact equal-rank
+ambiguity; input permutation; cross-hypothesis dedupe with one fit; exact fit,
+path, DP, candidate, hypothesis, pair, anchor and per-hypothesis cap boundaries;
+malformed/duplicate source identities; empty consensus; later better-rank
+ambiguity reset and later limit propagation. The >2048 injected chain delivery
+check consumes 2049 unique alternatives plus a better final chain while weak
+references prove at most three full consensus fit objects coexist. Forty noisy
+realistic fixtures and their permutations match the legacy API exactly on
+selected mapping, RobustAffineAlignment, decision and reason codes. A separate
+read-only oracle loaded the two unmodified expected-HEAD function bodies and
+matched the streaming result/ambiguity on all 89 fixtures (89/89 PASS).
+
+Fresh current-evidence validation fetched SubtitleCat search/detail/payload
+through the production GET-only proxy and ran the actual production alignment
+owner/content policy with unchanged production caps. Existing canonical ASR
+artifacts were strictly reused against current holding snapshots, with creation
+forbidden. Evidence run UTC: 2026-10-01 13:54:00 through 2026-10-01 14:05:51. Eight-title canary:
+- DROP-141: ACCEPT_HYBRID
+- HSODA-104: ACCEPT_HYBRID
+- SIRO-5537: ACCEPT_HYBRID
+- HUNTC-487: ACCEPT_HYBRID
+- START-501: ACCEPT_HYBRID
+- FNS-237: fail closed (multiple distinct accepted contents)
+- PRWF-014: fail closed (accepted content blocked by fit-work limit)
+- SONE-970: fail closed (multiple distinct accepted contents)
+
+Existing five ACCEPT match=5/5; fail-closed match=3/3; canary environment
+failures=0. Historic 13 UNIQUE_CHAINS subjects were freshly evaluated as part of
+the 51-title rescreen, without diagnostic cap overrides. Results: 11
+ACCEPT_HYBRID, 1 UNRESOLVED, 1 existing FIT_WORK_LIMIT (fail closed):
+
+| Title | Candidate ordinal | Fresh result | Unique chains consumed |
+| --- | --- | --- | --- |
+| FBOS-015 | 2 | ACCEPT_HYBRID | 2051 |
+| FNS-237 | 1 | ACCEPT_HYBRID | 2162 |
+| FNS-244 | 1 | ACCEPT_HYBRID | 2292 |
+| HMN-896 | 1 | ACCEPT_HYBRID | 2055 |
+| IPZZ-698 | 2 | UNRESOLVED | 2065 |
+| NSFS-456 | 1 | ACCEPT_HYBRID | 3358 |
+| PRWF-014 | 3 | FIT_WORK_LIMIT (fail closed) | 5752 |
+| SDDE-763 | 1 | ACCEPT_HYBRID | 2586 |
+| SDDE-763 | 3 | ACCEPT_HYBRID | 2586 |
+| SNOS-080 | 1 | ACCEPT_HYBRID | 2805 |
+| SNOS-216 | 1 | ACCEPT_HYBRID | 3220 |
+| SONE-970 | 3 | ACCEPT_HYBRID | 7159 |
+| SONE-978 | 1 | ACCEPT_HYBRID | 5354 |
+
+PRWF-014 candidate 3 consumed 16,773,286 fit pairs in 5752 chains; the next chain
+would exceed 16,777,216, so no selection escaped the fit-work failure. SONE-970
+candidate 3 completed 7159 chains / 9,496,009 fit pairs; SONE-978 candidate 1
+completed 5354 chains / 6,359,156 fit pairs. Their fresh results are measured
+outcomes, not hardcoded expected answers.
+
+Latest full 51-title consolidation (all current search candidates evaluated):
+- UNIQUE_SELECTOR_SAFE=10
+- MULTIPLE_ACCEPTED_CONTENTS=2 (FNS-237, SONE-970)
+- ACCEPTED_BUT_BLOCKED=1 (PRWF-014)
+- NO_SAFE_ACCEPTED_CONTENT=38
+
+Unique safe titles: FBOS-015, FNS-244, HMN-896, HUNTC-487, NSFS-456, SDDE-763, SNOS-080, SNOS-216, SONE-978, START-501. Equivalent SDDE-763 accepted payloads still
+count as one content. The broader 51-title scan recorded one transport
+indeterminate: IPZZ-340 candidate 3; a separate read-only refetch confirmed
+ExternalSubtitleTransportError caused by UnicodeEncodeError in source URL
+encoding. It remains fail closed under the existing transport contract; no
+validator/transport workaround was introduced. No accepted content exists for
+that title, so its consolidation is NO_SAFE_ACCEPTED_CONTENT. This broader
+transport failure does not affect the zero-environment-failure eight-title
+canary or the completed 13-subject rescreen.
+
+Whisper calls=0; Hermes calls=0; production NAS writes=0; production Jellyfin
+writes=0; production rollout DB writes=0. Only related source/smoke and this
+canonical CURRENT_HANDOFF were changed; no new handoff or runtime deployment
+was created. Local diagnostic evidence: `/tmp/streaming-live-screen.json`.
+
 ## 2026-10-01 Stage11 — generic safe multi-candidate external JA selection
 
 Operator forensic across 162 effective ASR_ONLY titles: existing single-source

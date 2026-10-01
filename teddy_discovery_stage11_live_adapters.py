@@ -24,11 +24,10 @@ from teddy_discovery_alignment import (
     MAX_AFFINE_CONSENSUS_SCALE,
     MIN_AFFINE_CONSENSUS_SCALE,
     generate_monotonic_anchor_candidates,
-    infer_affine_consensus_alignments,
 )
 from teddy_discovery_alignment_acceptance import (
     ACCEPT_HYBRID,
-    select_affine_consensus_alignment,
+    select_affine_consensus_from_candidates,
 )
 from teddy_discovery_alignment_application import (
     apply_alignment_acceptance, AlignmentAcceptanceApplicationResult,
@@ -184,20 +183,18 @@ def _align_external_payload(payload, title, asr_result, acceptance_policy,
         ) from error
     try:
         candidates = generate_monotonic_anchor_candidates(bundle)
-        alternatives = infer_affine_consensus_alignments(
+        selection = select_affine_consensus_from_candidates(
             candidates,
+            acceptance_policy,
             residual_threshold_ms=residual_threshold_ms,
             minimum_scale=MIN_AFFINE_CONSENSUS_SCALE,
             maximum_scale=MAX_AFFINE_CONSENSUS_SCALE,
         )
-        if not alternatives:
+        if selection is None:
             raise _NoExternalConsensus(
                 "no affine-consistent monotonic anchor chain was found"
             )
-        selected, decision = select_affine_consensus_alignment(
-            alternatives,
-            acceptance_policy,
-        )
+        selected, decision = selection
     except AlignmentLimitError as error:
         raise ExternalSubtitleValidationError(
             "external subtitle alignment exceeded a fixed "

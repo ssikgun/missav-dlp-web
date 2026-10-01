@@ -20,7 +20,7 @@ from difflib import SequenceMatcher
 from fractions import Fraction
 import math
 import unicodedata
-from typing import Final
+from typing import Final, Iterator
 
 from teddy_discovery_asr import ASRResult, MAX_ASR_SEGMENT_TEXT_CHARS
 from teddy_discovery_hybrid_evidence import (
@@ -58,6 +58,8 @@ MAX_AFFINE_CONSENSUS_CANDIDATE_EVALUATIONS: Final[int] = 16_777_216
 MAX_AFFINE_CONSENSUS_DP_OPERATIONS: Final[int] = 16_777_216
 MAX_AFFINE_CONSENSUS_CHAINS_PER_HYPOTHESIS: Final[int] = 64
 MAX_AFFINE_CONSENSUS_PATHS_EVALUATED: Final[int] = 65_536
+# Full-chain storage contract for the legacy tuple API only. Streaming
+# identity storage and computation remain bounded by the work caps above/below.
 MAX_AFFINE_CONSENSUS_UNIQUE_CHAINS: Final[int] = 2_048
 MAX_AFFINE_CONSENSUS_FIT_PAIR_EVALUATIONS: Final[int] = 16_777_216
 MAX_AFFINE_CONSENSUS_PAIR_COMPARISONS: Final[int] = (
@@ -1340,20 +1342,22 @@ def _maximum_monotonic_consensus_paths(
     )
 
 
-def infer_affine_consensus_alignments(
+def iter_unique_affine_consensus_anchor_chains(
     candidates: tuple[MonotonicAnchorCandidate, ...],
     *,
     residual_threshold_ms: int,
     minimum_scale: float,
     maximum_scale: float,
-) -> tuple[AffineConsensusAlignment, ...]:
-    """Search bounded pair-derived affine hypotheses over existing candidates.
+) -> Iterator[tuple[MonotonicAnchorCandidate, ...]]:
+    """Yield unique maximum consensus chains within the existing work bounds.
 
     Each hypothesis admits candidates whose exact midpoint residual is within
     ``residual_threshold_ms``. A Fenwick dynamic program then enumerates every
     maximum-cardinality strict monotonic chain up to a fixed ambiguity cap.
-    Returned chains are deduplicated by source identities and fitted through
-    :func:`infer_robust_affine_alignment`; no lexical candidate is synthesized.
+    Only compact source-ordinal identity keys persist across hypotheses.
+    Fit pair work is charged before each unique chain is yielded. Consumers
+    must exhaust the iterator before returning any selection; later work-limit
+    failures invalidate earlier provisional results. No candidate is synthesized.
     """
 
     residual_threshold_ms = _require_exact_positive_int(
@@ -1411,7 +1415,7 @@ def infer_affine_consensus_alignments(
         )
 
     if len(candidate_points) < 2:
-        return ()
+        return
 
     minimum_scale_fraction = Fraction(str(minimum_scale))
     maximum_scale_fraction = Fraction(str(maximum_scale))
@@ -1458,17 +1462,15 @@ def infer_affine_consensus_alignments(
                 )
 
     if not hypotheses:
-        return ()
+        return
     work = len(hypotheses) * len(candidate_points)
     if work > MAX_AFFINE_CONSENSUS_CANDIDATE_EVALUATIONS:
         raise AlignmentLimitError(
             "affine-consensus candidate evaluation exceeds its fixed work bound"
         )
 
-    unique_chains: dict[
-        tuple[tuple[str, str], ...],
-        tuple[MonotonicAnchorCandidate, ...],
-    ] = {}
+    seen_chains: set[tuple[tuple[int, int], ...]] = set()
+    fit_pair_evaluations = 0
     dynamic_program_work = [0]
     paths_evaluated = 0
     for scale, intercept in sorted(hypotheses):
@@ -1496,39 +1498,56 @@ def infer_affine_consensus_alignments(
                 raise AlignmentLimitError(
                     "affine-consensus chain exceeds MAX_AFFINE_ANCHORS"
                 )
-            identity_key = tuple(
-                (anchor.external_identity.cue_id, anchor.asr_identity.cue_id)
-                for anchor in anchors
-            )
-            unique_chains[identity_key] = anchors
-            if len(unique_chains) > MAX_AFFINE_CONSENSUS_UNIQUE_CHAINS:
+            identity_key = tuple(_candidate_order_key(anchor) for anchor in anchors)
+            if identity_key in seen_chains:
+                continue
+            # Every key accounts for at least one already-counted path, so
+            # this set can never exceed MAX_AFFINE_CONSENSUS_PATHS_EVALUATED.
+            seen_chains.add(identity_key)
+            fit_pair_evaluations += len(anchors) * (len(anchors) - 1) // 2
+            if fit_pair_evaluations > MAX_AFFINE_CONSENSUS_FIT_PAIR_EVALUATIONS:
                 raise AlignmentLimitError(
-                    "unique affine-consensus chain count exceeds its fixed bound"
+                    "affine-consensus fit work exceeds its fixed pairwise bound"
                 )
+            yield anchors
 
-    fit_pair_evaluations = sum(
-        len(anchors) * (len(anchors) - 1) // 2
-        for anchors in unique_chains.values()
-    )
-    if fit_pair_evaluations > MAX_AFFINE_CONSENSUS_FIT_PAIR_EVALUATIONS:
-        raise AlignmentLimitError(
-            "affine-consensus fit work exceeds its fixed pairwise bound"
-        )
 
-    results = []
-    for identity_key in sorted(unique_chains):
-        anchors = unique_chains[identity_key]
-        alignment = infer_robust_affine_alignment(
-            anchors,
-            residual_threshold_ms=residual_threshold_ms,
-        )
-        results.append(
-            AffineConsensusAlignment(
-                anchors=anchors,
-                alignment=alignment,
+def infer_affine_consensus_alignments(
+    candidates: tuple[MonotonicAnchorCandidate, ...],
+    *,
+    residual_threshold_ms: int,
+    minimum_scale: float,
+    maximum_scale: float,
+) -> tuple[AffineConsensusAlignment, ...]:
+    """Legacy tuple API with its original 2048 full-chain storage contract."""
+
+    chains = []
+    for anchors in iter_unique_affine_consensus_anchor_chains(
+        candidates,
+        residual_threshold_ms=residual_threshold_ms,
+        minimum_scale=minimum_scale,
+        maximum_scale=maximum_scale,
+    ):
+        chains.append(anchors)
+        if len(chains) > MAX_AFFINE_CONSENSUS_UNIQUE_CHAINS:
+            raise AlignmentLimitError(
+                "unique affine-consensus chain count exceeds its fixed bound"
             )
+    # Preserve the legacy tuple ordering by stable cue ID, independently of
+    # hypothesis traversal and production selection ranking.
+    chains.sort(key=lambda anchors: tuple(
+        (anchor.external_identity.cue_id, anchor.asr_identity.cue_id)
+        for anchor in anchors
+    ))
+    return tuple(
+        AffineConsensusAlignment(
+            anchors=anchors,
+            alignment=infer_robust_affine_alignment(
+                anchors, residual_threshold_ms=residual_threshold_ms,
+            ),
         )
-    return tuple(results)
+        for anchors in chains
+    )
 
 
 __all__ = [
@@ -1564,6 +1583,7 @@ __all__ = [
     "RobustAffineAlignment",
     "infer_robust_affine_alignment",
     "infer_affine_consensus_alignments",
+    "iter_unique_affine_consensus_anchor_chains",
     "japanese_lexical_similarity",
     "normalize_japanese_for_matching",
     "select_monotonic_anchors",
