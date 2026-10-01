@@ -42,18 +42,28 @@ ambiguity, transport/incomplete processing, detached returned identity/state,
 all-nonaccept fallback, full evaluation and deterministic permutations.
 git diff --check PASS.
 
-Canary limitation: a read-only production-proxy search attempt returned
-SubtitleCatSearchTransportError. Baseline artifacts were located for the five
-multi titles, but candidate byte/detail caches were not found. Current 2048-cap
-real audit metadata (audit HEAD 1987f2f) was replayed through the new content
-selection policy: HUNTC-487 and START-501 select ACCEPT_HYBRID; FNS-237,
-PRWF-014 and SONE-970 fail closed due to an indeterminate alignment-limit
-candidate. Existing single-title audit evidence remains ACCEPT_HYBRID for all
-three; single-candidate execution compatibility passes synthetic regression.
-This is cached real-evidence policy replay, NOT a fresh per-candidate alignment
-recomputation or live canary success claim. Exact fresh input replay remains
-pending access to candidate caches or working read-only SubtitleCat transport.
-Hermes calls=0, Whisper calls=0, production NAS/Jellyfin/rollout DB writes=0.
+Fresh live current-evidence canary now PASS under the production 2048
+UNIQUE_CHAINS cap. Current SubtitleCat search/detail/payload evidence was fetched
+through the production proxy and evaluated by the committed multi-candidate
+selector with fresh per-candidate alignment computation. Environment failures=0.
+
+Live results:
+- DROP-141: ACCEPT_HYBRID
+- HSODA-104: ACCEPT_HYBRID
+- SIRO-5537: ACCEPT_HYBRID
+- HUNTC-487: ACCEPT_HYBRID
+- START-501: ACCEPT_HYBRID
+- FNS-237: fail closed
+- PRWF-014: fail closed
+- SONE-970: fail closed
+
+Expected ACCEPT match=5/5 and expected fail-closed match=3/3.
+This supersedes the earlier cached-policy-replay limitation. The broader
+evidence-qualified pool remains 12 titles, but only the five above are currently
+confirmed selectable through the production 2048-cap path. Hermes calls=0,
+Whisper calls=0, production NAS/Jellyfin/rollout DB writes=0. The next separate
+task remains generic UNIQUE_CHAINS algorithm improvement without merely raising
+the production cap.
 
 ## 2026-10-01 Stage11 — SubtitleCat canonical detail redirect
 
