@@ -1,5 +1,44 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-01 Stage12 — FNS-247 production HYBRID replacement completed
+
+FNS-247 operator-approved production subtitle replacement is complete: PASS.
+
+The existing durable replacement operation was resumed rather than creating a
+new operation. Pre-resume state was:
+INTENT_RECORDED -> NAS_PENDING -> FAILED_RETRYABLE.
+
+The retry reused the exact original operation identity and completed
+successfully after the existing replacement-lock permission hardening.
+
+Final production verification:
+- RESULT_PHASE=COMPLETED
+- HISTORY_LAST_PHASE=COMPLETED
+- EXISTING_OPERATION_REUSED=YES
+- ORIGINAL_PUBLICATION_SHA_PRESERVED=YES
+- EFFECTIVE_PUBLICATION_SHA_MATCH=YES
+- FINAL_NAS_SHA_MATCH=YES
+- JELLYFIN_EXTERNAL_KO_VISIBLE=YES
+- replacement event count: 7
+- FNS247_PRODUCTION_REPLACEMENT=PASS
+
+SHA transition:
+- original ASR_ONLY SHA:
+  847b77037be7133567b4e56f4364b54858e6e5a3ef2d3e56ee593fa1becfaf59
+- effective HYBRID SHA:
+  ebed3bc9d195038f5f8be2e6cf54be77fef024cb94f7680aa8b50b4b369fc86f
+
+The original publication record/history remains preserved while the
+replacement-aware effective publication now points to the approved HYBRID
+artifact. NAS read-back matches the new SHA and Jellyfin recognizes the exact
+external Korean SubRip subtitle.
+
+No new Hermes or Whisper execution was performed during publication.
+The generic normal first-time publication COLLISION policy remains unchanged.
+
+FNS-247 subtitle recovery / promotion work is CLOSED / PASS.
+
+
 ## 2026-10-01 Stage12 — existing replacement lock permission hardening
 
 Operator-supplied CT108/NAS read-only forensic: the first FNS-247 production
