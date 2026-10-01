@@ -2,10 +2,12 @@
 
 ## 2026-10-01 Stage11 — CT120 native fresh review-session creation
 
-Checkpoint Git outcome: staging failed because worktree Git metadata is read
-only (`index.lock` creation denied). Only the related deployment source,
-new native smoke and canonical handoff are changed. HEAD remains `82c7493`;
-this checkpoint is uncommitted and not pushed. No metadata workaround used.
+Checkpoint Git outcome: implementation and verification are complete.
+The native fresh review-session creation fix was committed as
+`a6fe17b4103fe83b5353f996834cfc62d2e4bd9d`
+(`fix native fresh review session creation`) and pushed to
+`teddy-subtitle-stage11`. The checkpoint started from clean HEAD `82c7493`;
+the worktree was clean after commit/push. No Git metadata workaround was used.
 
 FNS-247 real HYBRID review resume reused baseline, targeted artifact and the
 completed first-pass, and built the review request successfully. It then
