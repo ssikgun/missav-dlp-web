@@ -30,14 +30,22 @@ from teddy_discovery_alignment_acceptance import (
     ACCEPT_HYBRID,
     select_affine_consensus_alignment,
 )
-from teddy_discovery_alignment_application import apply_alignment_acceptance
+from teddy_discovery_alignment_application import (
+    apply_alignment_acceptance, AlignmentAcceptanceApplicationResult,
+)
 from teddy_discovery_hybrid_evidence import (
     HybridEvidenceBundle, HybridAlignmentProvenance,
     HybridEvidenceValidationError,
     ALIGNMENT_PROVENANCE_UNRESOLVED,
 )
-from teddy_discovery_subtitlecat_discovery import SubtitleCatSearchError
-from teddy_discovery_subtitle_external import ExternalSubtitleValidationError
+from teddy_discovery_subtitlecat_discovery import (
+    SubtitleCatSearchError, SubtitleCatSearchCandidate, MAX_SEARCH_CANDIDATES,
+    _safe_url,
+)
+from teddy_discovery_subtitle_external import (
+    ExternalSubtitleValidationError, ExternalSubtitleTransportError,
+    ExternalSubtitlePayload,
+)
 from teddy_discovery_targeted_second_evidence_runner import (
     run_targeted_second_evidence_v1_from_local_source,
 )
@@ -149,6 +157,143 @@ def build_targeted_adapter(*, holding_resolver, source_provider, targeted_transp
     return targeted
 
 
+class _NoExternalConsensus(AlignmentValidationError):
+    """Completed inference without any consensus; not an ambiguity/limit."""
+
+
+@dataclass(frozen=True)
+class _ExternalCandidateOutcome:
+    detail_url: str
+    status: str
+    payload_sha256: str | None = None
+    application: object | None = None
+
+
+def _align_external_payload(payload, title, asr_result, acceptance_policy,
+                            residual_threshold_ms):
+    try:
+        bundle = HybridEvidenceBundle.from_external_ja_and_asr(
+            dvd_id=title, external_ja_payload=payload, asr_result=asr_result,
+            alignment=HybridAlignmentProvenance(
+                ALIGNMENT_PROVENANCE_UNRESOLVED, "lexical-affine",
+            ),
+        )
+    except HybridEvidenceValidationError as error:
+        raise ExternalSubtitleValidationError(
+            "external subtitle immutable payload validation failed"
+        ) from error
+    try:
+        candidates = generate_monotonic_anchor_candidates(bundle)
+        alternatives = infer_affine_consensus_alignments(
+            candidates,
+            residual_threshold_ms=residual_threshold_ms,
+            minimum_scale=MIN_AFFINE_CONSENSUS_SCALE,
+            maximum_scale=MAX_AFFINE_CONSENSUS_SCALE,
+        )
+        if not alternatives:
+            raise _NoExternalConsensus(
+                "no affine-consistent monotonic anchor chain was found"
+            )
+        selected, decision = select_affine_consensus_alignment(
+            alternatives,
+            acceptance_policy,
+        )
+    except AlignmentLimitError as error:
+        raise ExternalSubtitleValidationError(
+            "external subtitle alignment exceeded a fixed "
+            "lexical/affine analysis limit"
+        ) from error
+    except AlignmentValidationError as error:
+        raise ExternalSubtitleValidationError(
+            "external subtitle alignment validation failed"
+        ) from error
+    return apply_alignment_acceptance(
+        bundle, decision,
+        alignment=(
+            selected.alignment
+            if decision.verdict == ACCEPT_HYBRID
+            else None
+        ),
+    )
+
+
+def _evaluate_external_search_candidate(candidate, *, provider, title, asr_result,
+                                        acceptance_policy, residual_threshold_ms):
+    """Keep incomplete/ambiguous evidence separate from completed non-accepts."""
+    url = candidate.detail_url
+    try:
+        payload = provider.fetch_original_japanese_payload(dvd_id=title, detail_url=url)
+    except ExternalSubtitleTransportError:
+        return _ExternalCandidateOutcome(url, "INDETERMINATE")
+    except ExternalSubtitleValidationError:
+        return _ExternalCandidateOutcome(url, "CONCLUSIVE_NON_ACCEPT")
+    except Exception:
+        return _ExternalCandidateOutcome(url, "INDETERMINATE")
+    # A returned payload must carry its original exact immutable identity.
+    # Validation of a malformed returned object is an execution fault, not a
+    # conclusive negative result that could authorize selection of another one.
+    try:
+        if type(payload) is not ExternalSubtitlePayload or payload.dvd_id != title:
+            raise Stage11LiveAdapterError("external payload identity detached")
+        payload.__post_init__()
+    except Exception:
+        return _ExternalCandidateOutcome(url, "INDETERMINATE")
+    try:
+        application = _align_external_payload(payload, title, asr_result,
+                                              acceptance_policy, residual_threshold_ms)
+        application.__post_init__()
+    except ExternalSubtitleValidationError as error:
+        # Bundle parsing and a completed empty inference are conclusive. All
+        # other alignment validation (including limit/ambiguity) is blocking.
+        conclusive = isinstance(error.__cause__, (HybridEvidenceValidationError,
+                                                  _NoExternalConsensus))
+        return _ExternalCandidateOutcome(url, "CONCLUSIVE_NON_ACCEPT" if conclusive
+                                         else "INDETERMINATE")
+    except Exception:
+        return _ExternalCandidateOutcome(url, "INDETERMINATE")
+    if application.decision.verdict == ACCEPT_HYBRID:
+        return _ExternalCandidateOutcome(url, "ACCEPTED", payload.sha256, application)
+    return _ExternalCandidateOutcome(url, "CONCLUSIVE_NON_ACCEPT")
+
+
+def _unique_accepted_payload_sha(outcomes):
+    """Content selection only; source order never resolves distinct contents."""
+    accepted = {}
+    for outcome in outcomes:
+        if outcome.status == "ACCEPTED":
+            sha = outcome.payload_sha256
+            if (type(sha) is not str or len(sha) != 64
+                    or any(c not in "0123456789abcdef" for c in sha)):
+                raise ExternalSubtitleValidationError("accepted external payload SHA is invalid")
+            accepted.setdefault(sha, outcome)
+        elif outcome.status not in {"CONCLUSIVE_NON_ACCEPT", "INDETERMINATE"}:
+            raise ExternalSubtitleValidationError("external candidate outcome is invalid")
+    if any(outcome.status == "INDETERMINATE" for outcome in outcomes):
+        raise ExternalSubtitleValidationError("external candidate evaluation is indeterminate")
+    if len(accepted) > 1:
+        raise ExternalSubtitleValidationError("distinct accepted external payloads are ambiguous")
+    return next(iter(accepted)) if accepted else None
+
+
+def _select_external_candidate(outcomes):
+    sha = _unique_accepted_payload_sha(outcomes)
+    if sha is None:
+        return None
+    matching = sorted((item for item in outcomes if item.status == "ACCEPTED"),
+                      key=lambda item: item.detail_url)
+    for item in matching:
+        application = item.application
+        if type(application) is not AlignmentAcceptanceApplicationResult:
+            raise ExternalSubtitleValidationError("accepted external application is invalid")
+        application.__post_init__()
+        if (application.decision.verdict != ACCEPT_HYBRID
+                or application.bundle.external_ja_payload.sha256 != sha):
+            raise ExternalSubtitleValidationError("accepted external payload evidence is detached")
+    # Equivalent content sources use canonical URL order only to retain a
+    # stable provenance witness, never to choose between different contents.
+    return matching[0].application
+
+
 def build_external_ja_adapter(*, discovery, provider, acceptance_policy,
                               residual_threshold_ms):
     def external(canonical_video, asr_result):
@@ -164,55 +309,27 @@ def build_external_ja_adapter(*, discovery, provider, acceptance_policy,
             raise Stage11LiveAdapterError("discovery source detached")
         if not found.candidates:
             return None
-        if len(found.candidates) != 1:
-            raise SubtitleCatSearchError("external candidate is not unique")
-        payload = provider.fetch_original_japanese_payload(
-            dvd_id=title, detail_url=found.candidates[0].detail_url,
-        )
-        try:
-            bundle = HybridEvidenceBundle.from_external_ja_and_asr(
-                dvd_id=title, external_ja_payload=payload, asr_result=asr_result,
-                alignment=HybridAlignmentProvenance(
-                    ALIGNMENT_PROVENANCE_UNRESOLVED, "lexical-affine",
-                ),
+        if len(found.candidates) == 1:
+            # Preserve the exact existing result and exception contract.
+            payload = provider.fetch_original_japanese_payload(
+                dvd_id=title, detail_url=found.candidates[0].detail_url,
             )
-        except HybridEvidenceValidationError as error:
-            raise ExternalSubtitleValidationError(
-                "external subtitle immutable payload validation failed"
-            ) from error
-        try:
-            candidates = generate_monotonic_anchor_candidates(bundle)
-            alternatives = infer_affine_consensus_alignments(
-                candidates,
-                residual_threshold_ms=residual_threshold_ms,
-                minimum_scale=MIN_AFFINE_CONSENSUS_SCALE,
-                maximum_scale=MAX_AFFINE_CONSENSUS_SCALE,
-            )
-            if not alternatives:
-                raise AlignmentValidationError(
-                    "no affine-consistent monotonic anchor chain was found"
-                )
-            selected, decision = select_affine_consensus_alignment(
-                alternatives,
-                acceptance_policy,
-            )
-        except AlignmentLimitError as error:
-            raise ExternalSubtitleValidationError(
-                "external subtitle alignment exceeded a fixed "
-                "lexical/affine analysis limit"
-            ) from error
-        except AlignmentValidationError as error:
-            raise ExternalSubtitleValidationError(
-                "external subtitle alignment validation failed"
-            ) from error
-        return apply_alignment_acceptance(
-            bundle, decision,
-            alignment=(
-                selected.alignment
-                if decision.verdict == ACCEPT_HYBRID
-                else None
-            ),
-        )
+            return _align_external_payload(payload, title, asr_result,
+                                           acceptance_policy, residual_threshold_ms)
+        if (type(found.candidates) is not tuple
+                or len(found.candidates) > MAX_SEARCH_CANDIDATES
+                or any(type(candidate) is not SubtitleCatSearchCandidate
+                       or type(candidate.detail_url) is not str
+                       or not candidate.detail_url for candidate in found.candidates)):
+            raise SubtitleCatSearchError("external search candidate state is invalid")
+        for candidate in found.candidates:
+            _safe_url(candidate.detail_url)
+        outcomes = tuple(_evaluate_external_search_candidate(
+            candidate, provider=provider, title=title, asr_result=asr_result,
+            acceptance_policy=acceptance_policy,
+            residual_threshold_ms=residual_threshold_ms,
+        ) for candidate in sorted(found.candidates, key=lambda item: item.detail_url))
+        return _select_external_candidate(outcomes)
     return external
 
 

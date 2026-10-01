@@ -486,7 +486,7 @@ def contract_check() -> None:
         run_one_title_stage11,
     )
     from teddy_discovery_stage11_live_adapters import (
-        build_external_ja_adapter,
+        build_external_ja_adapter, _align_external_payload,
     )
     from teddy_discovery_stage12_batch import (
         Stage12BatchRunner,
@@ -652,8 +652,9 @@ def contract_check() -> None:
             "Jellyfin recognition/fallback contract changed"
         )
 
-    external_source = inspect.getsource(
-        build_external_ja_adapter
+    external_source = (
+        inspect.getsource(build_external_ja_adapter)
+        + inspect.getsource(_align_external_payload)
     )
 
     for token in (

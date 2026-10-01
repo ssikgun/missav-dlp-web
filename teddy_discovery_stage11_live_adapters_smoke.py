@@ -89,6 +89,87 @@ class Transport:
         return (ASRSegment(chunk.start_ms, chunk.start_ms + 100, "独立した証拠"),)
 
 
+def multicandidate_smoke(baseline, policy):
+    from teddy_discovery_subtitlecat_discovery import SubtitleCatSearchCandidate, SubtitleCatSearchResult
+    from teddy_discovery_subtitle_external import SubtitleCatDetailError
+    from teddy_discovery_alignment import AlignmentLimitError, AlignmentAmbiguityError
+
+    video = fixture.fixture.holding()
+    original = fixture.fixture.srt_bytes(tuple((s.start_ms, s.end_ms, s.text)
+                                               for s in baseline.segments))
+    variants = {
+        'accept': original,
+        'duplicate': original,
+        'distinct': original + b'\n',
+        'unresolved': fixture.fixture.srt_bytes(tuple((s.start_ms, s.end_ms, s.text)
+                                                     for s in baseline.segments[:2])),
+        'reject': fixture.fixture.srt_bytes(tuple((s.start_ms, s.end_ms, s.text)
+                                                 for s in baseline.segments)),
+        'invalid': b'not an SRT',
+        'no-consensus': fixture.fixture.srt_bytes(((0, 100, 'unrelated phrase'),)),
+        'limit': original + b'\n',
+        'ambiguity': original + b'\n',
+        'identity': original,
+        'malformed-state': original,
+    }
+    errors = {'detail-invalid': SubtitleCatDetailError,
+              'transport': ExternalSubtitleTransportError, 'incomplete': RuntimeError}
+
+    def execute(names, changed_policy=policy):
+        calls = []
+        urls = ['https://subtitlecat.com/subs/1/' + name + '.html' for name in names]
+        discovery = SimpleNamespace(discover=lambda **kwargs: SubtitleCatSearchResult(
+            fixture.TITLE, tuple(SubtitleCatSearchCandidate(url) for url in urls)))
+        actual_provider = SubtitleCatProvider(
+            fetch_detail=lambda url: SubtitleCatDetailPage(url,
+                '<html><a href="' + url.rsplit('/', 1)[1].replace('.html', '-ja.srt')
+                + '">Japanese</a></html>'),
+            payload_fetcher=lambda candidate: original)
+        def fetch(**kwargs):
+            name = kwargs['detail_url'].rsplit('/', 1)[1][:-5]
+            calls.append(name)
+            if name in errors: raise errors[name]('offline synthetic failure')
+            if name == 'malformed-state': return object()
+            payload = actual_provider.fetch_original_japanese_payload(**kwargs)
+            if name == 'identity':
+                object.__setattr__(payload, 'dvd_id', 'OTHER-001')
+                return payload
+            return replace(payload, payload=variants[name], sha256=None, byte_size=None)
+        generate = adapters.generate_monotonic_anchor_candidates
+        def anchors(bundle):
+            if bundle.external_ja_payload.payload == original + b'\n':
+                if 'limit' in names: raise AlignmentLimitError('offline fixed cap')
+                if 'ambiguity' in names: raise AlignmentAmbiguityError('offline ambiguity')
+            return generate(bundle)
+        adapter = adapters.build_external_ja_adapter(discovery=discovery,
+            provider=SimpleNamespace(fetch_original_japanese_payload=fetch),
+            acceptance_policy=changed_policy, residual_threshold_ms=100)
+        with patch.object(adapters, 'generate_monotonic_anchor_candidates', side_effect=anchors):
+            try: result = adapter(video, baseline)
+            finally:
+                assert calls == (names if len(names) == 1 else sorted(names))
+        return result
+
+    assert execute(['accept']).decision.verdict == 'ACCEPT_HYBRID'
+    assert execute(['reject'], replace(policy, minimum_scale=1.01)).decision.verdict == 'REJECT_EXTERNAL'
+    for other in ('detail-invalid', 'unresolved', 'invalid', 'no-consensus', 'duplicate'):
+        assert execute(['accept', other]).decision.verdict == 'ACCEPT_HYBRID'
+        print('PASS multi accept plus ' + other)
+    for other in ('distinct', 'limit', 'ambiguity', 'transport', 'incomplete',
+                  'identity', 'malformed-state'):
+        expect(ExternalSubtitleValidationError, lambda: execute(['accept', other]))
+        print('PASS multi fail closed ' + other)
+    assert execute(['reject', 'duplicate'], replace(policy, minimum_scale=1.01)) is None
+    assert execute(['invalid', 'detail-invalid']) is None
+    assert execute(['unresolved', 'no-consensus']) is None
+    left, right = execute(['duplicate', 'accept']), execute(['accept', 'duplicate'])
+    assert left == right
+    assert left.bundle.external_ja_payload.source_url.endswith('/accept-ja.srt')
+    # An indeterminate early candidate never prevents evaluation of later ones.
+    expect(ExternalSubtitleValidationError, lambda: execute(['transport', 'accept', 'unresolved']))
+    print('PASS multi all nonaccept fallback, deterministic permutation, complete evaluation')
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="stage11-live-smoke-") as raw:
         root = Path(raw)
@@ -143,6 +224,7 @@ def main():
                 (s.start_ms, s.end_ms, s.text) for s in baseline.segments)))
         external = adapters.build_external_ja_adapter(discovery=discovery(True),
             provider=provider, acceptance_policy=policy, residual_threshold_ms=100)
+        multicandidate_smoke(baseline, policy)
         accepted = external(fixture.fixture.holding(), baseline)
         assert accepted.decision.verdict == "ACCEPT_HYBRID"
 

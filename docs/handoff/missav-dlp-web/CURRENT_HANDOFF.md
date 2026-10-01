@@ -1,5 +1,60 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-01 Stage11 — generic safe multi-candidate external JA selection
+
+Operator forensic across 162 effective ASR_ONLY titles: existing single-source
+ACCEPT_HYBRID titles are DROP-141, HSODA-104 and SIRO-5537. Consolidation of 51
+multi-search-candidate titles plus the 4096 UNIQUE_CHAINS diagnostic yielded
+UNIQUE_SELECTOR_SAFE=9, MULTIPLE_ACCEPTED_CONTENTS=1, ACCEPTED_BUT_BLOCKED=2,
+NO_SAFE_ACCEPTED_CONTENT=39. The nine unique contents are FBOS-015, FNS-244,
+HMN-896, HUNTC-487, NSFS-456, SDDE-763, SNOS-080, SNOS-216 and START-501.
+FNS-237 has two distinct accepted contents at diagnostic scope; PRWF-014 and
+SONE-970 remain blocked. Evidence-qualified pool is single 3 + unique multi 9
+= 12; this does not mean all 12 are selectable under production limits.
+
+Generic implementation: single-search-candidate execution keeps the previous
+application/verdict/exception contract through the extracted alignment owner.
+Multiple candidates retain the discovery bound (128) and official URL validator,
+then evaluate every candidate in sorted source-URL order using existing provider,
+immutable payload/bundle, lexical generation, affine consensus and acceptance.
+Frozen outcomes distinguish ACCEPTED, CONCLUSIVE_NON_ACCEPT and INDETERMINATE.
+Exact accepted payload SHA-256 deduplicates equivalent contents. Selection
+requires exactly one distinct accepted SHA and zero indeterminate outcomes;
+multiple accepted contents, transport failure, analysis limit, ambiguity,
+incomplete execution or returned identity drift remain fail closed. Completed
+empty consensus, detail/payload validation failure, REJECT_EXTERNAL and
+UNRESOLVED are non-accepts. Accepted application/bundle/SHA proof is revalidated.
+Equivalent content sources retain a stable source-URL provenance witness;
+URL ordering never chooses between distinct accepted contents.
+
+Production MAX_AFFINE_CONSENSUS_UNIQUE_CHAINS remains 2048, with unchanged
+lexical/affine/acceptance thresholds and bounded detail/payload redirect policy.
+4096 is diagnostic evidence only, not production policy. Next separate task:
+improve UNIQUE_CHAINS algorithm. The Stage12 source-inspection contract guard
+now inspects the extracted alignment owner too; execution/publication policy
+is unchanged. No title/DVD/cue-specific production branches were introduced.
+
+Offline validation: production venv live-adapter smoke PASS, external subtitle,
+discovery and proxy smoke PASS; related 47-script Stage11/Stage12 regression
+suite PASS. Tests cover single ACCEPT/REJECT, accepted plus invalid/unresolved,
+equivalent SHA across distinct sources, distinct accepted payloads, limit,
+ambiguity, transport/incomplete processing, detached returned identity/state,
+all-nonaccept fallback, full evaluation and deterministic permutations.
+git diff --check PASS.
+
+Canary limitation: a read-only production-proxy search attempt returned
+SubtitleCatSearchTransportError. Baseline artifacts were located for the five
+multi titles, but candidate byte/detail caches were not found. Current 2048-cap
+real audit metadata (audit HEAD 1987f2f) was replayed through the new content
+selection policy: HUNTC-487 and START-501 select ACCEPT_HYBRID; FNS-237,
+PRWF-014 and SONE-970 fail closed due to an indeterminate alignment-limit
+candidate. Existing single-title audit evidence remains ACCEPT_HYBRID for all
+three; single-candidate execution compatibility passes synthetic regression.
+This is cached real-evidence policy replay, NOT a fresh per-candidate alignment
+recomputation or live canary success claim. Exact fresh input replay remains
+pending access to candidate caches or working read-only SubtitleCat transport.
+Hermes calls=0, Whisper calls=0, production NAS/Jellyfin/rollout DB writes=0.
+
 ## 2026-10-01 Stage11 — SubtitleCat canonical detail redirect
 
 Operator-supplied read-only forensic: all 13 UNIQUE_CHAINS diagnostic refetch
