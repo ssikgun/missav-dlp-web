@@ -1,5 +1,103 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-01 Stage12 — explicit operator-approved subtitle replacement
+
+FNS-247 HYBRID comparison CLEAN/report are durable and finalized; structural
+comparison PASS. The operator reviewed real playback and approved the HYBRID
+as a production promotion candidate because actual content coverage is better
+than ASR_ONLY and improves understanding, although translation is imperfect.
+The current ASR_ONLY has 477 cues / 754140 ms active time; HYBRID has 313 cues /
+1206085 ms, including 808106 ms HYBRID-only active time and 451813 ms additional
+coverage within 30 of the current subtitle's 64 gaps >=30 seconds.
+
+CT108 direct read-only production witnesses supplied by the operator:
+- CURRENT_STATE=PUBLISHED
+- RECORDED_OLD_SHA_MATCH=YES / CURRENT_NAS_SHA_MATCH=YES
+- CANDIDATE_SHA_MATCH=YES / CANDIDATE_REPORT_MATCH=YES
+- SOURCE_FINGERPRINT_MATCH=YES / DESTINATION_CANONICAL=YES
+- JELLYFIN_CURRENT_VISIBLE=YES
+- FNS247_REPLACEMENT_PREFLIGHT=PASS
+
+Exact approved SHA binding:
+- old ASR_ONLY: `847b77037be7133567b4e56f4364b54858e6e5a3ef2d3e56ee593fa1becfaf59`
+- new HYBRID: `ebed3bc9d195038f5f8be2e6cf54be77fef024cb94f7680aa8b50b4b369fc86f`
+
+Codex did not repeat live NAS/Jellyfin queries. These witnesses are operator
+production evidence, not hardcoded production branches or synthetic evidence.
+
+Generic implementation is separate from normal bulk/first-time publication:
+`Stage12Replacement.run` defaults to read-only preflight (`execute=False`).
+Execution additionally requires exact one-title `ReplacementAuthorization`
+with `OPERATOR_APPROVED_SINGLE_TITLE_REPLACEMENT` mode, DVD identity, old/new
+SHA and recorded approval note; candidate root binds exact CLEAN/report paths.
+Authorization is checked before any execution lock or mutation. The existing
+Stage11 completion validator, canonical SRT validation, baseline snapshot,
+current holding fingerprint, canonical KO destination, durable publication
+proof and exact NAS SHA witness all remain mandatory. Normal valid Stage11
+HYBRID and ASR_ONLY completions are both eligible; no title/cue/SHA special
+case or alignment/validator threshold change exists.
+
+`Stage12RolloutStateStore` adds native read-only preflight APIs, a title-scoped
+execution lock and transactional sequence-CAS append API. Replacement events
+are stored separately with immutable UPDATE/DELETE guards, operation digest,
+replacement and event sequences, old/new SHA, paths/report digest, approval,
+source fingerprint, started/attempt/completed timestamps, NAS witness,
+Jellyfin verification and effective SHA. Original published rows and original
+publication events remain unchanged. `effective_publication(dvd_id)` is the
+replacement-aware current artifact view; `get(dvd_id)` retains the historical
+first-publication row. `replacement_history(dvd_id)` exposes the independent
+replacement lifecycle. Preflight reads existing schema with SQLite mode=ro
+and performs no schema migration or event append. No direct SQL fallback exists.
+
+Lifecycle: INTENT_RECORDED -> NAS_PENDING -> NAS_REPLACED -> JELLYFIN_PENDING
+-> COMPLETED, with FAILED_RETRYABLE / FAILED_TERMINAL outcomes. Intent is
+committed before NAS effects. Retry inspects exact old/new SHA; only the exact
+durable operation can reconcile an already-new NAS destination. NAS new after
+a crash skips destructive replacement and verifies/cleans any displaced-old
+backup. NAS third SHA or regression from a recorded new SHA fails closed;
+pending operations are quarantined, requiring operator investigation. A NAS
+verification failure never reaches Jellyfin. Jellyfin failure records a
+retryable event with effective new SHA; subsequent execution continues only
+Jellyfin verification, without replacing NAS again. COMPLETED requires the
+existing Stage12 exact video/path/external Korean/subrip recognizer contract,
+source fingerprint recheck and final NAS SHA read-back. Completed retries are
+idempotent and retain all historical events.
+
+`SubtitleReplacementMutator` is separate from `SubtitleSSHMutator`; normal
+`different existing final => COLLISION` and absent-target first publication
+remain unchanged. The replacement worker opens safe directory descriptors,
+rejects symlinks/nonregular/hardlinked targets, requires exact expected old SHA
+and source stat witness, creates an exclusive private same-directory temp,
+checks exact bytes/SHA and fsync, and uses Linux renameat2 RENAME_EXCHANGE.
+The displaced old inode remains at the private operation temp name until new
+bytes, parent/video identity and read-back verify. Exchange-edge races are
+verified and rolled back only while the exchanged identities remain proven;
+unverified backups are retained. No delete-then-publish or plain overwrite
+fallback exists. Old read permission bits are preserved without propagating
+unsafe write/execute bits. Directory fsync and bounded read-back are required.
+Linux hosts lacking atomic exchange fail closed.
+
+Production-venv validation: replacement smoke PASS (34 case groups), all 47
+related Stage12 rollout/batch/bulk/retry/reconcile/performance, Stage11,
+stateful, Hermes v2, subtitle v2, targeted, normal publisher and SSH regression
+scripts PASS. Includes unauthorized/invalid input write-zero, malformed and
+detached candidate contracts, symlink/nonregular/source drift, temp/post-write
+mismatch, crash-before-NAS and crash-after-NAS, native exchange crash backup,
+atomic-edge concurrent-byte preservation, Jellyfin pending/identity failure,
+no second destructive replace, append/CAS and old-history preservation,
+subsequent replacements bound to effective SHA, and normal COLLISION behavior.
+
+Generic fixture/injected-dependency dry-run PASS with matching current/candidate
+SHA, source fingerprint, canonical destination, existing regular target,
+Jellyfin path/stream proof and old publication history. Fixture database bytes
+remain unchanged; NAS replace calls=0, Jellyfin recognizer calls=0,
+replacement event writes=0. Local test fixtures alone exercised mutation.
+
+Actual production replacement NOT PERFORMED. Live NAS write=0, live Jellyfin
+refresh/write=0, production rollout DB mutation=0. No new Hermes/Whisper calls,
+current KO overwrite or Stage13 changes occurred. Final execution requires
+separate operator approval after reviewing this implementation/checkpoint.
+
 ## 2026-10-01 Stage11 — FNS-247 HYBRID structural comparison
 
 Durable comparison CLEAN/report verification is complete. Read-only structural
@@ -24,10 +122,11 @@ Cross-coverage:
 - 30 of the current subtitle's 64 >=30 s gaps contain HYBRID coverage
 - HYBRID contributes 451813 ms of subtitle coverage inside those current gaps
 
-The structural result strongly confirms recovery of substantial subtitle
-coverage that ASR_ONLY lacked, but it does not by itself authorize publication.
-A small set of improvement and regression-candidate time windows should be
-spot-checked against the video before replacing the current KO subtitle.
+The subsequent operator playback spot-check is complete. The user judged
+that the HYBRID contains more actual content than ASR_ONLY and is more useful
+for understanding the work, despite imperfect translation. The HYBRID is now
+an operator-approved production promotion candidate. Actual replacement still
+requires a separate exact one-title execution approval and has not occurred.
 
 No NAS/Jellyfin/current KO/rollout DB write was performed.
 

@@ -23,6 +23,7 @@ from pathlib import Path, PurePosixPath
 import re
 import sqlite3
 import stat
+import os
 
 from teddy_discovery_asr import ASRSourceSnapshot
 from teddy_discovery_asr_artifact import (
@@ -743,6 +744,23 @@ def _validate_reconciliation_evidence(
     result["subtitle_language"] = language
     result["subtitle_codec"] = codec
     return result
+
+
+# Replacement provenance is a separate append-only journal. Original title
+# rows and first-publication events retain their frozen meaning.
+_STATE_SCHEMA += """
+CREATE TABLE IF NOT EXISTS stage12_replacement_events (
+ dvd_id TEXT NOT NULL REFERENCES stage12_rollout_titles(dvd_id),
+ sequence INTEGER NOT NULL,
+ operation_id TEXT NOT NULL,
+ event_json TEXT NOT NULL,
+ PRIMARY KEY(dvd_id, sequence)
+);
+CREATE TRIGGER IF NOT EXISTS stage12_replacement_no_update
+BEFORE UPDATE ON stage12_replacement_events BEGIN SELECT RAISE(ABORT, 'append-only replacement history'); END;
+CREATE TRIGGER IF NOT EXISTS stage12_replacement_no_delete
+BEFORE DELETE ON stage12_replacement_events BEGIN SELECT RAISE(ABORT, 'append-only replacement history'); END;
+"""
 
 
 class Stage12RolloutStateStore:
@@ -1865,6 +1883,151 @@ class Stage12RolloutStateStore:
                 "recovered_start_reason": STAGE12_EXPLICIT_RETRY_START,
             },
         )
+
+
+    def read_replacement_original(self, dvd_id: str) -> Stage12RolloutState:
+        """Read-only original state/proof; never migrate schema during preflight."""
+        dvd_id = _validated_dvd_id(dvd_id)
+        connection = sqlite3.connect(self.state_path.as_uri() + '?mode=ro', uri=True)
+        connection.row_factory = sqlite3.Row
+        try:
+            connection.execute('BEGIN')
+            row = self._get_in_transaction(connection, dvd_id)
+            if row is None:
+                raise Stage12RolloutValidationError('replacement title does not exist')
+            state = _state_from_row(row)
+            if state.status == STATE_PUBLISHED:
+                events = tuple(connection.execute(
+                    'SELECT * FROM stage12_rollout_events WHERE dvd_id=? ORDER BY event_id',
+                    (dvd_id,)).fetchall())
+                _validate_publication_provenance(state, _publication_provenance_from_events(events))
+            return state
+        finally:
+            connection.close()
+
+    def replacement_history(self, dvd_id: str) -> tuple[dict[str, object], ...]:
+        """Append-only replacement journal, separate from original publications."""
+        dvd_id = _validated_dvd_id(dvd_id)
+        connection = sqlite3.connect(self.state_path.as_uri() + '?mode=ro', uri=True)
+        try:
+            if connection.execute("SELECT 1 FROM sqlite_master WHERE name='stage12_replacement_events'").fetchone() is None:
+                return ()
+            rows = connection.execute(
+                'SELECT event_json FROM stage12_replacement_events WHERE dvd_id=? ORDER BY sequence',
+                (dvd_id,),
+            ).fetchall()
+            return tuple(json.loads(row[0]) for row in rows)
+        finally:
+            connection.close()
+
+    def effective_publication(self, dvd_id: str) -> Stage12RolloutState:
+        """Current artifact view; the original published row/events are immutable."""
+        from dataclasses import replace
+        state = self.read_replacement_original(dvd_id)
+        history = self.replacement_history(dvd_id)
+        for event in reversed(history):
+            if event['effective_sha256'] == event['plan']['new_sha256']:
+                plan = event['plan']
+                return replace(state, artifact_sha256=plan['new_sha256'],
+                               artifact_path=plan['artifact_path'], report_path=plan['report_path'],
+                               report_sha256=plan['report_sha256'])
+        return state
+
+    def append_replacement(self, plan: Mapping[str, object], phase: str, *,
+                           expected_sequence: int, nas_sha256: str | None = None,
+                           jellyfin_evidence: Stage12PublicationReconciliationEvidence | None = None,
+                           authorization=None) -> dict[str, object]:
+        """Native transactional API. Only append; never update publication history.
+
+        The caller holds a title-scoped execution lock across external effects.
+        Event sequence CAS also rejects stale/competing journal mutations.
+        """
+        from dataclasses import replace
+        from teddy_discovery_stage12_replacement import validate_authorization, validate_plan
+        plan = validate_plan(plan)
+        validate_authorization(authorization, plan['dvd_id'], plan['old_sha256'], plan['new_sha256'])
+        transitions = {
+            None: {'INTENT_RECORDED'},
+            'INTENT_RECORDED': {'NAS_PENDING', 'FAILED_TERMINAL'},
+            'NAS_PENDING': {'NAS_REPLACED', 'FAILED_RETRYABLE', 'FAILED_TERMINAL'},
+            'NAS_REPLACED': {'JELLYFIN_PENDING', 'FAILED_TERMINAL'},
+            'JELLYFIN_PENDING': {'COMPLETED', 'FAILED_RETRYABLE', 'FAILED_TERMINAL'},
+            'FAILED_RETRYABLE': {'NAS_PENDING', 'JELLYFIN_PENDING', 'FAILED_TERMINAL'},
+            'COMPLETED': set(), 'FAILED_TERMINAL': set(),
+        }
+        with self._transaction() as connection:
+            row = self._get_in_transaction(connection, plan['dvd_id'])
+            if row is None:
+                raise Stage12RolloutValidationError('replacement title does not exist')
+            state = _state_from_row(row)
+            if state.status != STATE_PUBLISHED:
+                raise Stage12RolloutValidationError('replacement requires PUBLISHED')
+            publication_rows = tuple(connection.execute(
+                'SELECT * FROM stage12_rollout_events WHERE dvd_id=? ORDER BY event_id',
+                (plan['dvd_id'],)).fetchall())
+            _validate_publication_provenance(state, _publication_provenance_from_events(publication_rows))
+            events = tuple(json.loads(r[0]) for r in connection.execute(
+                'SELECT event_json FROM stage12_replacement_events WHERE dvd_id=? ORDER BY sequence',
+                (plan['dvd_id'],)).fetchall())
+            if type(expected_sequence) is not int or expected_sequence != len(events):
+                raise Stage12RolloutValidationError('replacement event sequence is stale')
+            last = events[-1] if events else None
+            same = last is not None and last['operation_id'] == plan['operation_id']
+            if same and last['plan'] != plan:
+                raise Stage12RolloutValidationError('replacement operation provenance detached')
+            if not same and last is not None and last['phase'] != 'COMPLETED':
+                raise Stage12RolloutValidationError('another replacement is unresolved')
+            previous_phase = last['phase'] if same else None
+            if phase not in transitions.get(previous_phase, set()):
+                raise Stage12RolloutValidationError('invalid replacement phase transition')
+            effective_sha = last['effective_sha256'] if last else state.artifact_sha256
+            if not same and effective_sha != plan['old_sha256']:
+                raise Stage12RolloutValidationError('replacement old SHA differs from effective publication')
+            expected_fingerprint = {key: getattr(state, key) for key in (
+                'holding_identity', 'media_path_identity', 'source_size_bytes', 'source_mtime_ns')}
+            if plan['source_fingerprint'] != expected_fingerprint or plan['destination_relative'] != state.destination_relative:
+                raise Stage12RolloutValidationError('replacement source/destination detached')
+            if phase in {'NAS_REPLACED', 'JELLYFIN_PENDING', 'COMPLETED'}:
+                if nas_sha256 != plan['new_sha256']:
+                    raise Stage12RolloutValidationError('replacement new NAS witness required')
+                effective_sha = plan['new_sha256']
+            elif nas_sha256 is not None:
+                _validated_sha(nas_sha256, field_name='replacement NAS SHA')
+            jellyfin = None
+            if phase == 'COMPLETED':
+                jellyfin = _validate_reconciliation_evidence(
+                    replace(state, artifact_sha256=plan['new_sha256']), jellyfin_evidence)
+            timestamp = _utc_now()
+            operation_sequence = last['replacement_sequence'] if same else sum(
+                event['phase'] == 'INTENT_RECORDED' for event in events) + 1
+            event = dict(dvd_id=plan['dvd_id'], operation_id=plan['operation_id'],
+                         replacement_sequence=operation_sequence,
+                         started_at=last['started_at'] if same else timestamp,
+                         sequence=len(events)+1, phase=phase, plan=plan,
+                         operator_approved=True, source_fingerprint=expected_fingerprint,
+                         nas_sha256=nas_sha256, jellyfin_verification=jellyfin,
+                         effective_sha256=effective_sha, timestamp=timestamp,
+                         completed_at=timestamp if phase == 'COMPLETED' else None)
+            connection.execute(
+                'INSERT INTO stage12_replacement_events(dvd_id,sequence,operation_id,event_json) VALUES(?,?,?,?)',
+                (plan['dvd_id'], event['sequence'], plan['operation_id'], _canonical_provenance(event)))
+            return event
+
+    @contextmanager
+    def replacement_execution_lock(self, dvd_id: str):
+        """Serialize one title's external effects; unrelated titles stay independent."""
+        dvd_id = _validated_dvd_id(dvd_id)
+        path = Path(str(self.writer_lock_path) + '.replacement-' + dvd_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        try:
+            info = os.fstat(descriptor)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                raise Stage12RolloutValidationError('unsafe replacement execution lock')
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+            yield
+        finally:
+            os.close(descriptor)
 
 
 def _safe_artifact_root(value: str | Path) -> Path:
