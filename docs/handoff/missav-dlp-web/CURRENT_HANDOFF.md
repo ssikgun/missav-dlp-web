@@ -9550,3 +9550,34 @@ completion timer changes=0. Next: Teddy manual visual check on desktop and
 mobile in both themes, including cover sizing/contain, overflow, row-toggle
 isolation, X/backdrop/Esc and missing-cover placeholders; report PASS for UI-P2
 closure or visual preferences for a separate tuning checkpoint.
+
+### UI-P3 — Teddy final manual visual acceptance / closure
+
+Teddy confirmed the final manual visual acceptance on 2026-10-02 for the
+existing production UI source `24fc73a622632dfcf0ea872250ae4b3300a8d5e1`
+and image
+`sha256:da1e46073bb94b1f942b67b2fead20cc00656922b65f446ef7316b48d706aa0f`.
+This operator confirmation closes the earlier UI-P2 PENDING_TEDDY status.
+
+Confirmed manual checks:
+- Desktop layout PASS; mobile layout PASS.
+- Light theme PASS; dark theme PASS.
+- Enlarged 3:2 thumbnail PASS; object-fit contain PASS.
+- No problematic horizontal overflow PASS; cover hover magnifier PASS.
+- Cover click opens the large image PASS and does not toggle, expand or
+  collapse the Library row PASS.
+- X close PASS; backdrop close PASS; Esc close PASS.
+- Popup remains viewport-bounded on mobile PASS.
+
+`VISUAL_CANARY=PASS`
+`STAGE13_UI_CLOSED=YES`
+Stage13 core file-management functionality remains CLOSED/PASS.
+
+UI-P3 is closure bookkeeping only: source code changes=0, production
+build/deploy/restarts=0, DB/NAS/Jellyfin mutations=0, delete requests=0,
+subtitle source/pipeline changes=0. The existing subtitle handoff content is
+preserved. No UI blocker remains.
+
+Next project task: continue the current FNS-247 same-source translation
+quality A/B and Stage11 rescreen objective described at the top of this
+handoff, preserving its existing production subtitle pipeline boundary.
