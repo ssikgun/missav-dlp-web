@@ -9473,3 +9473,80 @@ timer/service changes=0 and subtitle pipeline mutations=0. Next checkpoint:
 production UI deploy + browser visual check for responsive overflow, both
 themes and native dialog interactions; rerun Flask-dependent fixture smokes
 in an existing suitable environment.
+
+## 2026-10-02 Stage13 UI — File Manager cover preview production deploy
+
+UI-P2 production is healthy; visual closure is INCOMPLETE / PENDING_TEDDY.
+Deployed exact detached source `24fc73a622632dfcf0ea872250ae4b3300a8d5e1`; later branch changes are
+not included in this image. UI source/test SHA-256 values matched the Git
+commit, candidate files and live assets. Detached build worktree remains clean.
+
+Candidate/deployed tag: `missav-dlp-web:stage13-ui-24fc73a`
+Image ID: `sha256:da1e46073bb94b1f942b67b2fead20cc00656922b65f446ef7316b48d706aa0f`
+OCI revision: `24fc73a622632dfcf0ea872250ae4b3300a8d5e1`
+New web container: `880cf97a6a3dece8e5ea51def22900c3aa41c32c2b73ba8f098c3025d7e9d4ca`; restart count=0.
+
+Rollback retained: `missav-dlp-web:stage13f2md10-52aa3f4`
+Prior image ID: `sha256:92104fcb5bf5c7501120b078ec0e8c778358f3b33064e77e4d89e0b6606274ff`
+Prior web container: `e7d8e64a05c6158e2ed8c3d60478281b316d6b75e8a2ec99095ab0a4cebb1c80`; restart count was 0.
+Prior image had no OCI revision label. Base compose literal image remains
+`missav-dlp-web:stage13f2md2-0fb6a59`; the prior effective image came from
+`/tmp/e4b-web-image-override.yaml`. Candidate pin is the additional override
+`/opt/missav-dlp-web/stage13-ui-24fc73a.override.yaml`. Original compose/override and preflight records
+are backed up under `/opt/missav-dlp-web/backups/stage13-ui-p2-20261002-105620`.
+
+Rendered Compose comparison allowed only the web service image delta. All
+other services, declared production environment, mounts, title locks, writer
+socket, DB/key mounts, ports, networks, user/groups and restart policy were
+preserved. Standard Dockerfile base-image Python metadata changed from
+3.10.21 to 3.10.22; declared runtime settings did not change.
+Only `missav-dlp-web` was recreated once with `--no-deps`; no rollback occurred.
+Gluetun `8a66f78e5ff0`, desktop browser
+`c4863d2f00e9` and mobile browser
+`6c79fd989f56` kept their container IDs and restart counts.
+
+Build environment note: two standard build attempts failed the writer smoke's
+new-socket inode inequality on Docker overlay storage; an isolated unlink/rebind
+probe confirmed immediate inode reuse. The exact writer source/assertions
+passed on tmpfs, matching the production writer socket filesystem. The final
+build used the existing Dockerfile with only a transient `/tmp` tmpfs mount on
+that writer-smoke RUN instruction. No repository Dockerfile/source/assertion
+changed or test was skipped; the image's original Dockerfile SHA still matches
+24fc73a. All final Dockerfile checks passed.
+
+Separate network-disabled, read-only candidate containers with temporary
+/tmp and no production mounts/secrets passed Library UI, Library API,
+delete dry-run, delete activity and Discovery shell smokes, plus writer smoke.
+The previously Flask-blocked API/delete dry-run checks are now PASS. Touched
+Python compile, V8 JS syntax and source `git diff --check` also PASS; no ad hoc
+dependencies installed.
+
+Production health: `/login`=200, unauth `/`=302 to login,
+unauth `/api/library`=401. Auth guard bytes match the prior image; no production
+delete prepare/validate/commit request was issued. Live Library CSS/JS=200,
+with exact source SHA-256 matches and thumbnail/lightbox markers intact.
+Read-only production Library builder returned 217 holdings/items, all with
+known size and Jellyfin status. Cached ADN-785 cover returned image/jpeg 200
+(28,768 bytes) through the existing cover route in a separate local Flask
+validation using production read-only DB/cache inputs; no live auth cookie
+was manufactured. Search/filter/sort and single shared playback wiring PASS.
+
+Writer host/web health remained READY; writer stayed active/enabled and was
+not restarted. Gate remains false. Completion timer stayed enabled/active,
+completion service inactive between natural cycles, reconcile-apply inactive;
+no timer/service changes. During read-only observation, 14 independent natural
+completion cycles had organizer applied=0, media attempted=0,
+metadata recovered=0 and Jellyfin mutations=0.
+
+No authenticated browser/DevTools automation harness was available; existing
+browsers were not restarted/reconfigured and no credentials were bypassed.
+Desktop/mobile, light/dark, layout/overflow, cover click without row toggle,
+X/backdrop/Esc and missing-poster visual checks remain PENDING_TEDDY.
+`VISUAL_CANARY=PENDING_TEDDY`. Healthy deploy is retained.
+
+UI checkpoint direct production DB/NAS writes/deletes, Jellyfin mutations,
+delete requests, subtitle generation/pipeline mutation, Hermes/VM122 and
+completion timer changes=0. Next: Teddy manual visual check on desktop and
+mobile in both themes, including cover sizing/contain, overflow, row-toggle
+isolation, X/backdrop/Esc and missing-cover placeholders; report PASS for UI-P2
+closure or visual preferences for a separate tuning checkpoint.
