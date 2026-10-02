@@ -1,6 +1,151 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
-## 2026-10-02 — NEXT CHAT START HERE: FNS-247 subtitle quality A/B + Stage11 rescreen handoff
+## 2026-10-02 — NEXT CHAT START HERE: Stage11 HYBRID suspect-only implementation
+
+Current checkpoint: source implementation and offline regression complete;
+**this HYBRID change has NOT been deployed to production**. Continue from the
+current `teddy-subtitle-stage11` branch. The older investigation below is
+historical context, superseded by this implementation checkpoint.
+
+### A/B conclusions and evidence boundaries
+
+The accepted A/B direction is the V3 **true-no-skill primary translation**:
+start with natural conversational Korean, preserve Japanese meaning, speaker
+relationships and context, and reserve semantic adjudication for a separate
+pass. A prompt that merely says not to load skills is insufficient enforcement.
+The native primary Hermes commands now explicitly contain `-t file,terminal`;
+`subtitle-semantic-quality-review` cannot enter via the skill toolset. Both the
+canonical translator query and the actual native part continuation query share
+this primary policy. `repaired_ja` requires material evidence justification;
+IDs/order and code-owned timestamps remain immutable.
+
+The V3 translation and audio-review files under `/tmp/FNS-247.*` remain
+comparison-only evidence. Their source identities and comparison schemas are
+not native production provenance and have not been imported, relabeled, or
+reused by this implementation. TurboScribe remains an operator reference,
+never a required production source/dependency.
+
+TurboScribe timestamps and the media timeline differed. The initially targeted
+raw-timestamp windows therefore sampled misplaced audio. The comparison fit
+was scale `1.0142255083179297`, intercept `-276.90735674676523 ms`; its selected
+suspect interval shifts ranged from +1.097 to +21.528 seconds. Replanning from
+affine-projected timestamps corrected the windows. The corrected run retained
+22 suspects / 13 bounded windows and returned 61 segments (the misplaced run
+had 42); no corrected window was empty. These are timing/evidence diagnostics,
+not a claim that Whisper is ground truth.
+
+Crucially, that TurboScribe comparison fit was **UNRESOLVED**, with 63/63
+anchors/inliers and median residual 194.933826 ms but external/ASR evidence
+spans only 1,635,130 / 1,657,664 ms. The production minimum remains
+`minimum_evidence_span_ms=1_800_000`; it was not lowered. Comparison timing
+correction does not make that fit production-accepted. The implementation
+projects only the alignment already accepted by the existing HYBRID route.
+
+The conservative V3 full review selected 22 non-KEEP cues from 374: 17 REPAIR
+and 5 AMBIGUOUS (352 KEEP). With corrected audio, whole-title final adjudication
+still showed semantic drift relative to the target-only run: 5 target
+action/category differences and 10 replacement-text differences. All 352 previous
+non-target KEEP cues remained KEEP in that particular comparison; the problem
+is uncontrolled whole-title decision ownership and inconsistent target
+repairs, not an observed non-target deletion in that saved run.
+
+The saved target-only adjudication succeeded structurally: exactly the same
+22 suspect IDs/order, 15 REPAIR, 4 KEEP, 3 AMBIGUOUS, 0 OMIT. AMBIGUOUS maps to
+KEEP, so seven suspects preserve the primary translation. It could read all
+374 cues as context while owning decisions for only the 22 targets. This is
+the scope contract carried into the generic native pipeline; no reference
+cue numbers, dialogue, title IDs or comparison constants were added to source.
+
+### Final generic HYBRID architecture
+
+1. Preserve accepted external JA, accepted affine alignment, native stateful
+   package/session/provenance and first-pass cue backbone. Primary Hermes uses
+   only `file,terminal` and prioritizes natural Korean without unsupported
+   addition, deletion or paraphrase.
+2. Execute the existing conservative full-title review as **triage only**.
+   Deterministically select exactly `action != KEEP`, including AMBIGUOUS.
+   Never pass this triage result directly to CLEAN.
+3. Reuse the external-cue affine projection and generic V1 window policy:
+   pre/post padding 5,000/5,000 ms, merge gap 10,000 ms, max 60,000 ms. Preserve
+   original external cue IDs after selection. Execute only suspect windows
+   through the shared bounded decoder and existing no-VAD
+   `transcribe_targeted_chunk` endpoint.
+4. Preserve `TargetedASRArtifact` / `TargetedASRWindowEvidence`; bind their
+   source snapshot and exact planned windows, plus durable context containing
+   baseline/triage hashes, affine parameters, target IDs, policy and artifact
+   SHA. Reuse full-window raw-context projection without treating every segment
+   as a direct cue transcript or replacing first-pass evidence ownership.
+5. Reuse the native review runner in target-only mode. It reads the full title,
+   but its validator accepts exactly the target IDs/order and rejects model
+   decisions for non-target cues. A fresh native execution session remains
+   distinct from immutable source translation provenance.
+6. Deterministically compose a full review: target decisions from final
+   adjudication, all non-targets local KEEP with null replacements. Feed only
+   this composition into the existing CLEAN materializer. AMBIGUOUS remains
+   auditable and applies as KEEP; only REPAIR supplies replacement JA/KO; OMIT
+   requires sufficient evidence of real non-dialogue metadata/noise. The full
+   review preserves original ID/count/order, and timing remains code-owned.
+
+Existing ASR-first targeted evidence and ASR_ONLY review/materialization are
+preserved. Empty suspect scope skips targeted execution and final model work.
+Targeted failure, wrong source/window/provenance, or out-of-scope final output
+fails before CLEAN/report creation. HYBRID generation identity now includes
+`hybrid-suspect-targeted-v1`, preserving deterministic identity construction
+while preventing reuse of an older translation as the new pipeline. Existing
+legacy HYBRID completions lacking the new durable final composition fail
+closed; use a separate explicitly chosen artifact/staging root for a future
+native canary instead of overwriting old artifacts.
+
+Durable per-title audit files added alongside existing CLEAN/report:
+`hybrid-triage-v1.json`, `hybrid-suspect-asr-v1.json`,
+`hybrid-suspect-context-v1.json`, `hybrid-final-target-v1.json`,
+`hybrid-final-request-v1.json`, and `hybrid-final-review-v1.json`.
+Suspect evidence/context/raw final files are absent when no suspects exist.
+Completed replay verifies composition and evidence hashes. Artifact writes
+reuse the existing owned 0600/no-overwrite/durable installation boundary.
+
+### Validation and remaining boundary
+
+Offline verification uses `/opt/stage11-stt-venv/bin/python` and synthetic,
+injected audio/model/native-session fixtures. The new suspect smoke covers
+primary tool restriction on both actual command paths, shared part prompt,
+triage isolation, deterministic selection/merge, REPAIR/AMBIGUOUS behavior,
+non-target ownership rejection, affine timing, policy/transport reuse, live
+adapter/native runner wiring, immutable provenance, failures before CLEAN,
+empty target scope and production acceptance-span preservation.
+
+Final verification: **69 smoke/regression scripts PASS, 0 FAIL**, including
+existing HYBRID, ASR_ONLY, all Stage11 controller/live adapter/deployment/native
+session checks and related alignment/ASR/stateful/targeted/CLEAN/legacy subtitle
+contracts. The new suspect smoke reports **43 assertions PASS, 0 FAIL**;
+its native-adapter test also uses the actual deployment originals registry.
+Changed Python compilation and `git diff --check` PASS. The host system Python
+lacks numpy; all final smokes ran in the existing project venv, with no dependency
+installation. No smoke was skipped.
+
+Source files changed: `teddy_discovery_hybrid_suspect_review.py` (new pure scope
+helpers), `teddy_discovery_hybrid_suspect_review_smoke.py` (new regression),
+`teddy_discovery_stage11_controller.py`, `teddy_discovery_stage11_live_adapters.py`,
+`teddy_discovery_stage11_deployment.py`, `teddy_discovery_stateful_translator.py`,
+`teddy_discovery_stateful_translator_policy.txt`,
+`teddy_discovery_stateful_controller.py`, `teddy_discovery_stateful_live_runner.py`,
+`teddy_discovery_stateful_quality_review.py`,
+`teddy_discovery_stateful_quality_review_runner.py`,
+`teddy_discovery_targeted_asr_window.py`, and
+`teddy_discovery_targeted_second_evidence_runner.py`. This canonical handoff is
+the only documentation file changed; no separate handoff was created.
+
+Git checkpoint uses current branch `teddy-subtitle-stage11`, with pre-change
+local/origin HEAD `dc3dea1bbab2a6dd351ffd1f14c2e1cc2dbcd9cc`. The implementation,
+regression and this handoff are committed/pushed together; final local/origin
+HEAD equality and clean worktree are checked after push and reported in the
+task completion response.
+No production deployment, production DB/NAS write, Jellyfin publication,
+service/timer change, or live Hermes/Whisper invocation was performed for this
+checkpoint. No source implementation blocker remains. Production deployment
+and live native quality canary remain a separate, future checkpoint.
+
+## 2026-10-02 — Previous subtitle quality A/B investigation (historical context)
 
 ### Current objective / priority
 

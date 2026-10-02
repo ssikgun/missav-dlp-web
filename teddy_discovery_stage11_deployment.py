@@ -1404,6 +1404,7 @@ class Stage11DeploymentDependencies:
             "first_pass_runner": self.live.first_pass_runner,
             "asr_review_runner": self.live.asr_review_runner,
             "hybrid_review_runner": self.live.hybrid_review_runner,
+            "hybrid_targeted_runner": self.live.hybrid_targeted_runner,
         }
 
 

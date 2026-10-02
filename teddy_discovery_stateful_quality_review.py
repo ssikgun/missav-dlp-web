@@ -647,12 +647,28 @@ def validate_review_request(request: QualityReviewRequest, **originals) -> Quali
     return request
 
 
-def validate_review_result(result: QualityReviewResult, request: QualityReviewRequest) -> QualityReviewResult:
+def validate_review_target_ids(request: QualityReviewRequest, target_cue_ids: tuple[str, ...]) -> tuple[str, ...]:
+    """Require an explicit nonempty subset in original source order."""
+    _validate(request, QualityReviewRequest)
+    if type(target_cue_ids) is not tuple or not target_cue_ids:
+        raise QualityReviewError("review targets must be a nonempty tuple")
+    if any(type(cue_id) is not str for cue_id in target_cue_ids):
+        raise QualityReviewError("invalid review target ID")
+    selected = set(target_cue_ids)
+    if tuple(c.cue_id for c in request.cues if c.cue_id in selected) != target_cue_ids:
+        raise QualityReviewError("review targets unknown, duplicated or out of order")
+    return target_cue_ids
+
+
+def validate_review_result(result: QualityReviewResult, request: QualityReviewRequest,
+                          *, target_cue_ids: tuple[str, ...] | None = None) -> QualityReviewResult:
     """Requires the caller's exact validated request, not an LLM-supplied copy."""
     _validate(result, QualityReviewResult)
     if result.request_sha256 != review_request_sha256(request):
         raise QualityReviewError("review result belongs to another request")
-    if tuple(c.cue_id for c in result.cues) != tuple(c.cue_id for c in request.cues):
+    expected_ids = (tuple(c.cue_id for c in request.cues) if target_cue_ids is None
+                    else validate_review_target_ids(request, target_cue_ids))
+    if tuple(c.cue_id for c in result.cues) != expected_ids:
         raise QualityReviewError("review result cue count/IDs/order differ")
     if (
         result.source_translation_session_id is not None
@@ -664,8 +680,9 @@ def validate_review_result(result: QualityReviewResult, request: QualityReviewRe
     return result
 
 
-def serialize_review_result(result: QualityReviewResult, request: QualityReviewRequest) -> bytes:
-    return _encode(validate_review_result(result, request))
+def serialize_review_result(result: QualityReviewResult, request: QualityReviewRequest,
+                            *, target_cue_ids: tuple[str, ...] | None = None) -> bytes:
+    return _encode(validate_review_result(result, request, target_cue_ids=target_cue_ids))
 
 
 def bind_review_execution_provenance(
@@ -827,8 +844,10 @@ def parse_review_request(payload: bytes, **originals) -> QualityReviewRequest:
     return validate_review_request(_parse(payload, QualityReviewRequest, QualityReviewInputCue), **originals)
 
 
-def parse_review_result(payload: bytes, request: QualityReviewRequest) -> QualityReviewResult:
-    return validate_review_result(_parse(payload, QualityReviewResult, QualityReviewResultCue), request)
+def parse_review_result(payload: bytes, request: QualityReviewRequest,
+                        *, target_cue_ids: tuple[str, ...] | None = None) -> QualityReviewResult:
+    return validate_review_result(_parse(payload, QualityReviewResult, QualityReviewResultCue), request,
+                                  target_cue_ids=target_cue_ids)
 
 
 def effective_review_action(

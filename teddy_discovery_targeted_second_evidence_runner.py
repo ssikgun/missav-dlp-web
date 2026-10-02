@@ -25,6 +25,7 @@ from teddy_discovery_asr_source_quality import ASRSourceQualityDecision
 from teddy_discovery_targeted_asr_window import (
     STAGE11_TARGETED_SECOND_EVIDENCE_WINDOW_POLICY_V1,
     TargetedSecondEvidenceWindowPolicy,
+    TargetedASRWindow,
     validate_targeted_second_evidence_window_policy,
 )
 from teddy_discovery_targeted_second_evidence import (
@@ -44,7 +45,7 @@ class TargetedSecondEvidenceRunnerError(RuntimeError):
 
 
 TargetedAudioWindowProvider = Callable[
-    [TargetedSecondEvidenceWindow],
+    [TargetedSecondEvidenceWindow | TargetedASRWindow],
     ASRAudioChunk,
 ]
 
@@ -194,8 +195,8 @@ def build_targeted_audio_window_provider(
             "audio_chunk_iterator must be callable"
         )
 
-    def provide(window: TargetedSecondEvidenceWindow) -> ASRAudioChunk:
-        if type(window) is not TargetedSecondEvidenceWindow:
+    def provide(window: TargetedSecondEvidenceWindow | TargetedASRWindow) -> ASRAudioChunk:
+        if type(window) not in (TargetedSecondEvidenceWindow, TargetedASRWindow):
             raise TargetedSecondEvidenceRunnerError(
                 "audio window provider received an invalid window"
             )
@@ -228,6 +229,43 @@ def build_targeted_audio_window_provider(
     return provide
 
 
+def transcribe_targeted_window(window, *, source_snapshot, targeted_transport,
+                              audio_window_provider) -> tuple[ASRSegment, ...]:
+    """Shared bounded no-VAD transport boundary for both targeted callers."""
+    transcribe = _require_targeted_transcriber(targeted_transport)
+    chunk = _validate_window_chunk(
+        audio_window_provider(window), source_snapshot=source_snapshot, window=window,
+    )
+    segments = _validated_targeted_segments(transcribe(chunk))
+    for segment in segments:
+        segment.__post_init__()
+        if segment.start_ms < window.start_ms or segment.end_ms > window.end_ms:
+            raise TargetedSecondEvidenceRunnerError("targeted segment outside requested window")
+    return segments
+
+
+def run_targeted_hybrid_windows(windows, *, local_source, targeted_transport,
+                               audio_chunk_iterator=iter_audio_chunks):
+    """Reuse the same decoder and targeted endpoint for suspect external cues."""
+    from teddy_discovery_targeted_asr_artifact import TargetedASRArtifact
+    from teddy_discovery_targeted_hybrid_evidence import TargetedASRWindowEvidence
+
+    if type(windows) is not tuple or not windows or any(type(w) is not TargetedASRWindow for w in windows):
+        raise TargetedSecondEvidenceRunnerError("invalid suspect windows")
+    provider = build_targeted_audio_window_provider(local_source, audio_chunk_iterator=audio_chunk_iterator)
+    evidence = tuple(TargetedASRWindowEvidence(
+        local_source.source_snapshot, window.start_ms, window.end_ms, window.external_cue_ids,
+        transcribe_targeted_window(
+            window, source_snapshot=local_source.source_snapshot,
+            targeted_transport=targeted_transport, audio_window_provider=provider,
+        ),
+    ) for window in windows)
+    return TargetedASRArtifact(
+        local_source.source_snapshot, targeted_transport.runtime_identity,
+        targeted_transport.engine_version, evidence,
+    )
+
+
 def run_targeted_second_evidence(
     asr_result: ASRResult,
     source_quality_decisions: tuple[ASRSourceQualityDecision, ...],
@@ -256,7 +294,7 @@ def run_targeted_second_evidence(
         raise TargetedSecondEvidenceRunnerError(
             "audio_window_provider must be callable"
         )
-    transcribe_targeted_chunk = _require_targeted_transcriber(
+    _require_targeted_transcriber(
         targeted_transport
     )
 
@@ -274,14 +312,10 @@ def run_targeted_second_evidence(
     results = []
     for window in plan.windows:
         try:
-            chunk = audio_window_provider(window)
-            chunk = _validate_window_chunk(
-                chunk,
-                source_snapshot=plan.source_snapshot,
-                window=window,
-            )
-            segments = _validated_targeted_segments(
-                transcribe_targeted_chunk(chunk)
+            segments = transcribe_targeted_window(
+                window, source_snapshot=plan.source_snapshot,
+                targeted_transport=targeted_transport,
+                audio_window_provider=audio_window_provider,
             )
             results.append(
                 TargetedSecondEvidenceWindowResult(
@@ -396,4 +430,6 @@ __all__ = [
     "run_targeted_second_evidence_from_local_source",
     "run_targeted_second_evidence_v1",
     "run_targeted_second_evidence_v1_from_local_source",
+    "run_targeted_hybrid_windows",
+    "transcribe_targeted_window",
 ]

@@ -998,6 +998,7 @@ if [ "$rok" -eq 1 ]; then
     --provider openai-codex \
     --model gpt-5.6-luna \
     --reasoning xhigh \
+    -t file,terminal \
     -q "$QUERY" &
 
   MODEL_PID=$!

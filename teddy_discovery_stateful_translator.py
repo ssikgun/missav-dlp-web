@@ -99,6 +99,14 @@ STATEFUL_TRANSLATOR_SEMANTIC_REPETITION_INSTRUCTION: Final[str] = (
     "deleting it. "
 )
 
+STATEFUL_TRANSLATOR_PRIMARY_TRANSLATION_INSTRUCTION: Final[str] = (
+    "Prioritize natural conversational Korean while preserving source meaning, "
+    "speaker relationships and surrounding context. Do not add meaning, omit "
+    "meaning or over-paraphrase. Do not load or use skills, including "
+    "subtitle-semantic-quality-review, during primary translation. "
+    "Use repaired_ja only when materially justified by the supplied evidence. "
+)
+
 STATEFUL_TRANSLATOR_QUERY: Final[str] = (
     "Read all authorized cue evidence from "
     + STATEFUL_TRANSLATOR_INPUT_FILENAME
@@ -116,6 +124,7 @@ STATEFUL_TRANSLATOR_QUERY: Final[str] = (
     "contain exactly: cue_id, repaired_ja, ko. Set repaired_ja to null "
     "unless a materially justified Japanese repair exists. Preserve cue IDs "
     "and order exactly. Every cue requires Korean output. "
+    + STATEFUL_TRANSLATOR_PRIMARY_TRANSLATION_INSTRUCTION
     + STATEFUL_TRANSLATOR_SEMANTIC_REPETITION_INSTRUCTION
     + "Use no external "
     "Korean source. Do not output timestamps, additional fields, or prose "
@@ -933,6 +942,8 @@ def build_stateful_translator_command(session_id: str) -> list[str]:
         STATEFUL_TRANSLATOR_MODEL,
         "--reasoning",
         STATEFUL_TRANSLATOR_REASONING,
+        "-t",
+        "file,terminal",
         STATEFUL_TRANSLATOR_QUERY_FLAG,
         STATEFUL_TRANSLATOR_QUERY,
     ]
@@ -1259,6 +1270,7 @@ __all__ = [
     "STATEFUL_TRANSLATOR_PROFILE",
     "STATEFUL_TRANSLATOR_PROVIDER",
     "STATEFUL_TRANSLATOR_QUERY",
+    "STATEFUL_TRANSLATOR_PRIMARY_TRANSLATION_INSTRUCTION",
     "STATEFUL_TRANSLATOR_SEMANTIC_REPETITION_INSTRUCTION",
     "STATEFUL_TRANSLATOR_QUERY_FLAG",
     "STATEFUL_TRANSLATOR_REASONING",

@@ -555,6 +555,7 @@ def plan_targeted_asr_windows(
     padding_after_ms: int,
     merge_gap_ms: int,
     max_window_ms: int,
+    target_cue_ids: tuple[str, ...] | None = None,
 ) -> tuple[TargetedASRWindow, ...]:
     """Plan bounded ASR windows from external-JA source cues.
 
@@ -568,6 +569,13 @@ def plan_targeted_asr_windows(
         external_cues,
         alignment,
     )
+    if target_cue_ids is not None:
+        if (type(target_cue_ids) is not tuple or not target_cue_ids
+                or any(type(cue_id) is not str for cue_id in target_cue_ids)):
+            raise TargetedASRWindowError("target cue IDs must be a nonempty tuple")
+        selected = set(target_cue_ids)
+        if tuple(cue_id for cue_id, _, _ in projected_cues if cue_id in selected) != target_cue_ids:
+            raise TargetedASRWindowError("target cue IDs unknown, duplicated or out of order")
 
     source_windows = plan_targeted_asr_source_windows(
         tuple(
@@ -579,6 +587,7 @@ def plan_targeted_asr_windows(
             )
             for source_index, (cue_id, projected_start_ms, projected_end_ms)
             in enumerate(projected_cues)
+            if target_cue_ids is None or cue_id in selected
         ),
         padding_before_ms=padding_before_ms,
         padding_after_ms=padding_after_ms,
@@ -617,6 +626,7 @@ def plan_targeted_asr_windows_with_policy(
     alignment: RobustAffineAlignment,
     *,
     policy: TargetedSecondEvidenceWindowPolicy,
+    target_cue_ids: tuple[str, ...] | None = None,
 ) -> tuple[TargetedASRWindow, ...]:
     """Apply an explicit policy through the existing Hybrid geometry.
 
@@ -632,6 +642,7 @@ def plan_targeted_asr_windows_with_policy(
         padding_after_ms=validated_policy.post_padding_ms,
         merge_gap_ms=validated_policy.merge_gap_ms,
         max_window_ms=validated_policy.max_window_ms,
+        target_cue_ids=target_cue_ids,
     )
 
 

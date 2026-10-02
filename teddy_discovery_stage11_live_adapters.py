@@ -47,6 +47,7 @@ from teddy_discovery_subtitle_external import (
 )
 from teddy_discovery_targeted_second_evidence_runner import (
     run_targeted_second_evidence_v1_from_local_source,
+    run_targeted_hybrid_windows,
 )
 from teddy_discovery_stateful_translator import (
     bind_stateful_semantic_policy,
@@ -134,7 +135,7 @@ def build_baseline_adapter(*, holding_resolver, source_provider, whisper,
 
 
 def build_targeted_adapter(*, holding_resolver, source_provider, targeted_transport,
-                           audio_chunk_iterator=iter_audio_chunks):
+                           audio_chunk_iterator=iter_audio_chunks, hybrid_suspects=False):
     def targeted(asr_result, source_quality_decisions):
         asr_result.__post_init__()
         snapshot = asr_result.source_snapshot
@@ -146,6 +147,12 @@ def build_targeted_adapter(*, holding_resolver, source_provider, targeted_transp
         ) as local_source:
             if local_source.source_snapshot != snapshot:
                 raise Stage11LiveAdapterError("targeted local source detached")
+            if hybrid_suspects:
+                return run_targeted_hybrid_windows(
+                    source_quality_decisions, local_source=local_source,
+                    targeted_transport=targeted_transport,
+                    audio_chunk_iterator=audio_chunk_iterator,
+                )
             execution = run_targeted_second_evidence_v1_from_local_source(
                 asr_result, source_quality_decisions, local_source=local_source,
                 targeted_transport=targeted_transport,
@@ -456,21 +463,37 @@ def build_asr_review_adapter(*, remote_task_for_session, runner_options):
 def build_hybrid_review_adapter(*, originals_provider, runner_options):
     """Supply exact caller originals to the native parser's trust boundary."""
     options = dict(runner_options)
-    if {"fresh_review_session", "review_execution_session_id", "session_id"} & options.keys():
+    if {"fresh_review_session", "review_execution_session_id", "session_id", "target_cue_ids"} & options.keys():
         raise Stage11LiveAdapterError("review execution identity is adapter-owned")
 
-    def hybrid_review(review_request, *, staging_root):
+    def hybrid_review(review_request, *, staging_root, target_cue_ids=None,
+                      targeted_asr_artifact=None):
         raw = serialize_review_request(review_request)
-        originals = originals_provider(review_request)
+        if target_cue_ids is None:
+            if targeted_asr_artifact is not None:
+                raise Stage11LiveAdapterError("triage cannot consume suspect evidence")
+            originals = originals_provider(review_request)
+        else:
+            from dataclasses import replace
+            from teddy_discovery_stateful_quality_review import build_full_window_raw_asr_context
+            baseline_request = replace(review_request, cues=tuple(
+                replace(cue, raw_asr_context=()) for cue in review_request.cues
+            ))
+            originals = dict(originals_provider(baseline_request))
+            originals["raw_asr_context"] = build_full_window_raw_asr_context(
+                targeted_asr_artifact, preparation=originals["preparation"],
+            )
         session = new_review_execution_session_id()
         directory = create_stateful_staging_directory(staging_root, session)
         result = run_quality_review(
             directory, raw, review_execution_session_id=session,
             fresh_review_session=True, **options, **originals,
+            target_cue_ids=target_cue_ids,
         )
         parsed = read_quality_review_result(
             directory, review_request, process_finished=True, returncode=0,
             review_execution_session_id=session,
+            target_cue_ids=target_cue_ids,
         )
         if parsed != result:
             raise Stage11LiveAdapterError("Hybrid review result readback mismatch")
@@ -487,6 +510,7 @@ class Stage11LiveDependencies:
     first_pass_runner: Callable
     asr_review_runner: Callable
     hybrid_review_runner: Callable
+    hybrid_targeted_runner: Callable
 
 
 def build_stage11_live_dependencies(*, source_provider, whisper, targeted_transport,
@@ -509,4 +533,7 @@ def build_stage11_live_dependencies(*, source_provider, whisper, targeted_transp
         build_first_pass_adapter(**first_pass_options),
         build_asr_review_adapter(**asr_review_options),
         build_hybrid_review_adapter(**hybrid_review_options),
+        build_targeted_adapter(holding_resolver=resolver, source_provider=source_provider,
+                               targeted_transport=targeted_transport, hybrid_suspects=True,
+                               audio_chunk_iterator=audio_chunk_iterator),
     )

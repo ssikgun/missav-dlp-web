@@ -25,6 +25,7 @@ from teddy_discovery_stateful_quality_review import (
     bind_review_execution_provenance, parse_review_request, parse_review_result,
     review_request_sha256,
     serialize_review_request, validate_review_request,
+    validate_review_target_ids,
 )
 from teddy_discovery_stateful_translator import (
     build_stateful_translator_command, STATEFUL_TRANSLATOR_QUERY_FLAG,
@@ -268,11 +269,34 @@ class QualityReviewRunnerError(RuntimeError):
     """Invocation or private staging failed closed."""
 
 
-def build_quality_review_command(review_execution_session_id: str) -> list[str]:
+def build_quality_review_command(review_execution_session_id: str, *, target_cue_ids=None) -> list[str]:
     """Reuse canonical UUID validation and all native first-pass command constants."""
     command = build_stateful_translator_command(review_execution_session_id)
     index = command.index(STATEFUL_TRANSLATOR_QUERY_FLAG)
     command[index + 1] = QUALITY_REVIEW_QUERY
+    if target_cue_ids is not None:
+        # Keep the conservative policy and full context, but remove full-result
+        # ownership instructions before specifying the bounded decision scope.
+        query = QUALITY_REVIEW_QUERY.replace(
+            'Review EVERY cue in source order, including source-quality KEEP.',
+            'Read EVERY cue as context; adjudicate only the caller target cue IDs.',
+        ).replace(
+            'Return exactly the same cue IDs, count and order;',
+            'Return exactly the caller target cue IDs, count and order;',
+        )
+        command[index + 1] = query + '''
+TARGET-ONLY FINAL ADJUDICATION: Read the entire title for context, but generate
+decisions ONLY for the ordered target cue IDs below. All non-target first-pass
+Japanese/Korean is immutable; do not redistribute meaning into or out of those
+cues. The final consistency pass may revise target decisions only. The result
+cues array must contain exactly these target IDs in this order. Use the caller
+FULL request digest. Targeted raw_asr_context is independent no-VAD window
+evidence, never a guaranteed cue-local transcript. REPAIR requires clear
+support from evidence and context; fluent phrasing alone is insufficient.
+OMIT requires sufficient proof of actual non-dialogue metadata/noise. Empty,
+noisy or conflicting targeted evidence does not prove silence or non-dialogue;
+use AMBIGUOUS when unsure, preserving first-pass text through KEEP.
+Caller target cue IDs: ''' + json.dumps(target_cue_ids, ensure_ascii=True)
     return command
 
 
@@ -425,6 +449,7 @@ def read_quality_review_result(
     process_finished: bool,
     returncode: int,
     review_execution_session_id: str | None = None,
+    target_cue_ids: tuple[str, ...] | None = None,
 ) -> QualityReviewResult:
     """Final trust boundary: caller-held exact request, after successful exit only."""
     if process_finished is not True or type(returncode) is not int or returncode != 0:
@@ -435,7 +460,7 @@ def read_quality_review_result(
         payload = _read(fd, QUALITY_REVIEW_RESULT_FILENAME)
     # Reuses validate_review_result through the canonical parser, never trusts
     # the model's claimed hash without comparing all IDs/order to this request.
-    result = parse_review_result(payload, request)
+    result = parse_review_result(payload, request, target_cue_ids=target_cue_ids)
     if review_execution_session_id is None:
         return result
     return bind_review_execution_provenance(
@@ -473,6 +498,7 @@ def run_quality_review(
     expected_profile_name: str | None = None,
     launcher: Callable = _launch,
     timeout: int = 600,
+    target_cue_ids: tuple[str, ...] | None = None,
     **originals,
 ) -> QualityReviewResult:
     """Stage and perform one explicit resume or native fresh-session review.
@@ -485,6 +511,8 @@ def run_quality_review(
     if type(timeout) is not int or timeout <= 0:
         raise QualityReviewRunnerError('timeout must be a positive integer')
     request = parse_review_request(request_payload, **originals)
+    if target_cue_ids is not None:
+        validate_review_target_ids(request, target_cue_ids)
     execution_session = _review_execution_session(
         review_execution_session_id, session_id
     )
@@ -501,7 +529,7 @@ def run_quality_review(
         review_execution_session_id=execution_session,
         **originals,
     )
-    command = build_quality_review_command(execution_session)
+    command = build_quality_review_command(execution_session, target_cue_ids=target_cue_ids)
     command[-1] += '\nCaller request_sha256: ' + review_request_sha256(request)
     with _directory(task_directory) as fd:
         _absent(fd, QUALITY_REVIEW_RESULT_FILENAME)
@@ -544,4 +572,5 @@ Caller exact review paths: ''' + json.dumps(paths, ensure_ascii=True, sort_keys=
             process_finished=True,
             returncode=returncode,
             review_execution_session_id=execution_session,
+            target_cue_ids=target_cue_ids,
         )

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import hashlib
 import json
 import os
@@ -73,8 +73,12 @@ from teddy_discovery_stateful_hybrid import (
     prepare_stateful_hybrid,
 )
 from teddy_discovery_stateful_quality_review import (
+    MAX_REVIEW_BYTES,
+    build_full_window_raw_asr_context,
     build_review_request,
+    parse_review_result,
     review_request_sha256,
+    serialize_review_request,
     serialize_review_result,
     validate_review_result,
 )
@@ -132,6 +136,15 @@ from teddy_discovery_subtitlecat_discovery import (
 )
 from teddy_discovery_targeted_asr_window import (
     STAGE11_TARGETED_SECOND_EVIDENCE_WINDOW_POLICY_V1,
+    plan_targeted_asr_windows_with_policy,
+)
+from teddy_discovery_targeted_asr_artifact import (
+    MAX_TARGETED_ASR_ARTIFACT_BYTES, parse_targeted_asr_artifact_bytes,
+    serialize_targeted_asr_artifact,
+)
+from teddy_discovery_hybrid_suspect_review import (
+    HYBRID_SUSPECT_REVIEW_VERSION, merge_target_review_result,
+    select_suspect_cue_ids, validate_suspect_artifact,
 )
 from teddy_discovery_targeted_hybrid_evidence import (
     TargetedASRBinding,
@@ -1269,6 +1282,31 @@ def _validate_existing_completion(
             raise Stage11ControllerArtifactError(
                 "Hybrid report lacks accepted alignment evidence"
             )
+        # A legacy/full-review completion must never masquerade as this new
+        # native pipeline. Replay also verifies its durable composition hashes.
+        directory = report_path.parent
+        request_raw = _read_private_file(directory / "hybrid-final-request-v1.json", max_bytes=MAX_REVIEW_BYTES)
+        result_raw = _read_private_file(directory / "hybrid-final-review-v1.json", max_bytes=MAX_REVIEW_BYTES)
+        identity = report["review_result_identity"]
+        if (hashlib.sha256(request_raw).hexdigest() != identity.get("request_sha256")
+                or hashlib.sha256(result_raw).hexdigest() != identity.get("result_sha256")):
+            raise Stage11ControllerArtifactError("completed suspect review composition is detached")
+        provenance_path = directory / "hybrid-suspect-context-v1.json"
+        evidence_path = directory / "hybrid-suspect-asr-v1.json"
+        if _lstat_or_none(evidence_path) is not None or _lstat_or_none(provenance_path) is not None:
+            provenance = json.loads(_read_private_file(provenance_path, max_bytes=MAX_REVIEW_BYTES))
+            evidence_raw = _read_private_file(evidence_path, max_bytes=MAX_TARGETED_ASR_ARTIFACT_BYTES)
+            evidence = parse_targeted_asr_artifact_bytes(evidence_raw)
+            baseline = parse_asr_result_bytes(_read_private_file(baseline_path, max_bytes=MAX_ASR_ARTIFACT_BYTES))
+            from teddy_discovery_targeted_asr_artifact import require_matching_targeted_asr_source
+            require_matching_targeted_asr_source(evidence, baseline.source_snapshot)
+            if (provenance.get("pipeline_version") != HYBRID_SUSPECT_REVIEW_VERSION
+                    or provenance.get("baseline_sha256") != baseline_sha256
+                    or provenance.get("artifact_sha256") != hashlib.sha256(evidence_raw).hexdigest()
+                    or provenance.get("triage_result_sha256") != hashlib.sha256(
+                        _read_private_file(directory / "hybrid-triage-v1.json", max_bytes=MAX_REVIEW_BYTES)
+                    ).hexdigest()):
+                raise Stage11ControllerArtifactError("completed suspect evidence provenance mismatch")
     elif alignment_outcome not in {
         ALIGNMENT_NOT_ATTEMPTED,
         ACCEPT_HYBRID,
@@ -1372,6 +1410,86 @@ def _require_clean_artifact(value: object) -> GeneratedKoreanSRT:
     return artifact
 
 
+def _run_hybrid_suspect_review(*, directory, preparation, first_pass, source_quality,
+                               targeted_artifact, asr_result, baseline_sha256,
+                               hybrid_review_runner, hybrid_targeted_runner, staging_root):
+    """Add post-first-pass triage/evidence/adjudication to existing HYBRID."""
+    originals = dict(preparation=preparation, package=preparation.package, result=first_pass,
+                     source_quality=source_quality, targeted_second_evidence_artifact=targeted_artifact)
+    triage_request = build_review_request(**originals)
+    triage_path = directory / "hybrid-triage-v1.json"
+    if _lstat_or_none(triage_path) is None:
+        triage = hybrid_review_runner(triage_request, staging_root=staging_root)
+        triage_raw = serialize_review_result(triage, triage_request)
+        _install_or_reuse(triage_path, triage_raw, max_bytes=MAX_REVIEW_BYTES)
+    else:
+        triage_raw = _read_private_file(triage_path, max_bytes=MAX_REVIEW_BYTES)
+        triage = parse_review_result(triage_raw, triage_request)
+    targets = select_suspect_cue_ids(triage_request, triage)
+    request = triage_request
+    evidence = None
+    context = None
+    final = None
+    if targets:
+        application = preparation.route_decision.alignment_application
+        windows = plan_targeted_asr_windows_with_policy(
+            application.bundle.external_ja_document.cues, application.alignment,
+            policy=STAGE11_TARGETED_SECOND_EVIDENCE_WINDOW_POLICY_V1,
+            target_cue_ids=targets,
+        )
+        evidence_path = directory / "hybrid-suspect-asr-v1.json"
+        provenance_path = directory / "hybrid-suspect-context-v1.json"
+        reused = _lstat_or_none(evidence_path) is not None
+        if reused:
+            evidence_raw = _read_private_file(evidence_path, max_bytes=MAX_TARGETED_ASR_ARTIFACT_BYTES)
+            evidence = parse_targeted_asr_artifact_bytes(evidence_raw)
+        else:
+            if not callable(hybrid_targeted_runner):
+                raise Stage11ControllerValidationError("HYBRID suspects require hybrid_targeted_runner")
+            evidence = hybrid_targeted_runner(asr_result, windows)
+            evidence_raw = serialize_targeted_asr_artifact(evidence)
+        evidence = validate_suspect_artifact(evidence, source_snapshot=asr_result.source_snapshot,
+                                           windows=windows)
+        provenance = {
+            "pipeline_version": HYBRID_SUSPECT_REVIEW_VERSION,
+            "baseline_sha256": baseline_sha256,
+            "triage_request_sha256": review_request_sha256(triage_request),
+            "triage_result_sha256": hashlib.sha256(triage_raw).hexdigest(),
+            "target_cue_ids": targets,
+            "alignment_scale": application.alignment.scale,
+            "alignment_intercept_ms": application.alignment.intercept_ms,
+            "window_policy": asdict(STAGE11_TARGETED_SECOND_EVIDENCE_WINDOW_POLICY_V1),
+            "artifact_sha256": hashlib.sha256(evidence_raw).hexdigest(),
+        }
+        provenance_raw = json.dumps(provenance, sort_keys=True, separators=(",", ":"),
+                                    allow_nan=False).encode("utf-8")
+        if reused:
+            if _read_private_file(provenance_path, max_bytes=MAX_REVIEW_BYTES) != provenance_raw:
+                raise Stage11ControllerArtifactError("suspect evidence provenance mismatch")
+        else:
+            _install_or_reuse(evidence_path, evidence_raw, max_bytes=MAX_TARGETED_ASR_ARTIFACT_BYTES)
+            _install_or_reuse(provenance_path, provenance_raw, max_bytes=MAX_REVIEW_BYTES)
+        context = build_full_window_raw_asr_context(evidence, preparation=preparation)
+        request = build_review_request(**originals, raw_asr_context=context)
+        final_path = directory / "hybrid-final-target-v1.json"
+        if _lstat_or_none(final_path) is None:
+            final = hybrid_review_runner(request, staging_root=staging_root,
+                                         target_cue_ids=targets, targeted_asr_artifact=evidence)
+            final_raw = serialize_review_result(final, request, target_cue_ids=targets)
+            _install_or_reuse(final_path, final_raw, max_bytes=MAX_REVIEW_BYTES)
+        else:
+            final = parse_review_result(_read_private_file(final_path, max_bytes=MAX_REVIEW_BYTES),
+                                        request, target_cue_ids=targets)
+    merged = merge_target_review_result(request, targets, final)
+    # Durable audit keeps triage, raw target output and deterministic composition
+    # separate. Only this full composition reaches the existing materializer.
+    _install_or_reuse(directory / "hybrid-final-request-v1.json", serialize_review_request(request),
+                     max_bytes=MAX_REVIEW_BYTES)
+    _install_or_reuse(directory / "hybrid-final-review-v1.json", serialize_review_result(merged, request),
+                     max_bytes=MAX_REVIEW_BYTES)
+    return request, merged, context
+
+
 def run_one_title_stage11(
     title: str,
     *,
@@ -1384,6 +1502,7 @@ def run_one_title_stage11(
     asr_review_runner: Callable,
     hybrid_review_runner: Callable,
     targeted_runner: Callable | None = None,
+    hybrid_targeted_runner: Callable | None = None,
     holding_resolver: Callable[[str], Mapping[str, object]] | None = None,
     semantic_policy: StatefulSemanticPolicy | str = (
         DEFAULT_STATEFUL_SEMANTIC_POLICY
@@ -1485,7 +1604,7 @@ def run_one_title_stage11(
         )
         try:
             hybrid_generation_base = bind_stateful_model_input_generation_key(
-                "stage11-hybrid-" + generation_suffix
+                "stage11-hybrid-" + HYBRID_SUSPECT_REVIEW_VERSION + "-" + generation_suffix
             )
             hybrid_generation_key = bind_stateful_policy_generation_key(
                 hybrid_generation_base,
@@ -1611,19 +1730,15 @@ def run_one_title_stage11(
         )
         document = route.alignment_application.bundle.external_ja_document
         source_quality = classify_source_document(document)
-        review_request = build_review_request(
-            preparation=preparation,
-            package=package,
-            result=first_pass,
-            source_quality=source_quality,
-            targeted_second_evidence_artifact=targeted_artifact,
-        )
         if not callable(hybrid_review_runner):
             raise Stage11ControllerValidationError(
                 "hybrid_review_runner must be callable"
             )
-        review_result = hybrid_review_runner(
-            review_request,
+        review_request, review_result, suspect_context = _run_hybrid_suspect_review(
+            directory=directory, preparation=preparation, first_pass=first_pass,
+            source_quality=source_quality, targeted_artifact=targeted_artifact,
+            asr_result=asr_result, baseline_sha256=baseline_sha256,
+            hybrid_review_runner=hybrid_review_runner, hybrid_targeted_runner=hybrid_targeted_runner,
             staging_root=staging_root_path,
         )
         validate_review_result(review_result, review_request)
@@ -1634,6 +1749,7 @@ def run_one_title_stage11(
             review_request,
             review_result,
             source_quality=source_quality,
+            raw_asr_context=suspect_context,
             targeted_second_evidence_artifact=targeted_artifact,
         )
         review_request_digest = review_request_sha256(review_request)
