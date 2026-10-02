@@ -9437,3 +9437,39 @@ The next task is a read-only structural comparison against the currently
 published FNS-247 ASR_ONLY subtitle. Cue count alone is not a quality metric;
 compare timeline coverage, long subtitle gaps and coverage of the previously
 missing-dialogue regions before any publication decision.
+
+## 2026-10-02 Stage13 UI — File Manager cover preview source ready
+
+UI-P1b integrates only the three UI source/test files from preserved commit
+`9d1502eb9ce15ca10f56cfe05acd211c10f63fae` onto the latest remote. The current
+subtitle objective at the top and all existing handoff content are preserved;
+this UI section is appended independently.
+
+File Manager covers previously used desktop 54×72 / mobile 44×60 portrait
+thumbnails with cropping. New desktop 132×88, tablet <=1020px 108×72 and
+mobile <=720px 96×64 covers use landscape 3:2 and `object-fit: contain`.
+Matching summary grid columns allow IDs, titles, metadata and badges to wrap.
+Accessible cover buttons prevent summary toggling and open a separate native
+dialog lightbox with X/backdrop/Esc closing, viewport-bounded full-cover
+display and light/dark theme styles. The same Discovery cover endpoint
+`/api/discovery/media/cover/<dvd_id>` is reused. Failed thumbnails display
+`포스터 없음` and disable preview; dialog failures show only a safe message.
+
+Backend/APIs, delete prepare/validate/commit and gate, shared player/playback,
+search/filter/sort, status mappings, title lock, writer, media completion and
+subtitle pipeline are unchanged. Subtitle/Stage11/Stage12 source files
+changed=0; index.html unchanged.
+
+Offline validation PASS: Library UI smoke, delete activity smoke, Discovery
+shell smoke (with required index/css/js arguments), touched Python compile,
+V8 JavaScript syntax, offline cover/close/failure/playback event fixture and
+`git diff --check`. Library API and delete dry-run smokes are
+BLOCKED_BY_ENVIRONMENT: `ModuleNotFoundError: No module named 'flask'`;
+no dependencies installed. This is not a source integration blocker.
+
+Production deploy NOT YET. Docker builds=0, production container recreates=0,
+runtime deploys=0, production DB/NAS writes=0, Jellyfin writes=0,
+timer/service changes=0 and subtitle pipeline mutations=0. Next checkpoint:
+production UI deploy + browser visual check for responsive overflow, both
+themes and native dialog interactions; rerun Flask-dependent fixture smokes
+in an existing suitable environment.

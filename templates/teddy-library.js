@@ -13,6 +13,7 @@
 
     let debounceTimer = null;
     let requestSerial = 0;
+    let activeCoverDialog = null;
     let activeDeleteDialog = null;
     let activeDeleteToken = null;
     let deleteCommitInFlight = false;
@@ -116,10 +117,10 @@
         const bytes = formatBytes(item.managed_size_bytes);
         const rawBytes = item.size_status === 'KNOWN' && typeof item.managed_size_bytes === 'number'
             ? `${item.managed_size_bytes.toLocaleString()} bytes` : '용량 확인 필요';
-        const coverAlt = `${dvd} cover`;
+        const coverAlt = `${item.dvd_id || ''} cover`;
         return `<details class="discovery-row library-row">
             <summary class="discovery-row-summary library-row-summary">
-                <span class="library-cover"><img loading="lazy" src="${coverUrl}" alt="${escapeHtml(coverAlt)}" onerror="this.remove();this.parentElement.innerHTML='<span class=&quot;library-cover-placeholder&quot;>포스터 없음</span>'"></span>
+                <button type="button" class="library-cover library-cover-button" data-cover-preview="${dvd}" aria-label="${dvd} 포스터 크게 보기"><img loading="lazy" src="${coverUrl}" alt="${escapeHtml(coverAlt)}"></button>
                 <span class="discovery-id">${dvd}</span>
                 <span class="library-summary-main"><span class="library-summary-title">${title}</span><span class="library-summary-meta"><span>📆 ${release}</span><span>${date}</span><span>${size}</span></span></span>
                 <span class="library-row-side"><span class="library-badges"><span class="library-badge">${subtitle}</span><span class="library-badge">${jellyfin}</span></span><button type="button" class="library-play-button" data-play-dvd="${dvd}">▶️ 재생</button></span>
@@ -131,6 +132,43 @@
                 ${detailCell('미해결 사유', unresolved)}${detailCell('Jellyfin 상태', jellyfin)}${detailCell('경로/identity 상태', mismatch)}
             </div><div class="library-delete-entry"><button type="button" class="library-delete-prepare" data-delete-prepare="${dvd}">🗑️ 영구 삭제</button></div></div>
         </details>`;
+    }
+
+    function openCoverPreview(dvd) {
+        if (activeCoverDialog) {
+            activeCoverDialog.close();
+            activeCoverDialog.remove();
+        }
+        const dialog = document.createElement('dialog');
+        dialog.className = 'library-cover-dialog';
+        dialog.setAttribute('aria-label', `${dvd} 포스터 미리보기`);
+        dialog.innerHTML = `<div class="library-cover-dialog-body"><button type="button" class="library-cover-close" aria-label="포스터 닫기" autofocus>×</button><img class="library-cover-preview-image" alt="${escapeHtml(dvd)} cover"><p class="library-cover-preview-error" role="status" hidden>포스터를 불러오지 못했습니다</p><p class="library-cover-caption">${escapeHtml(dvd)}</p></div>`;
+        const image = dialog.querySelector('.library-cover-preview-image');
+        image.addEventListener('error', () => {
+            image.hidden = true;
+            image.removeAttribute('src');
+            dialog.querySelector('.library-cover-preview-error').hidden = false;
+        }, { once: true });
+        image.src = `/api/discovery/media/cover/${encodeURIComponent(dvd)}`;
+        const close = () => dialog.close();
+        dialog.querySelector('.library-cover-close').addEventListener('click', close);
+        dialog.addEventListener('cancel', event => {
+            event.preventDefault();
+            close();
+        });
+        dialog.addEventListener('click', event => {
+            if (event.target !== dialog) return;
+            const bounds = dialog.getBoundingClientRect();
+            if (event.clientX < bounds.left || event.clientX > bounds.right ||
+                event.clientY < bounds.top || event.clientY > bounds.bottom) close();
+        });
+        dialog.addEventListener('close', () => {
+            if (activeCoverDialog === dialog) activeCoverDialog = null;
+            dialog.remove();
+        });
+        document.body.appendChild(dialog);
+        activeCoverDialog = dialog;
+        dialog.showModal();
     }
 
     function clearDeleteDialog() {
@@ -289,7 +327,22 @@
     });
     filter.addEventListener('change', loadLibrary);
     sort.addEventListener('change', loadLibrary);
+    list.addEventListener('error', event => {
+        const image = event.target;
+        const cover = image.closest('[data-cover-preview]');
+        if (!cover || image.tagName !== 'IMG') return;
+        cover.disabled = true;
+        cover.setAttribute('aria-label', `${cover.dataset.coverPreview} 포스터 없음`);
+        cover.innerHTML = '<span class="library-cover-placeholder">포스터 없음</span>';
+    }, true);
     list.addEventListener('click', event => {
+        const cover = event.target.closest('[data-cover-preview]');
+        if (cover) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!cover.disabled) openCoverPreview(cover.dataset.coverPreview);
+            return;
+        }
         const prepare = event.target.closest('[data-delete-prepare]');
         if (prepare) {
             event.preventDefault();

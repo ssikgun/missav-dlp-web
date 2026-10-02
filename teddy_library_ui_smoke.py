@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 
 def require(condition, message):
@@ -95,6 +96,69 @@ require(".discovery-row-summary.library-row-summary" in css, "Discovery summary 
 for breakpoint in ("max-width: 1020px", "max-width: 720px", "max-width: 420px"):
     require(breakpoint in css, f"missing responsive breakpoint: {breakpoint}")
 require("overflow-wrap: anywhere" in css, "long IDs/paths must wrap on narrow screens")
+
+# Stage13 UI-P1: landscape covers and an independent, accessible preview dialog.
+def css_rule(source, selector):
+    match = re.search(re.escape(selector) + r"\s*\{([^}]+)\}", source)
+    require(match is not None, f"missing CSS rule: {selector}")
+    return match.group(1)
+
+
+desktop_css, tablet_css = css.split("@media (max-width: 1020px)", 1)
+tablet_css, mobile_css = tablet_css.split("@media (max-width: 720px)", 1)
+for source, width in ((desktop_css, 132), (tablet_css, 108), (mobile_css, 96)):
+    cover_rule = css_rule(source, ".library-cover")
+    summary_rule = css_rule(source, ".discovery-row-summary.library-row-summary")
+    require(f"width: {width}px;" in cover_rule, f"cover width must be {width}px")
+    require("height:" not in cover_rule, "responsive covers must retain their aspect ratio")
+    require(f"grid-template-columns: {width}px minmax(0," in summary_rule,
+            f"summary grid must reserve {width}px and allow text to shrink")
+require("aspect-ratio: 3 / 2;" in css_rule(desktop_css, ".library-cover"),
+        "landscape 3:2 cover sizing missing")
+require("width: 54px;" not in css and "height: 72px;" not in css and
+        "width: 44px;" not in css and "height: 60px;" not in css,
+        "old tiny portrait sizing must be removed")
+require("object-fit: contain;" in css_rule(css, ".library-cover img"),
+        "thumbnails must show the entire cover")
+require('<button type="button" class="library-cover library-cover-button"' in js and
+        'data-cover-preview="${dvd}" aria-label=' in js,
+        "cover must be an accessible preview button")
+cover_click = js.split("const cover = event.target.closest('[data-cover-preview]');", 1)[1]
+cover_click = cover_click.split("const prepare =", 1)[0]
+for marker in ("event.preventDefault()", "event.stopPropagation()", "!cover.disabled",
+               "openCoverPreview(cover.dataset.coverPreview)", "return;"):
+    require(marker in cover_click, f"cover click must isolate summary activation: {marker}")
+preview = js.split("function openCoverPreview(dvd)", 1)[1].split("function clearDeleteDialog()", 1)[0]
+for marker in ("document.createElement('dialog')", "library-cover-dialog", "dialog.showModal()",
+               "aria-label", "library-cover-close", "autofocus", "dialog.close()",
+               "addEventListener('cancel'", "event.preventDefault()", "close();",
+               "addEventListener('click'", "event.target !== dialog", "getBoundingClientRect()",
+               "event.clientX < bounds.left", "event.clientX > bounds.right",
+               "event.clientY < bounds.top", "event.clientY > bounds.bottom",
+               "addEventListener('close'", "dialog.remove()",
+               "/api/discovery/media/cover/${encodeURIComponent(dvd)}",
+               "image.addEventListener('error'", "image.hidden = true", "image.removeAttribute('src')",
+               "포스터를 불러오지 못했습니다", "library-cover-caption"):
+    require(marker in preview, f"missing cover lightbox contract: {marker}")
+require("fetch(" not in preview and "response" not in preview,
+        "preview must load only the existing cover image without rendering backend payloads")
+thumbnail_failure = js.split("list.addEventListener('error'", 1)[1].split("list.addEventListener('click'", 1)[0]
+for marker in ("cover.disabled = true", "cover.innerHTML =", "포스터 없음", "}, true)"):
+    require(marker in thumbnail_failure, f"missing safe thumbnail failure contract: {marker}")
+dialog_rule = css_rule(css, ".library-cover-dialog")
+require("max-width: min(92vw, 1200px);" in dialog_rule and "max-height: 88vh;" in dialog_rule,
+        "cover dialog must fit the viewport")
+image_rule = css_rule(css, ".library-cover-preview-image")
+for marker in ("max-width: min(92vw, 1200px);", "max-height: calc(88vh - 90px);",
+               "height: auto;", "object-fit: contain;"):
+    require(marker in image_rule, f"large cover sizing missing: {marker}")
+require(".library-cover-dialog::backdrop" in css and
+        'html[data-theme="dark"] .library-cover-dialog' in css and
+        ".library-cover-preview-image[hidden]" in css,
+        "cover dialog theme/backdrop/failure visibility styles missing")
+require("library-delete-dialog" in js and ".library-delete-dialog" in css,
+        "existing delete dialog must remain independent")
+
 require("discovery-row" in discovery_js, "Discovery regression source unavailable")
 require('title="파일 관리" aria-label="파일 관리"' in html,
         "sidebar File Management label changed")
@@ -102,4 +166,4 @@ require('data-file-management-view="library"' in html and 'data-file-management-
         "File Management subtabs missing")
 require('GET' not in js, "unexpected Library method marker")
 
-print("Stage13-C Library UI shell smoke: OK")
+print("Stage13 UI-P1 Library UI shell smoke: OK")
