@@ -1,5 +1,537 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-02 — NEXT CHAT START HERE: FNS-247 subtitle quality A/B + Stage11 rescreen handoff
+
+### Current objective / priority
+
+Do **not** modify the production subtitle pipeline yet.
+
+The immediate goal is to determine the best subtitle ingredients before further
+pipeline engineering:
+
+1. isolate translation quality from STT/source quality;
+2. run a fair same-source A/B translation test on FNS-247;
+3. only after translation quality is understood, benchmark/tune STT;
+4. only after both are understood, redesign the production HYBRID pipeline once.
+
+FNS-247 is the quality reference title. The practical quality target is not a
+commercial-perfect subtitle; it is: dialogue coverage high enough to understand
+the scene, meaning preserved, Korean natural enough to follow, no obvious
+duplicate fragments, and no systematic missing dialogue.
+
+TurboScribe is **test/reference evidence only**. It is manually produced by the
+operator and must not become a required production dependency.
+
+### Exact repository / Git state at handoff creation
+
+- GitHub repo: `ssikgun/missav-dlp-web`
+- branch: `teddy-subtitle-stage11`
+- CT108 worktree: `/opt/missav-pwa-subtitle-stage11`
+- canonical handoff: `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md`
+- source HEAD before this handoff-only commit:
+  `b16059f3811cb311e0f0ae4e534677bbc04a1245`
+- Python venv: `/opt/stage11-stt-venv/bin/python`
+- Discovery DB: `/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3`
+- Stage12 rollout DB:
+  `/opt/missav-dlp-web/discovery/stage12-rollout-state.sqlite3`
+- SubtitleCat production GET-only proxy: `http://127.0.0.1:58888`
+
+At the start of a new chat, first check local/remote HEAD and worktree. This
+handoff update is committed directly to the remote branch, so the CT108
+worktree may need a safe fast-forward before further source work.
+
+### Internal hosts / access map
+
+#### CT108 — Downloader
+
+- IP: `192.168.1.155`
+- shell identity seen in operator sessions: `root@downloader`
+- normal project worktree:
+  `/opt/missav-pwa-subtitle-stage11`
+- production tree:
+  `/opt/missav-dlp-web`
+- typical direct access:
+  `ssh root@192.168.1.155`
+- do not assume a password/key that is not already configured by the operator.
+- all repo/source verification and comparison orchestration should normally
+  start here.
+
+#### VM122 — Local ASR / GPU
+
+- IP: `192.168.1.134`
+- user: `teddy`
+- access: `ssh teddy@192.168.1.134`
+- GPU: RTX 3060 12 GB
+- ASR worker port: `8091`
+- baseline endpoint: `/v1/asr/transcribe`
+- targeted endpoint: `/v1/asr/transcribe-targeted`
+- current ASR: faster-whisper large-v3 / CUDA / float16
+- Stage11 ASR should run here, not on CT108 CPU.
+
+Current worker details verified from source:
+- outer Silero VAD threshold: `0.54`
+- speech padding: `2500 ms`
+- each detected region then calls faster-whisper with:
+  - `language="ja"`
+  - `task="transcribe"`
+  - `temperature=0.0`
+  - `word_timestamps=True`
+  - `vad_filter=False`
+- this makes the **outer Silero VAD** a prime suspect for dialogue missed under
+  BGM/noise: audio rejected by the outer VAD never reaches Whisper.
+
+Do not tune this yet. Translation/source A/B comes first.
+
+#### CT120 — Hermes subtitle translator
+
+- IP: `192.168.1.230`
+- user: `teddy`
+- access from a normal shell: `ssh teddy@192.168.1.230`
+- Hermes executable:
+  `/home/teddy/.local/bin/hermes`
+- profile:
+  `/home/teddy/.hermes/profiles/subtitle-translator`
+- current stateful translator provider/model/reasoning:
+  `openai-codex / gpt-5.6-luna / xhigh`
+- CT108 -> CT120 dedicated SSH key:
+  `/root/.ssh/id_ed25519_stage11_hermes`
+- CT108 known_hosts:
+  `/root/.ssh/known_hosts_stage11_hermes`
+- normal production remote root:
+  `/home/teddy/.hermes/profiles/subtitle-translator/stage11-controller-canary-v1`
+
+For long Hermes live work, do not make Codex sit and orchestrate it. Use the
+native/direct runner path from CT108 with a dedicated comparison staging root.
+
+#### Synology NAS
+
+- IP: `192.168.1.201`
+- user: `ssikgun`
+- JAV root: `/volume1/video/video2/JAV`
+- CT108 NAS key:
+  `/opt/missav-dlp-web/teddy-nas-transfer/id_ed25519`
+- known_hosts:
+  `/opt/missav-dlp-web/teddy-nas-transfer/known_hosts`
+- no broad recursive `find`, `os.walk`, `rglob`, or root-wide `du`.
+- this quality investigation must not write to NAS.
+
+#### Jellyfin
+
+- host: `192.168.1.205`
+- URL: `http://192.168.1.205:8096`
+- API key path on CT108:
+  `/opt/missav-dlp-web/teddy-jellyfin/jellyfin_api_key`
+- normal external Korean subtitle expectation:
+  language `kor`, codec/type `subrip`.
+- this quality investigation must not refresh/publish/modify Jellyfin.
+
+### FNS-247 production state
+
+FNS-247 was originally Stage12-published as ASR_ONLY.
+
+Original ASR_ONLY KO SHA:
+`847b77037be7133567b4e56f4364b54858e6e5a3ef2d3e56ee593fa1becfaf59`
+
+A later operator-approved HYBRID replacement completed successfully.
+
+Current effective HYBRID KO SHA:
+`ebed3bc9d195038f5f8be2e6cf54be77fef024cb94f7680aa8b50b4b369fc86f`
+
+The replacement journal/history preserves the original publication and the
+effective publication points to the HYBRID artifact. NAS SHA and Jellyfin
+visibility were verified at replacement time.
+
+Important: the current HYBRID Korean was **not** produced by reusing the old
+ASR_ONLY Korean translation. The old Japanese ASR artifact was reused as
+evidence, external Japanese was aligned, and Hermes generated Korean again.
+
+### Why the current FNS-247 HYBRID still has quality problems
+
+The operator watched the title end-to-end and reported:
+- many places where people are speaking but no Korean subtitle appears;
+- Korean often feels machine-translated / awkward;
+- two-person dialogue is not visibly separated by speaker/line;
+- fragment duplication where the end of one cue and beginning of the next
+  repeat or split a word.
+
+These observations are consistent with the current implementation.
+
+#### Current HYBRID is external-JA-backbone, not coverage-complete fusion
+
+The accepted FNS-247 external JA originally had 314 cues. One isolated invalid
+zero-duration cue was dropped, leaving 313 admitted cues.
+
+The production HYBRID flow currently:
+1. treats those external JA cues as the output cue backbone;
+2. aligns external timeline to video/ASR with affine alignment;
+3. attaches matching Whisper Japanese as **supporting evidence** where available;
+4. sends one semantic request cue per external JA cue to Hermes;
+5. materializes one Korean subtitle cue per external JA cue.
+
+Therefore an ASR speech segment that exists in audio but has no external-JA cue
+does **not** automatically become a new subtitle cue. This is the main reason
+HYBRID can still miss spoken dialogue.
+
+This must be changed later, but **do not redesign it yet**. First determine the
+best STT/translation ingredients.
+
+#### Affine alignment itself does not rewrite Japanese text
+
+The anchor/affine stage maps time and evidence correspondence. It does not
+split, merge, rewrite, or repair the authoritative external Japanese text.
+
+Therefore source fragments such as a word split across adjacent external cues
+remain source fragments unless a later semantic step repairs them.
+
+#### Current semantic boundary destroys source line breaks
+
+`project_semantic_text()` currently converts CRLF/CR/LF to ASCII spaces before
+Hermes semantic input.
+
+The FNS-247 external JA had 53 multiline cues before translation, while the
+published 313-cue Korean artifact is effectively single-line throughout.
+Thus speaker/line structure can be lost **after alignment, at semantic input**.
+
+The final HYBRID materializer projects timestamps from each external cue and
+writes `semantic.ko`; it does not reconstruct the original multiline structure.
+
+This line-break/speaker issue is separate from affine timing quality.
+
+#### Fragment / rolling-cue evidence
+
+Inspection of the current Korean and source evidence found obvious boundary
+artifacts such as Japanese words being divided between cues (examples previously
+observed included boundaries equivalent to `結 / 局` and `強 / くて`).
+The Korean then exhibits corresponding partial/repeated fragments.
+
+The current Korean file has 313 cues and no retained multiline cues. Many cues
+also end in ellipsis, and adjacent suffix/prefix duplication was observed.
+
+Do not solve this with title-specific text rules. Any eventual repair must be
+generic and evidence/context based.
+
+### TurboScribe / Gemini comparison evidence
+
+The operator manually generated a Japanese STT with TurboScribe and then gave
+that Japanese SRT to Gemini with an instruction to translate it as natural
+Korean dialogue.
+
+This manual TurboScribe source is **not** intended for automation. It is a
+temporary quality oracle/reference.
+
+Observed TurboScribe source characteristics from the earlier uploaded file:
+- 374 cues over about 29m59s;
+- no meaningful multiline speaker structure;
+- some clearly loose/incorrect timestamps and long segments;
+- clear service metadata/watermark at the beginning;
+- several Japanese recognition errors / implausible phrases;
+- adjacent overlap/repetition exists.
+
+Despite those faults, it captures substantially more dialogue and uses much
+finer cue segmentation than the current external-JA backbone.
+
+The Gemini translation preserves the same 374 cue/timestamp structure and,
+in operator review, is substantially more natural and easier to understand than
+the current Hermes HYBRID. The assistant's text review agreed that the Gemini
+version reads more naturally.
+
+However this is **not yet a fair Gemini-vs-Hermes model comparison**, because
+they received different Japanese input:
+- Gemini received the TurboScribe 374-cue JA;
+- current Hermes HYBRID received the external-JA-based 313-cue semantic stream.
+
+The next experiment fixes that.
+
+### Coverage evidence from the first ~30 minutes
+
+A comparison of the current FNS-247 HYBRID KO against the manual STT timeline
+showed a large coverage difference:
+- current HYBRID KO in the comparable window: about 106 cues / 470.9 s active;
+- TurboScribe JA: 374 cues / about 622.7 s active;
+- after excluding obvious metadata/very-long anomalies and allowing roughly
+  ±2 s around current subtitle coverage, a large number of STT cue centers
+  still fell outside current KO coverage.
+
+Treat the exact count as diagnostic, not ground truth, because TurboScribe has
+timestamp errors. The scale of the mismatch is nevertheless large enough to
+confirm the operator's observation that current HYBRID still misses dialogue.
+
+### Exact comparison input now present on CT108
+
+The operator has uploaded the Japanese A/B input to:
+
+`/tmp/FNS-247.turboscribe-ja.abtest.srt`
+
+Operator-reported SHA-256:
+
+`49b757c85f086fa55d88bf7da3f920a655864a0f449afbbebf8a6a3b69e5b376`
+
+This file is the **next-task input**.
+
+At the start of the next chat:
+1. verify this exact SHA on CT108;
+2. parse it read-only and report cue count/timeline/structural validity;
+3. do not silently rewrite or clean it before the first A/B unless the operator
+   confirms the Gemini input was cleaned in exactly the same way.
+
+For a fair model comparison, the first Hermes test should use exactly the same
+Japanese cue text/order/timestamps that Gemini received. Obvious service
+metadata may be excluded from *scoring*, but should not be silently changed in
+the source unless equality with the Gemini input is proven.
+
+### NEXT CHECKPOINT — do this first in the new chat
+
+**Comparison-only Hermes translation of the exact TurboScribe Japanese SRT.**
+
+Goal:
+
+`same TurboScribe JA -> Gemini`
+versus
+`same TurboScribe JA -> Hermes`
+
+This isolates translation behavior from source/STT differences.
+
+Requirements:
+- production pipeline source code: no modification;
+- production Stage11/Stage12 DB: no write;
+- NAS: no write;
+- Jellyfin: no write/refresh;
+- Whisper: no call;
+- no publication;
+- use a dedicated temporary comparison staging/root;
+- preserve source cue order and timestamps;
+- one Korean result per input cue for the baseline A/B;
+- use surrounding Japanese cues as context through the existing bounded
+  stateful mechanism;
+- keep the existing native Hermes validation/safety boundaries;
+- generate a comparison-only Korean SRT, suggested path:
+  `/tmp/FNS-247.hermes-turboscribe-abtest.ko.srt`;
+- preserve an exact input SHA and output SHA in the comparison report.
+
+The current native Hermes instruction already asks for natural Korean and the
+stateful part query says to produce natural Korean while preserving uncertainty.
+Use the current Hermes path first rather than changing the production prompt.
+If that baseline remains much worse than Gemini, only then test a separate
+comparison prompt/style variant.
+
+Suggested semantic ownership for this comparison:
+- `stt_ja` = exact TurboScribe Japanese cue text;
+- `external_ja=None`;
+- adjacent cues supplied as bounded before/after context;
+- dedicated generation key, e.g.
+  `fns247-turboscribe-hermes-ab-v1`;
+- source timestamps stay outside Hermes ownership and are reattached
+  deterministically after translation.
+
+Do not use the previous ASR_ONLY Korean or current HYBRID Korean as translation
+input. They are comparison references only.
+
+### What to compare after Hermes A/B finishes
+
+Compare Gemini KO and Hermes KO on the same source for:
+- natural Korean conversational flow;
+- literal meaning preservation;
+- whether uncertain/bad JA is honestly preserved vs plausibly hallucinated;
+- pronouns/relationships/honorific tone;
+- repeated/rolling fragment handling;
+- sentence boundary quality;
+- cue-by-cue omissions/additions;
+- ability to follow dialogue during real playback.
+
+The operator's judgement during playback is an important final quality signal.
+
+If Hermes becomes similarly natural on the identical JA input, the dominant
+problem is source/STT/segmentation rather than the translation model.
+
+If Gemini remains clearly better on identical input, translation
+model/prompt/style becomes a separate optimization decision.
+
+### AFTER translation A/B — STT benchmark, not before
+
+Once translation behavior is understood, benchmark STT on FNS-247 without
+changing the production pipeline.
+
+Candidate experiments:
+1. current faster-whisper large-v3 result;
+2. same large-v3 with outer VAD behavior adjusted;
+3. gap-only / second-pass transcription with lower VAD threshold or no outer
+   VAD for dialogue-missing regions;
+4. optionally a separate Qwen ASR-family model or another Japanese-capable ASR
+   engine if it can be hosted automatically on VM122;
+5. TurboScribe remains manual reference only.
+
+Key current hypothesis:
+the outer Silero threshold `0.54` may discard quiet speech under music/noise
+before Whisper ever receives it. This should be measured, not assumed.
+
+The existing text Qwen model served by llama.cpp on the Local-LLM machine is
+not an audio/STT model. Do not try to feed audio to that existing text endpoint.
+A separate audio/ASR model would be required.
+
+### Future production HYBRID direction — NOT YET IMPLEMENTED
+
+After translation and STT choices are fixed, redesign HYBRID toward a
+coverage-complete Japanese master before Korean translation:
+
+`external JA + automatic ASR evidence -> repaired/coverage-complete JA master -> Hermes -> KO`
+
+Desired future properties:
+- external JA remains valuable high-quality text/timing evidence;
+- ASR can create missing dialogue cues when external JA has no cue;
+- conflicting sources are reconciled conservatively;
+- no title/cue/text hardcoding;
+- preserve or reconstruct useful multiline/speaker structure;
+- generic adjacent-fragment/rolling-overlap repair;
+- store the exact Japanese master used for translation next to the title,
+  suggested name:
+  `FNS-247.ja.master.srt`
+  or a generic production equivalent;
+- store provenance/SHA in the report;
+- final Korean stays the canonical `.ko.srt`;
+- old ASR_ONLY Korean is never authoritative source text for the new translation.
+
+The user specifically wants the Japanese translation-source subtitle saved in
+the title directory in future so KO can be compared directly to the JA source.
+Implement this only after the quality design is frozen.
+
+### 162-title current production rescreen status
+
+A full effective-ASR_ONLY rescreen was started at source HEAD
+`b16059f3811cb311e0f0ae4e534677bbc04a1245`.
+
+Inventory:
+- published total: 163
+- effective ASR_ONLY: 162
+- effective HYBRID: 1 (FNS-247)
+
+The run processed 161/162 titles and then stopped on the last title because its
+current holding cannot be resolved.
+
+Counts over the **161 completed titles**:
+- ACCEPT_HYBRID = 17
+- NO_SELECTED_EXTERNAL = 102
+- EXTERNAL_VALIDATION_FAILURE = 14
+- MULTI_INDETERMINATE = 8
+- UNRESOLVED = 8
+- PAYLOAD_OR_BUNDLE_VALIDATION_FAILURE = 6
+- ALIGNMENT_WORK_LIMIT = 4
+- MULTIPLE_ACCEPTED_CONTENTS = 2
+
+Current 17 ACCEPT_HYBRID titles:
+- DROP-141
+- FBOS-015
+- FNS-244
+- GDTM-091
+- HMN-896
+- HSODA-104
+- HUNTC-487
+- MFCS-198
+- NSFS-456
+- ONSG-104
+- SDDE-763
+- SDNM-537
+- SIRO-5537
+- SNOS-080
+- SNOS-216
+- SONE-978
+- START-501
+
+Including already-effective FNS-247, there are therefore **at least 18**
+currently known HYBRID-capable/effective titles. Do not translate/promote the
+17 candidates until the FNS-247 quality design is fixed.
+
+Newly exposed by the streaming alignment improvements during this full scan
+included GDTM-091, MFCS-198, ONSG-104 and SDNM-537.
+
+### VEMA-246 blocker — exact current state
+
+The failed 162nd rescreen title is VEMA-246.
+
+Read-only forensic:
+- rollout status: PUBLISHED
+- report title: VEMA-246
+- report route: ASR_ONLY
+- exact current Discovery holding matches: 0
+- casefold matches: none
+- VEMA/VEM prefix holdings: none
+- production writes: 0
+
+Therefore the 162-title rescreen is **INCOMPLETE 161/162** because the current
+Discovery holdings no longer contain VEMA-246. This is not an alignment or
+subtitle-model failure.
+
+Do not fabricate or re-add a holding merely to finish the audit. Investigate the
+missing holding separately after the FNS-247 quality work, unless it becomes
+operationally blocking.
+
+### Recent alignment / selector work that is already complete
+
+Do not redo these:
+
+1. exact official SubtitleCat DETAIL canonical redirect support:
+   `subtitlecat.com -> www.subtitlecat.com` one exact HTTPS 301 hop only.
+2. generic safe multi-candidate selector:
+   evaluate all bounded candidates, SHA-dedupe accepted content, multiple
+   distinct accepts or any indeterminate candidate fail closed.
+3. exact streaming affine-consensus selector:
+   production no longer accumulates all full chains or fails merely because
+   more than 2048 unique chains exist.
+4. original work caps remain:
+   hypothesis/candidate/DP/path/fit-work bounds remain fail-closed.
+5. streaming-vs-legacy equivalence:
+   89/89 comparison PASS plus related smoke/regression PASS.
+6. latest 13 historic UNIQUE_CHAINS fresh rescreen:
+   11 ACCEPT_HYBRID / 1 UNRESOLVED / 1 FIT_WORK_LIMIT.
+7. current 51-title multicandidate consolidation after streaming:
+   UNIQUE_SELECTOR_SAFE=10,
+   MULTIPLE_ACCEPTED_CONTENTS=2,
+   ACCEPTED_BUT_BLOCKED=1,
+   NO_SAFE_ACCEPTED_CONTENT=38.
+
+Commit containing streaming selector:
+`b16059f3811cb311e0f0ae4e534677bbc04a1245`
+
+### Safety / workflow rules for the next chat
+
+- FNS-247 is a quality canary, not a place for title-specific production logic.
+- Production fixes must remain generic and evidence based.
+- Never hardcode a DVD ID, cue number, exact dialogue text or title-specific
+  timing into production behavior.
+- Do not weaken validators just to make an example pass.
+- False deletion/OMIT is worse than conservative KEEP when evidence is unclear.
+- Deterministic code owns identities, indices, timestamps and publication.
+- LLM/Hermes owns semantic interpretation/translation, not timestamp authority.
+- Never automatically overwrite an existing KO.
+- Stage11 does not publish; Stage12 owns NAS/Jellyfin publication.
+- During this quality investigation, do not publish at all.
+- Codex is for implementation, bounded forensic and smoke; not for waiting on
+  long Hermes translation runs.
+- Do not run broad NAS recursion.
+- Do not print raw subtitle bodies/session IDs into logs or chat when not needed.
+- Long direct runs should use a bounded background runner with log/pid and a
+  separate tail command.
+- Important state changes must update this canonical handoff and commit/push.
+- Do not create a parallel canonical handoff file.
+
+### User reporting preference
+
+For Downloader work, keep reports short and practical:
+- first visible token for checkpoint/result reports: PASS / FAIL / INCOMPLETE;
+- explain what it means in non-specialist Korean;
+- separate confirmed facts from things needing verification;
+- give the single most important next action;
+- avoid dumping long internal logs unless asked.
+
+### Immediate new-chat opening instruction
+
+In the new conversation, tell the assistant:
+
+“Read `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md` from the
+`teddy-subtitle-stage11` branch. Start from the 2026-10-02 NEXT CHAT START HERE
+section. First verify CT108 repo HEAD/worktree and
+`/tmp/FNS-247.turboscribe-ja.abtest.srt` SHA, then perform the
+comparison-only Hermes translation A/B. Do not modify the production pipeline.”
+
 ## 2026-10-01 Stage11 — exact streaming affine-consensus selection (PASS)
 
 Started from clean expected HEAD
