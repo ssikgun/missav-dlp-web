@@ -1,5 +1,64 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-05 — NEXT CHAT START HERE: SubtitleCat internal ASCII space fix
+
+Current checkpoint: generic parser source fix and offline regression complete.
+**Live FNS-247 HYBRID canary has NOT been rerun; this fix has NOT been
+deployed to production.** The HYBRID implementation checkpoint below remains
+applicable after this external-source boundary correction.
+
+Prior operator observation: FNS-247 SubtitleCat discovery correctly returned
+six candidates. Candidates 1 and 3 contained actual terminal `-ja.srt` links
+with local language metadata identifying JA; candidates 2/4/6 had no actual
+JA link and must continue to fail closed. The observed HYBRID-to-ASR_ONLY
+fallback root cause was `_validate_href_text()` rejecting an internal literal
+ASCII space (U+0020) in a valid SubtitleCat JA href as
+`Japanese subtitle href is malformed or unsafe`, rather than discovery
+failing to find candidates. These live observations were supplied for this
+checkpoint; no new live search, detail fetch, payload fetch or canary ran.
+
+`teddy_discovery_subtitle_external.py` now validates the raw href while
+allowing only internal U+0020, returns its deterministic `%20` normalization,
+and uses that returned href for language resolution, `urljoin()` and final
+URL validation. The generic regression uses
+`/subs/1662/TITLE.zh-cn(by transub)-ja.srt`; the injected payload fetch receives
+the canonical URL without literal spaces and retains candidate language `ja`.
+No title ID, filename or observed phrase exception was added to production.
+
+Safety invariants are preserved: leading/trailing whitespace, tabs, CR/LF,
+other C0 controls, DEL, NBSP and other non-ASCII-space whitespace, backslash,
+`< > " '`, and unsafe `%00/%0a/%0d/%7f/%5c` escapes remain rejected.
+The common final HTTP(S) URL validator still rejects literal whitespace,
+credentials, non-HTTP(S) schemes and fragments. Missing/ambiguous JA,
+conflicting local language metadata, and generated/translated evidence remain
+fail-closed. Already encoded `%20` is stable, and equivalent raw/encoded
+hrefs deterministically identify the same URL.
+
+Offline validation used `/opt/stage11-stt-venv/bin/python`: **12 smoke scripts
+PASS, 0 FAIL**. The external smoke reports **183 checks PASS, 0 FAIL**.
+Exact scripts executed:
+
+- `teddy_discovery_subtitle_external_smoke.py`
+- `teddy_discovery_subtitlecat_discovery_smoke.py`
+- `teddy_discovery_subtitlecat_proxy_smoke.py`
+- `teddy_discovery_stage11_controller_smoke.py`
+- `teddy_discovery_stage11_live_adapters_smoke.py`
+- `teddy_discovery_stage11_deployment_smoke.py`
+- `teddy_discovery_subtitle_v2_orchestrator_smoke.py`
+- `teddy_discovery_subtitle_v2_pipeline_smoke.py`
+- `teddy_discovery_hybrid_evidence_smoke.py`
+- `teddy_discovery_alignment_smoke.py`
+- `teddy_discovery_alignment_application_smoke.py`
+- `teddy_discovery_alignment_limit_fallback_smoke.py`
+
+`python -m py_compile teddy_discovery_subtitle_external.py
+teddy_discovery_subtitle_external_smoke.py` and `git diff --check` PASS.
+Live-adapter/deployment smokes use injected fakes and network/process
+tripwires; they are offline regression, not a live canary or deployment.
+Production deploy/write, NAS subtitle writes and Jellyfin calls=0.
+Next checkpoint: a separately authorized live HYBRID canary; its routing and
+alignment outcome remain unverified by this source-only fix.
+
 ## 2026-10-02 — NEXT CHAT START HERE: Stage11 HYBRID suspect-only implementation
 
 Current checkpoint: source implementation and offline regression complete;

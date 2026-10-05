@@ -191,13 +191,13 @@ def _validate_http_url(value: object, *, field_name: str) -> str:
 
 
 def _validate_href_text(value: object) -> str:
-    """Reject unsafe raw href text before URL resolution can repair it."""
+    """Reject unsafe raw href text and encode validated internal ASCII spaces."""
 
     if (
         type(value) is not str
         or not value
         or value != value.strip()
-        or _has_control_or_whitespace(value)
+        or _has_control_or_whitespace(value.replace(" ", ""))
         or "\\" in value
         or any(character in value for character in '<>"\'')
     ):
@@ -210,7 +210,7 @@ def _validate_href_text(value: object) -> str:
             "Japanese subtitle href contains an unsafe escape"
         )
 
-    return value
+    return value.replace(" ", "%20")
 
 
 def _validate_external_candidate(
@@ -913,7 +913,7 @@ def find_subtitlecat_original_japanese_srt_url(
         if not _looks_like_srt_href(href):
             continue
 
-        _validate_href_text(href)
+        href = _validate_href_text(href)
 
         target_language = _resolve_local_target_language(
             record,

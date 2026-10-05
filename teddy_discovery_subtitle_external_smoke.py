@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from html import escape
 from pathlib import Path
 
 import teddy_discovery_subtitle_external as external_module
@@ -10,15 +11,22 @@ from teddy_discovery_subtitle import (
 from teddy_discovery_subtitle_text import MAX_SUBTITLE_BYTES
 
 
+PASSED_CHECKS = 0
+
+
 def require(condition: bool, marker: str):
+    global PASSED_CHECKS
     if not condition:
         raise AssertionError(marker)
+    PASSED_CHECKS += 1
 
 
 def expect_raises(exception_type, callback, marker: str):
+    global PASSED_CHECKS
     try:
         callback()
     except exception_type:
+        PASSED_CHECKS += 1
         return
 
     raise AssertionError(marker)
@@ -413,6 +421,130 @@ def main():
         "RELATIVE_JA_HREF_RESOLUTION",
     )
 
+    space_href = "/subs/1662/TITLE.zh-cn(by transub)-ja.srt"
+    canonical_href = "/subs/1662/TITLE.zh-cn(by%20transub)-ja.srt"
+    space_html = (
+        '<a id="download_ja" data-language="ja" '
+        'onclick="show_voting(\'ja\')" href="' + space_href + '">Download</a>'
+    )
+    space_payload_candidates = []
+
+    def space_payload_fetch(current_candidate):
+        space_payload_candidates.append(current_candidate)
+        return SRT_PAYLOAD
+
+    space_provider = external_module.SubtitleCatProvider(
+        fetch_detail=lambda url: external_module.SubtitleCatDetailPage(
+            final_url=final_detail_url,
+            html=space_html,
+        ),
+        payload_fetcher=space_payload_fetch,
+    )
+    space_payload = space_provider.fetch_original_japanese_payload(
+        dvd_id=DVD_ID,
+        detail_url=requested_detail_url,
+    )
+    require(
+        space_payload.source_url == "https://final.example" + canonical_href
+        and space_payload.candidate.external_source_id == space_payload.source_url
+        and " " not in space_payload.source_url,
+        "INTERNAL_ASCII_SPACE_CANONICALIZED_BEFORE_PAYLOAD_FETCH",
+    )
+    require(
+        space_payload.candidate.language == "ja"
+        and space_payload.is_translation_source
+        and space_payload_candidates == [space_payload.candidate],
+        "SPACE_HREF_PRESERVES_JA_LANGUAGE_METADATA",
+    )
+    require(
+        external_module._validate_href_text(canonical_href) == canonical_href
+        and external_module._validate_href_text(space_href) == canonical_href
+        and external_module._validate_href_text("../TITLE  name-ja.srt")
+        == "../TITLE%20%20name-ja.srt",
+        "SPACE_HREF_CANONICALIZATION_DETERMINISTIC_AND_IDEMPOTENT",
+    )
+    require(
+        external_module.find_subtitlecat_original_japanese_srt_url(
+            space_html + space_html.replace(space_href, canonical_href),
+            final_detail_url,
+        ) == space_payload.source_url,
+        "RAW_AND_ENCODED_SPACE_SAME_URL_DEDUPLICATED",
+    )
+    expect_raises(
+        external_module.SubtitleCatDetailError,
+        lambda: external_module._validate_http_url(
+            "https://final.example" + space_href,
+            field_name="final URL",
+        ),
+        "FINAL_URL_BOUNDARY_STILL_REJECTS_LITERAL_SPACE",
+    )
+
+    # Exercise raw validation and the actual HTML parser: URL parsing must
+    # never silently strip controls before the raw href boundary sees them.
+    forbidden_characters = [chr(code) for code in range(32)] + [
+        "\x7f", "\u0085", "\u00a0", "\u1680",
+        *[chr(code) for code in range(0x2000, 0x200B)],
+        "\u2028", "\u2029", "\u202f", "\u205f", "\u3000",
+        "\\", "<", ">", '"', "'",
+    ]
+    unsafe_hrefs = [
+        (space_href.replace(" ", character), f"CHAR_U{ord(character):04X}")
+        for character in forbidden_characters
+    ]
+    unsafe_hrefs.extend([
+        (" " + space_href, "LEADING_ASCII_SPACE"),
+        (space_href + " ", "TRAILING_ASCII_SPACE"),
+    ])
+    unsafe_hrefs.extend(
+        (space_href.replace(" ", " " + encoded), "ESCAPE_" + encoded)
+        for encoded in ("%00", "%0a", "%0A", "%0d", "%0D",
+                        "%7f", "%7F", "%5c", "%5C")
+    )
+    for unsafe_href, marker in unsafe_hrefs:
+        expect_raises(
+            external_module.SubtitleCatDetailError,
+            lambda href=unsafe_href: external_module._validate_href_text(href),
+            "RAW_HREF_REJECTS_" + marker,
+        )
+        expect_raises(
+            external_module.SubtitleCatDetailError,
+            lambda href=unsafe_href: external_module.find_subtitlecat_original_japanese_srt_url(
+                '<a data-language="ja" href="' + escape(href, quote=True)
+                + '">Download</a>',
+                final_detail_url,
+            ),
+            "PARSED_HREF_REJECTS_" + marker,
+        )
+
+    for html, marker in (
+        (space_html.replace("-ja.srt", "-ko.srt")
+         .replace("download_ja", "download_ko")
+         .replace('data-language="ja"', 'data-language="ko"')
+         .replace("show_voting('ja')", "show_voting('ko')"), "MISSING_JA"),
+        (space_html + space_html.replace("TITLE", "OTHER"), "AMBIGUOUS_JA"),
+        (space_html.replace('data-language="ja"', 'data-language="en"'),
+         "CONFLICTING_LANGUAGE"),
+        (space_html.replace(space_href, "javascript:TITLE name-ja.srt"),
+         "JAVASCRIPT_URL"),
+        (space_html.replace(space_href, "file:///tmp/TITLE name-ja.srt"),
+         "FILE_URL"),
+        (space_html.replace(space_href, "https://user:pass@example.test" + space_href),
+         "CREDENTIAL_URL"),
+        (space_html.replace(space_href, space_href + "#part"), "FRAGMENT"),
+        (space_html.replace(">Download</a>", ">Generated Japanese</a>"),
+         "GENERATED_EVIDENCE"),
+        (space_html.replace(">Download</a>", ">Auto-translated Japanese</a>"),
+         "TRANSLATED_EVIDENCE"),
+    ):
+        expect_raises(
+            external_module.SubtitleCatDetailError,
+            lambda html=html: external_module.find_subtitlecat_original_japanese_srt_url(
+                html,
+                final_detail_url,
+            ),
+            "SPACE_HREF_FAILS_CLOSED_" + marker,
+        )
+
     for html, marker in (
         (
             '<a data-language="en" href="/subs/1/english.srt">English</a>',
@@ -466,6 +598,8 @@ def main():
     )
 
     print("STAGE11_SUBTITLE_EXTERNAL_SMOKE=PASS")
+    print(f"STAGE11_SUBTITLE_EXTERNAL_CHECKS_PASS={PASSED_CHECKS}")
+    print("STAGE11_SUBTITLE_EXTERNAL_CHECKS_FAIL=0")
 
 
 if __name__ == "__main__":
