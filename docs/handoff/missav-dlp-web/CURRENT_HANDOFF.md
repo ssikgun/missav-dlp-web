@@ -1,5 +1,125 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-07 — Whole-title primary canary PASS / KO LF contract
+
+### Current goal
+
+Stage11 primary subtitle translation is being moved toward one whole-title Hermes
+translation when the title safely fits, with requirement #5 handled during the
+initial translation rather than by a broad post-translation temporal re-review.
+
+The fixed product direction remains:
+
+- external Japanese subtitle is the primary textual skeleton when available;
+- Whisper/STT is supporting audio/timing evidence, not absolute truth;
+- Hermes translates with whole-title context;
+- adjacent cue boundaries may be repaired conservatively for split/duplicated
+  wording while preserving each cue's semantic ownership;
+- deterministic code owns cue identity/order/timestamps/publication.
+
+### Whole-title primary canary
+
+FNS-247 validated Stage11 semantic evidence was reused without repeating external
+subtitle discovery, alignment, or Whisper extraction.
+
+Canary execution:
+
+- cue count: `313`
+- Hermes model invocation: `1` whole-title invocation
+- fresh deterministic session:
+  `45693c66-bfb5-5d85-a364-57dab1c5d6af`
+- isolated Hermes root:
+  `/tmp/stage11-hermes-root-20261007-083131`
+- NAS write: `NO`
+- Jellyfin write: `NO`
+- production subtitle write: `NO`
+- source mutation during translation: `NO`
+
+Preserved raw result:
+
+- remote result:
+  `/tmp/stage11-fns247-whole-title-primary-boundary-v2/45693c66-bfb5-5d85-a364-57dab1c5d6af/stage11-semantic-result.json`
+- SHA-256:
+  `60d7019e88d21a28c038baf10edf843cadb04deae7e5916d8d383df6071c9e02`
+- final cue count: `313`
+- empty Korean cues: `0`
+- existing `parse_stateful_result()` validation after contract fix: `PASS`
+
+This establishes that the 313-cue title can be translated as one complete Hermes
+request while preserving Stage11 package/result identity and cue-order validation.
+
+### KO LF contract discovered by canary
+
+The whole-title prompt allows a natural line break inside one cue when evidence
+clearly indicates multiple speakers.
+
+The raw canary result used LF (`U+000A`) in exactly 6 Korean output cues.
+No TAB, CR, NUL, DEL, or other control character appeared.
+
+The existing Hermes v2 validator rejected those otherwise valid outputs because
+the shared text validator rejected every control character.
+
+The generic contract was therefore narrowed as follows:
+
+- `HermesV2CueOutput.ko` may contain LF (`\n`);
+- LF remains rejected in `cue_id`, `external_ja`, `stt_ja`, `en`,
+  `before_context`, `after_context`, and `repaired_ja`;
+- Korean output still rejects TAB, CR, NUL, DEL, and other control characters;
+- wire schema, cue identity/order, timestamps, semantic policy, and part policy
+  are unchanged.
+
+Implementation commit:
+
+`6462dca` — `stage11: allow LF in Korean subtitle output`
+
+Changed files only:
+
+- `teddy_discovery_hermes_v2.py`
+- `teddy_discovery_hermes_v2_smoke.py`
+- `teddy_discovery_hermes_v2_ko_lf_smoke.py`
+
+Validation:
+
+- new LF regression: `8 PASS / 0 FAIL`
+- specified existing smoke: `3 PASS / 0 FAIL`
+- `py_compile`: `PASS`
+- `git diff --check`: `PASS`
+- preserved whole-title raw result revalidation: `PASS`
+- result SHA unchanged
+
+### Important decision
+
+Do not restart the old broad temporal whole-title re-review path.
+
+The preferred direction is now:
+
+1. reuse validated external-JA/alignment/Whisper evidence;
+2. perform whole-title primary Hermes translation when safely supported;
+3. apply boundary/speaker/semantic-ownership rules in that first translation;
+4. use partitioned translation only as a bounded fallback for titles that cannot
+   safely complete as one request;
+5. keep any later QA narrow and evidence-triggered.
+
+### Next work
+
+Before changing the production fixed-64 default, compare the new whole-title
+primary result against:
+
+- the current fixed-64 Stage11 result;
+- the historical true whole-title V3 result.
+
+Judge actual subtitle quality, especially:
+
+- natural Korean flow;
+- split cue boundaries;
+- duplicated wording/meaning across adjacent cues;
+- semantic stealing;
+- unsupported contextual/proper-name invention.
+
+Only after that comparison should the production first-pass policy be changed.
+
+
+
 
 ## 2026-10-07 — READ FIRST: Stage11 subtitle direction reset
 
