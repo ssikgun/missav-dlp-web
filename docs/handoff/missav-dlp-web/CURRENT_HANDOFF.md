@@ -1,5 +1,85 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+
+## 2026-10-07 — READ FIRST: Stage11 subtitle direction reset
+
+**This section is the current highest-priority subtitle direction and overrides
+older experimental temporal-retrofit conclusions below where they conflict.**
+
+### Fixed product goal
+
+Stage11 subtitle quality work must stay centered on this pipeline:
+
+1. Prefer a trustworthy external Japanese subtitle when available.
+2. Use Whisper/STT primarily to align that external Japanese to the real video
+   timeline and as independent evidence. Whisper is evidence, not ground truth.
+3. Use external JA and Whisper/STT to complement each other when one misses or
+   corrupts speech; do not blindly replace one with the other.
+4. Hermes performs the **primary Korean translation with whole-title context**
+   when stable. The target is natural conversational Korean while preserving
+   supported Japanese meaning. Context may repair malformed Japanese only when
+   evidence supports it; uncertainty stays conservative rather than becoming
+   invented dialogue.
+5. Cue-boundary quality is a **primary-translation rule**, not a broad
+   post-translation re-review: avoid duplicated words/meaning across adjacent
+   cues, handle genuinely split words/sentences across exact adjacent
+   boundaries, preserve speaker separation/readability where possible, and
+   never let one cue steal, swallow, or invent a neighbor's semantic content.
+   Cue identity/order/timestamps remain code-owned and immutable.
+
+Generic safety remains mandatory: no title/DVD/cue-specific production
+hardcoding; deterministic code owns identity/index/timestamps/publication and
+clear structural validation; Hermes owns semantic translation/repair;
+Whisper supplies evidence; false OMIT is worse than conservative KEEP and
+unresolved conflicts remain conservative/AMBIGUOUS.
+
+### Decision from the FNS-247 temporal-retrofit investigation
+
+Stop spending time trying to fix rule 5 by running a new temporal prompt over
+an already translated full title. Live A/B proved that this caused semantic
+drift: cues with no temporal neighbor were also re-judged, and REPAIR decisions
+expanded far beyond boundary problems. Exact TOUCHING metadata and the replay /
+isolated-session work remain useful evidence infrastructure, but **313-cue
+temporal full-title re-review is not the production direction**.
+
+For FNS-247, do **not** restart SubtitleCat discovery, affine alignment or
+Whisper evidence generation merely to test this direction. Reuse the already
+validated external JA / alignment / evidence and restart at the Hermes primary
+translation step.
+
+The next canary should reproduce the previously successful Luna/Hermes
+**whole-title primary translation** behavior, but with rule 5 and the learned
+safety boundaries present from the first translation. Prefer one whole-title
+translation when it remains stable; chunking (for example 64 cues) is fallback
+only if whole-title execution proves unreliable. If chunking is ever required,
+cross-chunk boundary context must be handled explicitly.
+
+Do not preserve a previous translation merely because it exists; the purpose
+of this canary is to validate the actual future first-translation path. Compare
+the new whole-title output against the prior whole-title/Luna evidence and
+current reference outputs for naturalness, meaning preservation, missing
+dialogue, speaker readability, boundary duplication/splits, proper-name drift,
+and semantic stealing. Do not publish to NAS/Jellyfin during this quality
+canary.
+
+### Work order
+
+**Current next task:** design/run the FNS-247 Hermes whole-title primary
+translation canary using existing validated source/alignment/evidence and the
+fixed rules above. Do not continue the temporal-retrofit branch as the main
+solution.
+
+**Immediately after this subtitle-translation direction is validated:** tune
+Whisper for dialogue recall under BGM/music/noise. The known next investigation
+is to find generic settings/preprocessing that let real speech reach Whisper
+more reliably (including the current outer Silero VAD boundary), without
+title-specific tuning or treating hallucinated speech as truth.
+
+Long Hermes bulk execution must use the direct runner/bridge/controller path,
+not Codex as a long-running orchestrator. Codex remains for implementation,
+bounded forensic work and validation.
+
+
 ## 2026-10-05 — NEXT CHAT START HERE: SubtitleCat internal ASCII space fix
 
 Current checkpoint: generic parser source fix and offline regression complete.
