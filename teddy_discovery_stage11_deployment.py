@@ -1223,6 +1223,7 @@ class _HybridOriginalRegistry:
             route,
             staging_root,
             semantic_policy=None,
+            boundary_evidence=None,
         ):
             callback_kwargs = {
                 "route": route,
@@ -1230,6 +1231,8 @@ class _HybridOriginalRegistry:
             }
             if semantic_policy is not None:
                 callback_kwargs["semantic_policy"] = semantic_policy
+            if boundary_evidence is not None:
+                callback_kwargs["boundary_evidence"] = boundary_evidence
             result = callback(package, **callback_kwargs)
             if route == V2_ROUTE_HYBRID:
                 try:

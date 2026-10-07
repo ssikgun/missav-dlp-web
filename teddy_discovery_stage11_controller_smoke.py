@@ -319,6 +319,7 @@ class FakeRuntime:
         route,
         staging_root,
         semantic_policy=None,
+        boundary_evidence=None,
     ):
         self.first_pass_calls += 1
         self.first_pass_routes.append(route)
@@ -328,6 +329,9 @@ class FakeRuntime:
             self.first_pass_policies.append(semantic_policy.policy_id)
         assert route in {V2_ROUTE_ASR_ONLY, V2_ROUTE_HYBRID}
         self.last_packages[route] = package
+        if boundary_evidence is not None:
+            from teddy_discovery_stateful_boundary import validate_stateful_boundary_evidence
+            validate_stateful_boundary_evidence(boundary_evidence, package)
         result = StatefulSubtitleResult(
             schema_version=package.schema_version,
             dvd_id=package.dvd_id,
@@ -346,6 +350,9 @@ class FakeRuntime:
                 create_stateful_staging_directory(staging_root, session)
             write_stateful_authoritative_input(directory, package)
             write_stateful_input(directory, package)
+            if boundary_evidence is not None:
+                from teddy_discovery_stateful_boundary import stage_stateful_boundary_evidence
+                stage_stateful_boundary_evidence(directory, boundary_evidence, package)
             _atomic_private_write(
                 stateful_staging_paths(directory).result_path,
                 serialize_stateful_result(result),

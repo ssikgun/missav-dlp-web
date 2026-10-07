@@ -49,6 +49,10 @@ from teddy_discovery_targeted_second_evidence_runner import (
     run_targeted_second_evidence_v1_from_local_source,
     run_targeted_hybrid_windows,
 )
+from teddy_discovery_stateful_boundary import (
+    STATEFUL_BOUNDARY_FILENAME, stage_stateful_boundary_evidence,
+    validate_stateful_boundary_evidence,
+)
 from teddy_discovery_stateful_translator import (
     bind_stateful_semantic_policy,
     create_stateful_staging_directory,
@@ -352,9 +356,13 @@ def build_first_pass_adapter(*, remote, ssh_key, known_hosts,
         semantic_policy: StatefulSemanticPolicy | str = (
             DEFAULT_STATEFUL_SEMANTIC_POLICY
         ),
+        boundary_evidence=None,
     ):
         if route not in {"ASR_ONLY", "HYBRID"}:
             raise Stage11LiveAdapterError("unsupported first-pass route")
+        validate_stateful_boundary_evidence(boundary_evidence, package)
+        if boundary_evidence is not None and route != "HYBRID":
+            raise Stage11LiveAdapterError("boundary evidence requires HYBRID route")
         try:
             policy = resolve_stateful_semantic_policy(semantic_policy)
             bound_package = bind_stateful_semantic_policy(package, policy)
@@ -386,6 +394,11 @@ def build_first_pass_adapter(*, remote, ssh_key, known_hosts,
         if not directory.exists() and not directory.is_symlink():
             create_stateful_staging_directory(staging_root, session)
         paths = stateful_staging_paths(directory)
+        boundary_path = None
+        if boundary_evidence is not None:
+            if (paths.result_path.exists() and not (directory / STATEFUL_BOUNDARY_FILENAME).exists()):
+                raise Stage11LiveAdapterError("existing result lacks bound boundary sidecar")
+            boundary_path = stage_stateful_boundary_evidence(directory, boundary_evidence, package)
         raw_payload = serialize_stateful_package(package)
         model_payload = serialize_stateful_model_input(package)
         raw_input_existed = (
@@ -426,6 +439,8 @@ def build_first_pass_adapter(*, remote, ssh_key, known_hosts,
             parser_args.extend(
                 ["--semantic-policy", policy.policy_id]
             )
+        if boundary_path is not None:
+            parser_args.extend(["--boundary-evidence", str(boundary_path)])
         args = build_parser().parse_args(parser_args)
         code = native_run(args)
         if type(code) is not int or code != 0:

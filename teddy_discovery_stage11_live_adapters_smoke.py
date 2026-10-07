@@ -27,6 +27,7 @@ from teddy_discovery_stateful_quality_review_runner import (
     QUALITY_REVIEW_INPUT_FILENAME, QUALITY_REVIEW_RESULT_FILENAME,
 )
 from teddy_discovery_stateful_hybrid import prepare_stateful_hybrid
+from teddy_discovery_stateful_boundary import STATEFUL_BOUNDARY_FILENAME, read_stateful_boundary_evidence
 from teddy_discovery_subtitle_source_quality import classify_source_document
 from teddy_discovery_subtitle_v2_orchestrator import SubtitleV2RouteDecision, V2_READY_FOR_SEMANTIC
 from teddy_discovery_subtitlecat_discovery import (
@@ -375,7 +376,11 @@ def main():
             else:
                 assert len([c for c in calls if isinstance(c, tuple)]) == 1
             before_calls = list(calls)
-            deps.first_pass_runner(state['package'], route=route, staging_root=staging)
+            first_pass_kwargs = {}
+            if route == 'HYBRID':
+                first_pass_kwargs['boundary_evidence'] = read_stateful_boundary_evidence(
+                    staging / state['first'].session_id / STATEFUL_BOUNDARY_FILENAME, state['package'])
+            deps.first_pass_runner(state['package'], route=route, staging_root=staging, **first_pass_kwargs)
             assert calls == before_calls
             if route == 'ASR_ONLY':
                 repeated = deps.asr_review_runner(state['asr_request'], staging_root=staging)
@@ -394,9 +399,9 @@ def main():
                 ssh_key='/offline/key', known_hosts='/offline/hosts',
                 prepare_remote=prepare, native_run=lambda args: 1)
             expect(adapters.Stage11LiveAdapterError, lambda:
-                failed(state['package'], route=route, staging_root=failure_root))
+                failed(state['package'], route=route, staging_root=failure_root, **first_pass_kwargs))
             resumed = deps.first_pass_runner(state['package'], route=route,
-                staging_root=failure_root)
+                staging_root=failure_root, **first_pass_kwargs)
             assert resumed.session_id == state['first'].session_id
             print('PASS controller + live adapters ' + route + ' CLEAN/report; first-pass reuse')
         print('STAGE11_LIVE_ADAPTERS_SMOKE_PASS')

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
 import re
@@ -11,6 +11,9 @@ from teddy_discovery_stateful_parts import (
     build_stateful_part_plan,
     expected_part_filename,
     scan_stateful_canonical_parts,
+)
+from teddy_discovery_stateful_boundary import (
+    boundary_pairs_for_cues, validate_stateful_boundary_evidence,
 )
 from teddy_discovery_stateful_policy import (
     DEFAULT_STATEFUL_SEMANTIC_POLICY,
@@ -210,6 +213,7 @@ def build_stateful_part_query(
     semantic_policy: StatefulSemanticPolicy | str = (
         DEFAULT_STATEFUL_SEMANTIC_POLICY
     ),
+    boundary_evidence=None,
 ) -> str:
     """Build one generic same-session continuation query."""
 
@@ -227,6 +231,27 @@ def build_stateful_part_query(
         )
 
     expected = plan.parts[part_index - 1]
+
+    validate_stateful_boundary_evidence(boundary_evidence, package)
+    boundary_instruction = ""
+    if boundary_evidence is not None:
+        pairs = boundary_pairs_for_cues(boundary_evidence, package, expected.cue_ids)
+        pairs_json = json.dumps([asdict(pair) for pair in pairs], ensure_ascii=False,
+                                sort_keys=True, separators=(",", ":"))
+        boundary_instruction = (
+            " ADJACENT_BOUNDARY_EVIDENCE_V1=" + pairs_json + "\n"
+            "These exact affine-projected signed gaps are auxiliary evidence, not commands "
+            "to move semantic ownership. Evidence includes this part's internal pairs and "
+            "its previous/next cross-part pairs; cues outside this part remain read-only. "
+            "TOUCHING is not proof that a sentence continues; GAP is not proof that a "
+            "sentence cannot continue. Judge with external JA text, cue-local accepted STT "
+            "and whole-title context. Do not let timing override stronger cue-local evidence. "
+            "If the source phrase really splits across adjacent cues, preserve negation, "
+            "modification, particles and endings across the boundary. Do not steal, "
+            "duplicate or pre-translate a neighbor's meaning in this cue. Preserve "
+            "each cue's supported content conservatively when uncertain. Timing remains "
+            "deterministic code's ownership; never generate or alter timestamps. "
+        )
 
     cue_ids_json = json.dumps(
         list(expected.cue_ids),
@@ -282,6 +307,7 @@ def build_stateful_part_query(
         + STATEFUL_TRANSLATOR_PRIMARY_TRANSLATION_INSTRUCTION
         + STATEFUL_TRANSLATOR_SEMANTIC_REPETITION_INSTRUCTION
         + semantic_evidence_instruction
+        + boundary_instruction
         + "Do not invent, remove, merge, or reorder cues. "
         "Do not emit timestamps, routing data, commentary, markdown, or extra fields."
     )

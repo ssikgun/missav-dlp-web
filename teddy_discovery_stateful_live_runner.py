@@ -45,6 +45,10 @@ from teddy_discovery_stateful_translator import (
     serialize_stateful_result,
     stateful_model_input_identity_is_bound,
 )
+from teddy_discovery_stateful_boundary import (
+    STATEFUL_BOUNDARY_FILENAME, read_stateful_boundary_evidence,
+    validate_stateful_boundary_evidence,
+)
 
 
 class StatefulLiveRunnerError(RuntimeError):
@@ -1402,11 +1406,15 @@ def _request_and_install_part(
     semantic_policy: StatefulSemanticPolicy | str = (
         DEFAULT_STATEFUL_SEMANTIC_POLICY
     ),
+    boundary_evidence=None,
 ) -> None:
     """Request one deterministic part with a bounded validation retry."""
 
     retry_feedback: str | None = None
     for attempt in range(1, STATEFUL_PART_MODEL_MAX_ATTEMPTS + 1):
+        if boundary_evidence is not None:
+            if read_stateful_boundary_evidence(args.boundary_evidence, package) != boundary_evidence:
+                raise StatefulLiveRunnerError("boundary sidecar changed before part invocation")
         print(
             "MODEL_PART_ATTEMPT="
             + str(expected.part_index)
@@ -1440,6 +1448,7 @@ def _request_and_install_part(
                 semantic_input_bytes,
                 expected.part_index,
                 semantic_policy=semantic_policy,
+                **({"boundary_evidence": boundary_evidence} if boundary_evidence is not None else {}),
             )
             if retry_feedback is not None:
                 query += "\n\n" + retry_feedback
@@ -1683,6 +1692,14 @@ def run(args: argparse.Namespace) -> int:
         raw_package_bytes = Path(raw_package_argument).read_bytes()
         package = parse_stateful_package(raw_package_bytes)
 
+    boundary_path = getattr(args, "boundary_evidence", None)
+    boundary_evidence = None
+    if boundary_path is not None:
+        if Path(boundary_path) != task_directory / STATEFUL_BOUNDARY_FILENAME:
+            raise StatefulLiveRunnerError("boundary sidecar must use its canonical staging path")
+        boundary_evidence = read_stateful_boundary_evidence(boundary_path, package)
+    validate_stateful_boundary_evidence(boundary_evidence, package)
+
     plan = build_stateful_part_plan(
         package,
         semantic_input_bytes,
@@ -1725,6 +1742,9 @@ def run(args: argparse.Namespace) -> int:
     print()
 
     while True:
+        if boundary_evidence is not None:
+            if read_stateful_boundary_evidence(boundary_path, package) != boundary_evidence:
+                raise StatefulLiveRunnerError("boundary sidecar changed during native run")
         decision = decide_stateful_controller_step(
             task_directory,
             package,
@@ -1844,6 +1864,7 @@ def run(args: argparse.Namespace) -> int:
             expected=expected,
             final_path=final_path,
             semantic_policy=semantic_policy,
+            **({"boundary_evidence": boundary_evidence} if boundary_evidence is not None else {}),
         )
 
         print(
@@ -1880,6 +1901,9 @@ def build_parser() -> argparse.ArgumentParser:
             "the package file itself remains the model-input projection"
         ),
     )
+
+    parser.add_argument("--boundary-evidence", default=None,
+                        help="canonical HYBRID boundary sidecar bound to model-input identity")
 
     parser.add_argument(
         "--task-directory",

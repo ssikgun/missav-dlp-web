@@ -16,6 +16,7 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import tempfile
 import uuid
@@ -746,7 +747,12 @@ def derive_stateful_session_id(
     return str(uuid.uuid5(STATEFUL_TRANSLATOR_SESSION_NAMESPACE, identity))
 
 
-def bind_stateful_model_input_generation_key(generation_key: str) -> str:
+STATEFUL_BOUNDARY_MODEL_INPUT_MARKER = "+boundary1="
+
+
+def bind_stateful_model_input_generation_key(
+    generation_key: str, *, boundary_evidence_sha256: str | None = None,
+) -> str:
     """Bind exactly one current model-input projection identity."""
 
     generation_key = _require_exact_string(
@@ -754,6 +760,11 @@ def bind_stateful_model_input_generation_key(generation_key: str) -> str:
         field_name="generation_key",
     )
 
+    if boundary_evidence_sha256 is not None and (
+        type(boundary_evidence_sha256) is not str
+        or re.fullmatch(r"[0-9a-f]{64}", boundary_evidence_sha256) is None
+    ):
+        raise StatefulTranslatorValidationError("invalid boundary model-input digest")
     prefix = "::stage11-model-input="
     marker = "::" + MODEL_INPUT_NORMALIZATION_VERSION
     identity_count = generation_key.count(prefix)
@@ -770,7 +781,20 @@ def bind_stateful_model_input_generation_key(generation_key: str) -> str:
             )
 
         marker_index = generation_key.find(marker)
+        boundary_index = generation_key.find(STATEFUL_BOUNDARY_MODEL_INPUT_MARKER)
+        if boundary_index >= 0 and (
+            generation_key.count(STATEFUL_BOUNDARY_MODEL_INPUT_MARKER) != 1
+            or boundary_index != marker_index + len(marker)
+        ):
+            raise StatefulTranslatorValidationError("malformed boundary model-input identity")
         after_marker = generation_key[marker_index + len(marker) :]
+        if after_marker.startswith(STATEFUL_BOUNDARY_MODEL_INPUT_MARKER):
+            digest = after_marker[len(STATEFUL_BOUNDARY_MODEL_INPUT_MARKER):][:64]
+            if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                raise StatefulTranslatorValidationError("invalid boundary model-input digest")
+            after_marker = after_marker[len(STATEFUL_BOUNDARY_MODEL_INPUT_MARKER) + 64:]
+            if boundary_evidence_sha256 is not None and digest != boundary_evidence_sha256:
+                raise StatefulTranslatorValidationError("model input is bound to different boundary evidence")
         if marker_index == 0 or (
             after_marker
             and not after_marker.startswith("::stage11-policy=")
@@ -784,8 +808,17 @@ def bind_stateful_model_input_generation_key(generation_key: str) -> str:
             raise StatefulTranslatorValidationError(
                 "model-input identity must precede the policy identity"
             )
-        return generation_key
+        if boundary_evidence_sha256 is None or STATEFUL_BOUNDARY_MODEL_INPUT_MARKER in generation_key:
+            return generation_key
+        if re.fullmatch(r"[0-9a-f]{64}", boundary_evidence_sha256) is None:
+            raise StatefulTranslatorValidationError("invalid boundary model-input digest")
+        bound = (generation_key[:marker_index + len(marker)]
+                 + STATEFUL_BOUNDARY_MODEL_INPUT_MARKER + boundary_evidence_sha256
+                 + generation_key[marker_index + len(marker):])
+        return _require_exact_string(bound, field_name="generation_key")
 
+    if STATEFUL_BOUNDARY_MODEL_INPUT_MARKER in generation_key:
+        raise StatefulTranslatorValidationError("boundary evidence requires a model-input identity")
     policy_marker = "::stage11-policy="
     policy_index = generation_key.find(policy_marker)
     if policy_index < 0:
@@ -796,7 +829,25 @@ def bind_stateful_model_input_generation_key(generation_key: str) -> str:
             + marker
             + generation_key[policy_index:]
         )
-    return _require_exact_string(bound, field_name="generation_key")
+    bound = _require_exact_string(bound, field_name="generation_key")
+    if boundary_evidence_sha256 is not None:
+        return bind_stateful_model_input_generation_key(
+            bound, boundary_evidence_sha256=boundary_evidence_sha256,
+        )
+    return bound
+
+
+def stateful_boundary_digest_from_generation_key(generation_key: str) -> str | None:
+    """Read the optional boundary digest inside the existing model-input identity."""
+    if not stateful_model_input_identity_is_bound(generation_key):
+        if STATEFUL_BOUNDARY_MODEL_INPUT_MARKER in generation_key:
+            raise StatefulTranslatorValidationError("boundary digest lacks model-input identity")
+        return None
+    if STATEFUL_BOUNDARY_MODEL_INPUT_MARKER not in generation_key:
+        return None
+    if generation_key.count(STATEFUL_BOUNDARY_MODEL_INPUT_MARKER) != 1:
+        raise StatefulTranslatorValidationError("multiple boundary model-input digests")
+    return generation_key.split(STATEFUL_BOUNDARY_MODEL_INPUT_MARKER, 1)[1][:64]
 
 
 def stateful_model_input_identity_is_bound(generation_key: str) -> bool:
@@ -1291,6 +1342,8 @@ __all__ = [
     "StatefulTranslatorStagingError",
     "StatefulTranslatorStagingPaths",
     "bind_stateful_model_input_generation_key",
+    "STATEFUL_BOUNDARY_MODEL_INPUT_MARKER",
+    "stateful_boundary_digest_from_generation_key",
     "bind_stateful_model_input_identity",
     "stateful_model_input_identity_is_bound",
     "build_stateful_model_input_package",

@@ -93,6 +93,10 @@ from teddy_discovery_stateful_policy import (
     bind_stateful_policy_generation_key,
     resolve_stateful_semantic_policy,
 )
+from teddy_discovery_stateful_boundary import (
+    bind_stateful_boundary_preparation, read_stateful_boundary_evidence,
+    STATEFUL_BOUNDARY_FILENAME, validate_stateful_boundary_evidence,
+)
 from teddy_discovery_stateful_translator import (
     STATEFUL_TRANSLATOR_MAX_PACKAGE_BYTES,
     STATEFUL_TRANSLATOR_MAX_RESULT_BYTES,
@@ -104,6 +108,7 @@ from teddy_discovery_stateful_translator import (
     serialize_stateful_model_input,
     serialize_stateful_result,
     stateful_model_input_identity_is_bound,
+    stateful_boundary_digest_from_generation_key,
     stateful_session_id_for_package,
     stateful_staging_paths,
     validate_stateful_result,
@@ -1192,6 +1197,8 @@ def _validate_existing_semantic_staging(
             raise Stage11ControllerArtifactError(
                 "completed semantic model bytes are noncanonical"
             )
+        if stateful_boundary_digest_from_generation_key(raw_package.generation_key) is not None:
+            read_stateful_boundary_evidence(paths.task_directory / STATEFUL_BOUNDARY_FILENAME, raw_package)
         result = parse_stateful_result(result_payload, raw_package)
         if result.session_id != session_id:
             raise Stage11ControllerArtifactError(
@@ -1368,6 +1375,7 @@ def _run_first_pass(
     semantic_policy: StatefulSemanticPolicy | str = (
         DEFAULT_STATEFUL_SEMANTIC_POLICY
     ),
+    boundary_evidence=None,
 ) -> StatefulSubtitleResult:
     if not callable(runner):
         raise Stage11ControllerValidationError(
@@ -1379,15 +1387,15 @@ def _run_first_pass(
         raise Stage11ControllerValidationError(
             "first-pass semantic policy is unsupported"
         ) from error
-    if policy == DEFAULT_STATEFUL_SEMANTIC_POLICY:
-        result = runner(package, route=route, staging_root=staging_root)
-    else:
-        result = runner(
-            package,
-            route=route,
-            staging_root=staging_root,
-            semantic_policy=policy,
-        )
+    validate_stateful_boundary_evidence(boundary_evidence, package)
+    kwargs = {"route": route, "staging_root": staging_root}
+    if policy != DEFAULT_STATEFUL_SEMANTIC_POLICY:
+        kwargs["semantic_policy"] = policy
+    if boundary_evidence is not None:
+        if route != V2_ROUTE_HYBRID:
+            raise Stage11ControllerValidationError("boundary evidence requires HYBRID route")
+        kwargs["boundary_evidence"] = boundary_evidence
+    result = runner(package, **kwargs)
     return validate_stateful_result(result, package)
 
 
@@ -1719,7 +1727,7 @@ def run_one_title_stage11(
             raise Stage11ControllerValidationError(
                 "HYBRID route has no prepared semantic evidence"
             )
-        preparation = hybrid_preparation
+        preparation, boundary_evidence = bind_stateful_boundary_preparation(hybrid_preparation)
         package = preparation.package
         first_pass = _run_first_pass(
             first_pass_runner,
@@ -1727,6 +1735,7 @@ def run_one_title_stage11(
             route=route.route,
             staging_root=staging_root_path,
             semantic_policy=selected_semantic_policy,
+            boundary_evidence=boundary_evidence,
         )
         document = route.alignment_application.bundle.external_ja_document
         source_quality = classify_source_document(document)
