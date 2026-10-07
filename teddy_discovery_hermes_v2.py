@@ -61,12 +61,13 @@ class HermesV2LimitError(HermesV2ValidationError):
     """Raised when a semantic value exceeds a fixed resource bound."""
 
 
-def _has_control_characters(value: str) -> bool:
+def _has_control_characters(value: str, *, allow_lf: bool = False) -> bool:
     return any(
         ord(character) < 32
         or ord(character) == 127
         or unicodedata.category(character) == "Cc"
         for character in value
+        if not (allow_lf and character == "\n")
     )
 
 
@@ -75,6 +76,7 @@ def _validate_text(
     *,
     field_name: str,
     allow_none: bool,
+    allow_lf: bool = False,
 ) -> str | None:
     if value is None:
         if allow_none:
@@ -90,7 +92,7 @@ def _validate_text(
         raise HermesV2LimitError(
             field_name + " exceeds MAX_HERMES_V2_TEXT_CHARS"
         )
-    if _has_control_characters(value):
+    if _has_control_characters(value, allow_lf=allow_lf):
         raise HermesV2ValidationError(
             field_name + " contains a control character"
         )
@@ -216,7 +218,7 @@ class HermesV2CueOutput:
             field_name="repaired_ja",
             allow_none=True,
         )
-        _validate_text(self.ko, field_name="ko", allow_none=False)
+        _validate_text(self.ko, field_name="ko", allow_none=False, allow_lf=True)
 
 
 @dataclass(frozen=True)

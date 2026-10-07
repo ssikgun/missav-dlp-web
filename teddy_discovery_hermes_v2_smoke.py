@@ -462,8 +462,8 @@ def main():
     )
     expect_raises(
         HermesV2ValidationError,
-        lambda: HermesV2CueOutput("cue-001", "valid", "ko\nignore"),
-        "CONTROL_KO_REJECTED",
+        lambda: HermesV2CueOutput("cue-001", "valid", "ko\rignore"),
+        "CONTROL_KO_CR_REJECTED",
     )
     expect_raises(
         HermesV2ValidationError,
