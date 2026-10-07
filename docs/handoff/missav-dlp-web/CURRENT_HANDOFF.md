@@ -1,5 +1,40 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-07 — Deterministic primary boundary evidence validated
+
+Whole-title primary translation remains the direction. The deterministic HYBRID
+boundary sidecar is implemented in source commit
+`79988169d52fb95f326fa5b9e2d4f3a87c632421`; production fixed-64 policy is unchanged.
+
+`stage11-boundary-evidence-v1.json` carries canonical adjacent-cue identity,
+projected signed `gap_ms`, and exact `OVERLAP` / `TOUCHING` / `GAP` relations.
+Accepted external-JA document and affine alignment remain the timing proof.
+The canonical boundary SHA-256 is bound into the existing model-input generation
+and deterministic session identity. Controller → adapter → native runner → part
+query plumbing includes internal and cross-part adjacent pairs; ASR_ONLY has no
+boundary sidecar. Semantic/result schemas, cue identity/order, and deterministic
+timestamp authority remain unchanged. Broad temporal post-review is not used.
+
+Confirmed FNS-247 projected timing evidence:
+
+| Adjacent cues | Relation | gap_ms |
+| --- | --- | ---: |
+| 96→97 | TOUCHING | 0 |
+| 255→256 | TOUCHING | 0 |
+| 256→257 | TOUCHING | 0 |
+| 257→258 | GAP | 12566 |
+
+CLEAN cue count: `313`. Review retained: KEEP `306`, REPAIR `6`, AMBIGUOUS `1`;
+OMIT `0`. These timings are auxiliary boundary evidence, not proof of meaning or
+sentence continuity, and do not authorize moving semantic ownership between cues.
+
+Offline recheck: new boundary smoke `20 PASS / 0 FAIL`, all `14` related existing
+smoke suites PASS, `py_compile` PASS, and `git diff --check` PASS. No actual Hermes
+invocation or NAS/Jellyfin publication occurred in this checkpoint.
+
+Next: run a whole-title v4 quality canary using the boundary sidecar. The canary
+is pending; production policy remains fixed-64 until a separate quality decision.
+
 ## 2026-10-07 — Whole-title primary canary PASS / KO LF contract
 
 ### Current goal
