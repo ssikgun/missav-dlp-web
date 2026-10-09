@@ -1,5 +1,41 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-09 — Native Hermes returned truncated SHA; strict recovery PASS
+
+Actual original run `/tmp/stage11-supplemental13-result-gAEwc4GU/` exists with
+session `20261009_193037_df203d` and tools.count=0. The staged prompt digest and
+local request/pin/prompt digest agree. Failure occurred in the model response:
+request_sha256 omitted `476` at positions 58..60 (zero-based), returning 61 rather
+than 64 lowercase hex characters. Existing `_digest()` correctly rejected it
+with `expected SHA256 digest`; no transport or request-generation defect found.
+Original response is contract-invalid, even though its three actions say
+AMBIGUOUS. No returned hash or decisions were edited to make it pass.
+
+Minimal change: preparation helper appends the exact caller-computed canonical
+request SHA after all evidence with explicit 64-character exact-copy guidance.
+Generated preflight verifies this footer against original request bytes; existing
+result parser, model/settings/CLI and evidence remain unchanged. Original bundle,
+request and failed raw stdout preserved; canonical request bytes identical in
+new bundle `/tmp/stage11-reazon-hermes-canary-1tjv828_/`. SHA pins/manifest updated
+only for this separate bundle. Original stdout/stderr pinned during retry.
+
+Offline ten contract checks PASS, plus actual malformed 61-character response
+rejected again. py_compile, bash -n and git diff --check PASS. One necessary
+three-group fresh native request was executed under the user's short-retest
+instruction; no further retry, Whisper inference or Worker change.
+Successful output `/tmp/stage11-supplemental13-result-vQPwr32q/`, session
+`20261009_193452_a30da2`, runtime tools.count=0. Strict parser PASS_CONTRACT_ONLY:
+KEEP=0, REPAIR=0, OMIT=0, AMBIGUOUS=3; replacement_ja/replacement_ko all null,
+Korean draft count=0, approvals=0, insertions=0. Original JA313/KO296/absorption17
+and known hashes/materialized SRT unchanged. Audio/text accuracy still unverified.
+
+Request SHA: b5a442b6766b3a800ebb9b4cfc89ba1a38536e32346862049394515cea4761a3
+New prompt SHA: 18be65a9ce7b8dd12e5eb2f157ca98a7434d31cea5d97f9f9b5c6db5b837d865
+Valid raw stdout SHA: 81730dfcbeb8963fc1fd74f6384ef845be9e7e7c87d7ddde1d38a0fee134a204
+See the new bundle's `sha-error-investigation.json` and result
+`validation-audit.json`. Do not repeat Hermes merely to obtain different actions;
+remaining obstacle is direct evidence for Japanese accuracy and utterance scope.
+
 ## 2026-10-09 — Reazon evidence connected to three-group native Hermes canary
 
 Prepared `/tmp/stage11-reazon-hermes-canary-0jy4_lx0/` from the existing native

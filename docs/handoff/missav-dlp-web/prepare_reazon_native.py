@@ -25,6 +25,13 @@ def encode(value):
                       allow_nan=False, separators=(',', ':')).encode()
 
 
+def response_identity_footer(request):
+    return (b'\nRESPONSE IDENTITY: Copy this exact 64-character lowercase hexadecimal '
+            b'request_sha256 into the response. Do not abbreviate, recompute, or omit '
+            b'any characters. Before answering, check that it is exactly 64 characters.\n'
+            b'request_sha256="' + sha(request).encode() + b'"\n')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base', type=Path, required=True)
@@ -108,7 +115,8 @@ def main():
         b'replacements must be null. A supported REPAIR may contain a review-only Korean draft; '
         b'it still cannot authorize SRT insertion. Return exactly the REQUEST groups in order.\n'
         + b'REQUEST_SHA256: ' + sha(request).encode() + b'\nREQUEST:\n' + request
-        + b'\nREAZON_CROSS_EVIDENCE:\n' + encode(projection))
+        + b'\nREAZON_CROSS_EVIDENCE:\n' + encode(projection)
+        + response_identity_footer(request))
     if len(prompt) > 128000:
         raise ValueError('existing native prompt limit exceeded')
     root = Path(tempfile.mkdtemp(prefix='stage11-reazon-hermes-canary-'))
@@ -149,7 +157,11 @@ for c in projection['negative_controls']:
 prompt=(root/'supplemental13.prompt.txt').read_bytes()
 assert len(prompt)<=128000 and sha(prompt)==pins['prompt_sha256']
 assert prompt==(root/'hermes-native-review-prompt.txt').read_bytes()
-assert b'REQUEST:\\n'+request in prompt and prompt.endswith((root/'cross-evidence-prompt-projection.json').read_bytes())
+from importlib.util import spec_from_file_location, module_from_spec
+spec=spec_from_file_location('native_prepare', pins['preparation_helper'])
+helper=module_from_spec(spec);spec.loader.exec_module(helper)
+footer=helper.response_identity_footer(request)
+assert b'REQUEST:\\n'+request in prompt and prompt.endswith((root/'cross-evidence-prompt-projection.json').read_bytes()+footer)
 '''
     verifier = verifier[:begin] + checks + verifier[end:]
     verifier = verifier.replace('==13', '=='+str(len(groups)))
@@ -191,7 +203,8 @@ assert b'REQUEST:\\n'+request in prompt and prompt.endswith((root/'cross-evidenc
         if not any(c['source'] in output['results'] for output in actual_outputs):
             raise ValueError('negative control detached from actual recognizer result')
     pins.update(files=files, request_sha256=sha(request), prompt_sha256=sha(prompt),
-                cross_evidence_sha256=sha(args.evidence.read_bytes()))
+                cross_evidence_sha256=sha(args.evidence.read_bytes()),
+                preparation_helper=str(Path(__file__).resolve()))
     (root / 'execution-pins.json').write_bytes(encode(pins))
     (root / 'SHA256SUMS').write_text(''.join(sha(p.read_bytes())+'  '+p.name+'\n'
         for p in sorted(root.iterdir()) if p.name != 'SHA256SUMS'))
