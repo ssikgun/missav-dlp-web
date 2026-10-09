@@ -115,7 +115,10 @@ print(json.dumps({'status':'PASS_READ_ONLY','PID':int(p.name),'start_tick':(p/'s
 
 class SequentialRunner:
     def __init__(self, *, plan, pcm, snapshot, plan_sha, config, output, transport,
-                 stop=None, wait=None, after_commit=None):
+                 stop=None, wait=None, after_commit=None, max_new=None):
+        if max_new is not None and (type(max_new) is not int or max_new <= 0):
+            raise ValueError("max_new must be a positive integer")
+        self.max_new = max_new
         self.plan, self.pcm, self.snapshot = plan, pcm, snapshot
         self.output = Path(output); self.output.mkdir(mode=0o700, parents=True, exist_ok=True)
         if self.output.is_symlink() or self.output.stat().st_uid != os.getuid() or self.output.stat().st_mode & 0o077:
@@ -197,6 +200,7 @@ class SequentialRunner:
             atomic(self.output/'resume-inventory.json',encode(inventory))
             summary = dict(status='INCOMPLETE',completed=0,failed=0,remaining=len(self.plan['windows']),
                 resumed=0,cached=0,new_requests=0,transport_attempts=0,approvals=0,publishable=False,chunk_statuses=[])
+            limited=False
             try:
                 for row in self.plan['windows']:
                     if self.stop.is_set(): break
@@ -205,6 +209,11 @@ class SequentialRunner:
                         done=self.validate_done(row,self.prefix);summary['resumed']+=1
                         summary['chunk_statuses'].append(done);summary['completed']+=1
                         summary['remaining']-=1
+                        continue
+                    # Count distinct newly attempted cores, including failures; cached/resumed cores are exempt.
+                    if (not row['reusable'] and self.max_new is not None
+                            and summary['new_requests'] >= self.max_new):
+                        limited=True
                         continue
                     begin=time.monotonic();self.attempts=0;self.wire=None
                     try:
@@ -247,17 +256,25 @@ class SequentialRunner:
                         summary['failed']+=1;summary['chunk_statuses'].append(failed)
                     summary['transport_attempts']+=self.attempts
                     atomic(self.output/'results.json',encode(summary))
-                summary['status']='COMPLETE_CANDIDATES_ONLY' if summary['completed']==len(self.plan['windows']) else 'STOPPED' if self.stop.is_set() else 'INCOMPLETE'
+                summary['status']='COMPLETE_CANDIDATES_ONLY' if summary['completed']==len(self.plan['windows']) else 'STOPPED' if self.stop.is_set() else 'LIMIT_REACHED' if limited and not summary['failed'] else 'INCOMPLETE'
             finally:
                 atomic(self.output/'results.json',encode(summary))
             return summary
         finally: lock.close()
 
 
+def positive_integer(value):
+    try: number=int(value)
+    except ValueError: raise argparse.ArgumentTypeError('max-new must be a positive integer')
+    if number <= 0: raise argparse.ArgumentTypeError('max-new must be a positive integer')
+    return number
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     for arg in ('plan','plan-sha256','pcm','config','source-pins','output'): parser.add_argument('--'+arg,required=True)
     parser.add_argument('--run',action='store_true',help='explicitly authorize direct live targeted requests')
+    parser.add_argument('--max-new',type=positive_integer,help='maximum newly attempted cores per invocation; cached/resumed cores excluded')
     args=parser.parse_args()
     plan,pcm,snapshot,cfg=prepare(args.plan,args.plan_sha256,args.pcm,args.config,args.source_pins)
     if not args.run:
@@ -269,10 +286,10 @@ def main():
     stop=threading.Event()
     for sig in (signal.SIGINT,signal.SIGTERM,signal.SIGHUP): signal.signal(sig,lambda *_:stop.set())
     runner=SequentialRunner(plan=plan,pcm=pcm,snapshot=snapshot,plan_sha=args.plan_sha256,
-        config=cfg,output=args.output,transport=_default_transport,stop=stop)
+        config=cfg,output=args.output,transport=_default_transport,stop=stop,max_new=args.max_new)
     atomic(runner.output/'worker-preflight.json',encode(receipt))
     summary=runner.run();print(json.dumps(summary,ensure_ascii=False))
-    raise SystemExit(0 if summary['status']=='COMPLETE_CANDIDATES_ONLY' else 2)
+    raise SystemExit(0 if summary['status'] in ('COMPLETE_CANDIDATES_ONLY','LIMIT_REACHED') else 2)
 
 
 if __name__=='__main__':main()

@@ -13,7 +13,7 @@ import numpy as np
 from teddy_discovery_asr import ASRSourceSnapshot
 from teddy_discovery_asr_remote import RemoteASRHTTPResponse, REMOTE_ASR_SCHEMA_VERSION, RemoteASRTransportError
 from teddy_discovery_stateful_short_plan import build_short_plan, encode, digest
-from teddy_discovery_stateful_short_runner import SequentialRunner, prepare
+from teddy_discovery_stateful_short_runner import SequentialRunner, prepare, positive_integer
 
 
 def main():
@@ -140,6 +140,45 @@ def main():
     assert result['completed']==524 and mock_calls[0]==524
     assert sum(r['core_hi']-r['core_lo'] for r in plan['windows'])==pcm.size
     checks.append('whole_524_mock_coverage_single_sample_ownership')
+    # The actual whole plan imports all13 caches while submitting exactly5 new cores.
+    limited_calls=[]
+    def limited_fake(*argv):limited_calls.append(digest(argv[1]));return fake(*argv)
+    def actual_limited(max_new=None):
+        return SequentialRunner(plan=plan,pcm=pcm,snapshot=snapshot,plan_sha=digest(encode(plan)),config=cfg,
+            output=root/'limited-real-plan',transport=limited_fake,max_new=max_new)
+    result=actual_limited(5).run()
+    expected=[r['request_sha256'] for r in plan['windows'] if not r['reusable']]
+    assert limited_calls==expected[:5] and result['new_requests']==5
+    assert result['cached']==13 and result['completed']==18 and result['remaining']==506
+    assert result['status']=='LIMIT_REACHED' and expected[5] not in limited_calls
+    checks.append('max_new5_all13_caches_exempt_no_sixth_new_core')
+    limited_calls.clear();result=actual_limited().run()
+    assert result['resumed']==18 and result['completed']==524 and result['new_requests']==506
+    assert limited_calls==expected[5:] and result['status']=='COMPLETE_CANDIDATES_ONLY'
+    checks.append('unlimited_resume_reuses_five_completed_new_cores')
+    for value in (0,-1,True,1.5,'5'):
+        try:runner('invalid-max',max_new=value)
+        except ValueError:pass
+        else:raise AssertionError('invalid max_new accepted')
+    for value in ('0','-1','1.5','bad'):
+        try:positive_integer(value)
+        except argparse.ArgumentTypeError:pass
+        else:raise AssertionError('invalid CLI limit accepted')
+    assert positive_integer('5')==5
+    checks.append('positive_integer_only_CLI_and_runner')
+    limited_fail=[0]
+    def permanent(*argv):limited_fail[0]+=1;raise ValueError('mock failure')
+    result=runner('limited-failure',permanent,max_new=1).run()
+    assert result['status']=='INCOMPLETE' and result['failed']==1 and limited_fail[0]==1
+    calls.clear();result=runner('limited-failure',counted,max_new=1).run()
+    assert result['status']=='LIMIT_REACHED' and result['completed']==1 and len(calls)==1
+    checks.append('limited_failure_counts_attempt_and_can_resume')
+    stop=threading.Event()
+    result=runner('limited-stop',stop=stop,after_commit=lambda _:stop.set(),max_new=2).run()
+    assert result['status']=='STOPPED' and result['completed']==1
+    calls.clear();result=runner('limited-stop',counted,max_new=1).run()
+    assert result['resumed']==1 and result['completed']==2 and len(calls)==1
+    checks.append('limited_stop_and_resume_preserves_budget')
     checks.append('canonical_preserved_source_pins_and_zero_actual_models')
     report=dict(status='PASS',checks=checks,test_count=len(checks),real_STT_calls=0,
         real_Whisper_calls=0,real_Reazon_calls=0,Hermes_calls=0,Gemini_calls=0,

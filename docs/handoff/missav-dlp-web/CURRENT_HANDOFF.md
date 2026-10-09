@@ -1,5 +1,46 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-10 — Five-new-core trial limit (offline only)
+
+Added optional `--max-new N` to existing short runner and
+`/tmp/stage11-short-runner-ready-c8fi5p67/CT108-commands.sh`. Positive integers
+only; omitted option retains unlimited sequential behavior. Counts newly
+attempted cores per invocation, including failed cores, excluding validated
+cache13 and already committed/resumed results. HTTP retries of one core do not
+select another core. After budget exhaustion, remaining caches/completed cores
+are still imported/validated; no sixth new core is scheduled for --max-new5.
+Clean limit termination returns LIMIT_REACHED/exit0, not full-video completion.
+Failures remain INCOMPLETE/exit2; cooperative stop remains STOPPED/exit2.
+
+The limit is scheduling-only, excluded from execution identity. Removing it
+with the same output directory and unchanged updated runner/settings validates
+and reuses the trial's completed5 plus cache13; expected new remainder506.
+All existing code/SHA identity checks remain strict: earlier-version output
+identity is not silently migrated. Atomic persistence, failure/interruption
+resume, source SHA and sample geometry are unchanged. No model/Worker/Hermes,
+recognition settings, source plan/PCM, SRT, JA313/KO296/absorption17 or approvals
+were changed. Actual STT/Reazon/Hermes/Gemini calls0.
+
+Offline regression23/23 PASS, including existing unlimited524 mock scheduling,
+real cache13 strict import, limited5 with sixth-new-core forbidden, unlimited
+resume506, positive integer validation, failed-attempt budget and stopped-run
+resume. Mock artifacts cleaned, never used as actual Japanese evidence.
+Report `/tmp/stage11-short-runner-verification-y4bhq2tb/offline-verification.json`.
+py_compile, bash -n, git diff --check, default and --max-new5 local preflight
+PASS. Script rejects0/-1/noninteger limits before any model request. Preserved
+SHA baselines were checked against HEAD/original script, then changed runner,
+smoke and script pins updated normally. Original manifest/script archived as
+SHA256SUMS.before-max-new / CT108-commands.before-max-new.sh; unchanged input
+pins remained verified. Current SHA256SUMS checks PASS.
+
+Direct five-core trial, only when operator chooses actual execution:
+`bash /tmp/stage11-short-runner-ready-c8fi5p67/CT108-commands.sh --run /tmp/stage11-full-short-execution-review --max-new 5`
+Expected results `/tmp/stage11-full-short-execution-review/results.json`,
+with per-core .done/.request/.wire/.segments files. Current task executed only
+--preflight; no live Worker check/inference. Live path keeps existing pinned
+Worker preflight fail-closed. Full resume uses identical command/output without
+--max-new5, after separate full-run approval. No automatic subtitle approval.
+
 ## 2026-10-10 — Sequential/resumable whole short-plan runner (offline verified)
 
 Added `teddy_discovery_stateful_short_runner.py`, reusing the existing targeted
