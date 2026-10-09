@@ -1,5 +1,59 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-09 — Separate non-publishable drafts for AMBIGUOUS supplemental cues
+
+Existing `QualityReviewResultCue` in `teddy_discovery_stateful_quality_review.py`
+still permits replacement text only for REPAIR. No quality-decision schema,
+canonical validator, approval or publication path was changed. New bounded
+`teddy_discovery_stateful_review_draft.py` builds/parses a separate translation
+artifact. Historical 06/11/13 AMBIGUOUS actions remain fixed; draft outputs cannot
+change actions or enter the canonical quality-result parser. Requests/results
+have their own exact SHA contract, separate from the unchanged canonical SHA.
+
+A draft preserves original cue ID, Japanese hypotheses, each Korean draft or
+null, original STT readings and source references/SHA, original judgment,
+conflict/unresolved notes, parent PCM identity and estimated timing uncertainty.
+All resulting groups/interpretations are publishable=false; group flags are
+approved=false, srt_eligible=false, audio_verification=UNVERIFIED_AUDIO. No
+source is reported as listened to or Japanese-verified. Model-provided approval,
+audio verification, new action/timestamps, changed/missing Japanese alternatives,
+wrong IDs/order/SHA or extra negative-control cues are rejected.
+
+Literal punctuation/spacing equivalents share a reading hypothesis while all
+observations remain recorded; observations are not counted as independent
+utterances/votes. Untimed Gemini turns such as adjacent responses remain visibly
+`UNTIMED_CLIP_TURN_MAY_BE_NEIGHBOR`, not asserted to be the target utterance.
+No scene/phrase/cue-specific production rule. Negative controls stay defensive
+context only. The draft prompt explicitly treats nested old instructions as
+historical evidence, preserving the original final judgment contract.
+
+Existing `prepare_reazon_native.py` gains only a separate draft preparation mode,
+reusing the current fresh native CLI transport and tools.count=0 runtime gate,
+unchanged temporary profile/model/reasoning, exact known tirith-line separation,
+stdout preservation and canonical preflight/materializer. No new model/runner
+framework, audio inference, Worker/settings/SRT change or actual Hermes call.
+
+Prepared bundle: `/tmp/stage11-review-draft-native-ffmzb4nh/`.
+Input decisions: `/tmp/stage11-supplemental13-result-vQPwr32q/validated-response.json`.
+Three original groups in canonical order 06/11/13; all word/kinship/sentence
+alternatives retained. 11's agreed `いいところだね` and 13's `弟さん`/`お父さん`
+hypotheses can receive conditional drafts without approving Japanese. Adjacent
+untimed turns are also preserved separately and may receive null drafts.
+Native prompt 112047 bytes, within the existing 128000-byte limit.
+
+CT108 direct execution, only when the user wants actual Hermes drafts:
+`bash /tmp/stage11-review-draft-native-ffmzb4nh/ct108-native-supplemental-command.sh`
+Output: new `/tmp/stage11-review-draft-result-XXXXXXXX/` containing raw stdout,
+`validated-review-draft-response.json`, `review_draft.json`, `validation-audit.json`.
+No `supplemental-language-decisions.json` is emitted from the draft run.
+
+Offline 17 checks PASS, including full native verifier with synthetic drafts;
+mock output `/tmp/stage11-review-draft-OFFLINE-MOCK-i6s4kwpj/` is NOT an actual
+Hermes translation. py_compile, bash -n and git diff --check PASS. Canonical
+313 JA/296 KO/17 absorptions and byte-identical SRT checked; approvals remain0.
+Next: run the prepared native draft request once and review conditional Korean
+translations and unresolved alternatives without publishing or changing actions.
+
 ## 2026-10-09 — Native Hermes returned truncated SHA; strict recovery PASS
 
 Actual original run `/tmp/stage11-supplemental13-result-gAEwc4GU/` exists with
