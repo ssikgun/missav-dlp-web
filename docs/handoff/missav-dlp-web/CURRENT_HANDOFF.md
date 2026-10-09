@@ -1,5 +1,47 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-09 — Reazon evidence connected to three-group native Hermes canary
+
+Prepared `/tmp/stage11-reazon-hermes-canary-0jy4_lx0/` from the existing native
+transport, retained canonical request builder and strict supplemental parser.
+Source: `/var/tmp/stage11-reazon-remaining9-controls-qktq2z8w/Hermes-Reazon-cross-evidence13.json`.
+Selected original review orders 11/13/06; canonical chronological output order is
+06/11/13. Original IDs, candidate membership, PCM identity and estimated ranges
+are unchanged. Surrounding original JA/KO/STT context, other clip readings,
+Whisper/Gemini/Reazon disagreements, estimated word/token points, source paths
+and unresolved overlap links are supplied as evidence, not new output cues.
+Baseline `/tmp/stage11-supplemental13-result-tZAgdVUl/validated-response.json`
+was revalidated with the original 13-group request: AMBIGUOUS 13, approvals zero.
+No new actual language judgments were generated.
+
+Four user-confirmed no-dialogue controls and their actual Reazon false
+transcripts are defensive references only. Controls cannot appear as result cue
+IDs. Model agreement, clip-level speech presence, timing estimates and repeated
+observations cannot approve Japanese. No blanket short-interjection omission.
+The original contract stays strict: AMBIGUOUS replacements are null; a supported
+REPAIR may carry a review-only Korean draft, but all parsed outputs remain
+UNVERIFIED_AUDIO, approved=false and srt_eligible=false.
+
+Current PCM SHA, existing audio-review manifest, recognizer output observations,
+recognizer WAV SHAs, prior baseline and original 313-result/296-SRT hashes are
+checked/pinned. Existing canonical validator/materializer confirm 313 cues,
+17 absorptions and byte-identical 296-cue SRT. Native transport still requires
+runtime tools.count=0 before fresh chat -Q, with unchanged temporary profile,
+model/reasoning and exact known tirith-prefix separation. No resume/settings edit.
+Offline: ten positive/negative contract tests PASS, py_compile, bash -n and
+project git diff --check PASS. Hermes/STT calls zero; Worker/SRT changes zero.
+
+CT108 direct execution (actual model call occurs only when user runs this):
+`bash /tmp/stage11-reazon-hermes-canary-0jy4_lx0/ct108-native-supplemental-command.sh`
+Inputs and SHA manifest are in that bundle; output uses a new
+`/tmp/stage11-supplemental13-result-XXXXXXXX/` directory. Missing/changed retained
+artifacts, remote profile or nonzero tools count stop execution. The committed
+preparation helper reuses the current pinned workspace and retained native
+bundle; it does not install an independent runtime or commit unrelated existing
+workspace changes. Actual audio/text accuracy and utterance deduplication remain
+unverified. Next: run this three-group native canary and inspect actual reasons,
+without treating contract PASS as accuracy or publication approval.
+
 ## 2026-10-07 — Deterministic primary boundary evidence validated
 
 Whole-title primary translation remains the direction. The deterministic HYBRID
