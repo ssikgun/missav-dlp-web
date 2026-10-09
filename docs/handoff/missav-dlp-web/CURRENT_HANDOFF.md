@@ -1,5 +1,49 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-10 — Whole-video short-core automatic planning (offline only)
+
+Implemented `teddy_discovery_stateful_short_plan.py` and the small saved-data
+adapter `docs/handoff/missav-dlp-web/prepare_short_plan.py`. Reuses existing
+ASRAudioChunk/remote NPY codec, R5 sample rounding, affine external-JA projection,
+supplemental collection, chunk reconciliation and cross-evidence/Hermes contracts.
+No new STT framework/model; no title, cue, Japanese text or case-time hardcoding.
+
+Output: `/tmp/stage11-full-short-plan-rkyplf42/whole-short-plan.json`.
+524 contiguous 20s cores cover 02:54:20.402, including the final 0.402s core,
+with up to 5s context on either side, clamped to source samples. PCM ends 0.75ms
+before nominal video duration. Exact sample ranges preserve the fractional-ms
+tail. Downstream execution must use audio_lo/audio_hi, not rounded ms times 16.
+Half-open core ownership does not choose the correct text; context/crossing
+records and alternative observations remain unapproved evidence.
+
+Full PCM/request SHA and source/runtime/settings/window/wire validation permits
+13 cached windows (24 retained observations); 511 Whisper requests remain new.
+B=2.0 and 590s-context results are excluded. Original video SHA is from retained
+validated source receipt, not a new NAS read; no fresh GPU health probe was done.
+Padding-inclusive input: 15,685.8025s (~4h21m26s); new input 15,295.8025s.
+New NPY storage ~0.979GB, shared PCM ~0.669GB needs no copy. Empirical reply-size
+estimate ~2MB is not a bound; protocol max for 511 replies is ~8.57GB. Local free
+disk ~31.26GB. Saved request timings extrapolate ~486.6s (~8.1min), observed-rate
+range ~3.7–33.2min, excluding cold load/queue/retries/Reazon/Hermes; not a runtime
+promise. Recommended GPU request concurrency: 1.
+
+16/16 offline smoke PASS: start/end, ms/sample core continuity, single ownership,
+padding, one-sample tail, legacy user-grid equivalence, cached SHA/settings,
+B/long-context exclusion, context/crossing preservation and zero inference.
+py_compile/git diff --check PASS; 69 preserved source pins PASS.
+Saved responses validate steps 2–6: strict Whisper decode -> JA comparison and
+candidates -> reconciliation -> Reazon-only cross evidence. Existing 13 Reazon
+clip results use the provider-neutral STT contract; Gemini not required/called.
+Historical manual Gemini evidence is preserved. Bounded Hermes files are saved
+contract demonstrations, not semantic approval or a whole-video execution queue.
+Audit: STT/Whisper/Reazon/Hermes/Gemini calls0; approvals0; existing JA313,
+KO296 SRT bytes and absorption17 unchanged. Worker/Hermes settings unchanged.
+Plan directory also contains cost.json, audit.json, offline-verification.json,
+source-pins.json, SHA256SUMS and reused-chunk-reconciliation.json.
+Whole-video STT is NOT complete: 511 cores unexecuted. Next single task: connect
+the sample-exact plan to the existing targeted launcher for sequential/resumable
+execution; user approval required before actual whole-video inference.
+
 ## 2026-10-10 — Whole-video missing-dialogue discovery audit; Gemini-free saved-data dry-run
 
 Inspected the actual boundary worktree, retained launchers and canonical handoff.
