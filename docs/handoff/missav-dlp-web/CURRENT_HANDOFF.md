@@ -1,5 +1,62 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-10 — Sequential/resumable whole short-plan runner (offline verified)
+
+Added `teddy_discovery_stateful_short_runner.py`, reusing the existing targeted
+no-VAD RemoteFasterWhisperASR endpoint, strict response decoder, planned_chunk
+absolute samples, and previously pinned whole-short-plan. No STT engine/Worker
+or recognition option was changed. Default CLI is offline preflight; live
+requests require explicit --run by the direct CT108 operator after approval.
+
+Whole plan: 524 cores, validated cached13, new511, concurrency1. All preserved
+source pins, full PCM, plan SHA, source/runtime/settings, geometry and per-window
+request SHA are checked before processing. Cached13 are decoded/verified again;
+24 original alternatives remain in the copied plan as unapproved evidence.
+Per-core request/wire/absolute segments are fsynced and atomically replaced;
+.done.json is committed last, with request/response/segments SHA, settings/source
+identity, source sample ranges and origin. Empty valid responses are completion.
+No STT reading is promoted to accurate Japanese or publication approval.
+
+Resume uses exact plan/settings/endpoint/codec/runner identity and validates ALL
+committed records before any new request. Corruption/identity change blocks,
+never silently overwrites a completed result. Completed, failed-retry-pending,
+and incomplete cores appear in resume-inventory.json; temporary files do not
+count as completion. results.json can lag after abrupt termination; committed
+per-core done files are authoritative. A local output flock prevents overlapping
+writers. Permanent failures preserve other cores and yield INCOMPLETE. Restart
+only schedules unfinished/failed cores, retaining prior failure records.
+SIGINT/SIGTERM/SIGHUP request cooperative stop after current bounded request
+(up to300s timeout). Abrupt loss before commit may require replay; no promise
+of exactly-once remote inference for an uncommitted request is made.
+
+At most3 attempts for explicit429/502/503/504 HTTP responses, including existing
+transport's HTTPError cause; no message parsing and no automatic replay of
+uncertain transport/timeouts. Worker preflight is read-only, checks actual
+launcher-script-directory import precedence before PYTHONPATH, executable,
+source SHA, model/engine/defaults and CUDA without inference. This task did NOT
+run that live check. Old Worker pins remain fail-closed: if current imports/SHA
+differ, stop and confirm read-only evidence instead of arbitrarily updating pins.
+
+Offline test18/18 PASS, including abrupt child exit mid-request/after commit,
+resume/skip-complete, corrupt late result blocking all calls, changed settings,
+failed-core recovery, bounded retry, urllib wrapped status, cooperative stop,
+output lock, real cached13 strict import, and full524 synthetic empty responses.
+Mock data are not transcripts and were removed after tests. Actual Whisper,
+ReazonSpeech, Hermes and Gemini calls0; JA313/KO296/absorption17 preserved,
+approvals0. py_compile, bash -n, SHA checks, git diff --check and direct script
+--preflight PASS. Worker/Hermes settings and SRT unchanged.
+
+Test report: `/tmp/stage11-short-runner-verification-z4sk8gf6/offline-verification.json`.
+Direct package: `/tmp/stage11-short-runner-ready-c8fi5p67/CT108-commands.sh` plus
+SHA256SUMS/README. Local check:
+`bash /tmp/stage11-short-runner-ready-c8fi5p67/CT108-commands.sh --preflight /tmp/stage11-full-short-execution-review`
+After explicit whole-STT user approval only, same script with --run and same
+private output directory runs/restarts sequentially; no full STT was run now.
+Next single task: obtain approval, verify current Worker pins read-only, and
+execute the direct sequential full plan. Downstream Reazon/Hermes/SRT approval
+stages remain separate; this runner does not automatically reconcile text or
+publish supplemental cues. Historical manual Gemini evidence remains unchanged.
+
 ## 2026-10-10 — Whole-video short-core automatic planning (offline only)
 
 Implemented `teddy_discovery_stateful_short_plan.py` and the small saved-data
