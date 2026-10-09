@@ -1,5 +1,74 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-10 — Whole-video missing-dialogue discovery audit; Gemini-free saved-data dry-run
+
+Inspected the actual boundary worktree, retained launchers and canonical handoff.
+Coverage-complete automatic recovery is PARTIAL, not implemented end-to-end.
+Existing functions already collect supplemental candidates, affine-project the
+external JA timeline, distinguish no/partial/full overlap, suppress only exact
+represented evidence, preserve context/crossing records, reconcile duplicates
+and conflicts, and build unapproved bounded Hermes semantic requests. Generic
+`build_supplemental_cross_evidence(external_stt=...)` accepts no external STT or
+non-Whisper families such as ReazonSpeech; Gemini is not required by that path.
+Manual Gemini13 bundles remain historical references; no Gemini API/engine was
+used, added or required in this dry-run. Do not mistake manual13 adapters for a
+whole-video automated controller.
+
+Original13 discovery was human-guided: five user-provided positive intervals ->
+Whisper targeted A/B -> 28 candidate records -> 21 groups ->13 NEW_NO_EXTERNAL_JA
+priority groups. Six alignment-ambiguous groups and two external-overlap groups
+were retained separately. Thus 13 was not a random/exhaustive full-video sample.
+Later listening confirms clip speech existence, not individual Japanese accuracy.
+Reazon now covers those13 clips plus four negative controls, not whole-video
+candidates. Negative controls falsely transcribed by both STT families remain
+counterevidence against promoting STT text or model agreement to speech truth.
+
+Saved full scan `/tmp/stage11-full-no-vad-result-fn0841kg/`: 18 successful
+590-second-core chunks; original source PCM SHA and every request/response SHA,
+exact sample origin, strict existing no-VAD decoder and contiguous ownership
+revalidated. Source PCM167366420 float32 samples, no missing sample ranges.
+Requested video0..10460402ms (02:54:20.402), decoded audio end10460401.25ms;
+0.75ms terminal quantization is not an unprocessed chunk. No new Whisper inference.
+Retained shorter30-second tests have5 positive and6 control cores, 220000ms union
+(2.10% of the video), not full short-chunk coverage. Existing amplitude/flatness
+analysis lists315 selected20-second windows (6300000ms union), not a complete
+speech detector or proof of dialogue. Baseline486 segments spanning0..10206516ms
+cannot by themselves establish processing coverage for empty audio. Worker Silero
+VAD is implemented, but its response exports region count, not a reusable complete
+whole-video speech-interval ledger. VAD misses must remain a possible blind spot.
+
+Saved-data dry-run `/tmp/stage11-full-discovery-dry-run-pfiwpf0a/`:
+`audit.json`, `candidate-index.json`, `reconciled-full-chunks.json`,
+`bounded-Hermes-contract-example.json`, README and SHA256SUMS.
+Reproduced all3153 existing candidate IDs, fields and evidence sources exactly:
+2670 NO_EXTERNAL_JA,173 PARTIAL_EXTERNAL_OVERLAP,310 FULL_EXTERNAL_OVERLAP.
+3021 have repetition/source-quality warnings. Remaining132 (76 noJA,28 partial,
+28 full-overlap) are still UNVERIFIED_AUDIO, not correct speech or approvals.
+No new candidate IDs relative to the saved full scan, and no newly verified
+Japanese/dialogue. Reconciliation preserved3160 records and3160 tentative review
+groups:3059 CORE,22 CROSSES_CORE_BOUNDARY,79 CONTEXT_ONLY;0 duplicate-review pairs
+accepted,90 conflicting pairs kept AMBIGUOUS. No forced boundary merges.
+The three-group Hermes artifact proves the existing contract accepts a Gemini-free
+candidate list; it is NOT a quality-selected execution target. Actual Hermes calls0.
+
+Protected canonical313 JA/296 KO/17 absorptions revalidated; materialized SRT
+byte-identical, approvals0. No Worker/settings/SRT/model changes, downloads,
+Gemini calls or remote ASR requests. Production source unchanged; only this new
+handoff section is staged/committed, leaving unrelated workspace edits intact.
+
+Missing connection: derive resumable, absolute-time short-core jobs across the
+whole timeline without human positive timestamps, retain no-VAD inspection for
+VAD-missed/unreviewed gaps, invoke the existing Whisper path, then attach source-
+verified Reazon outputs to actual candidate spans for bounded native Hermes
+review. Full Reazon evidence is not present and cannot be assumed. Existing
+long-chunk artifacts are too repetition-heavy to replace this work.
+Next ONE implementation: replace the current short launcher's positive-list-only
+job planning with a generic whole-timeline20s core +/-5s context plan, prioritizing
+external JA gaps/boundaries while keeping complete coverage and completion ledger.
+Reuse existing Worker/reconciliation; do not rerun the video in this investigation.
+A full plan would require524 cores, but that inference is not authorized/executed
+by this saved-data dry-run. Gemini stays outside automatic inputs and execution.
+
 ## 2026-10-09 — Separate non-publishable drafts for AMBIGUOUS supplemental cues
 
 Existing `QualityReviewResultCue` in `teddy_discovery_stateful_quality_review.py`
