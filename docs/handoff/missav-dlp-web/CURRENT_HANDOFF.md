@@ -1,5 +1,73 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-10 — Completed whole short-Whisper result extraction (READ_ONLY)
+
+Inspected /tmp/stage11-full-short-execution-review without running its launcher.
+All524 per-core done records, NPY SHA/exact source samples, strict no-VAD wire
+responses, segments SHA/serialization, row identity, settings/codec/runner SHA
+and final result summary verified. Source cores continuously cover0..10460402ms
+and every167366420 PCM sample exactly once, including fractional-ms audio tail.
+Last run: resumed18 (cache13 + prior newly recognized trial5), executed506,
+failed0. Total origin511 TARGETED_WHISPER +13 VALIDATED_CACHE; six valid empty
+cores are completion, not unexamined gaps. Results remain in core-NNNN.wire.json
+and core-NNNN.segments.json; no input/translation/result file was overwritten.
+
+Reused existing reconcile_stateful_hybrid_chunks and supplemental collector:
+2521 raw segment OBSERVATIONS ->2339 normalized-text/time duplicate-review groups
+(182 excess observations consolidated, original records all preserved), then
+2279 unapproved supplemental review groups;60 groups already represented by
+existing input remain separate. Roles1321 CORE /423 crossing /777 context-only,
+all preserved.182 duplicate pairs and882 unresolved conflict pairs;1457 connected
+review sets link alternatives, never merge them into proven utterances. Thus
+2279 is not the verified count of unique real spoken dialogues.
+
+Supplemental group temporal external-JA relation:1691 NONE,244 PARTIAL,344 FULL.
+FULL means overlapping but not exactly represented text, not proven semantic
+mismatch/new dialogue. Existing affine alignment and313JA identities reused.
+Canonical parse+boundary validation and SRT materializer confirm313JA/296KO/
+17absorption, approved0, original Korean SRT bytes unchanged.
+
+Existing source-quality rules applied without deleting records. One observation
+per normalized-equal duplicate group is used ONLY for document recurrence
+screening, not selection of correct Japanese.1871 candidate groups carry any
+warning (including duplicate/conflict metadata);1163 carry reading/negative
+control warnings. Features overlap: document_recurrent_text1069, consecutive
+identical512, intra-cue repetition259, runaway116, vocalic-run197, conflicts1206,
+duplicate observations168, overlap with user-confirmed no-speech clips7.
+Known negative clips use explicit user report control01–04, distinct from the
+older input's UNCONFIRMED labels. Whole-video silence/music ground truth is
+absent, so full-video hallucination rate remains unmeasured. Normal recurring
+speech, groans and effect-like text remain AMBIGUOUS, not automatically removed.
+Short chunks reduced raw observations versus long3160, but did NOT eliminate
+repetition; flags cannot by themselves establish accuracy or hallucination.
+
+Historical long3153 candidates were NOT appended.102 short groups share time+
+normalized reading with old long candidates;2177 lack that correspondence, which
+is not2177 confirmed new real dialogues. Historical13 all have temporal links;
+9 have time+reading overlap and4 differ. No old group IDs, human speech presence,
+Japanese accuracy or approvals were transferred solely by temporal overlap.
+
+Existing Reazon13 clips have temporal overlap with24 of2279 groups;2255 have no
+saved Reazon clip overlap. Even24 require utterance-level source/time/reading
+validation; all2279 remain unverified. Upper bound for independent evidence
+review2279; no batch of that size was executed/prepared.262 unapproved groups
+(NO_EXTERNAL_JA, no current warning, no saved Reazon clip) are a scheduling
+priority only. Other candidates remain preserved. Existing Gemini evidence is
+untouched but excluded from automatic input. A bounded saved-data request and
+Reazon-only cross-evidence example pass existing contracts, with all approvals0;
+this is not actual Hermes semantic verification or permission to merge SRT.
+
+Output /tmp/stage11-full-short-candidates-zko9vz8p/:
+reconciled-full-short-chunks.json, supplemental-review-groups.json, audit.json,
+historical13-links.json, Reazon-existing-clip-links.json,
+Reazon-priority-unapproved.json, followup-audit.json, analysis-checks.json,
+preserved-input-pins.json (2112 hashes checked before/after), SHA256SUMS, README.
+Temporary analysis scripts reuse existing code; no production implementation
+changed. Whisper/Reazon/Hermes/Gemini calls0; publications0; Worker unchanged.
+Next ONE task: prepare a small source-audio Reazon comparison batch from the262
+priority groups, reusing existing independent-STT route and retaining all
+conflicting/uncertain text. Do not automatically approve matching model outputs.
+
 ## 2026-10-10 — Actual VM122 Worker provenance verified; stale smoke baseline corrected
 
 READ-ONLY VM122 inspection confirmed Worker158369/start_tick324251721, Python
