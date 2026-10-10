@@ -1,5 +1,40 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-10 — Evaluated actual Reazon full12 +4 negative controls (READ ONLY)
+
+Actual saved execution /var/tmp/stage11-reazon-full12-controls-result-bcnr2qjn:
+COMPLETE_UNVERIFIED16/16, CPU fp32/1thread;10.110s processing +1.285s model load,
+peak RSS1080448KiB. No new inference/Worker/SRT changes during this analysis.
+Evaluation /tmp/stage11-reazon-full12-evaluation-uevskref/evaluation.json;
+2143 prior pins, batch requests byte equality, individual result equality,
+sourcePCM/WAV/subset PCM16 and float input SHAs verified. All12 estimated source
+utterance intervals have no aligned externalJA overlap. However actual Reazon
+context clips02 overlap ja-000084 and08 overlap ja-000225; extra contextual text
+cannot be counted as new dialogues. Group IDs/time/order/source preserved.
+
+Descriptive model-text comparison (NOT Hermes decisions or approval):4 agreement
+(05/06/10/11),3 partial (03/09/12),3 conflict (01/02/07),2 undetermined (04/08).
+04 retains240ms Whisper repeated voiced kana plus replacement character versus
+Reazon incomplete よかっ; neither is validated Japanese.08 Reazon token points
+all lie in artificial padding, preventing defensible utterance matching. Many
+other points also outside input: estimated points are not verified word/utterance
+boundaries and must not be repaired or blindly dropped to manufacture alignment.
+
+Known no-dialogue controls01..04 (same20s core PCM as prior experiment): Whisper
+30s-context output おやすみなさい overlaps every core; Reazon core outputs あれ,
+あら,うん,うん respectively. Thus4/4 known negatives still yield false textual
+recognitions, identical to previous saved Reazon reference. Not a full-video
+hallucination-rate estimate; model agreement alone cannot confirm speech/content.
+
+Recommendation: defer blanket262 execution as an automatic source verifier.
+Independent STT is useful for exposing alternatives/supporting common wording,
+but true recovery benefit is unmeasured without source audio checks. Different
+Whisper windows versus shortened Reazon contextual clips confound disagreements.
+Next single task: verify a small matched/partial/conflict subset against original
+audio at utterance level, retaining all alternatives and separating dialogue
+existence, Japanese accuracy and timing. No automatic approval. Existing313JA/
+296KO/17absorption remain byte/SHA protected, approvals0, Gemini excluded.
+
 ## 2026-10-10 — Prepared ReazonSpeech 12 whole-video candidates +4 known negatives
 
 Preparation only: /tmp/stage11-reazon-full12-controls-d1mj4udp. Reused installed
