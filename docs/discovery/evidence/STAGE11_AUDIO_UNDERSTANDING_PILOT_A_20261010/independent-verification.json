@@ -1,0 +1,16 @@
+{
+  "independent_score_reconstruction": "PASS",
+  "native_frames": 510,
+  "raw_class_scores": 265710,
+  "speech_detected_by_arm": {
+    "clips": 26,
+    "short_parts": 10
+  },
+  "true_positive": 13,
+  "false_positive": 13,
+  "all_means_maxima_frame_top1_monitored_scores_exact": true,
+  "protocol_sha256": "42edabac7d5932d36ccbd77a9aa76b968bea3966fac4f94ace3fa06ed2e4f1b0",
+  "no_posthoc_rule_changes": true,
+  "pip_check": "PASS",
+  "py_compile": "PASS"
+}

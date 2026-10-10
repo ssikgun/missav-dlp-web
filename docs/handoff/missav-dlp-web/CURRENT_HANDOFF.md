@@ -1,5 +1,42 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-10 — Audio Understanding Pilot A: actual official YAMNet CPU; FAIL
+
+Stopped candidate selection. Verified ALL13 user-confirmed listening clips and
+14 USER typed negatives (11moan/2music/1no-dialogue), WAV/source PCM/SHA and four
+historical manifests. No substitutions. Positive truth is clip speech presence;
+Japanese wording and STT core boundaries UNVERIFIED.01/02 share listening context;
+05/06/07 dialogue+music remain positive. R2 two UNVERIFIED candidates preserved
+separately, not inferred or counted. Existing evidence/labels untouched.
+
+Official google/yamnet/1 SavedModel,521 original classes, isolated
+/var/tmp/stage11-yamnet-pilot-a-20261010/venv, tensorflow-cpu2.20.0, CPU1thread.
+Audio-only Tensor input; no labels/STT text. Actual27/27 clips +13 auxiliary core
+runs COMPLETE;510 frames/265710 raw scores retained. Protocol SHA
+42edabac7d5932d36ccbd77a9aa76b968bea3966fac4f94ace3fa06ed2e4f1b0 fixed BEFORE
+inference: any native frame top1 in the recorded natural-speech class set.
+No posthoc tuning. Native0.96s patch/.48s hop, real .975s waveform support/padding
+recorded. Main speech13/13, missed0/13; false speech13/14:moan10/11,music2/2,
+no-dialogue1/1. Provisional FAIL. Predeclared mean-top1 baseline speech10/13,
+false4/14, also fails. Scores are not Japanese dialogue probabilities.
+
+Core-only detected10/13,03 lost detections (05/07/12); boundaries not human truth,
+so not an independent recall metric.05 full-clip speech frames miss the estimated
+core entirely;12 is368ms and padded, top1 Slap, smack. Moan missing07 has ALL13
+frames Speech/max.989. YAMNet is insufficient for safe missing-dialogue selection;
+further speech/nonlexical audio-model testing and utterance-scope truth needed.
+
+Evidence /var/tmp/stage11-yamnet-pilot-a-20261010/ and portable archive
+/var/tmp/stage11-audio-understanding-pilot-a-20261010.tar.gz (copy /mnt/data/).
+Report docs/discovery/STAGE11_AUDIO_UNDERSTANDING_PILOT_A_20261010.md; committed
+evidence directory retains all native521 scores, frame timeline, protocol,
+corpus/user scopes and evaluation. Generic isolated runner in tools/.
+Independent score reconstruction PASS,2152 protected SHA verified before/after,
+existing KO SRT SHA unchanged. Whisper/Reazon/Hermes/Gemini calls0; SRT
+changes/approval/publish0; operational/Worker/service changes0. Only this task
+section/tool/report/evidence are committed/pushed; prior dirty work and two
+previous local-only commits preserved, excluded from this push.
+
 ## 2026-10-07 — Whole-title primary canary PASS / KO LF contract
 
 ### Current goal

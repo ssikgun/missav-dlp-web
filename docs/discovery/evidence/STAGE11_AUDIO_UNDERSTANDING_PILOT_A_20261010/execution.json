@@ -1,0 +1,22 @@
+{
+  "status": "COMPLETE",
+  "tensorflow": "2.20.0",
+  "devices": [
+    "/physical_device:CPU:0"
+  ],
+  "gpu_visible": [],
+  "model_url": "https://tfhub.dev/google/yamnet/1",
+  "model_pins": {
+    "/var/tmp/stage11-yamnet-pilot-a-20261010/model/saved_model/assets/yamnet_class_map.csv": "cdf24d193e196d9e95912a2667051ae203e92a2ba09449218ccb40ef787c6df2",
+    "/var/tmp/stage11-yamnet-pilot-a-20261010/model/saved_model/saved_model.pb": "672af6e1e34fe15a42d45d70217fd39f97e10aef9b0effbf9b0bf7826fccd462",
+    "/var/tmp/stage11-yamnet-pilot-a-20261010/model/saved_model/variables/variables.data-00000-of-00001": "d6753f22f173b2a8b1ce78918eaae79bf0a41ca61f4cfe9a1b948c97ff094ddc",
+    "/var/tmp/stage11-yamnet-pilot-a-20261010/model/saved_model/variables/variables.index": "0bc2ca10e56e8a71b96a2cad26adbbabff927e9344fbd2df8ae7275ddf76ae1e"
+  },
+  "model_load_seconds": 1.603732586838305,
+  "clip_calls": 27,
+  "auxiliary_calls": 13,
+  "inference_input_sha256": "2f72931a4b73559a80d50c65a53ea142ddf3835d1492b3ccf7d430729bcf19ef",
+  "protocol_sha256": "42edabac7d5932d36ccbd77a9aa76b968bea3966fac4f94ace3fa06ed2e4f1b0",
+  "runner_sha256": "0166f1c4abf7f2c112267e7ae751d4c0b52332dc57e7a45af8885e593e38da99",
+  "model_receives": "ONLY normalized mono PCM float32 Tensor, 16000 Hz"
+}

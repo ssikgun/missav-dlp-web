@@ -1,0 +1,119 @@
+[
+  {
+    "id": "clip-001",
+    "core_start_ms": 63500,
+    "core_end_ms": 65220,
+    "core_boundary_truth": "STT_ESTIMATE_UNVERIFIED",
+    "full_speech_frames": 3,
+    "speech_frames_support_intersect_core": 2,
+    "speech_frames_wholly_inside_core": 0
+  },
+  {
+    "id": "clip-002",
+    "core_start_ms": 65220,
+    "core_end_ms": 67872,
+    "core_boundary_truth": "STT_ESTIMATE_UNVERIFIED",
+    "full_speech_frames": 9,
+    "speech_frames_support_intersect_core": 6,
+    "speech_frames_wholly_inside_core": 2
+  },
+  {
+    "id": "clip-003",
+    "core_start_ms": 191840,
+    "core_end_ms": 194020,
+    "core_boundary_truth": "STT_ESTIMATE_UNVERIFIED",
+    "full_speech_frames": 8,
+    "speech_frames_support_intersect_core": 5,
+    "speech_frames_wholly_inside_core": 2
+  },
+  {
+    "id": "clip-004",
+    "core_start_ms": 212820,
+    "core_end_ms": 213936,
+    "core_boundary_truth": "STT_ESTIMATE_UNVERIFIED",
+    "full_speech_frames": 4,
+    "speech_frames_support_intersect_core": 4,
+    "speech_frames_wholly_inside_core": 0
+  },
+  {
+    "id": "clip-005",
+    "core_start_ms": 215880,
+    "core_end_ms": 216620,
+    "core_boundary_truth": "STT_ESTIMATE_UNVERIFIED",
+    "full_speech_frames": 2,
+    "speech_frames_support_intersect_core": 0,
+    "speech_frames_wholly_inside_core": 0
+  },
+  {
+    "id": "clip-006",
+    "core_start_ms": 218940,
+    "core_end_ms": 221360,
+    "core_boundary_truth": "STT_ESTIMATE_UNVERIFIED",
+    "full_speech_frames": 4,
+    "speech_frames_support_intersect_core": 2,
+    "speech_frames_wholly_inside_core": 2
+  },
+  {
+    "id": "clip-007",
+    "core_start_ms": 221360,
+    "core_end_ms": 226020,
+    "core_boundary_truth": "STT_ESTIMATE_UNVERIFIED",
+    "full_speech_frames": 2,
+    "speech_frames_support_intersect_core": 1,
+    "speech_frames_wholly_inside_core": 0
+  },
+  {
+    "id": "clip-008",
+    "core_start_ms": 260360,
+    "core_end_ms": 262000,
+    "core_boundary_truth": "STT_ESTIMATE_UNVERIFIED",
+    "full_speech_frames": 10,
+    "speech_frames_support_intersect_core": 4,
+    "speech_frames_wholly_inside_core": 1
+  },
+  {
+    "id": "clip-009",
+    "core_start_ms": 262000,
+    "core_end_ms": 264580,
+    "core_boundary_truth": "STT_ESTIMATE_UNVERIFIED",
+    "full_speech_frames": 13,
+    "speech_frames_support_intersect_core": 7,
+    "speech_frames_wholly_inside_core": 3
+  },
+  {
+    "id": "clip-010",
+    "core_start_ms": 265200,
+    "core_end_ms": 266240,
+    "core_boundary_truth": "STT_ESTIMATE_UNVERIFIED",
+    "full_speech_frames": 6,
+    "speech_frames_support_intersect_core": 2,
+    "speech_frames_wholly_inside_core": 0
+  },
+  {
+    "id": "clip-011",
+    "core_start_ms": 3355932,
+    "core_end_ms": 3356832,
+    "core_boundary_truth": "STT_ESTIMATE_UNVERIFIED",
+    "full_speech_frames": 6,
+    "speech_frames_support_intersect_core": 4,
+    "speech_frames_wholly_inside_core": 0
+  },
+  {
+    "id": "clip-012",
+    "core_start_ms": 3357732,
+    "core_end_ms": 3358100,
+    "core_boundary_truth": "STT_ESTIMATE_UNVERIFIED",
+    "full_speech_frames": 9,
+    "speech_frames_support_intersect_core": 2,
+    "speech_frames_wholly_inside_core": 0
+  },
+  {
+    "id": "clip-013",
+    "core_start_ms": 3358992,
+    "core_end_ms": 3360612,
+    "core_boundary_truth": "STT_ESTIMATE_UNVERIFIED",
+    "full_speech_frames": 10,
+    "speech_frames_support_intersect_core": 5,
+    "speech_frames_wholly_inside_core": 1
+  }
+]

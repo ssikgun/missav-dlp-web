@@ -1,0 +1,19 @@
+{
+  "version": "pilot-a-v1",
+  "fixed_before_inference": true,
+  "primary": "At least one native YAMNet frame has top-1 in speech_classes; score ties use lowest official class index. No score threshold or post-hoc tuning.",
+  "speech_classes": [
+    "Speech",
+    "Child speech, kid speaking",
+    "Conversation",
+    "Narration, monologue",
+    "Whispering"
+  ],
+  "secondary": "Official inference example: mean over all native frames then top-1 in the same speech set. Descriptive only; primary determines provisional pass.",
+  "temporal": "Native 0.96s patches / 0.48s hop; waveform support includes 25ms STFT with final padding. Export nominal patch and effective waveform support.",
+  "positive_scope": "User-confirmed existing listening clip, with saved +/-2s context, remains positive even if music/moans coexist. Candidate-core timings are STT estimates, NOT human utterance times. Core-only reruns are descriptive and have no independent user truth.",
+  "truth": "13 user-confirmed speech-presence clips; Japanese wording and exact boundaries remain UNVERIFIED; 01/02 share context, not 13 independent utterances. 14 explicit USER typed negatives. No labels or transcripts passed to model.",
+  "r2": "Preserve 2 UNVERIFIED candidates separately, excluded from inference and metrics.",
+  "pass": "primary true positives >=10/13 AND false positives <=1/14 AND all input evidence verified",
+  "interpretation": "YAMNet audio-event scores are not calibrated probabilities of Japanese linguistic dialogue; mixed/ambiguous outputs never change human labels."
+}
