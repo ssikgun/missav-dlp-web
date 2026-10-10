@@ -1,5 +1,65 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-10 — R2 context-led missing-dialogue preparation + USER labels (NO INFERENCE)
+
+Explicit USER original-audio judgments recorded for14 R1 cores:missing01..10
+NON_SPEECH_MOAN;controls01..02 MUSIC;control03 NO_DIALOGUE;control04
+NON_SPEECH_MOAN. Counts11moan/2music/1no-dialogue. Existing22-column judgment.tsv
+schema/IDs/model reference cells preserved, reviewer=USER; non-assessed sound
+types remain NOT_ASSESSED. Original TSV/SHA list byte/SHA archived under R1
+user-r2-evidence/, separate user-judgments-r2.json records old/new cells and
+human provenance. Old STT/results/audits unchanged; only exact reviewed core
+scopes labelled, no extrapolation to neighboring sound and no title filter.
+
+Reused524 Whisper/2521 raw observations,313 affine JA and2152 protected input
+pins.755 no-output/no-JA gaps ->16 whole short gaps with dialogue context after
+excluding existing baseline, historical long candidates, current/legacy conflict
+group envelopes, prior Reazon clips and known positive/negative core scopes.
+No slicing old candidate speech into new gaps; existing records never deleted.
+Context: adjacent JA and short Whisper turns, or proximity to prior human-positive
+scope. Actual2 selected via short Whisper turn gaps near JA, NOT verified nearby
+language truth; no candidate met human-positive proximity rule in final set.
+
+Amplitude-normalized spectral flux/band motion/entropy and envelope rhythm
+compared with3 prior user-positive scopes and14 typed negative cores. RMS is
+only unusable-signal screening, NEVER ranking/feature distance.16 contextual
+probes ->3 positive-over-negative pattern preferences ->1 identical adjacent
+Whisper reading withheld ->2 UNVERIFIED candidates, no quota filling. Pattern
+distance is not speech/language probability or validated classifier performance.
+Candidate01 01:53:51.500..01:53:52.920 (1.42s),02
+01:57:27.220..01:57:30.740 (3.52s). Zero core overlap with all existing Whisper,
+JA, baseline, historical candidates and current/legacy conflicts. Candidate01
+adjacent-after Whisper has a preserved conflict warning; context is not counted
+as new dialogue. Boundaries remain model/affine estimates and require listening.
+
+New bundle /var/tmp/stage11-missing-dialogue-r2-20261010/:2 candidates,3 prior
+clip-dialogue-positive controls (exact Japanese text remains unverified),14
+USER-typed negatives.19 core WAV +19 +/-5s context WAV, listen.html with core
+markers/playback/user TSV export, judgment.tsv, review/selection/audit/SHA files,
+README/REPORT. R1 negative WAVs byte identical. Reazon hypotheses never shown on
+candidate screen. Relative audio + embedded TSV permit Mac file:// use without
+fetch/CORS/server; actual Mac listening/browser execution is still user work.
+
+Download /var/tmp/stage11-missing-dialogue-r2-20261010.tar.gz (14810654 bytes),
+copy /mnt/data/stage11-missing-dialogue-r2-20261010.tar.gz;
+SHAb1609b7e2a77a3bce9f5c568893d74031346ea92ec4dd1b128061f67364ba217.
+Archive contains54 files, extraction and all SHA checks PASS. Offline PASS:
+14-label import/schema/model-cell/archive/idempotence,2152 unchanged pins,
+canonical JA reprojection/313JA296KO17absorption SRT bytes, exact source PCM /
+context-core byte subset, negative copies, zero core duplicates/conflicts,
+amplitude invariance,38 relative WAV assets/embedded TSV/no model text display,
+py_compile/git diff --check. Browser checks are static, not claimed Mac execution.
+
+Whisper/Reazon/Hermes/Gemini calls0, verified new dialogues0, approvals/publish0,
+Worker/server operating settings changes0. Next USER task:unpack, listen to core
+then context then core, classify dialogue/Japanese/music/effect/moan separately,
+record heard Japanese and absolute speech times; mark existing-utterance
+continuation or ambiguity rather than counting it as independent recovery.
+Export judgment.user.tsv. Positive/negative controls are never new discoveries.
+Report docs/discovery/STAGE11_MISSING_DIALOGUE_R2_20261010.md; generic tool
+ tools/stage11_prepare_missing_dialogue_r2.py. Only this section/tool/report are
+committed; unrelated dirty work and earlier local-only commits are preserved.
+
 ## 2026-10-10 — Prepared INDEPENDENT Whisper-missing-output probes (NO INFERENCE)
 
 Separate experiment from prior twelve Whisper/Reazon candidate comparisons.
