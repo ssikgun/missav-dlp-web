@@ -1,5 +1,43 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-10 — Prepared ReazonSpeech 12 whole-video candidates +4 known negatives
+
+Preparation only: /tmp/stage11-reazon-full12-controls-d1mj4udp. Reused installed
+/var/tmp/stage11-reazon-four.0zHXMFlf CPU fp32 /1-thread /greedy-search environment
+and unchanged decode/token-point loop from stage11_reazon_remaining9_controls.py.
+No installations/downloads, Reazon/Whisper/Hermes inference0, Worker changes0.
+
+Selected12 of262 existing NO_EXTERNAL_JA/no-warning/no-prior-Reazon priority IDs:
+12 equal full-duration time bins, nearest-midpoint eligible group per bin;
+whole estimated utterance +up to2s context each side, existing0.9s model silence
+padding unchanged, total padded input<30s. Original groups and882 conflicting
+pairs remain untouched, no independent-utterance count inferred. Selection is
+not a random accuracy sample. IMPORTANT: priority-04 visibly has repetitive/broken
+characters although existing quality_features are empty. Retained and explicitly
+flagged for review, not approved or deleted. No-warning != verified speech.
+
+Four user-confirmed no-dialogue controls reuse exact old30s WAVs and SAME20s core
+subsets/source PCM from reazon-remaining9-controls-qktq2z8w. Prior Reazon texts
+retained as reference; controls are separate, never supplemental approval inputs.
+Comparison TSV/batch JSON preserve Whisper readings, absolute estimated times,
+source/core provenance, external JA relation, negative reference and pending
+Reazon output. Japanese text and timing remain unverified, all AMBIGUOUS and
+publishable=false; model consensus cannot authorize insertion.
+
+Offline PASS:2143 input pins verified, model/source/WAV SHA and PCM checked,
+12-bin coverage/unique IDs/no conflict links, exact negative subset hashes,
+corrupted batch plan blocked before model load, reused inference loop equality,
+bash -n /py_compile /actual preflight. Existing313JA/296KO/17absorption unchanged,
+approvals0. batch-plan SHA4658eb8ab61ef267f11be8c8b155e352ea6d80adf3ba645b8ee13c9945f315cd;
+SHA256SUMS SHA27f54aea0aa697304ee6f5762e77a79a57f0b09f821ae75bfe16a712624a9c31.
+
+CT108 future direct execution (NOT executed by Codex):
+`bash /tmp/stage11-reazon-full12-controls-d1mj4udp/CT108-commands.sh`
+Sequential16 requests, existing venv only, preflight before model load. New result
+root /var/tmp/stage11-reazon-full12-controls-result-* printed by runner; no old
+output overwritten. Next: user runs this small batch, then compare independent
+STT outputs/negative false recognitions; no automatic Japanese approval or SRT.
+
 ## 2026-10-10 — Completed whole short-Whisper result extraction (READ_ONLY)
 
 Inspected /tmp/stage11-full-short-execution-review without running its launcher.
