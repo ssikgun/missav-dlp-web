@@ -1,0 +1,122 @@
+[
+  {
+    "model": "google/gemma-3n-E2B-it-litert-lm",
+    "revision": "c03b6f60b8da6c5400b6838a2cf26420f80c0a01",
+    "gated": "manual",
+    "weights": [
+      {
+        "name": "gemma-3n-E2B-it-int4-Web.litertlm",
+        "bytes": 3038117888,
+        "sha256": "b6c8e1081ec80730f14473a5ece941b48da5d8e2a80c97c2963da153f3eff3d2"
+      },
+      {
+        "name": "gemma-3n-E2B-it-int4.litertlm",
+        "bytes": 3655827456,
+        "sha256": "2ed7bc3a0026c93d5b8a4544b352d9d00cd66ff0bac3ef6a20ac3d2cba4010d6"
+      },
+      {
+        "name": "gemma-3n-E2B-it-int4.mediatek.mt6993.litertlm",
+        "bytes": 4330192896,
+        "sha256": "ba38d54766a3a51cb977499a852d9839843c496a4f2f16c8b472a2cd52b8ab94"
+      }
+    ],
+    "total_weight_bytes": 11024138240,
+    "access_probe": {
+      "url": "https://huggingface.co/google/gemma-3n-E2B-it-litert-lm/resolve/c03b6f60b8da6c5400b6838a2cf26420f80c0a01/gemma-3n-E2B-it-int4.litertlm",
+      "method": "HEAD",
+      "http_status": 401,
+      "authenticated": false
+    },
+    "weights_downloaded": false
+  },
+  {
+    "model": "google/gemma-3n-E2B-it",
+    "revision": "5e092ebca197cdcd8d8b195040accf22693501bc",
+    "gated": "manual",
+    "weights": [
+      {
+        "name": "model-00001-of-00003.safetensors",
+        "bytes": 3077103824,
+        "sha256": "1af26e1fd61af0dc067252c907bf52900c7cd5864893e29970e6ea87320322a6"
+      },
+      {
+        "name": "model-00002-of-00003.safetensors",
+        "bytes": 4981242176,
+        "sha256": "f53ec36e9b34a1dda547103f7371eaf4dcce40a9e85ef2a04dfa12f30e1146ff"
+      },
+      {
+        "name": "model-00003-of-00003.safetensors",
+        "bytes": 2820739840,
+        "sha256": "28e11f2029b8d13aa3fde2a948808baa01d8bee0fd184c4faedbd09065e7fd0b"
+      }
+    ],
+    "total_weight_bytes": 10879085840,
+    "access_probe": {
+      "url": "https://huggingface.co/google/gemma-3n-E2B-it/resolve/5e092ebca197cdcd8d8b195040accf22693501bc/config.json",
+      "method": "HEAD",
+      "http_status": 401,
+      "authenticated": false
+    },
+    "weights_downloaded": false
+  },
+  {
+    "model": "google/gemma-3n-E4B-it-litert-lm",
+    "revision": "297ed75955702dec3503e00c2c2ecbbf475300bc",
+    "gated": "manual",
+    "weights": [
+      {
+        "name": "gemma-3n-E4B-it-int4-Web.litertlm",
+        "bytes": 4275044352,
+        "sha256": "63730ba3225a23a90d3292d89fdeff1a7537cedeb72aa687de9a35732d057e52"
+      },
+      {
+        "name": "gemma-3n-E4B-it-int4.litertlm",
+        "bytes": 4919541760,
+        "sha256": "2e67a6cd51dfe0f793431e6bd4ed8d029c88e10f52ca0469ad38445e3cd3c1f4"
+      }
+    ],
+    "total_weight_bytes": 9194586112,
+    "access_probe": {
+      "url": "https://huggingface.co/google/gemma-3n-E4B-it-litert-lm/resolve/297ed75955702dec3503e00c2c2ecbbf475300bc/gemma-3n-E4B-it-int4.litertlm",
+      "method": "HEAD",
+      "http_status": 401,
+      "authenticated": false
+    },
+    "weights_downloaded": false
+  },
+  {
+    "model": "google/gemma-3n-E4B-it",
+    "revision": "c1221e9c62e34a43ab7ffacd1be0ea71f126ef10",
+    "gated": "manual",
+    "weights": [
+      {
+        "name": "model-00001-of-00004.safetensors",
+        "bytes": 3077103824,
+        "sha256": "1af26e1fd61af0dc067252c907bf52900c7cd5864893e29970e6ea87320322a6"
+      },
+      {
+        "name": "model-00002-of-00004.safetensors",
+        "bytes": 4966792808,
+        "sha256": "5dff2214c41034789c514931257d804bc0808b8ce709a795a8f966b8cc36c002"
+      },
+      {
+        "name": "model-00003-of-00004.safetensors",
+        "bytes": 4992870216,
+        "sha256": "bbe396c49b463b6147243ea883b06a4c09e85d558a392501c2dbfbdd0e1f2f9f"
+      },
+      {
+        "name": "model-00004-of-00004.safetensors",
+        "bytes": 2663414864,
+        "sha256": "5bebe6d74423ec0cfb6a837d42319c36e5999888832606992a136258cd49e718"
+      }
+    ],
+    "total_weight_bytes": 15700181712,
+    "access_probe": {
+      "url": "https://huggingface.co/google/gemma-3n-E4B-it/resolve/c1221e9c62e34a43ab7ffacd1be0ea71f126ef10/config.json",
+      "method": "HEAD",
+      "http_status": 401,
+      "authenticated": false
+    },
+    "weights_downloaded": false
+  }
+]

@@ -1,0 +1,18 @@
+{
+  "hostname": "downloader",
+  "memory": {
+    "MemTotal": 10737418240,
+    "MemAvailable": 4304912384,
+    "SwapTotal": 1073741824,
+    "SwapFree": 0
+  },
+  "disk_free_bytes": 24713097216,
+  "modules": {
+    "torch": false,
+    "transformers": false,
+    "litert_lm": false,
+    "huggingface_hub": false
+  },
+  "cuda_devices_present": [],
+  "token_file_present": false
+}

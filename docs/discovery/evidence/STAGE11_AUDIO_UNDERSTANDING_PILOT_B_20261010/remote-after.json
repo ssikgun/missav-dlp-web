@@ -1,0 +1,120 @@
+{
+  "hostname": "local-llm",
+  "memory": {
+    "MemTotal": 33582940160,
+    "MemAvailable": 4679823360,
+    "SwapTotal": 4294963200,
+    "SwapFree": 3424493568
+  },
+  "disk": {
+    "free_bytes": 44492759040
+  },
+  "gpu_csv": "name, memory.total [MiB], memory.used [MiB], memory.free [MiB]\nNVIDIA GeForce RTX 3060, 12288 MiB, 9011 MiB, 2902 MiB\n",
+  "inventory": [
+    {
+      "path": "/home/teddy/models/gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf",
+      "bytes": 2620368960,
+      "gguf": {
+        "version": 3,
+        "tensors": 541,
+        "metadata_entries": 47,
+        "general.architecture": "gemma4",
+        "general.type": "model",
+        "general.name": "Gemma-4 E2B IT (smart Q4_0, QAT-lossless)",
+        "metadata_bytes_read": 15781429
+      }
+    },
+    {
+      "path": "/home/teddy/models/gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+      "bytes": 4215693760,
+      "gguf": {
+        "version": 3,
+        "tensors": 666,
+        "metadata_entries": 47,
+        "general.architecture": "gemma4",
+        "general.type": "model",
+        "general.name": "Gemma-4 E4B IT (smart Q4_0, QAT-lossless)",
+        "metadata_bytes_read": 15781288
+      }
+    },
+    {
+      "path": "/home/teddy/models/gemma-4-E2B-it-UD-Q8_K_XL.gguf",
+      "bytes": 5282805888,
+      "gguf": {
+        "version": 3,
+        "tensors": 601,
+        "metadata_entries": 56,
+        "general.architecture": "gemma4",
+        "general.type": "model",
+        "general.name": "Gemma-4-E2B-It",
+        "metadata_bytes_read": 15782050
+      }
+    },
+    {
+      "path": "/home/teddy/models/gemma4-e4b-stage11-mm/mmproj-BF16.gguf",
+      "bytes": 991552320,
+      "gguf": {
+        "version": 3,
+        "tensors": 1411,
+        "metadata_entries": 38,
+        "general.architecture": "clip",
+        "general.type": "mmproj",
+        "general.name": "Gemma-4-E4B-It",
+        "clip.has_vision_encoder": true,
+        "clip.has_audio_encoder": true,
+        "clip.vision.projector_type": "gemma4v",
+        "clip.audio.projector_type": "gemma4a",
+        "metadata_bytes_read": 1839
+      }
+    },
+    {
+      "path": "/usr/share/ollama/.ollama/models/manifests/registry.ollama.ai/library/gemma4/e4b-it-q4_K_M",
+      "bytes": 709
+    }
+  ],
+  "python_modules": {
+    "torch": false,
+    "transformers": false,
+    "litert_lm": false,
+    "huggingface_hub": false
+  },
+  "credential_files_present": {
+    "token": false,
+    "stored_tokens": false
+  },
+  "services": [
+    {
+      "pid": 56591,
+      "comm": "llama-server",
+      "start_ticks": "83920908",
+      "argv_sha256": "bd86df04694229302c5f240158ef7db67e8594cd39c49b3b8070ab98816a2be6",
+      "exe": "/home/teddy/llama.cpp/build/bin/llama-server",
+      "script_or_model": "/home/teddy/models/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
+    },
+    {
+      "pid": 158369,
+      "comm": "python",
+      "start_ticks": "324251721",
+      "argv_sha256": "bbb934e258a1b79705b8f75b9aa23ededbfff2f742e578afe507434b98ccfc56",
+      "exe": "/usr/bin/python3.12",
+      "script_or_model": "/tmp/stage11-asr-worker-targeted-r6d.py"
+    }
+  ],
+  "source_pins": {
+    "/home/teddy/llama.cpp/tools/mtmd/clip.cpp": "f6559f5dfdc7387f01a6fae6690663f808e7532fe166d8468ef6b68d7bb72b08",
+    "/home/teddy/llama.cpp/tools/mtmd/mtmd.cpp": "ff3dc925d81c3d55471327807895efc9602bebc1ee377918621719e99c53f385",
+    "/tmp/stage11-asr-worker-targeted-r6d.py": "914ef84fcda14d967e583525c3d8954df6b0f08192f2b8c0871ab252b648aab0",
+    "/tmp/teddy_discovery_asr_gpu_worker.py": "a8df232ba220ae15d736137545e90f3c3bae7cb2432e5cc062688c76ad58e619",
+    "/tmp/teddy_discovery_asr_remote.py": "0c68f7a7ed28da08cb3bd353e5f32daccd018cbb592e61d79678800ae579bfe8",
+    "/home/teddy/llama.cpp/build/bin/llama-server": "a26faf52ee89aa7d0a70ad69350ff7494ea519102d219faf8ea8bdde768ce0b0"
+  },
+  "llama_cpp_commit": "5190c2ea8d51f24c6a6f12e9d316ded72a6f2f23",
+  "gemma3n_audio_skip_evidence": {
+    "file": "/home/teddy/llama.cpp/tools/mtmd/clip.cpp",
+    "line": 2911,
+    "code": "            skip_audio = ctx_vision->model.proj_type == PROJECTOR_TYPE_GEMMA3NV;",
+    "comment": "            // TODO: we don't support audio for Gemma 3N, but GGUF contains audio tensors"
+  },
+  "model_loads": 0,
+  "inferences": 0
+}

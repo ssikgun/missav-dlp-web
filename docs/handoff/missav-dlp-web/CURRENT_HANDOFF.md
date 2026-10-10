@@ -1,5 +1,37 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-10 — Audio Understanding Pilot B: Gemma3n BLOCKED_SAFE_STOP
+
+Requested Gemma3n E2B audio inference could NOT be executed; model loads/calls0.
+E4B feasibility only, also NOT_READY. Inspected CT108/VM122 model files, GGUF
+headers, actual runtime source/resources and official pinned model metadata.
+Existing Gemma GGUFs/projector are Gemma4, not substituted. Installed llama.cpp
+5190c2ea8d51f24c6a6f12e9d316ded72a6f2f23 clip.cpp:2911 explicitly skips Gemma3n
+audio. No requested weights/compatible Transformers or LiteRT runtime found.
+Official E2B10.88GB/E4B15.70GB shards and standard LiteRT INT4 E2B3.66GB/E4B4.92GB
+access all HTTP401; no HF credentials. RAM available~4GiB, VM122 GPU2902MiB free;
+no safe standard load or verified lower-memory audio route. Weights download0,
+runtime installs0, no forced load or operational memory reclamation.
+
+Reused27 original cases/SHA:13 context-confirmed speech,11moan/2music/1no-dialogue.
+All13 positive CORE truth remains UNCONFIRMED: original listening clip has context,
+core times are STT estimates, no human utterance-time ledger. Positive labels
+preserved; context-only detections cannot count as core success. Same fixed prompt
+recorded, never applied; anonymous core/context27 each stored separately from
+truth/STT. Detection/false-positive/hallucination/AMBIGUOUS metrics NOT_MEASURED,
+not 0/13 or 0/14. Performance NOT_EVALUATED; current usability FAIL, no expansion.
+
+Evidence /var/tmp/stage11-gemma3n-pilot-b-20261010/; archive
+/var/tmp/stage11-audio-understanding-pilot-b-20261010.tar.gz (copy /mnt/data/).
+Report docs/discovery/STAGE11_AUDIO_UNDERSTANDING_PILOT_B_20261010.md; committed
+resource/access/scope/result evidence. Next ONE task: source-audio confirmation
+of all13 estimated positive cores and actual utterance times; scope-pack listening
+page/template provided.2152 protected SHA unchanged; Worker/llama PID/start/argv/
+source/binary SHA/inventory before-after identical. Whisper/Reazon/Hermes/Gemini
+calls0, SRT change/approval/publish0, service changes0. Only this task's canonical
+section/report/offline audit tool/evidence committed/pushed; prior dirty/local
+work preserved. This is an execution stop, not measured Gemma quality failure.
+
 ## 2026-10-10 — Audio Understanding Pilot A: actual official YAMNet CPU; FAIL
 
 Stopped candidate selection. Verified ALL13 user-confirmed listening clips and

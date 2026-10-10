@@ -1,0 +1,384 @@
+{
+  "core": [
+    {
+      "id": "clip-001",
+      "audio": "core/clip-001.wav",
+      "wav_sha256": "8afccc5d705e568b323a91e08fae9f38f041e4ad52d2cdc06befc4fb4f86d16b",
+      "samples": 27520,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-002",
+      "audio": "core/clip-002.wav",
+      "wav_sha256": "c96b04078e19ee6ee7e221894a4aa76caa94e95034c11d4cb9fd1ac49108f950",
+      "samples": 42432,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-003",
+      "audio": "core/clip-003.wav",
+      "wav_sha256": "5df4fbf77be48280ceeabf70bfd8505a632be56b28f700a7ccc0a5b402d6d8e8",
+      "samples": 34880,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-004",
+      "audio": "core/clip-004.wav",
+      "wav_sha256": "72b90b65b82666881a15a6ab8f6ee53da2c8e3248ab1baee47632250218f46bc",
+      "samples": 17856,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-005",
+      "audio": "core/clip-005.wav",
+      "wav_sha256": "5a5db4b273e977f950bb0a4fc757e1c5f10dc985180f3c843a56f45e15093265",
+      "samples": 11840,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-006",
+      "audio": "core/clip-006.wav",
+      "wav_sha256": "09801e6be6d0092ca6fa1b6484db74905889c26b6a526eb65488045631490678",
+      "samples": 38720,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-007",
+      "audio": "core/clip-007.wav",
+      "wav_sha256": "866bb76e262e2244127a6fe68dd9c2bdb01293efdbe2fdd3460a81eb71b152d7",
+      "samples": 74560,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-008",
+      "audio": "core/clip-008.wav",
+      "wav_sha256": "9e573038aaa708f9cfb65358838943813da691262a85ce9bb1f58cd1ef6a46a7",
+      "samples": 26240,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-009",
+      "audio": "core/clip-009.wav",
+      "wav_sha256": "4d11da757437fc2920a22a3bcf8175e389ae802893bbfcf69f8e17e8fcba2347",
+      "samples": 41280,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-010",
+      "audio": "core/clip-010.wav",
+      "wav_sha256": "d2f32709d5f727dfbe74932b69cd8bb2120a330134485960bd429c8b0a8a737a",
+      "samples": 16640,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-011",
+      "audio": "core/clip-011.wav",
+      "wav_sha256": "5c9e63db5cb814d0268ecf936661eb42a57ca30079173a21d4a946cc218eb896",
+      "samples": 14400,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-012",
+      "audio": "core/clip-012.wav",
+      "wav_sha256": "060ca35843a2fcb0ddedc2b0bbeb6cf5e90c464644a00b05fb9c5caed09d5689",
+      "samples": 5888,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-013",
+      "audio": "core/clip-013.wav",
+      "wav_sha256": "3bccd8657e0e87beb5473883a0695ebcf985467e42870c74c62249857a3c3a3b",
+      "samples": 25920,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-014",
+      "audio": "core/clip-014.wav",
+      "wav_sha256": "ffac1c8dc00826ef85d3f2cf574f631f0765b2cd4716445ba0b35ad09be1de62",
+      "samples": 66240,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-015",
+      "audio": "core/clip-015.wav",
+      "wav_sha256": "4def87d9f37534aa34456550f00cb66a22b98c8d897e3788c7d331cc82b1967c",
+      "samples": 126400,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-016",
+      "audio": "core/clip-016.wav",
+      "wav_sha256": "660a227a317145270e83db3f060fed265e992c5e4307bddc06a5f6f7fcddd82b",
+      "samples": 132160,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-017",
+      "audio": "core/clip-017.wav",
+      "wav_sha256": "fbaa0223a9235112a09ce23092ba39812030f66e5382f136f0dc792d282de1f6",
+      "samples": 64320,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-018",
+      "audio": "core/clip-018.wav",
+      "wav_sha256": "097a382e80585fcc462d074b2a6f0105926082502c356dacbccf555664af77e2",
+      "samples": 192000,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-019",
+      "audio": "core/clip-019.wav",
+      "wav_sha256": "3ae3d57c76a4bca2d318d362be9003e9ebecf8b2ef77f856ac3a672e5860dcb6",
+      "samples": 128320,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-020",
+      "audio": "core/clip-020.wav",
+      "wav_sha256": "159e585bcb64e277d6d0177b54beb698ed5facc0e4d5c8adfd06317e2b5fc800",
+      "samples": 101760,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-021",
+      "audio": "core/clip-021.wav",
+      "wav_sha256": "ae1165ae2f39bdc2ab12b728b0cb6ec47c0145966c0f6b0bacb0145c9f12c108",
+      "samples": 117440,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-022",
+      "audio": "core/clip-022.wav",
+      "wav_sha256": "51cddd4a03f33d346de2909811a29fbaf5bc160f261b317fb2a8f63c9e4c6a31",
+      "samples": 153280,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-023",
+      "audio": "core/clip-023.wav",
+      "wav_sha256": "8592f7790cec47e64b342eaa314e65f1da831ce3857aae8e90cb9ab38c3e706a",
+      "samples": 129920,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-024",
+      "audio": "core/clip-024.wav",
+      "wav_sha256": "9385b02cfe0598fa7f4259098378ef66a59a412577a7d027b55e553457bee460",
+      "samples": 320000,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-025",
+      "audio": "core/clip-025.wav",
+      "wav_sha256": "acb66511dffa8c7e8cdbcd8163534f7754892163b9bb36911ff1ea1a5fa5f9ca",
+      "samples": 320000,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-026",
+      "audio": "core/clip-026.wav",
+      "wav_sha256": "32435f844adf50c2677a63b9ce0fc85f04add25bcf97ec86355e9fadbc15055f",
+      "samples": 320000,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-027",
+      "audio": "core/clip-027.wav",
+      "wav_sha256": "7415d31714db896130c3595c5eb6b02c80084c7708df4be3377ac62fb5c44eb4",
+      "samples": 320000,
+      "sample_rate": 16000
+    }
+  ],
+  "context": [
+    {
+      "id": "clip-001",
+      "audio": "context/clip-001.wav",
+      "wav_sha256": "3102e08aa9bb42188261f0d3b91ceb0231188f1f871d835ec566b8b88c991d0b",
+      "samples": 91520,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-002",
+      "audio": "context/clip-002.wav",
+      "wav_sha256": "862df36ee4ac5cab81751e6a13c098a894390a7b41b8e7d9833d8064c51b73f5",
+      "samples": 106432,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-003",
+      "audio": "context/clip-003.wav",
+      "wav_sha256": "5b32eca5806231d9c06d5bfd44dcb51539880f48e96da80c1cedb6580326552f",
+      "samples": 98880,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-004",
+      "audio": "context/clip-004.wav",
+      "wav_sha256": "b82bf907e846de461172875e41f9e25c9f51da1a5a2d7afd5bc19a44cffb55cb",
+      "samples": 81856,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-005",
+      "audio": "context/clip-005.wav",
+      "wav_sha256": "ca5e9c5deb24d08de11cef34af13fcccf16f34a3089cf1faacf993ca7d978cc0",
+      "samples": 75840,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-006",
+      "audio": "context/clip-006.wav",
+      "wav_sha256": "8fa94931146b6e4653f2a29152a37531a2a438c5ecd5dba90ea7abb22d71b155",
+      "samples": 102720,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-007",
+      "audio": "context/clip-007.wav",
+      "wav_sha256": "7a2deb69fe3c3f40725e378f95958f9cb55e7d9a914df01937c75038bb142d40",
+      "samples": 138560,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-008",
+      "audio": "context/clip-008.wav",
+      "wav_sha256": "65ffa140d908c9003fa6c3d12241e81c92928bfe87876ba5caf80a95f679073a",
+      "samples": 90240,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-009",
+      "audio": "context/clip-009.wav",
+      "wav_sha256": "8bd79d51ae1c7fb37d07c4819b6d4030ddc9536638de8ae013d88e4e5b4516a0",
+      "samples": 105280,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-010",
+      "audio": "context/clip-010.wav",
+      "wav_sha256": "a2695aa3c8f43fc071c847fb9405e94273782812842b7f099a9a2facf82a7b60",
+      "samples": 80640,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-011",
+      "audio": "context/clip-011.wav",
+      "wav_sha256": "7147925aeac9aca78a704721fdb048ac91cdb2feb69e093188e7199d9ccc3e83",
+      "samples": 78400,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-012",
+      "audio": "context/clip-012.wav",
+      "wav_sha256": "c21d5576bb9899b7a5687dc0b890d7d341c397163fbb5cbdfed35debd730ea1c",
+      "samples": 69888,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-013",
+      "audio": "context/clip-013.wav",
+      "wav_sha256": "21177362b31b6d8951e88f2cbad2ffc523c01c634a25c4e2fa93ce0c39292727",
+      "samples": 89920,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-014",
+      "audio": "context/clip-014.wav",
+      "wav_sha256": "fb9bb01ed674d2030df95663a8e02bdcb70be1e3158bdbe94381882bd00cb82a",
+      "samples": 226240,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-015",
+      "audio": "context/clip-015.wav",
+      "wav_sha256": "1ffe29b5a9e6856f2b95b7d6ee1bc3bb034c295a3dbf263e2aff11af61a5521e",
+      "samples": 286400,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-016",
+      "audio": "context/clip-016.wav",
+      "wav_sha256": "51cff07fdbd92ce36e55c97e25740f50c0c7af13a51f2c84d1088dc24bf04d98",
+      "samples": 292160,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-017",
+      "audio": "context/clip-017.wav",
+      "wav_sha256": "b6fce80f55dbba5b911f42277bd8f9859f6bb1fe968d0095760e221112d444d8",
+      "samples": 224320,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-018",
+      "audio": "context/clip-018.wav",
+      "wav_sha256": "e4abc40314567f2dc4999ee5cd66b3ab203c1b78c1177df13a656e8822b0b87a",
+      "samples": 352000,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-019",
+      "audio": "context/clip-019.wav",
+      "wav_sha256": "dbdfc3a6b6330dc191a95982a42ee6d9f47afdee83a55fd5d88da11d9628ed6b",
+      "samples": 288320,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-020",
+      "audio": "context/clip-020.wav",
+      "wav_sha256": "ce28f1049c766ce3a9591d87ba4620cfd6ab6b3879e96d46fb9bd1b1fc865442",
+      "samples": 261760,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-021",
+      "audio": "context/clip-021.wav",
+      "wav_sha256": "800a4d1370be5d41256d94c70d26fe36ca51052f3c8115ba2842a33e27dce8d2",
+      "samples": 277440,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-022",
+      "audio": "context/clip-022.wav",
+      "wav_sha256": "3224a5bef1529bddc28549e12f9af84aef85fb41fd9ec08fcafac8324ef87d36",
+      "samples": 313280,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-023",
+      "audio": "context/clip-023.wav",
+      "wav_sha256": "8a42ab2ffddea3be9ad59ac67b316710ef92678c39a717abdbbbfcf43dcc24d6",
+      "samples": 289920,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-024",
+      "audio": "context/clip-024.wav",
+      "wav_sha256": "43b7bc891f304cc94444a48357cf6a2d70134213f85a4c56098ad3bd55e905be",
+      "samples": 480000,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-025",
+      "audio": "context/clip-025.wav",
+      "wav_sha256": "0f6e73f53e56a7de63c3e36a7658ac49dee8b947dc4c9d484b6d9879becc6a06",
+      "samples": 480000,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-026",
+      "audio": "context/clip-026.wav",
+      "wav_sha256": "dfad8fa9773096635d3ce9672ae57c2388184a8e8ead5804d88009565aefa52f",
+      "samples": 480000,
+      "sample_rate": 16000
+    },
+    {
+      "id": "clip-027",
+      "audio": "context/clip-027.wav",
+      "wav_sha256": "12bcbaa2e8949509a41ce4dfc5b6f970a5699a3672e2479b1cb4444698a0232a",
+      "samples": 480000,
+      "sample_rate": 16000
+    }
+  ]
+}

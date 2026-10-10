@@ -1,0 +1,30 @@
+{
+  "model": "google/gemma-3n-E2B-it",
+  "fallback": "E4B feasibility only; no substitution with Gemma 4",
+  "prompt_sha256": "5d7457334cd8faa157512cafadb980748222f89fac2e06564c2e4f4a609326b4",
+  "prompt_applied_to_model": false,
+  "input_arms": {
+    "core": 27,
+    "context": 27
+  },
+  "output_verdicts": [
+    "DIALOGUE",
+    "NON_DIALOGUE",
+    "MIXED",
+    "AMBIGUOUS"
+  ],
+  "generation": {
+    "do_sample": false,
+    "max_new_tokens": 512
+  },
+  "pass_criteria": {
+    "core_detection_minimum": 10,
+    "negative_false_positive_maximum": 1
+  },
+  "context_only_speech_counts_as_core_success": false,
+  "unconfirmed_core_truth_excluded_from_success": true,
+  "ambiguous_count_separate": true,
+  "all_model_outputs_unverified_until_comparison": true,
+  "inference_status": "NOT_EXECUTED",
+  "actual_model_used": false
+}

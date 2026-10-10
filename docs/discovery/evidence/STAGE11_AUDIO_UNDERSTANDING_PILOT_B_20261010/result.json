@@ -1,0 +1,51 @@
+{
+  "status": "BLOCKED_SAFE_STOP",
+  "actual_model_used": false,
+  "requested_model": "google/gemma-3n-E2B-it",
+  "fallback_model": "google/gemma-3n-E4B-it",
+  "fallback_action": "FEASIBILITY_ONLY",
+  "model_loads": 0,
+  "model_calls": 0,
+  "audio_input_functionally_verified": false,
+  "weights_downloaded_bytes": 0,
+  "runtime_installs": 0,
+  "existing_gemma_gguf_architecture": "gemma4",
+  "existing_projector_architecture": "gemma4a/gemma4v, not Gemma3n",
+  "blockers": [
+    "REQUESTED_GEMMA3N_WEIGHTS_NOT_FOUND",
+    "OFFICIAL_MODEL_AND_LITERT_ACCESS_HTTP401_NO_HF_CREDENTIALS",
+    "INSTALLED_LLAMA_CPP_EXPLICITLY_SKIPS_GEMMA3N_AUDIO",
+    "STANDARD_TRANSFORMERS_WEIGHTS_EXCEED_AVAILABLE_RAM_AND_GPU_HEADROOM",
+    "NO_VERIFIED_ISOLATED_LOW_MEMORY_AUDIO_RUNTIME",
+    "13_CORE_POSITIVE_TRUTHS_UNCONFIRMED_CONTEXT_ONLY_GROUND_TRUTH"
+  ],
+  "core_dialogue_detection": {
+    "detected": null,
+    "target_total": 13,
+    "evaluated": 0,
+    "unconfirmed_ground_truth": 13
+  },
+  "non_dialogue_false_positive": {
+    "false_positive": null,
+    "total": 14,
+    "evaluated": 0
+  },
+  "model_ambiguous": null,
+  "hallucination_cases": null,
+  "performance_verdict": "NOT_EVALUATED",
+  "usability_verdict": "FAIL_NO_EXECUTION_OR_CORE_TRUTH_EVIDENCE",
+  "provisional_pass": false,
+  "expanded_application_allowed": false,
+  "context_only_dialogue_counted_as_core_success": false,
+  "existing_positive_labels_preserved": true,
+  "worker_and_llama_services_unchanged": true,
+  "protected_sha_verified": 2152,
+  "Whisper_calls": 0,
+  "ReazonSpeech_calls": 0,
+  "Hermes_calls": 0,
+  "Gemini_calls": 0,
+  "SRT_changes": 0,
+  "approvals": 0,
+  "publications": 0,
+  "next_single_task": "Human source-audio confirmation of speech presence and actual utterance times inside all 13 estimated positive cores."
+}

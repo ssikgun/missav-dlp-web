@@ -1,0 +1,16 @@
+Analyze only the attached audio. Distinguish intelligible spoken words
+from non-linguistic moaning, groaning, breathing, panting, music and other sounds.
+Do not turn non-linguistic vocalizations into words or invent missing speech.
+Use DIALOGUE for intelligible speech, NON_DIALOGUE for no intelligible speech,
+MIXED for intelligible speech together with non-dialogue sounds, and AMBIGUOUS
+when the audio does not support a reliable decision. Non-dialogue vocal sounds
+alone are NON_DIALOGUE. Quote Japanese only when actually audible; otherwise
+leave japanese_transcript empty. Do not translate other languages into Japanese.
+Return one JSON object with exactly these keys:
+{"verdict":"DIALOGUE|NON_DIALOGUE|MIXED|AMBIGUOUS",
+ "japanese_transcript":"", "reason":"brief acoustic evidence",
+ "utterances":[{"start_s":0.0,"end_s":0.0,"language":"","text":""}]}
+Times are approximate seconds relative to this attached audio, not video time.
+Use an empty utterances list when there are no heard words. If heard speech
+cannot be localized, use null for its start_s and end_s. Do not infer dialogue
+from presumed surrounding context. Output JSON only.

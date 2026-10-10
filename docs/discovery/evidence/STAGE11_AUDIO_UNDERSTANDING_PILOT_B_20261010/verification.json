@@ -1,0 +1,18 @@
+{
+  "input_arm_sha_wav_checks": "PASS",
+  "core_audio_count": 27,
+  "context_audio_count": 27,
+  "no_labels_or_STT_text_in_anonymous_inputs": true,
+  "positive_core_truth_unconfirmed": 13,
+  "positive_context_truth_confirmed": 13,
+  "negative_core_truth_confirmed": 14,
+  "negative_context_truth_unconfirmed": 14,
+  "protocol_sha256": "f62a7f4e3ff04ac8306106c995dc21c66362b1ce471f23c07fa29af0d47b796b",
+  "prompt_sha256": "5d7457334cd8faa157512cafadb980748222f89fac2e06564c2e4f4a609326b4",
+  "worker_and_llama_before_after": "PASS",
+  "protected_input_sha": 2152,
+  "weights_downloads": 0,
+  "model_loads": 0,
+  "model_calls": 0,
+  "no_performance_scores_invented": true
+}
