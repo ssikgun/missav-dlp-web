@@ -76,11 +76,12 @@ def prepare(plan_path, expected_sha, pcm_path, config_path, pins_path):
     return plan, pcm, snapshot, cfg
 
 
-def worker_preflight(cfg):
+def worker_preflight(cfg, provenance=None):
     """Read-only check of existing PID, actual import precedence, code and model; no inference."""
     program = '''
-import json, pathlib, os, hashlib, importlib.metadata, inspect
+import json, pathlib, os, hashlib, importlib.metadata, inspect, marshal, struct
 c=CONFIG
+proof=PROVENANCE
 found=[]
 for p in pathlib.Path('/proc').iterdir():
  if not p.name.isdigit(): continue
@@ -92,6 +93,28 @@ p=found[0]
 env={a.decode():b.decode() for x in (p/'environ').read_bytes().split(b'\\0') if b'=' in x for a,b in [x.split(b'=',1)] if a in (b'PYTHONPATH',b'STAGE11_MODEL_CACHE')}
 assert str((p/'exe').resolve()) == str(pathlib.Path(c['python']).resolve()), 'Python executable differs'
 roots=[str(pathlib.Path(c['launcher']).parent)]+env.get('PYTHONPATH','').split(':')
+if proof is not None:
+ assert int(p.name)==proof['pid'] and int((p/'stat').read_text().rsplit(')',1)[1].split()[19])==proof['ticks'], 'Worker epoch differs'
+ for path,expected in proof['files'].items():
+  assert hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()==expected, 'provenance receipt drift'
+ deployment=json.loads(pathlib.Path(proof['deployment']).read_bytes())
+ recovery=json.loads(pathlib.Path(proof['recovery_deployment']).read_bytes())
+ state=json.loads(pathlib.Path(proof['state']).read_bytes())
+ assert state['phase']=='ROLLED_BACK' and state['new_pid']==int(p.name) and state['new_ticks']==proof['ticks']
+ assert state['argv']==[x.decode() for x in (p/'cmdline').read_bytes().split(b'\\0') if x]
+ assert deployment['source']==proof['source']==roots[0] and deployment['launcher']==c['launcher']
+ assert deployment['old']==recovery['old']==proof['old_sources'], 'historical original source identity differs'
+ assert deployment['launcher_sha256']==c['launcher_sha256']
+ assert all(proof['contract_checks'].values()), 'unverified targeted compatibility'
+ for name,expected in deployment['old'].items():
+  path=pathlib.Path(deployment['source'])/name
+  assert hashlib.sha256((pathlib.Path(proof['deployment']).parent/'backup'/name).read_bytes()).hexdigest()==expected
+  raw=path.read_bytes();cached=pathlib.Path(deployment['source'])/'__pycache__'/(path.stem+'.cpython-312.pyc')
+  bytecode=cached.read_bytes()
+  assert marshal.loads(bytecode[16:])==compile(raw,str(path),'exec',dont_inherit=True), 'startup bytecode/source differs'
+  assert struct.unpack('<II',bytecode[8:16])==(int(path.stat().st_mtime),len(raw)), 'startup cache metadata differs'
+  assert state['verified_imports'][name]==dict(path=str(path),sha256=expected)
+ c=dict(c,import_source_sha256=deployment['old'])
 for name, expected in c['import_source_sha256'].items():
  path=next(pathlib.Path(root)/name for root in roots if root and (pathlib.Path(root)/name).is_file())
  assert hashlib.sha256(path.read_bytes()).hexdigest()==expected, 'actual import source differs'
@@ -107,7 +130,7 @@ for k,v in SETTINGS.items():
 import ctranslate2
 assert ctranslate2.get_cuda_device_count()>=1
 print(json.dumps({'status':'PASS_READ_ONLY','PID':int(p.name),'start_tick':(p/'stat').read_text().rsplit(')',1)[1].split()[19],'inference_calls':0}))
-'''.replace('CONFIG', repr(cfg['worker'])).replace('SETTINGS', repr(cfg['settings']))
+'''.replace('CONFIG', repr(cfg['worker'])).replace('SETTINGS', repr(cfg['settings'])).replace('PROVENANCE',repr(provenance))
     result = subprocess.run(cfg['worker']['ssh_argv']+[cfg['worker']['python']+' -B -'],
         input=program, text=True, capture_output=True, timeout=30, check=True)
     return json.loads(result.stdout)
@@ -275,6 +298,7 @@ def main():
     for arg in ('plan','plan-sha256','pcm','config','source-pins','output'): parser.add_argument('--'+arg,required=True)
     parser.add_argument('--run',action='store_true',help='explicitly authorize direct live targeted requests')
     parser.add_argument('--max-new',type=positive_integer,help='maximum newly attempted cores per invocation; cached/resumed cores excluded')
+    parser.add_argument('--worker-provenance',type=Path,help='pinned historical rollback/source compatibility evidence')
     args=parser.parse_args()
     plan,pcm,snapshot,cfg=prepare(args.plan,args.plan_sha256,args.pcm,args.config,args.source_pins)
     if not args.run:
@@ -282,7 +306,8 @@ def main():
             new=plan['new_STT_count'],STT_calls=0)));return
     if shutil.disk_usage(Path(args.output).parent).free < sum(r['request_bytes'] for r in plan['windows'])+1024**3:
         raise ValueError('insufficient experiment storage')
-    receipt=worker_preflight(cfg)
+    provenance=json.loads(args.worker_provenance.read_bytes()) if args.worker_provenance else None
+    receipt=worker_preflight(cfg,provenance)
     stop=threading.Event()
     for sig in (signal.SIGINT,signal.SIGTERM,signal.SIGHUP): signal.signal(sig,lambda *_:stop.set())
     runner=SequentialRunner(plan=plan,pcm=pcm,snapshot=snapshot,plan_sha=args.plan_sha256,

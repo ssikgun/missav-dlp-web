@@ -1,5 +1,59 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-10 — Actual VM122 Worker provenance verified; stale smoke baseline corrected
+
+READ-ONLY VM122 inspection confirmed Worker158369/start_tick324251721, Python
+/home/teddy/stage11-whisper-v3-venv/bin/python, launcher
+/tmp/stage11-asr-worker-targeted-r6d.py, cwd/home/teddy. Script-directory /tmp
+precedes PYTHONPATH=/tmp/stage11-r6d-targeted-smoke:/home/teddy/stage11-asr-worker-dcc835a.
+The preflight's lookup was correct; historical short-input worker SHA pins were
+for the older smoke pair, not the actual original pair restored after A/B.
+Never choose the matching smoke files or change PYTHONPATH to hide this mismatch.
+
+Actual original pair:
+- /tmp/teddy_discovery_asr_gpu_worker.py:
+  a8df232ba220ae15d736137545e90f3c3bae7cb2432e5cc062688c76ad58e619
+- /tmp/teddy_discovery_asr_remote.py:
+  0c68f7a7ed28da08cb3bd353e5f32daccd018cbb592e61d79678800ae579bfe8
+
+These were verified against TWO historical deployment original-SHA records
+(signal recovery BAX2pyIu and A/B rollback DJRnRIEf), direct VM backup bytes,
+ROLLED_BACK state linking the same PID/start ticks/argv, saved verified imports,
+and startup Python312 bytecode equal to compiled current source with matching
+source mtime/size. Launcher SHA unchanged. Source restore mtimes~01:40:30.77UTC
+are ~0.55s after process start01:40:30.21, while pyc creation01:40:31.02–31.05
+is later and matches restored originals. Process start is not import time;
+startup bytecode/receipt evidence is used, not a claim of live-heap inspection.
+The rollback implementation restores files before start; later byte-identical
+restore metadata is not proof of a different loaded source. No unexplained
+later source version was found.8091 listener owner matches158369.
+
+Compared old-smoke vs actual-original AST: process_request, targeted request,
+request validation, normal response serialization, model acquisition and remote
+NPY/decode/targeted methods all identical; model.transcribe arguments identical.
+Pre-existing differences are empty-word normalization, opt-in diagnostic route
+and error logging; they were not added/deployed now. Malformed NOT_NPY requests
+to baseline and targeted endpoints returned400 before model acquisition.
+Actual Whisper inference0, no Worker source/env/cwd/model/service changes.
+
+Minimal fix: optional --worker-provenance on CT108 runner. Historical input
+config/plan/PCM pins remain UNCHANGED. A separately pinned evidence file binds
+old-source receipts/backup/startup code to actual PID/ticks. Live preflight
+rechecks all that evidence and only then derives the original SHA expectations
+from corroborated deployment records, rather than copying current disk hashes.
+Default no-proof SHA behavior remains strict. Updated existing direct script
+passes /tmp/stage11-worker-provenance-eau0_23o/worker-provenance.json; SHA256SUMS
+normally repinned, pre-change script/manifest archived. No validation bypass.
+
+Read-only live preflight PASS (PID158369, ticks324251721, inference0). Wrong
+process epoch/receipt digest/false targeted compatibility all BLOCKED. Offline
+runner regression23/23 PASS, local max-new5 preflight, py_compile, bash -n,
+SHA256SUMS/git diff --check PASS. Existing313JA/296KO/17absorption/approval0
+preserved. Inspection evidence /tmp/stage11-worker-provenance-eau0_23o/;
+regression /tmp/stage11-short-runner-verification-4zkhkzxx/offline-verification.json.
+Five-core trial can resume using the existing direct command, subject to these
+same fail-closed checks at execution time; no five-core inference ran now.
+
 ## 2026-10-10 — Five-new-core trial limit (offline only)
 
 Added optional `--max-new N` to existing short runner and
