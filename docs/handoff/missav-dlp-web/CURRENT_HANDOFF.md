@@ -1,5 +1,59 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-10 — Prepared INDEPENDENT Whisper-missing-output probes (NO INFERENCE)
+
+Separate experiment from prior twelve Whisper/Reazon candidate comparisons.
+Reused all524 saved short results:2521 raw observations, all context/crossing/
+conflicting alternatives retained for time union. No text-quality filtering.
+931 no-Whisper-segment gaps total4194201.25ms (40.096%); after canonical313JA
+existing affine coverage exclusion:755 gaps/3764812.25ms (35.991%). These are
+estimated output-free times, NOT actual missing dialogue/silence measurements.
+Decoded end10460401.25ms;0.75ms requested-video-end quantization preserved.
+
+No reusable whole-video VAD interval ledger found. Historical315 amplitude/
+flatness windows lack source SHA/method in JSON, so context references only.
+Measured exact source PCM100ms RMS/band-power/flatness/modulation without a
+model: ACOUSTIC_ACTIVITY_ONLY, never VAD/voice/Japanese-dialogue truth. Music,
+effects, groans and breathing remain independent PENDING judgment columns.
+
+Excluded ALL current Whisper spans, aligned JA, baseline486 Whisper spans,
+legacy conflict records, previous12/13 Reazon clip ranges and known negative
+30s references.182 eligible guarded gaps; equal10 timeline bins, highest
+acoustic score per bin;1s boundary guard,4..12s source clips. All10 probes have
+zero current/legacy conflict GROUP-envelope overlap, zero Whisper/JA overlap,
+and no mutual overlap. Eight still overlap historical non-conflicting long
+candidates; original IDs retained, never counted as first-ever new dialogues.
+Probe IDs are source-SHA/sample-derived, distinct from old candidate group IDs.
+
+Bundle /var/tmp/stage11-whisper-missing-probes-20261010/:
+listen.html, judgment.tsv, clips/missing-01..10.wav, controls01..04-core20.wav,
+controls01..04-reference30.wav, batch-plan.json, gap-ledger.json, audit.json,
+offline-verification.json, input-pins.json, SHA256SUMS, README.md. Each negative
+uses SAME prior20s PCM16/float input SHA; original30s WAV byte identical.
+Reference Reazon false text retained, not new outputs or candidate approvals.
+
+Offline PASS:2152 protected hashes before/after, all524 request NPY exact PCM/
+wire/segments/done SHA, independent endpoint-partition gap totals, trusted seed
+canonical JA reprojection, all selected source samples, conflict group exclusion,
+negative core/reference identity. Three corrupted plan/WAV/source-pin cases
+BLOCKED before model import. py_compile/bash-n/git-diff-check and actual existing
+CPU Reazon venv --preflight PASS, model load0. Future runner reuses byte-identical
+existing inference/token-point loop; only new independent14-request preparation
+checks differ. Future outputs get separate missing-probes-result-* folder.
+
+Technical inputs/environment READY; source listening ground truth and later
+separate Reazon execution PENDING. Agent did not listen/confirm Japanese speech;
+verified missing dialogues0. Record presence/language/music/effects/groans plus
+human transcript/time BEFORE seeing new Reazon output; then evaluate existence,
+wording and timing separately. No overall recovery/false-positive rate inferred.
+Acoustic-active != dialogue, empty Whisper != silence, model agreement != truth.
+
+Whisper/Reazon/Hermes/Gemini calls0, approvals/publications0, installs/downloads0;
+canonical313JA/296KO/17absorption and SRT bytes unchanged. Full report:
+docs/discovery/STAGE11_WHISPER_MISSING_PROBES_20261010.md. Generic offline builder:
+tools/stage11_prepare_whisper_missing_probes.py. Only this task section/tool/
+report belong to this commit; prior unrelated worktree modifications preserved.
+
 ## 2026-10-05 — NEXT CHAT START HERE: SubtitleCat internal ASCII space fix
 
 Current checkpoint: generic parser source fix and offline regression complete.
