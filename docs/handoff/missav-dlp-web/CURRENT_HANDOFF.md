@@ -1,5 +1,43 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — clip-011 boundary revision: ESTIMATED / AMBIGUOUS; native preparation PASS
+
+USER now reports CORE いいところ; CONTEXT いいところだね followed by separate はい.
+Context lexical reading matches retained STT; this does not verify a complete
+sentence in old CORE or precise waveform timestamps. Earlier labels/SHA retained.
+Old CORE3355.932-3356.832s excludes the ending per USER listening. Saved A/B
+word timing puts だね inside CORE, while medium ends3357.160s and Reazon ね
+point~3356.900s; disagreement preserved rather than treating model timing as truth.
+Single review candidate window now3355.400-3357.160s, ESTIMATED envelope of ALL
+saved matching segments, not measured utterance bounds. Separate はい envelope
+3357.540-3358.120s, context-only; no second candidate or extra output cue.
+
+Both revised ranges: temporal JA0/KO0, overlapping absorbed JA0, local absorption0.
+Prior ja-135 has another はい at3339.493-3342.881s; string match does not establish
+same reply. Same-utterance semantic duplication/local alignment/newness UNVERIFIED.
+Canonical JA313/KO296/absorption17 and existing SRT bytes unchanged.
+Canonical request SHA/old ASR ranges retained; current review window stored in
+auxiliary timing_revision and one review-candidate sidecar, never a subtitle edit.
+Native response contract unchanged; parsed sidecar distinguishes old/new ranges
+and remains approved=false/srt_eligible=false/publishable=false.
+
+New bundle /var/tmp/stage11-clip011-boundary-recovery-20261012/native/.
+User command: bash /var/tmp/stage11-clip011-boundary-recovery-20261012/native/ct108-native-single-command.sh
+Add --preflight for local input/safety checks only. Previous bundle superseded:
+fixed generic helper's overly broad group-count replacement which also changed
+CLI argc==3 to1. Historical bundle unchanged; old helper SHA pin is now stale.
+Shell/preflight/19 offline contract tests (including generated verifier CLI)
+PASS; synthetic test responses deleted, no actual Hermes judgments fabricated.
+Read-only remote profile SHA/native CLI inspection PASS; runtime tools.count=0
+check remains in the user-run native path. Preparation PASS is not recovery PASS.
+
+Report docs/discovery/STAGE11_CLIP011_BOUNDARY_RECOVERY_20261012.md and matching
+evidence directory. Protected2325 SHA unchanged; unrelated dirty work preserved.
+New STT/Hermes/other model/install/audio generation/SRT/approval/publication/
+operational service changes0. Candidate AMBIGUOUS, exact-boundary recovery INCOMPLETE.
+Next ONE task: manually mark actual phonetic bounds of the sentence and separate
+reply in the retained context WAV, replacing this estimated review envelope.
+
 ## 2026-10-11 — clip-011 single recovery pilot: AMBIGUOUS; native preparation PASS, no call
 
 Reused core/context WAVs and saved Whisper/Reazon hypotheses いいところだね.

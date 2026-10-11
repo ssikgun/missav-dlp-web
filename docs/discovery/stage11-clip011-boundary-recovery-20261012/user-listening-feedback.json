@@ -1,0 +1,23 @@
+{
+  "source": "USER_DIRECT_AUDIO_LISTENING_CURRENT_REQUEST_20261012",
+  "clip_id": "clip-011",
+  "core": {
+    "range_ms": [
+      3355932,
+      3356832
+    ],
+    "heard_japanese": "いいところ",
+    "complete_sentence_heard": false
+  },
+  "context": {
+    "range_ms": [
+      3353932,
+      3358832.0
+    ],
+    "heard_japanese": "いいところだね",
+    "following_separate_japanese": "はい",
+    "text_status": "USER_REPORTED_CONTEXT_TRANSCRIPT"
+  },
+  "actual_utterance_boundaries_ms": null,
+  "subtitle_approval": false
+}

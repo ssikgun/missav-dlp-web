@@ -11,6 +11,7 @@ from pathlib import Path
 import pickle
 import re
 import sys
+import unicodedata
 
 sys.dont_write_bytecode = True
 
@@ -23,6 +24,64 @@ def digest(path):
 def encode(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True,
                       allow_nan=False, separators=(',', ':')).encode()
+
+
+def retained_timing_envelope(row):
+    """Envelope of saved matching segments, never a measured audio boundary."""
+    def norm(value):
+        return ''.join(c for c in unicodedata.normalize('NFKC', value)
+                       if not c.isspace() and unicodedata.category(c)[0] not in 'PZ')
+    hypothesis = row['whisper']['primary_AB'][0]['text']
+    observations = []
+    def add(segment, source, input_range):
+        if norm(segment.get('text', segment.get('stt_ja', ''))) == norm(hypothesis):
+            a, z = segment['start_ms'], segment['end_ms']
+            assert input_range[0] <= a < z <= input_range[1]
+            observations.append({'source': source, 'input_range_ms': input_range,
+                                 'range_ms': [a, z], 'text': segment.get('text', segment.get('stt_ja'))})
+    w = row['whisper']
+    for s in w['primary_AB'] + w['saved_short_observations']:
+        add(s['segment'], s['evidence_origin'], s['input_range_ms'])
+    for s in w['saved_AB_comparison']:
+        for segment in s['segments']:
+            # These saved comparisons share the input scope of the matching
+            # saved short observation; no inference or timestamp re-estimation.
+            scope = next(x['input_range_ms'] for x in w['saved_short_observations']
+                         if x['segment']['start_ms'] == segment['start_ms'])
+            add(segment, s['response_file'], scope)
+    for s in w['saved_full_short']:
+        for segment in s['segments']:
+            add(segment, s['source_path'], s['input_range_ms'])
+    medium = w['saved_medium']
+    if 'result' in medium:
+        for segment in medium['result']['segments']:
+            add(segment, medium['source_path'], medium['input_range_ms'])
+    assert observations
+    return {'policy': 'MIN_START_MAX_END_OF_ALL_SAVED_MATCHING_SEGMENTS',
+            'status': 'ESTIMATED_REVIEW_ENVELOPE_NOT_ACTUAL_UTTERANCE_BOUNDARIES',
+            'text': hypothesis,
+            'range_ms': [min(x['range_ms'][0] for x in observations),
+                         max(x['range_ms'][1] for x in observations)],
+            'observations': observations}
+
+
+def validate_timing_revision(evidence):
+    revision = evidence.get('timing_revision')
+    if revision is None:
+        return
+    evaluation = json.loads(Path(revision['evaluation_path']).read_bytes())
+    rows = {r['id']: r for r in evaluation['clips']}
+    assert evidence['target'] == rows[evidence['target']['id']]
+    assert revision['main'] == retained_timing_envelope(evidence['target'])
+    following = revision['following_context_only']
+    assert following['timing'] == retained_timing_envelope(rows[following['source_clip_id']])
+    assert following['is_candidate'] is False
+    a, z = revision['main']['range_ms']
+    assert evidence['target']['original_context_range_ms'][0] <= a < z <= evidence['target']['original_context_range_ms'][1]
+    assert z < following['timing']['range_ms'][0]
+    assert revision['actual_audio_boundaries_confirmed'] is False
+    assert revision['original_core_range_ms'] == evidence['target']['core_range_ms']
+    assert revision['review_candidate_count'] == 1
 
 
 def main():
@@ -52,6 +111,7 @@ def main():
     prep, boundary, first, first_raw, srt_raw = pickle.loads(
         Path(old_pins['trusted_seed']).read_bytes())
     evidence = json.loads(args.evidence.read_bytes())
+    validate_timing_revision(evidence)
     target = evidence['target']
     assert evidence['assessment']['japanese_accuracy'] == 'UNVERIFIED'
     assert evidence['assessment']['existing_same_utterance_duplicate'] == 'UNVERIFIED'
@@ -94,7 +154,13 @@ def main():
               b'is allowed only for sufficiently supported REPAIR. For AMBIGUOUS both '
               b'replacements must be null; do not use REPAIR merely to obtain Korean text. '
               b'No tool calls, no resume, no approval or SRT changes. Return canonical JSON '
-              b'only, not the auxiliary evidence schema.\nREQUEST:\n' + request +
+              b'only, not the auxiliary evidence schema. If timing_revision is present, '
+              b'REQUEST start/end remain immutable historical ASR provenance; the current '
+              b'review envelope is timing_revision.main.range_ms, explicitly estimated. '
+              b'User core/context readings are scoped human evidence, not timed alignment. '
+              b'following_context_only is a separate utterance, never part of the candidate '
+              b'or an extra output cue. Do not claim precise audio bounds or full-core '
+              b'transcription from historical timestamps.\nREQUEST:\n' + request +
               b'\nSINGLE_CANDIDATE_EVIDENCE:\n' + encode(evidence) + footer)
     assert len(prompt) <= 128000
     root.mkdir(parents=True, exist_ok=False)
@@ -139,6 +205,10 @@ assert evidence['assessment']['existing_same_utterance_duplicate']=='UNVERIFIED'
 assert evidence['assessment']['publishable'] is False
 assert evidence['canonical_counts']=={'JA':313,'KO_playback':296,'absorptions':17}
 assert len(evidence['absorption_records'])==17
+import importlib.util
+spec=importlib.util.spec_from_file_location('single_preparation',pins['preparation_helper'])
+helper=importlib.util.module_from_spec(spec);spec.loader.exec_module(helper)
+helper.validate_timing_revision(evidence)
 for kind in ('core','context'):
  name=pins[kind+'_wav_path']
  assert sha(P(name).read_bytes())==target[kind+'_wav_sha256']
@@ -151,13 +221,23 @@ assert b'SINGLE_CANDIDATE_EVIDENCE:\\n'+json.dumps(evidence,ensure_ascii=False,s
 assert prompt.endswith(b'request_sha256="'+pins['request_sha256'].encode()+b'"\\n')
 '''
     verifier = verifier[:begin] + checks + verifier[end:]
-    verifier = re.sub(r'==' + str(original_group_count) + r'\b',
-                      "==pins['expected_group_count']", verifier)
+    # Replace only group-count assertions. A broad ==3 rewrite also replaced
+    # CLI argc==3 in the old single-group verifier and broke --validate DIR.
+    verifier = re.sub(r"(len\((?:json\.loads\(request\)\['groups'\]|states)\)==)" +
+                      str(original_group_count) + r'\b',
+                      r"\1pins['expected_group_count']", verifier)
+    assert "assert len(sys.argv)==3 " in verifier
     verifier = verifier.replace(str(original_group_count) + ' groups', '1 group')
     verifier = verifier.replace("'group_count':" + str(original_group_count),
                                 "'group_count':len(states)")
     verifier = verifier.replace('runtime_id=None',
                                  "states=tuple(dict(s,publishable=False) for s in states)\nruntime_id=None")
+    verifier = verifier.replace('runtime_id=None',
+        "if 'timing_revision' in evidence:\n"
+        " states=tuple(dict(s,review_range_ms=evidence['timing_revision']['main']['range_ms'],"
+        "review_timing_status=evidence['timing_revision']['main']['status'],"
+        "original_asr_range_ms=[s['start_ms'],s['end_ms']]) for s in states)\n"
+        "runtime_id=None")
     verifier = verifier.replace("projection['sidecar_sha256']", "sha((root/'candidate-evidence.json').read_bytes())")
     # No merge/materialization of the new supplemental state: output only a
     # review sidecar. Canonical materialization is solely a byte-identity check.

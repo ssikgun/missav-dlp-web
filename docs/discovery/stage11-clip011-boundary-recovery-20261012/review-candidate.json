@@ -1,0 +1,24 @@
+{
+  "cue_id": "supplemental-group-a51ee4697419a2fbc61aa90b261b0e930ef67c7ef138aaa1a18f8d1f9c33610a",
+  "source_candidate_ids": [
+    "supplemental-1ec5df0c0b89a4a6cb4b0cd8b9495476101a07cac743c106bde160933c667638",
+    "supplemental-f9f235eea3911280ae4830d66ca32a0a906026981a243fd234bbaabd89e17b85"
+  ],
+  "japanese_hypothesis": "いいところだね",
+  "user_context_reading": "USER_REPORTED_MATCH_WITH_STT",
+  "original_asr_range_ms": [
+    3355932,
+    3356832
+  ],
+  "review_range_ms": [
+    3355400,
+    3357160
+  ],
+  "timing_status": "ESTIMATED_REVIEW_ENVELOPE_NOT_ACTUAL_UTTERANCE_BOUNDARIES",
+  "decision": "AMBIGUOUS",
+  "decision_source": "EVIDENCE_PREPARATION_NOT_HERMES",
+  "following_utterance_is_part_of_candidate": false,
+  "approved": false,
+  "srt_eligible": false,
+  "publishable": false
+}

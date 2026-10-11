@@ -1,0 +1,34 @@
+{
+  "status": "INCOMPLETE_ESTIMATED_BOUNDARIES",
+  "main_review_range_ms": [
+    3355400,
+    3357160
+  ],
+  "following_context_range_ms": [
+    3357540,
+    3358120
+  ],
+  "core_crop_audit": [
+    {
+      "id": "clip-011",
+      "sha_preserved": true,
+      "core_is_exact_context_sample_crop": true
+    },
+    {
+      "id": "clip-012",
+      "sha_preserved": true,
+      "core_is_exact_context_sample_crop": true
+    }
+  ],
+  "main_vs_following_gap_ms": 380,
+  "canonical_counts": {
+    "JA": 313,
+    "KO_playback": 296,
+    "absorptions": 17
+  },
+  "canonical_SRT_byte_identical": true,
+  "human_audio_boundaries_confirmed": false,
+  "core_complete_sentence_detected": false,
+  "actual_model_calls": 0,
+  "new_audio_files": 0
+}

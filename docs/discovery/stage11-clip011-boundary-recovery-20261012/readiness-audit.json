@@ -1,0 +1,22 @@
+{
+  "readiness": "PASS_PREPARATION_ONLY",
+  "local_preflight": "PASS",
+  "shell_syntax": "PASS",
+  "contract_tests": 19,
+  "read_only_remote_profile_CLI_audit": "PASS",
+  "actual_Hermes_calls": 0,
+  "STT_calls": 0,
+  "model_installs": 0,
+  "canonical_counts": {
+    "JA": 313,
+    "KO_playback": 296,
+    "absorptions": 17
+  },
+  "canonical_SRT_byte_identical": true,
+  "review_candidate_count": 1,
+  "legacy_request_preserved": true,
+  "timing_revision_is_auxiliary_estimate": true,
+  "old_bundle": "PRESERVED_HISTORICAL_SUPERSEDED_SOURCE_PIN_STALE_AFTER_HELPER_FIX",
+  "run_command": "bash /var/tmp/stage11-clip011-boundary-recovery-20261012/native/ct108-native-single-command.sh",
+  "preflight_command": "bash /var/tmp/stage11-clip011-boundary-recovery-20261012/native/ct108-native-single-command.sh --preflight"
+}

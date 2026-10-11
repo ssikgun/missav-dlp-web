@@ -1,0 +1,90 @@
+{
+  "status": "PASS_CONTRACT_ONLY",
+  "tests": [
+    {
+      "test": "KEEP remains unapproved and SRT-ineligible",
+      "status": "PASS"
+    },
+    {
+      "test": "REPAIR remains unapproved and SRT-ineligible",
+      "status": "PASS"
+    },
+    {
+      "test": "OMIT remains unapproved and SRT-ineligible",
+      "status": "PASS"
+    },
+    {
+      "test": "AMBIGUOUS remains unapproved and SRT-ineligible",
+      "status": "PASS"
+    },
+    {
+      "test": "wrong request SHA rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "wrong candidate rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "second candidate rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "AMBIGUOUS replacement rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "publication field in native response rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "invented decision alias rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "invalid action/category rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "only exact known tirith prefix separated",
+      "status": "PASS"
+    }
+  ],
+  "test_count": 19,
+  "synthetic_results_persisted": false,
+  "actual_Hermes_calls": 0,
+  "generated_verifier_CLI_tests": [
+    {
+      "action": "KEEP",
+      "status": "PASS",
+      "synthetic_fixture_deleted": true
+    },
+    {
+      "action": "REPAIR",
+      "status": "PASS",
+      "synthetic_fixture_deleted": true
+    },
+    {
+      "action": "OMIT",
+      "status": "PASS",
+      "synthetic_fixture_deleted": true
+    },
+    {
+      "action": "AMBIGUOUS",
+      "status": "PASS",
+      "synthetic_fixture_deleted": true
+    },
+    {
+      "test": "reject changed range",
+      "status": "PASS"
+    },
+    {
+      "test": "reject changed count",
+      "status": "PASS"
+    },
+    {
+      "test": "reject changed following",
+      "status": "PASS"
+    }
+  ]
+}
