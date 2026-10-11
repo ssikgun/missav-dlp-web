@@ -12,10 +12,11 @@ particular, their 512-cue limit is not inherited here.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import tempfile
 import uuid
@@ -24,6 +25,7 @@ from typing import Final
 from teddy_discovery_hermes_v2 import (
     HermesV2CueInput,
     HermesV2CueOutput,
+    _validate_cue_id, _validate_text,
 )
 from teddy_discovery_model_input_normalization import (
     MODEL_INPUT_NORMALIZATION_VERSION,
@@ -225,7 +227,68 @@ def _validated_input_cue(value: object) -> HermesV2CueInput:
         ) from error
 
 
-def _validated_output_cue(value: object) -> HermesV2CueOutput:
+# Keep the opt-in tag compact within the existing 256-character identity bound.
+STATEFUL_ABSORPTION_GENERATION_MARKER = "::abs1"
+STATEFUL_AUDIO_EVIDENCE_GENERATION_MARKER = "::aud1"
+
+STATEFUL_AUDIO_EVIDENCE_INSTRUCTION = (
+    "Translate natural conversational Korean using external_ja as the primary source "
+    "and available STT as supporting evidence. Set needs_audio_evidence=false when "
+    "the source meaning is clear. Set it to true only when broken or ungrammatical "
+    "source, or substantially different possible source meanings, cannot be resolved "
+    "with the supplied evidence and audio is actually needed. Do not guess missing "
+    "meaning, actions, relationships or names. Korean wording preferences alone "
+    "are not a reason to request audio. "
+)
+
+
+def stateful_audio_evidence_is_enabled(generation_key: str) -> bool:
+    """Opt-in prompt state participates in the existing generation/session identity."""
+    _require_exact_string(generation_key, field_name="generation_key")
+    count = generation_key.count(STATEFUL_AUDIO_EVIDENCE_GENERATION_MARKER)
+    if count and (count != 1 or re.search(
+            r"::aud1(?:::abs1)?::stage11-model-input=", generation_key) is None):
+        raise StatefulTranslatorValidationError("invalid audio-evidence generation identity")
+    return count == 1
+
+
+def stateful_absorption_is_enabled(generation_key: str) -> bool:
+    """A distinct opt-in generation prevents reuse of ordinary translation state."""
+    _require_exact_string(generation_key, field_name="generation_key")
+    count = generation_key.count(STATEFUL_ABSORPTION_GENERATION_MARKER)
+    if count and (count != 1 or STATEFUL_ABSORPTION_GENERATION_MARKER
+                  + "::stage11-model-input=" not in generation_key):
+        raise StatefulTranslatorValidationError("invalid absorption generation identity")
+    return count == 1
+
+
+@dataclass(frozen=True)
+class StatefulCueOutput:
+    """Stateful-only explicit ownership; the shared Hermes v2 type stays strict."""
+    cue_id: str
+    repaired_ja: str | None
+    ko: str | None
+    absorbed_into: str | None = None
+    needs_audio_evidence: bool = False
+
+    def __post_init__(self):
+        if type(self.needs_audio_evidence) is not bool:
+            raise StatefulTranslatorValidationError("needs_audio_evidence must be an exact boolean")
+        _validate_cue_id(self.cue_id)
+        _validate_text(self.repaired_ja, field_name="repaired_ja", allow_none=True)
+        if self.absorbed_into is None:
+            _validate_text(self.ko, field_name="ko", allow_none=False, allow_lf=True)
+        else:
+            _validate_cue_id(self.absorbed_into, field_name="absorbed_into")
+            if self.ko is not None or self.absorbed_into == self.cue_id:
+                raise StatefulTranslatorValidationError("invalid absorbed cue state")
+
+
+def _validated_output_cue(value: object) -> HermesV2CueOutput | StatefulCueOutput:
+    if type(value) is StatefulCueOutput:
+        return StatefulCueOutput(value.cue_id, value.repaired_ja, value.ko, value.absorbed_into,
+                                 value.needs_audio_evidence)
+
     if type(value) is not HermesV2CueOutput:
         raise StatefulTranslatorValidationError(
             "stateful result cue has the wrong exact type"
@@ -292,7 +355,7 @@ class StatefulSubtitleResult:
     generation_key: str
     claim_token: int
     session_id: str
-    cues: tuple[HermesV2CueOutput, ...]
+    cues: tuple[HermesV2CueOutput | StatefulCueOutput, ...]
 
     def __post_init__(self):
         _validate_schema_version(self.schema_version)
@@ -326,6 +389,12 @@ class StatefulSubtitleResult:
             seen_cue_ids.add(validated.cue_id)
 
 
+@dataclass(frozen=True)
+class StatefulAbsorptionResult(StatefulSubtitleResult):
+    """Internal source proof is separate from the unchanged result envelope."""
+    boundary_evidence: object = field(default=None, repr=False, compare=False)
+
+
 def _validated_package(value: object) -> StatefulSubtitlePackage:
     if type(value) is not StatefulSubtitlePackage:
         raise StatefulTranslatorValidationError(
@@ -346,18 +415,19 @@ def _validated_package(value: object) -> StatefulSubtitlePackage:
 
 
 def _validated_result(value: object) -> StatefulSubtitleResult:
-    if type(value) is not StatefulSubtitleResult:
+    if type(value) not in (StatefulSubtitleResult, StatefulAbsorptionResult):
         raise StatefulTranslatorValidationError(
             "stateful result has the wrong exact type"
         )
     try:
-        return StatefulSubtitleResult(
+        return type(value)(
             schema_version=value.schema_version,
             dvd_id=value.dvd_id,
             generation_key=value.generation_key,
             claim_token=value.claim_token,
             session_id=value.session_id,
             cues=value.cues,
+            **({"boundary_evidence": value.boundary_evidence} if type(value) is StatefulAbsorptionResult else {}),
         )
     except (AttributeError, TypeError, ValueError, OverflowError) as error:
         raise StatefulTranslatorValidationError(
@@ -376,12 +446,17 @@ def _input_cue_json(cue: HermesV2CueInput) -> dict[str, object]:
     }
 
 
-def _output_cue_json(cue: HermesV2CueOutput) -> dict[str, object]:
-    return {
+def _output_cue_json(cue: HermesV2CueOutput | StatefulCueOutput) -> dict[str, object]:
+    data = {
         "cue_id": cue.cue_id,
         "repaired_ja": cue.repaired_ja,
         "ko": cue.ko,
     }
+    if type(cue) is StatefulCueOutput:
+        data["absorbed_into"] = cue.absorbed_into
+        if cue.needs_audio_evidence:
+            data["needs_audio_evidence"] = True
+    return data
 
 
 def _encode_json(data: dict[str, object], *, limit: int, label: str) -> bytes:
@@ -558,12 +633,15 @@ def _parse_input_cue(value: object) -> HermesV2CueInput:
         ) from error
 
 
-def _parse_output_cue(value: object) -> HermesV2CueOutput:
+def _parse_output_cue(value: object) -> HermesV2CueOutput | StatefulCueOutput:
     if type(value) is not dict:
         raise StatefulTranslatorValidationError(
             "each stateful result cue must be a JSON object"
         )
     expected_fields = {"cue_id", "repaired_ja", "ko"}
+    if (expected_fields <= set(value) <= expected_fields | {"absorbed_into", "needs_audio_evidence"}
+            and set(value) != expected_fields):
+        return StatefulCueOutput(**value)
     if set(value) != expected_fields:
         raise StatefulTranslatorValidationError(
             "stateful result cue fields are not exact"
@@ -645,6 +723,7 @@ def _validate_session_id(value: object) -> str:
 def validate_stateful_result(
     result: StatefulSubtitleResult,
     package: StatefulSubtitlePackage,
+    *, boundary_evidence=None,
 ) -> StatefulSubtitleResult:
     """Validate exact identity, session, cue set, and cue order."""
 
@@ -671,12 +750,33 @@ def validate_stateful_result(
         raise StatefulTranslatorValidationError(
             "stateful result cue IDs must exactly match package order"
         )
+    if boundary_evidence is None:
+        boundary_evidence = getattr(validated_result, "boundary_evidence", None)
+    absorption = stateful_absorption_is_enabled(validated_package.generation_key)
+    audio = stateful_audio_evidence_is_enabled(validated_package.generation_key)
+    if not audio:
+        from dataclasses import replace
+        validated_result = replace(validated_result, cues=tuple(
+            (StatefulCueOutput(c.cue_id, c.repaired_ja, c.ko, c.absorbed_into)
+             if absorption or c.absorbed_into is not None else HermesV2CueOutput(c.cue_id, c.repaired_ja, c.ko))
+            if type(c) is StatefulCueOutput else c
+            for c in validated_result.cues))
+    extended = any(getattr(c, "absorbed_into", None) is not None for c in validated_result.cues)
+    if extended or absorption:
+        from teddy_discovery_stateful_boundary import validate_stateful_absorption
+        validate_stateful_absorption(validated_result.cues, validated_package, boundary_evidence)
+        validated_result = StatefulAbsorptionResult(
+            validated_result.schema_version, validated_result.dvd_id, validated_result.generation_key,
+            validated_result.claim_token, validated_result.session_id, validated_result.cues,
+            boundary_evidence,
+        )
     return validated_result
 
 
 def parse_stateful_result(
     payload: bytes,
     package: StatefulSubtitlePackage,
+    *, boundary_evidence=None,
 ) -> StatefulSubtitleResult:
     """Strictly parse one complete result against one exact package."""
 
@@ -708,13 +808,15 @@ def parse_stateful_result(
             "stateful result exceeds its cue limit"
         )
     try:
-        result = StatefulSubtitleResult(
+        result_type = StatefulAbsorptionResult if stateful_absorption_is_enabled(validated_package.generation_key) else StatefulSubtitleResult
+        result = result_type(
             schema_version=parsed["schema_version"],
             dvd_id=parsed["dvd_id"],
             generation_key=parsed["generation_key"],
             claim_token=parsed["claim_token"],
             session_id=parsed["session_id"],
             cues=tuple(_parse_output_cue(cue) for cue in raw_cues),
+            **({"boundary_evidence": boundary_evidence} if result_type is StatefulAbsorptionResult else {}),
         )
     except StatefulTranslatorError:
         raise
@@ -722,7 +824,7 @@ def parse_stateful_result(
         raise StatefulTranslatorValidationError(
             "stateful result is invalid"
         ) from error
-    return validate_stateful_result(result, validated_package)
+    return validate_stateful_result(result, validated_package, boundary_evidence=boundary_evidence)
 
 
 def derive_stateful_session_id(
@@ -746,7 +848,12 @@ def derive_stateful_session_id(
     return str(uuid.uuid5(STATEFUL_TRANSLATOR_SESSION_NAMESPACE, identity))
 
 
-def bind_stateful_model_input_generation_key(generation_key: str) -> str:
+STATEFUL_BOUNDARY_MODEL_INPUT_MARKER = "+boundary1="
+
+
+def bind_stateful_model_input_generation_key(
+    generation_key: str, *, boundary_evidence_sha256: str | None = None,
+) -> str:
     """Bind exactly one current model-input projection identity."""
 
     generation_key = _require_exact_string(
@@ -754,6 +861,11 @@ def bind_stateful_model_input_generation_key(generation_key: str) -> str:
         field_name="generation_key",
     )
 
+    if boundary_evidence_sha256 is not None and (
+        type(boundary_evidence_sha256) is not str
+        or re.fullmatch(r"[0-9a-f]{64}", boundary_evidence_sha256) is None
+    ):
+        raise StatefulTranslatorValidationError("invalid boundary model-input digest")
     prefix = "::stage11-model-input="
     marker = "::" + MODEL_INPUT_NORMALIZATION_VERSION
     identity_count = generation_key.count(prefix)
@@ -770,7 +882,20 @@ def bind_stateful_model_input_generation_key(generation_key: str) -> str:
             )
 
         marker_index = generation_key.find(marker)
+        boundary_index = generation_key.find(STATEFUL_BOUNDARY_MODEL_INPUT_MARKER)
+        if boundary_index >= 0 and (
+            generation_key.count(STATEFUL_BOUNDARY_MODEL_INPUT_MARKER) != 1
+            or boundary_index != marker_index + len(marker)
+        ):
+            raise StatefulTranslatorValidationError("malformed boundary model-input identity")
         after_marker = generation_key[marker_index + len(marker) :]
+        if after_marker.startswith(STATEFUL_BOUNDARY_MODEL_INPUT_MARKER):
+            digest = after_marker[len(STATEFUL_BOUNDARY_MODEL_INPUT_MARKER):][:64]
+            if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                raise StatefulTranslatorValidationError("invalid boundary model-input digest")
+            after_marker = after_marker[len(STATEFUL_BOUNDARY_MODEL_INPUT_MARKER) + 64:]
+            if boundary_evidence_sha256 is not None and digest != boundary_evidence_sha256:
+                raise StatefulTranslatorValidationError("model input is bound to different boundary evidence")
         if marker_index == 0 or (
             after_marker
             and not after_marker.startswith("::stage11-policy=")
@@ -784,8 +909,17 @@ def bind_stateful_model_input_generation_key(generation_key: str) -> str:
             raise StatefulTranslatorValidationError(
                 "model-input identity must precede the policy identity"
             )
-        return generation_key
+        if boundary_evidence_sha256 is None or STATEFUL_BOUNDARY_MODEL_INPUT_MARKER in generation_key:
+            return generation_key
+        if re.fullmatch(r"[0-9a-f]{64}", boundary_evidence_sha256) is None:
+            raise StatefulTranslatorValidationError("invalid boundary model-input digest")
+        bound = (generation_key[:marker_index + len(marker)]
+                 + STATEFUL_BOUNDARY_MODEL_INPUT_MARKER + boundary_evidence_sha256
+                 + generation_key[marker_index + len(marker):])
+        return _require_exact_string(bound, field_name="generation_key")
 
+    if STATEFUL_BOUNDARY_MODEL_INPUT_MARKER in generation_key:
+        raise StatefulTranslatorValidationError("boundary evidence requires a model-input identity")
     policy_marker = "::stage11-policy="
     policy_index = generation_key.find(policy_marker)
     if policy_index < 0:
@@ -796,7 +930,25 @@ def bind_stateful_model_input_generation_key(generation_key: str) -> str:
             + marker
             + generation_key[policy_index:]
         )
-    return _require_exact_string(bound, field_name="generation_key")
+    bound = _require_exact_string(bound, field_name="generation_key")
+    if boundary_evidence_sha256 is not None:
+        return bind_stateful_model_input_generation_key(
+            bound, boundary_evidence_sha256=boundary_evidence_sha256,
+        )
+    return bound
+
+
+def stateful_boundary_digest_from_generation_key(generation_key: str) -> str | None:
+    """Read the optional boundary digest inside the existing model-input identity."""
+    if not stateful_model_input_identity_is_bound(generation_key):
+        if STATEFUL_BOUNDARY_MODEL_INPUT_MARKER in generation_key:
+            raise StatefulTranslatorValidationError("boundary digest lacks model-input identity")
+        return None
+    if STATEFUL_BOUNDARY_MODEL_INPUT_MARKER not in generation_key:
+        return None
+    if generation_key.count(STATEFUL_BOUNDARY_MODEL_INPUT_MARKER) != 1:
+        raise StatefulTranslatorValidationError("multiple boundary model-input digests")
+    return generation_key.split(STATEFUL_BOUNDARY_MODEL_INPUT_MARKER, 1)[1][:64]
 
 
 def stateful_model_input_identity_is_bound(generation_key: str) -> bool:
@@ -1233,7 +1385,11 @@ def read_stateful_result(
         )
     paths = stateful_staging_paths(task_directory)
     payload = _read_private_result_bytes(paths.result_path)
-    return parse_stateful_result(payload, package)
+    evidence = None
+    if stateful_absorption_is_enabled(package.generation_key):
+        from teddy_discovery_stateful_boundary import STATEFUL_BOUNDARY_FILENAME, read_stateful_boundary_evidence
+        evidence = read_stateful_boundary_evidence(paths.task_directory / STATEFUL_BOUNDARY_FILENAME, package)
+    return parse_stateful_result(payload, package, boundary_evidence=evidence)
 
 
 def consume_stateful_result(
@@ -1284,6 +1440,10 @@ __all__ = [
     "STATEFUL_TRANSLATOR_QUIET_FLAG",
     "StatefulSubtitlePackage",
     "StatefulSubtitleResult",
+    "StatefulCueOutput",
+    "StatefulAbsorptionResult",
+    "STATEFUL_ABSORPTION_GENERATION_MARKER",
+    "stateful_absorption_is_enabled",
     "StatefulTranslatorError",
     "StatefulTranslatorLimitError",
     "StatefulTranslatorSessionError",
@@ -1291,6 +1451,8 @@ __all__ = [
     "StatefulTranslatorStagingError",
     "StatefulTranslatorStagingPaths",
     "bind_stateful_model_input_generation_key",
+    "STATEFUL_BOUNDARY_MODEL_INPUT_MARKER",
+    "stateful_boundary_digest_from_generation_key",
     "bind_stateful_model_input_identity",
     "stateful_model_input_identity_is_bound",
     "build_stateful_model_input_package",

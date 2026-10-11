@@ -159,9 +159,20 @@ def build_stateful_hybrid_package(
 
 
 @dataclass(frozen=True)
+class StatefulHybridPlaybackCue:
+    cue_id: str
+    source_cue_ids: tuple[str, ...]
+    source_indexes: tuple[int, ...]
+    start_ms: int
+    end_ms: int
+    ko: str
+
+
+@dataclass(frozen=True)
 class StatefulHybridSRTMaterialization:
     artifact: GeneratedKoreanSRT
     source_indexes: tuple[int, ...]
+    playback_cues: tuple[StatefulHybridPlaybackCue, ...] = ()
 
 
 def materialize_stateful_hybrid_srt(
@@ -184,6 +195,7 @@ def materialize_stateful_hybrid_srt(
     document = application.bundle.external_ja_document
     cues = []
     previous_start = None
+    projected = []
     for index, (semantic, binding, external) in enumerate(zip(
         validated_result.cues, preparation.semantic_bindings, document.cues,
         strict=True,
@@ -202,7 +214,24 @@ def materialize_stateful_hybrid_srt(
         if start >= end or (previous_start is not None and start < previous_start):
             raise StatefulHybridValidationError("projected HYBRID timing is invalid")
         previous_start = start
-        cues.append(SubtitleCue(start, end, semantic.ko))
+        projected.append((start, end))
+        if semantic.ko is not None:
+            cues.append(SubtitleCue(start, end, semantic.ko))
+    from teddy_discovery_stateful_translator import stateful_absorption_is_enabled
+    if stateful_absorption_is_enabled(package.generation_key):
+        from teddy_discovery_stateful_boundary import validate_stateful_boundary_evidence, validate_stateful_absorption
+        evidence = validated_result.boundary_evidence
+        validate_stateful_boundary_evidence(evidence, package, preparation=preparation)
+        chains = validate_stateful_absorption(validated_result.cues, package, evidence)
+        by_id = {c.cue_id: c for c in validated_result.cues}
+        playback = tuple(StatefulHybridPlaybackCue(
+            chain.owner_cue_id, chain.cue_ids, chain.source_indexes,
+            min(projected[i][0] for i in chain.source_indexes),
+            max(projected[i][1] for i in chain.source_indexes),
+            by_id[chain.owner_cue_id].ko,
+        ) for chain in chains)
+        artifact = generate_korean_srt(tuple(SubtitleCue(c.start_ms, c.end_ms, c.ko) for c in playback))
+        return StatefulHybridSRTMaterialization(artifact, tuple(range(len(projected))), playback)
     artifact = generate_korean_srt(tuple(cues))
     if artifact.cue_count != len(validated_result.cues):
         raise StatefulHybridValidationError("generated HYBRID cue count differs from result")

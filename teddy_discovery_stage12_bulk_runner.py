@@ -31,7 +31,7 @@ import uuid
 from urllib.parse import urlsplit
 
 
-REPO = Path("/opt/missav-pwa-subtitle-stage11")
+REPO = Path(__file__).resolve().parent
 DISCOVERY_DB = Path(
     "/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3"
 )
@@ -46,7 +46,7 @@ HEARTBEAT_PATH = RUNTIME_STATUS_DIR / "status.json"
 LOCK_PATH = RUNTIME_STATUS_DIR / "bulk-runner.lock"
 
 RUN_ROOT = Path(
-    "/opt/missav-dlp-web/discovery/stage12-bulk-runtime-v1"
+    "/opt/missav-dlp-web/discovery/stage11-normal-runtime-v1"
 )
 ARTIFACT_ROOT = RUN_ROOT / "artifacts"
 STAGING_ROOT = RUN_ROOT / "staging"
@@ -210,7 +210,7 @@ def check_repo(expected_head: str) -> None:
             "repository HEAD differs from authorized HEAD"
         )
 
-    if branch != "teddy-subtitle-stage11":
+    if branch not in ("teddy-subtitle-stage11", ""):
         raise Stage12BulkRunnerError(
             "unexpected repository branch"
         )
@@ -550,6 +550,16 @@ def contract_check() -> None:
         raise Stage12BulkRunnerError(
             "Hermes validation retry contract changed"
         )
+
+    from teddy_discovery_stage11_normal_mode import (
+        USER_INTERVENTION, AUTO_INSERT, MAX_VALIDATION_ATTEMPTS,
+        NATIVE_INACTIVITY_TIMEOUT, NATIVE_ABSOLUTE_TIMEOUT,
+    )
+    if (USER_INTERVENTION != 0 or AUTO_INSERT is not False
+        or MAX_VALIDATION_ATTEMPTS != STATEFUL_PART_MODEL_MAX_ATTEMPTS
+        or NATIVE_INACTIVITY_TIMEOUT != DEFAULT_HERMES_INACTIVITY_TIMEOUT_SECONDS
+        or NATIVE_ABSOLUTE_TIMEOUT != CANDIDATE_HERMES_ABSOLUTE_TIMEOUT_SECONDS):
+        raise Stage12BulkRunnerError("unattended normal policy contract changed")
 
     controller_parameters = inspect.signature(
         run_one_title_stage11
@@ -1757,6 +1767,15 @@ def run_live(
                                 processed,
                         )
 
+                from teddy_discovery_stage11_normal_mode import (
+                    run_one_title_normal_mode, NativeNormalFirstPass,
+                )
+                normal_kwargs = dict(controller_kwargs)
+                normal_kwargs["first_pass_runner"] = NativeNormalFirstPass(
+                    dependencies.remote_bridge
+                )
+                normal_kwargs["acceptance_policy"] = acceptance_policy()
+
                 def controller_runner(
                     dvd_id: str,
                 ):
@@ -1767,7 +1786,7 @@ def run_live(
 
                     try:
                         result = (
-                            run_one_title_stage11(
+                            run_one_title_normal_mode(
                                 dvd_id,
                                 artifact_root=
                                     ARTIFACT_ROOT,
@@ -1777,7 +1796,7 @@ def run_live(
                                     CLAIM_TOKEN,
                                 semantic_policy=
                                     POLICY_ID,
-                                **controller_kwargs,
+                                **normal_kwargs,
                             )
                         )
                     except Exception:

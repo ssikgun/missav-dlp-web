@@ -1,0 +1,138 @@
+[
+  {
+    "name": "teddy_discovery_stateful_translator_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "STATEFUL_TRANSLATOR_SMOKE_PASS"
+    ]
+  },
+  {
+    "name": "teddy_discovery_stateful_parts_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "STATEFUL_PARTS_SMOKE_PASS",
+      "SYNTHETIC_TEST_PASS_COUNT=65",
+      "SYNTHETIC_TEST_FAIL_COUNT=0"
+    ]
+  },
+  {
+    "name": "teddy_discovery_stateful_controller_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "PASS=NO_FIXED_PART_COUNT",
+      "SMOKE_PASS_COUNT=39",
+      "SMOKE_FAIL_COUNT=0"
+    ]
+  },
+  {
+    "name": "teddy_discovery_stage11_controller_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "PASS explicit artifact and staging roots",
+      "PASS_COUNT=106",
+      "THIN_GENERIC_STAGE11_CONTROLLER_SMOKE_PASS"
+    ]
+  },
+  {
+    "name": "teddy_discovery_stage11_deployment_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "STAGE11_DEPLOYMENT_SMOKE_PASS",
+      "ASR media temp cleanup PASS temp_dir=tmpgrzikkbd",
+      "ASR media temp cleanup PASS temp_dir=tmplu4nxtsm"
+    ]
+  },
+  {
+    "name": "teddy_discovery_stage11_live_adapters_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "ASR media temp cleanup PASS temp_dir=tmp8ysxi_tv",
+      "ASR media temp cleanup PASS temp_dir=tmppzizy1ey",
+      "ASR media temp cleanup PASS temp_dir=tmpwk730oxj"
+    ]
+  },
+  {
+    "name": "teddy_discovery_stage11_native_session_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "NATIVE_FRESH_ENSURE_IDENTITY_HISTORY_PRIVACY_SMOKE=PASS"
+    ]
+  },
+  {
+    "name": "teddy_discovery_stateful_quality_review_clean_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "PASS no model filesystem database NAS or publication behavior",
+      "PASS no title cue or dialogue hardcode",
+      "Quality review CLEAN smoke: PASS=32 FAIL=0"
+    ]
+  },
+  {
+    "name": "teddy_discovery_stateful_hybrid_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "PASS=projected-start-order-inversion",
+      "PASS=baseline-segment-not-timing-authority",
+      "PASS=49 FAIL=0"
+    ]
+  },
+  {
+    "name": "teddy_discovery_hermes_v2_ko_lf_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "Ran 8 tests in 0.001s",
+      "",
+      "OK"
+    ]
+  },
+  {
+    "name": "teddy_discovery_subtitle_source_quality_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "PASS no cue number exceptions",
+      "PASS Japanese literal structural allowlist",
+      "Subtitle source quality smoke: PASS=70 FAIL=0"
+    ]
+  },
+  {
+    "name": "teddy_discovery_stage12_batch_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "STAGE12_BATCH_SMOKE=PASS"
+    ]
+  },
+  {
+    "name": "teddy_discovery_stage12_rollout_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "STAGE12_ROLLOUT_SMOKE=PASS"
+    ]
+  },
+  {
+    "name": "teddy_discovery_stage12_replacement_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "PASS=LOCK_REJECT_path-after-flock_BEFORE_SUBTITLE_MUTATION",
+      "PASS=EXISTING_FAILED_RETRYABLE_OLD_SHA_SAME_OPERATION_RESUME",
+      "STAGE12_REPLACEMENT_SMOKE=PASS"
+    ]
+  },
+  {
+    "name": "teddy_discovery_stateful_live_runner_retry_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "PASS=EVERY_VALIDATION_ATTEMPT_HAS_EXACT_REASON_MARKER",
+      "PASS=EVERY_VALIDATION_ATTEMPT_HAS_ARTIFACT_STATUS",
+      "STATEFUL_LIVE_RUNNER_RETRY_SMOKE=PASS"
+    ]
+  },
+  {
+    "name": "teddy_discovery_stateful_live_runner_timeout_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "PASS=REMOTE_TIMEOUT_RUNTIME_MARKERS_REMOVED",
+      "PASS=REMOTE_TIMEOUT_UNRELATED_HERMES_SURVIVES",
+      "STATEFUL_LIVE_RUNNER_TIMEOUT_SMOKE=PASS"
+    ]
+  }
+]

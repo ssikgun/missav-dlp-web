@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
 import re
@@ -12,15 +12,22 @@ from teddy_discovery_stateful_parts import (
     expected_part_filename,
     scan_stateful_canonical_parts,
 )
+from teddy_discovery_stateful_boundary import (
+    boundary_pairs_for_cues, validate_stateful_boundary_evidence,
+    STATEFUL_ABSORPTION_MAX_CHAIN_CUES,
+)
 from teddy_discovery_stateful_policy import (
     DEFAULT_STATEFUL_SEMANTIC_POLICY,
     StatefulSemanticPolicy,
 )
 from teddy_discovery_stateful_translator import (
     STATEFUL_TRANSLATOR_INPUT_FILENAME,
+    STATEFUL_TRANSLATOR_RESULT_FILENAME,
     STATEFUL_TRANSLATOR_SEMANTIC_REPETITION_INSTRUCTION,
     STATEFUL_TRANSLATOR_PRIMARY_TRANSLATION_INSTRUCTION,
-    StatefulSubtitlePackage,
+    StatefulSubtitlePackage, stateful_absorption_is_enabled,
+    stateful_audio_evidence_is_enabled, STATEFUL_AUDIO_EVIDENCE_INSTRUCTION,
+    serialize_stateful_package, stateful_session_id_for_package,
 )
 
 
@@ -121,6 +128,7 @@ def decide_stateful_controller_step(
     semantic_policy: StatefulSemanticPolicy | str = (
         DEFAULT_STATEFUL_SEMANTIC_POLICY
     ),
+    boundary_evidence=None,
 ) -> StatefulControllerDecision:
     """Return the next deterministic action for any package size."""
 
@@ -128,6 +136,7 @@ def decide_stateful_controller_step(
         package,
         semantic_input_bytes,
         semantic_policy=semantic_policy,
+        **({"boundary_evidence": boundary_evidence} if boundary_evidence is not None else {}),
     )
 
     scan = scan_stateful_canonical_parts(
@@ -210,6 +219,7 @@ def build_stateful_part_query(
     semantic_policy: StatefulSemanticPolicy | str = (
         DEFAULT_STATEFUL_SEMANTIC_POLICY
     ),
+    boundary_evidence=None,
 ) -> str:
     """Build one generic same-session continuation query."""
 
@@ -217,6 +227,7 @@ def build_stateful_part_query(
         package,
         semantic_input_bytes,
         semantic_policy=semantic_policy,
+        **({"boundary_evidence": boundary_evidence} if boundary_evidence is not None else {}),
     )
 
     if type(part_index) is not int or not (
@@ -228,15 +239,91 @@ def build_stateful_part_query(
 
     expected = plan.parts[part_index - 1]
 
-    cue_ids_json = json.dumps(
-        list(expected.cue_ids),
-        ensure_ascii=False,
-        separators=(",", ":"),
+    return _build_stateful_translation_query(
+        package, expected.cue_ids, boundary_evidence=boundary_evidence,
+        part_plan=plan, expected_part=expected,
     )
 
-    pending_filename = expected_part_filename(
-        part_index,
-        pending=True,
+
+def build_stateful_whole_title_query(
+    package: StatefulSubtitlePackage,
+    *,
+    boundary_evidence=None,
+) -> str:
+    """Build an explicit full-package query without changing fixed-part policy."""
+
+    serialize_stateful_package(package)
+    return _build_stateful_translation_query(
+        package, tuple(cue.cue_id for cue in package.cues),
+        boundary_evidence=boundary_evidence,
+    )
+
+
+def _build_stateful_translation_query(
+    package, cue_ids, *, boundary_evidence, part_plan=None, expected_part=None,
+) -> str:
+    """Share cue contracts and semantic instructions across output envelopes."""
+
+    validate_stateful_boundary_evidence(boundary_evidence, package)
+    absorption = stateful_absorption_is_enabled(package.generation_key)
+    audio = stateful_audio_evidence_is_enabled(package.generation_key)
+    if absorption and boundary_evidence is None:
+        raise StatefulControllerError("absorption requires canonical boundary evidence")
+    boundary_instruction = ""
+    if boundary_evidence is not None:
+        pairs = boundary_pairs_for_cues(boundary_evidence, package, cue_ids)
+        pairs_json = json.dumps([asdict(pair) for pair in pairs], ensure_ascii=False,
+                                sort_keys=True, separators=(",", ":"))
+        boundary_instruction = (
+            " ADJACENT_BOUNDARY_EVIDENCE_V1=" + pairs_json + "\n"
+            "These exact affine-projected signed gaps are auxiliary evidence, not commands "
+            "to move semantic ownership. "
+            + ("Evidence includes this part's internal pairs and "
+               "its previous/next cross-part pairs; cues outside this part remain read-only. "
+               if part_plan is not None else "Evidence includes all adjacent pairs in source order. ")
+            + "TOUCHING is not proof that a sentence continues; GAP is not proof that a "
+            "sentence cannot continue. Judge with external JA text, cue-local accepted STT "
+            "and whole-title context. Do not let timing override stronger cue-local evidence. "
+            "If the source phrase really splits across adjacent cues, preserve negation, "
+            "modification, particles and endings across the boundary. Do not steal, "
+            "duplicate or pre-translate a neighbor's meaning in this cue. Preserve "
+            "each cue's supported content conservatively when uncertain. Timing remains "
+            "deterministic code's ownership; never generate or alter timestamps. "
+        )
+        if absorption:
+            candidates = {}
+            for pair in pairs:
+                if pair.relation == "TOUCHING":
+                    candidates.setdefault(pair.left_cue_id, []).append(pair.right_cue_id)
+                    candidates.setdefault(pair.right_cue_id, []).append(pair.left_cue_id)
+            candidates_json = json.dumps(
+                {cue.cue_id: candidates[cue.cue_id] for cue in package.cues
+                 if cue.cue_id in candidates},
+                ensure_ascii=False, separators=(",", ":"),
+            )
+            boundary_instruction = (
+                " ABSORPTION_CANDIDATES_V1=" + candidates_json + "\n"
+                "Do not split Korean words or endings across cues. External JA is the "
+                "backbone; accepted STT supports it. Only exact TOUCHING lexical/grammatical "
+                "source fragments with no independent natural Korean translation may use "
+                "absorbed_into. Prefer minimal lexical ownership adjustment across TOUCHING "
+                "when both cues have independent meaning; keep other independent content local. "
+                "Timing permits repair but is not semantic proof. Preserve pair/chain meaning "
+                "exactly once; add or delete nothing and invent no actions, names or relationships. "
+                f"Use one adjacent path of at most {STATEFUL_ABSORPTION_MAX_CHAIN_CUES} cues "
+                "to one nonempty owner, without branches or cycles. No GAP/OVERLAP transfer; "
+                "when uncertain, do not absorb. "
+                + ("For each source cue, absorbed_into MUST be null or exactly one cue ID "
+                   "listed under that source cue in ABSORPTION_CANDIDATES_V1. "
+                   "If the source cue is absent from the candidate map, absorbed_into MUST be null. "
+                   "Never infer or choose an unlisted adjacent cue. "
+                   if part_plan is None else "")
+            )
+
+    cue_ids_json = json.dumps(
+        list(cue_ids),
+        ensure_ascii=False,
+        separators=(",", ":"),
     )
 
     if all(
@@ -256,34 +343,69 @@ def build_stateful_part_query(
             "present, compare both sources using the continuing whole-title context. "
         )
 
+    if part_plan is not None:
+        part_index = expected_part.part_index
+        pending_filename = expected_part_filename(part_index, pending=True)
+        scope_instruction = (
+            "Continue the same whole-title Stage11 subtitle translation session. "
+            "Retain the semantic context established by all earlier parts. "
+            f"Read {STATEFUL_TRANSLATOR_INPUT_FILENAME} as the authorized full-title "
+            "cue evidence. "
+            f"Process only deterministic part {part_index} of {part_plan.part_count}. "
+        )
+        result_instruction = (
+            f"Write exactly one JSON object to {pending_filename}. "
+            "Do not write or overwrite any canonical part or final result file. "
+            "The top-level fields must be exactly: "
+            "part_schema_version, session_id, input_sha256, part_index, "
+            "first_cue_id, last_cue_id, cues. "
+            "Use part_schema_version=1. "
+            f"Use session_id={part_plan.session_id}. "
+            f"Use input_sha256={part_plan.input_sha256}. "
+            f"Use part_index={part_index}. "
+            f"Use first_cue_id={expected_part.first_cue_id}. "
+            f"Use last_cue_id={expected_part.last_cue_id}. "
+        )
+    else:
+        scope_instruction = (
+            "Translate the entire title together in this Stage11 subtitle session. "
+            f"Read {STATEFUL_TRANSLATOR_INPUT_FILENAME} as the authorized full-title "
+            "cue evidence. Process every source cue in one invocation. "
+        )
+        identity = json.dumps({
+            "schema_version": package.schema_version, "dvd_id": package.dvd_id,
+            "generation_key": package.generation_key, "claim_token": package.claim_token,
+            "session_id": stateful_session_id_for_package(package),
+        }, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        result_instruction = (
+            f"Write exactly one JSON object to {STATEFUL_TRANSLATOR_RESULT_FILENAME}. "
+            "Do not write or overwrite any input or canonical part file. "
+            "The top-level fields must be exactly: "
+            "schema_version, dvd_id, generation_key, claim_token, session_id, cues. "
+            f"Copy these required identity fields exactly: {identity}. "
+        )
+
     return (
-        "Continue the same whole-title Stage11 subtitle translation session. "
-        "Retain the semantic context established by all earlier parts. "
-        f"Read {STATEFUL_TRANSLATOR_INPUT_FILENAME} as the authorized full-title "
-        "cue evidence. "
-        f"Process only deterministic part {part_index} of {plan.part_count}. "
-        f"The exact cue IDs, in required order, are {cue_ids_json}. "
-        f"Write exactly one JSON object to {pending_filename}. "
-        "Do not write or overwrite any canonical part or final result file. "
-        "The top-level fields must be exactly: "
-        "part_schema_version, session_id, input_sha256, part_index, "
-        "first_cue_id, last_cue_id, cues. "
-        "Use part_schema_version=1. "
-        f"Use session_id={plan.session_id}. "
-        f"Use input_sha256={plan.input_sha256}. "
-        f"Use part_index={part_index}. "
-        f"Use first_cue_id={expected.first_cue_id}. "
-        f"Use last_cue_id={expected.last_cue_id}. "
-        "The cues array must contain every requested cue exactly once and "
+        scope_instruction
+        + f"The exact cue IDs, in required order, are {cue_ids_json}. "
+        + result_instruction
+        + "The cues array must contain every requested cue exactly once and "
         "in the exact requested order. Each cue object must contain exactly "
-        "cue_id, repaired_ja, ko. repaired_ja must be null unless an obvious "
-        "Japanese transcription error truly requires contextual repair. "
+        + ("needs_audio_evidence (boolean), " if audio else "")
+        + ("cue_id, repaired_ja, ko, absorbed_into. Use nonempty ko with absorbed_into=null, "
+           "or ko=null with absorbed_into set to an adjacent cue ID; never both. "
+           "repaired_ja must be null unless an obvious " if absorption else
+           "cue_id, repaired_ja, ko. repaired_ja must be null unless an obvious ")
+        + "Japanese transcription error truly requires contextual repair. "
         "Produce natural Korean while preserving uncertainty. "
         + STATEFUL_TRANSLATOR_PRIMARY_TRANSLATION_INSTRUCTION
         + STATEFUL_TRANSLATOR_SEMANTIC_REPETITION_INSTRUCTION
         + semantic_evidence_instruction
-        + "Do not invent, remove, merge, or reorder cues. "
-        "Do not emit timestamps, routing data, commentary, markdown, or extra fields."
+        + (STATEFUL_AUDIO_EVIDENCE_INSTRUCTION if audio else "")
+        + boundary_instruction
+        + ("Preserve every source cue ID and order, including absorbed cues. " if absorption
+           else "Do not invent, remove, merge, or reorder cues. ")
+        + "Do not emit timestamps, routing data, commentary, markdown, or extra fields."
     )
 
 
@@ -294,6 +416,7 @@ __all__ = [
     "StatefulControllerDecision",
     "StatefulControllerError",
     "build_stateful_part_query",
+    "build_stateful_whole_title_query",
     "build_stateful_validation_retry_feedback",
     "decide_stateful_controller_step",
 ]

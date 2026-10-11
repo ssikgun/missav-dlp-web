@@ -1,5 +1,50 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — Normal Mode unattended E2E verified; deployment checkpoint
+
+Current operating objective supersedes the historical clip-011 listening tasks:
+USER_INTERVENTION=0. No user listening/transcript/manual approval is required.
+Automatic supplemental dialogue insertion is OFF (accuracy not established);
+AMBIGUOUS is skipped and cannot block/modify primary external-JA translation.
+
+Reused existing parser/selector/affine/native bridge, source-aware output guards,
+whole-title/absorption helpers and Stage12 locks/state/publication. Boundary
+worktree helpers were integrated into a separate clean release candidate; both
+original dirty worktrees and all protected artifacts are preserved. Worker and
+new-model changes0. No timing/automatic insertion thresholds were relaxed.
+
+Actual native E2E: FNS-247 JA313 -> new KO300/absorption13; JUR-750 JA661 ->
+KO648/absorption11/clear metadata2. One fresh zero-tool Hermes invocation each,
+existing openai-codex / gpt-5.6-luna / xhigh. Existing baseline ASR reused and
+real source snapshots verified. Live SubtitleCat independently fetched/selected
+ACCEPT_HYBRID for both with exact retained JA SHAs. User intervention0.
+Final SRTs under /opt/missav-dlp-web/discovery/stage11-normal-e2e-20261012/
+artifacts/{FNS-247,JUR-750}/clean-ko-v1.srt. Canonical SRT, cue/source coverage,
+absorption/timing unions, duplicate0 and actual Stage12 bundle preflight PASS.
+Existing ambiguous KO inventories remain protected; NAS replacement/Jellyfin0.
+
+Historical FNS JA313/KO296/absorption17 and SRT SHA bytes unchanged; 2213
+protected pins unchanged. Saved native supplemental AMBIGUOUS13 replayed with
+approved0/eligible0. GVH-713 unchanged UNRESOLVED alignment is a safe terminal
+error, not a success. The initial FNS final-readback field access defect was
+fixed generically and immutable resume completed without another Hermes call;
+original failure retained. No title/cue/dialogue special cases were introduced.
+
+Normal first pass is independent of optional STT/review. Core failures terminate
+with durable reasons. Native limits remain inactivity600/absolute3600 and two
+validation attempts, with existing fixed64 fallback. Focused tests11 + existing
+smoke scripts17, compile/shell/systemd/diff PASS. Detailed evidence/report:
+docs/discovery/STAGE11_NORMAL_MODE_20261012.md and stage11-normal-mode-20261012/.
+
+Production activation pending at this implementation commit. New bounded normal
+queue reuses existing Stage12 inventory/state/locks/no-overwrite publisher and
+heartbeat. It admits unseen canonical holdings automatically, preserves old
+states, and processes one ordinary PENDING title per cycle. Exact detached
+release, preflight, timer activation and first cycle audit are next, already
+authorized by the current task. Overall STAGE11_NORMAL_MODE=INCOMPLETE until
+operational activation is verified. No manual subtitle-quality task remains.
+
+
 ## 2026-10-12 — clip-011 boundary revision: ESTIMATED / AMBIGUOUS; native preparation PASS
 
 USER now reports CORE いいところ; CONTEXT いいところだね followed by separate はい.

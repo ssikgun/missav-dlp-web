@@ -1,0 +1,14 @@
+[Unit]
+Description=Teddy Downloader unattended Stage11 normal subtitles through Stage12
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/missav-dlp-web/discovery/stage11-normal-deployment/runtime.env
+Environment=USER_INTERVENTION=0
+WorkingDirectory=/opt/missav-dlp-web/discovery/stage11-normal-deployment/current
+ExecStart=/opt/stage11-stt-venv/bin/python -u /opt/missav-dlp-web/discovery/stage11-normal-deployment/current/teddy_discovery_stage11_normal_queue.py --expected-head ${STAGE11_NORMAL_HEAD}
+StandardInput=null
+TimeoutStartSec=24h
+KillMode=control-group

@@ -1,0 +1,56 @@
+[
+  {
+    "title": "FNS-247",
+    "status": "PASS",
+    "source_video_present": true,
+    "JA": 313,
+    "KO": 300,
+    "absorption": 13,
+    "metadata_omitted": 0,
+    "automatic_insertion": false,
+    "user_intervention": 0,
+    "native_hermes_calls": 1,
+    "native_runtime_sessions": [
+      "20261012_083743_fef6f0"
+    ],
+    "srt_path": "/opt/missav-dlp-web/discovery/stage11-normal-e2e-20261012/artifacts/FNS-247/clean-ko-v1.srt",
+    "srt_sha256": "55c5a92a3857e2e79de4a10a37aa728c112c12a9a75f491b2c7a6c66da68a58d",
+    "stage12_artifact_preflight": "PASS",
+    "canonical_existing_ko_protected": "UNRESOLVED",
+    "time_order": "PASS",
+    "cue_identity_unique_coverage": "PASS",
+    "exact_duplicate_cues": 0,
+    "srt_readback": "PASS",
+    "baseline_reused": true,
+    "external_acquisition": "RETAINED_ORIGINAL_JA",
+    "live_external_source_revalidated": true,
+    "live_external_sha256": "8e645dd1e55304075b03562ae38837012d401a6cb00cb96fc8d54d9df2508598"
+  },
+  {
+    "title": "JUR-750",
+    "status": "PASS",
+    "source_video_present": true,
+    "JA": 661,
+    "KO": 648,
+    "absorption": 11,
+    "metadata_omitted": 2,
+    "automatic_insertion": false,
+    "user_intervention": 0,
+    "native_hermes_calls": 1,
+    "native_runtime_sessions": [
+      "20261012_083936_cbb58d"
+    ],
+    "srt_path": "/opt/missav-dlp-web/discovery/stage11-normal-e2e-20261012/artifacts/JUR-750/clean-ko-v1.srt",
+    "srt_sha256": "d25d276c78efabb67dc334b325bf8e0fdd1a56b653d0a725aecd89c088feda56",
+    "stage12_artifact_preflight": "PASS",
+    "canonical_existing_ko_protected": "UNRESOLVED",
+    "time_order": "PASS",
+    "cue_identity_unique_coverage": "PASS",
+    "exact_duplicate_cues": 0,
+    "srt_readback": "PASS",
+    "baseline_reused": true,
+    "external_acquisition": "RETAINED_ORIGINAL_JA",
+    "live_external_source_revalidated": true,
+    "live_external_sha256": "88edae14fefd7a7838b50c55e4ae4b0b65fb9998e80a147cda81b35412142709"
+  }
+]

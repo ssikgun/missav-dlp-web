@@ -1,0 +1,18 @@
+[
+  {
+    "title": "FNS-247",
+    "status": "ACCEPT_HYBRID",
+    "source": "LIVE_SUBTITLECAT",
+    "model_calls": 0,
+    "external_sha256": "8e645dd1e55304075b03562ae38837012d401a6cb00cb96fc8d54d9df2508598",
+    "external_cue_count": 313
+  },
+  {
+    "title": "JUR-750",
+    "status": "ACCEPT_HYBRID",
+    "source": "LIVE_SUBTITLECAT",
+    "model_calls": 0,
+    "external_sha256": "88edae14fefd7a7838b50c55e4ae4b0b65fb9998e80a147cda81b35412142709",
+    "external_cue_count": 661
+  }
+]

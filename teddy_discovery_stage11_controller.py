@@ -1274,6 +1274,11 @@ def _validate_existing_completion(
         raise Stage11ControllerArtifactError(
             "report external JA outcome is invalid"
         )
+    # Normal Mode proves its primary-only completion from immutable JA/baseline,
+    # absorption and result artifacts; no synthetic Hermes review is implied.
+    if (report_path.parent / 'normal-mode-proof-v1.json').exists():
+        from teddy_discovery_stage11_normal_mode import validate_normal_completion
+        return validate_normal_completion(report_path, clean_path, baseline_path, title=title)
     if route == V2_ROUTE_HYBRID:
         if (
             external_outcome != EXTERNAL_JA_ACCEPTED

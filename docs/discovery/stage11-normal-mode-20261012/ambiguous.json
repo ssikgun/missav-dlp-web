@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "retained_native_ambiguous": 13,
+  "automatic_insertions": 0,
+  "user_requests": 0,
+  "normal_recovery_policy": "DISABLED_UNVERIFIED_ACCURACY",
+  "saved_response_sha256": "edbc53687de4ccd26e8c01ef4f0c8fddcbbee35e840ba634d9592c52c7e8c8f9",
+  "saved_request_sha256": "061387b62c00040a8b813789125e81b5d11a28750d04d1f7fe38ead1b7dc52f7",
+  "new_models_or_listening": 0
+}

@@ -1,0 +1,12 @@
+{
+  "normal_smoke_tests": 11,
+  "normal_smoke": "PASS",
+  "existing_smoke_scripts": 17,
+  "compile": "PASS",
+  "diff_check": "PASS",
+  "systemd_unit_verify": "PASS",
+  "bash_syntax": "PASS",
+  "fallback_fixed64_offline": "PASS",
+  "deployment": "PENDING",
+  "normal_mode": "INCOMPLETE_DEPLOYMENT_PENDING"
+}

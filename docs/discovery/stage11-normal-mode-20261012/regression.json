@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "protected_pin_count": 2213,
+  "changed_count": 0,
+  "JA": 313,
+  "KO": 296,
+  "absorption": 17,
+  "source_result_sha256": "ac69e4f2948e7736de1f7be37816742762ef2ef3c58e8c255ee84828addb81e6",
+  "srt_sha256": "8e7b24f88ea3e5232a7f8dab40884be2fcc8b590ea8c5bd49e18ee57a65ce3c1",
+  "source_seed_sha256": "ba7ce4953eb53930c99eae8490e94f3b0feb660aa0a3af08592a7667eac72401",
+  "original_bytes_unchanged": true
+}

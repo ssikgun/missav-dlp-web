@@ -26,6 +26,8 @@ from teddy_discovery_hermes_v2 import (
     HermesV2LimitError,
 )
 from teddy_discovery_stateful_translator import (
+    StatefulCueOutput, StatefulAbsorptionResult, _output_cue_json,
+    stateful_absorption_is_enabled,
     StatefulSubtitlePackage,
     StatefulSubtitleResult,
     StatefulTranslatorError,
@@ -574,17 +576,17 @@ def _validated_output_cue(
     *,
     source_cue: HermesV2CueInput | None = None,
     cue_ordinal: int | None = None,
-) -> HermesV2CueOutput:
-    if type(value) is not HermesV2CueOutput:
+) -> HermesV2CueOutput | StatefulCueOutput:
+    if type(value) not in (HermesV2CueOutput, StatefulCueOutput):
         raise StatefulPartsValidationError(
             "part cue has the wrong exact type",
             reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
         )
     try:
-        validated = HermesV2CueOutput(
-            cue_id=value.cue_id,
-            repaired_ja=value.repaired_ja,
-            ko=value.ko,
+        validated = type(value)(
+            cue_id=value.cue_id, repaired_ja=value.repaired_ja, ko=value.ko,
+            **({"absorbed_into": value.absorbed_into,
+                "needs_audio_evidence": value.needs_audio_evidence} if type(value) is StatefulCueOutput else {}),
         )
     except (AttributeError, TypeError, ValueError, OverflowError) as error:
         raise StatefulPartsValidationError(
@@ -592,7 +594,7 @@ def _validated_output_cue(
             reason_code=STATEFUL_VALIDATION_REASON_INVALID_FIELD,
         ) from error
 
-    if has_runaway_repetition(validated.ko):
+    if validated.ko is not None and has_runaway_repetition(validated.ko):
         ko_evidence = runaway_repetition_evidence(validated.ko)
         if not _source_grounded_ko_exception_allowed(
             ko_evidence,
@@ -706,6 +708,8 @@ class StatefulPartPlan:
         repr=False,
     )
 
+    boundary_evidence: object = field(default=None, repr=False)
+
     def __post_init__(self):
         if type(self.policy_id) is not str:
             raise StatefulPartsValidationError(
@@ -766,6 +770,13 @@ class StatefulPartPlan:
                 ),
             )
 
+        if self.boundary_evidence is not None or stateful_absorption_is_enabled(self.generation_key):
+            from teddy_discovery_stateful_boundary import validate_stateful_boundary_evidence
+            package = StatefulSubtitlePackage(1, self.dvd_id, self.generation_key, self.claim_token, self.source_cues)
+            validate_stateful_boundary_evidence(self.boundary_evidence, package)
+            if self.session_id != stateful_session_id_for_package(package):
+                raise StatefulPartsValidationError("boundary plan session is detached")
+
     @property
     def part_count(self) -> int:
         return len(self.parts)
@@ -781,7 +792,7 @@ class StatefulSemanticPart:
     part_index: int
     first_cue_id: str
     last_cue_id: str
-    cues: tuple[HermesV2CueOutput, ...]
+    cues: tuple[HermesV2CueOutput | StatefulCueOutput, ...]
     max_cues_per_part: int = STATEFUL_PART_BATCH_SIZE
     source_cues: tuple[HermesV2CueInput, ...] = field(
         default=(),
@@ -988,6 +999,7 @@ def plan_stateful_parts(
     semantic_policy: StatefulSemanticPolicy | str = (
         DEFAULT_STATEFUL_SEMANTIC_POLICY
     ),
+    boundary_evidence=None,
 ) -> StatefulPartPlan:
     """Derive immutable ranges and the exact input hash from frozen bytes."""
 
@@ -1025,6 +1037,7 @@ def plan_stateful_parts(
         policy_id=policy.policy_id,
         max_cues_per_part=policy.max_cues_per_part,
         source_cues=validated_package.cues,
+        boundary_evidence=boundary_evidence,
     )
 
 
@@ -1035,6 +1048,7 @@ def build_stateful_part_plan(
     semantic_policy: StatefulSemanticPolicy | str = (
         DEFAULT_STATEFUL_SEMANTIC_POLICY
     ),
+    boundary_evidence=None,
 ) -> StatefulPartPlan:
     """Explicit alias for the deterministic part-plan constructor."""
 
@@ -1042,6 +1056,7 @@ def build_stateful_part_plan(
         package,
         semantic_input_bytes,
         semantic_policy=semantic_policy,
+        boundary_evidence=boundary_evidence,
     )
 
 
@@ -1061,6 +1076,7 @@ def _validate_plan(plan: StatefulPartPlan) -> StatefulPartPlan:
             policy_id=plan.policy_id,
             max_cues_per_part=plan.max_cues_per_part,
             source_cues=plan.source_cues,
+            boundary_evidence=plan.boundary_evidence,
         )
     except (AttributeError, TypeError, ValueError, OverflowError) as error:
         raise StatefulPartsValidationError(
@@ -1144,11 +1160,7 @@ def serialize_stateful_part(part: StatefulSemanticPart) -> bytes:
             "first_cue_id": validated.first_cue_id,
             "last_cue_id": validated.last_cue_id,
             "cues": [
-                {
-                    "cue_id": cue.cue_id,
-                    "repaired_ja": cue.repaired_ja,
-                    "ko": cue.ko,
-                }
+                _output_cue_json(cue)
                 for cue in validated.cues
             ],
         }
@@ -1261,23 +1273,21 @@ def _parse_part_cue(
     value: object,
     *,
     cue_ordinal: int,
-) -> HermesV2CueOutput:
+) -> HermesV2CueOutput | StatefulCueOutput:
     if type(value) is not dict:
         raise StatefulPartsValidationError(
             "part cue must be a JSON object",
             reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
         )
-    if set(value) != {"cue_id", "repaired_ja", "ko"}:
+    base_fields = {"cue_id", "repaired_ja", "ko"}
+    if not base_fields <= set(value) <= base_fields | {"absorbed_into", "needs_audio_evidence"}:
         raise StatefulPartsValidationError(
             "part cue fields are not exact",
             reason_code=STATEFUL_VALIDATION_REASON_SCHEMA_FAILURE,
         )
     try:
-        return HermesV2CueOutput(
-            cue_id=value["cue_id"],
-            repaired_ja=value["repaired_ja"],
-            ko=value["ko"],
-        )
+        cue_type = StatefulCueOutput if set(value) != base_fields else HermesV2CueOutput
+        return cue_type(**value)
     except (TypeError, ValueError, OverflowError) as error:
         reason_code = _output_field_validation_reason(error)
         raise StatefulPartsValidationError(
@@ -1421,6 +1431,13 @@ def _part_from_payload(
             "part identity or cue order does not match its deterministic plan",
             reason_code=reason_code,
         )
+    if any(getattr(c, "absorbed_into", None) is not None for c in part.cues) or stateful_absorption_is_enabled(plan.generation_key):
+        from teddy_discovery_stateful_boundary import validate_stateful_absorption
+        package = StatefulSubtitlePackage(1, plan.dvd_id, plan.generation_key, plan.claim_token, plan.source_cues)
+        try:
+            validate_stateful_absorption(part.cues, package, plan.boundary_evidence, partial=True)
+        except ValueError as error:
+            raise StatefulPartsValidationError("invalid adjacent absorption ownership") from error
     return part
 
 
@@ -1755,13 +1772,15 @@ def assemble_stateful_result(
         for cue in part.cues
     )
     try:
-        result = StatefulSubtitleResult(
+        result_type = StatefulAbsorptionResult if stateful_absorption_is_enabled(package.generation_key) else StatefulSubtitleResult
+        result = result_type(
             schema_version=1,
             dvd_id=package.dvd_id,
             generation_key=package.generation_key,
             claim_token=package.claim_token,
             session_id=validated_plan.session_id,
             cues=output_cues,
+            **({"boundary_evidence": validated_plan.boundary_evidence} if result_type is StatefulAbsorptionResult else {}),
         )
         validated_result = validate_stateful_result(result, package)
         result_bytes = serialize_stateful_result(validated_result)

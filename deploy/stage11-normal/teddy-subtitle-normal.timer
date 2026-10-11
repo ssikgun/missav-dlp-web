@@ -1,0 +1,12 @@
+[Unit]
+Description=Run bounded normal subtitle queue after new completed holdings
+
+[Timer]
+OnActiveSec=60s
+OnUnitInactiveSec=300s
+AccuracySec=5s
+Persistent=false
+Unit=teddy-subtitle-normal.service
+
+[Install]
+WantedBy=timers.target

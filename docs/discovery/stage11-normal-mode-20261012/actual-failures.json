@@ -1,0 +1,20 @@
+[
+  {
+    "automatic_insertion": false,
+    "error_type": "AttributeError",
+    "reason": "'SubtitleCandidate' object has no attribute 'dvd_id'",
+    "status": "FAILED",
+    "title": "FNS-247",
+    "user_intervention": 0,
+    "source_log": "/opt/missav-dlp-web/discovery/stage11-normal-e2e-20261012/artifacts/FNS-247/normal-failure-380c812146604565826b73819ecd53c9.json"
+  },
+  {
+    "automatic_insertion": false,
+    "error_type": "Stage11ControllerValidationError",
+    "reason": "normal mode requires accepted external JA; outcome=ACCEPTED; alignment=UNRESOLVED",
+    "status": "FAILED",
+    "title": "GVH-713",
+    "user_intervention": 0,
+    "source_log": "/opt/missav-dlp-web/discovery/stage11-normal-e2e-20261012/artifacts/GVH-713/normal-failure-927790c5a32e4ea292c759881ae2b46b.json"
+  }
+]
