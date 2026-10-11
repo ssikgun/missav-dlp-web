@@ -1,0 +1,288 @@
+{
+  "previous_truth_path": "/var/tmp/stage11-gemma3n-pilot-b-20261010/scope-pack/truth.json",
+  "previous_truth_sha256": "fe729e2c0c23d7cbb243f71aebc91e8e6337ae4dc612a7358dfb91d3036bab64",
+  "truth": [
+    {
+      "id": "clip-001",
+      "original_label": "SPEECH",
+      "original_wav_sha256": "3102e08aa9bb42188261f0d3b91ceb0231188f1f871d835ec566b8b88c991d0b",
+      "core_label": "DIALOGUE_LIKELY",
+      "context_label": "SPEECH",
+      "core_start_ms": 63500,
+      "core_end_ms": 65220,
+      "prior_core_label": null,
+      "japanese_accuracy": "UNKNOWN",
+      "core_judgment_source": "USER_CURRENT_CORE_LISTENING_REPORT"
+    },
+    {
+      "id": "clip-002",
+      "original_label": "SPEECH",
+      "original_wav_sha256": "862df36ee4ac5cab81751e6a13c098a894390a7b41b8e7d9833d8064c51b73f5",
+      "core_label": "DIALOGUE_LIKELY",
+      "context_label": "SPEECH",
+      "core_start_ms": 65220,
+      "core_end_ms": 67872,
+      "prior_core_label": null,
+      "japanese_accuracy": "UNKNOWN",
+      "core_judgment_source": "USER_CURRENT_CORE_LISTENING_REPORT"
+    },
+    {
+      "id": "clip-003",
+      "original_label": "SPEECH",
+      "original_wav_sha256": "5b32eca5806231d9c06d5bfd44dcb51539880f48e96da80c1cedb6580326552f",
+      "core_label": "DIALOGUE_LIKELY",
+      "context_label": "SPEECH",
+      "core_start_ms": 191840,
+      "core_end_ms": 194020,
+      "prior_core_label": null,
+      "japanese_accuracy": "UNKNOWN",
+      "core_judgment_source": "USER_CURRENT_CORE_LISTENING_REPORT"
+    },
+    {
+      "id": "clip-004",
+      "original_label": "SPEECH",
+      "original_wav_sha256": "b82bf907e846de461172875e41f9e25c9f51da1a5a2d7afd5bc19a44cffb55cb",
+      "core_label": "DIALOGUE_LIKELY",
+      "context_label": "SPEECH",
+      "core_start_ms": 212820,
+      "core_end_ms": 213936,
+      "prior_core_label": null,
+      "japanese_accuracy": "UNKNOWN",
+      "core_judgment_source": "USER_CURRENT_CORE_LISTENING_REPORT"
+    },
+    {
+      "id": "clip-005",
+      "original_label": "SPEECH",
+      "original_wav_sha256": "ca5e9c5deb24d08de11cef34af13fcccf16f34a3089cf1faacf993ca7d978cc0",
+      "core_label": "DIALOGUE_SHORT_FRAGMENT",
+      "context_label": "SPEECH",
+      "core_start_ms": 215880,
+      "core_end_ms": 216620,
+      "prior_core_label": null,
+      "japanese_accuracy": "UNKNOWN",
+      "core_judgment_source": "USER_CURRENT_CORE_LISTENING_REPORT"
+    },
+    {
+      "id": "clip-006",
+      "original_label": "SPEECH",
+      "original_wav_sha256": "8fa94931146b6e4653f2a29152a37531a2a438c5ecd5dba90ea7abb22d71b155",
+      "core_label": "DIALOGUE_LIKELY",
+      "context_label": "SPEECH",
+      "core_start_ms": 218940,
+      "core_end_ms": 221360,
+      "prior_core_label": null,
+      "japanese_accuracy": "UNKNOWN",
+      "core_judgment_source": "USER_CURRENT_CORE_LISTENING_REPORT"
+    },
+    {
+      "id": "clip-007",
+      "original_label": "SPEECH",
+      "original_wav_sha256": "7a2deb69fe3c3f40725e378f95958f9cb55e7d9a914df01937c75038bb142d40",
+      "core_label": "DIALOGUE_SHORT_FRAGMENT",
+      "context_label": "SPEECH",
+      "core_start_ms": 221360,
+      "core_end_ms": 226020,
+      "prior_core_label": null,
+      "japanese_accuracy": "UNKNOWN",
+      "core_judgment_source": "USER_CURRENT_CORE_LISTENING_REPORT"
+    },
+    {
+      "id": "clip-008",
+      "original_label": "SPEECH",
+      "original_wav_sha256": "65ffa140d908c9003fa6c3d12241e81c92928bfe87876ba5caf80a95f679073a",
+      "core_label": "DIALOGUE_LIKELY",
+      "context_label": "SPEECH",
+      "core_start_ms": 260360,
+      "core_end_ms": 262000,
+      "prior_core_label": null,
+      "japanese_accuracy": "UNKNOWN",
+      "core_judgment_source": "USER_CURRENT_CORE_LISTENING_REPORT"
+    },
+    {
+      "id": "clip-009",
+      "original_label": "SPEECH",
+      "original_wav_sha256": "8bd79d51ae1c7fb37d07c4819b6d4030ddc9536638de8ae013d88e4e5b4516a0",
+      "core_label": "DIALOGUE_LIKELY",
+      "context_label": "SPEECH",
+      "core_start_ms": 262000,
+      "core_end_ms": 264580,
+      "prior_core_label": null,
+      "japanese_accuracy": "UNKNOWN",
+      "core_judgment_source": "USER_CURRENT_CORE_LISTENING_REPORT"
+    },
+    {
+      "id": "clip-010",
+      "original_label": "SPEECH",
+      "original_wav_sha256": "a2695aa3c8f43fc071c847fb9405e94273782812842b7f099a9a2facf82a7b60",
+      "core_label": "DIALOGUE_LIKELY",
+      "context_label": "SPEECH",
+      "core_start_ms": 265200,
+      "core_end_ms": 266240,
+      "prior_core_label": null,
+      "japanese_accuracy": "UNKNOWN",
+      "core_judgment_source": "USER_CURRENT_CORE_LISTENING_REPORT"
+    },
+    {
+      "id": "clip-011",
+      "original_label": "SPEECH",
+      "original_wav_sha256": "7147925aeac9aca78a704721fdb048ac91cdb2feb69e093188e7199d9ccc3e83",
+      "core_label": "DIALOGUE_LIKELY",
+      "context_label": "SPEECH",
+      "core_start_ms": 3355932,
+      "core_end_ms": 3356832,
+      "prior_core_label": null,
+      "japanese_accuracy": "UNKNOWN",
+      "core_judgment_source": "USER_CURRENT_CORE_LISTENING_REPORT"
+    },
+    {
+      "id": "clip-012",
+      "original_label": "SPEECH",
+      "original_wav_sha256": "c21d5576bb9899b7a5687dc0b890d7d341c397163fbb5cbdfed35debd730ea1c",
+      "core_label": "DIALOGUE_LIKELY",
+      "context_label": "SPEECH",
+      "core_start_ms": 3357732,
+      "core_end_ms": 3358100,
+      "prior_core_label": null,
+      "japanese_accuracy": "UNKNOWN",
+      "core_judgment_source": "USER_CURRENT_CORE_LISTENING_REPORT"
+    },
+    {
+      "id": "clip-013",
+      "original_label": "SPEECH",
+      "original_wav_sha256": "21177362b31b6d8951e88f2cbad2ffc523c01c634a25c4e2fa93ce0c39292727",
+      "core_label": "DIALOGUE_LIKELY",
+      "context_label": "SPEECH",
+      "core_start_ms": 3358992,
+      "core_end_ms": 3360612,
+      "prior_core_label": null,
+      "japanese_accuracy": "UNKNOWN",
+      "core_judgment_source": "USER_CURRENT_CORE_LISTENING_REPORT"
+    },
+    {
+      "id": "clip-014",
+      "original_label": "NON_SPEECH_MOAN",
+      "original_wav_sha256": "ffac1c8dc00826ef85d3f2cf574f631f0765b2cd4716445ba0b35ad09be1de62",
+      "core_label": "NON_SPEECH_MOAN",
+      "context_label": null,
+      "core_start_ms": 158840.0,
+      "core_end_ms": 162980.0
+    },
+    {
+      "id": "clip-015",
+      "original_label": "NON_SPEECH_MOAN",
+      "original_wav_sha256": "4def87d9f37534aa34456550f00cb66a22b98c8d897e3788c7d331cc82b1967c",
+      "core_label": "NON_SPEECH_MOAN",
+      "context_label": null,
+      "core_start_ms": 1191100.0,
+      "core_end_ms": 1199000.0
+    },
+    {
+      "id": "clip-016",
+      "original_label": "NON_SPEECH_MOAN",
+      "original_wav_sha256": "660a227a317145270e83db3f060fed265e992c5e4307bddc06a5f6f7fcddd82b",
+      "core_label": "NON_SPEECH_MOAN",
+      "context_label": null,
+      "core_start_ms": 3005740.0,
+      "core_end_ms": 3014000.0
+    },
+    {
+      "id": "clip-017",
+      "original_label": "NON_SPEECH_MOAN",
+      "original_wav_sha256": "fbaa0223a9235112a09ce23092ba39812030f66e5382f136f0dc792d282de1f6",
+      "core_label": "NON_SPEECH_MOAN",
+      "context_label": null,
+      "core_start_ms": 4106880.0,
+      "core_end_ms": 4110900.0
+    },
+    {
+      "id": "clip-018",
+      "original_label": "NON_SPEECH_MOAN",
+      "original_wav_sha256": "097a382e80585fcc462d074b2a6f0105926082502c356dacbccf555664af77e2",
+      "core_label": "NON_SPEECH_MOAN",
+      "context_label": null,
+      "core_start_ms": 5100140.0,
+      "core_end_ms": 5112140.0
+    },
+    {
+      "id": "clip-019",
+      "original_label": "NON_SPEECH_MOAN",
+      "original_wav_sha256": "3ae3d57c76a4bca2d318d362be9003e9ebecf8b2ef77f856ac3a672e5860dcb6",
+      "core_label": "NON_SPEECH_MOAN",
+      "context_label": null,
+      "core_start_ms": 6105980.0,
+      "core_end_ms": 6114000.0
+    },
+    {
+      "id": "clip-020",
+      "original_label": "NON_SPEECH_MOAN",
+      "original_wav_sha256": "159e585bcb64e277d6d0177b54beb698ed5facc0e4d5c8adfd06317e2b5fc800",
+      "core_label": "NON_SPEECH_MOAN",
+      "context_label": null,
+      "core_start_ms": 6856220.0,
+      "core_end_ms": 6862580.0
+    },
+    {
+      "id": "clip-021",
+      "original_label": "NON_SPEECH_MOAN",
+      "original_wav_sha256": "ae1165ae2f39bdc2ab12b728b0cb6ec47c0145966c0f6b0bacb0145c9f12c108",
+      "core_label": "NON_SPEECH_MOAN",
+      "context_label": null,
+      "core_start_ms": 8085980.0,
+      "core_end_ms": 8093320.0
+    },
+    {
+      "id": "clip-022",
+      "original_label": "NON_SPEECH_MOAN",
+      "original_wav_sha256": "51cddd4a03f33d346de2909811a29fbaf5bc160f261b317fb2a8f63c9e4c6a31",
+      "core_label": "NON_SPEECH_MOAN",
+      "context_label": null,
+      "core_start_ms": 9224660.0,
+      "core_end_ms": 9234240.0
+    },
+    {
+      "id": "clip-023",
+      "original_label": "NON_SPEECH_MOAN",
+      "original_wav_sha256": "8592f7790cec47e64b342eaa314e65f1da831ce3857aae8e90cb9ab38c3e706a",
+      "core_label": "NON_SPEECH_MOAN",
+      "context_label": null,
+      "core_start_ms": 9645880.0,
+      "core_end_ms": 9654000.0
+    },
+    {
+      "id": "clip-024",
+      "original_label": "MUSIC",
+      "original_wav_sha256": "9385b02cfe0598fa7f4259098378ef66a59a412577a7d027b55e553457bee460",
+      "core_label": "MUSIC",
+      "context_label": null,
+      "core_start_ms": 560000.0,
+      "core_end_ms": 580000.0
+    },
+    {
+      "id": "clip-025",
+      "original_label": "MUSIC",
+      "original_wav_sha256": "acb66511dffa8c7e8cdbcd8163534f7754892163b9bb36911ff1ea1a5fa5f9ca",
+      "core_label": "MUSIC",
+      "context_label": null,
+      "core_start_ms": 580000.0,
+      "core_end_ms": 600000.0
+    },
+    {
+      "id": "clip-026",
+      "original_label": "NO_DIALOGUE",
+      "original_wav_sha256": "32435f844adf50c2677a63b9ce0fc85f04add25bcf97ec86355e9fadbc15055f",
+      "core_label": "NO_DIALOGUE",
+      "context_label": null,
+      "core_start_ms": 3600000.0,
+      "core_end_ms": 3620000.0
+    },
+    {
+      "id": "clip-027",
+      "original_label": "NON_SPEECH_MOAN",
+      "original_wav_sha256": "7415d31714db896130c3595c5eb6b02c80084c7708df4be3377ac62fb5c44eb4",
+      "core_label": "NON_SPEECH_MOAN",
+      "context_label": null,
+      "core_start_ms": 4180000.0,
+      "core_end_ms": 4200000.0
+    }
+  ]
+}

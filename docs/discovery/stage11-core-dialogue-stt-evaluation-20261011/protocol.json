@@ -1,0 +1,16 @@
+{
+  "evaluation_kind": "OFFLINE_SAVED_EVIDENCE_SCOPE_AUDIT",
+  "primary_whisper": "original AB_readings only, all variants retained; no selection by Reazon agreement",
+  "whisper_body_output": "saved primary segment overlaps half-open core [start,end), estimated timing only",
+  "reazon_body_output": "at least one nonpadding estimated token point in half-open core, no boundary tolerance or invented ends",
+  "recognition_accuracy": "UNKNOWN without Japanese audio truth, even when output lies in core",
+  "pair_comparison": "NFKC and whitespace/punctuation removal only; equal full-clip hypothesis / contains primary / different surface text. Count separately whether Reazon has core token points. Not proof of complete same-core sentence match. Kana/kanji differences are not semantic conflicts.",
+  "ja_duplicate": "aligned temporal overlap separately from elsewhere literal substring, neither proves same-utterance duplication or novelty",
+  "short_fragment": "no full-sentence recovery credit; exact Japanese unknown",
+  "constraints": {
+    "new_inference": 0,
+    "new_install_download": 0,
+    "SRT_service_changes": 0,
+    "approvals_publications": 0
+  }
+}

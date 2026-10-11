@@ -1,0 +1,133 @@
+{
+  "source": "explicit current user message: Stage11 — Core Dialogue STT Evidence Evaluation",
+  "reviewer": "USER",
+  "recorded_at": "2026-10-11T03:02:11.577565+00:00",
+  "scope": "scope-pack/core/clip-001..013.wav, not surrounding context",
+  "japanese_transcript_truth_available": false,
+  "user_wording": [
+    "clip-001~004: 대사처럼 들림",
+    "clip-005: 신음이 아닌 매우 짧은 언어 발화, 약 한 음절",
+    "clip-006: 대사처럼 들림",
+    "clip-007: 신음이 아닌 매우 짧은 언어 발화, 약 한 음절",
+    "clip-008~013: 대사처럼 들림"
+  ],
+  "judgments": [
+    {
+      "id": "clip-001",
+      "core_label": "DIALOGUE_LIKELY",
+      "user_note": "대사처럼 들림",
+      "japanese_transcript": "",
+      "japanese_accuracy": "UNKNOWN",
+      "human_utterance_start_ms": null,
+      "human_utterance_end_ms": null
+    },
+    {
+      "id": "clip-002",
+      "core_label": "DIALOGUE_LIKELY",
+      "user_note": "대사처럼 들림",
+      "japanese_transcript": "",
+      "japanese_accuracy": "UNKNOWN",
+      "human_utterance_start_ms": null,
+      "human_utterance_end_ms": null
+    },
+    {
+      "id": "clip-003",
+      "core_label": "DIALOGUE_LIKELY",
+      "user_note": "대사처럼 들림",
+      "japanese_transcript": "",
+      "japanese_accuracy": "UNKNOWN",
+      "human_utterance_start_ms": null,
+      "human_utterance_end_ms": null
+    },
+    {
+      "id": "clip-004",
+      "core_label": "DIALOGUE_LIKELY",
+      "user_note": "대사처럼 들림",
+      "japanese_transcript": "",
+      "japanese_accuracy": "UNKNOWN",
+      "human_utterance_start_ms": null,
+      "human_utterance_end_ms": null
+    },
+    {
+      "id": "clip-005",
+      "core_label": "DIALOGUE_SHORT_FRAGMENT",
+      "user_note": "신음이 아닌 매우 짧은 언어 발화, 약 한 음절",
+      "japanese_transcript": "",
+      "japanese_accuracy": "UNKNOWN",
+      "human_utterance_start_ms": null,
+      "human_utterance_end_ms": null
+    },
+    {
+      "id": "clip-006",
+      "core_label": "DIALOGUE_LIKELY",
+      "user_note": "대사처럼 들림",
+      "japanese_transcript": "",
+      "japanese_accuracy": "UNKNOWN",
+      "human_utterance_start_ms": null,
+      "human_utterance_end_ms": null
+    },
+    {
+      "id": "clip-007",
+      "core_label": "DIALOGUE_SHORT_FRAGMENT",
+      "user_note": "신음이 아닌 매우 짧은 언어 발화, 약 한 음절",
+      "japanese_transcript": "",
+      "japanese_accuracy": "UNKNOWN",
+      "human_utterance_start_ms": null,
+      "human_utterance_end_ms": null
+    },
+    {
+      "id": "clip-008",
+      "core_label": "DIALOGUE_LIKELY",
+      "user_note": "대사처럼 들림",
+      "japanese_transcript": "",
+      "japanese_accuracy": "UNKNOWN",
+      "human_utterance_start_ms": null,
+      "human_utterance_end_ms": null
+    },
+    {
+      "id": "clip-009",
+      "core_label": "DIALOGUE_LIKELY",
+      "user_note": "대사처럼 들림",
+      "japanese_transcript": "",
+      "japanese_accuracy": "UNKNOWN",
+      "human_utterance_start_ms": null,
+      "human_utterance_end_ms": null
+    },
+    {
+      "id": "clip-010",
+      "core_label": "DIALOGUE_LIKELY",
+      "user_note": "대사처럼 들림",
+      "japanese_transcript": "",
+      "japanese_accuracy": "UNKNOWN",
+      "human_utterance_start_ms": null,
+      "human_utterance_end_ms": null
+    },
+    {
+      "id": "clip-011",
+      "core_label": "DIALOGUE_LIKELY",
+      "user_note": "대사처럼 들림",
+      "japanese_transcript": "",
+      "japanese_accuracy": "UNKNOWN",
+      "human_utterance_start_ms": null,
+      "human_utterance_end_ms": null
+    },
+    {
+      "id": "clip-012",
+      "core_label": "DIALOGUE_LIKELY",
+      "user_note": "대사처럼 들림",
+      "japanese_transcript": "",
+      "japanese_accuracy": "UNKNOWN",
+      "human_utterance_start_ms": null,
+      "human_utterance_end_ms": null
+    },
+    {
+      "id": "clip-013",
+      "core_label": "DIALOGUE_LIKELY",
+      "user_note": "대사처럼 들림",
+      "japanese_transcript": "",
+      "japanese_accuracy": "UNKNOWN",
+      "human_utterance_start_ms": null,
+      "human_utterance_end_ms": null
+    }
+  ]
+}

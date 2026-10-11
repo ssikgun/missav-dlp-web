@@ -1,0 +1,16 @@
+{
+  "output_root": "/var/tmp/stage11-core-dialogue-stt-evaluation-20261011",
+  "protected_pins": "/var/tmp/stage11-core-dialogue-stt-evaluation-20261011/protected-before.json",
+  "priority_manifest": "/tmp/stage11-supplemental-priority13-c23r6wp6/review-manifest.json",
+  "scope_audit": "/var/tmp/stage11-gemma3n-pilot-b-20261010/scope-pack/scope-audit.json",
+  "prior_truth": "/var/tmp/stage11-gemma3n-pilot-b-20261010/scope-pack/truth.json",
+  "old_reazon": "/var/tmp/stage11-reazon-four.0zHXMFlf/results.json",
+  "new_reazon": "/var/tmp/stage11-reazon-remaining9-controls-qktq2z8w/results.json",
+  "audio_manifest": "/tmp/stage11-supplemental-audio-review-yz95u5bs/audio-review-manifest.json",
+  "medium_results": "/tmp/stage11-medium-four-result-nawt6sn6/results.json",
+  "ja_source": "/var/tmp/stage11-core-dialogue-stt-evaluation-20261011/existing-ja-source.json",
+  "user_feedback": "/var/tmp/stage11-core-dialogue-stt-evaluation-20261011/user-feedback.json",
+  "source_alignment": "/var/tmp/stage11-whisper-missing-probes-20261010/source-alignment.json",
+  "full_short_root": "/tmp/stage11-full-short-execution-review",
+  "protocol": "/var/tmp/stage11-core-dialogue-stt-evaluation-20261011/protocol.json"
+}

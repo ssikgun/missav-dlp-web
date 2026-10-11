@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "protected_original_files": 2213,
+  "prior_dirty_files_preserved": 14,
+  "original_scope_truth_unchanged": true,
+  "negative14_unchanged": true,
+  "labels13_verified": true,
+  "accuracy13_unknown": true,
+  "all_calls0": {
+    "Whisper": 0,
+    "ReazonSpeech": 0,
+    "Hermes": 0,
+    "Gemini": 0
+  },
+  "syntax": "PASS"
+}

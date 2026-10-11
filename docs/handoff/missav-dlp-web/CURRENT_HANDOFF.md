@@ -1,5 +1,45 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-11 — Core Dialogue STT evidence: USER core labels recorded; accuracy UNKNOWN
+
+USER now listened to the thirteen Pilot B scope-pack CORE WAVs:01-04/06/08-13
+DIALOGUE_LIKELY (11),05/07 DIALOGUE_SHORT_FRAGMENT (2, about one syllable).
+New sidecar revision preserves original truth/SHA/context speech judgments and
+all14 negatives; old Pilot B null core labels remain historical records. No
+Japanese transcript truth or human utterance start/end supplied. These judgments
+supersede the prior core-scope uncertainty for speech presence, not STT accuracy.
+
+Saved original Whisper A/B, all intersecting saved full-short inputs/results,
+short comparisons and medium four connected without reruns. Absolute core,
+actual recognizer input scopes, segment/word estimates and Reazon raw token
+points/padding preserved. Whisper estimated body-overlap output13/13; Reazon
+nonpadding estimated token points in body11/13.04/05 have ALL tokens in padding,
+so core alignment unresolved, not proven no speech. Exact accurate body
+recognition count UNKNOWN for both.05/07 cannot count as full-sentence recovery.
+
+Primary full-input hypotheses: typography-only equal5, contains2, different6.
+With body token-point support: equal4, contains2, surface-different5, unresolved2.
+These are hypothesis relations, not verified same-core utterance agreement or
+semantic-conflict counts. Other Whisper hypotheses retained, not cherry-picked;
+13 also has saved お父さん vs 弟さん alternatives. Medium9 NOT_TESTED.
+Existing313 JA: simultaneous estimated-core overlap0/13; elsewhere literal
+substring matches3 cases (02/07/12), not proof of same dialogue duplication.
+Exact Japanese accuracy, same-utterance JA duplication and novelty UNKNOWN13.
+Verified new dialogue recoveries0/13; Japanese core truth needed13/13. No approval.
+
+Report docs/discovery/STAGE11_CORE_DIALOGUE_STT_EVIDENCE_EVALUATION_20261011.md;
+evidence /var/tmp/stage11-core-dialogue-stt-evaluation-20261011/ and committed
+matching evidence directory. Offline-only evaluator in tools/.2213 protected
+SHA checked; core sample crops/Whisper parent PCM/Reazon actual float32 input SHA
+verified. Earlier4 Reazon1s context/rounded PCM16 vs remaining9 2s/truncated PCM16
+preserved; this is not a controlled model accuracy experiment. Whisper/Reazon
+new executions0, Hermes/Gemini calls0, installs/downloads/candidate search0;
+SRT changes/approval/publication/service changes0. Prior Git changes preserved.
+Continue current STT only as review hypotheses, with no validated automatic
+recovery accuracy. Next ONE task: establish Japanese text and actual utterance
+bounds in all13 core WAVs, transcribing only the heard fragment for05/07, then
+compare saved hypotheses on the same utterance.
+
 ## 2026-10-10 — Audio Understanding Pilot B: Gemma3n BLOCKED_SAFE_STOP
 
 Requested Gemma3n E2B audio inference could NOT be executed; model loads/calls0.

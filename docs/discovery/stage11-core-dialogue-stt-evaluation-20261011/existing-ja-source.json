@@ -1,0 +1,1884 @@
+{
+  "trusted_seed": "/tmp/stage11-supplemental-candidates-Jsy4EEif/trusted-local-before.pkl",
+  "trusted_seed_sha256": "ba7ce4953eb53930c99eae8490e94f3b0feb660aa0a3af08592a7667eac72401",
+  "cues": [
+    {
+      "cue_id": "ja-000001",
+      "start_ms": 99261,
+      "end_ms": 106077,
+      "external_ja": "いじめられて帰ってきたと思ったらお姉ちゃ んお姉ちゃんってマジ大げさ結"
+    },
+    {
+      "cue_id": "ja-000002",
+      "start_ms": 106077,
+      "end_ms": 113074,
+      "external_ja": "局同級生に軽く押されただけやったよそんな 後お姉ちゃんそいつボ"
+    },
+    {
+      "cue_id": "ja-000003",
+      "start_ms": 113074,
+      "end_ms": 120011,
+      "external_ja": "コボコに来たじゃんそれは…ガキの頃も確"
+    },
+    {
+      "cue_id": "ja-000004",
+      "start_ms": 120011,
+      "end_ms": 126988,
+      "external_ja": "かに言ったよ兄ちゃんが欲しかったっていつ でも弟を守ってくれる強"
+    },
+    {
+      "cue_id": "ja-000005",
+      "start_ms": 126988,
+      "end_ms": 133773,
+      "external_ja": "くてかっこいい兄ちゃんがねだから私は頼れ る姉に男女"
+    },
+    {
+      "cue_id": "ja-000006",
+      "start_ms": 133773,
+      "end_ms": 138540,
+      "external_ja": "じゃんあんたが変なこと望んだからこんな見 た目になったんでしょ?"
+    },
+    {
+      "cue_id": "ja-000007",
+      "start_ms": 138986,
+      "end_ms": 145010,
+      "external_ja": "どうして兄弟なのに子を持ちがんの?"
+    },
+    {
+      "cue_id": "ja-000008",
+      "start_ms": 146612,
+      "end_ms": 153610,
+      "external_ja": "いい繋がってないじゃん親の連れ子同士じゃ んちっちゃい頃から同じもの食べてた"
+    },
+    {
+      "cue_id": "ja-000009",
+      "start_ms": 153610,
+      "end_ms": 157139,
+      "external_ja": "じゃんいや、今は違うじゃん勝手に逃げてち ゃってさ"
+    },
+    {
+      "cue_id": "ja-000010",
+      "start_ms": 164167,
+      "end_ms": 168691,
+      "external_ja": "イラージュのおふくらも心配してんぜ俺にも セミリン買いすぎてさ"
+    },
+    {
+      "cue_id": "ja-000011",
+      "start_ms": 168691,
+      "end_ms": 177068,
+      "external_ja": "まあ"
+    },
+    {
+      "cue_id": "ja-000012",
+      "start_ms": 177068,
+      "end_ms": 178548,
+      "external_ja": "食料はありがたいけど"
+    },
+    {
+      "cue_id": "ja-000013",
+      "start_ms": 232440,
+      "end_ms": 239012,
+      "external_ja": "あの、思いにもさ、最後まで俺に運ばせてた んだよ。受け取るだけでもいい。"
+    },
+    {
+      "cue_id": "ja-000014",
+      "start_ms": 241974,
+      "end_ms": 247754,
+      "external_ja": "んじゃ。"
+    },
+    {
+      "cue_id": "ja-000015",
+      "start_ms": 255259,
+      "end_ms": 256273,
+      "external_ja": "え?"
+    },
+    {
+      "cue_id": "ja-000016",
+      "start_ms": 256983,
+      "end_ms": 258018,
+      "external_ja": "あ、帰るわ。"
+    },
+    {
+      "cue_id": "ja-000017",
+      "start_ms": 259275,
+      "end_ms": 260288,
+      "external_ja": "なんで?"
+    },
+    {
+      "cue_id": "ja-000018",
+      "start_ms": 267581,
+      "end_ms": 271070,
+      "external_ja": "ちょっと待って教えるってえ?"
+    },
+    {
+      "cue_id": "ja-000019",
+      "start_ms": 274924,
+      "end_ms": 276648,
+      "external_ja": "ご飯食べていけないの?"
+    },
+    {
+      "cue_id": "ja-000020",
+      "start_ms": 277621,
+      "end_ms": 278635,
+      "external_ja": "は?"
+    },
+    {
+      "cue_id": "ja-000021",
+      "start_ms": 278960,
+      "end_ms": 280806,
+      "external_ja": "一人で3人っていいの?"
+    },
+    {
+      "cue_id": "ja-000022",
+      "start_ms": 281921,
+      "end_ms": 288067,
+      "external_ja": "変な勧誘とかも苦しさお願いしばらく住んで"
+    },
+    {
+      "cue_id": "ja-000023",
+      "start_ms": 295704,
+      "end_ms": 300490,
+      "external_ja": "お姉ちゃんからそんなセリフ聞くと一生ない と思ってたほ"
+    },
+    {
+      "cue_id": "ja-000024",
+      "start_ms": 300490,
+      "end_ms": 305014,
+      "external_ja": "ら高橋"
+    },
+    {
+      "cue_id": "ja-000025",
+      "start_ms": 305014,
+      "end_ms": 311261,
+      "external_ja": "ねえそんな気ばっかで"
+    },
+    {
+      "cue_id": "ja-000026",
+      "start_ms": 311261,
+      "end_ms": 317528,
+      "external_ja": "ちょっとごめんなさいご"
+    },
+    {
+      "cue_id": "ja-000027",
+      "start_ms": 317528,
+      "end_ms": 319232,
+      "external_ja": "めんなさいごめんなさい"
+    },
+    {
+      "cue_id": "ja-000028",
+      "start_ms": 367618,
+      "end_ms": 374169,
+      "external_ja": "姉ちゃんが料理してるの初めて見た俺一人暮 らししてるんだからね"
+    },
+    {
+      "cue_id": "ja-000029",
+      "start_ms": 374169,
+      "end_ms": 375934,
+      "external_ja": "できてないと"
+    },
+    {
+      "cue_id": "ja-000030",
+      "start_ms": 375934,
+      "end_ms": 382181,
+      "external_ja": "できた"
+    },
+    {
+      "cue_id": "ja-000031",
+      "start_ms": 400557,
+      "end_ms": 403214,
+      "external_ja": "逆にそれが苦手する男大好きですよね"
+    },
+    {
+      "cue_id": "ja-000032",
+      "start_ms": 403214,
+      "end_ms": 408427,
+      "external_ja": "ねぇ"
+    },
+    {
+      "cue_id": "ja-000033",
+      "start_ms": 408427,
+      "end_ms": 421753,
+      "external_ja": "どう"
+    },
+    {
+      "cue_id": "ja-000034",
+      "start_ms": 421753,
+      "end_ms": 427433,
+      "external_ja": "したの?本当に返せるのできた?"
+    },
+    {
+      "cue_id": "ja-000035",
+      "start_ms": 454500,
+      "end_ms": 459328,
+      "external_ja": "止まっていけないわいや帰る"
+    },
+    {
+      "cue_id": "ja-000036",
+      "start_ms": 459328,
+      "end_ms": 463668,
+      "external_ja": "だから"
+    },
+    {
+      "cue_id": "ja-000037",
+      "start_ms": 463668,
+      "end_ms": 470646,
+      "external_ja": "うざいんだって新聞"
+    },
+    {
+      "cue_id": "ja-000038",
+      "start_ms": 470646,
+      "end_ms": 475088,
+      "external_ja": "の勧誘が姉ちゃんなら平気だよ"
+    },
+    {
+      "cue_id": "ja-000039",
+      "start_ms": 521475,
+      "end_ms": 524518,
+      "external_ja": "いいよ、お腹いっぱいに"
+    },
+    {
+      "cue_id": "ja-000040",
+      "start_ms": 524518,
+      "end_ms": 533544,
+      "external_ja": "ゃ"
+    },
+    {
+      "cue_id": "ja-000041",
+      "start_ms": 533544,
+      "end_ms": 535876,
+      "external_ja": "ーちゃん"
+    },
+    {
+      "cue_id": "ja-000042",
+      "start_ms": 629513,
+      "end_ms": 630528,
+      "external_ja": "寝た?"
+    },
+    {
+      "cue_id": "ja-000043",
+      "start_ms": 632820,
+      "end_ms": 638945,
+      "external_ja": "まだ起きてんの?"
+    },
+    {
+      "cue_id": "ja-000044",
+      "start_ms": 640162,
+      "end_ms": 646105,
+      "external_ja": "うんなんかさ並んで寝てると"
+    },
+    {
+      "cue_id": "ja-000045",
+      "start_ms": 646105,
+      "end_ms": 649026,
+      "external_ja": "子供の頃に"
+    },
+    {
+      "cue_id": "ja-000046",
+      "start_ms": 662585,
+      "end_ms": 665770,
+      "external_ja": "姉ちゃん何?"
+    },
+    {
+      "cue_id": "ja-000047",
+      "start_ms": 667838,
+      "end_ms": 669461,
+      "external_ja": "どうしたの?"
+    },
+    {
+      "cue_id": "ja-000048",
+      "start_ms": 671591,
+      "end_ms": 672605,
+      "external_ja": "何が?"
+    },
+    {
+      "cue_id": "ja-000049",
+      "start_ms": 674410,
+      "end_ms": 679988,
+      "external_ja": "なんか女らしくなったっていうか"
+    },
+    {
+      "cue_id": "ja-000050",
+      "start_ms": 679988,
+      "end_ms": 684978,
+      "external_ja": "無理に女らしくしてる"
+    },
+    {
+      "cue_id": "ja-000051",
+      "start_ms": 695657,
+      "end_ms": 698963,
+      "external_ja": "あなた…なに?"
+    },
+    {
+      "cue_id": "ja-000052",
+      "start_ms": 701843,
+      "end_ms": 704500,
+      "external_ja": "なんでもないはぁ?"
+    },
+    {
+      "cue_id": "ja-000053",
+      "start_ms": 717806,
+      "end_ms": 723282,
+      "external_ja": "じゃあ言うけどな好きな人が…"
+    },
+    {
+      "cue_id": "ja-000054",
+      "start_ms": 728140,
+      "end_ms": 732785,
+      "external_ja": "バイト先の先輩うっ 貴重"
+    },
+    {
+      "cue_id": "ja-000055",
+      "start_ms": 732785,
+      "end_ms": 739113,
+      "external_ja": "まだ送ってはいないけどた"
+    },
+    {
+      "cue_id": "ja-000056",
+      "start_ms": 739113,
+      "end_ms": 743028,
+      "external_ja": "かしこそ彼女は?"
+    },
+    {
+      "cue_id": "ja-000057",
+      "start_ms": 743718,
+      "end_ms": 750208,
+      "external_ja": "いや、浪人生だぜ見た目は悪くないのね"
+    },
+    {
+      "cue_id": "ja-000058",
+      "start_ms": 767398,
+      "end_ms": 774254,
+      "external_ja": "私先輩に女として見られてるかなそれが気に なって気にな"
+    },
+    {
+      "cue_id": "ja-000059",
+      "start_ms": 774254,
+      "end_ms": 781029,
+      "external_ja": "って気になって気になってもし"
+    },
+    {
+      "cue_id": "ja-000060",
+      "start_ms": 781029,
+      "end_ms": 788107,
+      "external_ja": "兄弟じゃ"
+    },
+    {
+      "cue_id": "ja-000061",
+      "start_ms": 788107,
+      "end_ms": 792387,
+      "external_ja": "なかったらだけ見たいくらい"
+    },
+    {
+      "cue_id": "ja-000062",
+      "start_ms": 800601,
+      "end_ms": 807356,
+      "external_ja": "昔みたいにさ顔を破壊気味にしたじゃん昔と 違っておっぱい"
+    },
+    {
+      "cue_id": "ja-000063",
+      "start_ms": 807356,
+      "end_ms": 813482,
+      "external_ja": "顔に当たってたあったね"
+    },
+    {
+      "cue_id": "ja-000064",
+      "start_ms": 813482,
+      "end_ms": 820297,
+      "external_ja": "それよりいい匂いしたわ小"
+    },
+    {
+      "cue_id": "ja-000065",
+      "start_ms": 820297,
+      "end_ms": 826442,
+      "external_ja": "さい頃はしなかった女の人の匂いそっちの動 画"
+    },
+    {
+      "cue_id": "ja-000066",
+      "start_ms": 833471,
+      "end_ms": 834485,
+      "external_ja": "今も?"
+    },
+    {
+      "cue_id": "ja-000067",
+      "start_ms": 881511,
+      "end_ms": 882708,
+      "external_ja": "私たち兄弟でしょ?"
+    },
+    {
+      "cue_id": "ja-000068",
+      "start_ms": 888367,
+      "end_ms": 889381,
+      "external_ja": "ねぇ、"
+    },
+    {
+      "cue_id": "ja-000069",
+      "start_ms": 889665,
+      "end_ms": 893539,
+      "external_ja": "ダメねぇ、"
+    },
+    {
+      "cue_id": "ja-000070",
+      "start_ms": 894776,
+      "end_ms": 899543,
+      "external_ja": "ダメねぇ"
+    },
+    {
+      "cue_id": "ja-000071",
+      "start_ms": 899543,
+      "end_ms": 906155,
+      "external_ja": "ねぇ、お姉ちゃん怒るよ"
+    },
+    {
+      "cue_id": "ja-000072",
+      "start_ms": 906155,
+      "end_ms": 910476,
+      "external_ja": "怒ってる"
+    },
+    {
+      "cue_id": "ja-000073",
+      "start_ms": 930394,
+      "end_ms": 936904,
+      "external_ja": "ねえこのために止めたんじゃないんだけどち ょっと"
+    },
+    {
+      "cue_id": "ja-000074",
+      "start_ms": 936904,
+      "end_ms": 943618,
+      "external_ja": "ねえダメ何反応してるの反応してないそんな"
+    },
+    {
+      "cue_id": "ja-000075",
+      "start_ms": 943618,
+      "end_ms": 946032,
+      "external_ja": "わけないでしょ"
+    },
+    {
+      "cue_id": "ja-000076",
+      "start_ms": 948953,
+      "end_ms": 954814,
+      "external_ja": "本当に感じるわけないじゃんねえ本当"
+    },
+    {
+      "cue_id": "ja-000077",
+      "start_ms": 954814,
+      "end_ms": 959257,
+      "external_ja": "絶対感じないねえ"
+    },
+    {
+      "cue_id": "ja-000078",
+      "start_ms": 959257,
+      "end_ms": 966112,
+      "external_ja": "ねえちょっと"
+    },
+    {
+      "cue_id": "ja-000079",
+      "start_ms": 966112,
+      "end_ms": 968201,
+      "external_ja": "やめなさい分かりやすい"
+    },
+    {
+      "cue_id": "ja-000080",
+      "start_ms": 968201,
+      "end_ms": 974165,
+      "external_ja": "ちょっと"
+    },
+    {
+      "cue_id": "ja-000081",
+      "start_ms": 974165,
+      "end_ms": 976517,
+      "external_ja": "力強い"
+    },
+    {
+      "cue_id": "ja-000082",
+      "start_ms": 998413,
+      "end_ms": 999427,
+      "external_ja": "やらなきゃならないでしょ"
+    },
+    {
+      "cue_id": "ja-000083",
+      "start_ms": 1204033,
+      "end_ms": 1205048,
+      "external_ja": "本当に活かされる"
+    },
+    {
+      "cue_id": "ja-000084",
+      "start_ms": 1304151,
+      "end_ms": 1305165,
+      "external_ja": "わけないでしょ"
+    },
+    {
+      "cue_id": "ja-000085",
+      "start_ms": 1385639,
+      "end_ms": 1386653,
+      "external_ja": "うん"
+    },
+    {
+      "cue_id": "ja-000086",
+      "start_ms": 1439967,
+      "end_ms": 1441549,
+      "external_ja": "めっちゃ濡れてるんだけどえ?"
+    },
+    {
+      "cue_id": "ja-000087",
+      "start_ms": 1442198,
+      "end_ms": 1446275,
+      "external_ja": "知らない気持ちよくて回した?そんなわけな いじゃん"
+    },
+    {
+      "cue_id": "ja-000088",
+      "start_ms": 1446275,
+      "end_ms": 1451650,
+      "external_ja": "やめて"
+    },
+    {
+      "cue_id": "ja-000089",
+      "start_ms": 1451650,
+      "end_ms": 1458627,
+      "external_ja": "弟で感じるわけないじゃん感じないのにこん な濡れる"
+    },
+    {
+      "cue_id": "ja-000090",
+      "start_ms": 1458627,
+      "end_ms": 1459642,
+      "external_ja": "の?"
+    },
+    {
+      "cue_id": "ja-000091",
+      "start_ms": 1463151,
+      "end_ms": 1465929,
+      "external_ja": "意地悪してないでよ"
+    },
+    {
+      "cue_id": "ja-000092",
+      "start_ms": 1483170,
+      "end_ms": 1487511,
+      "external_ja": "気持ちよくなってない気持ちよくなってない"
+    },
+    {
+      "cue_id": "ja-000093",
+      "start_ms": 1590579,
+      "end_ms": 1591594,
+      "external_ja": "こんなこと考えたの?"
+    },
+    {
+      "cue_id": "ja-000094",
+      "start_ms": 1592182,
+      "end_ms": 1593987,
+      "external_ja": "いや、ずっとじゃないよ。"
+    },
+    {
+      "cue_id": "ja-000095",
+      "start_ms": 1596522,
+      "end_ms": 1599484,
+      "external_ja": "こうやってさせようとしてたの?私の手見て 。"
+    },
+    {
+      "cue_id": "ja-000096",
+      "start_ms": 1644421,
+      "end_ms": 1650993,
+      "external_ja": "何があって何させようとしてんの?なめてよ いや無理でしょなんで俺なめたじゃん頼んで"
+    },
+    {
+      "cue_id": "ja-000097",
+      "start_ms": 1650993,
+      "end_ms": 1653123,
+      "external_ja": "ないんだけどねえお願いなめてえ?"
+    },
+    {
+      "cue_id": "ja-000098",
+      "start_ms": 1653731,
+      "end_ms": 1660262,
+      "external_ja": "ねえ兄弟でしょなんで関係ないじゃんそんな の"
+    },
+    {
+      "cue_id": "ja-000099",
+      "start_ms": 1660262,
+      "end_ms": 1667158,
+      "external_ja": "ほら口開けてほら口開けてねえアカン"
+    },
+    {
+      "cue_id": "ja-000100",
+      "start_ms": 1667158,
+      "end_ms": 1668173,
+      "external_ja": "と思って"
+    },
+    {
+      "cue_id": "ja-000101",
+      "start_ms": 1686184,
+      "end_ms": 1687908,
+      "external_ja": "しょうがないじゃん、気持ちいいんだもん"
+    },
+    {
+      "cue_id": "ja-000102",
+      "start_ms": 1732886,
+      "end_ms": 1738991,
+      "external_ja": "そっちなんか気持ちいいか私たち兄弟なのに こんなことおかしいでしょ"
+    },
+    {
+      "cue_id": "ja-000103",
+      "start_ms": 1738991,
+      "end_ms": 1745198,
+      "external_ja": "姉ちゃんに飲みてほしいでもいいかい"
+    },
+    {
+      "cue_id": "ja-000104",
+      "start_ms": 1745198,
+      "end_ms": 1748261,
+      "external_ja": "だ"
+    },
+    {
+      "cue_id": "ja-000105",
+      "start_ms": 1748261,
+      "end_ms": 1754893,
+      "external_ja": "って俺"
+    },
+    {
+      "cue_id": "ja-000106",
+      "start_ms": 1754893,
+      "end_ms": 1761059,
+      "external_ja": "姉ちゃんでこんなになっちゃっていや変だよ 変じゃないよ"
+    },
+    {
+      "cue_id": "ja-000107",
+      "start_ms": 1846837,
+      "end_ms": 1851340,
+      "external_ja": "姉ちゃん 舐めるの上手だね上手だよ"
+    },
+    {
+      "cue_id": "ja-000108",
+      "start_ms": 2072831,
+      "end_ms": 2079647,
+      "external_ja": "いやダメでしょ兄弟だってば兄弟でそんなこ とするとダメでしょそれだけは絶対にダメ"
+    },
+    {
+      "cue_id": "ja-000109",
+      "start_ms": 2079647,
+      "end_ms": 2080517,
+      "external_ja": "なんで?"
+    },
+    {
+      "cue_id": "ja-000110",
+      "start_ms": 2080518,
+      "end_ms": 2085204,
+      "external_ja": "なんでってダメだからダメ本当に本当にやめ ようそういうのねえ"
+    },
+    {
+      "cue_id": "ja-000111",
+      "start_ms": 2352577,
+      "end_ms": 2353591,
+      "external_ja": "考えてるの"
+    },
+    {
+      "cue_id": "ja-000112",
+      "start_ms": 2642930,
+      "end_ms": 2644370,
+      "external_ja": "大丈夫じゃない。え?"
+    },
+    {
+      "cue_id": "ja-000113",
+      "start_ms": 2645262,
+      "end_ms": 2646276,
+      "external_ja": "大丈夫じゃない。"
+    },
+    {
+      "cue_id": "ja-000114",
+      "start_ms": 2647291,
+      "end_ms": 2648873,
+      "external_ja": "こんなことしといて。"
+    },
+    {
+      "cue_id": "ja-000115",
+      "start_ms": 2650232,
+      "end_ms": 2652747,
+      "external_ja": "じゃあ、もう一回やってみて。お願い。"
+    },
+    {
+      "cue_id": "ja-000116",
+      "start_ms": 2695869,
+      "end_ms": 2696883,
+      "external_ja": "よかったよ"
+    },
+    {
+      "cue_id": "ja-000117",
+      "start_ms": 3163446,
+      "end_ms": 3170322,
+      "external_ja": "やっぱり兄弟だしまずいかなでもしちゃった わけだし"
+    },
+    {
+      "cue_id": "ja-000118",
+      "start_ms": 3170322,
+      "end_ms": 3175636,
+      "external_ja": "でも女としてちゃんと見られてたわけやし"
+    },
+    {
+      "cue_id": "ja-000119",
+      "start_ms": 3222804,
+      "end_ms": 3228808,
+      "external_ja": "あんた、やらそうだな。こら。ちょっと待っ て。違うじゃん。ちょっと待って、待って。"
+    },
+    {
+      "cue_id": "ja-000120",
+      "start_ms": 3231019,
+      "end_ms": 3232358,
+      "external_ja": "お仕置きだな。"
+    },
+    {
+      "cue_id": "ja-000121",
+      "start_ms": 3233920,
+      "end_ms": 3234934,
+      "external_ja": "こら。"
+    },
+    {
+      "cue_id": "ja-000122",
+      "start_ms": 3235441,
+      "end_ms": 3240836,
+      "external_ja": "苦しいだろ。今のこういう空気じゃなかった な。空気とかわかんないもん。"
+    },
+    {
+      "cue_id": "ja-000123",
+      "start_ms": 3293197,
+      "end_ms": 3294252,
+      "external_ja": "あなたこそ誰ですか?"
+    },
+    {
+      "cue_id": "ja-000124",
+      "start_ms": 3294495,
+      "end_ms": 3300499,
+      "external_ja": "あの、僕は…ああ、いやいや、あの、どうせ 、加入手帳なのかな、新聞かなんかいや"
+    },
+    {
+      "cue_id": "ja-000125",
+      "start_ms": 3300499,
+      "end_ms": 3304576,
+      "external_ja": "いや、違ういやいや、いいっていいって、あ の、分かってるんでうち、そういうの、いや"
+    },
+    {
+      "cue_id": "ja-000126",
+      "start_ms": 3304576,
+      "end_ms": 3308105,
+      "external_ja": "いやいや、僕は…いやいや、だから、うち、 そういうの、あの、一切、いやいやいや、"
+    },
+    {
+      "cue_id": "ja-000127",
+      "start_ms": 3308105,
+      "end_ms": 3314373,
+      "external_ja": "ちょっ、ちょっ、ちょっ、ちょっ、ちょっす いません、すいません、弟がバカで弟さん?"
+    },
+    {
+      "cue_id": "ja-000128",
+      "start_ms": 3316178,
+      "end_ms": 3318997,
+      "external_ja": "はい、でも、どうしたんですか?"
+    },
+    {
+      "cue_id": "ja-000129",
+      "start_ms": 3319606,
+      "end_ms": 3321533,
+      "external_ja": "ああ、では、これ"
+    },
+    {
+      "cue_id": "ja-000130",
+      "start_ms": 3322699,
+      "end_ms": 3324910,
+      "external_ja": "昨日、バイトで忘れてたでしょ?"
+    },
+    {
+      "cue_id": "ja-000131",
+      "start_ms": 3325802,
+      "end_ms": 3326816,
+      "external_ja": "どれかまた?"
+    },
+    {
+      "cue_id": "ja-000132",
+      "start_ms": 3332881,
+      "end_ms": 3333895,
+      "external_ja": "じゃあ。"
+    },
+    {
+      "cue_id": "ja-000133",
+      "start_ms": 3334544,
+      "end_ms": 3336552,
+      "external_ja": "よかったら。"
+    },
+    {
+      "cue_id": "ja-000134",
+      "start_ms": 3337911,
+      "end_ms": 3338925,
+      "external_ja": "どうですか?"
+    },
+    {
+      "cue_id": "ja-000135",
+      "start_ms": 3339493,
+      "end_ms": 3342881,
+      "external_ja": "えっと、ちょっとだけ。はい。じゃあ、こち らで。"
+    },
+    {
+      "cue_id": "ja-000136",
+      "start_ms": 3362108,
+      "end_ms": 3367930,
+      "external_ja": "あんたは黙ってなさい"
+    },
+    {
+      "cue_id": "ja-000137",
+      "start_ms": 3367930,
+      "end_ms": 3372555,
+      "external_ja": "いつもこうなの?"
+    },
+    {
+      "cue_id": "ja-000138",
+      "start_ms": 3373853,
+      "end_ms": 3376875,
+      "external_ja": "あ、いや、いつもはこんなじゃないです"
+    },
+    {
+      "cue_id": "ja-000139",
+      "start_ms": 3446415,
+      "end_ms": 3448059,
+      "external_ja": "参加ってどこにあったんですか?"
+    },
+    {
+      "cue_id": "ja-000140",
+      "start_ms": 3448901,
+      "end_ms": 3453545,
+      "external_ja": "部屋は机の上に置きっぱなしだったそれ"
+    },
+    {
+      "cue_id": "ja-000141",
+      "start_ms": 3453545,
+      "end_ms": 3460543,
+      "external_ja": "じゃあまたはいお茶ありが"
+    },
+    {
+      "cue_id": "ja-000142",
+      "start_ms": 3460543,
+      "end_ms": 3464600,
+      "external_ja": "とねいいえあれ"
+    },
+    {
+      "cue_id": "ja-000143",
+      "start_ms": 3464600,
+      "end_ms": 3475573,
+      "external_ja": "が"
+    },
+    {
+      "cue_id": "ja-000144",
+      "start_ms": 3475573,
+      "end_ms": 3479924,
+      "external_ja": "ねえな大丈夫かな私、変に思われなかったか な?"
+    },
+    {
+      "cue_id": "ja-000145",
+      "start_ms": 3481506,
+      "end_ms": 3485278,
+      "external_ja": "弟を一撃でぶっ飛ばす男女って感じ。"
+    },
+    {
+      "cue_id": "ja-000146",
+      "start_ms": 3488017,
+      "end_ms": 3490795,
+      "external_ja": "終わった。"
+    },
+    {
+      "cue_id": "ja-000147",
+      "start_ms": 3492905,
+      "end_ms": 3495947,
+      "external_ja": "やっぱねぇじゃん。中身は男じゃん。"
+    },
+    {
+      "cue_id": "ja-000148",
+      "start_ms": 3518633,
+      "end_ms": 3525023,
+      "external_ja": "今は修行中なの 修行っているのが男の発想 じゃん"
+    },
+    {
+      "cue_id": "ja-000149",
+      "start_ms": 3525023,
+      "end_ms": 3528857,
+      "external_ja": "苦"
+    },
+    {
+      "cue_id": "ja-000150",
+      "start_ms": 3528857,
+      "end_ms": 3537335,
+      "external_ja": "しい"
+    },
+    {
+      "cue_id": "ja-000151",
+      "start_ms": 3537335,
+      "end_ms": 3538897,
+      "external_ja": "だろ 無理無理"
+    },
+    {
+      "cue_id": "ja-000152",
+      "start_ms": 3550550,
+      "end_ms": 3553430,
+      "external_ja": "まいったか?まいったまいったまいったまい ったまいったまいったまいったまいったまい"
+    },
+    {
+      "cue_id": "ja-000153",
+      "start_ms": 3553430,
+      "end_ms": 3569778,
+      "external_ja": "い"
+    },
+    {
+      "cue_id": "ja-000154",
+      "start_ms": 3569778,
+      "end_ms": 3570792,
+      "external_ja": "った"
+    },
+    {
+      "cue_id": "ja-000155",
+      "start_ms": 3585934,
+      "end_ms": 3586948,
+      "external_ja": "見ててよ"
+    },
+    {
+      "cue_id": "ja-000156",
+      "start_ms": 3628782,
+      "end_ms": 3629796,
+      "external_ja": "また会いましょう。"
+    },
+    {
+      "cue_id": "ja-000157",
+      "start_ms": 3663486,
+      "end_ms": 3664500,
+      "external_ja": "合ってる?"
+    },
+    {
+      "cue_id": "ja-000158",
+      "start_ms": 3736374,
+      "end_ms": 3738666,
+      "external_ja": "ちょっと黙っただけでこうなるんだ"
+    },
+    {
+      "cue_id": "ja-000159",
+      "start_ms": 3770186,
+      "end_ms": 3771200,
+      "external_ja": "寝かせていい?"
+    },
+    {
+      "cue_id": "ja-000160",
+      "start_ms": 3771240,
+      "end_ms": 3773086,
+      "external_ja": "いいよ"
+    },
+    {
+      "cue_id": "ja-000161",
+      "start_ms": 3773086,
+      "end_ms": 3785195,
+      "external_ja": "寝"
+    },
+    {
+      "cue_id": "ja-000162",
+      "start_ms": 3785195,
+      "end_ms": 3794627,
+      "external_ja": "ちゃ"
+    },
+    {
+      "cue_id": "ja-000163",
+      "start_ms": 3794627,
+      "end_ms": 3795864,
+      "external_ja": "うって気持ちいい"
+    },
+    {
+      "cue_id": "ja-000164",
+      "start_ms": 3827952,
+      "end_ms": 3829250,
+      "external_ja": "こんなにおいするね"
+    },
+    {
+      "cue_id": "ja-000165",
+      "start_ms": 3829250,
+      "end_ms": 3837810,
+      "external_ja": "ちょっと"
+    },
+    {
+      "cue_id": "ja-000166",
+      "start_ms": 3837810,
+      "end_ms": 3840690,
+      "external_ja": "だけ見たい ちょっとだけ?"
+    },
+    {
+      "cue_id": "ja-000167",
+      "start_ms": 3842069,
+      "end_ms": 3844909,
+      "external_ja": "だって恥ずかしいじゃん"
+    },
+    {
+      "cue_id": "ja-000168",
+      "start_ms": 4004141,
+      "end_ms": 4006636,
+      "external_ja": "大きすぎて出ちゃったよパンツから"
+    },
+    {
+      "cue_id": "ja-000169",
+      "start_ms": 4038704,
+      "end_ms": 4045600,
+      "external_ja": "しっかり飲みたいからこれ"
+    },
+    {
+      "cue_id": "ja-000170",
+      "start_ms": 4045600,
+      "end_ms": 4048440,
+      "external_ja": "もおなみかけの特訓特訓やね"
+    },
+    {
+      "cue_id": "ja-000171",
+      "start_ms": 4072688,
+      "end_ms": 4073946,
+      "external_ja": "どうすればいいの?こう?"
+    },
+    {
+      "cue_id": "ja-000172",
+      "start_ms": 4074960,
+      "end_ms": 4075974,
+      "external_ja": "こう?"
+    },
+    {
+      "cue_id": "ja-000173",
+      "start_ms": 4077698,
+      "end_ms": 4080193,
+      "external_ja": "何が気持ちいいの?"
+    },
+    {
+      "cue_id": "ja-000174",
+      "start_ms": 4141651,
+      "end_ms": 4143213,
+      "external_ja": "なんか気持ち良さそう"
+    },
+    {
+      "cue_id": "ja-000175",
+      "start_ms": 4263735,
+      "end_ms": 4265601,
+      "external_ja": "もうどんだけ溜めてたん"
+    },
+    {
+      "cue_id": "ja-000176",
+      "start_ms": 4273086,
+      "end_ms": 4278339,
+      "external_ja": "もーちゃんと強いちょっと"
+    },
+    {
+      "cue_id": "ja-000177",
+      "start_ms": 4278339,
+      "end_ms": 4281950,
+      "external_ja": "待って待って"
+    },
+    {
+      "cue_id": "ja-000178",
+      "start_ms": 4310275,
+      "end_ms": 4311289,
+      "external_ja": "はい。"
+    },
+    {
+      "cue_id": "ja-000179",
+      "start_ms": 4393771,
+      "end_ms": 4400829,
+      "external_ja": "ちょ、だめ。ねえ、セイジ食ってから出ちゃ う。だめ。もうだめ。だめ"
+    },
+    {
+      "cue_id": "ja-000180",
+      "start_ms": 4400829,
+      "end_ms": 4402776,
+      "external_ja": "だめだめ。ねえ。"
+    },
+    {
+      "cue_id": "ja-000181",
+      "start_ms": 4498432,
+      "end_ms": 4499446,
+      "external_ja": "私って言っちゃった?"
+    },
+    {
+      "cue_id": "ja-000182",
+      "start_ms": 4722723,
+      "end_ms": 4723716,
+      "external_ja": "そんな見ないで"
+    },
+    {
+      "cue_id": "ja-000183",
+      "start_ms": 4723716,
+      "end_ms": 4734061,
+      "external_ja": "そんな"
+    },
+    {
+      "cue_id": "ja-000184",
+      "start_ms": 4734061,
+      "end_ms": 4740065,
+      "external_ja": "ために行かなくてだめだ"
+    },
+    {
+      "cue_id": "ja-000185",
+      "start_ms": 4740065,
+      "end_ms": 4742357,
+      "external_ja": "めだからだめ"
+    },
+    {
+      "cue_id": "ja-000186",
+      "start_ms": 4772376,
+      "end_ms": 4773917,
+      "external_ja": "ねえ"
+    },
+    {
+      "cue_id": "ja-000187",
+      "start_ms": 4834868,
+      "end_ms": 4835882,
+      "external_ja": "すいません"
+    },
+    {
+      "cue_id": "ja-000188",
+      "start_ms": 5176314,
+      "end_ms": 5177329,
+      "external_ja": "気持ちいい?"
+    },
+    {
+      "cue_id": "ja-000189",
+      "start_ms": 5180391,
+      "end_ms": 5187369,
+      "external_ja": "めちゃくちゃ泣いてるねえわざわざ言わ"
+    },
+    {
+      "cue_id": "ja-000190",
+      "start_ms": 5187369,
+      "end_ms": 5194123,
+      "external_ja": "ないでじゃあもう"
+    },
+    {
+      "cue_id": "ja-000191",
+      "start_ms": 5194123,
+      "end_ms": 5195482,
+      "external_ja": "言えちゃっていい?"
+    },
+    {
+      "cue_id": "ja-000192",
+      "start_ms": 5197997,
+      "end_ms": 5199336,
+      "external_ja": "何その言い方"
+    },
+    {
+      "cue_id": "ja-000193",
+      "start_ms": 5665899,
+      "end_ms": 5666913,
+      "external_ja": "アニー"
+    },
+    {
+      "cue_id": "ja-000194",
+      "start_ms": 6244993,
+      "end_ms": 6251889,
+      "external_ja": "黙ってないよ 打ったんだって黒くもなって ないしね"
+    },
+    {
+      "cue_id": "ja-000195",
+      "start_ms": 6251889,
+      "end_ms": 6258988,
+      "external_ja": "え"
+    },
+    {
+      "cue_id": "ja-000196",
+      "start_ms": 6258988,
+      "end_ms": 6264667,
+      "external_ja": "せっかく洗ってあげようと思ったのに洗"
+    },
+    {
+      "cue_id": "ja-000197",
+      "start_ms": 6264667,
+      "end_ms": 6271685,
+      "external_ja": "わない洗わ"
+    },
+    {
+      "cue_id": "ja-000198",
+      "start_ms": 6271685,
+      "end_ms": 6272699,
+      "external_ja": "ない"
+    },
+    {
+      "cue_id": "ja-000199",
+      "start_ms": 6274951,
+      "end_ms": 6280529,
+      "external_ja": "めっちゃ撮ってるじゃんねえ、ほらね"
+    },
+    {
+      "cue_id": "ja-000200",
+      "start_ms": 6280529,
+      "end_ms": 6285863,
+      "external_ja": "え、可愛く撮ってね"
+    },
+    {
+      "cue_id": "ja-000201",
+      "start_ms": 6285863,
+      "end_ms": 6291664,
+      "external_ja": "え、ほら苦"
+    },
+    {
+      "cue_id": "ja-000202",
+      "start_ms": 6291664,
+      "end_ms": 6294341,
+      "external_ja": "しい?撮りづらい?"
+    },
+    {
+      "cue_id": "ja-000203",
+      "start_ms": 6294585,
+      "end_ms": 6295599,
+      "external_ja": "大丈夫?"
+    },
+    {
+      "cue_id": "ja-000204",
+      "start_ms": 6353274,
+      "end_ms": 6358162,
+      "external_ja": "ねえさっきこけた人がこんなに立つことある ?"
+    },
+    {
+      "cue_id": "ja-000205",
+      "start_ms": 6360130,
+      "end_ms": 6366519,
+      "external_ja": "こけたくせにしょうがないじゃんほら"
+    },
+    {
+      "cue_id": "ja-000206",
+      "start_ms": 6366519,
+      "end_ms": 6372827,
+      "external_ja": "気持ちいいイエーイ"
+    },
+    {
+      "cue_id": "ja-000207",
+      "start_ms": 6401771,
+      "end_ms": 6402785,
+      "external_ja": "上手になった?"
+    },
+    {
+      "cue_id": "ja-000208",
+      "start_ms": 6403982,
+      "end_ms": 6408972,
+      "external_ja": "上手気持ちいい特訓中"
+    },
+    {
+      "cue_id": "ja-000209",
+      "start_ms": 6436689,
+      "end_ms": 6437703,
+      "external_ja": "カメラ置いてんの?"
+    },
+    {
+      "cue_id": "ja-000210",
+      "start_ms": 6437966,
+      "end_ms": 6440847,
+      "external_ja": "ちょっとやだ!なんでよく撮れると思って?"
+    },
+    {
+      "cue_id": "ja-000211",
+      "start_ms": 6477742,
+      "end_ms": 6482630,
+      "external_ja": "今日もちょっと新しいことしてみたい何新し いことって?こう?"
+    },
+    {
+      "cue_id": "ja-000212",
+      "start_ms": 6483421,
+      "end_ms": 6488390,
+      "external_ja": "でも、上手にできるかわかんないうわ、すご いこうかな?"
+    },
+    {
+      "cue_id": "ja-000213",
+      "start_ms": 6489060,
+      "end_ms": 6490074,
+      "external_ja": "合ってる?"
+    },
+    {
+      "cue_id": "ja-000214",
+      "start_ms": 6490398,
+      "end_ms": 6493177,
+      "external_ja": "合ってると思うけどなこう?"
+    },
+    {
+      "cue_id": "ja-000215",
+      "start_ms": 6495449,
+      "end_ms": 6499972,
+      "external_ja": "口恥ずかしいちゃん"
+    },
+    {
+      "cue_id": "ja-000216",
+      "start_ms": 6499972,
+      "end_ms": 6503805,
+      "external_ja": "と挟めてるかな?"
+    },
+    {
+      "cue_id": "ja-000217",
+      "start_ms": 6506158,
+      "end_ms": 6513065,
+      "external_ja": "挟めてる冷めてる?うんよだれで滑っちゃう 気持ち"
+    },
+    {
+      "cue_id": "ja-000218",
+      "start_ms": 6513065,
+      "end_ms": 6514687,
+      "external_ja": "悪いかも"
+    },
+    {
+      "cue_id": "ja-000219",
+      "start_ms": 6563225,
+      "end_ms": 6564239,
+      "external_ja": "気持ちいい?"
+    },
+    {
+      "cue_id": "ja-000220",
+      "start_ms": 6564604,
+      "end_ms": 6567890,
+      "external_ja": "やばいやばい?"
+    },
+    {
+      "cue_id": "ja-000221",
+      "start_ms": 6569797,
+      "end_ms": 6570811,
+      "external_ja": "嘘?"
+    },
+    {
+      "cue_id": "ja-000222",
+      "start_ms": 6571176,
+      "end_ms": 6578153,
+      "external_ja": "なんか恥ずかしいんだけどなになにな"
+    },
+    {
+      "cue_id": "ja-000223",
+      "start_ms": 6578153,
+      "end_ms": 6579411,
+      "external_ja": "に?ダメダメダメえ、"
+    },
+    {
+      "cue_id": "ja-000224",
+      "start_ms": 6580141,
+      "end_ms": 6581155,
+      "external_ja": "ちょっと!"
+    },
+    {
+      "cue_id": "ja-000225",
+      "start_ms": 6581500,
+      "end_ms": 6583366,
+      "external_ja": "なになになに?ちょっと!"
+    },
+    {
+      "cue_id": "ja-000226",
+      "start_ms": 6591621,
+      "end_ms": 6593163,
+      "external_ja": "何食べたらこんなに出るの?"
+    },
+    {
+      "cue_id": "ja-000227",
+      "start_ms": 6639459,
+      "end_ms": 6645402,
+      "external_ja": "いや、あの、姉ちゃんの部屋なんか、ちょっ と…何?"
+    },
+    {
+      "cue_id": "ja-000228",
+      "start_ms": 6646132,
+      "end_ms": 6653069,
+      "external_ja": "最悪なにこれ?ちょ、やだ!なにこれ?ちょ 、戻してきてよいや、なにこれ?"
+    },
+    {
+      "cue_id": "ja-000229",
+      "start_ms": 6654530,
+      "end_ms": 6661547,
+      "external_ja": "私の彼氏彼氏なの?"
+    },
+    {
+      "cue_id": "ja-000230",
+      "start_ms": 6661649,
+      "end_ms": 6666882,
+      "external_ja": "うんちょっとさ、このやり方分かんないから さちょっとや!"
+    },
+    {
+      "cue_id": "ja-000231",
+      "start_ms": 6667328,
+      "end_ms": 6668342,
+      "external_ja": "ほんとに?"
+    },
+    {
+      "cue_id": "ja-000232",
+      "start_ms": 6668383,
+      "end_ms": 6673758,
+      "external_ja": "うんめっちゃ恥ずかしいんだけどよく見てて 嘘でしょ?"
+    },
+    {
+      "cue_id": "ja-000233",
+      "start_ms": 6674326,
+      "end_ms": 6680228,
+      "external_ja": "嘘じゃないよ本当"
+    },
+    {
+      "cue_id": "ja-000234",
+      "start_ms": 6680228,
+      "end_ms": 6685258,
+      "external_ja": "に?"
+    },
+    {
+      "cue_id": "ja-000235",
+      "start_ms": 6687672,
+      "end_ms": 6692844,
+      "external_ja": "いつの音で手伝ってるのか教えて本当に嫌だ"
+    },
+    {
+      "cue_id": "ja-000236",
+      "start_ms": 6803803,
+      "end_ms": 6804532,
+      "external_ja": "いけないって?"
+    },
+    {
+      "cue_id": "ja-000237",
+      "start_ms": 6804533,
+      "end_ms": 6810476,
+      "external_ja": "やだこれすごいな遊"
+    },
+    {
+      "cue_id": "ja-000238",
+      "start_ms": 6810476,
+      "end_ms": 6817129,
+      "external_ja": "ばないでめっちゃやだなんでじゃないやだ"
+    },
+    {
+      "cue_id": "ja-000239",
+      "start_ms": 6817129,
+      "end_ms": 6824228,
+      "external_ja": "なんかすごい暑いななんか暑いんだけど恥ず かし"
+    },
+    {
+      "cue_id": "ja-000240",
+      "start_ms": 6824228,
+      "end_ms": 6830111,
+      "external_ja": "かった?うん恥ずかしかったじゃあ次俺ちょ っとこっちはわかる"
+    },
+    {
+      "cue_id": "ja-000241",
+      "start_ms": 6840161,
+      "end_ms": 6847240,
+      "external_ja": "ちょっとやだねえくそ"
+    },
+    {
+      "cue_id": "ja-000242",
+      "start_ms": 6847240,
+      "end_ms": 6848254,
+      "external_ja": "ぐったい"
+    },
+    {
+      "cue_id": "ja-000243",
+      "start_ms": 6967012,
+      "end_ms": 6969750,
+      "external_ja": "気持ちいいいい"
+    },
+    {
+      "cue_id": "ja-000244",
+      "start_ms": 6969750,
+      "end_ms": 6976464,
+      "external_ja": "って言えば嫌だ意"
+    },
+    {
+      "cue_id": "ja-000245",
+      "start_ms": 6976464,
+      "end_ms": 6983421,
+      "external_ja": "地悪普段の使い方やっぱりみたいなさ"
+    },
+    {
+      "cue_id": "ja-000246",
+      "start_ms": 6983421,
+      "end_ms": 6986727,
+      "external_ja": "っきやったじゃんこれまた違うじゃん"
+    },
+    {
+      "cue_id": "ja-000247",
+      "start_ms": 7054371,
+      "end_ms": 7055385,
+      "external_ja": "一緒に、こっちに"
+    },
+    {
+      "cue_id": "ja-000248",
+      "start_ms": 7121194,
+      "end_ms": 7122208,
+      "external_ja": "どうしたらいいの?"
+    },
+    {
+      "cue_id": "ja-000249",
+      "start_ms": 7151183,
+      "end_ms": 7153718,
+      "external_ja": "1、2、3、4、5、6、"
+    },
+    {
+      "cue_id": "ja-000250",
+      "start_ms": 7154529,
+      "end_ms": 7155543,
+      "external_ja": "7、"
+    },
+    {
+      "cue_id": "ja-000251",
+      "start_ms": 7155807,
+      "end_ms": 7156821,
+      "external_ja": "8"
+    },
+    {
+      "cue_id": "ja-000252",
+      "start_ms": 7200684,
+      "end_ms": 7205876,
+      "external_ja": "これもペッてしていいってこと?"
+    },
+    {
+      "cue_id": "ja-000253",
+      "start_ms": 7206201,
+      "end_ms": 7207945,
+      "external_ja": "うん、ペッてしていいやれるよ"
+    },
+    {
+      "cue_id": "ja-000254",
+      "start_ms": 7211474,
+      "end_ms": 7212224,
+      "external_ja": "一緒に入っていいの?"
+    },
+    {
+      "cue_id": "ja-000255",
+      "start_ms": 7212225,
+      "end_ms": 7219324,
+      "external_ja": "うんいいよいいでしょいいよね?うんあった か"
+    },
+    {
+      "cue_id": "ja-000256",
+      "start_ms": 7219324,
+      "end_ms": 7225530,
+      "external_ja": "いよいしょ一緒に入っていい?うんもう片手 入れてんじゃん"
+    },
+    {
+      "cue_id": "ja-000257",
+      "start_ms": 7225530,
+      "end_ms": 7230256,
+      "external_ja": "あったかいより"
+    },
+    {
+      "cue_id": "ja-000258",
+      "start_ms": 7242822,
+      "end_ms": 7248542,
+      "external_ja": "生えてる?うん、生えてるいつまで撮ってん の?"
+    },
+    {
+      "cue_id": "ja-000259",
+      "start_ms": 7248765,
+      "end_ms": 7249779,
+      "external_ja": "ん?"
+    },
+    {
+      "cue_id": "ja-000260",
+      "start_ms": 7250266,
+      "end_ms": 7255073,
+      "external_ja": "ねえじゃあ撮るよほんと?"
+    },
+    {
+      "cue_id": "ja-000261",
+      "start_ms": 7255316,
+      "end_ms": 7256330,
+      "external_ja": "うん"
+    },
+    {
+      "cue_id": "ja-000262",
+      "start_ms": 7273814,
+      "end_ms": 7274950,
+      "external_ja": "もう気にならしたらいいよ"
+    },
+    {
+      "cue_id": "ja-000263",
+      "start_ms": 7341743,
+      "end_ms": 7342757,
+      "external_ja": "どうしたの?"
+    },
+    {
+      "cue_id": "ja-000264",
+      "start_ms": 7349450,
+      "end_ms": 7350464,
+      "external_ja": "姉ちゃん!"
+    },
+    {
+      "cue_id": "ja-000265",
+      "start_ms": 7350850,
+      "end_ms": 7351864,
+      "external_ja": "え?"
+    },
+    {
+      "cue_id": "ja-000266",
+      "start_ms": 7353446,
+      "end_ms": 7354460,
+      "external_ja": "なんかあったの?"
+    },
+    {
+      "cue_id": "ja-000267",
+      "start_ms": 7411020,
+      "end_ms": 7412034,
+      "external_ja": "勉強進んでる?"
+    },
+    {
+      "cue_id": "ja-000268",
+      "start_ms": 7413799,
+      "end_ms": 7414164,
+      "external_ja": "うん"
+    },
+    {
+      "cue_id": "ja-000269",
+      "start_ms": 7414164,
+      "end_ms": 7421689,
+      "external_ja": "ね"
+    },
+    {
+      "cue_id": "ja-000270",
+      "start_ms": 7421689,
+      "end_ms": 7422703,
+      "external_ja": "え、あったかいの?"
+    },
+    {
+      "cue_id": "ja-000271",
+      "start_ms": 7424812,
+      "end_ms": 7428382,
+      "external_ja": "うんねえ"
+    },
+    {
+      "cue_id": "ja-000272",
+      "start_ms": 7440998,
+      "end_ms": 7442012,
+      "external_ja": "何?"
+    },
+    {
+      "cue_id": "ja-000273",
+      "start_ms": 7444426,
+      "end_ms": 7445440,
+      "external_ja": "何かあった?"
+    },
+    {
+      "cue_id": "ja-000274",
+      "start_ms": 7454284,
+      "end_ms": 7455582,
+      "external_ja": "先輩に告られた"
+    },
+    {
+      "cue_id": "ja-000275",
+      "start_ms": 7472498,
+      "end_ms": 7473512,
+      "external_ja": "付き合うの?"
+    },
+    {
+      "cue_id": "ja-000276",
+      "start_ms": 7476352,
+      "end_ms": 7477772,
+      "external_ja": "たかしはどう思うの?"
+    },
+    {
+      "cue_id": "ja-000277",
+      "start_ms": 7484992,
+      "end_ms": 7491016,
+      "external_ja": "裏を切ればそうだ"
+    },
+    {
+      "cue_id": "ja-000278",
+      "start_ms": 7491016,
+      "end_ms": 7496838,
+      "external_ja": "よねそうしたかったんだもんね"
+    },
+    {
+      "cue_id": "ja-000279",
+      "start_ms": 7507436,
+      "end_ms": 7512608,
+      "external_ja": "姉ちゃん何?"
+    },
+    {
+      "cue_id": "ja-000280",
+      "start_ms": 7516725,
+      "end_ms": 7517739,
+      "external_ja": "姉ちゃんこそ何?"
+    },
+    {
+      "cue_id": "ja-000281",
+      "start_ms": 7519748,
+      "end_ms": 7520762,
+      "external_ja": "別に"
+    },
+    {
+      "cue_id": "ja-000282",
+      "start_ms": 7539280,
+      "end_ms": 7543012,
+      "external_ja": "姉ちゃんが好きだ一人の女として"
+    },
+    {
+      "cue_id": "ja-000283",
+      "start_ms": 7543012,
+      "end_ms": 7549949,
+      "external_ja": "私もたかしと離れたくない?"
+    },
+    {
+      "cue_id": "ja-000284",
+      "start_ms": 7557474,
+      "end_ms": 7563985,
+      "external_ja": "離れない兄弟じゃん離れなきゃ"
+    },
+    {
+      "cue_id": "ja-000285",
+      "start_ms": 7563985,
+      "end_ms": 7565527,
+      "external_ja": "兄弟なんだから"
+    },
+    {
+      "cue_id": "ja-000286",
+      "start_ms": 7609257,
+      "end_ms": 7616194,
+      "external_ja": "高木最後にさ"
+    },
+    {
+      "cue_id": "ja-000287",
+      "start_ms": 7797900,
+      "end_ms": 7798915,
+      "external_ja": "ねえ"
+    },
+    {
+      "cue_id": "ja-000288",
+      "start_ms": 8652683,
+      "end_ms": 8653697,
+      "external_ja": "くてくて"
+    },
+    {
+      "cue_id": "ja-000289",
+      "start_ms": 8873586,
+      "end_ms": 8880685,
+      "external_ja": "キンキンおいしいだめだめさせないだって飲 めれないもん"
+    },
+    {
+      "cue_id": "ja-000290",
+      "start_ms": 8880685,
+      "end_ms": 8883586,
+      "external_ja": "ね"
+    },
+    {
+      "cue_id": "ja-000291",
+      "start_ms": 8883586,
+      "end_ms": 8888941,
+      "external_ja": "え飲めれない"
+    },
+    {
+      "cue_id": "ja-000292",
+      "start_ms": 8922175,
+      "end_ms": 8923189,
+      "external_ja": "ダメです"
+    },
+    {
+      "cue_id": "ja-000293",
+      "start_ms": 8956017,
+      "end_ms": 8957031,
+      "external_ja": "だめだよ。"
+    },
+    {
+      "cue_id": "ja-000294",
+      "start_ms": 8957376,
+      "end_ms": 8958390,
+      "external_ja": "ちょっと。"
+    },
+    {
+      "cue_id": "ja-000295",
+      "start_ms": 8958755,
+      "end_ms": 8959993,
+      "external_ja": "だめだよ。"
+    },
+    {
+      "cue_id": "ja-000296",
+      "start_ms": 9021055,
+      "end_ms": 9022069,
+      "external_ja": "変にダメ!"
+    },
+    {
+      "cue_id": "ja-000297",
+      "start_ms": 9077625,
+      "end_ms": 9078740,
+      "external_ja": "気持ちいいからダメ"
+    },
+    {
+      "cue_id": "ja-000298",
+      "start_ms": 9308498,
+      "end_ms": 9314684,
+      "external_ja": "寝ちゃうよ寝ちゃうよ寝ちゃうよ寝ちゃうよ 寝ちゃう"
+    },
+    {
+      "cue_id": "ja-000299",
+      "start_ms": 9314684,
+      "end_ms": 9317138,
+      "external_ja": "よ"
+    },
+    {
+      "cue_id": "ja-000300",
+      "start_ms": 9317138,
+      "end_ms": 9325251,
+      "external_ja": "寝"
+    },
+    {
+      "cue_id": "ja-000301",
+      "start_ms": 9325251,
+      "end_ms": 9328720,
+      "external_ja": "ちゃう"
+    },
+    {
+      "cue_id": "ja-000302",
+      "start_ms": 9328720,
+      "end_ms": 9333953,
+      "external_ja": "よ"
+    },
+    {
+      "cue_id": "ja-000303",
+      "start_ms": 9443887,
+      "end_ms": 9444902,
+      "external_ja": "全然無理"
+    },
+    {
+      "cue_id": "ja-000304",
+      "start_ms": 9480265,
+      "end_ms": 9481279,
+      "external_ja": "気持ち良すぎ"
+    },
+    {
+      "cue_id": "ja-000305",
+      "start_ms": 9670116,
+      "end_ms": 9671556,
+      "external_ja": "プロフェイス技かけられてたから"
+    },
+    {
+      "cue_id": "ja-000306",
+      "start_ms": 9767606,
+      "end_ms": 9768621,
+      "external_ja": "ローレスエッチ?"
+    },
+    {
+      "cue_id": "ja-000307",
+      "start_ms": 9782961,
+      "end_ms": 9787038,
+      "external_ja": "そんな元気あるの?"
+    },
+    {
+      "cue_id": "ja-000308",
+      "start_ms": 9945226,
+      "end_ms": 9951372,
+      "external_ja": "気持ちいいじゃん"
+    },
+    {
+      "cue_id": "ja-000309",
+      "start_ms": 10004514,
+      "end_ms": 10009057,
+      "external_ja": "気持ちいい気持ちいいまた入れたい"
+    },
+    {
+      "cue_id": "ja-000310",
+      "start_ms": 10052929,
+      "end_ms": 10055931,
+      "external_ja": "すごいからめっちゃ音するかも大丈夫?"
+    },
+    {
+      "cue_id": "ja-000311",
+      "start_ms": 10357146,
+      "end_ms": 10360878,
+      "external_ja": "何その格好ダ"
+    },
+    {
+      "cue_id": "ja-000312",
+      "start_ms": 10360878,
+      "end_ms": 10364489,
+      "external_ja": "メかな"
+    },
+    {
+      "cue_id": "ja-000313",
+      "start_ms": 10404528,
+      "end_ms": 10409578,
+      "external_ja": "え、ちょっちょっちょっちょっちょっちょっ ちょっちょっちょっ"
+    }
+  ]
+}

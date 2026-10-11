@@ -1,0 +1,123 @@
+{
+  "status": "PASS",
+  "cases": [
+    {
+      "id": "clip-001",
+      "whisper_source_float32_exact": true,
+      "core_context_crop_exact": true,
+      "reazon_float32_payload_sha_exact": true,
+      "reazon_parent_conversion_exact": true,
+      "reazon_conversion": "ROUND",
+      "saved_full_short_input_exact": true
+    },
+    {
+      "id": "clip-002",
+      "whisper_source_float32_exact": true,
+      "core_context_crop_exact": true,
+      "reazon_float32_payload_sha_exact": true,
+      "reazon_parent_conversion_exact": true,
+      "reazon_conversion": "TRUNCATE",
+      "saved_full_short_input_exact": true
+    },
+    {
+      "id": "clip-003",
+      "whisper_source_float32_exact": true,
+      "core_context_crop_exact": true,
+      "reazon_float32_payload_sha_exact": true,
+      "reazon_parent_conversion_exact": true,
+      "reazon_conversion": "TRUNCATE",
+      "saved_full_short_input_exact": true
+    },
+    {
+      "id": "clip-004",
+      "whisper_source_float32_exact": true,
+      "core_context_crop_exact": true,
+      "reazon_float32_payload_sha_exact": true,
+      "reazon_parent_conversion_exact": true,
+      "reazon_conversion": "TRUNCATE",
+      "saved_full_short_input_exact": true
+    },
+    {
+      "id": "clip-005",
+      "whisper_source_float32_exact": true,
+      "core_context_crop_exact": true,
+      "reazon_float32_payload_sha_exact": true,
+      "reazon_parent_conversion_exact": true,
+      "reazon_conversion": "TRUNCATE",
+      "saved_full_short_input_exact": true
+    },
+    {
+      "id": "clip-006",
+      "whisper_source_float32_exact": true,
+      "core_context_crop_exact": true,
+      "reazon_float32_payload_sha_exact": true,
+      "reazon_parent_conversion_exact": true,
+      "reazon_conversion": "ROUND",
+      "saved_full_short_input_exact": true
+    },
+    {
+      "id": "clip-007",
+      "whisper_source_float32_exact": true,
+      "core_context_crop_exact": true,
+      "reazon_float32_payload_sha_exact": true,
+      "reazon_parent_conversion_exact": true,
+      "reazon_conversion": "TRUNCATE",
+      "saved_full_short_input_exact": true
+    },
+    {
+      "id": "clip-008",
+      "whisper_source_float32_exact": true,
+      "core_context_crop_exact": true,
+      "reazon_float32_payload_sha_exact": true,
+      "reazon_parent_conversion_exact": true,
+      "reazon_conversion": "TRUNCATE",
+      "saved_full_short_input_exact": true
+    },
+    {
+      "id": "clip-009",
+      "whisper_source_float32_exact": true,
+      "core_context_crop_exact": true,
+      "reazon_float32_payload_sha_exact": true,
+      "reazon_parent_conversion_exact": true,
+      "reazon_conversion": "TRUNCATE",
+      "saved_full_short_input_exact": true
+    },
+    {
+      "id": "clip-010",
+      "whisper_source_float32_exact": true,
+      "core_context_crop_exact": true,
+      "reazon_float32_payload_sha_exact": true,
+      "reazon_parent_conversion_exact": true,
+      "reazon_conversion": "TRUNCATE",
+      "saved_full_short_input_exact": true
+    },
+    {
+      "id": "clip-011",
+      "whisper_source_float32_exact": true,
+      "core_context_crop_exact": true,
+      "reazon_float32_payload_sha_exact": true,
+      "reazon_parent_conversion_exact": true,
+      "reazon_conversion": "ROUND",
+      "saved_full_short_input_exact": true
+    },
+    {
+      "id": "clip-012",
+      "whisper_source_float32_exact": true,
+      "core_context_crop_exact": true,
+      "reazon_float32_payload_sha_exact": true,
+      "reazon_parent_conversion_exact": true,
+      "reazon_conversion": "TRUNCATE",
+      "saved_full_short_input_exact": true
+    },
+    {
+      "id": "clip-013",
+      "whisper_source_float32_exact": true,
+      "core_context_crop_exact": true,
+      "reazon_float32_payload_sha_exact": true,
+      "reazon_parent_conversion_exact": true,
+      "reazon_conversion": "ROUND",
+      "saved_full_short_input_exact": true
+    }
+  ],
+  "new_model_imports_or_calls": 0
+}
