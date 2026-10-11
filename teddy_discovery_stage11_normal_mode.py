@@ -21,7 +21,8 @@ import uuid
 
 import teddy_discovery_stage11_controller as controller
 from teddy_discovery_alignment_acceptance import AlignmentAcceptancePolicy
-from teddy_discovery_stage11_deployment import SSHRemoteHermesBridge
+from teddy_discovery_stage11_deployment import SSHRemoteHermesBridge, Stage11DeploymentTransportError
+from teddy_discovery_asr import ASRError
 from teddy_discovery_stage11_live_adapters import _align_external_payload
 from teddy_discovery_stateful_boundary import (
     bind_stateful_absorption_preparation, serialize_stateful_boundary_evidence,
@@ -381,9 +382,9 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
         # Every failed invocation terminates, with an immutable reason; no user-wait state.
         store(directory/('normal-failure-'+uuid.uuid4().hex+'.json'),wire({'status':'FAILED','title':title,
             'error_type':type(error).__name__,'reason':str(error),'user_intervention':0,'automatic_insertion':False}))
-        if isinstance(error, ValueError):
-            raise controller.Stage11ControllerValidationError('normal core validation failed: '+str(error)) from error
-        raise
+        if isinstance(error,(controller.Stage11ControllerError,Stage11DeploymentTransportError,ASRError)):
+            raise
+        raise controller.Stage11ControllerValidationError('normal core failed: '+type(error).__name__+': '+str(error)) from error
 
 
 def main():

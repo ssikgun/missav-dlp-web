@@ -1324,6 +1324,9 @@ def run_preflight(
     emit("LIVE_EXECUTED", "NO")
 
     check_repo(expected_head)
+    from teddy_title_exclusion import configured_lock_dir, _validated_root
+    _validated_root(configured_lock_dir())
+    emit('SHARED_TITLE_LOCK_PREFLIGHT', 'PASS')
     contract_check()
     inspect_runtime_directories()
     inspect_remote_root()

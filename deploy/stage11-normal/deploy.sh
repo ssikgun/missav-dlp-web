@@ -30,7 +30,7 @@ if [[ ! -d "$stage11_release" ]]; then
   git -C "$stage11_source" worktree add --detach "$stage11_release" "$stage11_revision"
 fi
 [[ -z "$(git -C "$stage11_release" status --porcelain)" ]]
-/opt/stage11-stt-venv/bin/python -u "$stage11_release/teddy_discovery_stage12_bulk_runner.py" \
+TEDDY_TITLE_LOCK_DIR=/opt/missav-dlp-web/title-locks /opt/stage11-stt-venv/bin/python -u "$stage11_release/teddy_discovery_stage12_bulk_runner.py" \
   --mode preflight --batch-size 1 --expected-head "$stage11_revision" > "$stage11_backup/preflight.log" 2>&1
 ln -s "$stage11_release" "$stage11_deployment/current.next"
 mv -Tf "$stage11_deployment/current.next" "$stage11_deployment/current"

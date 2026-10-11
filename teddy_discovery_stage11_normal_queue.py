@@ -39,6 +39,9 @@ def main():
     parser.add_argument('--expected-head',required=True)
     args=parser.parse_args()
     bulk.require_production_interpreter(); bulk.check_repo(args.expected_head)
+    from teddy_title_exclusion import configured_lock_dir, _validated_root
+    _validated_root(configured_lock_dir())
+    bulk.emit('NORMAL_SHARED_TITLE_LOCK','CONFIGURED')
     # Deployment-owned authorization. There is no per-title user confirmation.
     os.environ[bulk.AUTH_ENV]=bulk.AUTH_VALUE
     with bulk.RunnerLock(bulk.LOCK_PATH):

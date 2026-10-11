@@ -36,7 +36,16 @@ validation attempts, with existing fixed64 fallback. Focused tests11 + existing
 smoke scripts17, compile/shell/systemd/diff PASS. Detailed evidence/report:
 docs/discovery/STAGE11_NORMAL_MODE_20261012.md and stage11-normal-mode-20261012/.
 
-Production activation pending at this implementation commit. New bounded normal
+Initial af0db3e deployment/preflight succeeded and the timer triggered at
+08:52:00 KST, admitting four previously unseen eligible holdings. It stopped
+before any title-state transition because the shared title-lock environment was
+missing (historical launchers export TEDDY_TITLE_LOCK_DIR). Corrected the normal
+service to use /opt/missav-dlp-web/title-locks, and added the existing read-only
+root validator before queue seeding and to production preflight. No existing
+row was reset, no model/NAS publication occurred in this stopped cycle.
+Redeployment/operational verification follows this correction commit.
+
+Production activation verification remains pending at this implementation commit. New bounded normal
 queue reuses existing Stage12 inventory/state/locks/no-overwrite publisher and
 heartbeat. It admits unseen canonical holdings automatically, preserves old
 states, and processes one ordinary PENDING title per cycle. Exact detached

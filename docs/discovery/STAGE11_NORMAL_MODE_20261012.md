@@ -76,3 +76,10 @@ runs one existing PENDING job per cycle. It preserves all historical states and
 existing KO; it does not reset failed rows or enable forensic approval paths.
 Deployment/rollback use an exact clean detached release and existing production
 preflight. Web, completion, writer and GPU services are outside this deployment.
+
+The initial production timer triggered at 08:52:00 KST and admitted four eligible
+new holdings. It stopped before a title state changed because the service lacked
+the existing shared title-lock environment. The service now points to the same
+host lock folder as completion/web, and the existing read-only root validator
+runs before seeding and during production preflight. The stopped cycle made no
+model or NAS subtitle call; its error and queue history remain intact.
