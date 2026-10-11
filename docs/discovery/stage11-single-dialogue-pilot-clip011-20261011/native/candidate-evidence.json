@@ -1,0 +1,1037 @@
+{
+  "purpose": "SINGLE_SUPPLEMENTAL_REVIEW_AUXILIARY_EVIDENCE_NOT_OUTPUT_CONTRACT",
+  "target": {
+    "id": "clip-011",
+    "group_id": "supplemental-group-a51ee4697419a2fbc61aa90b261b0e930ef67c7ef138aaa1a18f8d1f9c33610a",
+    "core_range_ms": [
+      3355932,
+      3356832
+    ],
+    "original_context_range_ms": [
+      3353932,
+      3358832.0
+    ],
+    "core_wav_sha256": "5c9e63db5cb814d0268ecf936661eb42a57ca30079173a21d4a946cc218eb896",
+    "context_wav_sha256": "7147925aeac9aca78a704721fdb048ac91cdb2feb69e093188e7199d9ccc3e83",
+    "user_core_judgment": {
+      "id": "clip-011",
+      "core_label": "DIALOGUE_LIKELY",
+      "user_note": "대사처럼 들림",
+      "japanese_transcript": "",
+      "japanese_accuracy": "UNKNOWN",
+      "human_utterance_start_ms": null,
+      "human_utterance_end_ms": null
+    },
+    "prior_context_truth": {
+      "id": "clip-011",
+      "original_label": "SPEECH",
+      "original_wav_sha256": "7147925aeac9aca78a704721fdb048ac91cdb2feb69e093188e7199d9ccc3e83",
+      "core_label": null,
+      "context_label": "SPEECH",
+      "core_start_ms": 3355932,
+      "core_end_ms": 3356832
+    },
+    "prior_user_note": "사용자가 이 클립에서 실제 대사 존재를 확인함. 개별 Whisper 문장의 일본어 정확성은 미확인. 발화 단위 중복 제거 필요. 자막 추가 승인 없음.",
+    "speech_presence": "DIALOGUE_LIKELY",
+    "japanese_accuracy": "UNKNOWN",
+    "whisper": {
+      "status": "CORE_SEGMENT_ESTIMATED",
+      "primary_AB": [
+        {
+          "run": "A",
+          "text": "いいところだね",
+          "segment": {
+            "start_ms": 3355932,
+            "end_ms": 3356832,
+            "text": "いいところだね",
+            "words": [
+              {
+                "start_ms": 3355932,
+                "end_ms": 3356292,
+                "text": "いい"
+              },
+              {
+                "start_ms": 3356292,
+                "end_ms": 3356552,
+                "text": "ところ"
+              },
+              {
+                "start_ms": 3356552,
+                "end_ms": 3356712,
+                "text": "だ"
+              },
+              {
+                "start_ms": 3356712,
+                "end_ms": 3356832,
+                "text": "ね"
+              }
+            ]
+          },
+          "input_range_ms": [
+            3351000,
+            3372000
+          ],
+          "input_path": "/tmp/stage11-positive-ab-result-7h3hrik9/positive-05.float32.npy",
+          "input_sha256": "c021321c20a79849c5fd00cfd1d6f5fe608129d9d2322679768ca222e0504c48",
+          "evidence_origin": "/tmp/stage11-supplemental-candidates-Jsy4EEif/positive-05.A.normalized-asr.json",
+          "body_time_overlap": true
+        },
+        {
+          "run": "B",
+          "text": "いいところだね",
+          "segment": {
+            "start_ms": 3355960,
+            "end_ms": 3356820,
+            "text": "いいところだね",
+            "words": [
+              {
+                "start_ms": 3355960,
+                "end_ms": 3356280,
+                "text": "いい"
+              },
+              {
+                "start_ms": 3356280,
+                "end_ms": 3356540,
+                "text": "ところ"
+              },
+              {
+                "start_ms": 3356540,
+                "end_ms": 3356700,
+                "text": "だ"
+              },
+              {
+                "start_ms": 3356700,
+                "end_ms": 3356820,
+                "text": "ね"
+              }
+            ]
+          },
+          "input_range_ms": [
+            3351000,
+            3372000
+          ],
+          "input_path": "/tmp/stage11-positive-ab-result-7h3hrik9/positive-05.float32.npy",
+          "input_sha256": "c021321c20a79849c5fd00cfd1d6f5fe608129d9d2322679768ca222e0504c48",
+          "evidence_origin": "/tmp/stage11-supplemental-candidates-Jsy4EEif/positive-05.B.normalized-asr.json",
+          "body_time_overlap": true
+        }
+      ],
+      "saved_short_observations": [
+        {
+          "role": "CORE",
+          "segment": {
+            "start_ms": 3355400,
+            "end_ms": 3356840,
+            "text": "いいところだね",
+            "words": [
+              {
+                "start_ms": 3355400,
+                "end_ms": 3355960,
+                "text": "いい"
+              },
+              {
+                "start_ms": 3355960,
+                "end_ms": 3356520,
+                "text": "ところ"
+              },
+              {
+                "start_ms": 3356520,
+                "end_ms": 3356700,
+                "text": "だ"
+              },
+              {
+                "start_ms": 3356700,
+                "end_ms": 3356840,
+                "text": "ね"
+              }
+            ]
+          },
+          "input_range_ms": [
+            3335000.0,
+            3365000.0
+          ],
+          "evidence_origin": "/tmp/stage11-short-no-vad-result-ypelldns/chunk-04.wire.json",
+          "body_time_overlap": true
+        },
+        {
+          "role": "CONTEXT_ONLY",
+          "segment": {
+            "start_ms": 3355900,
+            "end_ms": 3356820,
+            "text": "いいところだね。",
+            "words": [
+              {
+                "start_ms": 3355900,
+                "end_ms": 3356300,
+                "text": "いい"
+              },
+              {
+                "start_ms": 3356300,
+                "end_ms": 3356540,
+                "text": "ところ"
+              },
+              {
+                "start_ms": 3356540,
+                "end_ms": 3356700,
+                "text": "だ"
+              },
+              {
+                "start_ms": 3356700,
+                "end_ms": 3356820,
+                "text": "ね。"
+              }
+            ]
+          },
+          "input_range_ms": [
+            3355000.0,
+            3385000.0
+          ],
+          "evidence_origin": "/tmp/stage11-short-no-vad-result-ypelldns/chunk-05.wire.json",
+          "body_time_overlap": true
+        }
+      ],
+      "saved_AB_comparison": [
+        {
+          "arm": "A",
+          "chunk": 8,
+          "response_file": "/tmp/stage11-whisper-import-corrected-ab-result-g7600rpq/A-chunk-08.wire.json",
+          "response_sha256": "eb65aecca6659f6d37ef94c221aad272f09767d9304b82a6dbe2371cfab54f52",
+          "segments": [
+            {
+              "start_ms": 3355400,
+              "end_ms": 3356840,
+              "stt_ja": "いいところだね",
+              "words": [
+                {
+                  "start_ms": 20400,
+                  "end_ms": 20960,
+                  "text": "いい"
+                },
+                {
+                  "start_ms": 20960,
+                  "end_ms": 21520,
+                  "text": "ところ"
+                },
+                {
+                  "start_ms": 21520,
+                  "end_ms": 21700,
+                  "text": "だ"
+                },
+                {
+                  "start_ms": 21700,
+                  "end_ms": 21840,
+                  "text": "ね"
+                }
+              ],
+              "word_time_origin_ms": 3335000
+            }
+          ]
+        },
+        {
+          "arm": "A",
+          "chunk": 9,
+          "response_file": "/tmp/stage11-whisper-import-corrected-ab-result-g7600rpq/A-chunk-09.wire.json",
+          "response_sha256": "2c4b59f7829509b1c3dcb189d9217ecaa1770a1d5f43dd107f00f4c9f99c9dd1",
+          "segments": [
+            {
+              "start_ms": 3355900,
+              "end_ms": 3356820,
+              "stt_ja": "いいところだね。",
+              "words": [
+                {
+                  "start_ms": 900,
+                  "end_ms": 1300,
+                  "text": "いい"
+                },
+                {
+                  "start_ms": 1300,
+                  "end_ms": 1540,
+                  "text": "ところ"
+                },
+                {
+                  "start_ms": 1540,
+                  "end_ms": 1700,
+                  "text": "だ"
+                },
+                {
+                  "start_ms": 1700,
+                  "end_ms": 1820,
+                  "text": "ね。"
+                }
+              ],
+              "word_time_origin_ms": 3355000
+            }
+          ]
+        },
+        {
+          "arm": "B",
+          "chunk": 8,
+          "response_file": "/tmp/stage11-whisper-import-corrected-ab-result-g7600rpq/B-chunk-08.wire.json",
+          "response_sha256": "eb65aecca6659f6d37ef94c221aad272f09767d9304b82a6dbe2371cfab54f52",
+          "segments": [
+            {
+              "start_ms": 3355400,
+              "end_ms": 3356840,
+              "stt_ja": "いいところだね",
+              "words": [
+                {
+                  "start_ms": 20400,
+                  "end_ms": 20960,
+                  "text": "いい"
+                },
+                {
+                  "start_ms": 20960,
+                  "end_ms": 21520,
+                  "text": "ところ"
+                },
+                {
+                  "start_ms": 21520,
+                  "end_ms": 21700,
+                  "text": "だ"
+                },
+                {
+                  "start_ms": 21700,
+                  "end_ms": 21840,
+                  "text": "ね"
+                }
+              ],
+              "word_time_origin_ms": 3335000
+            }
+          ]
+        },
+        {
+          "arm": "B",
+          "chunk": 9,
+          "response_file": "/tmp/stage11-whisper-import-corrected-ab-result-g7600rpq/B-chunk-09.wire.json",
+          "response_sha256": "2c4b59f7829509b1c3dcb189d9217ecaa1770a1d5f43dd107f00f4c9f99c9dd1",
+          "segments": [
+            {
+              "start_ms": 3355900,
+              "end_ms": 3356820,
+              "stt_ja": "いいところだね。",
+              "words": [
+                {
+                  "start_ms": 900,
+                  "end_ms": 1300,
+                  "text": "いい"
+                },
+                {
+                  "start_ms": 1300,
+                  "end_ms": 1540,
+                  "text": "ところ"
+                },
+                {
+                  "start_ms": 1540,
+                  "end_ms": 1700,
+                  "text": "だ"
+                },
+                {
+                  "start_ms": 1700,
+                  "end_ms": 1820,
+                  "text": "ね。"
+                }
+              ],
+              "word_time_origin_ms": 3355000
+            }
+          ]
+        }
+      ],
+      "saved_full_short": [
+        {
+          "input_range_ms": [
+            3335000,
+            3365000
+          ],
+          "request_path": "/tmp/stage11-full-short-execution-review/core-0168.request.npy",
+          "request_sha256": "28d52b5ce03e477cb8f28c86da8b538e3f7b7cb9be50e40bfdb9b99479affc2b",
+          "source_path": "/tmp/stage11-full-short-execution-review/core-0168.segments.json",
+          "segments": [
+            {
+              "end_ms": 3356840,
+              "start_ms": 3355400,
+              "text": "いいところだね",
+              "words": [
+                {
+                  "end_ms": 3355960,
+                  "start_ms": 3355400,
+                  "text": "いい"
+                },
+                {
+                  "end_ms": 3356520,
+                  "start_ms": 3355960,
+                  "text": "ところ"
+                },
+                {
+                  "end_ms": 3356700,
+                  "start_ms": 3356520,
+                  "text": "だ"
+                },
+                {
+                  "end_ms": 3356840,
+                  "start_ms": 3356700,
+                  "text": "ね"
+                }
+              ],
+              "body_time_overlap": true
+            },
+            {
+              "end_ms": 3358100,
+              "start_ms": 3357540,
+              "text": "はい",
+              "words": [
+                {
+                  "end_ms": 3358100,
+                  "start_ms": 3357540,
+                  "text": "はい"
+                }
+              ],
+              "body_time_overlap": false
+            },
+            {
+              "end_ms": 3360520,
+              "start_ms": 3358680,
+              "text": "お父さんと住んでるの",
+              "words": [
+                {
+                  "end_ms": 3359240,
+                  "start_ms": 3358680,
+                  "text": "お"
+                },
+                {
+                  "end_ms": 3359400,
+                  "start_ms": 3359240,
+                  "text": "父"
+                },
+                {
+                  "end_ms": 3359580,
+                  "start_ms": 3359400,
+                  "text": "さん"
+                },
+                {
+                  "end_ms": 3359860,
+                  "start_ms": 3359580,
+                  "text": "と"
+                },
+                {
+                  "end_ms": 3360140,
+                  "start_ms": 3359860,
+                  "text": "住"
+                },
+                {
+                  "end_ms": 3360320,
+                  "start_ms": 3360140,
+                  "text": "んで"
+                },
+                {
+                  "end_ms": 3360360,
+                  "start_ms": 3360320,
+                  "text": "る"
+                },
+                {
+                  "end_ms": 3360520,
+                  "start_ms": 3360360,
+                  "text": "の"
+                }
+              ],
+              "body_time_overlap": false
+            }
+          ]
+        },
+        {
+          "input_range_ms": [
+            3355000,
+            3385000
+          ],
+          "request_path": "/tmp/stage11-full-short-execution-review/core-0169.request.npy",
+          "request_sha256": "db1a7e65be16d494035d650baa1d1085d0b8e108d037785c1fb6cb66b16a2c3b",
+          "source_path": "/tmp/stage11-full-short-execution-review/core-0169.segments.json",
+          "segments": [
+            {
+              "end_ms": 3356820,
+              "start_ms": 3355900,
+              "text": "いいところだね。",
+              "words": [
+                {
+                  "end_ms": 3356300,
+                  "start_ms": 3355900,
+                  "text": "いい"
+                },
+                {
+                  "end_ms": 3356540,
+                  "start_ms": 3356300,
+                  "text": "ところ"
+                },
+                {
+                  "end_ms": 3356700,
+                  "start_ms": 3356540,
+                  "text": "だ"
+                },
+                {
+                  "end_ms": 3356820,
+                  "start_ms": 3356700,
+                  "text": "ね。"
+                }
+              ],
+              "body_time_overlap": true
+            },
+            {
+              "end_ms": 3358120,
+              "start_ms": 3357720,
+              "text": "はい。",
+              "words": [
+                {
+                  "end_ms": 3358120,
+                  "start_ms": 3357720,
+                  "text": "はい。"
+                }
+              ],
+              "body_time_overlap": false
+            }
+          ]
+        }
+      ],
+      "saved_medium": {
+        "input_range_ms": [
+          3354400,
+          3357840
+        ],
+        "source_path": "/tmp/stage11-medium-four-result-nawt6sn6/case-04.absolute-estimates.json",
+        "result": {
+          "group_id": "supplemental-group-a51ee4697419a2fbc61aa90b261b0e930ef67c7ef138aaa1a18f8d1f9c33610a",
+          "segments": [
+            {
+              "start_ms": 3356000,
+              "end_ms": 3357160,
+              "text": "いいところだね",
+              "words": [
+                {
+                  "start_ms": 3356000,
+                  "end_ms": 3356480,
+                  "text": "いい"
+                },
+                {
+                  "start_ms": 3356480,
+                  "end_ms": 3356720,
+                  "text": "ところ"
+                },
+                {
+                  "start_ms": 3356720,
+                  "end_ms": 3356920,
+                  "text": "だ"
+                },
+                {
+                  "start_ms": 3356920,
+                  "end_ms": 3357160,
+                  "text": "ね"
+                }
+              ]
+            }
+          ],
+          "Japanese_accuracy": "UNVERIFIED",
+          "approved": false
+        }
+      },
+      "core_recognition_verified": "UNKNOWN"
+    },
+    "reazon": {
+      "status": "CORE_TOKEN_POINTS_ESTIMATED",
+      "input_range_ms": [
+        3354400.0,
+        3357840.0
+      ],
+      "input_wav_path": "/tmp/stage11-audio-crosscheck-four-bovq0py8/case-04.wav",
+      "input_wav_sha256": "c9530f055b1694f63e616f80f50ea39cc058b0bb56f93861e2523cbbefc86cdd",
+      "input_float32_sha256": "e10a60d08d96c0c046cf3ebb1e2034b282faba900dfad3249a695b91eb08d08d",
+      "source_path": "/var/tmp/stage11-reazon-four.0zHXMFlf/results.json",
+      "text": "いいところだね",
+      "core_point_tokens": "ところだ",
+      "core_points": [
+        {
+          "token": "と",
+          "raw_padded_seconds": 2.6399998664855957,
+          "relative_audio_seconds": 1.7399998664855958,
+          "absolute_estimated_ms": 3356139.9998664856,
+          "in_padding": false,
+          "end_time": null
+        },
+        {
+          "token": "こ",
+          "raw_padded_seconds": 2.799999952316284,
+          "relative_audio_seconds": 1.8999999523162843,
+          "absolute_estimated_ms": 3356299.9999523163,
+          "in_padding": false,
+          "end_time": null
+        },
+        {
+          "token": "ろ",
+          "raw_padded_seconds": 3.0,
+          "relative_audio_seconds": 2.1,
+          "absolute_estimated_ms": 3356500.0,
+          "in_padding": false,
+          "end_time": null
+        },
+        {
+          "token": "だ",
+          "raw_padded_seconds": 3.1599998474121094,
+          "relative_audio_seconds": 2.2599998474121095,
+          "absolute_estimated_ms": 3356659.999847412,
+          "in_padding": false,
+          "end_time": null
+        }
+      ],
+      "raw_points": [
+        {
+          "token": "い",
+          "raw_padded_seconds": 0.0,
+          "relative_audio_seconds": -0.9,
+          "absolute_estimated_ms": null,
+          "in_padding": true,
+          "end_time": null
+        },
+        {
+          "token": "い",
+          "raw_padded_seconds": 2.319999933242798,
+          "relative_audio_seconds": 1.419999933242798,
+          "absolute_estimated_ms": 3355819.999933243,
+          "in_padding": false,
+          "end_time": null
+        },
+        {
+          "token": "と",
+          "raw_padded_seconds": 2.6399998664855957,
+          "relative_audio_seconds": 1.7399998664855958,
+          "absolute_estimated_ms": 3356139.9998664856,
+          "in_padding": false,
+          "end_time": null
+        },
+        {
+          "token": "こ",
+          "raw_padded_seconds": 2.799999952316284,
+          "relative_audio_seconds": 1.8999999523162843,
+          "absolute_estimated_ms": 3356299.9999523163,
+          "in_padding": false,
+          "end_time": null
+        },
+        {
+          "token": "ろ",
+          "raw_padded_seconds": 3.0,
+          "relative_audio_seconds": 2.1,
+          "absolute_estimated_ms": 3356500.0,
+          "in_padding": false,
+          "end_time": null
+        },
+        {
+          "token": "だ",
+          "raw_padded_seconds": 3.1599998474121094,
+          "relative_audio_seconds": 2.2599998474121095,
+          "absolute_estimated_ms": 3356659.999847412,
+          "in_padding": false,
+          "end_time": null
+        },
+        {
+          "token": "ね",
+          "raw_padded_seconds": 3.3999998569488525,
+          "relative_audio_seconds": 2.4999998569488526,
+          "absolute_estimated_ms": 3356899.999856949,
+          "in_padding": false,
+          "end_time": null
+        }
+      ],
+      "raw_tokens": [
+        "い",
+        "い",
+        "と",
+        "こ",
+        "ろ",
+        "だ",
+        "ね"
+      ],
+      "raw_timestamps": [
+        0.0,
+        2.319999933242798,
+        2.6399998664855957,
+        2.799999952316284,
+        3.0,
+        3.1599998474121094,
+        3.3999998569488525
+      ],
+      "padding_seconds": 0.9,
+      "timestamps_are_points_not_ranges": true,
+      "core_recognition_verified": "UNKNOWN"
+    },
+    "clip_text_relation": "EXACT_TYPOGRAPHIC",
+    "core_supported_hypothesis_relation": "EXACT_TYPOGRAPHIC",
+    "verified_core_utterance_agreement": "UNKNOWN",
+    "ja_temporal_overlaps": [],
+    "ja_elsewhere_text_contains": [],
+    "same_utterance_ja_duplicate": "UNKNOWN",
+    "novel_dialogue": "UNKNOWN",
+    "new_subtitle_evidence": "UNVERIFIED_REVIEW_ONLY",
+    "verified_new_recovery": false,
+    "approved": false,
+    "srt_eligible": false
+  },
+  "original_canonical_group_id": "supplemental-group-a51ee4697419a2fbc61aa90b261b0e930ef67c7ef138aaa1a18f8d1f9c33610a",
+  "original_candidate_ids": [
+    "supplemental-1ec5df0c0b89a4a6cb4b0cd8b9495476101a07cac743c106bde160933c667638",
+    "supplemental-f9f235eea3911280ae4830d66ca32a0a906026981a243fd234bbaabd89e17b85"
+  ],
+  "adjacent_existing_subtitles": [
+    {
+      "cue_id": "ja-000134",
+      "start_ms": 3337911,
+      "end_ms": 3338925,
+      "original_ja": "どうですか?",
+      "existing_repaired_ja": null,
+      "first_pass_ko": "어떠세요?",
+      "current_ko": "어떠세요?",
+      "absorbed_into": null,
+      "playback_cues": [
+        {
+          "cue_id": "ja-000134",
+          "source_cue_ids": [
+            "ja-000134"
+          ],
+          "source_indexes": [
+            133
+          ],
+          "start_ms": 3337911,
+          "end_ms": 3338925,
+          "ko": "어떠세요?"
+        }
+      ]
+    },
+    {
+      "cue_id": "ja-000135",
+      "start_ms": 3339493,
+      "end_ms": 3342881,
+      "original_ja": "えっと、ちょっとだけ。はい。じゃあ、こち らで。",
+      "existing_repaired_ja": null,
+      "first_pass_ko": "어, 잠깐만요. 네. 그럼 이쪽에서.",
+      "current_ko": "어, 잠깐만요. 네. 그럼 이쪽에서.",
+      "absorbed_into": null,
+      "playback_cues": [
+        {
+          "cue_id": "ja-000135",
+          "source_cue_ids": [
+            "ja-000135"
+          ],
+          "source_indexes": [
+            134
+          ],
+          "start_ms": 3339493,
+          "end_ms": 3342881,
+          "ko": "어, 잠깐만요. 네. 그럼 이쪽에서."
+        }
+      ]
+    },
+    {
+      "cue_id": "ja-000136",
+      "start_ms": 3362108,
+      "end_ms": 3367930,
+      "original_ja": "あんたは黙ってなさい",
+      "existing_repaired_ja": null,
+      "first_pass_ko": "너는 조용히 해.",
+      "current_ko": "너는 조용히 해.",
+      "absorbed_into": null,
+      "playback_cues": [
+        {
+          "cue_id": "ja-000136",
+          "source_cue_ids": [
+            "ja-000136"
+          ],
+          "source_indexes": [
+            135
+          ],
+          "start_ms": 3362108,
+          "end_ms": 3367930,
+          "ko": "너는 조용히 해."
+        }
+      ]
+    },
+    {
+      "cue_id": "ja-000137",
+      "start_ms": 3367930,
+      "end_ms": 3372555,
+      "original_ja": "いつもこうなの?",
+      "existing_repaired_ja": null,
+      "first_pass_ko": "항상 이래요?",
+      "current_ko": "항상 이래요?",
+      "absorbed_into": null,
+      "playback_cues": [
+        {
+          "cue_id": "ja-000137",
+          "source_cue_ids": [
+            "ja-000137"
+          ],
+          "source_indexes": [
+            136
+          ],
+          "start_ms": 3367930,
+          "end_ms": 3372555,
+          "ko": "항상 이래요?"
+        }
+      ]
+    }
+  ],
+  "adjacent_saved_stt_context": [
+    {
+      "end_ms": 3358092,
+      "start_ms": 3357732,
+      "text": "はい",
+      "words": [
+        {
+          "end_ms": 3358092,
+          "start_ms": 3357732,
+          "text": "はい"
+        }
+      ]
+    },
+    {
+      "end_ms": 3360612,
+      "start_ms": 3358992,
+      "text": "弟さんと住んでるの?",
+      "words": [
+        {
+          "end_ms": 3359352,
+          "start_ms": 3358992,
+          "text": "弟"
+        },
+        {
+          "end_ms": 3359612,
+          "start_ms": 3359352,
+          "text": "さん"
+        },
+        {
+          "end_ms": 3359872,
+          "start_ms": 3359612,
+          "text": "と"
+        },
+        {
+          "end_ms": 3360132,
+          "start_ms": 3359872,
+          "text": "住"
+        },
+        {
+          "end_ms": 3360292,
+          "start_ms": 3360132,
+          "text": "んで"
+        },
+        {
+          "end_ms": 3360352,
+          "start_ms": 3360292,
+          "text": "る"
+        },
+        {
+          "end_ms": 3360612,
+          "start_ms": 3360352,
+          "text": "の?"
+        }
+      ]
+    }
+  ],
+  "canonical_counts": {
+    "JA": 313,
+    "KO_playback": 296,
+    "absorptions": 17
+  },
+  "absorption_records": [
+    {
+      "cue_id": "ja-000004",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000005",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000008",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000009",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000026",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000027",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000104",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000105",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000149",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000150",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000150",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000151",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000153",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000152",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000154",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000153",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000161",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000162",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000162",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000163",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000197",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000198",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000234",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000233",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000299",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000298",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000300",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000299",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000301",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000300",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000302",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000301",
+      "needs_audio_evidence": false
+    },
+    {
+      "cue_id": "ja-000311",
+      "repaired_ja": null,
+      "ko": null,
+      "absorbed_into": "ja-000312",
+      "needs_audio_evidence": false
+    }
+  ],
+  "local_absorption_records": [],
+  "time_comparison": {
+    "previous_end_ms": 3342881,
+    "next_start_ms": 3362108,
+    "previous_to_candidate_ms": 13051,
+    "candidate_to_next_ms": 5276,
+    "JA_temporal_overlaps": [],
+    "KO_playback_temporal_overlaps": [],
+    "JA_literal_contains_elsewhere": []
+  },
+  "source_video": {
+    "sha256": "442e19dd0c45df924ecac28c76f4b3c18b19f53f0e5a00e3abd76bb650a84651",
+    "sha_status": "REUSED_HISTORICAL_VIDEO_SHA_NOT_NEW_VIDEO_HASH",
+    "source_snapshot": {
+      "dvd_id": "FNS-247",
+      "canonical_video_relative": "FNS/FNS-247/FNS-247.mp4",
+      "source_size": 4864947420,
+      "source_mtime_ns": 1788084382892155972
+    },
+    "source_metadata_path": "/tmp/stage11-short-no-vad-controls-dvee9u7d/inputs.json"
+  },
+  "source_audio": {
+    "path": "/tmp/stage11-full-no-vad-result-fn0841kg/source-audio.float32.pcm",
+    "sha256": "51f551a00e713c3ad4c15e15c86fca55713210d94137da4d6055c9c96db77f75",
+    "media_timeline": {
+      "duration_us": 10460401250,
+      "start_time_us": 0,
+      "audio_start_seconds": 0.0,
+      "video_start_seconds": 0.021,
+      "audio_sample_rate": 48000
+    },
+    "media_timeline_path": "/tmp/stage11-positive-ab-result-7h3hrik9/media-timeline.json",
+    "core_start_sample": 53694912,
+    "core_end_sample": 53709312,
+    "alignment": {
+      "scale": 1.0141571005475907,
+      "intercept_ms": 239.12146403396832,
+      "residual_threshold_ms": 1000
+    },
+    "alignment_path": "/var/tmp/stage11-whisper-missing-probes-20261010/source-alignment.json",
+    "manual_utterance_boundaries_confirmed": false
+  },
+  "canonical_protection": {
+    "trusted_seed": "/tmp/stage11-supplemental-candidates-Jsy4EEif/trusted-local-before.pkl",
+    "trusted_seed_sha256": "ba7ce4953eb53930c99eae8490e94f3b0feb660aa0a3af08592a7667eac72401",
+    "approved_result": "/tmp/stage11-v8-approved-two-nkv52fj5/stage11-quality-approved-result.json",
+    "approved_result_sha256": "ac69e4f2948e7736de1f7be37816742762ef2ef3c58e8c255ee84828addb81e6",
+    "KO_SRT": "/tmp/stage11-v8-review-srt-lfmnmpwz/FNS-247.stage11-v8.REVIEW-ONLY.ko.srt",
+    "KO_SRT_sha256": "8e7b24f88ea3e5232a7f8dab40884be2fcc8b590ea8c5bd49e18ee57a65ce3c1"
+  },
+  "assessment": {
+    "speech_presence": "DIALOGUE_LIKELY",
+    "japanese_accuracy": "UNVERIFIED",
+    "existing_same_utterance_duplicate": "UNVERIFIED",
+    "candidate_status": "AMBIGUOUS",
+    "missing_dialogue_recovery": "INCOMPLETE",
+    "usable_as_review_candidate": true,
+    "usable_as_approved_subtitle": false,
+    "publishable": false,
+    "new_approvals": 0
+  },
+  "unresolved_issues": [
+    "Japanese hypothesis has no independently confirmed audio transcript",
+    "Human utterance start/end unknown; recognition estimates disagree at boundaries",
+    "Neighbor JA/KO temporal nonoverlap and no local absorption do not prove semantic nonduplication",
+    "Affine residual threshold is not a verified local error bound",
+    "Native text review receives no audio and cannot confirm waveform/text correspondence"
+  ],
+  "provenance": {
+    "/var/tmp/stage11-core-dialogue-stt-evaluation-20261011/evaluation.json": "e151762b22396395b0108cfea219827df3d15e256d0586bafe22954f1d870ac8",
+    "/var/tmp/stage11-whisper-missing-probes-20261010/source-alignment.json": "b18d25116cb4736b29adc05121e56e39d24f5263c6c15987903c40c755b06a32",
+    "/tmp/stage11-short-no-vad-controls-dvee9u7d/inputs.json": "48f59da7bbd92a4c3a6bd6d2bf1258ff6bc86e8885291e79b56c91e99ae446d1",
+    "/tmp/stage11-positive-ab-result-7h3hrik9/media-timeline.json": "4b3eeece1a973b97720a0d415db3f3cd263a7356e070be6e0f83ba66e72371ed",
+    "/tmp/stage11-supplemental-candidates-Jsy4EEif/trusted-local-before.pkl": "ba7ce4953eb53930c99eae8490e94f3b0feb660aa0a3af08592a7667eac72401",
+    "/tmp/stage11-v8-approved-two-nkv52fj5/stage11-quality-approved-result.json": "ac69e4f2948e7736de1f7be37816742762ef2ef3c58e8c255ee84828addb81e6",
+    "/tmp/stage11-v8-review-srt-lfmnmpwz/FNS-247.stage11-v8.REVIEW-ONLY.ko.srt": "8e7b24f88ea3e5232a7f8dab40884be2fcc8b590ea8c5bd49e18ee57a65ce3c1"
+  },
+  "waveform_scope_pack": "/var/tmp/stage11-gemma3n-pilot-b-20261010/scope-pack"
+}

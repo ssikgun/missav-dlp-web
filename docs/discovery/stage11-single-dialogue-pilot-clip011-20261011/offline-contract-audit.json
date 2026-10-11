@@ -1,0 +1,56 @@
+{
+  "status": "PASS_CONTRACT_ONLY",
+  "tests": [
+    {
+      "test": "KEEP remains unapproved and SRT-ineligible",
+      "status": "PASS"
+    },
+    {
+      "test": "REPAIR remains unapproved and SRT-ineligible",
+      "status": "PASS"
+    },
+    {
+      "test": "OMIT remains unapproved and SRT-ineligible",
+      "status": "PASS"
+    },
+    {
+      "test": "AMBIGUOUS remains unapproved and SRT-ineligible",
+      "status": "PASS"
+    },
+    {
+      "test": "wrong request SHA rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "wrong candidate rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "second candidate rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "AMBIGUOUS replacement rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "publication field in native response rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "invented decision alias rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "invalid action/category rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "only exact known tirith prefix separated",
+      "status": "PASS"
+    }
+  ],
+  "test_count": 12,
+  "synthetic_results_persisted": false,
+  "actual_Hermes_calls": 0
+}

@@ -1,0 +1,24 @@
+{
+  "status": "PASS_PREPARATION_ONLY",
+  "recovery_status": "INCOMPLETE",
+  "candidate_status": "AMBIGUOUS",
+  "local_preflight": "PASS",
+  "shell_syntax": "PASS",
+  "native_readonly_profile_cli": "PASS",
+  "runtime_tools_zero_check": "PRESERVED_IN_USER_COMMAND_NOT_EXECUTED",
+  "contract_checks": 12,
+  "existing_JA": 313,
+  "existing_KO": 296,
+  "existing_absorptions": 17,
+  "protected_sha_count": 2302,
+  "calls": {
+    "Whisper": 0,
+    "ReazonSpeech": 0,
+    "Hermes": 0,
+    "other_models": 0
+  },
+  "SRT_changes": 0,
+  "new_approvals": 0,
+  "publishable": false,
+  "model_results_created": false
+}

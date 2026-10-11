@@ -1,0 +1,35 @@
+{
+  "files": {
+    "/home/teddy/.hermes/hermes-agent/hermes_cli/main.py": {
+      "executable": false,
+      "exists": true,
+      "resolved": "/home/teddy/.hermes/hermes-agent/hermes_cli/main.py",
+      "sha256": "f27fcee078bc3696d4c37fa98d04972e214d53b01bd6075f12e988ef69d6c241"
+    },
+    "/home/teddy/.hermes/hermes-agent/venv/bin/python": {
+      "executable": true,
+      "exists": true,
+      "resolved": "/home/teddy/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/bin/python3.11",
+      "sha256": "572cfa2a8597e2f431c785613539b1d219fa99eecf5ffb5765731a2ebc3e692a"
+    },
+    "/home/teddy/.local/bin/hermes": {
+      "executable": true,
+      "exists": true,
+      "resolved": "/home/teddy/.local/bin/hermes",
+      "sha256": "c3636d17efed08ee04614efc3d54a83ec3154c43f5dd11eb07bc5433babab039"
+    },
+    "/tmp/stage11-hermes-277-native-cmbcdsp5/profiles/canary277/config.yaml": {
+      "executable": false,
+      "exists": true,
+      "resolved": "/tmp/stage11-hermes-277-native-cmbcdsp5/profiles/canary277/config.yaml",
+      "sha256": "45396316544977c241e10d1a9410ddd14898740ba28258b773c6daf9c27143db"
+    },
+    "profile_path_has_symlink": false
+  },
+  "hermes_invoked": false,
+  "hostname": "hermes-lxc-slack",
+  "remote_writes": 0,
+  "temporary_work_exists": true,
+  "readiness": "PASS_STATIC_PROFILE_CLI_PATHS",
+  "tools_count_runtime_check": "REQUIRED_IN_USER_RUNNER_NOT_EXECUTED_BY_CODEX"
+}

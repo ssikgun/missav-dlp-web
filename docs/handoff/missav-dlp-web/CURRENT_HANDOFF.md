@@ -1,5 +1,45 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-11 — clip-011 single recovery pilot: AMBIGUOUS; native preparation PASS, no call
+
+Reused core/context WAVs and saved Whisper/Reazon hypotheses いいところだね.
+USER core DIALOGUE_LIKELY preserved; Japanese correspondence UNVERIFIED.
+Core3355.932-3356.832s may not contain the complete sentence: Reazon in-core
+points ところだ, other い before/ね after; other Whisper estimates cross bounds.
+No boundary rewriting or new transcript truth. Existing JA/KO temporal overlap0;
+previous/next gaps13.051s/5.276s, local absorption0, full JA literal contains0.
+Same-utterance semantic duplication/alignment error/newness remain UNVERIFIED.
+Candidate AMBIGUOUS, recovery INCOMPLETE; review-only, new approvals0.
+
+Existing JA313/KO296/absorption17 and SRT SHA/bytes revalidated via canonical
+parser/materializer in memory. Current adjacent KO equals retained initial KO.
+Native controller/SSH bridge inspected but untouched. Reused existing direct
+canary transport and canonical supplemental builder/parser: one group, two
+original A/B IDs; no new model response contract. Added only bounded auxiliary
+current-KO/absorption/audio-scope uncertainty evidence. Old helper SHA linked
+to its already pinned later draft revision, prior bundles untouched; original
+3-group canonical request reproduced byte-exact before single-group build.
+
+Bundle /var/tmp/stage11-single-dialogue-pilot-20261011/native/.
+User command: bash /var/tmp/stage11-single-dialogue-pilot-20261011/native/ct108-native-single-command.sh
+Add --preflight for local input/safety verification only, no model call.
+Local preflight/shell syntax/12 synthetic in-memory contract checks PASS;
+remote profile SHA/CLI read-only inspection PASS, Hermes invocations0.
+Future user-run command retains pinned temporary profile, native tools.count=0
+check, fresh chat -Q, existing provider/model/reasoning/max-turns1, strict ID/SHA
+parser and exact known tirith-prefix separation. No resume or approval/SRT path.
+AMBIGUOUS replacement JA/KO must be null; even KEEP/REPAIR parsed output remains
+UNVERIFIED_AUDIO, approved=false, srt_eligible=false, publishable=false.
+Response schema documentation is not a precomputed Hermes judgment.
+
+Report docs/discovery/STAGE11_SINGLE_DIALOGUE_PILOT_CLIP011_20261011.md; committed
+single-candidate evidence/native bundle and generic preparation helper in tools/.
+2302 protected SHA unchanged; existing dirty work preserved. Whisper/Reazon/
+Hermes/other model executions0, installs/downloads0, SRT/source JA/KO/absorption/
+service changes/approval/publication0. Preparation PASS is not recovery PASS.
+Next ONE task: confirm actual Japanese text and complete utterance bounds in
+original audio; prepared Hermes text-context review cannot supply audio truth.
+
 ## 2026-10-11 — Core Dialogue STT evidence: USER core labels recorded; accuracy UNKNOWN
 
 USER now listened to the thirteen Pilot B scope-pack CORE WAVs:01-04/06/08-13
