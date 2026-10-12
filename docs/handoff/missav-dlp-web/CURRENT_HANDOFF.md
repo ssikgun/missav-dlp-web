@@ -1,5 +1,105 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — Normal automation paused / P1-A initial findings
+
+**Current state: INCOMPLETE.** The Normal timer is disabled and inactive. Keep it
+disabled until Teddy reviews the pipeline investigation. No subtitle source or
+pipeline code changed in this checkpoint.
+
+### Automatic run boundary
+
+- `teddy-subtitle-normal.timer` was stopped and disabled at 11:33:59 KST. It is
+  still `inactive/disabled`; the Normal service is now inactive. No other
+  service was changed.
+- A Normal service invocation had already started at 11:31:00 KST. Per the
+  instruction not to terminate an in-flight service, it was left alone. It
+  initialized four inventory rows as PENDING (`MARR-014`, `MFYD-181`,
+  `MIAD-866`, `MIDA-445`) and selected `DLDSS-555`.
+- The in-flight title completed after the timer was stopped:
+  `DLDSS-555` went `RUNNING` sequence 2 → `GENERATED` sequence 3 → `PUBLISHED`
+  sequence 4 at 11:36:02 KST. Stage12 provenance records `HYBRID`, accepted JA,
+  atomic NAS install, and Jellyfin subtitle recognition. This was the already
+  running automatic invocation, not a manual publish action. It means the
+  no-new-publish boundary could not be maintained while honoring the no-kill
+  instruction; this exception is recorded explicitly.
+- Current Stage12 counts are `PUBLISHED=164`, `PENDING=26`,
+  `FAILED_TERMINAL=5`, `UNRESOLVED=10`, with no `RUNNING` or `GENERATED` title.
+  `DANDYA-049` and `DLDSS-536` remain `FAILED_TERMINAL`, sequence 3. No state was
+  manually edited or recovered. Do not retry either failed title.
+
+### SubtitleCat / VPN evidence on deployed `e4e0b05`
+
+- Deployment config sets `http://127.0.0.1:58888`, timeout 20 seconds, and wires
+  it into both search discovery and the detail/payload provider. Search uses an
+  explicit `ProxyHandler` and rejects redirects. Detail uses the same explicit
+  proxy, permits only the exact official same-path `subtitlecat.com` →
+  `www.subtitlecat.com` 301 once, and otherwise rejects redirects. JA SRT GET
+  also uses the explicit proxy, rejects redirects, and is capped at 8 MiB.
+  Search and detail responses are each capped at 4 MiB.
+- CT108 has a loopback listener on `127.0.0.1:58888`, Docker maps it to
+  `gluetun-missav:8888`, and the container reports healthy. Gluetun's local
+  read-only status endpoint returned `{"status":"running"}`. One small GET to
+  `api.ipify.org` through the explicit proxy returned HTTP 200, confirming
+  external egress through that listener. The address is intentionally not
+  retained here. The Normal unit's runtime environment has no proxy-bypass
+  variables; `urllib.proxy_bypass()` was false for both official hosts.
+- Bounded live SubtitleCat checks used the existing proxy only: the two title
+  searches returned HTTP 200 with HTML and no CAPTCHA/block marker. The complete
+  production-bounded DANDYA-049 search body was 95,742 bytes and parsed to zero
+  candidates. DLDSS-536's 34,712-byte search parsed to one detail candidate;
+  its detail GET completed at the transport layer, but parsing found no safe
+  original Japanese SRT link. No JA payload GET was made because there was no
+  safe link. Thus search blocking was not observed; the detail response body
+  was not retained for independent challenge-marker inspection, and the SRT
+  download route was verified statically rather than exercised live.
+- Historical Stage12 evidence is narrower than a complete root cause:
+  `DANDYA-049` recorded `NO_CANDIDATE`, which maps to a successful discovery
+  attempt returning no candidate; its Normal failure artifact has that outcome.
+  `DLDSS-536` recorded only `VALIDATION_FAILURE` and
+  `alignment=NOT_ATTEMPTED`. The underlying validation subtype was not persisted.
+  The current detail-page result is consistent with that outcome, but does not
+  prove that it was the exact historical failure.
+
+### Bulk ASR_ONLY report census (134 reports)
+
+- All 134 reports have `route=ASR_ONLY`; none has a final HYBRID route.
+
+  | Evidence category | Count | Interpretation |
+  | --- | ---: | --- |
+  | `NO_CANDIDATE` | 63 | Search/discovery produced no external JA candidate |
+  | Search transport | 2 | `SEARCH_TRANSPORT_FAILURE` |
+  | Other external transport | 1 | `TRANSPORT_FAILURE`; report does not identify detail vs payload step |
+  | Validation bucket | 67 | `VALIDATION_FAILURE`; exact validation stage not retained |
+  | Alignment unresolved / ASR_ONLY fallback | 1 | External JA was accepted, alignment was `UNRESOLVED`, controller fell back |
+  | Final HYBRID route | 0 | No report ended on `HYBRID` |
+  | Unknown outcome label | 0 | All report outcome labels matched the schema |
+
+  The alignment/fallback row is the same one report, so it is not an additional
+  count beyond the 134 external outcome records.
+- `VALIDATION_FAILURE` is a broad controller bucket covering search/detail and
+  external-subtitle validation exceptions. Per-title reports do not preserve
+  the failing validation step, so the 67 cannot be asserted to mean 67 subtitle
+  content-validation failures. No report has an unknown outcome value, but
+  those 67 underlying causes remain unclassified.
+- Historical Stage11 `_select_route()` deliberately converts missing JA,
+  transport failures, and validation failures into a direct ASR_ONLY route,
+  which then proceeded to semantic output. Current Normal Mode requires
+  `route=HYBRID` with `ACCEPT_HYBRID`; non-HYBRID outcomes fail before Hermes
+  translation and publication. Keep this quality gate. Minimum next improvement
+  is generic per-stage error evidence (search HTTP/result, detail parse, SRT
+  payload validation, alignment verdict) plus proxy preflight, not an ASR_ONLY
+  publish fallback.
+
+### Preservation / next gate
+
+The protected dirty worktree `/opt/missav-pwa-subtitle-stage11` was not edited.
+No direct SQL, NAS/Jellyfin command, retry, lock/session cleanup, source change,
+timer re-enable, or other service restart was performed by this checkpoint.
+The already-running Normal invocation's PENDING insertions and `DLDSS-555`
+publication above are the only observed title-state changes during the
+interval. The next action is Teddy's review of this checkpoint; keep the Normal
+timer disabled until that review and an explicit resume decision.
+
 ## 2026-10-12 — FINALIZED WORK PRIORITIES / NO-HUMAN NORMAL MODE (새 대화 최우선)
 
 **본 섹션은 10:06 감사 이후 사용자와 합의한 우선순위 정본이다.** 그 아래에 남은
@@ -10,8 +110,9 @@
 
 - 원래 목적: 과거 약200개 일괄 자막의 ASR_ONLY 편중 및 한국어 품질 저하를 해결.
   현재 확인 가능한 bulk report **134개 모두 ASR_ONLY**, 그중 **96개 targeted ASR**.
-  ASR_ONLY 원인의 세부 유형은 **미확정**: 외부 JA 부재/검증 실패, 정렬 실패,
-  선택기/fallback/연결 오류를 실제 로그 및 소스에서 분리 조사한다.
+  report-level 원인은 최상단 P1-A census에서 분류했지만, 67개 validation bucket의
+  단계별 원인과 그중 실제 subtitle-content validation 실패 수는 **미확정**이다.
+  ASR_ONLY publish fallback은 허용하지 않는다.
 - 모든 작품 **동일 generic evidence-based** 정책. 제목·품번·cue 번호·특정 대사
   하드코딩 금지. **USER_INTERVENTION=0**: 원음 청취, 전사·번역 수정, 사람 승인,
   개별 작품 선택, 수동 재시도 요청은 **정상 운영 처리의 일부가 아님**.
@@ -31,18 +132,21 @@
 
 **P0 OPERATIONS BLOCKER → P1 ASR_ONLY/HYBRID ROOT CAUSE → P2 QUALITY WIRING/REGRESSION → P3 UNATTENDED E2E/PUBLISH → [P4 OPTIONAL SUPPLEMENTAL RESEARCH]**
 
-- **P0 운영 복구/배포 완료; 다음 PENDING도 자동 처리됨:** 운영은
-  `e4e0b05bee3550b0ba2734e71ccccb319e802864`를 실행 중이다. Stage12
-  `recover_running("DANDYA-033")`로 해당 제목만 `RUNNING → PENDING`,
-  `CRASH_RECOVERY`, sequence 3으로 복구했고, 자연 timer가 이를 `FAILED_TERMINAL`,
-  sequence 5로 처리했다. DANDYA-033의 Whisper/Hermes/게시/Jellyfin 호출은 없고
-  한국어 NAS 목적지도 없다. 자동 선택된 다음 PENDING `DANDYA-049`도 baseline ASR 후
-  외부 JA 후보 부재로 `FAILED_TERMINAL` 처리되어 큐에 고착되지 않았다.
-  `FAILED_ACTIVE_STATE` 반복은 배포 후 0회, 현재 활성 RUNNING/GENERATED는 0이다.
-  timer는 enabled/active이고 다음 PENDING은 DLDSS-536이다. 상세 증거는 아래 checkpoint에 기록했다.
-- **P1:** 134 ASR_ONLY 보고서의 원인 유형을 증거 기준으로 구분. 외부 JA가 실제로
-  유효한 작품의 HYBRID 선택/정렬/ASR 보조증거/모드결과가 운영 경로에서 보존되는지
-  확인·최소 수정. JA 없거나 실패한 작품에 가짜 HYBRID를 강제하지 말고 명시적 상태를 남김.
+- **P0 코드 수정/배포 완료; 자동 처리는 현재 중지:** 운영 배포 SHA는
+  `e4e0b05bee3550b0ba2734e71ccccb319e802864`. DANDYA-033은 작품별
+  `FAILED_TERMINAL`로 종료됐고, 다음 DANDYA-049도 `NO_CANDIDATE`로 종료되어
+  queue lock은 고착되지 않았다. 2026-10-12 11:33:59 KST에
+  `teddy-subtitle-normal.timer`를 disable/stop했다. 이미 실행 중이던 DLDSS-555는
+  강제 종료하지 않아 11:36:02 KST에 HYBRID 게시까지 완료했다. 현재 timer는
+  `disabled/inactive`, 서비스 inactive이며 활성 RUNNING/GENERATED는 0이다.
+  timer는 사용자 검토와 명시적 재개 결정 전까지 켜지 않는다. 최신 상태와 P1-A
+  증거는 본 문서 최상단 체크포인트에 기록했다.
+- **P1-A 초기 조사 완료/세부 원인 불완전:** 134 bulk report의 report-level
+  outcome 분포는 본 문서 최상단에 기록했다. 67개 `VALIDATION_FAILURE`의 실제
+  validation 단계는 보존된 보고서로 분리할 수 없다. SubtitleCat 검색은 현재
+  VPN 경유 HTTP 200이지만 DANDYA-049는 후보 0, DLDSS-536은 상세에서 안전한
+  JA SRT 링크를 찾지 못했다. historical DLDSS-536의 상세 원인은 미확정.
+  다음은 validation telemetry를 generic 단계별로 보존하는 최소 P1 설계다.
 - **P2:** legacy fixed64 vs 실제 whole-title input(일괄 출력), original review/repair,
   temporal/affine/source_index, absorption, targeted ASR, Hermes 의미 review 연결 확인.
   FNS-247 품질 퇴행 예: 이전 repaired_ja4 → normal0,
@@ -80,10 +184,10 @@
 
 ### 새 대화 첫 행동
 
-(1) 이 canonical handoff의 최상단 및 당시 live state 읽기;
-(2) CT108 Git/server timer, stage12-runtime/status.json, DANDYA failure log 읽기;
-(3) **P0만** 범위로 정해 원인 확인→최소 수정→bounded regression→운영 재개/증거;
-(4) handoff update→commit/push. **P0 완료 전 P1~P4로 갈아타지 말 것.**
+(1) 이 canonical handoff의 최상단 및 CT108 read-only state 읽기;
+(2) `teddy-subtitle-normal.timer`가 disabled/inactive인지 확인하고 자동 재활성화하지 말 것;
+(3) Teddy가 본 조사 결과를 검토하기 전 운영 재개, FAILED 재시도, P1~P4 구현을 하지 말 것;
+(4) 명시적 재개 결정 이후에도 source/dirty worktree 보호 및 handoff commit/push 경계를 유지.
 
 
 ### 2026-10-12 — Downloader Stage11 P0 code-only checkpoint
