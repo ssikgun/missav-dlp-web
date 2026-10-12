@@ -6,9 +6,11 @@ import base64
 from dataclasses import replace
 import json
 from pathlib import Path
+import stat
 import tempfile
 import unittest
 import uuid
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import teddy_discovery_stage11_normal_mode as normal
@@ -169,6 +171,92 @@ class NormalSmoke(unittest.TestCase):
         self.assertEqual(retained['package'],preparation.package)
         self.assertEqual(retained['result'],first)
         self.assertEqual(retained['preparation'].package,preparation.package)
+
+    def test_normal_cli_captures_native_and_local_ja_for_review(self):
+        from teddy_discovery_stage11_deployment import (
+            Stage11DeploymentDependencies, _HybridOriginalRegistry,
+        )
+        import teddy_discovery_stage12_bulk_runner as bulk
+        import teddy_discovery_stage12_rollout as rollout
+
+        # Exercise the real local parser callback. A synthetic approved affine
+        # alignment is rebound to the CLI's local bytes by the existing pure
+        # application boundary, so no model or network is involved.
+        from teddy_discovery_alignment_application import apply_alignment_acceptance
+        from teddy_discovery_hybrid_evidence import (
+            ALIGNMENT_PROVENANCE_UNRESOLVED, HybridAlignmentProvenance,
+            HybridEvidenceBundle,
+        )
+        def align_local_payload(payload, title, baseline, _policy, _threshold):
+            bundle=HybridEvidenceBundle.from_external_ja_and_asr(
+                dvd_id=title,external_ja_payload=payload,asr_result=baseline,
+                alignment=HybridAlignmentProvenance(
+                    ALIGNMENT_PROVENANCE_UNRESOLVED,'lexical-affine'))
+            accepted=self.route.alignment_application
+            return apply_alignment_acceptance(
+                bundle,accepted.decision,alignment=accepted.alignment)
+        registry=_HybridOriginalRegistry()
+        retained={}
+        first_boundary={}
+        def cli_first_pass(package, **kwargs):
+            first_boundary['value']=kwargs.get('boundary_evidence')
+            return self.first(package,**kwargs)
+        def review_with_retained_originals(request, *, staging_root,
+                                           target_cue_ids=None,
+                                           targeted_asr_artifact=None):
+            retained.update(registry.originals_provider(request))
+            return self.review(request,staging_root=staging_root,
+                target_cue_ids=target_cue_ids,
+                targeted_asr_artifact=targeted_asr_artifact)
+        live=SimpleNamespace(
+            holding_resolver=lambda _title:fixture._holding(self.baseline),
+            baseline_transcriber=lambda _video:self.baseline,
+            external_ja_attempt=registry.capture_external(lambda *_args:None),
+            targeted_runner=lambda *_args:self.fail('unused targeted runner'),
+            first_pass_runner=lambda *_args,**_kwargs:self.fail('CLI must inject native first pass'),
+            asr_review_runner=lambda *_args:self.fail('unused ASR review runner'),
+            hybrid_review_runner=review_with_retained_originals,
+            hybrid_targeted_runner=self.targeted,
+        )
+        dependencies=Stage11DeploymentDependencies(
+            config=object(),source_provider=None,whisper=None,targeted_transport=None,
+            discovery=None,provider=None,remote_bridge=object(),
+            remote_task_for_session=lambda *_args:None,prepare_remote=lambda *_args:None,
+            originals_provider=registry.originals_provider,live=live,
+            _first_pass_capture=registry.capture_first_pass,
+            _external_capture=registry.capture_external)
+        local_ja=self.artifacts.parent/'cli-local-ja.srt'
+        local_raw=self.route.alignment_application.bundle.external_ja_payload.payload
+        local_ja.write_bytes(local_raw)
+        snapshot=self.baseline.source_snapshot
+        fs=SimpleNamespace(lstat=lambda _path:SimpleNamespace(
+            st_mode=stat.S_IFREG|0o600,st_size=snapshot.source_size,
+            st_mtime_ns=snapshot.source_mtime_ns))
+        run_root=self.artifacts.parent/'cli-run'
+        with patch.object(bulk,'build_deployment_config',return_value=object()), \
+             patch.object(bulk,'build_dependencies',return_value=dependencies), \
+             patch.object(bulk,'acceptance_policy',return_value=policy_with()), \
+             patch.object(rollout,'build_nas_preflight_filesystem',return_value=fs), \
+             patch.object(bulk,'NAS',{}), \
+             patch.object(normal,'_align_external_payload',side_effect=align_local_payload), \
+             patch.object(normal,'NativeNormalFirstPass',side_effect=lambda _bridge:cli_first_pass), \
+             patch('sys.argv',['stage11-normal','--dvd-id',self.baseline.source_snapshot.dvd_id,
+                               '--run-root',str(run_root),'--external-ja',str(local_ja)]):
+            self.assertEqual(normal.main(),0)
+
+        self.assertEqual((self.first_calls,self.review_calls,self.targeted_calls),(1,1,0))
+        self.assertEqual(retained['package'].dvd_id,self.baseline.source_snapshot.dvd_id)
+        self.assertEqual(retained['result'].session_id,
+                         normal.stateful_session_id_for_package(retained['package']))
+        self.assertEqual(retained['result'].boundary_evidence,first_boundary['value'])
+        application=retained['preparation'].route_decision.alignment_application
+        self.assertEqual(application.bundle.external_ja_payload.payload,local_raw)
+        self.assertTrue(application.bundle.external_ja_payload.candidate.external_source_id.startswith(
+            'local-sha256-'))
+        self.assertEqual(application.decision.verdict,'ACCEPT_HYBRID')
+        generated=run_root/'artifacts'/self.baseline.source_snapshot.dvd_id
+        self.assertTrue((generated/'clean-ko-v1.srt').is_file())
+        self.assertEqual((generated/'normal-external-ja.srt').read_bytes(),local_raw)
 
     def test_review_failure_or_missing_review_sidecar_blocks_completion(self):
         with self.assertRaisesRegex(RuntimeError,'review transport failed'):

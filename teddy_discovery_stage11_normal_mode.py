@@ -625,7 +625,7 @@ def main():
     failed=False
     for index,title in enumerate(args.dvd_id):
         kwargs=dependencies.controller_kwargs()
-        kwargs['first_pass_runner']=first_pass
+        kwargs['first_pass_runner']=dependencies.capture_first_pass_runner(first_pass)
         if args.baseline_root:
             def cached(video):
                 _,snapshot=controller._resolve_holding(video.dvd_id,kwargs['holding_resolver'])
@@ -638,7 +638,9 @@ def main():
                 candidate=SubtitleCandidate.validated_external_text('local-sha256-'+sha(raw),dvd_id=video.dvd_id,language='ja',text_format='srt')
                 payload=ExternalSubtitlePayload.from_bytes(dvd_id=video.dvd_id,candidate=candidate,payload=raw)
                 return _align_external_payload(payload,video.dvd_id,baseline,acceptance_policy(),1000)
-            kwargs['external_ja_attempt']=local_external
+            kwargs['external_ja_attempt']=dependencies.capture_external_ja_attempt(
+                local_external
+            )
         try:
             from teddy_discovery_stage12_rollout import build_nas_preflight_filesystem
             from teddy_discovery_stage12_bulk_runner import NAS

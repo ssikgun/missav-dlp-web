@@ -1,5 +1,60 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — Stage11 P2-C Normal CLI registry connection / real NumPy checks
+
+**Code and offline verification: PASS. This checkpoint did not deploy.** The
+starting GitHub HEAD was `6fd1a1fa9b5532e112f8072b6283fc193d0063e3`; the
+production pointer remains `e4e0b05bee3550b0ba2734e71ccccb319e802864`.
+`teddy-subtitle-normal.timer` is still `inactive/disabled`, and the Normal
+service is `inactive/dead` (`MainPID=0`). The protected dirty worktree
+`/opt/missav-pwa-subtitle-stage11` was not changed.
+
+### Normal CLI registry connection
+
+Normal's direct CLI now passes `NativeNormalFirstPass` through the existing
+`_HybridOriginalRegistry` capture boundary. Its `--external-ja` callback also
+uses that registry, so the accepted local JA payload and its approved
+alignment application are retained with the package, first-pass result and
+boundary evidence. The existing review originals provider reconstructs and
+validates the same request. The CLI does not repeat translation. Stage12's
+queue path and selection behavior are unchanged.
+
+An offline `main()` regression supplied fake dependencies, a temporary local
+JA file and synthetic accepted alignment evidence. Review reconstructed the
+registered source/application and first-pass boundary; first-pass ran once and
+Targeted ASR ran zero times because there were no suspect cues. The existing
+primary-only promotion rejection, review failure/hash checks, CLEAN policies,
+targeted-suspect flow and Stage12 no-overwrite checks also passed.
+
+### Real environment and regression results
+
+The specified `/opt/stage11-stt-venv/bin/python` imported NumPy 2.5.2 from the
+venv site-packages and PyAV 18.1.0 from the same environment. A NumPy array
+operation and the Stage11 audio module import passed with `PYTHONPATH` unset.
+The three earlier shim-dependent suites (HYBRID suspect review, deployment and
+live adapters) all passed using this interpreter and no shim.
+
+All 13 offline smoke scripts passed with `PYTHONPATH` unset: Normal Mode (19
+tests), HYBRID suspect review (43 checks), deployment (49), live adapters,
+CLEAN materializer (38), CLEAN projection, review context (41), proximity (66),
+review runner (86), generic quality review (134), and Stage12 bulk, batch and
+rollout. `py_compile` and `git diff --check` passed.
+
+Read-only replay of saved FNS-247 and JUR-750 Normal artifacts rejected both
+because the historical primary-only completion has no triage result. SHA-256
+checks before and after confirmed the saved artifact directories were
+unchanged. This validates fail-closed handling; it does not turn those older
+outputs into reviewed completions.
+
+No real Hermes/Whisper, service, database, NAS, Jellyfin or publication action
+was performed. The deployment symlink still points to `e4e0b05b`; keep the
+timer disabled. The code is a candidate for a separate deployment checkpoint;
+production preflight, rollback and post-deploy behavior remain unverified.
+
+**Next task:** review and deploy the committed candidate in a separate
+operational checkpoint while leaving automatic execution disabled until that
+checkpoint explicitly verifies its deployment boundary.
+
 ## 2026-10-12 — Stage11 P2-B Normal HYBRID review and CLEAN connection
 
 **Implementation and offline verification: PASS. Operations remain paused.**

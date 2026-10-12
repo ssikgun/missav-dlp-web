@@ -1490,6 +1490,7 @@ class Stage11DeploymentDependencies:
     originals_provider: Callable
     live: Stage11LiveDependencies
     _first_pass_capture: Callable
+    _external_capture: Callable
 
     def controller_kwargs(self) -> dict[str, Callable]:
         """Return only the existing controller-facing callable contract."""
@@ -1508,6 +1509,10 @@ class Stage11DeploymentDependencies:
     def capture_first_pass_runner(self, callback: Callable) -> Callable:
         """Retain Normal's native result at the existing HYBRID trust boundary."""
         return self._first_pass_capture(callback)
+
+    def capture_external_ja_attempt(self, callback: Callable) -> Callable:
+        """Retain Normal's accepted external JA application for review replay."""
+        return self._external_capture(callback)
 
 
 def build_stage11_deployment_dependencies(
@@ -1709,6 +1714,7 @@ def build_stage11_deployment_dependencies(
         originals_provider=originals_registry.originals_provider,
         live=live,
         _first_pass_capture=originals_registry.capture_first_pass,
+        _external_capture=originals_registry.capture_external,
     )
 
 
