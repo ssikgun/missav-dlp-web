@@ -1,5 +1,68 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-13 — Stage11 P1-I integration and deployment-readiness audit
+
+**P1 runtime wiring and offline regressions: PASS. P1-only deployment readiness:
+INCOMPLETE.** The remote branch HEAD is `fa5f1b446432363e323d66584e8f79dfdb5ba9f1`;
+the operational `current` symlink still targets
+`e4e0b05bee3550b0ba2734e71ccccb319e802864`. The Normal timer is
+`disabled/inactive` and its service is `inactive`. The protected dirty
+worktree remains unchanged. This audit made no deployment, systemd, DB, queue,
+model, NAS or Jellyfin change.
+
+| P1 feature | Current HEAD / Normal route | In deployed `e4e0b05` | Offline evidence |
+|---|---|---|---|
+| SubtitleCat search and allowlisted one-hop detail 301 | Wired through `build_stage11_live_dependencies` into Normal's `external_ja_attempt` | Search and one-hop 301 behavior present; P1 response diagnostics absent | Deployment smoke: 301, redirect and response-policy checks |
+| Raw ASCII-space href and Unicode URL transport | Wired through external provider and deployment transport | ASCII-space canonicalization present; Unicode request encoding absent | External/deployment smoke: space canonicalization and Unicode request encoding |
+| Multi-candidate safe selection | Wired through `build_external_ja_adapter` and the Normal route callback | Safe selector present; P1 candidate diagnostics and P1-H identity classification absent | Live-adapter smoke: equivalent content, conflicts, non-accept and indeterminate cases |
+| Streaming affine alignment and calculation limit | Called by the external adapter; algorithm files are unchanged from `e4e0b05` | Present | Affine-consensus, acceptance and alignment-limit smoke |
+| Malformed external cue rejection | Existing bounded SRT parser remains the content gate; invalid candidates do not bypass the HYBRID gate | Parser safety present; P1 stage diagnostics absent | External and live-adapter malformed-payload checks |
+| P1-H candidate identity classification | Known `SubtitleCandidateValidationError` maps to `detail_ja_link / JA_LINK_INVALID`; other/systemic errors stay fail-closed | Absent | External and live-adapter C1 mixed-candidate checks |
+| P1-B stage diagnostics | URL/body-free bounded diagnostics are persisted by Normal's controller path | Absent | Deployment, Normal and live-adapter diagnostics checks |
+
+The P1 external search/selection path does not depend on P2 review code: it
+returns a validated accepted alignment to Normal. P2 then reviews that result
+before CLEAN materialization and adds review-proof validation. However, P1 and
+P2 both modify `teddy_discovery_stage11_controller.py`,
+`teddy_discovery_stage11_deployment.py` and
+`teddy_discovery_stage11_normal_mode.py`; P2 also changes Stage12 runner
+integration. No isolated P1-only revision or its production preflight was
+built or tested. Therefore **do not treat the current `fa5f1b4` HEAD as a
+P1-only release, or claim an isolated P1 drop-in is deployment-ready**. A
+P1-only source candidate appears feasible because its search/selection path
+has no P2 review import dependency, but the overlapping Normal/deployment
+hunks need an isolated integration and verification on `e4e0b05`.
+
+The existing `deploy.sh` validates the exact SHA and runs production preflight,
+but then switches `current`, writes `runtime.env`, installs units and runs
+`systemctl enable --now teddy-subtitle-normal.timer`. It does not preserve the
+present stopped state. `rollback.sh` restores the backed-up `current`,
+`runtime.env` and unit files, then restores timer enabled/active state from the
+backup. Its rollback contract is source-inspected only; neither deploy nor
+rollback was executed. A separate timer-safe rollout procedure is required
+before any future deployment.
+
+Offline checks all passed using fakes/temporary artifacts: external subtitle
+186 checks; SubtitleCat discovery 63; proxy 6; deployment 51; live adapters;
+Normal Mode 19; affine consensus; alignment acceptance; alignment-limit
+fallback; Stage12 bulk runner; and subtitle publication/no-overwrite smoke.
+No real SubtitleCat search, Whisper/Hermes execution, NAS or Jellyfin access
+occurred.
+
+P1 result scope remains: 164 effective published titles (2 HYBRID, 162
+ASR_ONLY); 20 of the effective ASR_ONLY set were previously judged
+`ACCEPT_HYBRID` candidates, which means possible eligibility, not completed
+publication. VEMA-246 remains untested because its source/baseline is absent.
+SDDE-763 remains withheld because an additional candidate exceeded the
+alignment calculation limit although prior accepted candidates remain
+individually valid. PRED-054's general exception-classification fix is
+committed, but its actual candidate has not been rechecked. No P1 closure or
+P2 continuation is decided here.
+
+**Recommended next work:** build and offline-preflight one isolated P1-only
+candidate on top of `e4e0b05`, preserving the stopped timer; present its SHA and
+a timer-safe deployment/rollback plan for a separate user decision.
+
 ## 2026-10-12 — Stage11 P1-H PRED-054 candidate exception classification
 
 **PASS for the minimal code fix and offline regression; PRED-054's exact live
