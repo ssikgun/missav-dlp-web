@@ -31,15 +31,19 @@
 
 **P0 OPERATIONS BLOCKER → P1 ASR_ONLY/HYBRID ROOT CAUSE → P2 QUALITY WIRING/REGRESSION → P3 UNATTENDED E2E/PUBLISH → [P4 OPTIONAL SUPPLEMENTAL RESEARCH]**
 
-- **P0 즉시 다음 한 작업:** 2026-10-12 09:10:17 KST DANDYA-033의
-  `DANDYA/DANDYA-033/DANDYA-033.ts`에서 발생한
-  `FullTitleASRValidationError("canonical_video must identify a canonical MP4")`
-  가 Stage12의 `_is_title_exception` 처리에 매핑되지 않아 systemic failure로
-  전파, durable `RUNNING` 잔존, 5분 timer `FAILED_ACTIVE_STATE` 반복.
-  **기존 Normal/Stage12 예외 경계 최소 수정**으로 작품별 terminal error를
-  기록하게 하고, 저장된 실패/무게시 evidence를 확인한 뒤 **기존 복구 절차**로
-  고립된 RUNNING만 안전하게 정리한다. 무분별한 state SQL 수정/모든 실패 reset 금지.
-  다음 작품이 사용자 개입 없이 이어지고 timer blockage가 풀리는 것을 확인.
+- **P0 운영 장애; 코드 체크포인트 완료, 운영 반영 대기:** 2026-10-12 09:10:17 KST
+  DANDYA-033의 `DANDYA/DANDYA-033/DANDYA-033.ts`에서 발생한
+  `FullTitleASRValidationError("canonical_video must identify a canonical MP4")`가
+  Stage12 `_is_title_exception`에 매핑되지 않아 systemic failure와 durable `RUNNING`을
+  남겼다. 코드 원인은 Normal Mode가 canonical holding 직후 MP4 형식을 검사하지 않아
+  ASR의 입력 형식 오류가 그대로 전파된 것이다. 구현 커밋
+  `70066f34f65e617e8c5d387038921f9695b541c5`는 canonical `.mp4` 검사를 ASR 전에
+  추가하고 `.ts`를 기존 `Stage11ControllerValidationError`로 실패시킨다. Stage12 분류기와
+  ASR validation 계약은 변경하지 않았다. 격리 DB/가짜 의존성 회귀는 PASS.
+  **이 checkpoint는 소스·오프라인 검증·Git 반영만 포함한다.** 운영 배포, timer/service 변경,
+  DB의 `RUNNING` 복구는 하지 않았다. 따라서 기존 운영 blocker 해소를 의미하지 않는다.
+  다음 P0 작업은 별도 운영 checkpoint에서 저장된 실패/무게시 evidence를 확인하고 기존
+  복구 절차로 해당 `RUNNING`만 정리한 뒤, 다음 작품 진행과 timer blockage 해소를 검증하는 것이다.
 - **P1:** 134 ASR_ONLY 보고서의 원인 유형을 증거 기준으로 구분. 외부 JA가 실제로
   유효한 작품의 HYBRID 선택/정렬/ASR 보조증거/모드결과가 운영 경로에서 보존되는지
   확인·최소 수정. JA 없거나 실패한 작품에 가짜 HYBRID를 강제하지 말고 명시적 상태를 남김.
@@ -84,6 +88,40 @@
 (2) CT108 Git/server timer, stage12-runtime/status.json, DANDYA failure log 읽기;
 (3) **P0만** 범위로 정해 원인 확인→최소 수정→bounded regression→운영 재개/증거;
 (4) handoff update→commit/push. **P0 완료 전 P1~P4로 갈아타지 말 것.**
+
+
+### 2026-10-12 — Downloader Stage11 P0 code-only checkpoint
+
+Root cause was verified in code: `validate_canonical_holding()` accepts a
+canonical `.ts` holding, while frozen full-title ASR validation accepts only
+`video_format == "mp4"`. Normal Mode passed the `.ts` through to ASR; its
+`FullTitleASRValidationError` escaped Stage12's narrow title-exception list and
+became systemic. Normal Mode now checks the already validated holding format
+immediately after `_resolve_holding()` and raises the existing
+`Stage11ControllerValidationError` before baseline ASR. Stage12's exception
+classifier remains unchanged, so ASR validation/configuration errors remain
+systemic. No title-specific branch, ASR contract relaxation, format spoofing,
+or conversion was added.
+
+Offline verification PASS, all using temporary artifacts/SQLite and fake
+adapters:
+- Normal Mode unittest: 12/12 PASS, including canonical MP4 success and `.ts`
+  rejection before Whisper, external-JA acquisition or Hermes.
+- Stage12 batch, full-title ASR, Stage11 controller (106 checks), Stage12
+  rollout and subtitle publication smokes: all PASS. The integrated `.ts`
+  case reaches `FAILED_TERMINAL`, leaves publication/Jellyfin NOT_RUN, then
+  publishes the next selected PENDING title. A synthetic ASR configuration
+  `FullTitleASRValidationError` still stops the batch systemically.
+- Existing baseline ASR bytes and external JA bytes remain unchanged; Normal
+  Mode's report retains `publication_performed=false`; Stage12's existing
+  publication contract passed. `py_compile` and `git diff --check` PASS.
+
+Source/test commit: `70066f34f65e617e8c5d387038921f9695b541c5` on
+`teddy-subtitle-stage11` (base `6335158cccfb7d8427aef6ff485e7cf4404e7eff`).
+The previous worktree `/opt/missav-pwa-subtitle-stage11` was left unchanged.
+This checkpoint made no production DB/NAS writes, deployment, timer/service
+changes, queue recovery, or long-running Hermes/Whisper calls. The known
+operational `RUNNING` blocker remains for the separate P0 operations checkpoint.
 
 
 ## 2026-10-12 — READ-ONLY 운영 반영 비교 감사: 부분 반영; 지속 무인 운영 INCOMPLETE
