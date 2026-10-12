@@ -23,7 +23,7 @@ import subprocess
 from types import SimpleNamespace
 from urllib import error as urllib_error
 from urllib import request as urllib_request
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from teddy_discovery_alignment_application import (
     AlignmentAcceptanceApplicationResult,
@@ -79,6 +79,7 @@ from teddy_discovery_subtitle_external import (
     SubtitleCatDetailPage,
     SubtitleCatProvider,
     MAX_SUBTITLECAT_DETAIL_HTML_BYTES,
+    annotate_external_subtitle_error,
 )
 from teddy_discovery_subtitle_text import MAX_SUBTITLE_BYTES
 from teddy_discovery_subtitle_source_quality import classify_source_document
@@ -317,8 +318,11 @@ def _make_remote_task_factory(config: Stage11DeploymentConfig) -> Callable[[str]
 
 class _NoRedirectHandler(urllib_request.HTTPRedirectHandler):
     def redirect_request(self, request, fp, code, msg, headers, newurl):
-        raise ExternalSubtitleTransportError(
-            "SubtitleCat redirect is not permitted"
+        raise annotate_external_subtitle_error(
+            ExternalSubtitleTransportError("SubtitleCat redirect is not permitted"),
+            stage="ja_srt_download",
+            reason_code="SRT_REDIRECT",
+            http_status=code,
         )
 
 
@@ -332,21 +336,46 @@ def _http_bytes(
     try:
         parsed = urlsplit(url)
     except ValueError as error:
-        raise ExternalSubtitleTransportError(
+        wrapped = ExternalSubtitleTransportError(
             "SubtitleCat URL could not be parsed"
-        ) from error
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise ExternalSubtitleTransportError(
-            "SubtitleCat transport requires an HTTP(S) URL"
         )
-    request = urllib_request.Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 Teddy-Downloader-SubtitleDiscovery/1.0",
-            "Accept": "text/html,application/x-subrip,text/plain,*/*",
-        },
-        method="GET",
-    )
+        annotate_external_subtitle_error(
+            wrapped, stage="ja_srt_download", reason_code="SRT_URL_INVALID"
+        )
+        raise wrapped from error
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise annotate_external_subtitle_error(ExternalSubtitleTransportError(
+            "SubtitleCat transport requires an HTTP(S) URL"
+        ), stage="ja_srt_download", reason_code="SRT_URL_INVALID")
+    try:
+        # Keep the candidate's Unicode URL as its source identity, but send a
+        # standards-compliant ASCII URI to urllib. ``safe`` preserves existing
+        # delimiters and percent escapes, so only raw non-ASCII path/query
+        # characters are UTF-8 percent-encoded.
+        request_url = urlunsplit((
+            parsed.scheme,
+            parsed.netloc,
+            quote(parsed.path, safe="/%:@!$&'()*+,;=-._~%"),
+            quote(parsed.query, safe="/?%:@!$&'()*+,;=-._~"),
+            parsed.fragment,
+        ))
+        request_url.encode("ascii")
+        request = urllib_request.Request(
+            request_url,
+            headers={
+                "User-Agent": "Mozilla/5.0 Teddy-Downloader-SubtitleDiscovery/1.0",
+                "Accept": "text/html,application/x-subrip,text/plain,*/*",
+            },
+            method="GET",
+        )
+    except UnicodeError as error:
+        wrapped = ExternalSubtitleTransportError(
+            "SubtitleCat request URL cannot be encoded safely"
+        )
+        annotate_external_subtitle_error(
+            wrapped, stage="ja_srt_download", reason_code="SRT_URL_ENCODING"
+        )
+        raise wrapped from error
     handlers = []
     if proxy_url is not None:
         handlers.append(
@@ -361,28 +390,52 @@ def _http_bytes(
             status = response.getcode()
             final_url = response.geturl()
             if type(status) is not int or not 200 <= status < 300:
-                raise ExternalSubtitleTransportError(
-                    "SubtitleCat HTTP status is not successful"
+                raise annotate_external_subtitle_error(
+                    ExternalSubtitleTransportError(
+                        "SubtitleCat HTTP status is not successful"
+                    ),
+                    stage="ja_srt_download",
+                    reason_code="SRT_HTTP_STATUS",
+                    http_status=status if type(status) is int else None,
                 )
-            if final_url != url:
-                raise ExternalSubtitleTransportError(
-                    "SubtitleCat redirect is not permitted"
+            if final_url != request_url:
+                raise annotate_external_subtitle_error(
+                    ExternalSubtitleTransportError(
+                        "SubtitleCat redirect is not permitted"
+                    ),
+                    stage="ja_srt_download",
+                    reason_code="SRT_REDIRECT",
+                    http_status=status,
                 )
             payload = response.read(max_bytes + 1)
     except ExternalSubtitleTransportError:
         raise
-    except (
-        OSError,
-        TimeoutError,
-        urllib_error.URLError,
-        urllib_error.HTTPError,
-    ) as error:
-        raise ExternalSubtitleTransportError(
-            "SubtitleCat HTTP transport failed"
-        ) from error
+    except urllib_error.HTTPError as error:
+        wrapped = ExternalSubtitleTransportError(
+            "SubtitleCat HTTP status is not successful"
+        )
+        annotate_external_subtitle_error(
+            wrapped,
+            stage="ja_srt_download",
+            reason_code="SRT_HTTP_STATUS",
+            http_status=error.code,
+        )
+        raise wrapped from error
+    except (OSError, TimeoutError, urllib_error.URLError) as error:
+        wrapped = ExternalSubtitleTransportError("SubtitleCat HTTP transport failed")
+        annotate_external_subtitle_error(
+            wrapped,
+            stage="ja_srt_download",
+            reason_code="SRT_TRANSPORT_FAILURE",
+        )
+        raise wrapped from error
     if type(payload) is not bytes or not 0 < len(payload) <= max_bytes:
-        raise ExternalSubtitleTransportError(
-            "SubtitleCat response exceeded its bounded byte limit"
+        raise annotate_external_subtitle_error(
+            ExternalSubtitleTransportError(
+                "SubtitleCat response exceeded its bounded byte limit"
+            ),
+            stage="ja_srt_download",
+            reason_code="SRT_RESPONSE_INVALID",
         )
     return payload
 
@@ -435,23 +488,68 @@ def _detail_http_bytes(
                 if type(status) is int and 200 <= status < 300:
                     payload = response.read(max_bytes + 1)
                     if type(payload) is not bytes or not 0 < len(payload) <= max_bytes:
-                        raise ExternalSubtitleTransportError("SubtitleCat response exceeded its bounded byte limit")
+                        raise annotate_external_subtitle_error(
+                            ExternalSubtitleTransportError(
+                                "SubtitleCat response exceeded its bounded byte limit"
+                            ),
+                            stage="detail_http",
+                            reason_code="DETAIL_RESPONSE_INVALID",
+                        )
                     return payload, current
                 if status != 301 or hop != 0:
-                    raise ExternalSubtitleTransportError("SubtitleCat detail redirect/status is not permitted")
+                    raise annotate_external_subtitle_error(
+                        ExternalSubtitleTransportError(
+                            "SubtitleCat detail redirect/status is not permitted"
+                        ),
+                        stage="detail_http",
+                        reason_code=(
+                            "DETAIL_HTTP_STATUS" if status != 301
+                            else "DETAIL_REDIRECT"
+                        ),
+                        http_status=status if type(status) is int else None,
+                    )
                 source = canonical_host(current, "subtitlecat.com")
                 locations = response.headers.get_all("Location", [])
                 if len(locations) != 1:
-                    raise ExternalSubtitleTransportError("SubtitleCat canonical detail Location is invalid")
+                    raise annotate_external_subtitle_error(
+                        ExternalSubtitleTransportError(
+                            "SubtitleCat canonical detail Location is invalid"
+                        ),
+                        stage="detail_http",
+                        reason_code="DETAIL_REDIRECT_INVALID",
+                        http_status=status,
+                    )
                 target_url = locations[0]
                 target = canonical_host(target_url, "www.subtitlecat.com")
                 if (source.path, source.query) != (target.path, target.query):
-                    raise ExternalSubtitleTransportError("SubtitleCat canonical detail target is detached")
+                    raise annotate_external_subtitle_error(
+                        ExternalSubtitleTransportError(
+                            "SubtitleCat canonical detail target is detached"
+                        ),
+                        stage="detail_http",
+                        reason_code="DETAIL_REDIRECT_INVALID",
+                        http_status=status,
+                    )
                 current = target_url
     except ExternalSubtitleTransportError:
         raise
+    except urllib_error.HTTPError as error:
+        wrapped = ExternalSubtitleTransportError(
+            "SubtitleCat detail HTTP status is not successful"
+        )
+        annotate_external_subtitle_error(
+            wrapped,
+            stage="detail_http",
+            reason_code="DETAIL_HTTP_STATUS",
+            http_status=error.code,
+        )
+        raise wrapped from error
     except (OSError, TimeoutError, urllib_error.URLError, ValueError) as error:
-        raise ExternalSubtitleTransportError("SubtitleCat detail HTTP transport failed") from error
+        wrapped = ExternalSubtitleTransportError("SubtitleCat detail HTTP transport failed")
+        annotate_external_subtitle_error(
+            wrapped, stage="detail_http", reason_code="DETAIL_TRANSPORT_FAILURE"
+        )
+        raise wrapped from error
 
 
 def _default_detail_fetcher(
@@ -1192,8 +1290,17 @@ class _HybridOriginalRegistry:
         self._targeted: dict[str, TargetedSecondEvidenceArtifact] = {}
 
     def capture_external(self, callback: Callable) -> Callable:
-        def wrapped(canonical_video, asr_result):
-            application = callback(canonical_video, asr_result)
+        accepts_diagnostic = bool(
+            getattr(callback, "_stage11_accepts_diagnostic", False)
+        )
+
+        def wrapped(canonical_video, asr_result, *, diagnostic_out=None):
+            if accepts_diagnostic:
+                application = callback(
+                    canonical_video, asr_result, diagnostic_out=diagnostic_out
+                )
+            else:
+                application = callback(canonical_video, asr_result)
             if application is None:
                 return None
             if type(application) is not AlignmentAcceptanceApplicationResult:
@@ -1214,6 +1321,8 @@ class _HybridOriginalRegistry:
             )
             return application
 
+        if accepts_diagnostic:
+            wrapped._stage11_accepts_diagnostic = True
         return wrapped
 
     def capture_first_pass(self, callback: Callable) -> Callable:

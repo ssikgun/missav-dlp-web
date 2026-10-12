@@ -15,6 +15,8 @@ from urllib.parse import unquote, urlencode, urljoin, urlsplit
 from teddy_discovery_subtitle_external import (
     ExternalSubtitleValidationError,
     ExternalSubtitleTransportError,
+    annotate_external_subtitle_error,
+    external_subtitle_error_diagnostic,
     _validate_dvd_id,
 )
 
@@ -49,6 +51,8 @@ class SubtitleCatSearchCandidate:
 class SubtitleCatSearchResult:
     dvd_id: str
     candidates: tuple[SubtitleCatSearchCandidate, ...]
+    diagnostic_reason_code: str | None = None
+    diagnostic_http_status: int | None = None
 
     @property
     def found(self) -> bool:
@@ -118,7 +122,12 @@ def _safe_url(value: str):
 
 class _NoRedirectHandler(urllib_request.HTTPRedirectHandler):
     def redirect_request(self, request, fp, code, msg, headers, newurl):
-        raise SubtitleCatSearchTransportError("search redirect is not permitted")
+        raise annotate_external_subtitle_error(
+            SubtitleCatSearchTransportError("search redirect is not permitted"),
+            stage="search_http",
+            reason_code="SEARCH_REDIRECT",
+            http_status=code,
+        )
 
 
 def _fetch(
@@ -140,9 +149,23 @@ def _fetch(
     with opener.open(request, timeout=timeout) as response:
         status, final_url = response.getcode(), response.geturl()
         if type(status) is not int or not 200 <= status < 300:
-            raise SubtitleCatSearchTransportError("search HTTP status is not successful")
+            raise annotate_external_subtitle_error(
+                SubtitleCatSearchTransportError(
+                    "search HTTP status is not successful"
+                ),
+                stage="search_http",
+                reason_code="SEARCH_HTTP_STATUS",
+                http_status=status if type(status) is int else None,
+            )
         if final_url != request.full_url:
-            raise SubtitleCatSearchTransportError("search redirect is not permitted")
+            raise annotate_external_subtitle_error(
+                SubtitleCatSearchTransportError(
+                    "search redirect is not permitted"
+                ),
+                stage="search_http",
+                reason_code="SEARCH_REDIRECT",
+                http_status=status,
+            )
         return SubtitleCatSearchResponse(
             status, final_url, response.read(MAX_SEARCH_HTML_BYTES + 1)
         )
@@ -218,7 +241,12 @@ def parse_search_response(*, dvd_id: str, response: SubtitleCatSearchResponse) -
     if not isinstance(response, SubtitleCatSearchResponse):
         raise SubtitleCatSearchError("fetch must return SubtitleCatSearchResponse")
     if type(response.status) is not int or not 200 <= response.status < 300:
-        raise SubtitleCatSearchTransportError("search HTTP status is not successful")
+        raise annotate_external_subtitle_error(
+            SubtitleCatSearchTransportError("search HTTP status is not successful"),
+            stage="search_http",
+            reason_code="SEARCH_HTTP_STATUS",
+            http_status=response.status if type(response.status) is int else None,
+        )
     _safe_url(response.final_url)
     if response.final_url != expected_url:
         raise SubtitleCatSearchTransportError("search final URL differs from request")
@@ -230,6 +258,18 @@ def parse_search_response(*, dvd_id: str, response: SubtitleCatSearchResponse) -
         raise SubtitleCatSearchError("search HTML must be UTF-8") from error
     if any((ord(c) < 32 and c not in "\t\r\n") or ord(c) == 127 for c in html):
         raise SubtitleCatSearchError("search HTML contains invalid text controls")
+    lowered_html = html.casefold()
+    block_page = any(
+        marker in lowered_html
+        for marker in (
+            "verify you are human",
+            "checking your browser before accessing",
+            "access denied",
+            "temporarily blocked",
+            "cf-chl-",
+            "challenge-platform",
+        )
+    )
     parser = _SearchParser(dvd_id, response.final_url)
     try:
         parser.feed(html)
@@ -239,9 +279,12 @@ def parse_search_response(*, dvd_id: str, response: SubtitleCatSearchResponse) -
         raise SubtitleCatSearchError("invalid search HTML or relevant href") from error
     if not parser.saw_tag:
         raise SubtitleCatSearchError("search response is not HTML")
-    return SubtitleCatSearchResult(dvd_id, tuple(
-        SubtitleCatSearchCandidate(url) for url in sorted(parser.urls)
-    ))
+    return SubtitleCatSearchResult(
+        dvd_id,
+        tuple(SubtitleCatSearchCandidate(url) for url in sorted(parser.urls)),
+        "SEARCH_BLOCK_PAGE" if block_page else None,
+        response.status if block_page else None,
+    )
 
 
 class SubtitleCatDiscovery:
@@ -295,8 +338,52 @@ class SubtitleCatDiscovery:
         )
         try:
             response = self.fetch(request, self.timeout)
-        except (SubtitleCatSearchError, SubtitleCatSearchTransportError):
+        except (SubtitleCatSearchError, SubtitleCatSearchTransportError) as error:
+            if external_subtitle_error_diagnostic(error) is None:
+                if isinstance(error, SubtitleCatSearchTransportError):
+                    annotate_external_subtitle_error(
+                        error,
+                        stage="search_http",
+                        reason_code="SEARCH_TRANSPORT_FAILURE",
+                    )
+                else:
+                    annotate_external_subtitle_error(
+                        error,
+                        stage="search_response",
+                        reason_code="SEARCH_RESPONSE_INVALID",
+                    )
             raise
         except Exception as error:
-            raise SubtitleCatSearchTransportError("search request failed") from error
-        return parse_search_response(dvd_id=dvd_id, response=response)
+            wrapped = SubtitleCatSearchTransportError("search request failed")
+            annotate_external_subtitle_error(
+                wrapped,
+                stage="search_http",
+                reason_code=(
+                    "SEARCH_HTTP_STATUS"
+                    if type(getattr(error, "code", None)) is int
+                    else "SEARCH_TRANSPORT_FAILURE"
+                ),
+                http_status=(
+                    getattr(error, "code", None)
+                    if type(getattr(error, "code", None)) is int
+                    else None
+                ),
+            )
+            raise wrapped from error
+        try:
+            return parse_search_response(dvd_id=dvd_id, response=response)
+        except (SubtitleCatSearchError, SubtitleCatSearchTransportError) as error:
+            if external_subtitle_error_diagnostic(error) is None:
+                if isinstance(error, SubtitleCatSearchTransportError):
+                    annotate_external_subtitle_error(
+                        error,
+                        stage="search_http",
+                        reason_code="SEARCH_TRANSPORT_FAILURE",
+                    )
+                else:
+                    annotate_external_subtitle_error(
+                        error,
+                        stage="search_response",
+                        reason_code="SEARCH_RESPONSE_INVALID",
+                    )
+            raise

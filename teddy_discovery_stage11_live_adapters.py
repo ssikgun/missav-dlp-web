@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from collections.abc import Callable, Mapping
 import os
 from pathlib import Path
+import re
 
 from teddy_discovery_availability import canonical_dvd_id
 from teddy_discovery_organizer import load_db_state
@@ -38,12 +39,16 @@ from teddy_discovery_hybrid_evidence import (
     ALIGNMENT_PROVENANCE_UNRESOLVED,
 )
 from teddy_discovery_subtitlecat_discovery import (
-    SubtitleCatSearchError, SubtitleCatSearchCandidate, MAX_SEARCH_CANDIDATES,
+    SubtitleCatSearchError, SubtitleCatSearchTransportError,
+    SubtitleCatSearchCandidate, MAX_SEARCH_CANDIDATES,
     _safe_url,
 )
 from teddy_discovery_subtitle_external import (
+    ExternalSubtitleError,
     ExternalSubtitleValidationError, ExternalSubtitleTransportError,
     ExternalSubtitlePayload,
+    annotate_external_subtitle_error,
+    external_subtitle_error_diagnostic,
 )
 from teddy_discovery_targeted_second_evidence_runner import (
     run_targeted_second_evidence_v1_from_local_source,
@@ -173,6 +178,85 @@ class _ExternalCandidateOutcome:
     status: str
     payload_sha256: str | None = None
     application: object | None = None
+    diagnostic_stage: str | None = None
+    diagnostic_reason_code: str | None = None
+    http_status: int | None = None
+
+
+def _external_diagnostic(
+    stage,
+    reason_code,
+    *,
+    candidate_count=None,
+    http_status=None,
+    accepted_candidate_count=0,
+    candidate_failures=(),
+):
+    """Build a body-free, URL-free, bounded diagnostic record."""
+    if (type(stage) is not str
+            or re.fullmatch(r"[a-z][a-z0-9_]{0,39}", stage) is None
+            or type(reason_code) is not str
+            or re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", reason_code) is None):
+        raise Stage11LiveAdapterError("external JA diagnostic code is invalid")
+    if candidate_count is not None and (
+        type(candidate_count) is not int or not 0 <= candidate_count <= MAX_SEARCH_CANDIDATES
+    ):
+        raise Stage11LiveAdapterError("external JA diagnostic candidate count is invalid")
+    if (type(accepted_candidate_count) is not int
+            or not 0 <= accepted_candidate_count <= MAX_SEARCH_CANDIDATES):
+        raise Stage11LiveAdapterError("external JA diagnostic accepted count is invalid")
+    if http_status is not None and (
+        type(http_status) is not int or not 100 <= http_status <= 599
+    ):
+        raise Stage11LiveAdapterError("external JA diagnostic HTTP status is invalid")
+    safe_failures = []
+    for item in candidate_failures:
+        if (type(item) is not tuple or len(item) != 3
+                or type(item[0]) is not str
+                or re.fullmatch(r"[a-z][a-z0-9_]{0,39}", item[0]) is None
+                or type(item[1]) is not str
+                or re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", item[1]) is None):
+            raise Stage11LiveAdapterError("external JA diagnostic failure is invalid")
+        failure_stage, failure_code, status = item
+        if status is not None and (type(status) is not int or not 100 <= status <= 599):
+            raise Stage11LiveAdapterError("external JA diagnostic failure status is invalid")
+        safe_failures.append((failure_stage, failure_code, status))
+    grouped = {}
+    for failure_stage, failure_code, status in safe_failures:
+        key = (failure_stage, failure_code, status)
+        grouped[key] = grouped.get(key, 0) + 1
+    failures = [
+        {"stage": key[0], "reason_code": key[1], "http_status": key[2], "count": count}
+        for key, count in sorted(grouped.items(), key=lambda pair: (
+            pair[0][0], pair[0][1], pair[0][2] or 0
+        ))
+    ]
+    return {
+        "schema_version": 1,
+        "stage": stage,
+        "reason_code": reason_code,
+        "candidate_count": candidate_count,
+        "http_status": http_status,
+        "accepted_candidate_count": accepted_candidate_count,
+        "candidate_failures": failures,
+    }
+
+
+def _diagnostic_from_error(error, *, fallback_stage, fallback_reason):
+    value = external_subtitle_error_diagnostic(error)
+    if value is None:
+        return fallback_stage, fallback_reason, None
+    return value["stage"], value["reason_code"], value["http_status"]
+
+
+def _candidate_failures(outcomes):
+    return tuple(
+        (item.diagnostic_stage or "candidate_evaluation",
+         item.diagnostic_reason_code or "CANDIDATE_NOT_ACCEPTED",
+         item.http_status)
+        for item in outcomes
+        if item.status != "ACCEPTED"
+    )
 
 
 def _align_external_payload(payload, title, asr_result, acceptance_policy,
@@ -185,9 +269,15 @@ def _align_external_payload(payload, title, asr_result, acceptance_policy,
             ),
         )
     except HybridEvidenceValidationError as error:
-        raise ExternalSubtitleValidationError(
+        wrapped = ExternalSubtitleValidationError(
             "external subtitle immutable payload validation failed"
-        ) from error
+        )
+        annotate_external_subtitle_error(
+            wrapped,
+            stage="ja_srt_content",
+            reason_code="SRT_CONTENT_INVALID",
+        )
+        raise wrapped from error
     try:
         candidates = generate_monotonic_anchor_candidates(bundle)
         selection = select_affine_consensus_from_candidates(
@@ -203,14 +293,28 @@ def _align_external_payload(payload, title, asr_result, acceptance_policy,
             )
         selected, decision = selection
     except AlignmentLimitError as error:
-        raise ExternalSubtitleValidationError(
+        wrapped = ExternalSubtitleValidationError(
             "external subtitle alignment exceeded a fixed "
             "lexical/affine analysis limit"
-        ) from error
+        )
+        annotate_external_subtitle_error(
+            wrapped, stage="alignment", reason_code="ALIGNMENT_LIMIT"
+        )
+        raise wrapped from error
     except AlignmentValidationError as error:
-        raise ExternalSubtitleValidationError(
+        wrapped = ExternalSubtitleValidationError(
             "external subtitle alignment validation failed"
-        ) from error
+        )
+        annotate_external_subtitle_error(
+            wrapped,
+            stage="alignment",
+            reason_code=(
+                "ALIGNMENT_NO_CONSENSUS"
+                if isinstance(error, _NoExternalConsensus)
+                else "ALIGNMENT_VALIDATION_FAILURE"
+            ),
+        )
+        raise wrapped from error
     return apply_alignment_acceptance(
         bundle, decision,
         alignment=(
@@ -227,12 +331,31 @@ def _evaluate_external_search_candidate(candidate, *, provider, title, asr_resul
     url = candidate.detail_url
     try:
         payload = provider.fetch_original_japanese_payload(dvd_id=title, detail_url=url)
-    except ExternalSubtitleTransportError:
-        return _ExternalCandidateOutcome(url, "INDETERMINATE")
-    except ExternalSubtitleValidationError:
-        return _ExternalCandidateOutcome(url, "CONCLUSIVE_NON_ACCEPT")
+    except ExternalSubtitleTransportError as error:
+        stage, reason, status = _diagnostic_from_error(
+            error,
+            fallback_stage="candidate_fetch",
+            fallback_reason="CANDIDATE_TRANSPORT_FAILURE",
+        )
+        return _ExternalCandidateOutcome(
+            url, "INDETERMINATE", diagnostic_stage=stage,
+            diagnostic_reason_code=reason, http_status=status,
+        )
+    except ExternalSubtitleValidationError as error:
+        stage, reason, status = _diagnostic_from_error(
+            error,
+            fallback_stage="candidate_fetch",
+            fallback_reason="CANDIDATE_VALIDATION_FAILURE",
+        )
+        return _ExternalCandidateOutcome(
+            url, "CONCLUSIVE_NON_ACCEPT", diagnostic_stage=stage,
+            diagnostic_reason_code=reason, http_status=status,
+        )
     except Exception:
-        return _ExternalCandidateOutcome(url, "INDETERMINATE")
+        return _ExternalCandidateOutcome(
+            url, "INDETERMINATE", diagnostic_stage="candidate_evaluation",
+            diagnostic_reason_code="UNEXPECTED_EVALUATION_FAILURE",
+        )
     # A returned payload must carry its original exact immutable identity.
     # Validation of a malformed returned object is an execution fault, not a
     # conclusive negative result that could authorize selection of another one.
@@ -241,7 +364,10 @@ def _evaluate_external_search_candidate(candidate, *, provider, title, asr_resul
             raise Stage11LiveAdapterError("external payload identity detached")
         payload.__post_init__()
     except Exception:
-        return _ExternalCandidateOutcome(url, "INDETERMINATE")
+        return _ExternalCandidateOutcome(
+            url, "INDETERMINATE", diagnostic_stage="ja_srt_content",
+            diagnostic_reason_code="PAYLOAD_IDENTITY_INVALID",
+        )
     try:
         application = _align_external_payload(payload, title, asr_result,
                                               acceptance_policy, residual_threshold_ms)
@@ -251,13 +377,34 @@ def _evaluate_external_search_candidate(candidate, *, provider, title, asr_resul
         # other alignment validation (including limit/ambiguity) is blocking.
         conclusive = isinstance(error.__cause__, (HybridEvidenceValidationError,
                                                   _NoExternalConsensus))
-        return _ExternalCandidateOutcome(url, "CONCLUSIVE_NON_ACCEPT" if conclusive
-                                         else "INDETERMINATE")
+        stage, reason, status = _diagnostic_from_error(
+            error,
+            fallback_stage="alignment",
+            fallback_reason="ALIGNMENT_VALIDATION_FAILURE",
+        )
+        return _ExternalCandidateOutcome(
+            url,
+            "CONCLUSIVE_NON_ACCEPT" if conclusive else "INDETERMINATE",
+            diagnostic_stage=stage,
+            diagnostic_reason_code=reason,
+            http_status=status,
+        )
     except Exception:
-        return _ExternalCandidateOutcome(url, "INDETERMINATE")
+        return _ExternalCandidateOutcome(
+            url, "INDETERMINATE", diagnostic_stage="alignment",
+            diagnostic_reason_code="UNEXPECTED_ALIGNMENT_FAILURE",
+        )
     if application.decision.verdict == ACCEPT_HYBRID:
         return _ExternalCandidateOutcome(url, "ACCEPTED", payload.sha256, application)
-    return _ExternalCandidateOutcome(url, "CONCLUSIVE_NON_ACCEPT")
+    reason = (
+        "HYBRID_REJECTED"
+        if application.decision.verdict == "REJECT_EXTERNAL"
+        else "HYBRID_UNRESOLVED"
+    )
+    return _ExternalCandidateOutcome(
+        url, "CONCLUSIVE_NON_ACCEPT", diagnostic_stage="alignment",
+        diagnostic_reason_code=reason,
+    )
 
 
 def _unique_accepted_payload_sha(outcomes):
@@ -268,14 +415,38 @@ def _unique_accepted_payload_sha(outcomes):
             sha = outcome.payload_sha256
             if (type(sha) is not str or len(sha) != 64
                     or any(c not in "0123456789abcdef" for c in sha)):
-                raise ExternalSubtitleValidationError("accepted external payload SHA is invalid")
+                raise annotate_external_subtitle_error(
+                    ExternalSubtitleValidationError(
+                        "accepted external payload SHA is invalid"
+                    ),
+                    stage="candidate_resolution",
+                    reason_code="CANDIDATE_STATE_INVALID",
+                )
             accepted.setdefault(sha, outcome)
         elif outcome.status not in {"CONCLUSIVE_NON_ACCEPT", "INDETERMINATE"}:
-            raise ExternalSubtitleValidationError("external candidate outcome is invalid")
+            raise annotate_external_subtitle_error(
+                ExternalSubtitleValidationError(
+                    "external candidate outcome is invalid"
+                ),
+                stage="candidate_resolution",
+                reason_code="CANDIDATE_STATE_INVALID",
+            )
     if any(outcome.status == "INDETERMINATE" for outcome in outcomes):
-        raise ExternalSubtitleValidationError("external candidate evaluation is indeterminate")
+        raise annotate_external_subtitle_error(
+            ExternalSubtitleValidationError(
+                "external candidate evaluation is indeterminate"
+            ),
+            stage="candidate_resolution",
+            reason_code="CANDIDATE_EVALUATION_INDETERMINATE",
+        )
     if len(accepted) > 1:
-        raise ExternalSubtitleValidationError("distinct accepted external payloads are ambiguous")
+        raise annotate_external_subtitle_error(
+            ExternalSubtitleValidationError(
+                "distinct accepted external payloads are ambiguous"
+            ),
+            stage="candidate_resolution",
+            reason_code="ACCEPTED_CANDIDATE_CONFLICT",
+        )
     return next(iter(accepted)) if accepted else None
 
 
@@ -288,11 +459,23 @@ def _select_external_candidate(outcomes):
     for item in matching:
         application = item.application
         if type(application) is not AlignmentAcceptanceApplicationResult:
-            raise ExternalSubtitleValidationError("accepted external application is invalid")
+            raise annotate_external_subtitle_error(
+                ExternalSubtitleValidationError(
+                    "accepted external application is invalid"
+                ),
+                stage="candidate_resolution",
+                reason_code="CANDIDATE_STATE_INVALID",
+            )
         application.__post_init__()
         if (application.decision.verdict != ACCEPT_HYBRID
                 or application.bundle.external_ja_payload.sha256 != sha):
-            raise ExternalSubtitleValidationError("accepted external payload evidence is detached")
+            raise annotate_external_subtitle_error(
+                ExternalSubtitleValidationError(
+                    "accepted external payload evidence is detached"
+                ),
+                stage="candidate_resolution",
+                reason_code="CANDIDATE_STATE_INVALID",
+            )
     # Equivalent content sources use canonical URL order only to retain a
     # stable provenance witness, never to choose between different contents.
     return matching[0].application
@@ -300,42 +483,106 @@ def _select_external_candidate(outcomes):
 
 def build_external_ja_adapter(*, discovery, provider, acceptance_policy,
                               residual_threshold_ms):
-    def external(canonical_video, asr_result):
-        asr_result.__post_init__()
-        if ASRSourceSnapshot.from_holding(
-            canonical_video, source_size=asr_result.source_snapshot.source_size,
-            source_mtime_ns=asr_result.source_snapshot.source_mtime_ns,
-        ) != asr_result.source_snapshot:
-            raise Stage11LiveAdapterError("external baseline source detached")
-        title = canonical_video.dvd_id
-        found = discovery.discover(dvd_id=title)
-        if found.dvd_id != title:
-            raise Stage11LiveAdapterError("discovery source detached")
-        if not found.candidates:
-            return None
-        if len(found.candidates) == 1:
-            # Preserve the exact existing result and exception contract.
-            payload = provider.fetch_original_japanese_payload(
-                dvd_id=title, detail_url=found.candidates[0].detail_url,
-            )
-            return _align_external_payload(payload, title, asr_result,
-                                           acceptance_policy, residual_threshold_ms)
-        if (type(found.candidates) is not tuple
-                or len(found.candidates) > MAX_SEARCH_CANDIDATES
-                or any(type(candidate) is not SubtitleCatSearchCandidate
-                       or type(candidate.detail_url) is not str
-                       or not candidate.detail_url for candidate in found.candidates)):
-            raise SubtitleCatSearchError("external search candidate state is invalid")
-        for candidate in found.candidates:
-            _safe_url(candidate.detail_url)
-        outcomes = tuple(_evaluate_external_search_candidate(
-            candidate, provider=provider, title=title, asr_result=asr_result,
-            acceptance_policy=acceptance_policy,
-            residual_threshold_ms=residual_threshold_ms,
-        ) for candidate in sorted(found.candidates, key=lambda item: item.detail_url))
-        return _select_external_candidate(outcomes)
-    return external
+    def external(canonical_video, asr_result, *, diagnostic_out=None):
+        state = {"candidate_count": None, "accepted_candidate_count": 0,
+                 "candidate_failures": ()}
 
+        def record(stage, reason_code, *, http_status=None):
+            if diagnostic_out is not None:
+                diagnostic_out.clear()
+                diagnostic_out.update(_external_diagnostic(
+                    stage, reason_code,
+                    candidate_count=state["candidate_count"],
+                    http_status=http_status,
+                    accepted_candidate_count=state["accepted_candidate_count"],
+                    candidate_failures=state["candidate_failures"],
+                ))
+
+        try:
+            asr_result.__post_init__()
+            if ASRSourceSnapshot.from_holding(
+                canonical_video, source_size=asr_result.source_snapshot.source_size,
+                source_mtime_ns=asr_result.source_snapshot.source_mtime_ns,
+            ) != asr_result.source_snapshot:
+                raise Stage11LiveAdapterError("external baseline source detached")
+            title = canonical_video.dvd_id
+            found = discovery.discover(dvd_id=title)
+            if found.dvd_id != title:
+                raise Stage11LiveAdapterError("discovery source detached")
+            if not found.candidates:
+                if found.diagnostic_reason_code == "SEARCH_BLOCK_PAGE":
+                    state["candidate_count"] = 0
+                    record("search_response", "SEARCH_BLOCK_PAGE",
+                           http_status=found.diagnostic_http_status)
+                else:
+                    state["candidate_count"] = 0
+                    record("search_candidates", "SEARCH_NO_CANDIDATES")
+                return None
+            if len(found.candidates) == 1:
+                state["candidate_count"] = 1
+                payload = provider.fetch_original_japanese_payload(
+                    dvd_id=title, detail_url=found.candidates[0].detail_url,
+                )
+                application = _align_external_payload(
+                    payload, title, asr_result, acceptance_policy,
+                    residual_threshold_ms,
+                )
+                if application.decision.verdict == ACCEPT_HYBRID:
+                    state["accepted_candidate_count"] = 1
+                    record("hybrid", "HYBRID_ACCEPTED")
+                else:
+                    reason = ("HYBRID_REJECTED"
+                              if application.decision.verdict == "REJECT_EXTERNAL"
+                              else "HYBRID_UNRESOLVED")
+                    record("alignment", reason)
+                return application
+            if (type(found.candidates) is not tuple
+                    or len(found.candidates) > MAX_SEARCH_CANDIDATES
+                    or any(type(candidate) is not SubtitleCatSearchCandidate
+                           or type(candidate.detail_url) is not str
+                           or not candidate.detail_url for candidate in found.candidates)):
+                raise SubtitleCatSearchError("external search candidate state is invalid")
+            state["candidate_count"] = len(found.candidates)
+            for candidate in found.candidates:
+                _safe_url(candidate.detail_url)
+            outcomes = tuple(_evaluate_external_search_candidate(
+                candidate, provider=provider, title=title, asr_result=asr_result,
+                acceptance_policy=acceptance_policy,
+                residual_threshold_ms=residual_threshold_ms,
+            ) for candidate in sorted(found.candidates, key=lambda item: item.detail_url))
+            state["accepted_candidate_count"] = sum(
+                item.status == "ACCEPTED" for item in outcomes
+            )
+            state["candidate_failures"] = _candidate_failures(outcomes)
+            selected = _select_external_candidate(outcomes)
+            if selected is None:
+                record("candidate_resolution", "NO_ACCEPTED_CANDIDATE")
+                return None
+            record("hybrid", "HYBRID_ACCEPTED")
+            return selected
+        except ExternalSubtitleError as error:
+            if diagnostic_out is not None and not diagnostic_out:
+                if isinstance(error, SubtitleCatSearchTransportError):
+                    fallback_stage, fallback_reason = "search_http", "SEARCH_TRANSPORT_FAILURE"
+                elif isinstance(error, SubtitleCatSearchError):
+                    fallback_stage, fallback_reason = "search_response", "SEARCH_RESPONSE_INVALID"
+                elif isinstance(error, ExternalSubtitleTransportError):
+                    fallback_stage, fallback_reason = "candidate_fetch", "CANDIDATE_TRANSPORT_FAILURE"
+                else:
+                    fallback_stage, fallback_reason = "candidate_validation", "CANDIDATE_VALIDATION_FAILURE"
+                stage, reason, status = _diagnostic_from_error(
+                    error, fallback_stage=fallback_stage,
+                    fallback_reason=fallback_reason,
+                )
+                record(stage, reason, http_status=status)
+            raise
+        except BaseException:
+            if diagnostic_out is not None and not diagnostic_out:
+                record("system", "SYSTEMIC_FAILURE")
+            raise
+
+    external._stage11_accepts_diagnostic = True
+    return external
 
 def build_first_pass_adapter(*, remote, ssh_key, known_hosts,
                              prepare_remote, native_run=run):

@@ -344,7 +344,15 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
         if report_path.exists():
             if not (directory/PROOF_NAME).exists(): raise controller.Stage11ControllerArtifactError('legacy completion requires separate normal artifact root')
             return validate_normal_completion(report_path,clean_path,baseline_path,title=title)
-        route,outcome,alignment=controller._select_route(video,baseline,external_ja_attempt)
+        external_diagnostic={}
+        try:
+            route,outcome,alignment=controller._select_route(
+                video,baseline,external_ja_attempt,
+                diagnostic_out=external_diagnostic)
+        finally:
+            if external_diagnostic:
+                controller._persist_external_ja_diagnostic(
+                    directory,external_diagnostic)
         if route.route!='HYBRID':
             raise controller.Stage11ControllerValidationError('normal mode requires accepted external JA; outcome='+outcome+'; alignment='+alignment)
         app=route.alignment_application; payload=app.bundle.external_ja_payload
