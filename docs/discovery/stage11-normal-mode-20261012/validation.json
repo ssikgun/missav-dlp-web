@@ -1,12 +1,26 @@
 {
   "normal_smoke_tests": 11,
   "normal_smoke": "PASS",
-  "existing_smoke_scripts": 17,
+  "existing_smoke_scripts": 18,
   "compile": "PASS",
   "diff_check": "PASS",
   "systemd_unit_verify": "PASS",
   "bash_syntax": "PASS",
   "fallback_fixed64_offline": "PASS",
-  "deployment": "PENDING",
-  "normal_mode": "INCOMPLETE_DEPLOYMENT_PENDING"
+  "deployment": "PASS",
+  "normal_mode": "PASS",
+  "user_intervention": 0,
+  "automatic_insertion": false,
+  "actual_successful_native_e2e_titles": 2,
+  "production_first_cycle": "SAFE_FAILED_TERMINAL_INVALID_JA",
+  "new_nas_publications": 0,
+  "closure_criteria": {
+    "actual_KO_SRT_E2E": "PASS_TWO_TITLES",
+    "unattended": "PASS_ZERO_INTERVENTION",
+    "original_timing_identity_protection": "PASS",
+    "ambiguous_noninsertion_nonblocking": "PASS_DISABLED",
+    "output_storage_operational_connection": "PASS_SAVED_AND_STAGE12_VALIDATED_WITH_ACTIVE_NATIVE_QUEUE",
+    "safe_error_reasons": "PASS_OFFLINE_AND_ACTUAL_PRODUCTION_FAILURE",
+    "canonical_handoff": "PASS_UPDATED_IN_CLOSURE_COMMIT"
+  }
 }

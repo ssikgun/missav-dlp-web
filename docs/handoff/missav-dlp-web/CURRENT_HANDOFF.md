@@ -1,57 +1,72 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
-## 2026-10-12 — Normal Mode unattended E2E verified; deployment checkpoint
+## 2026-10-12 — Stage11 Normal Mode complete: PASS; unattended native queue deployed
 
-Current operating objective supersedes the historical clip-011 listening tasks:
-USER_INTERVENTION=0. No user listening/transcript/manual approval is required.
-Automatic supplemental dialogue insertion is OFF (accuracy not established);
-AMBIGUOUS is skipped and cannot block/modify primary external-JA translation.
+STAGE11_NORMAL_MODE=PASS. USER_INTERVENTION=0 supersedes historical clip-011
+listening/transcript/manual approval objectives below. Automatic missing-dialogue
+insertion is OFF: accuracy not established. AMBIGUOUS is skipped and cannot
+block or change the primary external-JA translation. No user quality task remains.
 
-Reused existing parser/selector/affine/native bridge, source-aware output guards,
-whole-title/absorption helpers and Stage12 locks/state/publication. Boundary
-worktree helpers were integrated into a separate clean release candidate; both
-original dirty worktrees and all protected artifacts are preserved. Worker and
-new-model changes0. No timing/automatic insertion thresholds were relaxed.
+Existing parser/selector/affine acceptance, source-aware output guards, native
+SSH bridge, whole-title/absorption helpers and Stage12 inventory/locks/state/
+no-overwrite publication are reused. Existing boundary worktree helpers were
+integrated into an isolated clean release; both original dirty worktrees are
+preserved. No title/cue/dialogue special case, threshold relaxation, Worker
+change or new model. Normal flow is independent of optional targeted STT/review.
+Core errors terminate automatically with immutable reasons; no approval wait.
+Native limits remain inactivity600/absolute3600 and two validation attempts;
+existing fixed64 partition fallback is tested. Fresh native chat -Q uses the
+existing zero-tool config/provider/model/reasoning; no obsolete session --resume.
 
 Actual native E2E: FNS-247 JA313 -> new KO300/absorption13; JUR-750 JA661 ->
-KO648/absorption11/clear metadata2. One fresh zero-tool Hermes invocation each,
-existing openai-codex / gpt-5.6-luna / xhigh. Existing baseline ASR reused and
-real source snapshots verified. Live SubtitleCat independently fetched/selected
-ACCEPT_HYBRID for both with exact retained JA SHAs. User intervention0.
-Final SRTs under /opt/missav-dlp-web/discovery/stage11-normal-e2e-20261012/
-artifacts/{FNS-247,JUR-750}/clean-ko-v1.srt. Canonical SRT, cue/source coverage,
-absorption/timing unions, duplicate0 and actual Stage12 bundle preflight PASS.
-Existing ambiguous KO inventories remain protected; NAS replacement/Jellyfin0.
+KO648/absorption11/clear metadata2. One actual fresh zero-tool Hermes call each,
+openai-codex / gpt-5.6-luna / xhigh. Real video/source snapshots verified;
+existing matching baseline ASR and external JA reused. Live SubtitleCat also
+returned ACCEPT_HYBRID for both with exact original JA SHAs. Intervention0.
+Final SRTs: /opt/missav-dlp-web/discovery/stage11-normal-e2e-20261012/
+artifacts/{FNS-247,JUR-750}/clean-ko-v1.srt. SRT readback/time order, unique
+source/cue coverage, absorption timing unions, duplicate0, immutable completion
+and actual Stage12 bundle preflight PASS. Existing ambiguous KO inventories are
+protected, so these comparison files were not installed over NAS originals.
+Historical FNS JA313/KO296/absorption17/SRT bytes and all2213 protected pins
+remain unchanged, including the repeated post-operation audit. Saved native
+AMBIGUOUS13 replay: approved0/eligible0; no new listening/STT experiment.
 
-Historical FNS JA313/KO296/absorption17 and SRT SHA bytes unchanged; 2213
-protected pins unchanged. Saved native supplemental AMBIGUOUS13 replayed with
-approved0/eligible0. GVH-713 unchanged UNRESOLVED alignment is a safe terminal
-error, not a success. The initial FNS final-readback field access defect was
-fixed generically and immutable resume completed without another Hermes call;
-original failure retained. No title/cue/dialogue special cases were introduced.
+Production code commit dfa213762c94ec54671454f30c7f1c992bfcd835 is pinned in a
+clean detached release via /opt/missav-dlp-web/discovery/stage11-normal-deployment/
+current. Production preflight PASS; normal timer enabled/active. Shared title
+locks use /opt/missav-dlp-web/title-locks, matching completion/web. Rollback:
+backups/20261012-085324 in that deployment root; deploy/stage11-normal/rollback.sh
+refuses an active subtitle job. New native wrapper admits <=4 unseen canonical
+holdings and runs one ordinary PENDING title per cycle. Historical/failed rows
+are not reset; original subtitles are never overwritten. Artifacts under
+/opt/missav-dlp-web/discovery/stage11-normal-runtime-v1/artifacts; read-only UI
+heartbeat remains /opt/missav-dlp-web/discovery/stage12-runtime/status.json.
+Web/completion/library writer/GPU unchanged; web200, completion timer active,
+library writer running. StandardInput=null; no Codex bulk model orchestration.
 
-Normal first pass is independent of optional STT/review. Core failures terminate
-with durable reasons. Native limits remain inactivity600/absolute3600 and two
-validation attempts, with existing fixed64 fallback. Focused tests11 + existing
-smoke scripts17, compile/shell/systemd/diff PASS. Detailed evidence/report:
-docs/discovery/STAGE11_NORMAL_MODE_20261012.md and stage11-normal-mode-20261012/.
+The first 08:52:00 timer cycle admitted four titles then stopped before any
+transition/model/NAS write because shared title-lock env was missing. Fixed it
+in the pinned code above and added read-only validation before seeding/preflight.
+Corrected native cycle 08:53:43–08:57:50 KST: CAWB-039 PENDING -> RUNNING ->
+FAILED_TERMINAL (external JA VALIDATION_FAILURE, alignment NOT_ATTEMPTED).
+Actual baseline saved, media temp cleaned, no Hermes/KO/NAS write. Runner exit0
+and heartbeat COMPLETE mean the bounded cycle finished; title success is not
+claimed. Queue audit: historical PUBLISHED163/UNRESOLVED10 unchanged,
+FAILED_TERMINAL1/PENDING7. Timer continues other titles without user input.
+GVH-713 unchanged UNRESOLVED alignment also safely failed in actual E2E.
+Initial FNS completion readback field bug was fixed generically; immutable resume
+completed with zero extra Hermes calls. Original failure evidence is retained.
 
-Initial af0db3e deployment/preflight succeeded and the timer triggered at
-08:52:00 KST, admitting four previously unseen eligible holdings. It stopped
-before any title-state transition because the shared title-lock environment was
-missing (historical launchers export TEDDY_TITLE_LOCK_DIR). Corrected the normal
-service to use /opt/missav-dlp-web/title-locks, and added the existing read-only
-root validator before queue seeding and to production preflight. No existing
-row was reset, no model/NAS publication occurred in this stopped cycle.
-Redeployment/operational verification follows this correction commit.
-
-Production activation verification remains pending at this implementation commit. New bounded normal
-queue reuses existing Stage12 inventory/state/locks/no-overwrite publisher and
-heartbeat. It admits unseen canonical holdings automatically, preserves old
-states, and processes one ordinary PENDING title per cycle. Exact detached
-release, preflight, timer activation and first cycle audit are next, already
-authorized by the current task. Overall STAGE11_NORMAL_MODE=INCOMPLETE until
-operational activation is verified. No manual subtitle-quality task remains.
+Focused offline tests11 + existing smoke scripts18, compile/shell/systemd/diff
+PASS. Detailed report docs/discovery/STAGE11_NORMAL_MODE_20261012.md; summaries,
+actual receipts/failures, queue journal, seven closure criteria and limitations
+in docs/discovery/stage11-normal-mode-20261012/. Successful new NAS publication
+is not claimed in this audit: comparison titles are protected and the first
+new queue title had invalid JA. Output storage, actual Stage12 bundle connection,
+shared locks, unattended runtime and safe error path are verified. External-JA,
+accepted timing and Hermes availability limit success; perfect transcription or
+complete backlog processing is not claimed. No mandatory user action remains.
 
 
 ## 2026-10-12 — clip-011 boundary revision: ESTIMATED / AMBIGUOUS; native preparation PASS

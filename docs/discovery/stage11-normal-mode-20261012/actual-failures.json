@@ -16,5 +16,15 @@
     "title": "GVH-713",
     "user_intervention": 0,
     "source_log": "/opt/missav-dlp-web/discovery/stage11-normal-e2e-20261012/artifacts/GVH-713/normal-failure-927790c5a32e4ea292c759881ae2b46b.json"
+  },
+  {
+    "automatic_insertion": false,
+    "error_type": "Stage11ControllerValidationError",
+    "reason": "normal mode requires accepted external JA; outcome=VALIDATION_FAILURE; alignment=NOT_ATTEMPTED",
+    "status": "FAILED",
+    "title": "CAWB-039",
+    "user_intervention": 0,
+    "source_log": "/opt/missav-dlp-web/discovery/stage11-normal-runtime-v1/artifacts/CAWB-039/normal-failure-7da63ccfb0814e49a16617cb61bb688e.json",
+    "stage12_final_state": "FAILED_TERMINAL"
   }
 ]

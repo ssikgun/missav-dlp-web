@@ -134,5 +134,21 @@
       "PASS=REMOTE_TIMEOUT_UNRELATED_HERMES_SURVIVES",
       "STATEFUL_LIVE_RUNNER_TIMEOUT_SMOKE=PASS"
     ]
+  },
+  {
+    "name": "teddy_discovery_stage12_bulk_runner_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "STAGE12_BULK_RUNNER_SMOKE=PASS"
+    ]
+  },
+  {
+    "name": "teddy_title_exclusion_smoke.py",
+    "rc": 0,
+    "last_lines": [
+      "DIFFERENT_TITLE=PARALLEL",
+      "CRASH_RELEASE=PASS",
+      "ROOT_FILE_SAFETY=PASS"
+    ]
   }
 ]

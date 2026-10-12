@@ -1,0 +1,109 @@
+{
+  "status": "PASS",
+  "captured_at_kst": "2026-10-12T08:59:14.558312+09:00",
+  "deployed_code_commit": "dfa213762c94ec54671454f30c7f1c992bfcd835",
+  "release_path": "/opt/missav-dlp-web/discovery/stage11-normal-deployment/releases/dfa213762c94ec54671454f30c7f1c992bfcd835",
+  "worktree_clean": true,
+  "preflight": "PASS",
+  "preflight_log": "/opt/missav-dlp-web/discovery/stage11-normal-deployment/backups/20261012-085324/preflight.log",
+  "rollback_backup": "/opt/missav-dlp-web/discovery/stage11-normal-deployment/backups/20261012-085324",
+  "timer_enabled": "enabled",
+  "timer": {
+    "ActiveState": "active",
+    "SubState": "waiting"
+  },
+  "service": {
+    "ExecMainStartTimestamp": "Mon 2026-10-12 08:53:43 KST",
+    "ExecMainExitTimestamp": "Mon 2026-10-12 08:57:50 KST",
+    "ExecMainStatus": "0",
+    "ActiveState": "inactive",
+    "SubState": "dead"
+  },
+  "heartbeat": {
+    "batch_number": 1,
+    "batch_size": 1,
+    "current_dvd_id": null,
+    "head_sha": "dfa213762c94ec54671454f30c7f1c992bfcd835",
+    "part_count": null,
+    "part_index": null,
+    "pid": 43913,
+    "processed_titles": 1,
+    "runner_state": "COMPLETE",
+    "schema_version": 1,
+    "stage": "COMPLETE",
+    "started_at": "2026-10-11T23:53:45.001299+00:00",
+    "updated_at": "2026-10-11T23:57:50.613517+00:00"
+  },
+  "rollout_counts": {
+    "FAILED_TERMINAL": 1,
+    "PENDING": 7,
+    "PUBLISHED": 163,
+    "UNRESOLVED": 10
+  },
+  "first_corrected_cycle": {
+    "dvd_id": "CAWB-039",
+    "status": "FAILED_TERMINAL",
+    "transition_sequence": 3,
+    "last_transition_reason": "STAGE12_TITLE_FAILURE",
+    "destination_relative": "CAWB/CAWB-039/CAWB-039.ko.srt",
+    "artifact_path": null,
+    "provenance": {
+      "destination": "CAWB/CAWB-039/CAWB-039.ko.srt",
+      "error": "normal mode requires accepted external JA; outcome=VALIDATION_FAILURE; alignment=NOT_ATTEMPTED",
+      "error_type": "Stage11ControllerValidationError",
+      "operation": "STAGE12_SERIAL_BATCH",
+      "retry_performed": false
+    }
+  },
+  "title_events": [
+    {
+      "from_status": null,
+      "to_status": "PENDING",
+      "transition_sequence": 1,
+      "transitioned_at": "2026-10-11T23:52:01.261883+00:00",
+      "reason": "INITIALIZE_FROM_INVENTORY"
+    },
+    {
+      "from_status": "PENDING",
+      "to_status": "RUNNING",
+      "transition_sequence": 2,
+      "transitioned_at": "2026-10-11T23:53:45.338277+00:00",
+      "reason": "STAGE12_BATCH_START"
+    },
+    {
+      "from_status": "RUNNING",
+      "to_status": "FAILED_TERMINAL",
+      "transition_sequence": 3,
+      "transitioned_at": "2026-10-11T23:57:50.606082+00:00",
+      "reason": "STAGE12_TITLE_FAILURE"
+    }
+  ],
+  "new_nas_publications": 0,
+  "existing_ko_overwrites": 0,
+  "user_intervention": 0,
+  "automatic_insertion": false,
+  "initial_timer_defect": {
+    "trigger_kst": "2026-10-12 08:52:00",
+    "reason": "shared title exclusion environment absent",
+    "title_transitions": 0,
+    "model_calls": 0,
+    "nas_writes": 0,
+    "fixed_in": "dfa213762c94ec54671454f30c7f1c992bfcd835"
+  },
+  "shared_title_lock": "/opt/missav-dlp-web/title-locks",
+  "normal_artifact_root": "/opt/missav-dlp-web/discovery/stage11-normal-runtime-v1/artifacts",
+  "web_login_http_status": 200,
+  "completion_timer": {
+    "ActiveState": "active",
+    "SubState": "waiting"
+  },
+  "library_writer": {
+    "ExecMainStartTimestamp": "Wed 2026-09-30 08:06:40 KST",
+    "ExecMainExitTimestamp": "",
+    "ExecMainStatus": "0",
+    "ActiveState": "active",
+    "SubState": "running"
+  },
+  "gpu_worker_changes": 0,
+  "audit_limit": "Two actual successful comparison outputs are source/proof validated and Stage12-bundle compatible. Existing ambiguous KO inventory prevented their publication. The first new production title terminated safely on invalid external JA. No successful new NAS publication is claimed."
+}
