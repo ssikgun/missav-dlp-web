@@ -16,7 +16,7 @@ stage11_backup="$1"
 stage11_deployment=/opt/missav-dlp-web/discovery/stage11-normal-deployment
 stage11_systemd_dir=/etc/systemd/system
 if [[ "$stage11_mode" == paused ]]; then
-  stage11_backup="$(realpath -e -- "$stage11_backup")"
+  stage11_backup="$(realpath -m -- "$stage11_backup")"
   case "$stage11_backup" in
     "$stage11_deployment"/backups/*) ;;
     *)

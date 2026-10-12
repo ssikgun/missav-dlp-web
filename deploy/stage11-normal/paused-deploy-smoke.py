@@ -437,6 +437,8 @@ class PausedDeploySmoke(unittest.TestCase):
         self.assertEqual(deployed.returncode, 0, deployed.stdout)
         missing_backup = str(missing.deployment / "backups" / "missing-backup")
         before_current = (missing.deployment / "current").resolve()
+        (missing.root / "timer-enabled").write_text("enabled\n")
+        (missing.root / "timer-active").write_text("active\n")
         rejected = missing.run("rollback.sh", "--paused", missing_backup)
         self.assertNotEqual(rejected.returncode, 0)
         self.assertEqual((missing.deployment / "current").resolve(), before_current)
