@@ -18,6 +18,7 @@ import stat
 import subprocess
 import sys
 import uuid
+from collections import Counter
 
 import teddy_discovery_stage11_controller as controller
 from teddy_discovery_alignment_acceptance import AlignmentAcceptancePolicy
@@ -29,7 +30,7 @@ from teddy_discovery_stateful_boundary import (
     validate_stateful_absorption,
 )
 from teddy_discovery_stateful_controller import build_stateful_whole_title_query, build_stateful_part_query
-from teddy_discovery_stateful_hybrid import prepare_stateful_hybrid, materialize_stateful_hybrid_srt
+from teddy_discovery_stateful_hybrid import prepare_stateful_hybrid
 from teddy_discovery_stateful_parts import build_stateful_part_plan, parse_stateful_part, assemble_stateful_result, serialize_stateful_part, _validated_output_cue
 from teddy_discovery_stateful_translator import (
     serialize_stateful_package, serialize_stateful_model_input, serialize_stateful_result,
@@ -42,7 +43,6 @@ from teddy_discovery_subtitle import SubtitleCandidate
 from teddy_discovery_subtitle_external import ExternalSubtitlePayload
 from teddy_discovery_subtitle_source_quality import classify_source_document, OMIT_METADATA
 from teddy_discovery_subtitle_text import SubtitleCue, MAX_SUBTITLE_BYTES
-from teddy_discovery_ko_srt import generate_korean_srt
 
 PROOF_NAME = 'normal-mode-proof-v1.json'
 SOURCE_NAME = 'normal-mode-source-v1.json'
@@ -263,18 +263,207 @@ def validate_normal_translation(raw, package, boundary):
     return result
 
 
-def normal_materialization(preparation, result):
-    validate_normal_translation(serialize_stateful_result(result),preparation.package,result.boundary_evidence)
-    materialized=materialize_stateful_hybrid_srt(preparation.package,result,preparation.route_decision,preparation)
-    metadata={d.source_index for d in classify_source_document(
-        preparation.route_decision.alignment_application.bundle.external_ja_document) if d.action==OMIT_METADATA}
-    playback=tuple(c for c in materialized.playback_cues if not set(c.source_indexes)<=metadata)
-    rendered=tuple(SubtitleCue(c.start_ms,c.end_ms,c.ko) for c in playback)
-    if len({(c.start_ms,c.end_ms,c.text) for c in rendered})!=len(rendered):
-        raise controller.Stage11ControllerValidationError('duplicate Korean cue interval/text')
-    artifact=generate_korean_srt(rendered)
-    if artifact.payload is None: raise controller.Stage11ControllerValidationError('no translated dialogue remains')
-    return artifact,playback
+def _require_review_provenance(result, *, source_session_id, label):
+    if (result.source_translation_session_id != source_session_id
+            or not result.review_execution_session_id):
+        raise controller.Stage11ControllerArtifactError(
+            label + ' lacks source or execution session provenance')
+    try:
+        from teddy_discovery_quality_review_session import (
+            validate_canonical_review_execution_session_id,
+        )
+        validate_canonical_review_execution_session_id(
+            result.review_execution_session_id)
+    except Exception as error:
+        raise controller.Stage11ControllerArtifactError(
+            label + ' execution session ID is invalid') from error
+
+
+def _normal_review_evidence(directory, preparation, first, baseline, baseline_sha256,
+                            staging_root, *, hybrid_review_runner=None,
+                            hybrid_targeted_runner=None, create_missing=True,
+                            targeted_reused_hint=None):
+    document = preparation.route_decision.alignment_application.bundle.external_ja_document
+    source_quality = classify_source_document(document)
+    originals = dict(preparation=preparation, package=preparation.package,
+                     result=first, source_quality=source_quality)
+    triage_request = controller.build_review_request(**originals)
+    targeted_path = directory / 'hybrid-suspect-asr-v1.json'
+    targeted_existed = targeted_path.exists() or targeted_path.is_symlink()
+    request, merged, context = controller._run_hybrid_suspect_review(
+        directory=directory, preparation=preparation, first_pass=first,
+        source_quality=source_quality, targeted_artifact=None,
+        asr_result=baseline, baseline_sha256=baseline_sha256,
+        hybrid_review_runner=hybrid_review_runner,
+        hybrid_targeted_runner=hybrid_targeted_runner,
+        staging_root=staging_root, create_missing=create_missing,
+    )
+
+    triage_raw = controller._read_private_file(
+        directory / 'hybrid-triage-v1.json', max_bytes=controller.MAX_REVIEW_BYTES)
+    triage = controller.parse_review_result(triage_raw, triage_request)
+    _require_review_provenance(
+        triage, source_session_id=first.session_id, label='HYBRID triage')
+    targets = controller.select_suspect_cue_ids(triage_request, triage)
+    targeted = None
+    if targets:
+        targeted_raw = controller._read_private_file(
+            targeted_path, max_bytes=controller.MAX_TARGETED_ASR_ARTIFACT_BYTES)
+        targeted = controller.parse_targeted_asr_artifact_bytes(targeted_raw)
+        target_raw = controller._read_private_file(
+            directory / 'hybrid-final-target-v1.json',
+            max_bytes=controller.MAX_REVIEW_BYTES)
+        target_result = controller.parse_review_result(
+            target_raw, request, target_cue_ids=targets)
+        _require_review_provenance(
+            target_result, source_session_id=first.session_id,
+            label='HYBRID targeted review')
+        target_execution_session_id = target_result.review_execution_session_id
+    else:
+        target_execution_session_id = triage.review_execution_session_id
+
+    final_request_raw = controller._read_private_file(
+        directory / 'hybrid-final-request-v1.json',
+        max_bytes=controller.MAX_REVIEW_BYTES)
+    final_result_raw = controller._read_private_file(
+        directory / 'hybrid-final-review-v1.json',
+        max_bytes=controller.MAX_REVIEW_BYTES)
+    if (final_request_raw != controller.serialize_review_request(request)
+            or final_result_raw != controller.serialize_review_result(merged, request)):
+        raise controller.Stage11ControllerArtifactError(
+            'HYBRID review composition differs from validated evidence')
+    controller.validate_review_result(merged, request)
+    if targets:
+        from teddy_discovery_targeted_asr_window import (
+            plan_targeted_asr_windows_with_policy,
+        )
+        application = preparation.route_decision.alignment_application
+        windows = plan_targeted_asr_windows_with_policy(
+            document.cues, application.alignment,
+            policy=controller.STAGE11_TARGETED_SECOND_EVIDENCE_WINDOW_POLICY_V1,
+            target_cue_ids=targets,
+        )
+        targeted_provenance_raw = controller._read_private_file(
+            directory / 'hybrid-suspect-context-v1.json',
+            max_bytes=controller.MAX_REVIEW_BYTES)
+        target_count = len(targets)
+        window_count = len(windows)
+        targeted_sha256 = sha(targeted_raw)
+        targeted_provenance_sha256 = sha(targeted_provenance_raw)
+        targeted_reused = (targeted_reused_hint if not create_missing
+                            else targeted_existed)
+        if type(targeted_reused) is not bool:
+            raise controller.Stage11ControllerArtifactError(
+                'targeted ASR reuse provenance is invalid')
+    else:
+        target_count = 0
+        window_count = 0
+        targeted_sha256 = None
+        targeted_provenance_sha256 = None
+        targeted_reused = None
+
+    evidence = {
+        'translation_result_sha256': sha(serialize_stateful_result(first)),
+        'source_translation_session_id_sha256': sha(first.session_id.encode()),
+        'triage_request_sha256': controller.review_request_sha256(triage_request),
+        'triage_result_sha256': sha(triage_raw),
+        'triage_review_execution_session_id_sha256': sha(
+            triage.review_execution_session_id.encode()),
+        'review_request_sha256': sha(final_request_raw),
+        'review_result_sha256': sha(final_result_raw),
+        'review_execution_session_id_sha256': sha(
+            target_execution_session_id.encode()),
+        'targeted_artifact_sha256': targeted_sha256,
+        'targeted_provenance_sha256': targeted_provenance_sha256,
+        'targeted_source_count': target_count,
+        'targeted_window_count': window_count,
+        'targeted_reused': targeted_reused,
+        'reviewed_action_counts': dict(sorted(Counter(
+            cue.action for cue in merged.cues).items())),
+    }
+    return source_quality, request, merged, context, evidence
+
+
+def normal_materialization(preparation, result, review_request, review_result,
+                           source_quality, *, raw_asr_context=None):
+    validate_normal_translation(serialize_stateful_result(result),
+                                preparation.package, result.boundary_evidence)
+    clean = controller.materialize_stateful_quality_review_clean(
+        preparation.package, result, preparation, review_request, review_result,
+        source_quality=source_quality, raw_asr_context=raw_asr_context,
+        preserve_absorption=True, omit_metadata=True,
+    )
+    playback = clean.cues
+    rendered = tuple(SubtitleCue(c.start_ms, c.end_ms, c.ko) for c in playback)
+    if len({(c.start_ms, c.end_ms, c.text) for c in rendered}) != len(rendered):
+        raise controller.Stage11ControllerValidationError(
+            'duplicate Korean cue interval/text')
+    artifact = controller._require_clean_artifact(clean)
+    if artifact.payload is None:
+        raise controller.Stage11ControllerValidationError(
+            'no translated dialogue remains')
+    return artifact, playback, clean
+
+
+def _normal_proof(package_raw, result_raw, first, source_quality, playback,
+                  review_evidence, clean_sha256):
+    covered = {index for cue in playback for index in cue.source_indexes}
+    # Source quality carries exact source text; omitted indexes are sufficient
+    # proof for the established metadata omission report.
+    metadata_omissions = [asdict(decision) for decision in source_quality
+                          if decision.action == OMIT_METADATA
+                          and decision.source_index not in covered]
+    proof = {
+        'mode': 'NORMAL', 'user_intervention': USER_INTERVENTION,
+        'automatic_insertion': AUTO_INSERT,
+        'supplemental_status': 'DISABLED_UNVERIFIED_ACCURACY',
+        'ambiguous_policy': 'EXTERNAL_JA_AND_PRIMARY_KO',
+        'quality_review': 'HYBRID_REVIEWED_CLEAN_V1',
+        'package_sha256': sha(package_raw), 'result_sha256': sha(result_raw),
+        'clean_sha256': clean_sha256,
+        'source_count': len(first.cues),
+        'absorption_count': sum(c.absorbed_into is not None for c in first.cues),
+        'review_evidence': review_evidence,
+        'metadata_omissions': metadata_omissions,
+        'playback': [asdict(cue) for cue in playback],
+    }
+    return proof
+
+
+def _normal_report(title, baseline_path, baseline_raw, baseline_reused,
+                   outcome, alignment, baseline, clean_path, artifact,
+                   review_evidence):
+    return {
+        'title': title, 'route': 'HYBRID',
+        'baseline_artifact_path': str(baseline_path),
+        'baseline_sha256': sha(baseline_raw),
+        'baseline_reused': baseline_reused,
+        'external_ja_outcome': outcome,
+        'alignment_outcome': alignment,
+        'source_quality_counts': controller._source_quality_counts(
+            controller.classify_asr_result_source_quality(baseline)),
+        'targeted_source_count': review_evidence['targeted_source_count'],
+        'targeted_window_count': review_evidence['targeted_window_count'],
+        'targeted_reused': ('not_applicable'
+                            if review_evidence['targeted_reused'] is None
+                            else review_evidence['targeted_reused']),
+        'translation_result_identity': {
+            'session_id_sha256': review_evidence[
+                'source_translation_session_id_sha256'],
+            'sha256': review_evidence['translation_result_sha256'],
+        },
+        'review_result_identity': {
+            'request_sha256': review_evidence['review_request_sha256'],
+            'result_sha256': review_evidence['review_result_sha256'],
+            'source_translation_session_id_sha256': review_evidence[
+                'source_translation_session_id_sha256'],
+            'review_execution_session_id_sha256': review_evidence[
+                'review_execution_session_id_sha256'],
+        },
+        'clean_artifact_path': str(clean_path),
+        'clean_sha256': artifact.sha256,
+        'publication_performed': False,
+    }
 
 
 def reconstruct(directory, baseline):
@@ -293,12 +482,23 @@ def reconstruct(directory, baseline):
     return prepare_normal(route,sha(controller.serialize_asr_result(baseline)),source['claim_token'])
 
 
-def validate_normal_completion(report_path, clean_path, baseline_path, *, title, **unused):
+def validate_normal_completion(report_path, clean_path, baseline_path, *, title,
+                               staging_root=None, **unused):
     directory=report_path.parent
     report_raw=controller._read_private_file(report_path,max_bytes=controller.MAX_STAGE11_REPORT_BYTES)
     report=controller._parse_report(report_raw)
     proof_raw=controller._read_private_file(directory/PROOF_NAME,max_bytes=16*1024*1024)
     proof=json.loads(proof_raw)
+    targeted_reused_hint=None
+    if proof.get('quality_review')=='HYBRID_REVIEWED_CLEAN_V1':
+        review_evidence=proof.get('review_evidence')
+        if type(review_evidence) is not dict:
+            raise controller.Stage11ControllerArtifactError(
+                'normal proof review evidence is invalid')
+        targeted_reused_hint=review_evidence.get('targeted_reused')
+        if targeted_reused_hint is not None and type(targeted_reused_hint) is not bool:
+            raise controller.Stage11ControllerArtifactError(
+                'normal proof targeted reuse value is invalid')
     baseline_raw=controller._read_private_file(baseline_path,max_bytes=controller.MAX_ASR_ARTIFACT_BYTES)
     baseline=controller.parse_asr_result_bytes(baseline_raw)
     preparation,boundary=reconstruct(directory,baseline)
@@ -307,28 +507,43 @@ def validate_normal_completion(report_path, clean_path, baseline_path, *, title,
     result_raw=controller._read_private_file(directory/'normal-result.json',max_bytes=16*1024*1024)
     if package_raw!=serialize_stateful_package(package): raise controller.Stage11ControllerArtifactError('normal package detached')
     result=validate_normal_translation(result_raw,package,boundary)
-    artifact,playback=normal_materialization(preparation,result)
+    source_quality, review_request, review_result, raw_asr_context, evidence = _normal_review_evidence(
+        directory, preparation, result, baseline, sha(baseline_raw),
+        staging_root or directory, create_missing=False,
+        targeted_reused_hint=targeted_reused_hint)
+    artifact,playback,clean=normal_materialization(
+        preparation,result,review_request,review_result,source_quality,
+        raw_asr_context=raw_asr_context)
     clean_raw=controller._read_private_file(clean_path,max_bytes=MAX_SUBTITLE_BYTES)
-    identity={'request_sha256':sha(controller._read_private_file(directory/SOURCE_NAME,max_bytes=16*1024*1024)),
-        'result_sha256':sha(proof_raw),'source_translation_session_id_sha256':None,'review_execution_session_id_sha256':None}
+    expected_proof=_normal_proof(package_raw,result_raw,result,source_quality,
+                                  playback,evidence,artifact.sha256)
+    expected_proof_raw=wire(expected_proof)
+    expected_report=_normal_report(
+        title,baseline_path,baseline_raw,report.get('baseline_reused'),
+        'ACCEPTED','ACCEPT_HYBRID',baseline,clean_path,artifact,evidence)
+    expected_report_raw=controller._serialize_report(expected_report)
     if (report['title']!=title or baseline.source_snapshot.dvd_id!=title
         or report['route']!='HYBRID' or report['external_ja_outcome']!='ACCEPTED' or report['alignment_outcome']!='ACCEPT_HYBRID'
         or report['publication_performed'] is not False or report['baseline_artifact_path']!=str(baseline_path)
         or report['baseline_sha256']!=sha(baseline_raw) or report['clean_artifact_path']!=str(clean_path)
         or report['clean_sha256']!=sha(clean_raw) or clean_raw!=artifact.payload
-        or report['translation_result_identity']!={'session_id_sha256':sha(result.session_id.encode()),'sha256':sha(result_raw)}
-        or report['review_result_identity']!=identity
-        or proof['user_intervention']!=0 or proof['automatic_insertion'] is not False
-        or proof['package_sha256']!=sha(package_raw) or proof['result_sha256']!=sha(result_raw)
-        or wire(proof['playback'])!=wire([asdict(c) for c in playback])):
+        or type(report['baseline_reused']) is not bool
+        or report_raw!=expected_report_raw
+        or proof_raw!=expected_proof_raw
+        or proof['quality_review']!='HYBRID_REVIEWED_CLEAN_V1'
+        or clean.artifact!=artifact):
         raise controller.Stage11ControllerArtifactError('normal completion proof invalid')
+    targeted_reused=(report['targeted_reused']
+                     if type(report['targeted_reused']) is bool else None)
     return controller.Stage11ControllerResult(title,'HYBRID',clean_path,sha(clean_raw),report_path,sha(report_raw),
-        report['baseline_reused'],None,True,True,'ACCEPTED','ACCEPT_HYBRID')
+        report['baseline_reused'],targeted_reused,True,True,'ACCEPTED','ACCEPT_HYBRID')
 
 
 def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, claim_token,
                              baseline_transcriber, external_ja_attempt, first_pass_runner,
-                             acceptance_policy, holding_resolver=None, **unused):
+                             acceptance_policy, holding_resolver=None,
+                             hybrid_review_runner=None, hybrid_targeted_runner=None,
+                             **unused):
     title=controller._canonical_title(title)
     root=controller._validate_root(artifact_root,field_name='artifact_root')
     staging=controller._validate_root(stateful_staging_root,field_name='stateful_staging_root')
@@ -366,28 +581,24 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
         first=first_pass_runner(package,route='HYBRID',staging_root=staging,boundary_evidence=boundary)
         first=validate_normal_translation(serialize_stateful_result(first),package,boundary)
         result_raw=serialize_stateful_result(first); store(directory/'normal-result.json',result_raw)
-        artifact,playback=normal_materialization(preparation,first)
-        # Optional recovery remains OFF: no candidate, STT error or AMBIGUOUS can block or alter playback.
-        covered={i for c in playback for i in c.source_indexes}
-        proof={'mode':'NORMAL','user_intervention':0,'automatic_insertion':False,
-            'supplemental_status':'DISABLED_UNVERIFIED_ACCURACY','ambiguous_policy':'SKIP_AND_CONTINUE',
-            'quality_review':'PRIMARY_TRANSLATION_ONLY','package_sha256':sha(package_raw),
-            'result_sha256':sha(result_raw),'source_count':len(package.cues),
-            'absorption_count':sum(c.absorbed_into is not None for c in first.cues),
-            'metadata_omissions':[asdict(d) for d in classify_source_document(app.bundle.external_ja_document) if d.action==OMIT_METADATA and d.source_index not in covered],
-            'playback':[asdict(c) for c in playback]}
-        proof_raw=wire(proof); store(directory/PROOF_NAME,proof_raw)
+        source_quality,review_request,review_result,raw_asr_context,evidence = _normal_review_evidence(
+            directory,preparation,first,baseline,sha(raw),staging,
+            hybrid_review_runner=hybrid_review_runner,
+            hybrid_targeted_runner=hybrid_targeted_runner,
+            create_missing=True)
+        artifact,playback,clean=normal_materialization(
+            preparation,first,review_request,review_result,source_quality,
+            raw_asr_context=raw_asr_context)
+        proof=_normal_proof(package_raw,result_raw,first,source_quality,
+                            playback,evidence,artifact.sha256)
+        proof_raw=wire(proof)
         store(clean_path,artifact.payload)
-        report={'title':title,'route':'HYBRID','baseline_artifact_path':str(baseline_path),'baseline_sha256':sha(raw),
-            'baseline_reused':reused,'external_ja_outcome':outcome,'alignment_outcome':alignment,
-            'source_quality_counts':controller._source_quality_counts(controller.classify_asr_result_source_quality(baseline)),
-            'targeted_source_count':0,'targeted_window_count':0,'targeted_reused':'not_applicable',
-            'translation_result_identity':{'session_id_sha256':sha(first.session_id.encode()),'sha256':sha(result_raw)},
-            'review_result_identity':{'request_sha256':sha(source_raw),'result_sha256':sha(proof_raw),
-                'source_translation_session_id_sha256':None,'review_execution_session_id_sha256':None},
-            'clean_artifact_path':str(clean_path),'clean_sha256':artifact.sha256,'publication_performed':False}
+        store(directory/PROOF_NAME,proof_raw)
+        report=_normal_report(title,baseline_path,raw,reused,outcome,alignment,
+                              baseline,clean_path,artifact,evidence)
         store(report_path,controller._serialize_report(report))
-        return validate_normal_completion(report_path,clean_path,baseline_path,title=title)
+        return validate_normal_completion(report_path,clean_path,baseline_path,
+                                          title=title,staging_root=staging)
     except Exception as error:
         # Every failed invocation terminates, with an immutable reason; no user-wait state.
         store(directory/('normal-failure-'+uuid.uuid4().hex+'.json'),wire({'status':'FAILED','title':title,

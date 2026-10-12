@@ -71,6 +71,7 @@ from teddy_discovery_stateful_translator import (
     serialize_stateful_model_input,
     stateful_model_input_identity_is_bound,
     stateful_session_id_for_package,
+    validate_stateful_result,
 )
 from teddy_discovery_subtitle_external import (
     ExternalSubtitleTransport,
@@ -1311,6 +1312,7 @@ class _HybridOriginalRegistry:
             route,
             staging_root,
             semantic_policy=None,
+            boundary_evidence=None,
         ):
             callback_kwargs = {
                 "route": route,
@@ -1318,10 +1320,17 @@ class _HybridOriginalRegistry:
             }
             if semantic_policy is not None:
                 callback_kwargs["semantic_policy"] = semantic_policy
+            if boundary_evidence is not None:
+                callback_kwargs["boundary_evidence"] = boundary_evidence
             result = callback(package, **callback_kwargs)
             if route == V2_ROUTE_HYBRID:
                 try:
+                    result = validate_stateful_result(
+                        result, package, boundary_evidence=boundary_evidence
+                    )
                     session_id = stateful_session_id_for_package(package)
+                    if result.session_id != session_id:
+                        raise ValueError("first-pass session differs from package")
                 except Exception as error:
                     raise Stage11DeploymentValidationError(
                         "Hybrid package session identity is invalid"
@@ -1480,6 +1489,7 @@ class Stage11DeploymentDependencies:
     prepare_remote: Callable
     originals_provider: Callable
     live: Stage11LiveDependencies
+    _first_pass_capture: Callable
 
     def controller_kwargs(self) -> dict[str, Callable]:
         """Return only the existing controller-facing callable contract."""
@@ -1494,6 +1504,10 @@ class Stage11DeploymentDependencies:
             "hybrid_review_runner": self.live.hybrid_review_runner,
             "hybrid_targeted_runner": self.live.hybrid_targeted_runner,
         }
+
+    def capture_first_pass_runner(self, callback: Callable) -> Callable:
+        """Retain Normal's native result at the existing HYBRID trust boundary."""
+        return self._first_pass_capture(callback)
 
 
 def build_stage11_deployment_dependencies(
@@ -1694,6 +1708,7 @@ def build_stage11_deployment_dependencies(
         prepare_remote=prepare_remote,
         originals_provider=originals_registry.originals_provider,
         live=live,
+        _first_pass_capture=originals_registry.capture_first_pass,
     )
 
 

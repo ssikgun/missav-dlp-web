@@ -1336,8 +1336,8 @@ def _validate_existing_completion(
         raise Stage11ControllerArtifactError(
             "report external JA outcome is invalid"
         )
-    # Normal Mode proves its primary-only completion from immutable JA/baseline,
-    # absorption and result artifacts; no synthetic Hermes review is implied.
+    # Normal Mode validates reviewed CLEAN output from the retained HYBRID
+    # review evidence, original JA/alignment, baseline and first-pass artifacts.
     if (report_path.parent / 'normal-mode-proof-v1.json').exists():
         from teddy_discovery_stage11_normal_mode import validate_normal_completion
         return validate_normal_completion(report_path, clean_path, baseline_path, title=title)
@@ -1479,13 +1479,18 @@ def _require_clean_artifact(value: object) -> GeneratedKoreanSRT:
 
 def _run_hybrid_suspect_review(*, directory, preparation, first_pass, source_quality,
                                targeted_artifact, asr_result, baseline_sha256,
-                               hybrid_review_runner, hybrid_targeted_runner, staging_root):
+                               hybrid_review_runner, hybrid_targeted_runner, staging_root,
+                               create_missing=True):
     """Add post-first-pass triage/evidence/adjudication to existing HYBRID."""
     originals = dict(preparation=preparation, package=preparation.package, result=first_pass,
                      source_quality=source_quality, targeted_second_evidence_artifact=targeted_artifact)
     triage_request = build_review_request(**originals)
     triage_path = directory / "hybrid-triage-v1.json"
     if _lstat_or_none(triage_path) is None:
+        if not create_missing or not callable(hybrid_review_runner):
+            raise Stage11ControllerArtifactError(
+                "completed HYBRID review is missing its triage result"
+            )
         triage = hybrid_review_runner(triage_request, staging_root=staging_root)
         triage_raw = serialize_review_result(triage, triage_request)
         _install_or_reuse(triage_path, triage_raw, max_bytes=MAX_REVIEW_BYTES)
@@ -1511,6 +1516,10 @@ def _run_hybrid_suspect_review(*, directory, preparation, first_pass, source_qua
             evidence_raw = _read_private_file(evidence_path, max_bytes=MAX_TARGETED_ASR_ARTIFACT_BYTES)
             evidence = parse_targeted_asr_artifact_bytes(evidence_raw)
         else:
+            if not create_missing:
+                raise Stage11ControllerArtifactError(
+                    "completed HYBRID review is missing targeted evidence"
+                )
             if not callable(hybrid_targeted_runner):
                 raise Stage11ControllerValidationError("HYBRID suspects require hybrid_targeted_runner")
             evidence = hybrid_targeted_runner(asr_result, windows)
@@ -1540,6 +1549,10 @@ def _run_hybrid_suspect_review(*, directory, preparation, first_pass, source_qua
         request = build_review_request(**originals, raw_asr_context=context)
         final_path = directory / "hybrid-final-target-v1.json"
         if _lstat_or_none(final_path) is None:
+            if not create_missing or not callable(hybrid_review_runner):
+                raise Stage11ControllerArtifactError(
+                    "completed HYBRID review is missing its targeted result"
+                )
             final = hybrid_review_runner(request, staging_root=staging_root,
                                          target_cue_ids=targets, targeted_asr_artifact=evidence)
             final_raw = serialize_review_result(final, request, target_cue_ids=targets)
@@ -1547,13 +1560,36 @@ def _run_hybrid_suspect_review(*, directory, preparation, first_pass, source_qua
         else:
             final = parse_review_result(_read_private_file(final_path, max_bytes=MAX_REVIEW_BYTES),
                                         request, target_cue_ids=targets)
+    else:
+        unexpected = tuple(
+            directory / name for name in (
+                "hybrid-suspect-asr-v1.json",
+                "hybrid-suspect-context-v1.json",
+                "hybrid-final-target-v1.json",
+            ) if _lstat_or_none(directory / name) is not None
+        )
+        if unexpected:
+            raise Stage11ControllerArtifactError(
+                "non-targeted HYBRID review has unexpected suspect artifacts"
+            )
     merged = merge_target_review_result(request, targets, final)
     # Durable audit keeps triage, raw target output and deterministic composition
     # separate. Only this full composition reaches the existing materializer.
-    _install_or_reuse(directory / "hybrid-final-request-v1.json", serialize_review_request(request),
-                     max_bytes=MAX_REVIEW_BYTES)
-    _install_or_reuse(directory / "hybrid-final-review-v1.json", serialize_review_result(merged, request),
-                     max_bytes=MAX_REVIEW_BYTES)
+    final_request_raw = serialize_review_request(request)
+    final_result_raw = serialize_review_result(merged, request)
+    if create_missing:
+        _install_or_reuse(directory / "hybrid-final-request-v1.json", final_request_raw,
+                         max_bytes=MAX_REVIEW_BYTES)
+        _install_or_reuse(directory / "hybrid-final-review-v1.json", final_result_raw,
+                         max_bytes=MAX_REVIEW_BYTES)
+    else:
+        if (_read_private_file(directory / "hybrid-final-request-v1.json", max_bytes=MAX_REVIEW_BYTES)
+                != final_request_raw
+                or _read_private_file(directory / "hybrid-final-review-v1.json", max_bytes=MAX_REVIEW_BYTES)
+                != final_result_raw):
+            raise Stage11ControllerArtifactError(
+                "completed HYBRID review composition differs from validated evidence"
+            )
     return request, merged, context
 
 

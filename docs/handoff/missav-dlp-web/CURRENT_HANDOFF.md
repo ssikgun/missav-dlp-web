@@ -1,5 +1,81 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — Stage11 P2-B Normal HYBRID review and CLEAN connection
+
+**Implementation and offline verification: PASS. Operations remain paused.**
+The implementation is based on GitHub HEAD
+`df377d1e853003d6688829eeb0d656a6c18c2f72`; the deployed source remains
+`e4e0b05bee3550b0ba2734e71ccccb319e802864`. `teddy-subtitle-normal.timer`
+remains `inactive/disabled` and the Normal service is `inactive/dead`
+(`MainPID=0`). No deployment, timer/service action, queue/DB change, real
+Hermes/Whisper run, NAS write or Jellyfin action was performed. The protected
+dirty worktree `/opt/missav-pwa-subtitle-stage11` remains unchanged. P1-B
+diagnostics are still not in the deployed `e4e0b05b` source.
+
+### Normal HYBRID review path
+
+The existing `NativeNormalFirstPass` now goes through the deployment's
+`_HybridOriginalRegistry` capture boundary. The same accepted external
+application, baseline, package, first-pass result and `boundary_evidence` are
+retained and revalidated with the package session identity, so the existing
+HYBRID review adapter's originals provider can rebuild and verify its request.
+Whole-title translation and the established fixed-64 fallback remain unchanged;
+the first pass is not run twice.
+
+Before any CLEAN file or completion report is installed, Normal calls the
+existing `_run_hybrid_suspect_review`. Its full-title triage selects suspects;
+only non-KEEP cues get the existing affine targeted window and Targeted ASR
+runner. Final review outputs pass `validate_review_result` and the deterministic
+existing target merge. `materialize_stateful_quality_review_clean()` now creates
+the actual Normal CLEAN artifact. It retains external-JA cue identity,
+`source_index`, accepted affine timing and absorption ownership. A validated
+absorption member may have `first_pass_ko=null` in the existing review input;
+that null is bound to the exact original absorption result. The prompt prohibits
+independent repair or omission of such a member. Partial review or metadata
+decisions that split an absorption group fail closed. `AMBIGUOUS` keeps the
+external JA and the validated first-pass Korean; unreviewed `repaired_ja` is not
+promoted.
+
+The Normal proof now binds translation, triage and final review request/result
+SHA-256 values, source and native review-session provenance, targeted artifact
+and provenance hashes/counts, action counts, absorption/source-index output and
+final CLEAN SHA-256. Completion replay reconstructs JA, baseline, accepted
+alignment, package and first-pass result, revalidates saved review/targeted
+evidence without calling a model, rematerializes CLEAN and compares exact proof,
+report and SRT bytes. Missing, detached or changed review evidence blocks
+completion. Existing primary-only results cannot be promoted: read-only replay
+of the saved FNS-247 and JUR-750 Normal artifacts rejected both because review
+triage evidence is absent. Stage12's existing generated-artifact preflight now
+reaches this stronger Normal completion validator; no publication behavior or
+NAS no-overwrite policy was relaxed.
+
+### Offline regression results
+
+- Normal Mode: 18 tests PASS, including no-target review, suspect-only Targeted
+  ASR, approved JA/Korean repair, session/source binding, review failure/missing
+  result/SHA mismatch rejection, primary-only proof rejection, immutable replay
+  and Stage12 completion validation.
+- CLEAN materializer: 38 checks PASS across KEEP/REPAIR/OMIT/AMBIGUOUS, external
+  JA retention for AMBIGUOUS, metadata omission, absorption owner/index/timing
+  preservation and fail-closed partial group decisions.
+- Existing HYBRID suspect review: 43 checks PASS; generic review: 134 PASS;
+  review runner: 86 PASS; deployment: 49 PASS; live adapters: 22 PASS.
+- Stage12 bulk runner, batch and rollout smoke tests PASS. `py_compile` and
+  `git diff --check` PASS.
+- Three audio-fixture suites initially lacked the environment's NumPy package;
+  they passed using a temporary `/tmp` zero-array-only shim for synthetic audio
+  fixtures. No dependency or shim was added to the repository. No real audio,
+  Whisper, Hermes, NAS or publication call was made.
+
+Historical FNS-247 four-cue reviewed-JA repair evidence remains comparison
+evidence only; this change does not require a future model to reproduce those
+four decisions. The approved historical artifact was not used to bypass source
+or session binding.
+
+**Next task:** deploy this reviewed-CLEAN implementation only in a separate
+authorized operations checkpoint, after Teddy reviews the offline evidence; keep
+the timer stopped until that checkpoint is approved.
+
 ## 2026-10-12 — Stage11 P2-A Normal quality-pipeline connection audit
 
 **READ-ONLY audit: PASS. Normal quality-pipeline readiness: INCOMPLETE.** No

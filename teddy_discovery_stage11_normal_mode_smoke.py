@@ -8,16 +8,22 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import uuid
 from unittest.mock import patch
 
 import teddy_discovery_stage11_normal_mode as normal
 import teddy_discovery_stage11_controller_smoke as fixture
 import teddy_discovery_stage11_live_adapters as live_adapters
+import teddy_discovery_stateful_quality_review as review
 from teddy_discovery_alignment_acceptance_smoke import policy_with
 from teddy_discovery_stateful_translator import StatefulAbsorptionResult, StatefulCueOutput
 from teddy_discovery_stage11_deployment import Stage11DeploymentTransportError
 from teddy_discovery_subtitle_external import SubtitleCatProvider, SubtitleCatDetailPage
 from teddy_discovery_subtitlecat_discovery import SubtitleCatDiscovery, SubtitleCatSearchResponse
+from teddy_discovery_asr import ASRSegment
+from teddy_discovery_hybrid_evidence import HybridCueIdentity
+from teddy_discovery_targeted_asr_artifact import TargetedASRArtifact
+from teddy_discovery_targeted_hybrid_evidence import TargetedASRWindowEvidence
 
 
 class NormalSmoke(unittest.TestCase):
@@ -27,6 +33,8 @@ class NormalSmoke(unittest.TestCase):
         for p in (self.artifacts,self.staging): p.mkdir(mode=0o700)
         self.route=fixture.fixture.accepted_hybrid_route()
         self.baseline=self.route.alignment_application.bundle.asr_result
+        self.first_calls=0; self.review_calls=0; self.targeted_calls=0
+        self.triage_actions=None
         self.align=patch.object(normal,'_align_external_payload',return_value=self.route.alignment_application)
         self.align.start(); self.addCleanup(self.align.stop)
         for target in ('subprocess.run','subprocess.Popen','socket.socket'):
@@ -34,27 +42,71 @@ class NormalSmoke(unittest.TestCase):
             p.start(); self.addCleanup(p.stop)
 
     def first(self, package, *, boundary_evidence, **unused):
+        self.first_calls+=1
         return StatefulAbsorptionResult(package.schema_version,package.dvd_id,package.generation_key,
             package.claim_token,normal.stateful_session_id_for_package(package),
             tuple(StatefulCueOutput(c.cue_id,None,'검증용 번역 '+str(i),None) for i,c in enumerate(package.cues)),boundary_evidence)
+
+    def review(self, request, *, staging_root, target_cue_ids=None,
+               targeted_asr_artifact=None):
+        self.review_calls+=1
+        ids=(tuple(c.cue_id for c in request.cues) if target_cue_ids is None
+             else target_cue_ids)
+        if target_cue_ids is None:
+            actions=(self.triage_actions if self.triage_actions is not None
+                     else (review.KEEP,)*len(ids))
+            if targeted_asr_artifact is not None:
+                self.fail('triage must not receive targeted evidence')
+        else:
+            if targeted_asr_artifact is None:
+                self.fail('target review requires exact targeted artifact')
+            actions=(review.REPAIR,)*len(ids)
+        categories={review.KEEP:'DIALOGUE',review.REPAIR:'SEMANTIC_REPAIR',
+                    review.OMIT:'SOURCE_NOISE',review.AMBIGUOUS:'AMBIGUOUS'}
+        cues=tuple(review.QualityReviewResultCue(
+            cue_id,action,categories[action],'Synthetic offline evidence supports the decision.',
+            '修正版' if action==review.REPAIR else None,
+            '검수 수정본' if action==review.REPAIR else None)
+            for cue_id,action in zip(ids,actions,strict=True))
+        return review.QualityReviewResult(
+            review.STATEFUL_QUALITY_REVIEW_SCHEMA_VERSION,
+            review.review_request_sha256(request),cues,
+            request.source_translation_session_id,str(uuid.uuid4()))
+
+    def targeted(self, asr_result, windows):
+        self.targeted_calls+=1
+        return TargetedASRArtifact(
+            asr_result.source_snapshot,asr_result.runtime_identity,asr_result.engine_version,
+            tuple(TargetedASRWindowEvidence(
+                asr_result.source_snapshot,window.start_ms,window.end_ms,
+                window.external_cue_ids,
+                (ASRSegment(window.start_ms,window.end_ms,'補助音声'),))
+                for window in windows))
 
     def run_title(self, **overrides):
         kwargs=dict(artifact_root=self.artifacts,stateful_staging_root=self.staging,claim_token=1,
             holding_resolver=lambda _:fixture._holding(self.baseline),baseline_transcriber=lambda _:self.baseline,
             external_ja_attempt=lambda *_:self.route.alignment_application,first_pass_runner=self.first,
             acceptance_policy=policy_with(),targeted_runner=lambda *_:self.fail('optional STT ran'),
-            hybrid_review_runner=lambda *_:self.fail('optional review ran'))
+            hybrid_review_runner=self.review,hybrid_targeted_runner=self.targeted)
         kwargs.update(overrides)
         return normal.run_one_title_normal_mode(self.baseline.source_snapshot.dvd_id,**kwargs)
 
-    def test_primary_completes_with_optional_recovery_unavailable(self):
+    def test_hybrid_reviewed_clean_completes_and_replays_without_models(self):
         baseline_formats=[]
         result=self.run_title(baseline_transcriber=lambda video: baseline_formats.append(video.video_format) or self.baseline)
         proof=json.loads((result.report_path.parent/normal.PROOF_NAME).read_bytes())
         report=json.loads(result.report_path.read_bytes())
         self.assertEqual(proof['user_intervention'],0)
         self.assertFalse(proof['automatic_insertion'])
-        self.assertEqual(proof['ambiguous_policy'],'SKIP_AND_CONTINUE')
+        self.assertEqual(proof['ambiguous_policy'],'EXTERNAL_JA_AND_PRIMARY_KO')
+        self.assertEqual(proof['quality_review'],'HYBRID_REVIEWED_CLEAN_V1')
+        evidence=proof['review_evidence']
+        self.assertEqual(evidence['targeted_source_count'],0)
+        self.assertEqual(evidence['targeted_window_count'],0)
+        self.assertEqual(evidence['review_result_sha256'],report['review_result_identity']['result_sha256'])
+        self.assertIsNotNone(evidence['source_translation_session_id_sha256'])
+        self.assertIsNotNone(evidence['review_execution_session_id_sha256'])
         self.assertTrue(result.clean_path.is_file())
         self.assertEqual(baseline_formats,['mp4'])
         self.assertEqual((result.report_path.parent/'normal-external-ja.srt').read_bytes(),
@@ -63,8 +115,85 @@ class NormalSmoke(unittest.TestCase):
         self.assertEqual(baseline_raw,normal.controller.serialize_asr_result(self.baseline))
         self.assertEqual(report['baseline_sha256'],normal.sha(baseline_raw))
         self.assertIs(report['publication_performed'],False)
+        self.assertEqual((self.first_calls,self.review_calls,self.targeted_calls),(1,1,0))
         repeated=self.run_title(first_pass_runner=lambda *_a,**_k:self.fail('resume called Hermes'))
         self.assertEqual(repeated.clean_sha256,result.clean_sha256)
+        self.assertEqual((self.review_calls,self.targeted_calls),(1,0))
+
+    def test_suspect_only_targeted_asr_is_bound_to_original_and_repair(self):
+        self.triage_actions=(review.REPAIR,review.KEEP,review.KEEP,review.KEEP)
+        result=self.run_title()
+        directory=result.report_path.parent
+        proof=json.loads((directory/normal.PROOF_NAME).read_bytes())
+        evidence=proof['review_evidence']
+        report=json.loads(result.report_path.read_bytes())
+        clean=normal.controller.parse_subtitle_bytes(result.clean_path.read_bytes(),'srt')
+        self.assertEqual(self.targeted_calls,1)
+        self.assertEqual(self.review_calls,2)
+        self.assertEqual(evidence['targeted_source_count'],1)
+        self.assertEqual(evidence['targeted_window_count'],1)
+        self.assertEqual(report['targeted_source_count'],1)
+        self.assertIs(report['targeted_reused'],False)
+        self.assertIs(result.targeted_reused,False)
+        self.assertEqual(clean.cues[0].text,'검수 수정본')
+        self.assertEqual(proof['playback'][0]['ja'],'修正版')
+        targeted=normal.controller.parse_targeted_asr_artifact_bytes(
+            (directory/'hybrid-suspect-asr-v1.json').read_bytes())
+        self.assertEqual(targeted.source_snapshot,self.baseline.source_snapshot)
+        self.assertEqual(targeted.windows[0].external_cue_ids,
+                         (HybridCueIdentity.for_external_ja(0).cue_id,))
+        validated=normal.controller._validate_existing_completion(
+            result.report_path,result.clean_path,
+            directory/normal.controller.BASELINE_ASR_FILENAME,title=result.title,
+            baseline_sha256=report['baseline_sha256'],baseline_reused=False,
+            source_quality_counts=report['source_quality_counts'],targeted_reused=False,
+            targeted_source_count=1,targeted_window_count=1)
+        self.assertEqual(validated.clean_sha256,result.clean_sha256)
+
+    def test_deployment_registry_captures_native_normal_boundary_evidence(self):
+        from teddy_discovery_stage11_deployment import _HybridOriginalRegistry
+        preparation,boundary=normal.prepare_normal(
+            self.route,normal.sha(normal.controller.serialize_asr_result(self.baseline)),1)
+        registry=_HybridOriginalRegistry()
+        registry.capture_external(lambda _video,_asr:self.route.alignment_application)(
+            self.route.canonical_video,self.baseline)
+        callback=registry.capture_first_pass(self.first)
+        first=callback(preparation.package,route='HYBRID',staging_root=self.staging,
+                       boundary_evidence=boundary)
+        source_quality=normal.classify_source_document(
+            self.route.alignment_application.bundle.external_ja_document)
+        request=review.build_review_request(
+            preparation=preparation,package=preparation.package,result=first,
+            source_quality=source_quality)
+        retained=registry.originals_provider(request)
+        self.assertEqual(retained['package'],preparation.package)
+        self.assertEqual(retained['result'],first)
+        self.assertEqual(retained['preparation'].package,preparation.package)
+
+    def test_review_failure_or_missing_review_sidecar_blocks_completion(self):
+        with self.assertRaisesRegex(RuntimeError,'review transport failed'):
+            self.run_title(hybrid_review_runner=lambda *_a,**_k:
+                           (_ for _ in ()).throw(RuntimeError('review transport failed')))
+        directory=next(self.artifacts.iterdir())
+        self.assertFalse((directory/'clean-ko-v1.srt').exists())
+        self.assertFalse((directory/'stage11-controller-report-v1.json').exists())
+        successful=self.run_title()
+        (successful.report_path.parent/'hybrid-final-review-v1.json').unlink()
+        with self.assertRaises(normal.controller.Stage11ControllerArtifactError):
+            self.run_title()
+
+    def test_review_sha_and_primary_only_proof_cannot_be_promoted(self):
+        result=self.run_title(); directory=result.report_path.parent
+        triage=directory/'hybrid-triage-v1.json'
+        triage.write_bytes(triage.read_bytes()+b' ')
+        with self.assertRaises(normal.controller.Stage11ControllerArtifactError):
+            self.run_title()
+        triage.write_bytes(normal.wire(json.loads(triage.read_bytes())))
+        proof_path=directory/normal.PROOF_NAME
+        proof=json.loads(proof_path.read_bytes()); proof['quality_review']='PRIMARY_TRANSLATION_ONLY'
+        proof_path.write_bytes(normal.wire(proof))
+        with self.assertRaises(normal.controller.Stage11ControllerArtifactError):
+            self.run_title()
 
     def test_non_mp4_fails_before_baseline_or_model_calls(self):
         holding=fixture._holding(self.baseline)

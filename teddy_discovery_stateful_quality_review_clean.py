@@ -31,9 +31,10 @@ from teddy_discovery_stateful_translator import (
     STATEFUL_TRANSLATOR_MAX_CUES,
     StatefulSubtitlePackage,
     StatefulSubtitleResult,
+    stateful_absorption_is_enabled,
     validate_stateful_result,
 )
-from teddy_discovery_subtitle_source_quality import SourceQualityDecision
+from teddy_discovery_subtitle_source_quality import OMIT_METADATA, SourceQualityDecision
 from teddy_discovery_subtitle_text import SubtitleCue
 from teddy_discovery_subtitle_v2_orchestrator import project_affine_timestamp_ms
 from teddy_discovery_targeted_asr_artifact import TargetedASRArtifact
@@ -57,6 +58,7 @@ class CleanSubtitleCue:
     ja: str
     ko: str
     review_action: str
+    source_indexes: tuple[int, ...] = ()
 
     def __post_init__(self):
         if (
@@ -89,6 +91,22 @@ class CleanSubtitleCue:
             raise StatefulQualityReviewCleanError(
                 "CLEAN text must use exact strings"
             )
+        indexes = self.source_indexes
+        if indexes == ():
+            indexes = (self.original_source_index,)
+            object.__setattr__(self, "source_indexes", indexes)
+        if (
+            type(indexes) is not tuple
+            or not indexes
+            or any(type(index) is not int or not 0 <= index < STATEFUL_TRANSLATOR_MAX_CUES
+                   for index in indexes)
+            or tuple(sorted(set(indexes))) != indexes
+            or self.original_source_index not in indexes
+            or indexes != tuple(range(indexes[0], indexes[-1] + 1))
+        ):
+            raise StatefulQualityReviewCleanError(
+                "CLEAN source-index group is invalid"
+            )
         try:
             SubtitleCue(self.start_ms, self.end_ms, self.ja)
             SubtitleCue(self.start_ms, self.end_ms, self.ko)
@@ -111,6 +129,7 @@ class StatefulQualityReviewCleanMaterialization:
                 "CLEAN cues must be an immutable tuple"
             )
         previous_source_index = None
+        seen_source_indexes = set()
         rendered_cues = []
         for cue in self.cues:
             if type(cue) is not CleanSubtitleCue:
@@ -118,14 +137,18 @@ class StatefulQualityReviewCleanMaterialization:
                     "CLEAN cues contain an invalid value"
                 )
             cue.__post_init__()
-            if (
-                previous_source_index is not None
-                and cue.original_source_index <= previous_source_index
-            ):
+            first_source_index = cue.source_indexes[0]
+            if (previous_source_index is not None
+                    and first_source_index <= previous_source_index):
                 raise StatefulQualityReviewCleanError(
                     "CLEAN cues differ from original source order"
                 )
-            previous_source_index = cue.original_source_index
+            previous_source_index = cue.source_indexes[-1]
+            if seen_source_indexes.intersection(cue.source_indexes):
+                raise StatefulQualityReviewCleanError(
+                    "CLEAN source index is represented more than once"
+                )
+            seen_source_indexes.update(cue.source_indexes)
             rendered_cues.append(
                 SubtitleCue(cue.start_ms, cue.end_ms, cue.ko)
             )
@@ -147,7 +170,11 @@ class StatefulQualityReviewCleanMaterialization:
 
     @property
     def source_indexes(self) -> tuple[int, ...]:
-        return tuple(cue.original_source_index for cue in self.cues)
+        return tuple(
+            source_index
+            for cue in self.cues
+            for source_index in cue.source_indexes
+        )
 
 
 def materialize_stateful_quality_review_clean(
@@ -163,6 +190,8 @@ def materialize_stateful_quality_review_clean(
     targeted_second_evidence_artifact: (
         TargetedSecondEvidenceArtifact | None
     ) = None,
+    preserve_absorption: bool = False,
+    omit_metadata: bool = False,
 ) -> StatefulQualityReviewCleanMaterialization:
     """Revalidate FULL and review evidence, then apply decisions without I/O.
 
@@ -212,7 +241,8 @@ def materialize_stateful_quality_review_clean(
                 "frozen external timing source is missing"
             )
 
-        clean_cues = []
+        clean_by_source_index = []
+        projected = []
         previous_start_ms = None
         values = zip(
             package.cues,
@@ -221,6 +251,7 @@ def materialize_stateful_quality_review_clean(
             request.cues,
             result.cues,
             document.cues,
+            source_quality,
             strict=True,
         )
         for source_index, (
@@ -230,6 +261,7 @@ def materialize_stateful_quality_review_clean(
             review_input,
             decision,
             external,
+            hint,
         ) in enumerate(values):
             identity = HybridCueIdentity.for_external_ja(source_index)
             if (
@@ -268,13 +300,26 @@ def materialize_stateful_quality_review_clean(
                     "frozen projected timing is invalid"
                 )
             previous_start_ms = start_ms
+            projected.append((start_ms, end_ms))
 
             effective_action = effective_review_action(review_input, decision)
+            if omit_metadata and hint.action == OMIT_METADATA:
+                effective_action = OMIT
             if effective_action == OMIT:
-                continue
-            if effective_action == REPAIR:
+                clean_by_source_index.append(None)
+            elif decision.action == REPAIR:
                 ja = decision.replacement_ja
                 ko = decision.replacement_ko
+                clean_by_source_index.append(
+                    (ja, ko, decision.action)
+                )
+            elif effective_action == KEEP and decision.action == AMBIGUOUS:
+                # Uncertain repairs are not promoted; retain the external JA.
+                ja = source.external_ja
+                ko = first.ko
+                clean_by_source_index.append(
+                    (ja, ko, decision.action)
+                )
             elif effective_action == KEEP:
                 ja = (
                     first.repaired_ja
@@ -282,21 +327,106 @@ def materialize_stateful_quality_review_clean(
                     else source.external_ja
                 )
                 ko = first.ko
+                clean_by_source_index.append(
+                    (ja, ko, decision.action)
+                )
             else:
                 raise StatefulQualityReviewCleanError(
                     "validated review action is unsupported"
                 )
+
+        if preserve_absorption and stateful_absorption_is_enabled(
+            package.generation_key
+        ):
+            try:
+                from teddy_discovery_stateful_boundary import (
+                    validate_stateful_absorption,
+                )
+
+                chains = validate_stateful_absorption(
+                    first_pass.cues,
+                    package,
+                    first_pass.boundary_evidence,
+                )
+            except Exception as error:
+                raise StatefulQualityReviewCleanError(
+                    "CLEAN absorption relation failed original-evidence validation"
+                ) from error
+        else:
+            from teddy_discovery_stateful_boundary import StatefulAbsorptionChain
+
+            chains = tuple(
+                StatefulAbsorptionChain(
+                    package.cues[index].cue_id,
+                    (package.cues[index].cue_id,),
+                    (index,),
+                )
+                for index in range(len(package.cues))
+            )
+
+        clean_cues = []
+        source_quality_by_index = {
+            decision.source_index: decision for decision in source_quality
+        }
+        for chain in chains:
+            indexes = chain.source_indexes
+            metadata_indexes = {
+                index for index in indexes
+                if omit_metadata
+                and source_quality_by_index[index].action == OMIT_METADATA
+            }
+            if metadata_indexes == set(indexes):
+                continue
+            if metadata_indexes:
+                raise StatefulQualityReviewCleanError(
+                    "metadata omission intersects a retained absorption group"
+                )
+            owner_index = next(
+                index for index, cue in enumerate(package.cues)
+                if cue.cue_id == chain.owner_cue_id
+            )
+            if len(indexes) > 1:
+                if any(
+                    review_result.cues[index].action not in {KEEP, AMBIGUOUS}
+                    for index in indexes
+                ):
+                    raise StatefulQualityReviewCleanError(
+                        "review decision conflicts with a validated absorption group"
+                    )
+                owner_value = clean_by_source_index[owner_index]
+                if owner_value is None or owner_value[1] is None:
+                    raise StatefulQualityReviewCleanError(
+                        "reviewed absorption owner has no retained translation"
+                    )
+                ja, ko, action = owner_value
+                start_ms = min(projected[index][0] for index in indexes)
+                end_ms = max(projected[index][1] for index in indexes)
+                clean_cue_id = chain.owner_cue_id
+            else:
+                owner_value = clean_by_source_index[owner_index]
+                if owner_value is None:
+                    continue
+                ja, ko, action = owner_value
+                if ko is None:
+                    raise StatefulQualityReviewCleanError(
+                        "retained CLEAN cue has no Korean translation"
+                    )
+                start_ms, end_ms = projected[owner_index]
+                clean_cue_id = package.cues[owner_index].cue_id
             clean_cues.append(
                 CleanSubtitleCue(
-                    cue_id=identity.cue_id,
-                    original_source_index=source_index,
+                    cue_id=clean_cue_id,
+                    original_source_index=owner_index,
                     start_ms=start_ms,
                     end_ms=end_ms,
                     ja=ja,
                     ko=ko,
-                    review_action=decision.action,
+                    review_action=action,
+                    source_indexes=indexes,
                 )
             )
+
+        clean_cues.sort(key=lambda cue: cue.source_indexes[0])
 
         rendered = generate_korean_srt(
             tuple(
