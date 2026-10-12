@@ -1,5 +1,82 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — Stage11 P1-D residual HYBRID failure investigation
+
+**INCOMPLETE; no new code defect was confirmed in the bounded samples.** Work
+started from GitHub HEAD
+`de7e26b6fe6e6be07bb7eb102ac0b699c892f286`; production remains at
+`e4e0b05bee3550b0ba2734e71ccccb319e802864`. The Normal timer and service were
+verified disabled/inactive. The existing dirty worktree was not touched. No
+deployment, service/timer change, DB write, Hermes/Whisper execution, or
+NAS/Jellyfin write occurred.
+
+### Reused historical evidence
+
+No title-wide search or re-screen was run. The existing 161/162 classification
+remains: `NO_SELECTED_EXTERNAL=102`, `EXTERNAL_VALIDATION_FAILURE=14`,
+`MULTI_INDETERMINATE=8`, and `PAYLOAD_OR_BUNDLE_VALIDATION_FAILURE=6` (plus the
+previously recorded categories). The 134 stored bulk reports still contain
+63 `NO_CANDIDATE`, 67 `VALIDATION_FAILURE`, 2 `SEARCH_TRANSPORT_FAILURE`, one
+`TRANSPORT_FAILURE`, and one `ACCEPTED`. The 67 validation-failure artifact
+directories have no retained HTTP response, JA payload, stage reason or
+alignment attempt, so their historical causes remain `UNKNOWN`.
+
+The saved 51-title candidate scan remains the detailed multi-candidate
+evidence: 10 unique safe accepts, 2 distinct accepted-content conflicts, 1
+accepted-but-blocked candidate set, and 38 with no safe accepted content. Its
+candidate set includes the previously reproduced IPZZ-340 Unicode URL transport
+failure, already fixed generically in P1-C. That candidate still did not pass
+alignment after the URL fix. The saved 162-title audit is a separate snapshot:
+it records 71 `NO_CANDIDATE`, 51 `SEARCH_VALIDATION_FAILURE`, 14
+`DETAIL_VALIDATION_FAILURE`, 7 `PAYLOAD_VALIDATION_FAILURE`, 8 `UNRESOLVED`, 8
+alignment-limit failures and 3 accepts. The later 51-title scan found actual
+search candidates for those 51 titles; therefore the earlier
+`SEARCH_VALIDATION_FAILURE` label cannot be read as proof that the catalog had
+no candidates. These snapshots do not provide a complete title-by-title cause
+map for the 102 `NO_SELECTED_EXTERNAL` results.
+
+Existing P1-A observations still distinguish two real outcomes: DANDYA-049's
+bounded search returned HTTP 200 with zero candidates, while DLDSS-536 returned
+one detail candidate but no safe Japanese SRT link. Those observations do not
+recover the original historical causes for other titles.
+
+### Bounded representative rechecks
+
+Two cases were rechecked through the existing Gluetun-only proxy
+`127.0.0.1:58888`, using eight-second request timeouts, production-bounded
+responses, one search and at most one candidate evaluation per title. No raw
+URLs, bodies or subtitle text were retained.
+
+- DLDSS-543: search returned one candidate; detail and JA SRT retrieval
+  succeeded. Reusing its saved baseline, the candidate remained
+  `INDETERMINATE` with `ALIGNMENT_LIMIT`. This did not reproduce its earlier
+  detail-validation label and does not justify changing the alignment limits.
+- HAWA-345: search returned one candidate; the first candidate was rejected at
+  `ja_srt_content / SRT_CONTENT_INVALID`. The payload body was not logged, so
+  the specific malformed-content cause is unknown. The existing validator
+  rejected it safely; no parser defect was demonstrated.
+
+The prior IPZZ-340 check is reused rather than repeated: P1-C confirmed the
+generic Unicode request-URI defect and the fixed candidate still failed the
+existing alignment acceptance gate. No additional transport, candidate
+selection, or alignment defect was confirmed. No acceptance threshold or
+ASR_ONLY behavior changed, and no source file was modified in this checkpoint.
+
+### Offline verification and disposition
+
+Using `/opt/stage11-stt-venv/bin/python`, the deployment smoke passed 51/51,
+the live-adapter smoke passed, SubtitleCat discovery passed 63/63, and external
+subtitle validation passed 183/183. The default system Python could not import
+NumPy for the deployment/live-adapter smokes; the same suites passed in the
+existing Stage11 venv. The two online samples used only the explicit Gluetun
+proxy. No model or publishing path ran.
+
+The P1-C fix remains the only confirmed general program defect in this
+investigation. The historical 14/8/6 categories and the full 102-title
+no-selection group remain incompletely attributed because their per-stage
+responses and title-level join evidence were not retained. P1 closure is left
+for Teddy to decide; do not start another workstream until that decision.
+
 ## 2026-10-12 — Stage11 P1-C Unicode JA source URL transport defect
 
 **One generic defect was reproduced and fixed; attribution of the historical
