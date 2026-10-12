@@ -1,0 +1,2579 @@
+{
+  "schema": "stage11-p1e-asr-only-revalidation-report-v1",
+  "source_head": "c8883b286b23137d5d954645f69b1319e5331c87",
+  "started_utc": "2026-10-12T05:10:52Z",
+  "finished_utc": "2026-10-12T05:46:44Z",
+  "inventory": {
+    "published_total": 164,
+    "published_asr_only": 163,
+    "published_hybrid": 1,
+    "targets": 163,
+    "completed": 163,
+    "incomplete": 0,
+    "incomplete_title_reason": {
+      "dvd_id": "VEMA-246",
+      "reason_code": "CURRENT_HOLDING_OR_BASELINE_UNAVAILABLE"
+    }
+  },
+  "execution": {
+    "proxy_route": "existing_gluetun_loopback",
+    "request_timeout_seconds": 20.0,
+    "minimum_seconds_between_gets": 1.0,
+    "transport_calls": 525,
+    "normal_acceptance_policy": "existing production policy; no threshold or limit raised",
+    "models_invoked": false,
+    "database_or_publication_writes": false
+  },
+  "title_result_counts": {
+    "ACCEPT_HYBRID": 21,
+    "ALIGNMENT_LIMIT": 17,
+    "DETAIL_FAILURE": 17,
+    "INCOMPLETE": 1,
+    "INDETERMINATE": 1,
+    "MULTIPLE_ACCEPTED_CONTENTS": 2,
+    "NO_CANDIDATE": 71,
+    "SRT_CONTENT_INVALID": 6,
+    "UNRESOLVED": 27
+  },
+  "candidate_failure_counts": [
+    {
+      "count": 21,
+      "http_status": null,
+      "reason_code": "ALIGNMENT_LIMIT",
+      "stage": "alignment"
+    },
+    {
+      "count": 3,
+      "http_status": null,
+      "reason_code": "ALIGNMENT_NO_CONSENSUS",
+      "stage": "alignment"
+    },
+    {
+      "count": 44,
+      "http_status": null,
+      "reason_code": "HYBRID_UNRESOLVED",
+      "stage": "alignment"
+    },
+    {
+      "count": 1,
+      "http_status": null,
+      "reason_code": "UNEXPECTED_EVALUATION_FAILURE",
+      "stage": "candidate_evaluation"
+    },
+    {
+      "count": 6,
+      "http_status": null,
+      "reason_code": "JA_LINK_INVALID",
+      "stage": "detail_ja_link"
+    },
+    {
+      "count": 114,
+      "http_status": null,
+      "reason_code": "JA_LINK_MISSING",
+      "stage": "detail_ja_link"
+    },
+    {
+      "count": 25,
+      "http_status": null,
+      "reason_code": "SRT_CONTENT_INVALID",
+      "stage": "ja_srt_content"
+    }
+  ],
+  "previous_comparison": {
+    "previous_161_162_accepted_count": 17,
+    "current_comparable_previous_title_set_accepted_count": 20,
+    "retained_previous_accepts": 16,
+    "previous_accepts_now_not_accepted": [
+      "SDDE-763"
+    ],
+    "newly_accepted_within_previous_title_set": [
+      "IPZZ-698",
+      "MREC-010",
+      "NSFS-457",
+      "REAL-970"
+    ],
+    "net_change_within_previous_title_set": 3,
+    "additional_current_target_accept": [
+      "FNS-247"
+    ],
+    "note": "The 163-title current scope includes FNS-247 beyond the prior 161 completed titles; VEMA-246 remains unavailable. The saved 51-title multi-candidate screen is a selected subset and its counts are not directly comparable to this full current sweep."
+  },
+  "confirmed_classification_boundary": {
+    "dvd_id": "PRED-054",
+    "live_result": "INDETERMINATE",
+    "live_candidate_failure": "candidate_evaluation/UNEXPECTED_EVALUATION_FAILURE",
+    "observed_exception_type": "SubtitleCandidateValidationError",
+    "offline_synthetic_check": {
+      "detail_url_validation_accepts_unicode_c1_control": true,
+      "candidate_identity_validation_rejects_unicode_c1_control": true,
+      "exception_type": "SubtitleCandidateValidationError"
+    },
+    "limitation": "The exact live candidate input was not retained, so the synthetic C1 mismatch reproduces the boundary but does not prove the exact character in the live PRED-054 candidate."
+  },
+  "titles": [
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 6,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        },
+        {
+          "count": 5,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 5,
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "ADN-785",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 3
+      },
+      "dvd_id": "ADN-799",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "AKDL-312",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "AT-099",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 5,
+      "candidate_failure_counts": [
+        {
+          "count": 3,
+          "http_status": null,
+          "reason_code": "JA_LINK_INVALID",
+          "stage": "detail_ja_link"
+        },
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 5
+      },
+      "dvd_id": "AVSA-455",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 4,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        },
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_INVALID",
+          "stage": "detail_ja_link"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 3,
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "AVSA-456",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 2
+      },
+      "dvd_id": "BAGR-093",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "BLOR-289",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1,
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "DASS-884",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "DLDSS-543",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "DOKI-037",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "DOKS-689",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 1,
+      "candidate_failure_counts": [],
+      "candidate_status_counts": {
+        "ACCEPTED": 1
+      },
+      "dvd_id": "DROP-141",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_NO_CONSENSUS",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "DVAJ-754",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "DVAJ-757",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 11,
+      "candidate_failure_counts": [
+        {
+          "count": 3,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_INVALID",
+          "stage": "detail_ja_link"
+        },
+        {
+          "count": 6,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 8,
+        "INDETERMINATE": 3
+      },
+      "dvd_id": "DVDES-795",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 2
+      },
+      "dvd_id": "DVDMS-117",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "EBWH-350",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1,
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "EBWH-353",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "EBWH-354",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 2
+      },
+      "dvd_id": "EKDV-826",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "EROFV-366",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "EROFV-387",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "EROFV-390",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "EYAN-228",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 1,
+        "CONCLUSIVE_NON_ACCEPT": 2
+      },
+      "dvd_id": "FBOS-015",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4451371",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4551303",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4555371",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4575470",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4592689",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4640215",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4660439",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4696030",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "FC2-PPV-4722815",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4758058",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4778191",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4778984",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4783033",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4783149",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4783151",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4783157",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4783446",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4783822",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4784721",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4784880",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4795461",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4960750",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FC2-PPV-4973050",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FCT-188",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FCT-198",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FCT-201",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FCT-203",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FCT-204",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FCT-205",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1,
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "FNS-235",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 2,
+      "candidate_count": 2,
+      "candidate_failure_counts": [],
+      "candidate_status_counts": {
+        "ACCEPTED": 2
+      },
+      "dvd_id": "FNS-237",
+      "result": "MULTIPLE_ACCEPTED_CONTENTS",
+      "selection_reason_code": "ACCEPTED_CANDIDATE_CONFLICT"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 3,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 3
+      },
+      "dvd_id": "FNS-239",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 1,
+        "CONCLUSIVE_NON_ACCEPT": 2
+      },
+      "dvd_id": "FNS-244",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 6,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 4,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 1,
+        "CONCLUSIVE_NON_ACCEPT": 5
+      },
+      "dvd_id": "FNS-247",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 2
+      },
+      "dvd_id": "FPRE-239",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "FPRE-240",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "GANA-3432",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 1,
+      "candidate_failure_counts": [],
+      "candidate_status_counts": {
+        "ACCEPTED": 1
+      },
+      "dvd_id": "GDTM-091",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 2
+      },
+      "dvd_id": "GVH-713",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 3,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 3
+      },
+      "dvd_id": "GVH-823",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "HAWA-345",
+      "result": "SRT_CONTENT_INVALID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "HJMO-738",
+      "result": "SRT_CONTENT_INVALID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 1,
+        "CONCLUSIVE_NON_ACCEPT": 2
+      },
+      "dvd_id": "HMN-896",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "HNBR-014",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "HRSM-087",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 1,
+      "candidate_failure_counts": [],
+      "candidate_status_counts": {
+        "ACCEPTED": 1
+      },
+      "dvd_id": "HSODA-104",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "HUNTC-419",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 6,
+      "candidate_failure_counts": [
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 1,
+        "CONCLUSIVE_NON_ACCEPT": 5
+      },
+      "dvd_id": "HUNTC-487",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "HUNTC-513",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "IESP-765",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 5,
+      "candidate_failure_counts": [
+        {
+          "count": 3,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 5
+      },
+      "dvd_id": "IPZZ-340",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "IPZZ-523",
+      "result": "SRT_CONTENT_INVALID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "IPZZ-597",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 1,
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "IPZZ-698",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 3
+      },
+      "dvd_id": "JUR-821",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "KIR-079",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "MAAN-1193",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "MAAN-869",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "MAAN-945",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 2
+      },
+      "dvd_id": "MADV-622",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "MFC-258",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "MFC-355",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "MFCS-085",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 1,
+      "candidate_failure_counts": [],
+      "candidate_status_counts": {
+        "ACCEPTED": 1
+      },
+      "dvd_id": "MFCS-198",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "MFCW-068",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "MFYD-180",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "MILK-306",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "MIUM-1327",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "MKON-126",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "MKON-127",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "MNGS-076",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 1,
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "MREC-010",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "MSFH-048",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "NACT-171",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "NAMH-074",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "NHDTA-663",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "NHDTB-93803",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "NHDTC-233",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "NHDTC-247",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "NLD-033",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "NOSKN-104",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 4,
+      "candidate_failure_counts": [
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 4
+      },
+      "dvd_id": "NSFS-280",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 1,
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "NSFS-456",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 5,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 1,
+        "CONCLUSIVE_NON_ACCEPT": 4
+      },
+      "dvd_id": "NSFS-457",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "NXGS-025",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "OAE-292",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 1,
+      "candidate_failure_counts": [],
+      "candidate_status_counts": {
+        "ACCEPTED": 1
+      },
+      "dvd_id": "ONSG-104",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "ORECO-754",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 10,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "UNEXPECTED_EVALUATION_FAILURE",
+          "stage": "candidate_evaluation"
+        },
+        {
+          "count": 3,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        },
+        {
+          "count": 5,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 9,
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "PRED-054",
+      "result": "INDETERMINATE",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 12,
+      "candidate_failure_counts": [
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 10,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 12
+      },
+      "dvd_id": "PRED-451",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "PRED-888",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "PRED-892",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 1,
+        "CONCLUSIVE_NON_ACCEPT": 1,
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "PRWF-014",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 5,
+      "candidate_failure_counts": [
+        {
+          "count": 3,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 5
+      },
+      "dvd_id": "RCT-631",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 3
+      },
+      "dvd_id": "REAL-875",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 1,
+      "candidate_failure_counts": [],
+      "candidate_status_counts": {
+        "ACCEPTED": 1
+      },
+      "dvd_id": "REAL-970",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 3
+      },
+      "dvd_id": "ROYD-271",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "SCOP-830",
+      "result": "SRT_CONTENT_INVALID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "SCPX-533",
+      "result": "SRT_CONTENT_INVALID",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "SDAM-181",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 2,
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "SDDE-763",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 1,
+      "candidate_failure_counts": [],
+      "candidate_status_counts": {
+        "ACCEPTED": 1
+      },
+      "dvd_id": "SDNM-537",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "SIRO-3917",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "SIRO-4381",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "SIRO-4448",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "SIRO-5536",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 1,
+      "candidate_failure_counts": [],
+      "candidate_status_counts": {
+        "ACCEPTED": 1
+      },
+      "dvd_id": "SIRO-5537",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "SIRO-5722",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "SIRO-5731",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 4,
+      "candidate_failure_counts": [
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        },
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 2,
+        "INDETERMINATE": 2
+      },
+      "dvd_id": "SNOS-079",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 1,
+        "CONCLUSIVE_NON_ACCEPT": 2
+      },
+      "dvd_id": "SNOS-080",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "INDETERMINATE": 2
+      },
+      "dvd_id": "SNOS-105",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 5,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 3,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 5
+      },
+      "dvd_id": "SNOS-120",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "SNOS-125",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 1,
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "SNOS-216",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "SNOS-249",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 4,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        },
+        {
+          "count": 3,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 3,
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "SONE-948",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "SONE-958",
+      "result": "SRT_CONTENT_INVALID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 2,
+      "candidate_count": 4,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 2,
+        "CONCLUSIVE_NON_ACCEPT": 2
+      },
+      "dvd_id": "SONE-970",
+      "result": "MULTIPLE_ACCEPTED_CONTENTS",
+      "selection_reason_code": "ACCEPTED_CANDIDATE_CONFLICT"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 2,
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "SONE-975",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 1,
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "SONE-978",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 2
+      },
+      "dvd_id": "SONE-989",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "SONE-999",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 1,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "ACCEPTED": 1,
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "START-501",
+      "result": "ACCEPT_HYBRID",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 3,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 3
+      },
+      "dvd_id": "START-636",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "STSK-030",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "STSK-093",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "candidate_count": 0,
+      "dvd_id": "STSK-242",
+      "failure_stage": "search_candidates",
+      "http_status": null,
+      "reason_code": "SEARCH_NO_CANDIDATES",
+      "result": "NO_CANDIDATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1
+      },
+      "dvd_id": "STSK-243",
+      "result": "DETAIL_FAILURE",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 3,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 3
+      },
+      "dvd_id": "SW-269",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 4,
+      "candidate_failure_counts": [
+        {
+          "count": 3,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 4
+      },
+      "dvd_id": "SW-289",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 5,
+      "candidate_failure_counts": [
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 3,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 5
+      },
+      "dvd_id": "SW-320",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 15,
+      "candidate_failure_counts": [
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_NO_CONSENSUS",
+          "stage": "alignment"
+        },
+        {
+          "count": 4,
+          "http_status": null,
+          "reason_code": "HYBRID_UNRESOLVED",
+          "stage": "alignment"
+        },
+        {
+          "count": 7,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        },
+        {
+          "count": 2,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 15
+      },
+      "dvd_id": "SW-331",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "SRT_CONTENT_INVALID",
+          "stage": "ja_srt_content"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 2
+      },
+      "dvd_id": "SW-416",
+      "result": "UNRESOLVED",
+      "selection_reason_code": null
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 1,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        }
+      ],
+      "candidate_status_counts": {
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "SW-893",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "accepted_distinct_content_count": 0,
+      "candidate_count": 2,
+      "candidate_failure_counts": [
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "ALIGNMENT_LIMIT",
+          "stage": "alignment"
+        },
+        {
+          "count": 1,
+          "http_status": null,
+          "reason_code": "JA_LINK_MISSING",
+          "stage": "detail_ja_link"
+        }
+      ],
+      "candidate_status_counts": {
+        "CONCLUSIVE_NON_ACCEPT": 1,
+        "INDETERMINATE": 1
+      },
+      "dvd_id": "VEC-737",
+      "result": "ALIGNMENT_LIMIT",
+      "selection_reason_code": "CANDIDATE_EVALUATION_INDETERMINATE"
+    },
+    {
+      "dvd_id": "VEMA-246",
+      "reason_code": "CURRENT_HOLDING_OR_BASELINE_UNAVAILABLE",
+      "result": "INCOMPLETE"
+    }
+  ]
+}

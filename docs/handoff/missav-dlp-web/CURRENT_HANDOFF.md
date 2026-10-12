@@ -1,5 +1,79 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — Stage11 P1-E full ASR_ONLY revalidation
+
+**INCOMPLETE.** The current published inventory contained 164 works: 163
+`ASR_ONLY` and one `HYBRID`. Of the 163 ASR_ONLY works, 162 had both the
+current holding and saved baseline needed for verification; `VEMA-246` did
+not, so it was not queried or reconstructed. The other 162 were processed
+sequentially using the candidate search, detail, SRT validation, streaming
+alignment and selection path at GitHub HEAD
+`c8883b286b23137d5d954645f69b1319e5331c87`. All HTTP requests used the existing
+Gluetun loopback proxy, a 20-second timeout and at least one second between
+GETs (525 transport calls total). Existing production alignment policy and
+limits were retained. No Hermes/Whisper model call, DB write, deployment, NAS
+write or Jellyfin action occurred. The per-title sanitized result is preserved
+in [P1E_ASR_ONLY_REVALIDATION_20261012.json](reports/P1E_ASR_ONLY_REVALIDATION_20261012.json);
+it contains no source URLs, subtitle text, response bodies or content hashes.
+
+### Current title outcomes
+
+| Outcome | Works |
+| --- | ---: |
+| `ACCEPT_HYBRID` | 21 |
+| `NO_CANDIDATE` | 71 |
+| `DETAIL_FAILURE` (no valid JA link) | 17 |
+| `SRT_CONTENT_INVALID` | 6 |
+| `UNRESOLVED` | 27 |
+| `ALIGNMENT_LIMIT` | 17 |
+| `MULTIPLE_ACCEPTED_CONTENTS` | 2 |
+| `INDETERMINATE` | 1 |
+| `INCOMPLETE` | 1 |
+| **Total** | **163** |
+
+There were no search/detail/payload transport failures in this run. Candidate
+level diagnostics recorded 114 missing JA links, 6 invalid JA links, 25
+invalid SRT payloads, 21 alignment-limit results, 3 no-consensus results, 44
+unresolved alignments and one unexpected candidate-evaluation exception.
+Candidate counts can exceed title outcomes because one title can have several
+candidates. `NO_CANDIDATE` means the current search produced no candidate; it
+does not attribute historical failures.
+
+### Historical comparison and confirmed boundary defect
+
+Against the previous 161-title completed comparison set, the current run
+accepted 20: 16 of the previous 17 accepts remain accepted, `SDDE-763` no
+longer passes (`ALIGNMENT_LIMIT`), and four titles newly pass
+(`IPZZ-698`, `MREC-010`, `NSFS-457`, `REAL-970`), for a net increase of 3.
+`FNS-247` is the additional current-scope title and also passes, bringing the
+current total to 21. `VEMA-246` remains outside the comparable completed set.
+The historical 51-title multi-candidate scan is a selected subset with
+different candidate snapshots and is not numerically comparable to this full
+current sweep; its recorded 10 unique safe accepts, 2 accepted-content
+conflicts, 1 accepted-but-blocked set and 38 no-safe-accept sets remain the
+historical figures.
+
+`PRED-054` is currently `INDETERMINATE`: nine candidates were conclusive
+non-accepts and one raised `SubtitleCandidateValidationError`, which the
+adapter maps to generic `candidate_evaluation / UNEXPECTED_EVALUATION_FAILURE`.
+The SubtitleCat provider catches its detail-parser errors but directly
+constructs the validated external candidate; that constructor's
+`SubtitleCandidateValidationError` is outside the adapter's typed external
+error catches. An offline synthetic check reproduced the boundary: the detail
+URL validator accepts a C1 control character that the candidate identity
+validator rejects. This confirms a general exception-classification mismatch;
+the exact live PRED-054 character was not retained, so the synthetic input is
+not asserted as its precise cause. No source fix was made in this checkpoint.
+A minimal provider-boundary normalization/classification fix needs separate
+review; it must preserve fail-closed behavior for unsafe candidate identity.
+
+The Normal timer remains `disabled/inactive` and the service remains
+`inactive`. The protected dirty worktree remains unchanged. No deployment,
+timer/service action, queue/DB update, model execution, or publication was
+performed. This full sweep does not decide P1 closure; Teddy should decide
+whether to authorize the bounded classification fix before closing P1. Do not
+start P2.
+
 ## 2026-10-12 — Stage11 P1-D residual HYBRID failure investigation
 
 **INCOMPLETE; no new code defect was confirmed in the bounded samples.** Work
