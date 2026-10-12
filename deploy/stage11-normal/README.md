@@ -37,6 +37,32 @@ new subtitle timer. Inspect `journalctl -u teddy-subtitle-normal.service` and
 `/opt/missav-dlp-web/discovery/stage12-runtime/status.json`. Generated artifacts
 are under `/opt/missav-dlp-web/discovery/stage11-normal-runtime-v1/artifacts`.
 
+For an explicitly paused deployment that must not enable or start the timer,
+use:
+
+```sh
+bash deploy/stage11-normal/deploy.sh --paused COMMIT_SHA
+```
+
+Paused mode requires the Normal timer to be `disabled/inactive` and the Normal
+service to be `inactive`. It snapshots and checksums the current release,
+`runtime.env` and both systemd units before preflight. It repeats the paused
+state checks after preflight, immediately before switching `current`, after
+installing runtime settings and units, and after `daemon-reload`. Any failure
+after the pointer switch attempts a paused restore without starting a unit.
+
+Use only the backup from that paused deployment for its rollback:
+
+```sh
+bash deploy/stage11-normal/rollback.sh --paused BACKUP_DIRECTORY
+```
+
+Paused rollback verifies the backup identity and checksums, restores the exact
+saved release pointer, `runtime.env` and unit files, and verifies that the
+timer remains `disabled/inactive` and the service `inactive`. A corrupt or
+non-paused backup is rejected. Commands without `--paused` retain the existing
+live deployment and saved timer-state rollback behavior.
+
 Rollback while the subtitle service is inactive with:
 
 ```sh
