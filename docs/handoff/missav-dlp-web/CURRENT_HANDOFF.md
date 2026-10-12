@@ -1,5 +1,36 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — Stage11 P1-G SDDE-763 bounded follow-up
+
+**INCOMPLETE.** The audit started from GitHub HEAD
+`f80cbf40c909b2c89e1e51c829ff03c668ea908f`; the deployed release remains
+`e4e0b05bee3550bba2734e71ccccb319e802864`. The Normal timer is
+`disabled/inactive`, its service is `inactive`, and the protected dirty
+worktree remains unchanged.
+
+The saved evidence still cannot map P1-E's `ALIGNMENT_LIMIT` candidate to the
+2026-10-01 accepted ordinals. One bounded fresh SubtitleCat search was issued
+through the existing Gluetun proxy at `127.0.0.1:58888`, using the saved
+baseline only and existing request timeout and response limits. The search
+returned, and the evaluator was limited to the first three candidates, but a
+diagnostic-output omission left the candidate count, URL fingerprints,
+payload fingerprints, and per-candidate outcomes unavailable after the
+process ended. No second search was issued. The live attempt therefore adds no
+usable candidate comparison; the cause remains **UNKNOWN**. The 2026-10-01
+accepted payload's current validity also remains **UNKNOWN**.
+
+The previously observed P1-E fail-closed behavior remains correct: its two
+accepted candidates shared one payload, while the third was indeterminate at
+`alignment / ALIGNMENT_LIMIT`; overall selection was withheld. No evidence
+confirms an alignment-code regression or justifies a code change.
+
+SDDE-763's Stage12 row was inspected read-only: `PUBLISHED`, sequence 5, with
+a valid original `ASR_ONLY` report SHA. No database mutation, deployment,
+timer/service action, model execution, NAS write, or Jellyfin action occurred.
+The fresh check made no source-code changes. Any further live attribution
+requires a separately bounded retry whose sanitized evidence is persisted
+before the request.
+
 ## 2026-10-12 — Stage11 P1-F publication scope and SDDE-763 regression audit
 
 **INCOMPLETE.** Read-only inspection of the deployed Stage12 store and saved
