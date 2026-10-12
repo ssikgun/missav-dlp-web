@@ -45,14 +45,44 @@ class NormalSmoke(unittest.TestCase):
         return normal.run_one_title_normal_mode(self.baseline.source_snapshot.dvd_id,**kwargs)
 
     def test_primary_completes_with_optional_recovery_unavailable(self):
-        result=self.run_title()
+        baseline_formats=[]
+        result=self.run_title(baseline_transcriber=lambda video: baseline_formats.append(video.video_format) or self.baseline)
         proof=json.loads((result.report_path.parent/normal.PROOF_NAME).read_bytes())
+        report=json.loads(result.report_path.read_bytes())
         self.assertEqual(proof['user_intervention'],0)
         self.assertFalse(proof['automatic_insertion'])
         self.assertEqual(proof['ambiguous_policy'],'SKIP_AND_CONTINUE')
         self.assertTrue(result.clean_path.is_file())
+        self.assertEqual(baseline_formats,['mp4'])
+        self.assertEqual((result.report_path.parent/'normal-external-ja.srt').read_bytes(),
+            self.route.alignment_application.bundle.external_ja_payload.payload)
+        baseline_raw=(result.report_path.parent/normal.controller.BASELINE_ASR_FILENAME).read_bytes()
+        self.assertEqual(baseline_raw,normal.controller.serialize_asr_result(self.baseline))
+        self.assertEqual(report['baseline_sha256'],normal.sha(baseline_raw))
+        self.assertIs(report['publication_performed'],False)
         repeated=self.run_title(first_pass_runner=lambda *_a,**_k:self.fail('resume called Hermes'))
         self.assertEqual(repeated.clean_sha256,result.clean_sha256)
+
+    def test_non_mp4_fails_before_baseline_or_model_calls(self):
+        holding=fixture._holding(self.baseline)
+        holding['relative_path']=holding['relative_path'][:-4]+'.ts'
+        calls=[]
+        def forbidden(name):
+            def invoke(*_args,**_kwargs):
+                calls.append(name)
+                self.fail(name+' must not run for a non-MP4 input')
+            return invoke
+        with self.assertRaises(normal.controller.Stage11ControllerValidationError) as raised:
+            self.run_title(holding_resolver=lambda _title:holding,
+                baseline_transcriber=forbidden('whisper'),
+                external_ja_attempt=forbidden('external_ja'),
+                first_pass_runner=forbidden('hermes'))
+        self.assertIn('normal mode requires canonical MP4 input',str(raised.exception))
+        self.assertEqual(calls,[])
+        failure=json.loads(next(self.artifacts.glob('*/normal-failure-*.json')).read_bytes())
+        self.assertEqual(failure['error_type'],'Stage11ControllerValidationError')
+        self.assertFalse(list(self.artifacts.glob('*/normal-external-ja.srt')))
+        self.assertFalse(list(self.artifacts.glob('*/clean-ko-v1.srt')))
 
     def test_missing_ja_fails_and_saves_reason(self):
         with self.assertRaises(normal.controller.Stage11ControllerValidationError):

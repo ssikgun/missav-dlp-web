@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import hashlib
 import json
@@ -9,12 +10,16 @@ from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 
 from teddy_discovery_asr_source import ASRSourceError
-from teddy_discovery_asr_transcriber import FullTitleASRNoSpeechError
+from teddy_discovery_asr_transcriber import (
+    FullTitleASRNoSpeechError,
+    FullTitleASRValidationError,
+)
 from teddy_discovery_asr_whisper import ASRWhisperError
 from teddy_discovery_asr_audio import (
     ASRAudioUnsafeTimelineError,
     ASRAudioValidationError,
 )
+import teddy_discovery_stage11_normal_mode as normal_mode
 from teddy_discovery_stage11_controller import (
     ALIGNMENT_NOT_ATTEMPTED,
     EXTERNAL_JA_TRANSPORT_FAILURE,
@@ -214,6 +219,7 @@ def controller_for(
     audio_error_ids=(),
     unsafe_timeline_error_ids=(),
     no_speech_ids=(),
+    full_title_validation_error_ids=(),
     source_error_ids=(),
     whisper_error_ids=(),
     deployment_transport_error_ids=(),
@@ -244,6 +250,10 @@ def controller_for(
         if dvd_id in no_speech_ids:
             raise FullTitleASRNoSpeechError(
                 "full-title ASR produced no speech segments"
+            )
+        if dvd_id in full_title_validation_error_ids:
+            raise FullTitleASRValidationError(
+                "whisper.transcribe_chunk must be callable"
             )
         if dvd_id in source_error_ids:
             raise ASRSourceError("synthetic source transfer failure")
@@ -299,6 +309,7 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
                 audio_error_ids=(),
                 unsafe_timeline_error_ids=(),
                 no_speech_ids=(),
+                full_title_validation_error_ids=(),
                 source_error_ids=(),
                 whisper_error_ids=(),
                 deployment_transport_error_ids=(),
@@ -318,6 +329,7 @@ def make_runner(root, records, store, *, controller_calls, nas, publisher,
         audio_error_ids=audio_error_ids,
         unsafe_timeline_error_ids=unsafe_timeline_error_ids,
         no_speech_ids=no_speech_ids,
+        full_title_validation_error_ids=full_title_validation_error_ids,
         source_error_ids=source_error_ids,
         whisper_error_ids=whisper_error_ids,
         deployment_transport_error_ids=deployment_transport_error_ids,
@@ -669,6 +681,155 @@ def main():
             and isolated_result.titles[0].final_state == STATE_PUBLISHED
             and isolated_result.titles[2].final_state == STATE_PUBLISHED,
             "TITLE_FAILURE_ISOLATION",
+        )
+
+        # The actual Normal Mode guard rejects a valid canonical .ts holding
+        # before ASR, external-JA acquisition or Hermes, then Stage12 records
+        # only that title as terminal and proceeds to the next PENDING title.
+        ts_root = Path(temp) / "non-mp4-isolation-artifacts"
+        ts_root.mkdir()
+        ts_records = (
+            records[0],
+            replace(
+                records[1],
+                holding_identity="jav:AAA/AAA-002/AAA-002.ts",
+                media_path_identity="AAA/AAA-002/AAA-002.ts",
+            ),
+            records[2],
+        )
+        ts_store = Stage12RolloutStateStore(
+            Path(temp) / "non-mp4-isolation.sqlite3"
+        )
+        ts_store.initialize_from_inventory(Stage12HoldingsInventoryReport(ts_records))
+        ts_nas = FakeNAS(ts_records)
+        ts_publisher = FakePublisher(ts_nas)
+        ts_calls: list[str] = []
+        default_ts_controller = controller_for(ts_root, ts_records, ts_calls)
+        downstream_calls: list[str] = []
+        ts_record = ts_records[1]
+        ts_mode_artifacts = ts_root / "normal-mode-artifacts"
+        ts_mode_staging = ts_root / "normal-mode-staging"
+        ts_mode_artifacts.mkdir(mode=0o700)
+        ts_mode_staging.mkdir(mode=0o700)
+
+        def normal_mode_controller(dvd_id):
+            if dvd_id != "AAA-002":
+                return default_ts_controller(dvd_id)
+            ts_calls.append(dvd_id)
+            holding = {
+                "holding_id": ts_record.holding_id,
+                "storage_root": "jav",
+                "relative_path": ts_record.media_path_identity,
+                "dvd_id": dvd_id,
+                "parse_status": "MATCHED",
+                "parse_method": "smoke",
+                "size_bytes": ts_record.source_size_bytes,
+                "mtime_ns": ts_record.source_mtime_ns,
+                "present": 1,
+            }
+            def forbidden(name):
+                def invoke(*_args, **_kwargs):
+                    downstream_calls.append(name)
+                    raise AssertionError(name + " must not run for canonical .ts")
+                return invoke
+            return normal_mode.run_one_title_normal_mode(
+                dvd_id,
+                artifact_root=ts_mode_artifacts,
+                stateful_staging_root=ts_mode_staging,
+                claim_token=1,
+                baseline_transcriber=forbidden("whisper"),
+                external_ja_attempt=forbidden("external_ja"),
+                first_pass_runner=forbidden("hermes"),
+                acceptance_policy=None,
+                holding_resolver=lambda _title: holding,
+            )
+
+        ts_title_locks = ts_root.parent / "non-mp4-title-locks"
+        ts_title_locks.mkdir(mode=0o750)
+
+        def ts_controller_with_lock_assertion(dvd_id):
+            probe = try_acquire_title_lock(dvd_id, ts_title_locks)
+            require(
+                probe.status == "BUSY",
+                "NON_MP4_STAGE12_LOCK_HELD_DURING_TITLE_PROCESSING",
+            )
+            return normal_mode_controller(dvd_id)
+
+        ts_runner = Stage12BatchRunner(
+            store=ts_store,
+            inventory=Stage12HoldingsInventoryReport(ts_records),
+            artifact_root=ts_root,
+            nas_filesystem=ts_nas,
+            subtitle_reader=FakeSubtitleReader(ts_nas),
+            publisher=ts_publisher,
+            controller_runner=ts_controller_with_lock_assertion,
+            jellyfin_recognizer=recognition_for,
+            title_lock_dir=ts_title_locks,
+        )
+        ts_result = ts_runner.run(
+            Stage12BatchSelection(3, ("AAA-001", "AAA-002", "AAA-003"))
+        )
+        ts_failure_state = ts_store.get("AAA-002")
+        ts_failure_provenance = json.loads(
+            ts_failure_state.last_transition_provenance_json
+        )
+        ts_failure = json.loads(
+            next(ts_mode_artifacts.glob("*/normal-failure-*.json")).read_bytes()
+        )
+        require(
+            ts_calls == ["AAA-001", "AAA-002", "AAA-003"]
+            and downstream_calls == []
+            and ts_failure["error_type"] == "Stage11ControllerValidationError"
+            and "normal mode requires canonical MP4 input" in ts_failure["reason"]
+            and ts_failure_provenance["error_type"]
+            == "Stage11ControllerValidationError"
+            and ts_result.titles[1].final_state == STATE_FAILED_TERMINAL
+            and ts_result.titles[1].publication_result == "NOT_RUN"
+            and ts_result.titles[1].jellyfin_recognition == "NOT_RUN"
+            and ts_result.titles[0].final_state == STATE_PUBLISHED
+            and ts_result.titles[2].final_state == STATE_PUBLISHED
+            and ts_publisher.calls == ["AAA-001", "AAA-003"]
+            and "AAA/AAA-002/AAA-002.ko.srt" not in ts_nas.published,
+            "CANONICAL_TS_TERMINAL_ISOLATION_NO_ASR_HERMES_OR_PUBLISH",
+        )
+
+        # ASR validation/configuration errors remain systemic. Only Normal
+        # Mode's pre-ASR input-format guard creates the title-scoped error.
+        asr_config_root = Path(temp) / "asr-config-systemic-artifacts"
+        asr_config_root.mkdir()
+        asr_config_store = Stage12RolloutStateStore(
+            Path(temp) / "asr-config-systemic.sqlite3"
+        )
+        asr_config_store.initialize_from_inventory(
+            Stage12HoldingsInventoryReport(records[:3])
+        )
+        asr_config_nas = FakeNAS(records[:3])
+        asr_config_publisher = FakePublisher(asr_config_nas)
+        asr_config_calls: list[str] = []
+        asr_config_runner = make_runner(
+            asr_config_root,
+            records[:3],
+            asr_config_store,
+            controller_calls=asr_config_calls,
+            nas=asr_config_nas,
+            publisher=asr_config_publisher,
+            full_title_validation_error_ids={"AAA-002"},
+        )
+        expect_raises(
+            Stage12BatchSystemicError,
+            lambda: asr_config_runner.run(
+                Stage12BatchSelection(
+                    3, ("AAA-001", "AAA-002", "AAA-003")
+                )
+            ),
+            "ASR_CONFIGURATION_VALIDATION_REMAINS_SYSTEMIC",
+        )
+        require(
+            asr_config_calls == ["AAA-001", "AAA-002"]
+            and asr_config_store.get("AAA-002").status == "RUNNING"
+            and asr_config_store.get("AAA-003").status == STATE_PENDING
+            and asr_config_publisher.calls == ["AAA-001"],
+            "ASR_CONFIGURATION_ERROR_STOPS_BATCH",
         )
 
         # Bounded semantic-output retry exhaustion is a title-level retryable

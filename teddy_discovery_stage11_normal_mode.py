@@ -335,6 +335,8 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
     directory=controller._title_directory(root,title)
     try:
         video,snapshot=controller._resolve_holding(title,holding_resolver)
+        if video.video_format != 'mp4':
+            raise controller.Stage11ControllerValidationError('normal mode requires canonical MP4 input')
         baseline_path=directory/controller.BASELINE_ASR_FILENAME
         baseline,raw,reused=controller._dispatch_baseline(baseline_path,canonical_video=video,source_snapshot=snapshot,
             baseline_transcriber=baseline_transcriber,allow_create=not (directory/controller.MECHANICAL_REPORT_FILENAME).exists())
