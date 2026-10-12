@@ -1,5 +1,46 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — Stage11 P1-G2 SDDE-763 bounded candidate comparison
+
+**INCOMPLETE for the historical cause; diagnostic capture PASS.** Started from
+GitHub HEAD `7b3439a0c422acfeaabc3e4fe4b0ff0d90ecf7c0`. The synthetic
+three-candidate write/read preflight passed, including SHA-256 fingerprints,
+alignment/failure fields, `0600` permissions and sensitive-content checks.
+The bounded live capture used one SubtitleCat search (HTTP 200), the existing
+Gluetun proxy, the saved baseline, and evaluated all three returned candidates.
+Each candidate record was atomically saved and read back successfully. The
+sanitized diagnostic is at `/tmp/p1g2-sdde763-live-20261012.json`; it contains
+fingerprints and stable outcomes, not source URLs or subtitle text.
+
+All three current detail-URL fingerprints match the 2026-10-01 ordinals, so
+there is no candidate-identity churn. Ordinals 1 and 3 still return the same
+payload SHA recorded on 2026-10-01 and are individually `ACCEPTED`, with 65
+anchors, 63 inliers, and 249.8566 ms median absolute residual. Ordinal 2 has
+the same detail identity as before; its prior record has no payload SHA or
+failure reason, while this check fetched a payload and classified it
+`INDETERMINATE / alignment / ALIGNMENT_LIMIT`. The current payload cannot be
+compared to a historical digest for ordinal 2. The current selection therefore
+reproduces P1-E's fail-closed `CANDIDATE_EVALUATION_INDETERMINATE` result. P1-E
+did not retain candidate identities, so an exact P1-E ordinal mapping remains
+unproven.
+
+The alignment, acceptance and application modules are unchanged from the
+2026-10-01 source head. Candidate alignment/classification logic is unchanged;
+the relevant adapter changes add diagnostic annotations. A prior general URL
+handling fix (`49345a4`) now encodes internal ASCII spaces in subtitle hrefs,
+which could explain why ordinal 2 reaches payload evaluation now, but the old
+detail response and failure reason were not retained, so this is not
+confirmed. **The historical cause remains `UNKNOWN`; no code regression or
+justified code fix was found.** The old accepted candidates remain valid
+individually; overall selection remains withheld while ordinal 2 is
+indeterminate. Do not increase the alignment limit or weaken fail-closed
+selection.
+
+Timer/service remain disabled/inactive; deployment remains
+`e4e0b05bee3550b0ba2734e71ccccb319e802864`. No source code, DB, NAS, Jellyfin,
+timer or service changes were made. The protected dirty worktree remains
+unchanged. P1 closure and later-stage work remain for user discussion.
+
 ## 2026-10-12 — Stage11 P1-G SDDE-763 bounded follow-up
 
 **INCOMPLETE.** The audit started from GitHub HEAD
