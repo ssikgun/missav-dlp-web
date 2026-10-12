@@ -1,5 +1,34 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — Stage11 P1-H PRED-054 candidate exception classification
+
+**PASS for the minimal code fix and offline regression; PRED-054's exact live
+input remains unknown.** Work started from GitHub HEAD
+`d01415bde0e966df9d13227c889c9ace4a7b6cd9`. In
+`teddy_discovery_subtitle_external.py`, the SubtitleCat provider now catches
+only the known `SubtitleCandidateValidationError` raised while constructing a
+validated candidate and wraps it as `SubtitleCatDetailError` with the existing
+`detail_ja_link / JA_LINK_INVALID` diagnostic. The unsafe C1 URL remains
+rejected; it is neither normalized nor fetched. Other exceptions retain their
+existing classification.
+
+The offline C1 regression confirms that the multi-candidate evaluator records
+this as `CONCLUSIVE_NON_ACCEPT`. A separate valid candidate still reaches the
+unchanged alignment and HYBRID acceptance path. Existing transport failures,
+alignment limits and unexpected provider failures remain fail-closed. No
+evidence establishes that the PRED-054 live candidate contained a C1 character;
+no live search or title-specific retest was performed.
+
+Regression results: external subtitle smoke 186 checks; live adapter smoke
+PASS, including mixed invalid/accepted candidates and fail-closed cases;
+SubtitleCat discovery 63 checks; proxy 6; Stage11 deployment 51; Normal Mode
+19 tests; Stage12 bulk runner PASS; compile and `git diff --check` PASS. The
+Normal timer remains disabled/inactive and the production release remains
+`e4e0b05bee3550b0ba2734e71ccccb319e802864`. No deployment, service/timer
+action, model execution, DB change, NAS write or Jellyfin action occurred.
+The protected dirty worktree was not modified. This checkpoint does not
+declare P1 closed or start P2; discuss P1 closure with Teddy.
+
 ## 2026-10-12 — Stage11 P1-G2 SDDE-763 bounded candidate comparison
 
 **INCOMPLETE for the historical cause; diagnostic capture PASS.** Started from

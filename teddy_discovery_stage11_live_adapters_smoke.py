@@ -268,6 +268,69 @@ def main():
         assert route_diagnostic['reason_code'] == 'HYBRID_ACCEPTED'
         print("PASS safe external JA diagnostic through normal route selection")
 
+        # A candidate whose URL passed the page parser but fails the stricter
+        # candidate identity contract is a conclusive per-candidate rejection.
+        # It must not block a separate candidate accepted by the existing
+        # alignment policy.
+        from teddy_discovery_subtitlecat_discovery import (
+            SubtitleCatSearchCandidate,
+            SubtitleCatSearchResult,
+        )
+        bad_detail_url = "https://subtitlecat.com/subs/1/a-invalid.html"
+        good_detail_url = "https://subtitlecat.com/subs/1/z-valid.html"
+        mixed_detail_calls = []
+        mixed_payload_calls = []
+        mixed_discovery = SimpleNamespace(discover=lambda **kwargs:
+            SubtitleCatSearchResult(
+                fixture.TITLE,
+                (
+                    SubtitleCatSearchCandidate(good_detail_url),
+                    SubtitleCatSearchCandidate(bad_detail_url),
+                ),
+            )
+        )
+
+        def mixed_detail_fetch(url):
+            mixed_detail_calls.append(url)
+            if url == bad_detail_url:
+                html = '<a href="/subs/1/original\u0080-ja.srt">Japanese</a>'
+            else:
+                html = '<a href="test-ja.srt">Japanese</a>'
+            return SubtitleCatDetailPage(url, html)
+
+        mixed_provider = SubtitleCatProvider(
+            fetch_detail=mixed_detail_fetch,
+            payload_fetcher=lambda candidate: mixed_payload_calls.append(candidate)
+            or fixture.fixture.srt_bytes(tuple(
+                (segment.start_ms, segment.end_ms, segment.text)
+                for segment in baseline.segments
+            )),
+        )
+        mixed_adapter = adapters.build_external_ja_adapter(
+            discovery=mixed_discovery,
+            provider=mixed_provider,
+            acceptance_policy=policy,
+            residual_threshold_ms=100,
+        )
+        mixed_diagnostic = {}
+        mixed_result = mixed_adapter(
+            fixture.fixture.holding(),
+            baseline,
+            diagnostic_out=mixed_diagnostic,
+        )
+        assert mixed_result.decision.verdict == "ACCEPT_HYBRID"
+        assert mixed_diagnostic["candidate_failures"] == [{
+            "stage": "detail_ja_link",
+            "reason_code": "JA_LINK_INVALID",
+            "http_status": None,
+            "count": 1,
+        }]
+        assert mixed_diagnostic["accepted_candidate_count"] == 1
+        assert mixed_detail_calls == [bad_detail_url, good_detail_url]
+        assert len(mixed_payload_calls) == 1
+        assert "detail_url" not in mixed_diagnostic
+        print("PASS C1 candidate conclusive rejection preserves accepted HYBRID choice")
+
         malformed_provider = SubtitleCatProvider(
             fetch_detail=lambda url: SubtitleCatDetailPage(
                 url,

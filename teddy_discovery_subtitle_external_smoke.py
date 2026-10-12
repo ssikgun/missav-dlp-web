@@ -260,6 +260,53 @@ def main():
         "PROVIDER_PAYLOAD_PASSES_EXISTING_PARSER",
     )
 
+    # Candidate construction applies the stricter Unicode Cc identity check.
+    # Keep that rejection, while translating this known validation error into
+    # the provider's existing JA-link validation boundary.
+    c1_href = "/subs/888/original\u0080-ja.srt"
+    c1_html = '<a href="' + escape(c1_href, quote=True) + '">Japanese</a>'
+    c1_source_url = external_module.find_subtitlecat_original_japanese_srt_url(
+        c1_html,
+        final_detail_url,
+    )
+    require(
+        c1_source_url == "https://final.example" + c1_href,
+        "C1_REACHES_STRICT_CANDIDATE_IDENTITY_BOUNDARY",
+    )
+    c1_payload_calls = []
+    c1_provider = external_module.SubtitleCatProvider(
+        fetch_detail=lambda url: external_module.SubtitleCatDetailPage(
+            final_detail_url,
+            c1_html,
+        ),
+        payload_fetcher=lambda current_candidate: c1_payload_calls.append(
+            current_candidate
+        ) or SRT_PAYLOAD,
+    )
+    try:
+        c1_provider.find_original_japanese_candidate(
+            dvd_id=DVD_ID,
+            detail_url=requested_detail_url,
+        )
+    except external_module.SubtitleCatDetailError as error:
+        require(
+            external_module.external_subtitle_error_diagnostic(error)
+            == {
+                "stage": "detail_ja_link",
+                "reason_code": "JA_LINK_INVALID",
+                "http_status": None,
+            },
+            "C1_CANDIDATE_FAILURE_HAS_STABLE_JA_LINK_DIAGNOSTIC",
+        )
+        require(
+            isinstance(error.__cause__, external_module.SubtitleCandidateValidationError)
+            and c1_source_url not in str(error)
+            and c1_payload_calls == [],
+            "C1_REJECTED_WITHOUT_URL_LEAK_OR_PAYLOAD_FETCH",
+        )
+    else:
+        raise AssertionError("C1 candidate identity must remain rejected")
+
     # Regression: all language labels live in one shared container, while
     # language identity is available only from each anchor's local metadata.
     shared_language_html = """

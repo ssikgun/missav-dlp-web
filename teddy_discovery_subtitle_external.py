@@ -20,6 +20,7 @@ from teddy_discovery_subtitle import (
     SOURCE_KIND_VALIDATED_EXTERNAL_TEXT,
     SUPPORTED_TEXT_FORMATS,
     SubtitleCandidate,
+    SubtitleCandidateValidationError,
 )
 from teddy_discovery_subtitle_text import (
     MAX_SUBTITLE_BYTES,
@@ -1150,12 +1151,23 @@ class SubtitleCatProvider:
                 )
             raise
 
-        return SubtitleCandidate.validated_external_text(
-            source_url,
-            dvd_id=dvd_id,
-            language=EXTERNAL_LANGUAGE_JA,
-            text_format="srt",
-        )
+        try:
+            return SubtitleCandidate.validated_external_text(
+                source_url,
+                dvd_id=dvd_id,
+                language=EXTERNAL_LANGUAGE_JA,
+                text_format="srt",
+            )
+        except SubtitleCandidateValidationError as error:
+            wrapped = SubtitleCatDetailError(
+                "Japanese subtitle candidate identity is invalid"
+            )
+            annotate_external_subtitle_error(
+                wrapped,
+                stage="detail_ja_link",
+                reason_code="JA_LINK_INVALID",
+            )
+            raise wrapped from error
 
     # Descriptive aliases for provider callers.
     locate_original_japanese_candidate = find_original_japanese_candidate
