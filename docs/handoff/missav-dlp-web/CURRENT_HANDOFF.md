@@ -31,19 +31,15 @@
 
 **P0 OPERATIONS BLOCKER → P1 ASR_ONLY/HYBRID ROOT CAUSE → P2 QUALITY WIRING/REGRESSION → P3 UNATTENDED E2E/PUBLISH → [P4 OPTIONAL SUPPLEMENTAL RESEARCH]**
 
-- **P0 운영 장애; 코드 체크포인트 완료, 운영 반영 대기:** 2026-10-12 09:10:17 KST
-  DANDYA-033의 `DANDYA/DANDYA-033/DANDYA-033.ts`에서 발생한
-  `FullTitleASRValidationError("canonical_video must identify a canonical MP4")`가
-  Stage12 `_is_title_exception`에 매핑되지 않아 systemic failure와 durable `RUNNING`을
-  남겼다. 코드 원인은 Normal Mode가 canonical holding 직후 MP4 형식을 검사하지 않아
-  ASR의 입력 형식 오류가 그대로 전파된 것이다. 구현 커밋
-  `70066f34f65e617e8c5d387038921f9695b541c5`는 canonical `.mp4` 검사를 ASR 전에
-  추가하고 `.ts`를 기존 `Stage11ControllerValidationError`로 실패시킨다. Stage12 분류기와
-  ASR validation 계약은 변경하지 않았다. 격리 DB/가짜 의존성 회귀는 PASS.
-  **이 checkpoint는 소스·오프라인 검증·Git 반영만 포함한다.** 운영 배포, timer/service 변경,
-  DB의 `RUNNING` 복구는 하지 않았다. 따라서 기존 운영 blocker 해소를 의미하지 않는다.
-  다음 P0 작업은 별도 운영 checkpoint에서 저장된 실패/무게시 evidence를 확인하고 기존
-  복구 절차로 해당 `RUNNING`만 정리한 뒤, 다음 작품 진행과 timer blockage 해소를 검증하는 것이다.
+- **P0 운영 복구/배포 완료; 후속 제목 실행 중:** 2026-10-12 운영 checkpoint에서
+  canonical `.ts` 검사를 포함한 `e4e0b05bee3550b0ba2734e71ccccb319e802864`를 배포했다.
+  Stage12 `recover_running("DANDYA-033")`로 해당 제목만 `RUNNING → PENDING`,
+  `CRASH_RECOVERY`, sequence 3으로 복구했고, 자연 timer가 이를 `FAILED_TERMINAL`,
+  sequence 5로 처리했다. Whisper/Hermes/NAS 게시/Jellyfin 인식은 실행되지 않았고
+  한국어 NAS 목적지는 없다. `FAILED_ACTIVE_STATE` 반복은 배포 후 관측되지 않았다.
+  다음 PENDING `DANDYA-049`도 자연 timer가 사용자 개입 없이 선택해 현재 `RUNNING`;
+  11:08:05 KST에는 ASR 입력 복사가 진행 중이었다. 이 작품의 번역·게시 완료는 미확정이다.
+  상세 증거는 아래 P0 operations checkpoint에 기록했다.
 - **P1:** 134 ASR_ONLY 보고서의 원인 유형을 증거 기준으로 구분. 외부 JA가 실제로
   유효한 작품의 HYBRID 선택/정렬/ASR 보조증거/모드결과가 운영 경로에서 보존되는지
   확인·최소 수정. JA 없거나 실패한 작품에 가짜 HYBRID를 강제하지 말고 명시적 상태를 남김.
@@ -122,6 +118,61 @@ The previous worktree `/opt/missav-pwa-subtitle-stage11` was left unchanged.
 This checkpoint made no production DB/NAS writes, deployment, timer/service
 changes, queue recovery, or long-running Hermes/Whisper calls. The known
 operational `RUNNING` blocker remains for the separate P0 operations checkpoint.
+
+
+## 2026-10-12 — Downloader Stage11 P0 operations recovery/deploy PASS
+
+Preflight was read-only. The protected worktree `/opt/missav-pwa-subtitle-stage11`
+remained at `b1bc851fdcf95642fa2ed1cd9ae3a0bf2a8ee3bc` with its original dirty
+file list. The clean source clone and GitHub branch both matched
+`e4e0b05bee3550b0ba2734e71ccccb319e802864`; deployed `current` and
+`runtime.env` matched the prior `dfa213762c94ec54671454f30c7f1c992bfcd835`.
+The Normal service had no process; its last state was `failed` from the expected
+`FAILED_ACTIVE_STATE` block. The timer was enabled/waiting. Stage12's global
+runner lock was available. Only DANDYA-033 was RUNNING/GENERATED, at sequence 2
+with reason `STAGE12_BATCH_START`; its only artifact was the saved failure
+record. Stage12 artifact/report/publication fields were null. Discovery and NAS
+both identified the regular source `DANDYA/DANDYA-033/DANDYA-033.ts` as
+6,571,739,656 bytes with mtime_ns `1791539419025119040`. The exact `.ko.srt`
+NAS destination was absent. CT120 had no DANDYA-related process or marker; two
+unrelated Normal Hermes temp roots had no DANDYA-033 reference. Deployment and
+rollback scripts were reviewed before changes.
+
+With only `teddy-subtitle-normal.timer` stopped and the Stage12 runner lock held,
+state/event sequence was rechecked. The existing
+`Stage12RolloutStateStore.recover_running("DANDYA-033")` produced
+`RUNNING → PENDING`, reason `CRASH_RECOVERY`, sequence 3. The other 188
+pre-existing titles/events retained protected SHA-256
+`534f6e63c9d656fb12721b39116ce5a5de274ecfc0af7b9b84c582de1752982a` immediately
+after recovery; no SQL update was used.
+
+Existing `deploy/stage11-normal/deploy.sh` deployed exact HEAD
+`e4e0b05bee3550b0ba2734e71ccccb319e802864`. Built-in production preflight
+PASSed (`ACTIVE_ROLLOUT_IDS=[]`, first selection DANDYA-033,
+`FIRST_SELECTION_NAS_PREFLIGHT=PASS`, `PRODUCTION_WRITES_TOTAL=0`). New detached
+release is clean; `current` and `runtime.env` match the target. The previous
+release/runtime/units/timer snapshot is retained at
+`/opt/missav-dlp-web/discovery/stage11-normal-deployment/backups/20261012-110635`.
+Timer is enabled and active.
+
+Natural timer evidence:
+- 11:06:56 KST selected and processed only DANDYA-033. Stage12 recorded
+  `FAILED_TERMINAL`, sequence 5, reason `STAGE12_TITLE_FAILURE`, error
+  `Stage11ControllerValidationError: normal mode requires canonical MP4 input`.
+  Result summary was failed_terminal=1 / published=0; artifact/report remain
+  null; NAS destination remains absent; Jellyfin was NOT_RUN. The new Normal
+  Mode guard runs before baseline ASR, so no Whisper, Hermes, or publication call
+  was made. `PUBLISHED=163` remained unchanged. The service completed successfully.
+- 11:07:40 KST selected the next PENDING title, DANDYA-049, without user action.
+  As of 11:08:05 KST it was `RUNNING`, sequence 2, and its normal ASR source copy
+  had started. The service was left running for the existing controller. Its
+  eventual translation/publication is not confirmed here. State activity after
+  recovery was limited to DANDYA-033, this expected DANDYA-049 selection, and
+  eight new holdings admitted by normal queue seeding across the two invocations.
+
+No rollback, other-title recovery, timer interval/policy change, existing
+subtitle mutation, or P1–P4 work occurred. Next work: allow DANDYA-049's current
+Normal runner to finish and then verify its final Stage12/NAS/Jellyfin state.
 
 
 ## 2026-10-12 — READ-ONLY 운영 반영 비교 감사: 부분 반영; 지속 무인 운영 INCOMPLETE
