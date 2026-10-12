@@ -1,5 +1,91 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — FINALIZED WORK PRIORITIES / NO-HUMAN NORMAL MODE (새 대화 최우선)
+
+**본 섹션은 10:06 감사 이후 사용자와 합의한 우선순위 정본이다.** 그 아래에 남은
+역사적 PASS/INCOMPLETE 항목은 당시 checkpoint 기록이며, 현재 상태를 대체하지 않는다.
+자막 관련 기존 품질 실험을 전부 운영에 연결했다고 가정하지 말 것.
+
+### 절대 변경하지 않는 목표/정책
+
+- 원래 목적: 과거 약200개 일괄 자막의 ASR_ONLY 편중 및 한국어 품질 저하를 해결.
+  현재 확인 가능한 bulk report **134개 모두 ASR_ONLY**, 그중 **96개 targeted ASR**.
+  ASR_ONLY 원인의 세부 유형은 **미확정**: 외부 JA 부재/검증 실패, 정렬 실패,
+  선택기/fallback/연결 오류를 실제 로그 및 소스에서 분리 조사한다.
+- 모든 작품 **동일 generic evidence-based** 정책. 제목·품번·cue 번호·특정 대사
+  하드코딩 금지. **USER_INTERVENTION=0**: 원음 청취, 전사·번역 수정, 사람 승인,
+  개별 작품 선택, 수동 재시도 요청은 **정상 운영 처리의 일부가 아님**.
+- Source priority와 deterministic(HYBRID/identity/affine/timing/absorption/
+  published artifact) + Whisper(불완전한 음성 증거) + Hermes(번역/문맥 의미 판단)
+  의 기존 역할 분담을 보존한다. 텍스트만 보고 공격적 삭제 금지.
+- 불확실한 보완 후보는 AMBIGUOUS/skip, 기존 정상 자막 보존. 사용자 확인 대기 없이
+  정상적으로 자동 종료. 선택적 누락 보완 불가가 기본 외부JA→KO 실패를 의미하지 않음.
+  **검증되지 않은 누락 대사 자동 삽입은 OFF 유지.** 안전성이 증명되지 않은 것을
+  정상 운영 PASS의 조건으로 무리하게 편입하지 않는다.
+- Codex는 구현/짧은 forensic/smoke에만 사용. 작품별 장시간 Hermes 대량 실행은
+  CT108 native runner/bridge/controller에서 직접 처리하고 Codex가 기다리지 않는다.
+- 파일·실행증거로 검증한 결과만 PASS. E2E 단발 성공과 운영 큐·NAS 게시 완료는 별도 판정.
+  원음 직접 청취를 다시 요청하지 말고 이전 사용자 시험 라벨은 평가 자료로만 보존.
+
+### 고정 진행 순서 (새 제안이 있어도 임의로 전환 금지)
+
+**P0 OPERATIONS BLOCKER → P1 ASR_ONLY/HYBRID ROOT CAUSE → P2 QUALITY WIRING/REGRESSION → P3 UNATTENDED E2E/PUBLISH → [P4 OPTIONAL SUPPLEMENTAL RESEARCH]**
+
+- **P0 즉시 다음 한 작업:** 2026-10-12 09:10:17 KST DANDYA-033의
+  `DANDYA/DANDYA-033/DANDYA-033.ts`에서 발생한
+  `FullTitleASRValidationError("canonical_video must identify a canonical MP4")`
+  가 Stage12의 `_is_title_exception` 처리에 매핑되지 않아 systemic failure로
+  전파, durable `RUNNING` 잔존, 5분 timer `FAILED_ACTIVE_STATE` 반복.
+  **기존 Normal/Stage12 예외 경계 최소 수정**으로 작품별 terminal error를
+  기록하게 하고, 저장된 실패/무게시 evidence를 확인한 뒤 **기존 복구 절차**로
+  고립된 RUNNING만 안전하게 정리한다. 무분별한 state SQL 수정/모든 실패 reset 금지.
+  다음 작품이 사용자 개입 없이 이어지고 timer blockage가 풀리는 것을 확인.
+- **P1:** 134 ASR_ONLY 보고서의 원인 유형을 증거 기준으로 구분. 외부 JA가 실제로
+  유효한 작품의 HYBRID 선택/정렬/ASR 보조증거/모드결과가 운영 경로에서 보존되는지
+  확인·최소 수정. JA 없거나 실패한 작품에 가짜 HYBRID를 강제하지 말고 명시적 상태를 남김.
+- **P2:** legacy fixed64 vs 실제 whole-title input(일괄 출력), original review/repair,
+  temporal/affine/source_index, absorption, targeted ASR, Hermes 의미 review 연결 확인.
+  FNS-247 품질 퇴행 예: 이전 repaired_ja4 → normal0,
+  ja-000007/ja-000242의 잘못된 번역 변화. 지난 개선 실험을 무조건 live 연결하지 말고
+  증거·품질 게이트를 통과한 최소 연결만 수행. 기존 JA313/KO296/absorption17 보존.
+- **P3:** 큐→직접 Hermes 번역→SRT→Stage12→NAS/Jellyfin의 여러 작품 무인 실행,
+  실패 격리, restart/resume, no-overwrite, state/heartbeat 및 실제 신규 PUBLISHED 확인.
+  기존 두 primary E2E(FNS KO300/JUR KO648)는 NAS 신규 게시를 증명하지 않음.
+- **P4 (기본 완료 차단 금지):** 524×20s core/5s pad, 2279 review candidates,
+  Reazon, YAMNet/Gemma 오디오 판별 연구는 개발 기록으로만 보존.
+  hallucination/비언어 발성을 신뢰성 있게 가르는 성능이 미입증이므로 auto insertion OFF.
+  사람 청취를 정상 운영에 요구하지 않음.
+
+### 현재 최신 사실 / 인프라 확인
+
+- 전 회차 **read-only audit 2026-10-12 10:06**, commit `91fe641`:
+  Normal whole-title/absorption E2E 적용은 확인; 지속 무인 운영은 **INCOMPLETE**.
+  legacy VAD/Whisper 운영, 524-core/Reazon/supplemental review는 실험만,
+  신규 누락 발화 최종 SRT 추가 **0**. FNS 296→300은 absorption17→13에 따른
+  순증4, 신규 발화 복구0; JUR 661→648은 absorption11+metadata2.
+  09:10 blocker 이후 배포 신규 PUBLISHED0; 당시 큐 counts
+  PUBLISHED163/UNRESOLVED10/FAILED_TERMINAL2/RUNNING1/PENDING13 (변동 가능).
+- Repo `ssikgun/missav-dlp-web`; branch `teddy-subtitle-stage11`;
+  worktree historically `/opt/missav-pwa-subtitle-stage11`.
+  Active detached release historically `dfa213762c94ec54671454f30c7f1c992bfcd835`,
+  `/opt/missav-dlp-web/discovery/stage11-normal-deployment/current`.
+  Server HEAD/worktree/deployment 상태는 매 새 대화에서 먼저 실제 확인한다.
+- CT108 downloader `192.168.1.155`, VM122 GPU Whisper `teddy@192.168.1.134:8091`,
+  CT120 Hermes `teddy@192.168.1.230`, NAS `192.168.1.201`,
+  Jellyfin `192.168.1.205:8096`. 비밀키/credential 출력 금지.
+- **GitHub에서 canonical handoff를 갱신하더라도 CT108 서버 worktree에 자동 반영되는
+  것은 아니다.** 서버에서 clean/status/HEAD/remote/deployment 확인 후 안전한
+  fast-forward만 수행. dirty 작업, detached release, 동시 작업을 보호하며
+  reset/force checkout 금지. 관련 없는 파일 건드리지 않는다.
+
+### 새 대화 첫 행동
+
+(1) 이 canonical handoff의 최상단 및 당시 live state 읽기;
+(2) CT108 Git/server timer, stage12-runtime/status.json, DANDYA failure log 읽기;
+(3) **P0만** 범위로 정해 원인 확인→최소 수정→bounded regression→운영 재개/증거;
+(4) handoff update→commit/push. **P0 완료 전 P1~P4로 갈아타지 말 것.**
+
+
 ## 2026-10-12 — READ-ONLY 운영 반영 비교 감사: 부분 반영; 지속 무인 운영 INCOMPLETE
 
 이번 감사는 저장된 로그·산출물·Git 및 실제 배포 소스, 읽기 전용 SQLite,
