@@ -31,15 +31,15 @@
 
 **P0 OPERATIONS BLOCKER → P1 ASR_ONLY/HYBRID ROOT CAUSE → P2 QUALITY WIRING/REGRESSION → P3 UNATTENDED E2E/PUBLISH → [P4 OPTIONAL SUPPLEMENTAL RESEARCH]**
 
-- **P0 운영 복구/배포 완료; 후속 제목 실행 중:** 2026-10-12 운영 checkpoint에서
-  canonical `.ts` 검사를 포함한 `e4e0b05bee3550b0ba2734e71ccccb319e802864`를 배포했다.
-  Stage12 `recover_running("DANDYA-033")`로 해당 제목만 `RUNNING → PENDING`,
+- **P0 운영 복구/배포 완료; 다음 PENDING도 자동 처리됨:** 운영은
+  `e4e0b05bee3550b0ba2734e71ccccb319e802864`를 실행 중이다. Stage12
+  `recover_running("DANDYA-033")`로 해당 제목만 `RUNNING → PENDING`,
   `CRASH_RECOVERY`, sequence 3으로 복구했고, 자연 timer가 이를 `FAILED_TERMINAL`,
-  sequence 5로 처리했다. Whisper/Hermes/NAS 게시/Jellyfin 인식은 실행되지 않았고
-  한국어 NAS 목적지는 없다. `FAILED_ACTIVE_STATE` 반복은 배포 후 관측되지 않았다.
-  다음 PENDING `DANDYA-049`도 자연 timer가 사용자 개입 없이 선택해 현재 `RUNNING`;
-  11:08:05 KST에는 ASR 입력 복사가 진행 중이었다. 이 작품의 번역·게시 완료는 미확정이다.
-  상세 증거는 아래 P0 operations checkpoint에 기록했다.
+  sequence 5로 처리했다. DANDYA-033의 Whisper/Hermes/게시/Jellyfin 호출은 없고
+  한국어 NAS 목적지도 없다. 자동 선택된 다음 PENDING `DANDYA-049`도 baseline ASR 후
+  외부 JA 후보 부재로 `FAILED_TERMINAL` 처리되어 큐에 고착되지 않았다.
+  `FAILED_ACTIVE_STATE` 반복은 배포 후 0회, 현재 활성 RUNNING/GENERATED는 0이다.
+  timer는 enabled/active이고 다음 PENDING은 DLDSS-536이다. 상세 증거는 아래 checkpoint에 기록했다.
 - **P1:** 134 ASR_ONLY 보고서의 원인 유형을 증거 기준으로 구분. 외부 JA가 실제로
   유효한 작품의 HYBRID 선택/정렬/ASR 보조증거/모드결과가 운영 경로에서 보존되는지
   확인·최소 수정. JA 없거나 실패한 작품에 가짜 HYBRID를 강제하지 말고 명시적 상태를 남김.
@@ -164,15 +164,21 @@ Natural timer evidence:
   Mode guard runs before baseline ASR, so no Whisper, Hermes, or publication call
   was made. `PUBLISHED=163` remained unchanged. The service completed successfully.
 - 11:07:40 KST selected the next PENDING title, DANDYA-049, without user action.
-  As of 11:08:05 KST it was `RUNNING`, sequence 2, and its normal ASR source copy
-  had started. The service was left running for the existing controller. Its
-  eventual translation/publication is not confirmed here. State activity after
-  recovery was limited to DANDYA-033, this expected DANDYA-049 selection, and
-  eight new holdings admitted by normal queue seeding across the two invocations.
+  Its baseline ASR artifact was created; it then failed terminally at sequence 3
+  because external JA was `NO_CANDIDATE` (`Stage11ControllerValidationError`).
+  The natural service completed successfully at 11:13:16 KST with
+  `failed_terminal=1` / `published=0`; Hermes and publication were not reached.
+  Both DANDYA-033 and DANDYA-049 Korean NAS destinations remain absent.
+- At the latest audit, counts were FAILED_TERMINAL=4, PENDING=20, PUBLISHED=163,
+  UNRESOLVED=10, RUNNING/GENERATED=0. PUBLISHED stayed 163; there were no
+  `FAILED_ACTIVE_STATE` occurrences after deployment. State activity after recovery
+  was limited to the two intended DANDYA transitions and eight new-title inventory
+  seeds. Other pre-existing title states remained unchanged. Timer remains
+  enabled/active; next scheduled run is 11:18:16 KST and next PENDING is DLDSS-536.
 
 No rollback, other-title recovery, timer interval/policy change, existing
-subtitle mutation, or P1–P4 work occurred. Next work: allow DANDYA-049's current
-Normal runner to finish and then verify its final Stage12/NAS/Jellyfin state.
+subtitle mutation, or P1–P4 work occurred. Next work: observe the natural
+DLDSS-536 timer cycle and verify its final Stage12/NAS/Jellyfin state.
 
 
 ## 2026-10-12 — READ-ONLY 운영 반영 비교 감사: 부분 반영; 지속 무인 운영 INCOMPLETE
