@@ -442,6 +442,38 @@ def detail_redirect_smoke(check):
         else: raise AssertionError('payload response URL')
     check('PAYLOAD_FINAL_URL_EXACT_REQUIRED', True)
 
+    # A valid original-JA href can be an IRI. Send its UTF-8 URI form while
+    # retaining the exact Unicode source identity in the accepted payload.
+    raw_source_url = 'https://www.subtitlecat.com/subs/1/日本語-ja.srt'
+    encoded_source_url = (
+        'https://www.subtitlecat.com/subs/1/'
+        '%E6%97%A5%E6%9C%AC%E8%AA%9E-ja.srt'
+    )
+    detail_url = 'https://www.subtitlecat.com/subs/1/generic.html'
+    srt_bytes = '1\n00:00:00,000 --> 00:00:00,100\n日本語\n'.encode('utf-8')
+    sent_urls = []
+    provider = deployment.build_subtitlecat_provider(
+        fetch_detail=lambda _url: SubtitleCatDetailPage(
+            final_url=detail_url,
+            html='<html><a href="日本語-ja.srt">Japanese</a></html>',
+        ),
+        timeout=1,
+    )
+    def open_payload(request, **_kwargs):
+        sent_urls.append(request.full_url)
+        return Response(request.full_url, payload=srt_bytes)
+    with patch.object(deployment.urllib_request, 'build_opener',
+                      return_value=SimpleNamespace(open=open_payload)):
+        payload = provider.fetch_original_japanese_payload(
+            dvd_id='GEN-123', detail_url=detail_url,
+        )
+    check('PAYLOAD_UNICODE_PATH_IS_UTF8_PERCENT_ENCODED',
+          sent_urls == [encoded_source_url])
+    check('PAYLOAD_UNICODE_SOURCE_ID_AND_SRT_VALIDATION_PRESERVED',
+          payload.source_url == raw_source_url
+          and payload.candidate.external_source_id == raw_source_url
+          and payload.payload == srt_bytes
+          and len(payload.parse().cues) == 1)
 
 def main():
     passed = 0

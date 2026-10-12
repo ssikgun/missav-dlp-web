@@ -1,5 +1,75 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — Stage11 P1-C Unicode JA source URL transport defect
+
+**One generic defect was reproduced and fixed; attribution of the historical
+67 failures remains INCOMPLETE.** Work started from GitHub HEAD
+`8dfbca4a8a8dfadbfa987095b3817850ae3fd652`. Production still points to
+`e4e0b05bee3550b0ba2734e71ccccb319e802864`. The Normal timer remains
+`inactive/disabled`; its service remains inactive. No deployment, queue/DB
+change, subtitle write, Hermes/Whisper run or publication was performed.
+
+### Historical evidence and limits
+
+The existing 134-report census was reused, not rerun. All 134 remain
+`ASR_ONLY`; 67 report `VALIDATION_FAILURE`. Those 67 artifact directories
+contain only their Stage12 report, baseline ASR and completed SRT: no retained
+SubtitleCat response, external JA payload, per-stage diagnostic or detailed
+Normal failure record. Their original individual causes cannot be recovered.
+The older 161/162 and 51-title current-candidate results were also reused; no
+catalog rescreen was run. That 51-title evidence recorded IPZZ-340 candidate 3
+as `INDETERMINATE` after a Unicode URL encoding exception. The old bulk report
+for IPZZ-340 still does not identify its exact historical failure stage.
+
+### Confirmed current defect
+
+Gluetun was `running/healthy`; its existing `8888/tcp` mapping was bound only
+to `127.0.0.1:58888`, with a loopback listener present. A bounded IPZZ-340
+check used that explicit proxy only: one search GET returned HTTP 200 and five
+candidates, including the same saved candidate; its detail GET succeeded and
+yielded an original-JA SRT link. The link path contained raw Unicode. Before
+the fix, the payload path passed that URL unchanged to `urllib`; the resulting
+`ExternalSubtitleTransportError` had `UnicodeEncodeError` as its cause, before
+the SRT GET could be issued. This is a generic IRI-to-URI transport defect. In
+multi-candidate selection it made that candidate indeterminate and could
+block selection of a different unique accepted candidate.
+
+`_http_bytes()` now UTF-8 percent-encodes raw non-ASCII path/query characters
+for the outbound ASCII request URI. The retained candidate/source URL remains
+unchanged, as do payload bytes/hash, SRT parsing, HTTP bounds, proxy use and
+redirect rejection. The exact-response check now compares against the encoded
+request URI. No acceptance threshold, source classifier, candidate-selection
+rule or HYBRID gate changed.
+
+After the fix, a single bounded detail/payload check through the same proxy
+fetched 59,963 bytes; the SRT parser accepted 909 cues. Alignment against the
+saved matching-title baseline returned `UNRESOLVED` with 19 anchors / 19
+inliers and `INSUFFICIENT_ANCHOR_COUNT` plus `INSUFFICIENT_INLIER_COUNT`. The
+candidate therefore remains safely rejected for HYBRID. This confirms the
+transport fix without claiming that IPZZ-340's old report had this exact cause.
+Search and detail succeeded in this representative check; no defect was
+observed in those two stages.
+
+### Validation and remaining unknowns
+
+The deployment smoke passed 51 checks, including fake-provider proof that a
+Unicode JA link is percent-encoded for the request while original source
+identity and SRT validation remain intact. Live-adapter HYBRID regression,
+SubtitleCat external parsing (183 checks), discovery (63), proxy (6), and
+alignment/acceptance/application/limit/streaming smoke suites passed. The
+existing selection and alignment policies still reject unresolved evidence.
+
+The specific cause of the original IPZZ-340 bulk report, and the exact causes
+of the other 66 `VALIDATION_FAILURE` reports, remain `UNKNOWN` because their
+historical response and stage evidence was not persisted. P1-B diagnostics are
+still not in production `e4e0b05b`. This checkpoint does not establish P1 as
+fully complete; the code fix is not deployed, and no other candidate was
+retried or rescanned.
+
+**Next action:** Teddy decides whether this one confirmed generic fix is enough
+to close P1-C, or whether another explicitly bounded evidence sample is needed.
+Keep the timer disabled and do not start P2/P3 work in this checkpoint.
+
 ## 2026-10-12 — Stage11 P2-C Normal CLI registry connection / real NumPy checks
 
 **Code and offline verification: PASS. This checkpoint did not deploy.** The

@@ -23,7 +23,7 @@ import subprocess
 from types import SimpleNamespace
 from urllib import error as urllib_error
 from urllib import request as urllib_request
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from teddy_discovery_alignment_application import (
     AlignmentAcceptanceApplicationResult,
@@ -348,14 +348,35 @@ def _http_bytes(
         raise annotate_external_subtitle_error(ExternalSubtitleTransportError(
             "SubtitleCat transport requires an HTTP(S) URL"
         ), stage="ja_srt_download", reason_code="SRT_URL_INVALID")
-    request = urllib_request.Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 Teddy-Downloader-SubtitleDiscovery/1.0",
-            "Accept": "text/html,application/x-subrip,text/plain,*/*",
-        },
-        method="GET",
-    )
+    try:
+        # Keep the candidate's Unicode URL as its source identity, but send a
+        # standards-compliant ASCII URI to urllib. ``safe`` preserves existing
+        # delimiters and percent escapes, so only raw non-ASCII path/query
+        # characters are UTF-8 percent-encoded.
+        request_url = urlunsplit((
+            parsed.scheme,
+            parsed.netloc,
+            quote(parsed.path, safe="/%:@!$&'()*+,;=-._~%"),
+            quote(parsed.query, safe="/?%:@!$&'()*+,;=-._~"),
+            parsed.fragment,
+        ))
+        request_url.encode("ascii")
+        request = urllib_request.Request(
+            request_url,
+            headers={
+                "User-Agent": "Mozilla/5.0 Teddy-Downloader-SubtitleDiscovery/1.0",
+                "Accept": "text/html,application/x-subrip,text/plain,*/*",
+            },
+            method="GET",
+        )
+    except UnicodeError as error:
+        wrapped = ExternalSubtitleTransportError(
+            "SubtitleCat request URL cannot be encoded safely"
+        )
+        annotate_external_subtitle_error(
+            wrapped, stage="ja_srt_download", reason_code="SRT_URL_ENCODING"
+        )
+        raise wrapped from error
     handlers = []
     if proxy_url is not None:
         handlers.append(
@@ -378,7 +399,7 @@ def _http_bytes(
                     reason_code="SRT_HTTP_STATUS",
                     http_status=status if type(status) is int else None,
                 )
-            if final_url != url:
+            if final_url != request_url:
                 raise annotate_external_subtitle_error(
                     ExternalSubtitleTransportError(
                         "SubtitleCat redirect is not permitted"
