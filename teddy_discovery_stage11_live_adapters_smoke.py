@@ -30,11 +30,12 @@ from teddy_discovery_stateful_hybrid import prepare_stateful_hybrid
 from teddy_discovery_subtitle_source_quality import classify_source_document
 from teddy_discovery_subtitle_v2_orchestrator import SubtitleV2RouteDecision, V2_READY_FOR_SEMANTIC
 from teddy_discovery_subtitlecat_discovery import (
-    SubtitleCatDiscovery, SubtitleCatSearchResponse,
+    SubtitleCatDiscovery, SubtitleCatSearchError, SubtitleCatSearchResponse,
+    SubtitleCatSearchTransportError,
 )
 from teddy_discovery_subtitle_external import (
     SubtitleCatProvider, SubtitleCatDetailPage, ExternalSubtitleTransportError,
-    ExternalSubtitleValidationError,
+    ExternalSubtitleValidationError, SubtitleCatDetailError,
 )
 from teddy_discovery_alignment_acceptance import AlignmentAcceptancePolicy
 from teddy_discovery_quality_review_session_smoke import FakeNativeSessionDB
@@ -144,10 +145,36 @@ def multicandidate_smoke(baseline, policy):
         adapter = adapters.build_external_ja_adapter(discovery=discovery,
             provider=SimpleNamespace(fetch_original_japanese_payload=fetch),
             acceptance_policy=changed_policy, residual_threshold_ms=100)
+        diagnostic = {}
         with patch.object(adapters, 'generate_monotonic_anchor_candidates', side_effect=anchors):
-            try: result = adapter(video, baseline)
+            try:
+                result = adapter(video, baseline, diagnostic_out=diagnostic)
+            except Exception:
+                assert diagnostic['candidate_count'] == len(names)
+                if 'distinct' in names:
+                    assert diagnostic['reason_code'] == 'ACCEPTED_CANDIDATE_CONFLICT'
+                    assert diagnostic['accepted_candidate_count'] == 2
+                elif any(name in names for name in
+                         ('limit', 'ambiguity', 'transport', 'incomplete',
+                          'identity', 'malformed-state')):
+                    assert diagnostic['reason_code'] == 'CANDIDATE_EVALUATION_INDETERMINATE'
+                    assert diagnostic['candidate_failures']
+                raise
             finally:
                 assert calls == (names if len(names) == 1 else sorted(names))
+        assert diagnostic['candidate_count'] == len(names)
+        if result is None:
+            assert diagnostic['reason_code'] == 'NO_ACCEPTED_CANDIDATE'
+            assert sum(item['count'] for item in diagnostic['candidate_failures']) <= len(names)
+        elif result.decision.verdict == 'UNRESOLVED':
+            assert diagnostic['reason_code'] == 'HYBRID_UNRESOLVED'
+            assert diagnostic['accepted_candidate_count'] == 0
+        elif result.decision.verdict == 'REJECT_EXTERNAL':
+            assert diagnostic['reason_code'] == 'HYBRID_REJECTED'
+            assert diagnostic['accepted_candidate_count'] == 0
+        else:
+            assert diagnostic['reason_code'] == 'HYBRID_ACCEPTED'
+            assert diagnostic['accepted_candidate_count'] >= 1
         return result
 
     assert execute(['accept']).decision.verdict == 'ACCEPT_HYBRID'
@@ -225,8 +252,21 @@ def main():
         external = adapters.build_external_ja_adapter(discovery=discovery(True),
             provider=provider, acceptance_policy=policy, residual_threshold_ms=100)
         multicandidate_smoke(baseline, policy)
-        accepted = external(fixture.fixture.holding(), baseline)
+        external_diagnostic = {}
+        accepted = external(fixture.fixture.holding(), baseline,
+                            diagnostic_out=external_diagnostic)
         assert accepted.decision.verdict == "ACCEPT_HYBRID"
+        assert external_diagnostic == {
+            'schema_version': 1, 'stage': 'hybrid', 'reason_code': 'HYBRID_ACCEPTED',
+            'candidate_count': 1, 'http_status': None,
+            'accepted_candidate_count': 1, 'candidate_failures': []}
+        route_diagnostic = {}
+        routed = fixture.controller._select_route(
+            fixture.fixture.holding(), baseline, external,
+            diagnostic_out=route_diagnostic)
+        assert routed[0].route == 'HYBRID'
+        assert route_diagnostic['reason_code'] == 'HYBRID_ACCEPTED'
+        print("PASS safe external JA diagnostic through normal route selection")
 
         malformed_provider = SubtitleCatProvider(
             fetch_detail=lambda url: SubtitleCatDetailPage(
@@ -248,22 +288,99 @@ def main():
                 residual_threshold_ms=100,
             )(fixture.fixture.holding(), baseline),
         )
+        invalid_adapter = adapters.build_external_ja_adapter(
+            discovery=discovery(True), provider=malformed_provider,
+            acceptance_policy=policy, residual_threshold_ms=100)
+        invalid_diagnostic = {}
+        expect(ExternalSubtitleValidationError,
+            lambda: invalid_adapter(fixture.fixture.holding(), baseline,
+                                    diagnostic_out=invalid_diagnostic))
+        assert invalid_diagnostic['stage'] == 'ja_srt_content'
+        assert invalid_diagnostic['reason_code'] == 'SRT_CONTENT_INVALID'
         print("PASS malformed immutable external payload maps to validation failure")
-        assert adapters.build_external_ja_adapter(discovery=discovery(False),
+        empty_adapter = adapters.build_external_ja_adapter(discovery=discovery(False),
             provider=provider, acceptance_policy=policy,
-            residual_threshold_ms=100)(fixture.fixture.holding(), baseline) is None
+            residual_threshold_ms=100)
+        empty_diagnostic = {}
+        assert empty_adapter(fixture.fixture.holding(), baseline,
+                             diagnostic_out=empty_diagnostic) is None
+        assert empty_diagnostic['reason_code'] == 'SEARCH_NO_CANDIDATES'
+        challenged = adapters.build_external_ja_adapter(
+            discovery=SubtitleCatDiscovery(fetch=lambda req, timeout:
+                SubtitleCatSearchResponse(200, req.full_url,
+                    b'<html>Verify you are human</html>')),
+            provider=provider, acceptance_policy=policy,
+            residual_threshold_ms=100)
+        challenged_diagnostic = {}
+        assert challenged(fixture.fixture.holding(), baseline,
+                          diagnostic_out=challenged_diagnostic) is None
+        assert challenged_diagnostic['reason_code'] == 'SEARCH_BLOCK_PAGE'
+        assert challenged_diagnostic['http_status'] == 200
+        denied = adapters.build_external_ja_adapter(
+            discovery=SubtitleCatDiscovery(fetch=lambda req, timeout:
+                SubtitleCatSearchResponse(403, req.full_url, b'')),
+            provider=provider, acceptance_policy=policy,
+            residual_threshold_ms=100)
+        denied_diagnostic = {}
+        expect(SubtitleCatSearchTransportError,
+            lambda: denied(fixture.fixture.holding(), baseline,
+                           diagnostic_out=denied_diagnostic))
+        assert denied_diagnostic['reason_code'] == 'SEARCH_HTTP_STATUS'
+        assert denied_diagnostic['http_status'] == 403
+        print("PASS empty, blocked and HTTP-error search diagnostics")
+        missing_detail_provider = SubtitleCatProvider(
+            fetch_detail=lambda url: SubtitleCatDetailPage(url, '<html></html>'),
+            payload_fetcher=lambda candidate: b'not reached')
+        missing_detail = adapters.build_external_ja_adapter(
+            discovery=discovery(True), provider=missing_detail_provider,
+            acceptance_policy=policy, residual_threshold_ms=100)
+        missing_detail_diagnostic = {}
+        expect(SubtitleCatDetailError,
+            lambda: missing_detail(fixture.fixture.holding(), baseline,
+                                   diagnostic_out=missing_detail_diagnostic))
+        assert missing_detail_diagnostic['reason_code'] == 'JA_LINK_MISSING'
+        failed_payload_provider = SubtitleCatProvider(
+            fetch_detail=lambda url: SubtitleCatDetailPage(
+                url, '<html><a href="test-ja.srt">Japanese</a></html>'),
+            payload_fetcher=lambda candidate: (_ for _ in ()).throw(
+                ExternalSubtitleTransportError('synthetic download failure')))
+        failed_payload = adapters.build_external_ja_adapter(
+            discovery=discovery(True), provider=failed_payload_provider,
+            acceptance_policy=policy, residual_threshold_ms=100)
+        failed_payload_diagnostic = {}
+        expect(ExternalSubtitleTransportError,
+            lambda: failed_payload(fixture.fixture.holding(), baseline,
+                                   diagnostic_out=failed_payload_diagnostic))
+        assert failed_payload_diagnostic['stage'] == 'ja_srt_download'
+        print("PASS detail JA-link and SRT-download stage diagnostics")
         for changed, verdict in ((replace(policy, minimum_anchor_count=4), "UNRESOLVED"),
                                  (replace(policy, minimum_scale=1.01), "REJECT_EXTERNAL")):
-            application = adapters.build_external_ja_adapter(discovery=discovery(True),
+            verdict_adapter = adapters.build_external_ja_adapter(discovery=discovery(True),
                 provider=provider, acceptance_policy=changed,
-                residual_threshold_ms=100)(fixture.fixture.holding(), baseline)
+                residual_threshold_ms=100)
+            verdict_diagnostic = {}
+            application = verdict_adapter(fixture.fixture.holding(), baseline,
+                                          diagnostic_out=verdict_diagnostic)
             assert application.decision.verdict == verdict
+            assert verdict_diagnostic['reason_code'] == (
+                'HYBRID_UNRESOLVED' if verdict == 'UNRESOLVED' else 'HYBRID_REJECTED')
         def broken(**kwargs):
             raise ExternalSubtitleTransportError("offline failure")
         expect(ExternalSubtitleTransportError, lambda:
             adapters.build_external_ja_adapter(discovery=SimpleNamespace(discover=broken),
                 provider=provider, acceptance_policy=policy,
                 residual_threshold_ms=100)(fixture.fixture.holding(), baseline))
+        def systemic(**kwargs):
+            raise RuntimeError('offline synthetic configuration failure')
+        systemic_adapter=adapters.build_external_ja_adapter(
+            discovery=SimpleNamespace(discover=systemic),provider=provider,
+            acceptance_policy=policy,residual_threshold_ms=100)
+        systemic_diagnostic={}
+        expect(RuntimeError,lambda:fixture.controller._select_route(
+            fixture.fixture.holding(),baseline,systemic_adapter,
+            diagnostic_out=systemic_diagnostic))
+        assert systemic_diagnostic['stage']=='system'
+        assert systemic_diagnostic['reason_code']=='SYSTEMIC_FAILURE'
         for exception in (ExternalSubtitleValidationError, RuntimeError):
             def fail(**kwargs):
                 raise exception('must propagate')
@@ -369,6 +486,17 @@ def main():
                 claim_token=7, **asdict(deps))
             assert completed.route == route and completed.clean_path.is_file()
             assert completed.report_path.is_file() and transport.baseline_calls == before
+            diagnostic_files = list((artifacts / fixture.TITLE).glob(
+                'external-ja-diagnostic-*.json'))
+            assert len(diagnostic_files) == 1
+            diagnostic_raw = diagnostic_files[0].read_bytes()
+            diagnostic = __import__('json').loads(diagnostic_raw)
+            assert diagnostic['reason_code'] == (
+                'HYBRID_ACCEPTED' if route == 'HYBRID' else 'SEARCH_NO_CANDIDATES')
+            assert candidate_url.encode() not in diagnostic_raw
+            assert fixture.TITLE.encode() not in diagnostic_raw
+            assert not any(segment.text.encode() in diagnostic_raw
+                           for segment in baseline.segments)
             assert ('asr' if route == 'ASR_ONLY' else 'hybrid') in calls
             if route == 'HYBRID':
                 assert len(sessions.create_calls) == 1

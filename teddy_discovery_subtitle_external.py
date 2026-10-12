@@ -117,6 +117,54 @@ class SubtitleCatDetailError(ExternalSubtitleValidationError):
     """Raised when a SubtitleCat detail page has no safe unique JA source."""
 
 
+def annotate_external_subtitle_error(
+    error: BaseException,
+    *,
+    stage: str,
+    reason_code: str,
+    http_status: int | None = None,
+) -> BaseException:
+    """Attach bounded diagnostic identifiers without changing the error."""
+
+    if (
+        type(stage) is not str
+        or re.fullmatch(r"[a-z][a-z0-9_]{0,39}", stage) is None
+        or type(reason_code) is not str
+        or re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", reason_code) is None
+        or (
+            http_status is not None
+            and (type(http_status) is not int or not 100 <= http_status <= 599)
+        )
+    ):
+        return error
+    try:
+        error._stage11_external_ja_diagnostic = (stage, reason_code, http_status)
+    except Exception:
+        pass
+    return error
+
+
+def external_subtitle_error_diagnostic(error: BaseException):
+    """Return a defensive copy of known safe diagnostic metadata, if any."""
+
+    value = getattr(error, "_stage11_external_ja_diagnostic", None)
+    if type(value) is not tuple or len(value) != 3:
+        return None
+    stage, reason_code, status = value
+    if (
+        type(stage) is not str
+        or re.fullmatch(r"[a-z][a-z0-9_]{0,39}", stage) is None
+        or type(reason_code) is not str
+        or re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", reason_code) is None
+        or (
+            status is not None
+            and (type(status) is not int or not 100 <= status <= 599)
+        )
+    ):
+        return None
+    return {"stage": stage, "reason_code": reason_code, "http_status": status}
+
+
 def _has_control_or_whitespace(value: str) -> bool:
     return any(
         character.isspace()
@@ -926,9 +974,9 @@ def find_subtitlecat_original_japanese_srt_url(
         if _GENERATED_EVIDENCE_RE.search(
             _record_evidence(record)
         ) is not None:
-            raise SubtitleCatDetailError(
+            raise annotate_external_subtitle_error(SubtitleCatDetailError(
                 "Japanese subtitle link is not an unambiguous original"
-            )
+            ), stage="detail_ja_link", reason_code="JA_LINK_NOT_ORIGINAL")
 
         try:
             absolute_url = urljoin(final_url, href)
@@ -946,14 +994,14 @@ def find_subtitlecat_original_japanese_srt_url(
         matches.add(absolute_url)
 
     if not matches:
-        raise SubtitleCatDetailError(
+        raise annotate_external_subtitle_error(SubtitleCatDetailError(
             "detail page has no safe original Japanese SRT link"
-        )
+        ), stage="detail_ja_link", reason_code="JA_LINK_MISSING")
 
     if len(matches) != 1:
-        raise SubtitleCatDetailError(
+        raise annotate_external_subtitle_error(SubtitleCatDetailError(
             "detail page has ambiguous original Japanese SRT links"
-        )
+        ), stage="detail_ja_link", reason_code="JA_LINK_AMBIGUOUS")
 
     return next(iter(matches))
 
@@ -1055,18 +1103,52 @@ class SubtitleCatProvider:
 
         try:
             response = self.fetch_detail(requested_url)
-        except ExternalSubtitleError:
+        except ExternalSubtitleError as error:
+            if external_subtitle_error_diagnostic(error) is None:
+                stage = "detail_http" if isinstance(
+                    error, ExternalSubtitleTransportError
+                ) else "detail_page"
+                reason_code = (
+                    "DETAIL_TRANSPORT_FAILURE"
+                    if stage == "detail_http"
+                    else "DETAIL_RESPONSE_INVALID"
+                )
+                annotate_external_subtitle_error(
+                    error, stage=stage, reason_code=reason_code
+                )
             raise
         except Exception as error:
-            raise ExternalSubtitleTransportError(
+            wrapped = ExternalSubtitleTransportError(
                 "injected SubtitleCat detail fetch failed"
-            ) from error
+            )
+            annotate_external_subtitle_error(
+                wrapped, stage="detail_http", reason_code="DETAIL_TRANSPORT_FAILURE"
+            )
+            raise wrapped from error
 
-        page = _coerce_detail_page(response)
-        source_url = find_subtitlecat_original_japanese_srt_url(
-            page.html,
-            page.final_url,
-        )
+        try:
+            page = _coerce_detail_page(response)
+        except SubtitleCatDetailError as error:
+            if external_subtitle_error_diagnostic(error) is None:
+                annotate_external_subtitle_error(
+                    error,
+                    stage="detail_page",
+                    reason_code="DETAIL_RESPONSE_INVALID",
+                )
+            raise
+        try:
+            source_url = find_subtitlecat_original_japanese_srt_url(
+                page.html,
+                page.final_url,
+            )
+        except SubtitleCatDetailError as error:
+            if external_subtitle_error_diagnostic(error) is None:
+                annotate_external_subtitle_error(
+                    error,
+                    stage="detail_ja_link",
+                    reason_code="JA_LINK_INVALID",
+                )
+            raise
 
         return SubtitleCandidate.validated_external_text(
             source_url,
@@ -1109,10 +1191,26 @@ class SubtitleCatProvider:
             dvd_id=dvd_id,
             detail_url=detail_url,
         )
-        return self.fetch_payload(
-            dvd_id=dvd_id,
-            candidate=candidate,
-        )
+        try:
+            return self.fetch_payload(
+                dvd_id=dvd_id,
+                candidate=candidate,
+            )
+        except ExternalSubtitleError as error:
+            if external_subtitle_error_diagnostic(error) is None:
+                if isinstance(error, ExternalSubtitleTransportError):
+                    annotate_external_subtitle_error(
+                        error,
+                        stage="ja_srt_download",
+                        reason_code="SRT_DOWNLOAD_FAILURE",
+                    )
+                else:
+                    annotate_external_subtitle_error(
+                        error,
+                        stage="ja_srt_content",
+                        reason_code="SRT_CONTENT_INVALID",
+                    )
+            raise
 
     def fetch_original_japanese_document(
         self,

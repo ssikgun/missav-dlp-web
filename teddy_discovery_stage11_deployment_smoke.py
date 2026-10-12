@@ -8,6 +8,7 @@ smoke cannot send Hermes/Whisper requests or create a remote session.
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -662,6 +663,14 @@ def main():
             and completed_asr.report_path.is_file()
             and not asr_bridge.launch_calls,
         )
+        asr_diagnostics = list((root / "asr-e2e" / "artifacts" /
+            controller_fixture.TITLE).glob("external-ja-diagnostic-*.json"))
+        check(
+            "ASR_ONLY_EXTERNAL_DIAGNOSTIC_REACHES_DEPLOYMENT_WRAPPER",
+            len(asr_diagnostics) == 1
+            and json.loads(asr_diagnostics[0].read_bytes())["reason_code"]
+            == "SEARCH_NO_CANDIDATES",
+        )
         check(
             "ASR_REVIEW_FRESH_SESSION_WIRING",
             asr_runtime.first_pass_calls == 1
@@ -687,6 +696,14 @@ def main():
             and completed_hybrid.clean_path.is_file()
             and completed_hybrid.report_path.is_file()
             and len(hybrid_bridge.launch_calls) == 1,
+        )
+        hybrid_diagnostics = list((hybrid_root / "artifacts" /
+            controller_fixture.TITLE).glob("external-ja-diagnostic-*.json"))
+        check(
+            "HYBRID_EXTERNAL_DIAGNOSTIC_REACHES_DEPLOYMENT_WRAPPER",
+            len(hybrid_diagnostics) == 1
+            and json.loads(hybrid_diagnostics[0].read_bytes())["reason_code"]
+            == "HYBRID_ACCEPTED",
         )
         check(
             "HYBRID_FRESH_SESSION_AND_ORIGINALS",

@@ -1,5 +1,42 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — Stage11 P1-B external JA failure diagnostics
+
+**Code and offline verification: PASS. Operations remain paused.** The change is
+not deployed. `teddy-subtitle-normal.timer` remains `inactive/disabled`; the
+Normal service is inactive with `MainPID=0`. The current deployment pointer
+still targets `e4e0b05bee3550b0ba2734e71ccccb319e802864`.
+
+- The SubtitleCat path now provides stable, body-free diagnostics for search
+  HTTP/response outcomes, zero candidates and recognized challenge pages;
+  detail HTTP and JA-link extraction; JA SRT download and content validation;
+  alignment validation/limits/no consensus; and HYBRID accept, reject, or
+  unresolved verdicts.
+- Each attempt records a private content-addressed
+  `external-ja-diagnostic-<sha256>.json` sidecar with stage, reason code,
+  candidate counts, HTTP status, and grouped per-candidate failures. It omits
+  URLs, title identifiers, subtitle text, and response bodies. Existing Stage11
+  report fields remain unchanged.
+- Multiple candidates now retain the distinction between indeterminate
+  evaluation, distinct accepted-content conflict, and no accepted candidate.
+  Existing error classes, outcome mapping, candidate choice, stable ordering,
+  ASR_ONLY fallback behavior, Normal Mode HYBRID gate, and alignment quality
+  policy are unchanged. A recognized HTTP 200 challenge remains the existing
+  no-candidate result; only its diagnostic code differs.
+- No cause was backfilled into the 67 historical `VALIDATION_FAILURE` records.
+  Those records did not persist the failing stage; the new fields apply to
+  future executions only.
+- Offline tests used fake HTTP responses and temporary artifacts. Stage11 live
+  adapter, Normal Mode (14 tests), controller (106 checks), deployment (49
+  checks), subtitle external (183 checks), SubtitleCat discovery (63 checks),
+  Stage12 bulk runner, and Stage12 batch smoke tests all passed. No production
+  SubtitleCat request, Whisper, Hermes, translation, database, NAS, or Jellyfin
+  action was performed.
+- The protected dirty worktree `/opt/missav-pwa-subtitle-stage11` remains
+  untouched. This checkpoint ends at code, offline verification, and Git
+  canonicalization; do not deploy or re-enable the timer until Teddy reviews
+  the diagnostics and separately authorizes operational resumption.
+
 ## 2026-10-12 — Normal automation paused / P1-A initial findings
 
 **Current state: INCOMPLETE.** The Normal timer is disabled and inactive. Keep it

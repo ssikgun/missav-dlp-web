@@ -12,9 +12,12 @@ from unittest.mock import patch
 
 import teddy_discovery_stage11_normal_mode as normal
 import teddy_discovery_stage11_controller_smoke as fixture
+import teddy_discovery_stage11_live_adapters as live_adapters
 from teddy_discovery_alignment_acceptance_smoke import policy_with
 from teddy_discovery_stateful_translator import StatefulAbsorptionResult, StatefulCueOutput
 from teddy_discovery_stage11_deployment import Stage11DeploymentTransportError
+from teddy_discovery_subtitle_external import SubtitleCatProvider, SubtitleCatDetailPage
+from teddy_discovery_subtitlecat_discovery import SubtitleCatDiscovery, SubtitleCatSearchResponse
 
 
 class NormalSmoke(unittest.TestCase):
@@ -89,6 +92,52 @@ class NormalSmoke(unittest.TestCase):
             self.run_title(external_ja_attempt=lambda *_:None)
         self.assertEqual(len(list(self.artifacts.glob('*/normal-failure-*.json'))),1)
         self.assertFalse(list(self.artifacts.glob('*/clean-ko-v1.srt')))
+
+    def test_safe_hybrid_diagnostic_sidecar_is_written(self):
+        detail_url='https://subtitlecat.com/subs/1/diagnostic-test.html'
+        discovery=SubtitleCatDiscovery(fetch=lambda request,timeout: SubtitleCatSearchResponse(
+            200,request.full_url,('<html><a href="'+detail_url+'">'
+                +fixture.TITLE+'</a></html>').encode()))
+        provider=SubtitleCatProvider(
+            fetch_detail=lambda url:SubtitleCatDetailPage(url,
+                '<html><a href="diagnostic-ja.srt">Japanese</a></html>'),
+            payload_fetcher=lambda candidate:fixture.fixture.srt_bytes(tuple(
+                (segment.start_ms,segment.end_ms,segment.text)
+                for segment in self.baseline.segments)))
+        attempt=live_adapters.build_external_ja_adapter(discovery=discovery,
+            provider=provider,acceptance_policy=policy_with(),residual_threshold_ms=100)
+        with patch.object(live_adapters,'_align_external_payload',
+                return_value=self.route.alignment_application):
+            result=self.run_title(external_ja_attempt=attempt)
+        self.assertTrue(result.clean_path.is_file())
+        sidecars=list(result.report_path.parent.glob('external-ja-diagnostic-*.json'))
+        self.assertEqual(len(sidecars),1)
+        raw=sidecars[0].read_bytes(); diagnostic=json.loads(raw)
+        self.assertEqual(diagnostic['reason_code'],'HYBRID_ACCEPTED')
+        self.assertNotIn(detail_url.encode(),raw)
+        self.assertNotIn(fixture.TITLE.encode(),raw)
+        self.assertNotIn(self.baseline.segments[0].text.encode(),raw)
+
+    def test_detail_failure_diagnostic_sidecar_preserves_normal_gate(self):
+        detail_url='https://subtitlecat.com/subs/1/missing-ja.html'
+        discovery=SubtitleCatDiscovery(fetch=lambda request,timeout: SubtitleCatSearchResponse(
+            200,request.full_url,('<html><a href="'+detail_url+'">'
+                +fixture.TITLE+'</a></html>').encode()))
+        provider=SubtitleCatProvider(
+            fetch_detail=lambda url:SubtitleCatDetailPage(url,'<html></html>'),
+            payload_fetcher=lambda candidate:self.fail('payload must not run'))
+        attempt=live_adapters.build_external_ja_adapter(discovery=discovery,
+            provider=provider,acceptance_policy=policy_with(),residual_threshold_ms=100)
+        with self.assertRaises(normal.controller.Stage11ControllerValidationError):
+            self.run_title(external_ja_attempt=attempt)
+        directory=next(self.artifacts.iterdir())
+        sidecars=list(directory.glob('external-ja-diagnostic-*.json'))
+        self.assertEqual(len(sidecars),1)
+        diagnostic=json.loads(sidecars[0].read_bytes())
+        self.assertEqual(diagnostic['stage'],'detail_ja_link')
+        self.assertEqual(diagnostic['reason_code'],'JA_LINK_MISSING')
+        self.assertFalse(list(directory.glob('normal-external-ja.srt')))
+        self.assertFalse(list(directory.glob('clean-ko-v1.srt')))
 
     def test_transport_failure_is_terminal_without_user_wait(self):
         def fail(*_a,**_k): raise Stage11DeploymentTransportError('offline Hermes outage')

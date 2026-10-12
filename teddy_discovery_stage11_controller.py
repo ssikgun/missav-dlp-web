@@ -180,6 +180,7 @@ MECHANICAL_REPORT_FILENAME: Final[str] = "stage11-controller-report-v1.json"
 STAGE11_CONTROLLER_FILE_MODE: Final[int] = 0o600
 STAGE11_CONTROLLER_DIRECTORY_MODE: Final[int] = 0o700
 MAX_STAGE11_REPORT_BYTES: Final[int] = 1024 * 1024
+MAX_EXTERNAL_JA_DIAGNOSTIC_BYTES: Final[int] = 64 * 1024
 
 EXTERNAL_JA_NO_CANDIDATE: Final[str] = "NO_CANDIDATE"
 EXTERNAL_JA_ACCEPTED: Final[str] = "ACCEPTED"
@@ -497,6 +498,33 @@ def _install_or_reuse(path: Path, payload: bytes, *, max_bytes: int) -> bool:
             "durable artifact readback differs from written bytes"
         )
     return False
+
+
+def _persist_external_ja_diagnostic(
+    directory: Path, diagnostic: Mapping[str, object]
+) -> Path:
+    clean = dict(diagnostic)
+    if set(clean) != {
+        "schema_version", "stage", "reason_code", "candidate_count",
+        "http_status", "accepted_candidate_count", "candidate_failures",
+    }:
+        raise Stage11ControllerArtifactError("external JA diagnostic fields are invalid")
+    try:
+        payload = json.dumps(
+            clean,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError, UnicodeError) as error:
+        raise Stage11ControllerArtifactError(
+            "external JA diagnostic cannot be serialized"
+        ) from error
+    digest = hashlib.sha256(payload).hexdigest()
+    path = directory / ("external-ja-diagnostic-" + digest + ".json")
+    _install_or_reuse(path, payload, max_bytes=MAX_EXTERNAL_JA_DIAGNOSTIC_BYTES)
+    return path
 
 
 def _configured_holding(title: str) -> Mapping[str, object]:
@@ -929,14 +957,45 @@ def _select_route(
     canonical_video: CanonicalVideoHolding,
     asr_result: ASRResult,
     external_ja_attempt: Callable,
+    *,
+    diagnostic_out: dict[str, object] | None = None,
 ) -> tuple[SubtitleV2RouteDecision, str, str]:
     if not callable(external_ja_attempt):
         raise Stage11ControllerValidationError(
             "external_ja_attempt must be callable"
         )
+    external_error: BaseException | None = None
+    application = None
+    accepts_diagnostic = bool(
+        getattr(external_ja_attempt, "_stage11_accepts_diagnostic", False)
+    )
+    attempt_kwargs = (
+        {"diagnostic_out": diagnostic_out}
+        if diagnostic_out is not None and accepts_diagnostic
+        else {}
+    )
     try:
-        application = external_ja_attempt(canonical_video, asr_result)
-    except SubtitleCatSearchTransportError:
+        application = external_ja_attempt(
+            canonical_video, asr_result, **attempt_kwargs
+        )
+    except (
+        SubtitleCatSearchTransportError,
+        ExternalSubtitleTransportError,
+        SubtitleCatDetailError,
+        SubtitleCatSearchError,
+        ExternalSubtitleValidationError,
+    ) as error:
+        external_error = error
+    finally:
+        if diagnostic_out and set(diagnostic_out) != {
+            "schema_version", "stage", "reason_code", "candidate_count",
+            "http_status", "accepted_candidate_count", "candidate_failures",
+        }:
+            raise Stage11ControllerArtifactError(
+                "external JA diagnostic fields are invalid"
+            )
+
+    if isinstance(external_error, SubtitleCatSearchTransportError):
         return (
             _direct_asr_route(
                 canonical_video,
@@ -946,7 +1005,7 @@ def _select_route(
             EXTERNAL_JA_SEARCH_TRANSPORT_FAILURE,
             ALIGNMENT_NOT_ATTEMPTED,
         )
-    except ExternalSubtitleTransportError:
+    if isinstance(external_error, ExternalSubtitleTransportError):
         return (
             _direct_asr_route(
                 canonical_video,
@@ -956,10 +1015,13 @@ def _select_route(
             EXTERNAL_JA_TRANSPORT_FAILURE,
             ALIGNMENT_NOT_ATTEMPTED,
         )
-    except (
-        SubtitleCatDetailError,
-        SubtitleCatSearchError,
-        ExternalSubtitleValidationError,
+    if isinstance(
+        external_error,
+        (
+            SubtitleCatDetailError,
+            SubtitleCatSearchError,
+            ExternalSubtitleValidationError,
+        ),
     ):
         return (
             _direct_asr_route(
@@ -1594,11 +1656,17 @@ def run_one_title_stage11(
             targeted_window_count=targeted_window_count,
         )
 
-    route, external_outcome, alignment_outcome = _select_route(
-        canonical_video,
-        asr_result,
-        external_ja_attempt,
-    )
+    external_diagnostic: dict[str, object] = {}
+    try:
+        route, external_outcome, alignment_outcome = _select_route(
+            canonical_video,
+            asr_result,
+            external_ja_attempt,
+            diagnostic_out=external_diagnostic,
+        )
+    finally:
+        if external_diagnostic:
+            _persist_external_ja_diagnostic(directory, external_diagnostic)
     generation_suffix = baseline_sha256
 
     hybrid_preparation = None
