@@ -1,5 +1,79 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — Stage11 P2-A Normal quality-pipeline connection audit
+
+**READ-ONLY audit: PASS. Normal quality-pipeline readiness: INCOMPLETE.** No
+source, database, subtitle, service, timer, NAS, or Jellyfin state was changed.
+GitHub HEAD is `da731af679a042b2996065da34e0d074afdfcee4`; production still points
+to `e4e0b05bee3550b0ba2734e71ccccb319e802864`. P1-B diagnostic changes are in
+the development HEAD and are not in deployed `e4e0b05b`. The Normal timer is
+`inactive/disabled` and its service is `inactive/dead` (`MainPID=0`). The
+protected dirty worktree `/opt/missav-pwa-subtitle-stage11` was not modified.
+
+### Normal execution path
+
+`teddy-subtitle-normal.timer → Stage12 normal queue → Stage12 bulk runner's
+controller_runner → run_one_title_normal_mode → canonical MP4/holding check →
+baseline ASR dispatch → external-JA selection and ACCEPT_HYBRID gate →
+prepare_stateful_hybrid → NativeNormalFirstPass → Normal output validation and
+materialization → clean SRT/report/proof → Stage12 generated-artifact and
+publication path.` The inspected production source is commit `e4e0b05b`; the
+Normal entry point requires accepted external JA and has no ASR_ONLY success
+fallback. The timer is currently stopped, so this describes the deployed code
+path and saved prior E2E evidence, not a current queue execution.
+
+### Feature status
+
+| Capability | Status in code / Normal | Saved execution evidence |
+| --- | --- | --- |
+| External JA + baseline Whisper evidence + alignment | IMPLEMENTED / WIRED / VERIFIED in saved Normal E2E | FNS-247 carried external JA for 313/313 cues and baseline `stt_ja` for 40; JUR-750 carried external JA for 661/661 and baseline `stt_ja` for 71. Both reports say `HYBRID`, `ACCEPTED`, `ACCEPT_HYBRID`. Existing baseline ASR was reused; these runs did not execute Whisper again. The accepted affine mapping projects external JA timestamps. |
+| Whole-title translation context | IMPLEMENTED / WIRED / VERIFIED in saved Native E2E | FNS prompt 57,417 bytes and JUR prompt 102,163 bytes; each saved receipt has one successful tool-free native call and a matching prompt SHA. Neither staging directory has a fixed-64 part receipt or whole-title fallback record. The existing fixed-64 path is selected when the whole-title prompt exceeds 128,000 bytes or the whole-title invocation raises `Stage11ControllerError`; oversized part prompts first drop the duplicated whole-title JA context while retaining requested cues and local/neighbor context. |
+| Japanese source repair / review | IMPLEMENTED in the generic HYBRID review and CLEAN materializer; BYPASSED in Normal | Saved approved FNS-247 review result has 4 `repaired_ja` cues (`/tmp/stage11-v8-approved-two-nkv52fj5/stage11-quality-approved-result.json`; audit PASS). Saved Normal FNS result has 0. The Normal proof says `PRIMARY_TRANSLATION_ONLY`; its report has no review execution session identity. JUR Normal output contains 14 `repaired_ja` values, but no separate review validated or applied them. |
+| Targeted ASR | IMPLEMENTED in the generic Stage11 controller; BYPASSED in Normal | Normal FNS/JUR reports both have `targeted_source_count=0` and `targeted_window_count=0`. Normal calls `prepare_stateful_hybrid` without targeted bindings and does not call the targeted runner. Baseline `stt_ja` above is not targeted re-recognition. |
+| Hermes KEEP / REPAIR / OMIT / AMBIGUOUS semantic review | IMPLEMENTED in the generic HYBRID review path; BYPASSED in Normal | Normal proof records `quality_review=PRIMARY_TRANSLATION_ONLY`, `supplemental_status=DISABLED_UNVERIFIED_ACCURACY`, and `ambiguous_policy=SKIP_AND_CONTINUE`. The report's review identity hashes the mechanical proof; both review execution session IDs are null. The saved FNS review artifact verifies an earlier review, not a Normal review. |
+| Cue identity, affine time, absorption, metadata, duplicates, line breaks | IMPLEMENTED / WIRED; saved Normal E2E verifies the primary path | Source indexes are retained in internal HYBRID bindings/playback evidence; the model package carries cue IDs, external JA, and accepted STT. Final timing comes from the accepted affine projection, not generated timestamps. FNS/JUR results record 13/11 absorptions; the saved Korean SRTs contain 300/648 cues and no multiline cues. Normal removes classifier-marked metadata and rejects duplicate `(start,end,text)` cues. This duplicate guard is exact-structure protection, not semantic duplicate detection. The generic Korean SRT renderer supports interior newlines; these two outputs had none. The older JUR comparison records two metadata omissions; the current Normal proof does not include a distinct omission count, so that count is not attributed to its receipt. |
+| Validated output → Stage12 | WIRED for HYBRID and mechanical/provenance checks; semantic quality gate BYPASSED | Normal validates cue/result identity, accepted route, source/timing reconstruction, output bytes, and report/proof hashes before returning a generated artifact. Saved E2E reports say `publication_performed=false`; prior Stage12 bundle preflight passed. This does not establish semantic review acceptance or a new NAS/Jellyfin publication. |
+
+### Main disconnect and FNS-247 regression
+
+Normal runs the primary translator and immediately calls `normal_materialization`;
+it does not call the existing HYBRID `hybrid_review_runner`,
+`materialize_stateful_quality_review_clean`, or targeted-evidence route. Thus the
+implemented repair/review decisions cannot affect the Normal SRT or block
+Stage12. The FNS-247 regression is a wiring gap: the earlier approved result
+contains four reviewed Japanese repairs, while the saved Normal result contains
+zero and does not consume that approved result. A `repaired_ja` value returned
+by the primary model is not itself reviewed; Normal materialization uses the
+Korean translation and absorption result. No title-specific production logic
+or prior artifact was edited.
+
+### Minimal change order for a separate implementation checkpoint
+
+1. First, connect Normal HYBRID output to the existing source-bound
+   post-translation review and CLEAN materializer, including its targeted
+   evidence branch when the existing review requests it. Preserve the current
+   `ACCEPT_HYBRID` requirement and make reviewed cue decisions part of the
+   generated-artifact proof.
+2. Extend Normal completion validation and Stage12 preflight to require the
+   matching review request/result identity and final CLEAN hash; keep the
+   current structural and no-overwrite checks.
+3. Reuse saved FNS-247/JUR-750 inputs in offline tests to check repaired source
+   preservation, review actions, timings, absorption and output identity before
+   any operational checkpoint. Do not add ASR_ONLY publication fallback.
+
+**First implementation item:** wire the existing HYBRID post-translation review
+and CLEAN materializer into Normal Mode before it writes `clean-ko-v1.srt` or
+returns a Stage12 generated artifact. This audit did not implement or deploy it.
+
+Evidence read without re-running old batch work: current canonical handoff at
+`da731af`; deployed source at `e4e0b05b`; saved FNS-247/JUR-750 Normal package,
+result, proof, SRT, and native receipts under
+`/opt/missav-dlp-web/discovery/stage11-normal-e2e-20261012/`; saved FNS approved
+review result and audit under `/tmp/stage11-v8-approved-two-nkv52fj5/`; plus
+the existing handoff's prior 161/162 and 18-candidate findings. No tests,
+full-catalog reviews, model calls, timer actions, publication, DB writes, or
+source edits were performed in this audit. P1-B remains unshipped.
+
 ## 2026-10-12 — Stage11 P1-B external JA failure diagnostics
 
 **Code and offline verification: PASS. Operations remain paused.** The change is
