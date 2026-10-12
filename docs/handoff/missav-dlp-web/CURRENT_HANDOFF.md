@@ -1,8 +1,111 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
-## 2026-10-12 — Stage11 Normal Mode complete: PASS; unattended native queue deployed
+## 2026-10-12 — READ-ONLY 운영 반영 비교 감사: 부분 반영; 지속 무인 운영 INCOMPLETE
 
-STAGE11_NORMAL_MODE=PASS. USER_INTERVENTION=0 supersedes historical clip-011
+이번 감사는 저장된 로그·산출물·Git 및 실제 배포 소스, 읽기 전용 SQLite,
+CT120 세션 기록과 VM122 실행 소스만 읽었다. 번역/STT/모델 설치/테스트 실행,
+소스·자막·큐 상태 수정, 배포·서비스 재시작은 하지 않았다. 이 정본만 정정한다.
+아래 09:01 체크포인트의 두 비교 E2E 성공은 유효하지만, 후속 운영을 포함한
+STAGE11_NORMAL_MODE=PASS 완료 판정은 유지할 수 없다.
+CURRENT_PRIMARY_COMPARISON_E2E=PASS; CURRENT_QUEUE=BLOCKED;
+STAGE11_NORMAL_MODE=INCOMPLETE. 기존 약200개 작품에 새 개선 결과가 재게시된
+것은 아니다. 배포 이후 PUBLISHED 전이0, 기존 PUBLISHED163은 그대로다.
+
+실제 경로:
+- 과거 bulk 로그 /opt/missav-dlp-web/discovery/stage12-bulk-all-20260918-110044.log
+  의 실행 HEAD=7dfee8c0dddf8f6921e15a51000351c7d88f3ad7. 해당 Git 소스의
+  bulk.run_live -> run_one_title_stage11 -> fixed64 first pass -> ASR/HYBRID
+  review -> CLEAN -> Stage12 publication. 현재 남아 있는 bulk report134개는
+  전부 ASR_ONLY이며96개에 targeted_source_count>0. 이134개를 약200개 전체의
+  완전한 감사 결과로 확대하지 않는다. 일부 초기16-cue 자료도 별도 보존돼 있다.
+- CT120 /home/teddy/.hermes/profiles/subtitle-translator/state.db를 mode=ro로 읽었다.
+  기존 FNS ASR 세션0765e4d9-3274-53ca-8c83-ff2115e81b6c의 user 메시지는
+  실제 part 요청/재시도이며, whole-title 단일 번역 요청이 아니다.
+  adjacent-continuity 실험19bbe2fb-267b-515c-8754-61884246b99f는5개 part 요청과
+  313개 JA를 읽은 실제 terminal 응답이 있다. 출력 단위64와 입력 문맥 범위는
+  구분한다: 이 실험은 전체 파일을 읽고 인접 문맥을 참고하면서64개씩 출력했다.
+- 배포는 여전히 clean detached dfa213762c94ec54671454f30c7f1c992bfcd835.
+  normal timer -> normal_queue.main -> bulk.run_live -> run_one_title_normal_mode
+  -> NativeNormalFirstPass -> SSHRemoteHermesBridge._python -> native chat -Q.
+  모델은 과거와 동일한 openai-codex/gpt-5.6-luna/xhigh. 정상 번역 이후 기존
+  Stage12 publisher/Jellyfin 경로에 연결돼 있으나 새 게시 성공은 확인되지 않았다.
+
+품질 기능의 확인 범위:
+- 전체 문맥/absorption은 PARTIAL: 실제 Normal E2E에서는 적용됐지만 운영 큐의
+  정상 번역·게시까지 확인되지 않았다. FNS prompt57417 bytes/313 cue,
+  JUR prompt102163 bytes/661 cue; receipt의 prompt SHA 일치, 각각 Hermes1회,
+  part 출력0. generation_key의 cue64 표기는 실제64 실행의 증거가 아니다.
+  128000 bytes 초과/실패 시 fixed64 fallback 코드가 있으며 실제 E2E에서는 미사용.
+- Whisper 기본 경로는 LEGACY: VM122 PID158369의 기존 r6d launcher와 worker SHA
+  a8df232ba220ae15d736137545e90f3c3bae7cb2432e5cc062688c76ad58e619 그대로.
+  outer Silero VAD0.54/pad2500ms가 먼저 적용되고 각 region 내부 vad_filter=False.
+  이 내부 옵션을 전체 no-VAD로 해석하지 않는다. 두 E2E는 기존 baseline 재사용
+  (FNS486/JUR166 segments). 정렬뿐 아니라 FNS40/JUR71 JA cue의 stt_ja로도 전달됐다.
+- 전체 no-VAD18 long chunks/3160 observations, 전체524 short cores(20s+양쪽5s
+  padding)/2521 observations,2279 미승인 후보, Reazon 교차검증은 EXPERIMENT_ONLY.
+  해당 자료는 Normal의 입력/실행 경로에서 읽히지 않는다.1871 후보에 경고가 있고
+  전체 발화 정확도/환각률은 미측정이다. 전 구간 분석 완료가 전 대사 인식 성공은 아니다.
+- Targeted ASR/별도 품질 review는 DISABLED/BYPASSED: dependencies에 callable은
+  만들어지지만 Normal 함수는 호출하지 않는다. targeted_source/window_count=0,
+  quality_review=PRIMARY_TRANSLATION_ONLY. review_result_identity는 기계적 proof
+  SHA이며 Hermes review 수행 증거가 아니다. KEEP/REPAIR/OMIT/AMBIGUOUS 별도
+  의미 검토는 미실행; saved supplemental13의 실제 AMBIGUOUS13은 과거 실험이다.
+- 누락 대사 자동 삽입은 DISABLED, actual insertion0. Reazon13+음성 없는 대조군4
+  실험에서 대조군4개 모두 오인식, saved Hermes13은 모두AMBIGUOUS/승인0.
+  후보 추출·교차검증을 운영 자동 복구 성공으로 보고하지 않는다.
+- 외부 JA/affine/cue identity/SRT formatter는 기존 구현 재사용. FNS affine
+  scale1.0141571005475907/intercept239.12146403396832ms로 과거와 동일.
+  원본/시간/정체성 보존, 반복 문자열 guard와 exact(time,text) 중복 검사는 확인되지만
+  일반적인 의미 중복/음향 환각 제거까지 입증된 것은 아니다. JA LF는 공백으로 투영되고
+  KO LF 지원은 있어도 새 FNS/JUR 출력 모두 multiline0. 화자 분리 개선 미입증.
+
+FNS296 ->300 직접 파일 비교:
+- /tmp/stage11-v8-approved-two-nkv52fj5/stage11-quality-approved-result.json 및
+  /tmp/stage11-v8-review-srt-lfmnmpwz/FNS-247.stage11-v8.REVIEW-ONLY.ko.srt와
+  /opt/missav-dlp-web/discovery/stage11-normal-e2e-20261012/artifacts/FNS-247/
+  normal-result.json, clean-ko-v1.srt를 대조했다. 둘 다 동일한313 source cue ID.
+  absorption17 ->13: 기존 흡수7개가 독립 cue로 돌아오고3개가 새로 흡수돼 순증4.
+  JA 밖 신규 발화/cue0. source KO 필드213/313 변경(null/흡수 변화 포함).
+  동일 source group283개의 시간은 모두 동일; 나머지는 흡수 그룹의 시간 합집합 차이.
+  두 파일 모두 multiline0, 말줄임 끝 cue61 ->28만으로 품질 향상을 단정하지 않는다.
+- 과거 repaired_ja4개 대비 새 FNS repaired_ja0. 과거 검토·승인 기준의 ja-000007
+  "왜 형제인데 이렇게 다른 거야?"가 새 결과에서는
+  "왜 남매인데 아이를 갖고 싶어 하는 거야?"로, ja-000242
+  "간지러워, 정말?"가 "지쳤어…"로 바뀌었다. 원문 인식 오류 수정의 보존 실패를
+  보여주는 비교다. 이 감사에서 원음을 다시 듣거나 새 일본어 정답을 판정하지 않았다.
+- JUR661 ->648은 absorption11+명확한 metadata2 생략이며 신규 발화0.
+  CT120의 과거 /home/teddy/hermes-workspace/JUR-750.ko.srt(661 cue,
+  SHA30a69ed8ce12a345cce0b5cf212bd867f575ea3a5a1ea990db2b5c2ea0fccd75)는 실재한다.
+  그 과거 agent의 정확한 모델 호출/문맥 범위는 NOT_VERIFIABLE; helper의 존재만으로
+  호출을 증명하지 않는다. 새 native receipt/inline cue 전체 전달은 별도로 확인된다.
+
+새 운영 장애(소스·큐 수정 없이 기록):
+- 09:10:17 KST DANDYA-033의 canonical source는 DANDYA/DANDYA-033/DANDYA-033.ts.
+  FullTitleASRValidationError("canonical_video must identify a canonical MP4")가
+  Normal의 ASRError passthrough를 거쳐 Stage12._is_title_exception에 분류되지 않아
+  systemic error가 됐다. durable state는 RUNNING으로 남고 heartbeat는 ERROR다.
+  이후09:15:20부터 timer가5분마다 NORMAL_QUEUE=FAILED_ACTIVE_STATE로 종료한다.
+  timer enabled/active는 정상 처리 중이라는 뜻이 아니다. 관측 counts:
+  PUBLISHED163, UNRESOLVED10, FAILED_TERMINAL2, RUNNING1, PENDING13. CAWB/DAL은
+  외부 JA 검증 실패로 정상적인 terminal 오류, DANDYA는 전역 큐를 막는 별도 결함이다.
+- 다음 작업 하나(이번 감사에서는 실행하지 않음): 기존 Normal/Stage12 오류 경계에
+  ASR validation 실패를 작품별 terminal 상태로 전달하는 연결을 완성하고, 현재 고립
+  RUNNING은 저장된 source/실패/무게시 증거로 기존 복구 절차에서 안전하게 정리한다.
+  모델·자막 삽입 기준이나 새 아키텍처를 바꿀 이유가 없다.
+
+주요 근거: 배포 소스 normal_mode.py:142/217/329/385, bulk_runner.py:1773,
+batch.py:948/1123, normal_queue.py:49; E2E staging/{FNS-247,JUR-750}/
+whole-title-attempt-1.{prompt.txt,receipt.json}; artifacts의 normal-mode-proof-v1.json;
+/tmp/stage11-full-short-execution-review/results.json;
+/tmp/stage11-full-short-candidates-zko9vz8p/audit.json;
+/var/tmp/stage11-reazon-remaining9-controls-qktq2z8w/audit.json;
+/tmp/stage11-supplemental13-result-iAqSULRH/validation-audit.json;
+운영 journalctl -u teddy-subtitle-normal.service 및 stage12-runtime/status.json.
+
+## 2026-10-12 09:01 checkpoint — primary E2E PASS; operational verdict superseded
+
+Historical PASS checkpoint; current operational INCOMPLETE is explained above.
+USER_INTERVENTION=0 supersedes historical clip-011
 listening/transcript/manual approval objectives below. Automatic missing-dialogue
 insertion is OFF: accuracy not established. AMBIGUOUS is skipped and cannot
 block or change the primary external-JA translation. No user quality task remains.
