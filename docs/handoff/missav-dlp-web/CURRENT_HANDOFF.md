@@ -11322,3 +11322,49 @@ preserved. No UI blocker remains.
 Next project task: continue the current FNS-247 same-source translation
 quality A/B and Stage11 rescreen objective described at the top of this
 handoff, preserving its existing production subtitle pipeline boundary.
+
+## 2026-10-13 Stage11 P1-J — isolated P1-only deployment candidate
+
+Created and pushed `codex-stage11-p1j-20261013` at
+`f89bd92b4f769a62622d9ed2b0fd7650f1912fc8`. The candidate is based
+directly on operational source `e4e0b05bee3550b0ba2734e71ccccb319e802864`.
+It carries only the completed P1-B external-JA diagnostics, Unicode URL
+request encoding and P1-H invalid candidate-identity classification, with
+their regression tests. The candidate changes 10 Stage11 source/test files.
+
+P2 changes were not transplanted. Relative to e4e0b05, Stage12 bulk runner,
+quality-review modules and CLEAN review artifacts have no diff. Normal Mode's
+only delta is the P1 diagnostic sidecar path. Existing code already present in
+the e4e0b05 base remains as-is.
+
+Candidate validation used `/opt/stage11-stt-venv/bin/python`: 11/11 offline
+smokes passed (SubtitleCat search/proxy, external JA and candidate selection,
+deployment transport/Unicode URLs, live adapters, Normal Mode, affine
+alignment, alignment acceptance/limit, Stage12 bulk and no-overwrite publish).
+Touched-module `py_compile` and `git diff --check` passed. Tests used synthetic
+HTTP/model responses and temporary artifacts; no live SubtitleCat, model,
+production DB or NAS request was made. The venv lacks `soundfile`; these P1
+smokes do not perform audio I/O.
+
+Read-only operating checks: deployed `current` still resolves to release
+`e4e0b05bee3550b0ba2734e71ccccb319e802864`; Normal timer is disabled/inactive
+and Normal service inactive. No deploy, symlink/config mutation, timer/service
+operation, queue/DB change or publication occurred. The protected dirty
+`/opt/missav-pwa-subtitle-stage11` worktree remained untouched.
+
+Deployment plan review: existing `deploy.sh` backs up `current`, `runtime.env`,
+unit files and timer enabled/active state, runs production preflight and swaps
+the release pointer, but then executes `systemctl enable --now
+teddy-subtitle-normal.timer`. It is unsafe to run unchanged for this paused
+pipeline. A future timer-safe deployment must retain those backups and the
+preflight/pointer/runtime steps while omitting timer enable/start, then verify
+timer disabled/inactive and service inactive. The existing rollback restores
+the saved pointer/config/units and only re-enables or starts the timer when the
+saved state says it was enabled/active; the current saved state is disabled /
+inactive, so rollback must be followed by exact e4 pointer and inactive-state
+checks. This plan was not executed.
+
+P1-only candidate construction and offline validation: PASS. This is not
+production deployment approval. Next task: review and implement a timer-safe
+deployment entrypoint for this exact candidate before any separately approved
+operational rollout.
