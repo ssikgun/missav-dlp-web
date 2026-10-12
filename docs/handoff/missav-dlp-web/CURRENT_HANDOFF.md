@@ -11365,6 +11365,49 @@ inactive, so rollback must be followed by exact e4 pointer and inactive-state
 checks. This plan was not executed.
 
 P1-only candidate construction and offline validation: PASS. This is not
-production deployment approval. Next task: review and implement a timer-safe
-deployment entrypoint for this exact candidate before any separately approved
-operational rollout.
+production deployment approval. The timer-safe deployment tooling follow-up is
+recorded in the P1-K section below.
+
+## 2026-10-13 Stage11 P1-K — paused deployment tooling
+
+Added the explicit `deploy.sh --paused COMMIT_SHA` and
+`rollback.sh --paused BACKUP_DIRECTORY` paths on
+`codex-stage11-p1j-20261013`, commit
+`d59bc4fd7baa5e8c7dbfbff63d7acccadd899964` (follow-up to
+`93b210bae1ac95189b1d6c75ca1673b5c2e3fea4`). The existing no-flag live deploy
+path retains its timer activation behavior. Normal rollback continues to
+restore its saved timer state; its current symlink restoration now uses an
+atomic replacement. Offline testing exposed that the former `cp`-to-current
+path could copy through a directory symlink instead of restoring the link.
+
+Paused deployment requires the timer to be `disabled/inactive` and Normal
+service `inactive`. It backs up and checksums the current release identity,
+`runtime.env` and both units, validates an exact clean release SHA, runs the
+existing preflight, and rechecks systemd state after preflight, around the
+pointer transition, after configuration/unit installation and after
+`daemon-reload`. It has no timer/service enable or start calls in that path.
+An error after the pointer transition disables the timer if needed and tries
+to restore the saved pointer/config/units without terminating a running
+service. Paused rollback accepts only a valid paused backup, keeps the timer
+disabled/inactive, restores and verifies the exact prior release/config/units,
+and never starts the service. If Normal service is already active, rollback
+disables the timer and blocks without terminating the service. Missing or
+checksum-invalid backups are rejected; a missing in-scope backup also leaves
+the timer disabled.
+
+Fake-systemd/Git/preflight integration smoke: 8/8 groups PASS, including
+active-state and SHA rejection, dirty release and preflight failure, pointer,
+runtime, unit and daemon-reload fault restoration, state drift, paused rollback
+and corrupt/missing backup handling. The fake systemctl log showed no
+`enable`, `start` or `restart` invocation in any paused path. General live-mode
+deploy/rollback behavior was also simulated and passed. Existing P1-only offline
+regressions: 12/12 PASS. Bash syntax, smoke compilation and `git diff --check`
+passed. Every test used temporary paths and fakes; the real deployment path,
+systemd, production preflight, DB, queue, NAS and Jellyfin were not touched.
+
+At completion, the actual deployment pointer remains e4
+(`e4e0b05bee3550b0ba2734e71ccccb319e802864`), timer remains
+`disabled/inactive`, and Normal service remains `inactive`. The protected dirty
+worktree is unchanged. P1-K tools are pushed, but the tool was not executed on
+the server. A separately approved production preflight and paused deployment
+remain outstanding; no timer reactivation or P1/P2 stage decision is implied.
