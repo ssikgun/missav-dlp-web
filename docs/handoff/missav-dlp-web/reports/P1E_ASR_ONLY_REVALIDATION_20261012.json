@@ -5,15 +5,29 @@
   "finished_utc": "2026-10-12T05:46:44Z",
   "inventory": {
     "published_total": 164,
-    "published_asr_only": 163,
-    "published_hybrid": 1,
-    "targets": 163,
-    "completed": 163,
-    "incomplete": 0,
-    "incomplete_title_reason": {
-      "dvd_id": "VEMA-246",
-      "reason_code": "CURRENT_HOLDING_OR_BASELINE_UNAVAILABLE"
-    }
+    "original_publication_report_route_counts": {
+      "ASR_ONLY": 163,
+      "HYBRID": 1
+    },
+    "effective_publication_route_counts": {
+      "ASR_ONLY": 162,
+      "HYBRID": 2
+    },
+    "p1e_selection_basis": "original PUBLISHED report route; not replacement-aware",
+    "p1e_original_route_selected_titles": 163,
+    "effective_asr_only_titles": 162,
+    "effective_asr_only_titles_with_completed_p1e_evaluation": 161,
+    "already_effective_hybrid_evaluated_outside_scope": [
+      "FNS-247"
+    ],
+    "effective_asr_only_incomplete_titles": [
+      {
+        "dvd_id": "VEMA-246",
+        "reason_code": "CURRENT_HOLDING_OR_BASELINE_UNAVAILABLE"
+      }
+    ],
+    "p1e_result_rows": 163,
+    "p1e_candidate_evaluations": 162
   },
   "execution": {
     "proxy_route": "existing_gluetun_loopback",
@@ -80,8 +94,8 @@
     }
   ],
   "previous_comparison": {
-    "previous_161_162_accepted_count": 17,
-    "current_comparable_previous_title_set_accepted_count": 20,
+    "previous_161_completed_accepted_count": 17,
+    "current_same_161_completed_titles_accepted_count": 20,
     "retained_previous_accepts": 16,
     "previous_accepts_now_not_accepted": [
       "SDDE-763"
@@ -93,10 +107,10 @@
       "REAL-970"
     ],
     "net_change_within_previous_title_set": 3,
-    "additional_current_target_accept": [
+    "already_effective_hybrid_not_an_asr_only_target": [
       "FNS-247"
     ],
-    "note": "The 163-title current scope includes FNS-247 beyond the prior 161 completed titles; VEMA-246 remains unavailable. The saved 51-title multi-candidate screen is a selected subset and its counts are not directly comparable to this full current sweep."
+    "note": "The P1E runner evaluated FNS-247 because it read the immutable original publication report route. Current effective inventory excludes FNS-247 from ASR_ONLY. VEMA-246 remains the one unavailable effective ASR_ONLY title. The saved 51-title screen is a selected subset and its counts are not directly comparable to this full sweep."
   },
   "confirmed_classification_boundary": {
     "dvd_id": "PRED-054",
@@ -918,7 +932,9 @@
       },
       "dvd_id": "FNS-247",
       "result": "ACCEPT_HYBRID",
-      "selection_reason_code": null
+      "selection_reason_code": null,
+      "effective_publication_route": "HYBRID",
+      "selection_scope": "ALREADY_EFFECTIVE_HYBRID_NOT_AN_ASR_ONLY_TARGET"
     },
     {
       "accepted_distinct_content_count": 0,
@@ -2575,5 +2591,128 @@
       "reason_code": "CURRENT_HOLDING_OR_BASELINE_UNAVAILABLE",
       "result": "INCOMPLETE"
     }
-  ]
+  ],
+  "effective_asr_only_title_result_counts": {
+    "ACCEPT_HYBRID": 20,
+    "ALIGNMENT_LIMIT": 17,
+    "DETAIL_FAILURE": 17,
+    "INCOMPLETE": 1,
+    "INDETERMINATE": 1,
+    "MULTIPLE_ACCEPTED_CONTENTS": 2,
+    "NO_CANDIDATE": 71,
+    "SRT_CONTENT_INVALID": 6,
+    "UNRESOLVED": 27
+  },
+  "effective_asr_only_candidate_failure_counts": [
+    {
+      "count": 21,
+      "http_status": null,
+      "reason_code": "ALIGNMENT_LIMIT",
+      "stage": "alignment"
+    },
+    {
+      "count": 3,
+      "http_status": null,
+      "reason_code": "ALIGNMENT_NO_CONSENSUS",
+      "stage": "alignment"
+    },
+    {
+      "count": 43,
+      "http_status": null,
+      "reason_code": "HYBRID_UNRESOLVED",
+      "stage": "alignment"
+    },
+    {
+      "count": 1,
+      "http_status": null,
+      "reason_code": "UNEXPECTED_EVALUATION_FAILURE",
+      "stage": "candidate_evaluation"
+    },
+    {
+      "count": 6,
+      "http_status": null,
+      "reason_code": "JA_LINK_INVALID",
+      "stage": "detail_ja_link"
+    },
+    {
+      "count": 110,
+      "http_status": null,
+      "reason_code": "JA_LINK_MISSING",
+      "stage": "detail_ja_link"
+    },
+    {
+      "count": 25,
+      "http_status": null,
+      "reason_code": "SRT_CONTENT_INVALID",
+      "stage": "ja_srt_content"
+    }
+  ],
+  "p1f_read_only_audit": {
+    "rollout_status_counts": {
+      "PUBLISHED": 164,
+      "FAILED_TERMINAL": 5,
+      "PENDING": 26,
+      "UNRESOLVED": 10
+    },
+    "original_route_counts": {
+      "ASR_ONLY": 163,
+      "HYBRID": 1
+    },
+    "effective_route_counts": {
+      "ASR_ONLY": 162,
+      "HYBRID": 2
+    },
+    "original_and_effective_report_sha_checks": "164/164 match",
+    "replacement_journal_title_count": 1,
+    "fns_247": {
+      "original_status": "PUBLISHED",
+      "original_transition_sequence": 4,
+      "original_route": "ASR_ONLY",
+      "original_artifact_sha256": "847b77037be7133567b4e56f4364b54858e6e5a3ef2d3e56ee593fa1becfaf59",
+      "replacement_event_count": 7,
+      "replacement_last_sequence": 7,
+      "replacement_last_phase": "COMPLETED",
+      "effective_route": "HYBRID",
+      "effective_artifact_sha256": "ebed3bc9d195038f5f8be2e6cf54be77fef024cb94f7680aa8b50b4b369fc86f",
+      "nas_and_jellyfin_rechecked_in_p1f": false
+    },
+    "p1e_scope_finding": "The runner counted original publication routes and did not call the replacement-aware effective_publication API. FNS-247 is the only currently replaced title, so this caused one extra non-target evaluation; Stage12 replacement aggregation itself is correct."
+  },
+  "sdde_763_comparison": {
+    "previous_scan": {
+      "date": "2026-10-01",
+      "source_head": "b16059f3811cb311e0f0ae4e534677bbc04a1245",
+      "candidate_count": 3,
+      "accepted_candidate_ordinals": [
+        1,
+        3
+      ],
+      "accepted_distinct_payload_count": 1,
+      "accepted_payload_sha256": "f1c77fe0764a1409175eca5325160e592738e6b9db2e981e673bd324a7bb61c7",
+      "accepted_alignment": {
+        "anchor_count": 65,
+        "inlier_count": 63,
+        "median_residual_ms": 249.85662465118955,
+        "unique_chains_consumed": 2586
+      },
+      "candidate_2_outcome": "CONCLUSIVE_NON_ACCEPT"
+    },
+    "p1e_current": {
+      "candidate_count": 3,
+      "accepted_candidate_count": 2,
+      "accepted_distinct_payload_count": 1,
+      "indeterminate_candidate_count": 1,
+      "indeterminate_reason": "alignment/ALIGNMENT_LIMIT",
+      "selection_reason": "CANDIDATE_EVALUATION_INDETERMINATE",
+      "candidate_url_or_payload_identity_retained": false
+    },
+    "code_comparison": {
+      "adapter_and_external_url_diagnostic_changes_present": true,
+      "acceptance_threshold_or_limit_change_found": false,
+      "confirmed_code_regression": false,
+      "core_alignment_algorithm_or_acceptance_policy_modules_changed": false,
+      "stage11_live_adapter_changed": true
+    },
+    "cause": "UNKNOWN: current candidate URL/payload identities were not retained, so the limited candidate cannot be mapped to the prior ordinals or payload. A changed/ newly accessible site candidate is plausible but unproven."
+  }
 }

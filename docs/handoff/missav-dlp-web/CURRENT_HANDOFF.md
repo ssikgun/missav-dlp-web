@@ -1,13 +1,77 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-12 — Stage11 P1-F publication scope and SDDE-763 regression audit
+
+**INCOMPLETE.** Read-only inspection of the deployed Stage12 store and saved
+P1-E / 2026-10-01 artifacts found one P1-E inventory-scope error; SDDE-763's
+current candidate-level cause remains `UNKNOWN`. No SubtitleCat request, code
+change, deployment, database write, model run, NAS write or Jellyfin action
+occurred.
+
+### FNS-247 effective publication versus P1-E selection
+
+The original Stage12 row remains `PUBLISHED`, transition sequence 4, with its
+original ASR_ONLY report and original artifact SHA preserved. The separate
+replacement journal has seven events and ends at sequence 7 `COMPLETED`. The
+read-only `effective_publication("FNS-247")` returns the HYBRID report and
+replacement artifact SHA. Original and effective report SHA checks passed for
+all 164 published rows. The replacement journal contains only FNS-247; the
+other existing HYBRID publication is unchanged. NAS/Jellyfin were not
+re-queried in this audit; their successful verification at replacement time
+is preserved in the 2026-10-01 record below.
+
+The P1-E runner selected titles by reading `stage12_rollout_titles.report_path`
+and counting that immutable report's `route`. It did not call the
+replacement-aware `effective_publication()` API. Therefore its 163
+`ASR_ONLY` rows are original-publication routes, not the current effective
+inventory. Current routes are **162 effective ASR_ONLY and 2 effective
+HYBRID**. P1-E included already-effective-HYBRID FNS-247 as one extra check.
+Of the true 162 effective ASR_ONLY titles, 161 were evaluated; VEMA-246 remains
+the unavailable one. The P1-E data has 21 accepted rows including FNS-247;
+the effective-ASR_ONLY result count is **20**. The original P1-E JSON metadata
+and comparison note were corrected in place. This is a generic
+replacement-unaware scope bug in that audit's inventory method, but only one
+replacement title currently exists; Stage12's replacement-aware effective
+publication is working.
+
+### SDDE-763 prior acceptance and current fail-closed result
+
+The saved 2026-10-01 scan recorded three candidates. Distinct source candidates
+1 and 3 both produced the same accepted payload SHA and one unique content;
+each had 65 anchors, 63 inliers, median residual 249.8566 ms, and consumed
+2,586 unique chains. Candidate 2 was a conclusive non-accept. P1-E recorded
+three current candidates: two accepted with one distinct accepted content,
+and one `INDETERMINATE` candidate at `alignment / ALIGNMENT_LIMIT`.
+`CANDIDATE_EVALUATION_INDETERMINATE` stopped the overall title selection, so
+the existing fail-closed policy worked as designed.
+
+P1-E did not retain candidate URL or payload identities. The current limit
+candidate therefore cannot be mapped to old ordinal 1, 2 or 3, nor can the old
+and current accepted payload bytes be compared. Between the saved scan head
+`b16059f3` and P1-E head `c8883b28`, the alignment and acceptance modules and
+their configured limits did not change. Adapter diagnostics and external URL
+handling did change, but the saved evidence does not establish that either
+caused this candidate's limit. **No alignment-code regression is confirmed;
+the candidate/input cause remains UNKNOWN.**
+
+If further attribution is needed, the minimum next evidence is one bounded
+SDDE-763 candidate-identity and payload-fingerprint capture through the
+existing proxy, followed by offline alignment against the saved baseline. It
+was not performed in this read-only checkpoint. P1 closure and P2 remain for
+Teddy to decide.
+
 ## 2026-10-12 — Stage11 P1-E full ASR_ONLY revalidation
 
-**INCOMPLETE.** The current published inventory contained 164 works: 163
-`ASR_ONLY` and one `HYBRID`. Of the 163 ASR_ONLY works, 162 had both the
-current holding and saved baseline needed for verification; `VEMA-246` did
-not, so it was not queried or reconstructed. The other 162 were processed
-sequentially using the candidate search, detail, SRT validation, streaming
-alignment and selection path at GitHub HEAD
+**INCOMPLETE.** P1-E initially read the original publication reports for 164
+published rows, counted 163 original `ASR_ONLY` routes and selected those
+titles. P1-F above establishes that one selected title, FNS-247, was already
+effectively `HYBRID` by replacement. Thus P1-E evaluated 161 of the 162
+effective ASR_ONLY titles; `VEMA-246` lacked a current holding/baseline and was
+not queried or reconstructed. P1-E also evaluated FNS-247 as an extra,
+non-target title. The corrected route counts and effective-target outcomes are
+in the report JSON. The 162 candidate evaluations were processed sequentially
+using the candidate search, detail, SRT validation, streaming alignment and
+selection path at GitHub HEAD
 `c8883b286b23137d5d954645f69b1319e5331c87`. All HTTP requests used the existing
 Gluetun loopback proxy, a 20-second timeout and at least one second between
 GETs (525 transport calls total). Existing production alignment policy and
@@ -37,16 +101,18 @@ invalid SRT payloads, 21 alignment-limit results, 3 no-consensus results, 44
 unresolved alignments and one unexpected candidate-evaluation exception.
 Candidate counts can exceed title outcomes because one title can have several
 candidates. `NO_CANDIDATE` means the current search produced no candidate; it
-does not attribute historical failures.
+does not attribute historical failures. These raw row counts include the
+extra FNS-247 evaluation; for the effective ASR_ONLY set, `ACCEPT_HYBRID=20`
+and `INCOMPLETE=1`.
 
 ### Historical comparison and confirmed boundary defect
 
-Against the previous 161-title completed comparison set, the current run
-accepted 20: 16 of the previous 17 accepts remain accepted, `SDDE-763` no
-longer passes (`ALIGNMENT_LIMIT`), and four titles newly pass
+Against the previous 161-title completed comparison set, the effective
+ASR_ONLY subset accepted 20: 16 of the previous 17 accepts remain accepted,
+`SDDE-763` no longer passes (`ALIGNMENT_LIMIT`), and four titles newly pass
 (`IPZZ-698`, `MREC-010`, `NSFS-457`, `REAL-970`), for a net increase of 3.
-`FNS-247` is the additional current-scope title and also passes, bringing the
-current total to 21. `VEMA-246` remains outside the comparable completed set.
+FNS-247 is already effectively HYBRID and is not an additional ASR_ONLY
+candidate. VEMA-246 remains unavailable.
 The historical 51-title multi-candidate scan is a selected subset with
 different candidate snapshots and is not numerically comparable to this full
 current sweep; its recorded 10 unique safe accepts, 2 accepted-content
