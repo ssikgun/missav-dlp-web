@@ -11554,3 +11554,39 @@ production DB/queue, NAS, Jellyfin, or existing subtitle write occurred. The
 next task is a later one-shot check of this same process and its finished
 review/CLEAN proof, followed by read-only Stage12 artifact validation if the
 bundle is complete.
+
+
+## 2026-10-13 Stage11 P2-E3 — existing isolated E2E result (FAILED)
+
+The one-shot check found PID 732694 absent; its recorded command matched the
+P2-D FNS-247 direct Normal run root, `exit.status` is 1, and the runner emitted
+`FAILED` with `Stage11DeploymentTransportError`. The retained first-pass
+translation was independently revalidated read-only: the JA SHA matches its
+source record, the cached baseline remains bound to FNS-247, candidate source
+alignment reconstruction passed, package and boundary evidence match, and the
+translation result parses against that package with the expected session and
+cue count. The Hermes receipt's prompt/stdout/stderr hashes match the saved
+files; return code is zero, timeout is absent, tool count is zero, and a runtime
+session identity is present. First-pass response SHA-256:
+`baf0eadd61caf192b7336d800b3ec70ddaab5c1e76bf94b399a96cc3acc72535`.
+
+The quality-review input was saved, but no triage/review result exists. The
+failure record classifies the stopped bridge call as
+`CT120_NATIVE_COMMAND_FAILED`; the underlying remote command cause is not
+established by the retained local evidence. No review decisions were applied,
+and no Targeted Whisper artifact exists; because triage did not return, whether
+Targeted ASR would have been required is unknown. No CLEAN SRT, completion
+proof, or report exists. Therefore the approved FNS-247 result cannot yet be
+compared with a new CLEAN output. Stage12 artifact validation was not attempted
+because its required bundle is absent; no database transition or publication
+was performed.
+
+At the one-shot operations check, production remained on P1
+`d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`, Normal timer disabled/inactive,
+Normal service inactive, FNS-247 PUBLISHED at sequence 4, and rollout counts
+unchanged (PUBLISHED=164, PENDING=26, UNRESOLVED=10, FAILED_TERMINAL=5, no
+active rows). No production DB/queue, NAS, Jellyfin, or existing subtitle
+write occurred; the protected dirty worktree remains untouched. P2-E E2E is
+FAIL at the review bridge stage, while the first-pass translation itself passed
+its local binding checks. Next: inspect retained CT120 review-call failure
+evidence read-only; do not rerun models as part of this checkpoint.
