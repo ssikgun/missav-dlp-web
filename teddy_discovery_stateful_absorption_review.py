@@ -627,6 +627,10 @@ def _unique_object(pairs):
     return value
 
 
+def _reject_json_constant(value: str):
+    raise AbsorptionGroupReviewError("non-finite JSON number is invalid")
+
+
 def parse_absorption_group_review_result(
     payload: bytes,
     request: AbsorptionGroupReviewRequest,
@@ -638,6 +642,7 @@ def parse_absorption_group_review_result(
         value = json.loads(
             payload.decode("utf-8", errors="strict"),
             object_pairs_hook=_unique_object,
+            parse_constant=_reject_json_constant,
         )
         if type(value) is not dict or set(value) != {
             "schema_version", "request_sha256", "decisions",
@@ -665,8 +670,15 @@ def parse_absorption_group_review_result(
     canonical = serialize_absorption_group_review_result(
         result, request, review_execution_session_id=review_execution_session_id
     )
-    if canonical != payload:
-        raise AbsorptionGroupReviewError("group result is not canonical JSON")
+    canonical_value = json.loads(
+        canonical.decode("utf-8", errors="strict"),
+        object_pairs_hook=_unique_object,
+        parse_constant=_reject_json_constant,
+    )
+    if canonical_value != value:
+        raise AbsorptionGroupReviewError(
+            "group result values differ from canonical serialization"
+        )
     return result
 
 

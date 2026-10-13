@@ -518,6 +518,206 @@ def main():
         return group_review.AbsorptionGroupReviewExecutionEvidence(
             request_payload, result_payload, receipt_payload, task, nonce, session_id)
 
+    def rebind_group_execution_result(execution, payload, *, rebind_receipt=True):
+        receipt = json.loads(execution.receipt_payload)
+        if rebind_receipt:
+            receipt["result_sha256"] = hashlib.sha256(payload).hexdigest()
+            receipt["result_size_bytes"] = len(payload)
+        receipt_payload = json.dumps(
+            receipt, sort_keys=True, separators=(",", ":")).encode("ascii")
+        return replace(
+            execution, result_payload=payload, receipt_payload=receipt_payload)
+
+    json_variant_base = group_execution(
+        group_review.GROUP_REVIEW_REPAIR,
+        replacement_ja="グループ全体の修正文",
+        replacement_ko="흡수 그룹 전체의 수정 번역",
+    )
+    json_variant_value = json.loads(json_variant_base.result_payload)
+
+    def accepts_group_result_payload(payload):
+        evidence = rebind_group_execution_result(json_variant_base, payload)
+        return group_review.validate_absorption_group_review_execution(
+            evidence, group_request).decisions[0].action == group_review.GROUP_REVIEW_REPAIR
+
+    pretty_group_result = json.dumps(
+        json_variant_value, ensure_ascii=False, indent=2).encode("utf-8")
+    check("group parser accepts semantically identical pretty JSON", lambda:
+          accepts_group_result_payload(pretty_group_result))
+
+    one_decision = json_variant_value["decisions"][0]
+    reordered_group_result = {
+        "decisions": [{key: one_decision[key] for key in reversed(tuple(one_decision))}],
+        "request_sha256": json_variant_value["request_sha256"],
+        "schema_version": json_variant_value["schema_version"],
+    }
+    reordered_group_payload = json.dumps(
+        reordered_group_result, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    check("group parser accepts object field-order differences", lambda:
+          accepts_group_result_payload(reordered_group_payload))
+
+    escaped_group_payload = json.dumps(
+        json_variant_value, ensure_ascii=True, separators=(",", ":")
+    ).encode("ascii")
+    check("group parser accepts equivalent Unicode escapes", lambda:
+          accepts_group_result_payload(escaped_group_payload))
+
+    def rejects_group_result_payload(payload, *, rebind_receipt=True):
+        evidence = rebind_group_execution_result(
+            json_variant_base, payload, rebind_receipt=rebind_receipt)
+        return _raises_group_error(lambda:
+            group_review.validate_absorption_group_review_execution(
+                evidence, group_request))
+
+    check("result bytes remain bound to the native receipt SHA", lambda:
+          rejects_group_result_payload(pretty_group_result, rebind_receipt=False))
+    check("duplicate result JSON keys are rejected", lambda:
+          rejects_group_result_payload(
+              json_variant_base.result_payload[:-1] + b',"schema_version":1}'))
+
+    missing_group_field = dict(json_variant_value)
+    missing_group_field.pop("request_sha256")
+    check("missing group result field is rejected", lambda:
+          rejects_group_result_payload(json.dumps(
+              missing_group_field, sort_keys=True, separators=(",", ":")).encode()))
+
+    extra_group_field = dict(json_variant_value)
+    extra_group_field["unexpected"] = True
+    check("additional group result field is rejected", lambda:
+          rejects_group_result_payload(json.dumps(
+              extra_group_field, sort_keys=True, separators=(",", ":")).encode()))
+
+    check("malformed group result JSON is rejected", lambda:
+          rejects_group_result_payload(b"{invalid"))
+    for constant in (b"NaN", b"Infinity"):
+        nonfinite_group_payload = json_variant_base.result_payload.replace(
+            b'"schema_version":1', b'"schema_version":' + constant, 1)
+        check("non-finite JSON " + constant.decode("ascii") + " is rejected", lambda:
+              rejects_group_result_payload(nonfinite_group_payload))
+
+    wrong_group_id_value = json.loads(json_variant_base.result_payload)
+    wrong_group_id_value["decisions"][0]["group_id"] = "0" * 64
+    check("decision with a different group ID is rejected", lambda:
+          rejects_group_result_payload(json.dumps(
+              wrong_group_id_value, sort_keys=True, separators=(",", ":")).encode()))
+
+    wrong_group_request_value = dict(json_variant_value)
+    wrong_group_request_value["request_sha256"] = "0" * 64
+    check("decision with a different request SHA is rejected", lambda:
+          rejects_group_result_payload(json.dumps(
+              wrong_group_request_value, sort_keys=True, separators=(",", ":")).encode()))
+
+    invalid_repair_value = json.loads(json_variant_base.result_payload)
+    invalid_repair_value["decisions"][0]["replacement_ja"] = "한글이 섞인 일본어"
+    check("invalid group REPAIR replacement remains rejected", lambda:
+          rejects_group_result_payload(json.dumps(
+              invalid_repair_value, ensure_ascii=False,
+              sort_keys=True, separators=(",", ":")).encode("utf-8")))
+
+    wrong_nonce_value = json.loads(json_variant_base.receipt_payload)
+    wrong_nonce_value["receipt_nonce"] = "0" * 64
+    wrong_nonce_execution = replace(
+        json_variant_base,
+        receipt_payload=json.dumps(
+            wrong_nonce_value, sort_keys=True, separators=(",", ":")).encode("ascii"))
+    check("receipt nonce must match the independent execution nonce", lambda:
+          _raises_group_error(lambda:
+              group_review.validate_absorption_group_review_execution(
+                  wrong_nonce_execution, group_request)))
+
+    missing_receipt_execution = replace(
+        json_variant_base, receipt_payload=b"")
+    check("missing native receipt blocks a valid group result", lambda:
+          _raises_group_error(lambda:
+              group_review.validate_absorption_group_review_execution(
+                  missing_receipt_execution, group_request)))
+
+    reordered_title = list(group_request.title_context)
+    reordered_title[2] = replace(reordered_title[2], first_pass_ko=None)
+    second_cues = (reordered_title[2], reordered_title[3])
+    second_scope_fields = group_review._scope_fields(group_request.groups[0].scope)
+    second_scope_fields.update(
+        owner_cue_id=reordered_title[3].cue_id,
+        cue_ids=tuple(cue.cue_id for cue in second_cues),
+        source_indexes=(2, 3),
+        targeted_evidence_sha256=group_review._targeted_evidence_sha256(second_cues),
+    )
+    second_scope = group_review.AbsorptionGroupScope(
+        group_id=group_review._scope_identity(second_scope_fields),
+        **second_scope_fields,
+    )
+    second_group = group_review.AbsorptionGroupReviewGroup(
+        second_scope,
+        second_cues,
+        (
+            review.QualityReviewResultCue(
+                second_cues[0].cue_id, review.KEEP, "DIALOGUE",
+                "Synthetic ordered group context.", None, None),
+            review.QualityReviewResultCue(
+                second_cues[1].cue_id, review.REPAIR, "SEMANTIC_REPAIR",
+                "Synthetic ordered group context.", "修正版", "수정 번역"),
+        ),
+    )
+    two_group_request = group_review.AbsorptionGroupReviewRequest(
+        group_request.schema_version,
+        group_request.parent_review_request_sha256,
+        group_request.parent_review_result_sha256,
+        group_request.source_translation_session_id,
+        group_request.parent_review_execution_session_id,
+        tuple(reordered_title),
+        (group_request.groups[0], second_group),
+    )
+    two_group_session = str(uuid.uuid4())
+    two_group_decisions = tuple(
+        group_review.AbsorptionGroupReviewDecision(
+            group.scope.group_id, group_review.GROUP_REVIEW_KEEP,
+            "Synthetic ordered group decision.")
+        for group in two_group_request.groups
+    )
+    two_group_result = group_review.AbsorptionGroupReviewResult(
+        group_review.ABSORPTION_GROUP_REVIEW_SCHEMA_VERSION,
+        group_review.absorption_group_review_request_sha256(two_group_request),
+        two_group_decisions,
+    )
+    two_group_canonical = group_review.serialize_absorption_group_review_result(
+        two_group_result, two_group_request,
+        review_execution_session_id=two_group_session)
+    two_group_value = json.loads(two_group_canonical)
+    two_group_value["decisions"].reverse()
+    out_of_order_payload = json.dumps(
+        two_group_value, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    two_group_task = "/tmp/stage11-p2l-group-review/" + two_group_session
+    two_group_request_payload = group_review.serialize_absorption_group_review_request(
+        two_group_request)
+    two_group_nonce = uuid.uuid4().hex + uuid.uuid4().hex
+    two_group_receipt = {
+        "schema_version": 1,
+        "session_id": two_group_session,
+        "task_sha256": hashlib.sha256(two_group_task.encode("utf-8")).hexdigest(),
+        "request_sha256": hashlib.sha256(two_group_request_payload).hexdigest(),
+        "input_sha256": hashlib.sha256(two_group_request_payload).hexdigest(),
+        "receipt_nonce": two_group_nonce,
+        "child_outcome": "COMPLETED",
+        "child_returncode": 0,
+        "result_state": "PRESENT",
+        "result_sha256": hashlib.sha256(out_of_order_payload).hexdigest(),
+        "result_size_bytes": len(out_of_order_payload),
+    }
+    two_group_execution = group_review.AbsorptionGroupReviewExecutionEvidence(
+        two_group_request_payload,
+        out_of_order_payload,
+        json.dumps(two_group_receipt, sort_keys=True, separators=(",", ":")).encode("ascii"),
+        two_group_task,
+        two_group_nonce,
+        two_group_session,
+    )
+    check("group decision order must match the canonical request order", lambda:
+          _raises_group_error(lambda:
+              group_review.validate_absorption_group_review_execution(
+                  two_group_execution, two_group_request)))
+
     reverse_first = StatefulAbsorptionResult(
         absorption_first.schema_version, absorption_first.dvd_id,
         absorption_first.generation_key, absorption_first.claim_token,

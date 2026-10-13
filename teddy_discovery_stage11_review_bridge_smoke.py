@@ -277,6 +277,25 @@ def main():
               and validated_diag["execution_phase"] == "RECEIPT_WRITE"
               and validated_diag["error_class"] == "NONE",
               "DIAGNOSTIC_BOUND_TO_LOCAL_INTENT_AND_V1_RECEIPT")
+        mismatched_diagnostic = json.loads(diagnostic_payload)
+        mismatched_diagnostic["result_sha256"] = (
+            "0" * 64 if validated_diag["result_sha256"] != "0" * 64 else "1" * 64)
+        try:
+            deployment.validate_quality_review_execution_diagnostic(
+                intent_payload,
+                json.dumps(
+                    mismatched_diagnostic, sort_keys=True, separators=(",", ":")
+                ).encode("utf-8"),
+                (task / deployment.QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME).read_bytes(),
+                session_id=SESSION, task_sha256=hashlib.sha256(str(task).encode()).hexdigest(),
+                request_sha256=request_sha,
+            )
+        except deployment.Stage11DeploymentValidationError:
+            diagnostic_mismatch_blocked = True
+        else:
+            diagnostic_mismatch_blocked = False
+        check(diagnostic_mismatch_blocked,
+              "DIAGNOSTIC_RESULT_IDENTITY_MUST_MATCH_RECEIPT")
         check(stat_mode(bridge.local_task / deployment.QUALITY_REVIEW_EXECUTION_INTENT_FILENAME) == 0o600
               and nonce not in json.dumps(validated_diag, sort_keys=True)
               and nonce not in diagnostic_payload.decode("ascii"),
