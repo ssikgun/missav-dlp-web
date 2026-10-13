@@ -12051,3 +12051,28 @@ changes remain zero. Production P1 is still
 disabled/inactive and service inactive. Next: perform one read-only audit of
 this exact session's completion receipt, diagnostic, and group result; do not
 create another session.
+
+
+## 2026-10-14 Stage11 P2-M8 — existing group review result audit
+
+The single P2-M7 runner has exited. Its configured CT120 task was derived from
+the deployment configuration and exact session ID. The saved P2-I reconstruction
+preflight remains `PREFLIGHT_PASS` for one group, and the remote group input
+matches the saved canonical request. The independent local intent, native V1
+completion receipt, and diagnostic sidecar validate together. The Hermes child
+completed with return code 0; the result is present, and its request, task,
+session, size, and SHA bindings match.
+
+P2-L `validate_absorption_group_review_execution()` rejects the result because
+its bytes are not the canonical serialization. The decoded result object matches
+its canonical reserialization, and the separate semantic result validator binds
+the sole decision to the requested group and review session: `REPAIR`. This is
+not an accepted group approval because the execution validator failed closed.
+The runner recorded `QualityReviewRunnerError`; the result was not promoted.
+
+The audit made no model calls, CLEAN artifacts, Stage12 changes, or production
+writes. Production remains on P1 `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`;
+the Normal timer is disabled/inactive and the service is inactive. The protected
+dirty worktree remains unchanged. Next: address canonical result serialization
+at the existing review boundary in a separate code checkpoint; do not retry this
+session or generate CLEAN from this result.
