@@ -11411,3 +11411,40 @@ At completion, the actual deployment pointer remains e4
 worktree is unchanged. P1-K tools are pushed, but the tool was not executed on
 the server. A separately approved production preflight and paused deployment
 remain outstanding; no timer reactivation or P1/P2 stage decision is implied.
+
+
+## 2026-10-13 Stage11 P1-L — production paused deployment
+
+Approved production prechecks passed. Candidate branch `codex-stage11-p1j-20261013`
+was clean at `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`, matching the remote.
+Before deployment, `current` and `runtime.env` both identified the prior
+`e4e0b05bee3550b0ba2734e71ccccb319e802864` release. Normal timer was
+disabled/inactive; Normal service was inactive; no Normal/Stage12 worker or
+held runner lock was observed. The existing release, runtime configuration, and
+both systemd units were readable and backed up. The protected dirty
+`/opt/missav-pwa-subtitle-stage11` worktree was not touched.
+
+Ran only `deploy/stage11-normal/deploy.sh --paused
+d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`. Production preflight PASS:
+`LIVE_EXECUTED=NO`, active rollout IDs empty, counts were
+PUBLISHED=164, PENDING=26, UNRESOLVED=10, FAILED_TERMINAL=5, the first pending
+NAS preflight passed, and `PRODUCTION_WRITES_TOTAL=0`. `RUNNING`/`GENERATED`
+rows were absent. FNS-247's replacement journal remained COMPLETED with its new
+artifact as the effective publication.
+
+Paused deployment PASS. Backup: `/opt/missav-dlp-web/discovery/
+stage11-normal-deployment/backups/20261013-094611-bloxLVmy`. Its checksum
+manifest passed. The final `current` symlink, release Git HEAD, and
+`runtime.env` all identify `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; release
+worktree is clean. Timer remains disabled/inactive and Normal service inactive.
+Post-deploy rollout counts match preflight, no active rows exist, and SQLite
+quick-check passed. No rollback was needed. No Stage12 state transition,
+subtitle publication/replacement, NAS write, or Jellyfin write was performed.
+No Hermes or Whisper model was run.
+
+P1-only source is deployed. Relative to e4, the candidate adds the P1 diagnostic
+path to Normal Mode and controller; Stage12 bulk runner and CLEAN/review modules
+have no diff from the operational base. Normal Mode still reports
+`PRIMARY_TRANSLATION_ONLY`; P2-B review/CLEAN wiring was not deployed. This
+successful deployment does not authorize timer reactivation or declare P1
+complete. Automatic processing remains paused pending separate user approval.
