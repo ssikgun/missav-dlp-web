@@ -11750,3 +11750,33 @@ remains completed. This audit made no production DB/queue, NAS or Jellyfin
 changes. Protected dirty worktree remains unchanged. Next: separately run the
 existing targeted-evidence and CLEAN path for the 9 selected cues, without
 starting publication.
+
+## 2026-10-13 Stage11 P2-I — FNS-247 Targeted ASR / review (RUNNING)
+
+The P2-G candidate and canonical handoff were rechecked. The protected dirty
+worktree was not modified. The saved P2-E baseline, JA, accepted alignment,
+package, whole-title translation receipt/result and P2-H review were
+revalidated. The existing 313-cue triage was reconstructed with its original
+request/session provenance and connected to a new isolated root at
+`/tmp/stage11-p2i-fns247-577669e89b8b`; no whole-title translation or full
+triage call was made. The existing Normal review path reused that triage,
+re-derived the same nine targets, and planned eight windows using the
+existing policy.
+
+Targeted Whisper completed through the existing live adapter. The source
+snapshot matched Discovery and NAS; the 4,864,947,420-byte source was copied
+to the configured disk-backed temporary area and the temporary copy was
+cleaned. The existing suspect-artifact and provenance checks passed before
+the targeted Hermes review was invoked for the nine cues. At this checkpoint
+that native Hermes review is still running. No retry, second call or long
+wait was started. Its session/receipt/result and final review decisions have
+not yet been audited; CLEAN SRT, proof/report and Stage12 artifact validation
+are not yet confirmed.
+
+Production remains on P1 `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; Normal
+timer remains disabled/inactive and service inactive. FNS-247 remains
+`PUBLISHED`, transition sequence 4. No production DB/queue, NAS or Jellyfin
+write or publication was performed. Existing P2-E/P2-H evidence was left
+unchanged. Next: once the same targeted Hermes invocation is known to have
+finished, perform a single read-only audit of its receipt/result, then validate
+CLEAN and the Stage12 bundle without publication.
