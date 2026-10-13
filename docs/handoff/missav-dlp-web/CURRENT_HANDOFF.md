@@ -12076,3 +12076,35 @@ the Normal timer is disabled/inactive and the service is inactive. The protected
 dirty worktree remains unchanged. Next: address canonical result serialization
 at the existing review boundary in a separate code checkpoint; do not retry this
 session or generate CLEAN from this result.
+
+
+## 2026-10-14 Stage11 P2-M9 — group result JSON validation
+
+P2-M9 candidate codex-stage11-p2m9-20261014 is based on P2-M6
+04a9a4e128181aa594f2bac7fc822a2e6fe8aae3. Group-result parsing now accepts
+JSON object-order, whitespace, and equivalent Unicode-escape differences only
+when the decoded schema and every value match the canonical serialization.
+Duplicate keys, unknown or missing fields, non-finite constants, invalid
+types/actions/replacements, group/request mismatches, and provenance failures
+remain rejected. Receipt V1 and canonical group-request serialization are
+unchanged; validation still checks the receipt against the original result
+bytes before parsing. The stored result was not rewritten.
+
+Offline checks passed: CLEAN/group review 78; native review bridge 31;
+deployment diagnostics, quality-review runner 86, Normal Mode 19, controller
+106, Stage12 bulk runner, and Stage12 batch smoke. Python compilation and
+git diff --check passed.
+
+Read-only replay of the existing P2-M7 FNS-247 evidence passed with the
+independent local intent, native receipt V1, diagnostic sidecar, original
+result bytes/SHA, and P2-L execution validator. The P2-I package, first-pass,
+parent review request/result, and source fingerprints match the saved group
+scope; the single result is REPAIR. No CLEAN/proof/report was generated.
+
+Code and regression tests were pushed as 92cb941 on
+codex-stage11-p2m9-20261014. Production remains on P1
+d59bc4fd7baa5e8c7dbfbff63d7acccadd899964; the Normal timer is
+disabled/inactive and service inactive. The protected dirty worktree remains
+unchanged. No new Hermes/Whisper calls or production writes occurred. Next:
+separately authorize isolated CLEAN generation and read-only Stage12 artifact
+validation; this checkpoint does not authorize publishing or deployment.
