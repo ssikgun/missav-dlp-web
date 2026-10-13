@@ -11590,3 +11590,48 @@ write occurred; the protected dirty worktree remains untouched. P2-E E2E is
 FAIL at the review bridge stage, while the first-pass translation itself passed
 its local binding checks. Next: inspect retained CT120 review-call failure
 evidence read-only; do not rerun models as part of this checkpoint.
+
+
+## 2026-10-13 Stage11 P2-F — CT120 review failure investigation (ROOT_CAUSE=UNKNOWN)
+
+A read-only trace matched the P2-E local staging UUID to the exact CT120 review
+session and its task directory under
+`/home/teddy/.hermes/profiles/subtitle-translator/stage12-bulk-runtime-v1/`.
+The directory contained the private review input and a remote result. The result
+SHA-256 was `6527c927e40e43db04ae54ee4c2928d952060cf62a3808aa56fdbd9a5261dd52`;
+its request digest matched the input, and its schema, cue count/order, and cue
+field shape matched the saved request (313 cues; 308 KEEP, 5 REPAIR). This is
+only structural evidence: the nonzero native invocation prevented CT108 from
+reading and accepting the result. The earlier P2-E3 statement that no review
+result existed applies to the local staging directory; a remote result had been
+written but was not consumed.
+
+The exact SessionDB record identifies source `stage11-quality-review`, profile
+`subtitle-translator`, and model `gpt-5.6-luna`. It contains 23 messages, 7 API
+calls and 15 tool calls. The last recorded event is a successful terminal tool
+result (`exit_code=0`); the session has no `ended_at` or `end_reason`, and no
+matching process remains. The task directory contains only input and result;
+no native stderr/stdout receipt or numeric Hermes exit status was retained.
+
+The P2-D source confirms that `SSHRemoteHermesBridge.launch_quality_review()`
+checks the private task path, launches the native Hermes command with stdout
+and stderr redirected to `DEVNULL`, and propagates a nonzero child status.
+`SSHRemoteHermesBridge._run()` then maps the SSH command's nonzero exit to the
+local `Stage11DeploymentTransportError: CT120 native command failed`. Since the
+exact task and result exist and the session shows tool execution, the command
+reached Hermes; the failure is at native-command completion, not an observed
+SSH connection exception. The local runner recorded exit status 1, but the
+Hermes child exit code and its lower-level error are unknown. The review runner
+default timeout is 600 seconds; the recorded session start-to-result interval
+was about 470 seconds, and no timeout exception or timeout record exists.
+Therefore do not attribute this to a model, profile, file, resource, or timeout
+cause: `ROOT_CAUSE=UNKNOWN`.
+
+No review result was accepted, no Targeted ASR ran, and no CLEAN/proof/report
+was created; Stage12 validation was not called. Production remains on P1
+`d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`, Normal timer disabled/inactive and
+service inactive; FNS-247 remains PUBLISHED at sequence 4. No production DB,
+queue, NAS, Jellyfin, or existing subtitle was changed, and the protected dirty
+worktree remains untouched. Minimal follow-up: preserve the native child exit
+code and a bounded, sanitized stderr/error class in the existing failure record
+before any separately approved retry.
