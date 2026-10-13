@@ -137,8 +137,28 @@ QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME = (
 )
 QUALITY_REVIEW_EXECUTION_RECEIPT_MAX_BYTES = 4096
 QUALITY_REVIEW_EXECUTION_RESULT_MAX_BYTES = 16 * 1024 * 1024
+QUALITY_REVIEW_EXECUTION_INTENT_FILENAME = (
+    "stage11-quality-review-execution-intent-v1.json"
+)
+QUALITY_REVIEW_EXECUTION_DIAGNOSTIC_FILENAME = (
+    "stage11-quality-review-execution-diagnostic-v1.json"
+)
+QUALITY_REVIEW_EXECUTION_INTENT_MAX_BYTES = 4096
+QUALITY_REVIEW_EXECUTION_DIAGNOSTIC_MAX_BYTES = 4096
+QUALITY_REVIEW_EXECUTION_STDERR_MAX_BYTES = 8192
 _REVIEW_SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 _REVIEW_NONCE_RE = re.compile(r"[0-9a-f]{64}\Z")
+_QUALITY_REVIEW_PHASES = {
+    "PREFLIGHT", "INPUT_VERIFIED", "CHILD_START", "CHILD_EXIT",
+    "RESULT_CHECK", "RECEIPT_WRITE",
+}
+_QUALITY_REVIEW_ERROR_CLASSES = {
+    "NONE", "CLI_ARGUMENT_ERROR", "PROFILE_SESSION_ERROR",
+    "AUTH_PROVIDER_ERROR", "FILE_PERMISSION_ERROR", "EXECUTABLE_ERROR",
+    "TIMEOUT", "UNKNOWN_NONZERO", "PREFLIGHT_ERROR",
+    "INPUT_VALIDATION_ERROR", "RESULT_MISSING", "RESULT_INVALID",
+    "RECEIPT_WRITE_ERROR",
+}
 
 
 def _safe_review_diagnostic(value: object) -> dict | None:
@@ -156,6 +176,12 @@ def _safe_review_diagnostic(value: object) -> dict | None:
         "REMOTE_RESULT_MISMATCH", "REMOTE_RESULT_CONFIRMATION_FAILED",
         "REMOTE_RECEIPT_CONFLICT",
     }
+    phase = value.get("execution_phase")
+    if type(phase) is str and phase in _QUALITY_REVIEW_PHASES:
+        result["execution_phase"] = phase
+    error_class = value.get("error_class")
+    if type(error_class) is str and error_class in _QUALITY_REVIEW_ERROR_CLASSES:
+        result["error_class"] = error_class
     stage = value.get("stage")
     if type(stage) is str and stage in {"ssh", "review_execution", "review_result"}:
         result["stage"] = stage
@@ -175,12 +201,17 @@ def _safe_review_diagnostic(value: object) -> dict | None:
         digest = value.get(name)
         if type(digest) is str and _REVIEW_SHA256_RE.fullmatch(digest):
             result[name] = digest
-    nonce = value.get("receipt_nonce")
-    if type(nonce) is str and _REVIEW_NONCE_RE.fullmatch(nonce):
-        result["receipt_nonce"] = nonce
-    for name in ("child_returncode", "ssh_returncode", "result_size_bytes"):
+    for name in (
+        "child_returncode", "ssh_returncode", "result_size_bytes",
+        "stderr_bytes_observed",
+    ):
         number = value.get(name)
-        if type(number) is int and -255 <= number <= QUALITY_REVIEW_EXECUTION_RESULT_MAX_BYTES:
+        upper = (
+            QUALITY_REVIEW_EXECUTION_STDERR_MAX_BYTES + 1
+            if name == "stderr_bytes_observed"
+            else QUALITY_REVIEW_EXECUTION_RESULT_MAX_BYTES
+        )
+        if type(number) is int and -255 <= number <= upper:
             result[name] = number
     child_outcome = value.get("child_outcome")
     if type(child_outcome) is str and child_outcome in {"COMPLETED", "NONZERO", "START_FAILED", "TIMEOUT"}:
@@ -188,6 +219,9 @@ def _safe_review_diagnostic(value: object) -> dict | None:
     result_state = value.get("result_state")
     if type(result_state) is str and result_state in {"PRESENT", "ABSENT", "INVALID"}:
         result["result_state"] = result_state
+    stderr_truncated = value.get("stderr_truncated")
+    if type(stderr_truncated) is bool:
+        result["stderr_truncated"] = stderr_truncated
     return result or None
 
 
@@ -266,6 +300,217 @@ def _parse_review_execution_receipt(
     elif result_sha is not None or result_size is not None:
         raise Stage11DeploymentValidationError("non-present review result has a fingerprint")
     return value
+
+
+def _parse_quality_review_execution_intent(
+    payload: bytes,
+    *,
+    session_id: str,
+    task_sha256: str,
+    request_sha256: str,
+) -> dict:
+    """Validate the local pre-launch nonce record independently of the receipt."""
+    if (
+        type(payload) is not bytes
+        or not 0 < len(payload) <= QUALITY_REVIEW_EXECUTION_INTENT_MAX_BYTES
+    ):
+        raise Stage11DeploymentValidationError("review execution intent is outside bounds")
+    try:
+        value = json.loads(
+            payload.decode("utf-8", errors="strict"),
+            object_pairs_hook=_unique_review_receipt_object,
+        )
+    except (ValueError, UnicodeError, RecursionError) as error:
+        raise Stage11DeploymentValidationError("review execution intent is malformed") from error
+    if json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8") != payload:
+        raise Stage11DeploymentValidationError("review execution intent is not canonical")
+    fields = {
+        "schema_version", "session_id", "task_sha256", "request_sha256",
+        "receipt_nonce",
+    }
+    if type(value) is not dict or set(value) != fields:
+        raise Stage11DeploymentValidationError("review execution intent fields are invalid")
+    if (
+        type(value["schema_version"]) is not int
+        or value["schema_version"] != 1
+        or type(value["session_id"]) is not str
+        or value["session_id"] != _require_session_id(session_id)
+        or type(value["task_sha256"]) is not str
+        or value["task_sha256"] != task_sha256
+        or not _REVIEW_SHA256_RE.fullmatch(value["task_sha256"])
+        or type(value["request_sha256"]) is not str
+        or value["request_sha256"] != request_sha256
+        or not _REVIEW_SHA256_RE.fullmatch(value["request_sha256"])
+        or type(value["receipt_nonce"]) is not str
+        or not _REVIEW_NONCE_RE.fullmatch(value["receipt_nonce"])
+    ):
+        raise Stage11DeploymentValidationError("review execution intent identity differs")
+    return value
+
+
+def _parse_quality_review_execution_diagnostic(
+    payload: bytes,
+    *,
+    intent: Mapping,
+) -> dict:
+    """Validate bounded remote diagnostics against locally saved launch intent."""
+    if (
+        type(payload) is not bytes
+        or not 0 < len(payload) <= QUALITY_REVIEW_EXECUTION_DIAGNOSTIC_MAX_BYTES
+    ):
+        raise Stage11DeploymentValidationError("review execution diagnostic is outside bounds")
+    try:
+        value = json.loads(
+            payload.decode("utf-8", errors="strict"),
+            object_pairs_hook=_unique_review_receipt_object,
+        )
+    except (ValueError, UnicodeError, RecursionError) as error:
+        raise Stage11DeploymentValidationError("review execution diagnostic is malformed") from error
+    if json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8") != payload:
+        raise Stage11DeploymentValidationError("review execution diagnostic is not canonical")
+    fields = {
+        "schema_version", "session_id", "task_sha256", "request_sha256",
+        "input_sha256", "receipt_nonce_sha256", "phase", "failure_phase", "error_class",
+        "child_outcome", "child_returncode", "result_state", "result_sha256",
+        "result_size_bytes", "stderr_bytes_observed", "stderr_truncated",
+    }
+    if type(value) is not dict or set(value) != fields:
+        raise Stage11DeploymentValidationError("review execution diagnostic fields are invalid")
+    phase = value["phase"]
+    failure_phase = value["failure_phase"]
+    error_class = value["error_class"]
+    child_outcome = value["child_outcome"]
+    result_state = value["result_state"]
+    input_sha = value["input_sha256"]
+    result_sha = value["result_sha256"]
+    child_code = value["child_returncode"]
+    result_size = value["result_size_bytes"]
+    observed = value["stderr_bytes_observed"]
+    if (
+        type(value["schema_version"]) is not int
+        or value["schema_version"] != 1
+        or value["session_id"] != intent["session_id"]
+        or value["task_sha256"] != intent["task_sha256"]
+        or value["request_sha256"] != intent["request_sha256"]
+        or value["receipt_nonce_sha256"]
+        != hashlib.sha256(intent["receipt_nonce"].encode("ascii")).hexdigest()
+        or type(phase) is not str
+        or phase not in _QUALITY_REVIEW_PHASES
+        or (failure_phase is not None and (
+            type(failure_phase) is not str
+            or failure_phase not in _QUALITY_REVIEW_PHASES
+        ))
+        or type(error_class) is not str
+        or error_class not in _QUALITY_REVIEW_ERROR_CLASSES
+        or (child_outcome is not None and (
+            type(child_outcome) is not str
+            or child_outcome not in {"COMPLETED", "NONZERO", "START_FAILED", "TIMEOUT"}
+        ))
+        or (result_state is not None and (
+            type(result_state) is not str
+            or result_state not in {"PRESENT", "ABSENT", "INVALID"}
+        ))
+        or (input_sha is not None and (
+            type(input_sha) is not str
+            or not _REVIEW_SHA256_RE.fullmatch(input_sha)
+            or input_sha != intent["request_sha256"]
+        ))
+        or (result_sha is not None and (
+            type(result_sha) is not str
+            or not _REVIEW_SHA256_RE.fullmatch(result_sha)
+        ))
+        or (child_code is not None and (
+            type(child_code) is not int or not -255 <= child_code <= 255
+        ))
+        or (result_size is not None and (
+            type(result_size) is not int
+            or not 0 <= result_size <= QUALITY_REVIEW_EXECUTION_RESULT_MAX_BYTES
+        ))
+        or type(observed) is not int
+        or not 0 <= observed <= QUALITY_REVIEW_EXECUTION_STDERR_MAX_BYTES + 1
+        or type(value["stderr_truncated"]) is not bool
+        or value["stderr_truncated"]
+        != (observed > QUALITY_REVIEW_EXECUTION_STDERR_MAX_BYTES)
+    ):
+        raise Stage11DeploymentValidationError("review execution diagnostic identity or values are invalid")
+    if result_state == "PRESENT":
+        if result_sha is None or type(result_size) is not int or result_size <= 0:
+            raise Stage11DeploymentValidationError("review diagnostic result fingerprint is incomplete")
+    elif result_sha is not None or result_size is not None:
+        raise Stage11DeploymentValidationError("non-present diagnostic result has a fingerprint")
+    if child_outcome == "TIMEOUT" and error_class != "TIMEOUT":
+        raise Stage11DeploymentValidationError("review timeout diagnostic is inconsistent")
+    if child_outcome == "TIMEOUT" and failure_phase != "CHILD_EXIT":
+        raise Stage11DeploymentValidationError("review timeout phase is inconsistent")
+    if child_outcome == "START_FAILED" and error_class not in {
+        "EXECUTABLE_ERROR", "FILE_PERMISSION_ERROR",
+    }:
+        raise Stage11DeploymentValidationError("review start diagnostic is inconsistent")
+    if child_outcome == "START_FAILED" and failure_phase != "CHILD_START":
+        raise Stage11DeploymentValidationError("review start phase is inconsistent")
+    if child_outcome == "NONZERO" and error_class in {
+        "NONE", "TIMEOUT", "RESULT_MISSING", "RESULT_INVALID", "RECEIPT_WRITE_ERROR",
+    }:
+        raise Stage11DeploymentValidationError("review nonzero diagnostic is inconsistent")
+    if child_outcome == "NONZERO" and failure_phase != "CHILD_EXIT":
+        raise Stage11DeploymentValidationError("review nonzero phase is inconsistent")
+    if child_outcome == "COMPLETED":
+        expected_error = {
+            "PRESENT": "NONE",
+            "ABSENT": "RESULT_MISSING",
+            "INVALID": "RESULT_INVALID",
+        }.get(result_state)
+        if error_class != expected_error and error_class != "RECEIPT_WRITE_ERROR":
+            raise Stage11DeploymentValidationError("review completion diagnostic is inconsistent")
+        expected_failure_phase = "RESULT_CHECK" if expected_error != "NONE" else None
+        if error_class != "RECEIPT_WRITE_ERROR" and failure_phase != expected_failure_phase:
+            raise Stage11DeploymentValidationError("review completion phase is inconsistent")
+    parsed = dict(value)
+    parsed["execution_phase"] = failure_phase or phase
+    return parsed
+
+
+def validate_quality_review_execution_diagnostic(
+    intent_payload: bytes,
+    diagnostic_payload: bytes,
+    receipt_payload: bytes,
+    *,
+    session_id: str,
+    task_sha256: str,
+    request_sha256: str,
+) -> dict:
+    """Bind the diagnostic sidecar to pre-launch intent and unchanged receipt V1."""
+    intent = _parse_quality_review_execution_intent(
+        intent_payload, session_id=session_id, task_sha256=task_sha256,
+        request_sha256=request_sha256,
+    )
+    diagnostic = _parse_quality_review_execution_diagnostic(
+        diagnostic_payload, intent=intent,
+    )
+    receipt = _parse_review_execution_receipt(
+        receipt_payload, session_id=session_id, task_sha256=task_sha256,
+        request_sha256=request_sha256, input_sha256=request_sha256,
+        receipt_nonce=intent["receipt_nonce"],
+    )
+    if (
+        diagnostic["phase"] != "RECEIPT_WRITE"
+        or diagnostic["input_sha256"] != receipt["input_sha256"]
+        or diagnostic["child_outcome"] != receipt["child_outcome"]
+        or diagnostic["child_returncode"] != receipt["child_returncode"]
+        or diagnostic["result_state"] != receipt["result_state"]
+        or diagnostic["result_sha256"] != receipt["result_sha256"]
+        or diagnostic["result_size_bytes"] != receipt["result_size_bytes"]
+    ):
+        raise Stage11DeploymentValidationError("review diagnostic differs from receipt")
+    if receipt["child_outcome"] == "COMPLETED":
+        receipt_error = {
+            "PRESENT": "NONE",
+            "ABSENT": "RESULT_MISSING",
+            "INVALID": "RESULT_INVALID",
+        }[receipt["result_state"]]
+        if diagnostic["error_class"] != receipt_error:
+            raise Stage11DeploymentValidationError("review diagnostic completion class differs from receipt")
+    return diagnostic
 
 
 def assess_quality_review_recovery(
@@ -906,7 +1151,7 @@ def _private_local_read_at(fd: int, filename: str, *, max_bytes: int) -> bytes:
 def _private_local_write_at(fd: int, filename: str, payload: bytes) -> None:
     if type(payload) is not bytes or not payload:
         raise Stage11DeploymentValidationError(
-            "private review result must be nonempty bytes"
+            "private review evidence must be nonempty bytes"
         )
     try:
         descriptor = os.open(
@@ -920,19 +1165,19 @@ def _private_local_write_at(fd: int, filename: str, payload: bytes) -> None:
         )
     except OSError as error:
         raise Stage11DeploymentValidationError(
-            "private review result destination is not absent"
+            "private review evidence destination is not absent"
         ) from error
     try:
         os.fchmod(descriptor, STATEFUL_TRANSLATOR_PRIVATE_FILE_MODE)
         written = os.write(descriptor, payload)
         if written != len(payload):
             raise Stage11DeploymentValidationError(
-                "private review result write was short"
+                "private review evidence write was short"
             )
         os.fsync(descriptor)
     except OSError as error:
         raise Stage11DeploymentValidationError(
-            "private review result write failed"
+            "private review evidence write failed"
         ) from error
     finally:
         os.close(descriptor)
@@ -1306,6 +1551,7 @@ finally:
         self,
         command: list[str],
         *,
+        local_task_fd: int,
         remote_task: str,
         timeout: int | float,
         session_id: str,
@@ -1354,15 +1600,54 @@ finally:
             )
         task_sha256 = hashlib.sha256(remote_task.encode("utf-8")).hexdigest()
         receipt_path = remote_task + "/" + QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME
+        diagnostic_path = remote_task + "/" + QUALITY_REVIEW_EXECUTION_DIAGNOSTIC_FILENAME
+        if type(local_task_fd) is not int or local_task_fd < 0:
+            raise Stage11DeploymentValidationError(
+                "native review launch lacks a pinned local task directory"
+            )
+        local_info = os.fstat(local_task_fd)
+        if (
+            not stat.S_ISDIR(local_info.st_mode)
+            or local_info.st_uid != os.geteuid()
+            or stat.S_IMODE(local_info.st_mode) != 0o700
+        ):
+            raise Stage11DeploymentValidationError(
+                "local review task directory is not private"
+            )
+        intent_value = {
+            "schema_version": 1,
+            "session_id": session_id,
+            "task_sha256": task_sha256,
+            "request_sha256": request_sha256,
+            "receipt_nonce": receipt_nonce,
+        }
+        intent_payload = json.dumps(
+            intent_value, sort_keys=True, separators=(",", ":")
+        ).encode("ascii")
+        _private_local_write_at(
+            local_task_fd, QUALITY_REVIEW_EXECUTION_INTENT_FILENAME,
+            intent_payload,
+        )
+        local_intent_payload = _private_local_read_at(
+            local_task_fd, QUALITY_REVIEW_EXECUTION_INTENT_FILENAME,
+            max_bytes=QUALITY_REVIEW_EXECUTION_INTENT_MAX_BYTES,
+        )
+        local_intent = _parse_quality_review_execution_intent(
+            local_intent_payload, session_id=session_id,
+            task_sha256=task_sha256, request_sha256=request_sha256,
+        )
         encoded = base64.b64encode(
             json.dumps(command, ensure_ascii=True, separators=(",", ":")).encode(
                 "utf-8"
             )
         ).decode("ascii")
         script = """
-import base64, hashlib, json, os, stat, subprocess, sys
+import base64, errno, hashlib, json, os, selectors, signal, stat, subprocess, sys, time
 task, encoded, session_id, request_sha, nonce, timeout_text, input_name, result_name = sys.argv[1:9]
 timeout = float(timeout_text)
+receipt_name = "stage11-quality-review-execution-receipt.json"
+diagnostic_name = "stage11-quality-review-execution-diagnostic-v1.json"
+stderr_limit = 8192
 if any('/' in name or name in ('', '.', '..') for name in (input_name, result_name)):
     raise SystemExit(10)
 task_fd = os.open(task, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
@@ -1371,47 +1656,180 @@ if (not stat.S_ISDIR(info.st_mode)
         or info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700):
     raise SystemExit(2)
 task_hash = hashlib.sha256(os.fsencode(task)).hexdigest()
-receipt_name = "stage11-quality-review-execution-receipt.json"
+diag = {"schema_version": 1, "session_id": session_id, "task_sha256": task_hash,
+        "request_sha256": request_sha, "input_sha256": None,
+        "receipt_nonce_sha256": hashlib.sha256(nonce.encode("ascii")).hexdigest(),
+        "phase": "PREFLIGHT", "failure_phase": None,
+        "error_class": "NONE", "child_outcome": None,
+        "child_returncode": None, "result_state": None, "result_sha256": None,
+        "result_size_bytes": None, "stderr_bytes_observed": 0,
+        "stderr_truncated": False}
+diag_fd = os.open(diagnostic_name,
+                  os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                  0o600, dir_fd=task_fd)
+os.fchmod(diag_fd, 0o600)
+def write_diag():
+    payload = json.dumps(diag, sort_keys=True, separators=(",", ":")).encode("ascii")
+    if len(payload) > 4096:
+        raise OSError(errno.EFBIG, "diagnostic outside bound")
+    os.lseek(diag_fd, 0, os.SEEK_SET)
+    os.ftruncate(diag_fd, 0)
+    view = memoryview(payload)
+    while view:
+        count = os.write(diag_fd, view)
+        view = view[count:]
+    os.fsync(diag_fd)
+def fail(code, error_class):
+    diag["failure_phase"] = diag["phase"]
+    diag["error_class"] = error_class
+    write_diag()
+    os.close(diag_fd)
+    os.close(task_fd)
+    raise SystemExit(code)
+write_diag()
 for name in (result_name, receipt_name):
     try:
         os.stat(name, dir_fd=task_fd, follow_symlinks=False)
     except FileNotFoundError:
         continue
-    raise SystemExit(5)
-fd = os.open(input_name,
-             os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=task_fd)
+    fail(5, "PREFLIGHT_ERROR")
+try:
+    fd = os.open(input_name,
+                 os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=task_fd)
+except OSError:
+    fail(6, "INPUT_VALIDATION_ERROR")
 try:
     input_info = os.fstat(fd)
     if (not stat.S_ISREG(input_info.st_mode) or input_info.st_nlink != 1
             or input_info.st_uid != os.geteuid() or stat.S_IMODE(input_info.st_mode) != 0o600
             or not 0 < input_info.st_size <= 16 * 1024 * 1024):
-        raise SystemExit(6)
+        os.close(fd)
+        fail(6, "INPUT_VALIDATION_ERROR")
     input_hash = hashlib.sha256()
     while True:
         chunk = os.read(fd, 65536)
         if not chunk:
             break
         input_hash.update(chunk)
-finally:
-    os.close(fd)
-if input_hash.hexdigest() != request_sha:
-    raise SystemExit(7)
-command = json.loads(base64.b64decode(encoded).decode("utf-8"))
-if type(command) is not list or not all(type(item) is str for item in command):
-    raise SystemExit(3)
-outcome, returncode = "START_FAILED", None
-try:
-    completed = subprocess.run(command, cwd="/proc/self/fd/" + str(task_fd),
-                               pass_fds=(task_fd,), stdin=subprocess.DEVNULL,
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                               timeout=timeout, check=False)
-    returncode = int(completed.returncode)
-    outcome = "COMPLETED" if returncode == 0 else "NONZERO"
-except subprocess.TimeoutExpired:
-    outcome = "TIMEOUT"
 except OSError:
-    outcome = "START_FAILED"
-
+    fail(6, "INPUT_VALIDATION_ERROR")
+finally:
+    try:
+        os.close(fd)
+    except OSError:
+        pass
+input_digest = input_hash.hexdigest()
+if input_digest != request_sha:
+    fail(7, "INPUT_VALIDATION_ERROR")
+diag["input_sha256"] = input_digest
+diag["phase"] = "INPUT_VERIFIED"
+write_diag()
+try:
+    command = json.loads(base64.b64decode(encoded, validate=True).decode("utf-8"))
+except Exception:
+    fail(3, "PREFLIGHT_ERROR")
+if (type(command) is not list or not command
+        or not all(type(item) is str and "\\x00" not in item for item in command)):
+    fail(3, "PREFLIGHT_ERROR")
+diag["phase"] = "CHILD_START"
+write_diag()
+retained = bytearray()
+total_stderr = 0
+def classify_stderr(data):
+    text = data.decode("utf-8", "replace").lower()
+    if any(token in text for token in ("unrecognized arguments", "unknown option", "invalid choice", "usage:")):
+        return "CLI_ARGUMENT_ERROR"
+    if any(token in text for token in ("session not found", "invalid session", "no session", "session does not exist", "profile not found", "invalid profile", "active profile")):
+        return "PROFILE_SESSION_ERROR"
+    if any(token in text for token in ("unauthorized", "invalid api key", "authentication failed", "provider error", "http 401", "http 403", "http 429", "rate limit", "quota exceeded")):
+        return "AUTH_PROVIDER_ERROR"
+    if any(token in text for token in ("permission denied", "operation not permitted", "access denied")):
+        return "FILE_PERMISSION_ERROR"
+    return "UNKNOWN_NONZERO"
+outcome, returncode = "START_FAILED", None
+error_class = "EXECUTABLE_ERROR"
+timed_out = False
+process = None
+try:
+    process = subprocess.Popen(command, cwd="/proc/self/fd/" + str(task_fd),
+                               pass_fds=(task_fd,), stdin=subprocess.DEVNULL,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                               start_new_session=True, close_fds=True)
+except OSError as error:
+    if error.errno in (errno.EACCES, errno.EPERM):
+        error_class = "FILE_PERMISSION_ERROR"
+    elif error.errno in (errno.ENOENT, errno.ENOEXEC):
+        error_class = "EXECUTABLE_ERROR"
+    else:
+        error_class = "EXECUTABLE_ERROR"
+else:
+    selector = selectors.DefaultSelector()
+    selector.register(process.stderr, selectors.EVENT_READ)
+    deadline = time.monotonic() + timeout
+    eof = False
+    while not eof:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            timed_out = True
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except OSError:
+                pass
+            try:
+                process.wait(timeout=0.5)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except OSError:
+                    pass
+                process.wait()
+        events = selector.select(0.05 if timed_out else min(0.1, remaining))
+        if not events:
+            if process.poll() is not None and timed_out:
+                break
+            continue
+        try:
+            chunk = os.read(process.stderr.fileno(), 4096)
+        except OSError:
+            chunk = b""
+        if not chunk:
+            eof = True
+            try:
+                selector.unregister(process.stderr)
+            except Exception:
+                pass
+            break
+        total_stderr = min(stderr_limit + 1, total_stderr + len(chunk))
+        room = stderr_limit - len(retained)
+        if room > 0:
+            retained.extend(chunk[:room])
+    selector.close()
+    process.stderr.close()
+    returncode = process.wait()
+    if timed_out:
+        outcome, returncode, error_class = "TIMEOUT", None, "TIMEOUT"
+    elif returncode == 0:
+        outcome, error_class = "COMPLETED", "NONE"
+    else:
+        outcome, error_class = "NONZERO", classify_stderr(bytes(retained))
+    retained.clear()
+if outcome == "START_FAILED":
+    diag["phase"] = "CHILD_START"
+    diag["failure_phase"] = "CHILD_START"
+elif error_class != "NONE":
+    diag["phase"] = "CHILD_EXIT"
+    diag["failure_phase"] = "CHILD_EXIT"
+else:
+    diag["phase"] = "CHILD_EXIT"
+    diag["failure_phase"] = None
+diag["error_class"] = error_class
+diag["child_outcome"] = outcome
+diag["child_returncode"] = returncode
+diag["stderr_bytes_observed"] = total_stderr
+diag["stderr_truncated"] = total_stderr > stderr_limit
+write_diag()
+diag["phase"] = "RESULT_CHECK"
+write_diag()
 result_state, result_hash, result_size = "ABSENT", None, None
 try:
     result_fd = os.open(result_name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
@@ -1444,28 +1862,54 @@ else:
                 result_state, result_hash, result_size = "PRESENT", digest.hexdigest(), size
             elif result_state != "INVALID":
                 result_state = "INVALID"
+    except OSError:
+        result_state = "INVALID"
     finally:
         os.close(result_fd)
+if error_class == "NONE" and result_state == "ABSENT":
+    error_class = "RESULT_MISSING"
+    diag["failure_phase"] = "RESULT_CHECK"
+elif error_class == "NONE" and result_state == "INVALID":
+    error_class = "RESULT_INVALID"
+    diag["failure_phase"] = "RESULT_CHECK"
+diag["error_class"] = error_class
+diag["result_state"] = result_state
+diag["result_sha256"] = result_hash
+diag["result_size_bytes"] = result_size
+diag["phase"] = "RECEIPT_WRITE"
+write_diag()
 receipt = {"schema_version": 1, "session_id": session_id,
            "task_sha256": task_hash,
-           "request_sha256": request_sha, "input_sha256": input_hash.hexdigest(),
+           "request_sha256": request_sha, "input_sha256": input_digest,
            "receipt_nonce": nonce, "child_outcome": outcome,
            "child_returncode": returncode, "result_state": result_state,
            "result_sha256": result_hash, "result_size_bytes": result_size}
 payload = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode("ascii")
-receipt_fd = os.open(receipt_name,
-                     os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                     0o600, dir_fd=task_fd)
 try:
-    os.fchmod(receipt_fd, 0o600)
-    view = memoryview(payload)
-    while view:
-        written = os.write(receipt_fd, view)
-        view = view[written:]
-    os.fsync(receipt_fd)
-finally:
-    os.close(receipt_fd)
-os.fsync(task_fd)
+    receipt_fd = os.open(receipt_name,
+                         os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                         0o600, dir_fd=task_fd)
+    try:
+        os.fchmod(receipt_fd, 0o600)
+        view = memoryview(payload)
+        while view:
+            written = os.write(receipt_fd, view)
+            view = view[written:]
+        os.fsync(receipt_fd)
+    finally:
+        os.close(receipt_fd)
+    os.fsync(task_fd)
+except OSError:
+    diag["error_class"] = "RECEIPT_WRITE_ERROR"
+    diag["failure_phase"] = "RECEIPT_WRITE"
+    try:
+        write_diag()
+    finally:
+        os.close(diag_fd)
+        os.close(task_fd)
+    raise SystemExit(20)
+os.fsync(diag_fd)
+os.close(diag_fd)
 os.close(task_fd)
 """
         diagnostic = {
@@ -1473,8 +1917,26 @@ os.close(task_fd)
             "session_id": session_id,
             "task_sha256": task_sha256,
             "request_sha256": request_sha256,
-            "receipt_nonce": receipt_nonce,
         }
+
+        def read_execution_diagnostic(receipt_payload: bytes | None = None) -> dict | None:
+            try:
+                raw = self.read_regular(
+                    diagnostic_path,
+                    max_bytes=QUALITY_REVIEW_EXECUTION_DIAGNOSTIC_MAX_BYTES,
+                )
+                if receipt_payload is not None:
+                    return validate_quality_review_execution_diagnostic(
+                        local_intent_payload, raw, receipt_payload,
+                        session_id=session_id, task_sha256=task_sha256,
+                        request_sha256=request_sha256,
+                    )
+                return _parse_quality_review_execution_diagnostic(
+                    raw, intent=local_intent,
+                )
+            except (Stage11DeploymentError, OSError, TypeError, ValueError):
+                return None
+
         try:
             self._python(
                 script,
@@ -1492,6 +1954,7 @@ os.close(task_fd)
             # The SSH channel can fail after the remote wrapper wrote its
             # receipt. Read it through a new SSH command, but never promote the
             # result on this path; it remains eligible only for explicit review.
+            remote_diagnostic = read_execution_diagnostic()
             try:
                 raw_receipt = self.read_regular(
                     receipt_path,
@@ -1516,6 +1979,10 @@ os.close(task_fd)
                         "state": "SSH_FAILED_NO_RECEIPT",
                         "transport_state": transport_diagnostic.get("state"),
                         "ssh_returncode": transport_diagnostic.get("ssh_returncode"),
+                        "execution_phase": (remote_diagnostic or {}).get("execution_phase"),
+                        "error_class": (remote_diagnostic or {}).get("error_class"),
+                        "stderr_bytes_observed": (remote_diagnostic or {}).get("stderr_bytes_observed"),
+                        "stderr_truncated": (remote_diagnostic or {}).get("stderr_truncated"),
                     },
                 ) from transport_error
             raise Stage11DeploymentTransportError(
@@ -1529,6 +1996,10 @@ os.close(task_fd)
                     "result_sha256": receipt["result_sha256"],
                     "result_size_bytes": receipt["result_size_bytes"],
                     "input_sha256": receipt["input_sha256"],
+                    "execution_phase": (remote_diagnostic or {}).get("execution_phase"),
+                    "error_class": (remote_diagnostic or {}).get("error_class"),
+                    "stderr_bytes_observed": (remote_diagnostic or {}).get("stderr_bytes_observed"),
+                    "stderr_truncated": (remote_diagnostic or {}).get("stderr_truncated"),
                 },
             ) from transport_error
         try:
@@ -1545,10 +2016,16 @@ os.close(task_fd)
                 receipt_nonce=receipt_nonce,
             )
         except (Stage11DeploymentError, OSError) as error:
+            remote_diagnostic = read_execution_diagnostic()
             raise Stage11DeploymentTransportError(
                 "CT120 review execution receipt is unavailable or invalid",
-                diagnostic={**diagnostic, "state": "RECEIPT_INVALID"},
+                diagnostic={**diagnostic, "state": "RECEIPT_INVALID",
+                            "execution_phase": (remote_diagnostic or {}).get("execution_phase"),
+                            "error_class": (remote_diagnostic or {}).get("error_class"),
+                            "stderr_bytes_observed": (remote_diagnostic or {}).get("stderr_bytes_observed"),
+                            "stderr_truncated": (remote_diagnostic or {}).get("stderr_truncated")},
             ) from error
+        remote_diagnostic = read_execution_diagnostic(raw_receipt)
         child_outcome = receipt["child_outcome"]
         if child_outcome != "COMPLETED" or receipt["child_returncode"] != 0:
             state = {
@@ -1564,7 +2041,11 @@ os.close(task_fd)
                             "result_state": receipt["result_state"],
                             "result_sha256": receipt["result_sha256"],
                             "result_size_bytes": receipt["result_size_bytes"],
-                            "input_sha256": receipt["input_sha256"]},
+                            "input_sha256": receipt["input_sha256"],
+                            "execution_phase": (remote_diagnostic or {}).get("execution_phase"),
+                            "error_class": (remote_diagnostic or {}).get("error_class"),
+                            "stderr_bytes_observed": (remote_diagnostic or {}).get("stderr_bytes_observed"),
+                            "stderr_truncated": (remote_diagnostic or {}).get("stderr_truncated")},
             )
         if receipt["result_state"] != "PRESENT":
             raise Stage11DeploymentTransportError(
@@ -1574,11 +2055,14 @@ os.close(task_fd)
                             "child_outcome": child_outcome,
                             "child_returncode": receipt["child_returncode"],
                             "result_state": receipt["result_state"],
-                            "input_sha256": receipt["input_sha256"]},
+                            "input_sha256": receipt["input_sha256"],
+                            "execution_phase": (remote_diagnostic or {}).get("execution_phase"),
+                            "error_class": (remote_diagnostic or {}).get("error_class")},
             )
         return SimpleNamespace(
             returncode=0,
             execution_receipt=receipt,
+            execution_diagnostic=remote_diagnostic,
         )
 
 
@@ -1759,6 +2243,7 @@ def _hybrid_launcher_factory(
             }
         completed = launch(
             remote_command,
+            local_task_fd=cwd,
             remote_task=remote_task,
             timeout=timeout,
             session_id=session_id,
@@ -1790,8 +2275,7 @@ def _hybrid_launcher_factory(
             raise Stage11DeploymentTransportError(
                 "CT120 review launcher returned no valid completion receipt",
                 diagnostic={"stage": "review_execution", "state": "RECEIPT_INVALID",
-                            "session_id": session_id, "request_sha256": request_sha,
-                            "receipt_nonce": receipt_nonce},
+                            "session_id": session_id, "request_sha256": request_sha},
             ) from error
         if (
             receipt["child_outcome"] != "COMPLETED"
@@ -1802,7 +2286,6 @@ def _hybrid_launcher_factory(
                 "CT120 review receipt does not prove a successful result",
                 diagnostic={"stage": "review_execution", "state": "REMOTE_RESULT_INVALID",
                             "session_id": session_id, "request_sha256": request_sha,
-                            "receipt_nonce": receipt_nonce,
                             "child_outcome": receipt["child_outcome"],
                             "child_returncode": receipt["child_returncode"],
                             "result_state": receipt["result_state"]},
@@ -1823,7 +2306,6 @@ def _hybrid_launcher_factory(
                             "task_sha256": receipt["task_sha256"],
                             "request_sha256": request_sha,
                             "input_sha256": receipt["input_sha256"],
-                            "receipt_nonce": receipt_nonce,
                             "result_sha256": receipt["result_sha256"],
                             "result_size_bytes": receipt["result_size_bytes"]},
             ) from error
@@ -1835,7 +2317,6 @@ def _hybrid_launcher_factory(
                 "CT120 review result differs from its completion receipt",
                 diagnostic={"stage": "review_result", "state": "REMOTE_RESULT_MISMATCH",
                             "session_id": session_id, "request_sha256": request_sha,
-                            "receipt_nonce": receipt_nonce,
                             "result_sha256": hashlib.sha256(result_payload).hexdigest(),
                             "result_size_bytes": len(result_payload)},
             )

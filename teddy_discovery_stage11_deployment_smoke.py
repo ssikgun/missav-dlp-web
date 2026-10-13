@@ -134,9 +134,10 @@ class FakeRemoteBridge:
         return []
 
     def launch_quality_review(
-        self, command, *, remote_task, timeout, session_id,
+        self, command, *, local_task_fd, remote_task, timeout, session_id,
         request_sha256, receipt_nonce,
     ):
+        del local_task_fd
         self.launch_calls.append((command, remote_task, timeout))
         if self.review_payload_to_result is None:
             raise AssertionError("fake Hybrid result callback was not installed")

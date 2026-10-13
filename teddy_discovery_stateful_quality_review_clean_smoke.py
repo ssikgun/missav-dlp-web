@@ -636,9 +636,10 @@ def main():
             self.files[remote_path] = payload
 
         def launch_quality_review(
-            self, command, *, remote_task, timeout, session_id,
+            self, command, *, local_task_fd, remote_task, timeout, session_id,
             request_sha256, receipt_nonce, input_filename, result_filename,
         ):
+            del local_task_fd
             self.group_filenames = (input_filename, result_filename)
             input_payload = self.files[remote_task + "/" + input_filename]
             result_payload = repair_execution.result_payload

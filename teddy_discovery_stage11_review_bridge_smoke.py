@@ -9,7 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-from types import ModuleType, SimpleNamespace
+from types import SimpleNamespace
 from unittest.mock import patch
 import uuid
 
@@ -22,7 +22,6 @@ from teddy_discovery_subtitle_source_quality import classify_source_document
 
 
 SESSION = "12345678-1234-5678-1234-567812345678"
-COMMAND = ["/home/teddy/.local/bin/hermes", "--resume", SESSION]
 
 
 def fixture():
@@ -74,27 +73,6 @@ class FakeRemoteBridge(deployment.SSHRemoteHermesBridge):
         self.remote_scripts = 0
         self.child_error = None
 
-    def _child_run(self, command, *, cwd, pass_fds, stdin, stdout, stderr, timeout, check):
-        assert len(pass_fds) == 1
-        del stdin, stdout, stderr, check
-        self.child_calls += 1
-        if self.mode == "start_failed":
-            raise OSError("private child error")
-        if self.mode == "timeout":
-            raise subprocess.TimeoutExpired(command, timeout)
-        if self.mode != "no_result":
-            output = Path(cwd) / deployment.QUALITY_REVIEW_RESULT_FILENAME
-            try:
-                fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            except OSError as error:
-                self.child_error = type(error).__name__
-                raise
-            with os.fdopen(fd, "wb") as stream:
-                stream.write(self.result_payload)
-                stream.flush()
-                os.fsync(stream.fileno())
-        return SimpleNamespace(returncode=7 if self.mode == "nonzero" else 0)
-
     def _python(
         self, script, *arguments, input_payload=None, capture=False,
         timeout=None, python_executable="python3",
@@ -115,11 +93,8 @@ class FakeRemoteBridge(deployment.SSHRemoteHermesBridge):
         try:
             with patch.object(sys, "argv", ["remote-probe", *arguments]):
                 if is_launch:
-                    fake_subprocess = ModuleType("subprocess")
-                    fake_subprocess.DEVNULL = subprocess.DEVNULL
-                    fake_subprocess.TimeoutExpired = subprocess.TimeoutExpired
-                    fake_subprocess.run = self._child_run
-                    with patch.dict(sys.modules, {"subprocess": fake_subprocess}), redirect_stdout(text_output):
+                    self.child_calls += 1
+                    with redirect_stdout(text_output):
                         exec(compile(script, "<fake-ct120-review>", "exec"), namespace)
                 else:
                     with redirect_stdout(text_output):
@@ -130,6 +105,11 @@ class FakeRemoteBridge(deployment.SSHRemoteHermesBridge):
                 diagnostic={"stage": "ssh", "state": "SSH_EXIT_UNKNOWN", "ssh_returncode": int(error.code or 1)},
             ) from error
         text_output.flush()
+        if is_launch and self.mode == "receipt_mismatch":
+            receipt_path = self.task / deployment.QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME
+            receipt = json.loads(receipt_path.read_bytes())
+            receipt["request_sha256"] = "0" * 64
+            receipt_path.write_text(json.dumps(receipt, sort_keys=True, separators=(",", ":")))
         if is_launch and self.mode == "ssh_after_completion":
             raise deployment.Stage11DeploymentTransportError(
                 "simulated SSH channel loss after remote completion",
@@ -150,14 +130,47 @@ def make_task(root: Path, request_payload: bytes) -> Path:
     return task
 
 
+def make_command(mode: str, result_payload: bytes):
+    if mode == "start_failed":
+        return ["/missing/stage11-hermes", "--resume", SESSION]
+    encoded = result_payload.hex()
+    stderr_value = {
+        "cli_error": repr("usage: hermes [options]"),
+        "profile_error": repr("session not found in profile"),
+        "auth_error": repr("HTTP 401 unauthorized provider"),
+        "permission_error": repr("permission denied opening private file"),
+        "unknown_nonzero": repr("opaque failure with token=super-secret"),
+        "long_stderr": "'x' * 1000000",
+        "sensitive_stderr": repr("token=very-secret /root/private user message=do-not-store"),
+    }.get(mode, "''")
+    child = (
+        "import os,sys,time\n"
+        f"mode={mode!r}\n"
+        f"stderr={stderr_value}\n"
+        "sys.stderr.write(stderr); sys.stderr.flush()\n"
+        "if mode == 'timeout': time.sleep(2)\n"
+        "if mode != 'no_result':\n"
+        f" fd=os.open({deployment.QUALITY_REVIEW_RESULT_FILENAME!r}, os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600)\n"
+        f" os.write(fd, bytes.fromhex({encoded!r})); os.fsync(fd); os.close(fd)\n"
+        "sys.exit(2 if mode in ('cli_error','profile_error','auth_error','permission_error','unknown_nonzero','long_stderr','sensitive_stderr','nonzero') else 0)\n"
+    )
+    return [sys.executable, "-c", child, "--resume", SESSION]
+
+
 def run_bridge(root: Path, request_payload: bytes, result_payload: bytes, mode: str):
     task = make_task(root, request_payload)
+    local_task = root / "local-task"
+    local_task.mkdir(mode=0o700)
+    local_fd = os.open(local_task, os.O_RDONLY | os.O_DIRECTORY)
     bridge = FakeRemoteBridge(task, result_payload, mode)
+    bridge.local_fd = local_fd
+    bridge.local_task = local_task
     nonce = uuid.uuid4().hex + uuid.uuid4().hex
     request_sha = hashlib.sha256(request_payload).hexdigest()
     try:
         completed = bridge.launch_quality_review(
-            COMMAND,
+            make_command(mode, result_payload),
+            local_task_fd=local_fd,
             remote_task=str(task),
             timeout=1,
             session_id=SESSION,
@@ -181,10 +194,21 @@ class ResultReadFailureBridge:
         self.files[remote_path] = payload
 
     def launch_quality_review(
-        self, command, *, remote_task, timeout, session_id,
+        self, command, *, local_task_fd, remote_task, timeout, session_id,
         request_sha256, receipt_nonce,
     ):
         del command, timeout
+        deployment._private_local_write_at(
+            local_task_fd,
+            deployment.QUALITY_REVIEW_EXECUTION_INTENT_FILENAME,
+            json.dumps({
+                "schema_version": 1,
+                "session_id": session_id,
+                "task_sha256": hashlib.sha256(remote_task.encode()).hexdigest(),
+                "request_sha256": request_sha256,
+                "receipt_nonce": receipt_nonce,
+            }, sort_keys=True, separators=(",", ":")).encode("ascii"),
+        )
         input_payload = self.files[remote_task + "/" + deployment.QUALITY_REVIEW_INPUT_FILENAME]
         self.files[remote_task + "/" + deployment.QUALITY_REVIEW_RESULT_FILENAME] = self.result_payload
         return SimpleNamespace(
@@ -233,11 +257,64 @@ def main():
         receipt = completed.execution_receipt
         check(completed.returncode == 0 and receipt["child_returncode"] == 0, "NORMAL_COMPLETION_RECEIPT")
         check(bridge.child_calls == 1 and stat_mode(task / deployment.QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME) == 0o600, "PRIVATE_NO_OVERWRITE_RECEIPT")
+        check(set(receipt) == {
+            "schema_version", "session_id", "task_sha256", "request_sha256", "input_sha256",
+            "receipt_nonce", "child_outcome", "child_returncode", "result_state",
+            "result_sha256", "result_size_bytes",
+        }, "RECEIPT_V1_EXACT_FIELDS_UNCHANGED")
+        intent_payload = deployment._private_local_read_at(
+            bridge.local_fd, deployment.QUALITY_REVIEW_EXECUTION_INTENT_FILENAME,
+            max_bytes=deployment.QUALITY_REVIEW_EXECUTION_INTENT_MAX_BYTES,
+        )
+        diagnostic_payload = (task / deployment.QUALITY_REVIEW_EXECUTION_DIAGNOSTIC_FILENAME).read_bytes()
+        validated_diag = deployment.validate_quality_review_execution_diagnostic(
+            intent_payload, diagnostic_payload,
+            (task / deployment.QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME).read_bytes(),
+            session_id=SESSION, task_sha256=hashlib.sha256(str(task).encode()).hexdigest(),
+            request_sha256=request_sha,
+        )
+        check(validated_diag["phase"] == "RECEIPT_WRITE"
+              and validated_diag["execution_phase"] == "RECEIPT_WRITE"
+              and validated_diag["error_class"] == "NONE",
+              "DIAGNOSTIC_BOUND_TO_LOCAL_INTENT_AND_V1_RECEIPT")
+        check(stat_mode(bridge.local_task / deployment.QUALITY_REVIEW_EXECUTION_INTENT_FILENAME) == 0o600
+              and nonce not in json.dumps(validated_diag, sort_keys=True)
+              and nonce not in diagnostic_payload.decode("ascii"),
+              "LOCAL_NONCE_PRIVATE_AND_NOT_IN_DIAGNOSTIC")
 
         task, bridge, nonce, error = run_bridge(root / "nonzero", request_payload, result_payload, "nonzero")
         check(isinstance(error, deployment.Stage11DeploymentTransportError)
               and error.safe_diagnostic["state"] == "REMOTE_CHILD_NONZERO"
+              and error.safe_diagnostic.get("error_class") == "UNKNOWN_NONZERO"
+              and error.safe_diagnostic.get("execution_phase") == "CHILD_EXIT"
               and (task / deployment.QUALITY_REVIEW_RESULT_FILENAME).exists(), "NONZERO_CHILD_WITH_RESULT_BLOCKED")
+
+        for mode, classification in (
+            ("cli_error", "CLI_ARGUMENT_ERROR"),
+            ("profile_error", "PROFILE_SESSION_ERROR"),
+            ("auth_error", "AUTH_PROVIDER_ERROR"),
+            ("permission_error", "FILE_PERMISSION_ERROR"),
+            ("unknown_nonzero", "UNKNOWN_NONZERO"),
+        ):
+            task, bridge, nonce, error = run_bridge(root / mode, request_payload, result_payload, mode)
+            check(isinstance(error, deployment.Stage11DeploymentTransportError)
+                  and error.safe_diagnostic.get("error_class") == classification
+                  and error.safe_diagnostic.get("execution_phase") == "CHILD_EXIT"
+                  and nonce not in json.dumps(error.safe_diagnostic, sort_keys=True),
+                  "ERROR_CLASS_" + mode.upper())
+
+        task, bridge, nonce, error = run_bridge(root / "long-stderr", request_payload, result_payload, "long_stderr")
+        check(error.safe_diagnostic.get("stderr_bytes_observed") == deployment.QUALITY_REVIEW_EXECUTION_STDERR_MAX_BYTES + 1
+              and error.safe_diagnostic.get("stderr_truncated") is True
+              and task.joinpath(deployment.QUALITY_REVIEW_EXECUTION_DIAGNOSTIC_FILENAME).stat().st_size < 4096,
+              "STDERR_CAPTURE_BOUNDED_AND_DRAINED")
+
+        task, bridge, nonce, error = run_bridge(root / "sensitive-stderr", request_payload, result_payload, "sensitive_stderr")
+        diagnostic_bytes = task.joinpath(deployment.QUALITY_REVIEW_EXECUTION_DIAGNOSTIC_FILENAME).read_bytes()
+        safe_text = json.dumps(error.safe_diagnostic, sort_keys=True)
+        check(b"very-secret" not in diagnostic_bytes and b"/root/private" not in diagnostic_bytes
+              and "very-secret" not in safe_text and "do-not-store" not in safe_text,
+              "SENSITIVE_STDERR_NOT_STORED_OR_RETURNED")
 
         task, bridge, nonce, error = run_bridge(root / "ssh-missing", request_payload, result_payload, "ssh_before_start")
         check(isinstance(error, deployment.Stage11DeploymentTransportError)
@@ -261,19 +338,29 @@ def main():
 
         task, bridge, nonce, error = run_bridge(root / "timeout", request_payload, result_payload, "timeout")
         check(isinstance(error, deployment.Stage11DeploymentTransportError)
-              and error.safe_diagnostic["state"] == "REMOTE_TIMEOUT", "TIMEOUT_FAILS_CLOSED")
+              and error.safe_diagnostic["state"] == "REMOTE_TIMEOUT"
+              and error.safe_diagnostic.get("error_class") == "TIMEOUT"
+              and error.safe_diagnostic.get("execution_phase") == "CHILD_EXIT", "TIMEOUT_FAILS_CLOSED")
 
         task, bridge, nonce, error = run_bridge(root / "start", request_payload, result_payload, "start_failed")
         check(isinstance(error, deployment.Stage11DeploymentTransportError)
-              and error.safe_diagnostic["state"] == "REMOTE_START_FAILED", "CHILD_START_FAILURE_DISTINCT")
+              and error.safe_diagnostic["state"] == "REMOTE_START_FAILED"
+              and error.safe_diagnostic.get("error_class") == "EXECUTABLE_ERROR"
+              and error.safe_diagnostic.get("execution_phase") == "CHILD_START", "CHILD_START_FAILURE_DISTINCT")
 
         task, bridge, nonce, error = run_bridge(root / "absent", request_payload, result_payload, "no_result")
         check(isinstance(error, deployment.Stage11DeploymentTransportError)
-              and error.safe_diagnostic["state"] == "REMOTE_RESULT_MISSING", "RESULT_ABSENCE_BLOCKED")
+              and error.safe_diagnostic["state"] == "REMOTE_RESULT_MISSING"
+              and error.safe_diagnostic.get("execution_phase") == "RESULT_CHECK", "RESULT_ABSENCE_BLOCKED")
 
         task, bridge, nonce, error = run_bridge(root / "no-receipt", request_payload, result_payload, "receipt_missing")
         check(isinstance(error, deployment.Stage11DeploymentTransportError)
               and error.safe_diagnostic["state"] == "RECEIPT_INVALID", "MISSING_COMPLETION_DIAGNOSTIC_BLOCKED")
+
+        task, bridge, nonce, error = run_bridge(root / "receipt-mismatch", request_payload, result_payload, "receipt_mismatch")
+        check(isinstance(error, deployment.Stage11DeploymentTransportError)
+              and error.safe_diagnostic["state"] == "RECEIPT_INVALID",
+              "MISMATCHED_V1_RECEIPT_BLOCKED")
 
         local_task = root / "local-review-task"
         local_task.mkdir(mode=0o700)
@@ -310,6 +397,25 @@ def main():
             review_execution_session_id=SESSION, receipt_nonce=nonce,
         )
         check(rejected.eligible is False, "RESULT_SHA_MISMATCH_BLOCKED")
+        intent_payload = deployment._private_local_read_at(
+            bridge.local_fd, deployment.QUALITY_REVIEW_EXECUTION_INTENT_FILENAME,
+            max_bytes=deployment.QUALITY_REVIEW_EXECUTION_INTENT_MAX_BYTES,
+        )
+        diagnostic_payload = (task / deployment.QUALITY_REVIEW_EXECUTION_DIAGNOSTIC_FILENAME).read_bytes()
+        bad_intent = json.loads(intent_payload)
+        bad_intent["receipt_nonce"] = "0" * 64
+        try:
+            deployment.validate_quality_review_execution_diagnostic(
+                json.dumps(bad_intent, sort_keys=True, separators=(",", ":")).encode(),
+                diagnostic_payload, receipt_path.read_bytes(), session_id=SESSION,
+                task_sha256=hashlib.sha256(str(task).encode()).hexdigest(),
+                request_sha256=request_sha,
+            )
+        except deployment.Stage11DeploymentValidationError:
+            nonce_mismatch_blocked = True
+        else:
+            nonce_mismatch_blocked = False
+        check(nonce_mismatch_blocked, "INDEPENDENT_NONCE_MISMATCH_BLOCKED")
         receipt = json.loads(receipt_path.read_bytes())
         receipt["request_sha256"] = "0" * 64
         try:
@@ -377,10 +483,11 @@ def main():
         next_nonce = uuid.uuid4().hex + uuid.uuid4().hex
         try:
             bridge.launch_quality_review(
-                COMMAND, remote_task=str(duplicate_task), timeout=1,
+                make_command("success", result_payload), local_task_fd=bridge.local_fd,
+                remote_task=str(duplicate_task), timeout=1,
                 session_id=SESSION, request_sha256=request_sha, receipt_nonce=next_nonce,
             )
-        except deployment.Stage11DeploymentTransportError:
+        except deployment.Stage11DeploymentError:
             duplicate_blocked = True
         else:
             duplicate_blocked = False

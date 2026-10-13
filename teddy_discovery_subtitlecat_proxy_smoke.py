@@ -178,10 +178,10 @@ class _NoOpBridge:
         return []
 
     def launch_quality_review(
-        self, command, *, remote_task, timeout, session_id,
+        self, command, *, local_task_fd, remote_task, timeout, session_id,
         request_sha256, receipt_nonce,
     ):
-        del command, remote_task, timeout, session_id, request_sha256, receipt_nonce
+        del command, local_task_fd, remote_task, timeout, session_id, request_sha256, receipt_nonce
         return SimpleNamespace(returncode=0)
 
 
