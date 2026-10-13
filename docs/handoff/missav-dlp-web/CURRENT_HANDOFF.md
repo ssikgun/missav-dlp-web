@@ -11684,3 +11684,39 @@ Jellyfin, release pointer, or existing FNS-247 artifact changed. The protected
 dirty worktree remains untouched. P2-G is not deployed. Next: separately review
 the P2-G candidate before deciding whether to attempt a read-only recovery
 assessment of any future run that has a valid completion receipt.
+
+## 2026-10-13 Stage11 P2-H — FNS-247 review invocation (RUNNING / INCOMPLETE)
+
+Before starting a review, the saved first-pass inputs were revalidated with the
+P2-G candidate code. The reconstructed HYBRID package and boundary evidence
+matched the saved package; the saved `normal-result.json` and
+`stage11-semantic-result.json` validated against that package and were
+byte-equivalent after canonical serialization. The saved whole-title prompt
+matched a prompt rebuilt from the package. Its receipt matched prompt, stdout
+and stderr SHA-256 values and recorded return code 0, no timeout, zero tools,
+and native session `20261013_103954_153374`. The saved baseline, Japanese source,
+alignment and package identities agreed. A read-only Discovery/NAS check also
+matched the current FNS-247 MP4 path, size and modification time to the saved
+baseline snapshot.
+
+The existing failed CT120 review task was left untouched; its directory still
+contains only its input and result, without a completion receipt. Before the
+new call, no process matched that task/session. The existing Hybrid review
+adapter and native bridge were exercised in an in-memory preflight: the request
+was rebuilt from the saved originals, validated by the existing originals
+provider, and contains 313 cues. A single call to the existing
+`hybrid_review_runner` then began using
+a new local staging root at
+`/tmp/stage11-p2h-fns247-czzlpvlx/staging`. It reused the saved translation;
+the first-pass runner was not called. The bridge invocation had not returned at
+the checkpoint, so the new CT120 child status, completion receipt and review
+result remain unverified. No further wait or retry was started.
+
+This direct review call does not invoke Targeted ASR, materialize CLEAN, or
+invoke Stage12. No new translation, publication, production Stage12 DB/queue,
+NAS or Jellyfin write was performed; the new private CT120 review session/task
+is the only authorized execution state created. Production remains on P1
+`d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; the Normal timer remains
+disabled/inactive and service inactive. The protected dirty worktree remains
+unchanged. Next: perform one short read-only audit of this same invocation's
+completion receipt and result; do not launch another model call.
