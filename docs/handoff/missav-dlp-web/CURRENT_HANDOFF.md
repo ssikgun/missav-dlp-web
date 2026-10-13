@@ -11965,3 +11965,26 @@ unknown, and no result is accepted. This does not establish the underlying
 Hermes error cause. No new model call, CLEAN generation, or production write
 occurred. Next: inspect only existing native failure diagnostics for this task;
 do not retry or resume it.
+
+
+## 2026-10-13 Stage11 P2-M5 — P2-M Hermes failure forensics
+
+The exact local run records the expected session/task and ends with
+`Stage11DeploymentTransportError`, but its failure record contains no stage,
+child diagnostic, or independently saved receipt nonce. The short runner log
+contains only a generic `FAILED_OR_UNKNOWN` classification. The CT120 task has
+the original request and receipt but no group result. Its receipt fields report
+`NONZERO`, child return code 1, and result `ABSENT`; receipt authentication
+remains unverified because the expected nonce was not retained independently.
+
+The exact CT120 SessionDB entry exists under the expected profile, has no parent
+session, and contains one user message with no assistant/tool response or
+recorded error marker. Static comparison confirms group review uses the same
+Hermes base command, fresh-session API, SSH native bridge, task path contract,
+and receipt writer as the successful P2-H/P2-I review path; only its group
+prompt and group artifact names differ. Both remote and local launch wrappers
+discard child stdout/stderr. No evidence distinguishes CLI, provider, profile,
+permission, or model failure: `ROOT_CAUSE=UNKNOWN`. For any separately approved
+future invocation, preserve only a bounded allowlisted stderr error category
+and execution phase in the receipt; discard raw output. No model call, source
+change, CLEAN generation, or production write occurred.
