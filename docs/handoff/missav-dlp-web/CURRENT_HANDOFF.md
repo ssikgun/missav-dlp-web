@@ -11523,3 +11523,34 @@ subtitle write was performed. P2 remains undeployed and automatic processing
 remains paused. The next task is to inspect this same isolated run after it
 finishes, validate its review/CLEAN proof and Stage12 artifact bundle read-only,
 and record the resulting status without repeating model execution.
+
+
+## 2026-10-13 Stage11 P2-E2 — one-shot read-only status
+
+The existing P2-E process was checked once, without waiting or restarting it.
+The P2-D direct Normal runner remained active locally (PID 732694). Its isolated
+run directory now contains `normal-result.json`, the first-pass Hermes receipt,
+and captured stdout/stderr, plus a quality-review input. This is evidence that
+the full-context translation returned and the review path was entered; receipt,
+session binding, and response content have not yet received final validation.
+No quality-review result, Targeted ASR evidence, CLEAN SRT, completion proof,
+or report was present in that snapshot. The review outcome and whether
+Targeted ASR will be required remain unconfirmed. Stage12's artifact-bundle
+preflight was not run because the CLEAN/proof/report bundle is incomplete.
+
+The read-only CT120 check found no active isolated Hermes process at that
+instant; the recent isolated task had tools-check and stdout/stderr files. The
+Downloader runner remained active, so this checkpoint is still
+RUNNING / INCOMPLETE. No process was stopped, no new model run was started, and
+no existing artifact was changed. The retained JA and baseline SHA-256 values
+still match the previous check. Full source/alignment replay was not claimed by
+this snapshot.
+
+Production remains on P1 `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; the Normal
+timer is disabled/inactive and service inactive. Read-only rollout counts are
+unchanged at PUBLISHED=164, PENDING=26, UNRESOLVED=10, FAILED_TERMINAL=5;
+FNS-247 remains PUBLISHED at sequence 4, with no active Stage12 rows. No
+production DB/queue, NAS, Jellyfin, or existing subtitle write occurred. The
+next task is a later one-shot check of this same process and its finished
+review/CLEAN proof, followed by read-only Stage12 artifact validation if the
+bundle is complete.
