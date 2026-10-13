@@ -357,10 +357,16 @@ class NormalSmoke(unittest.TestCase):
         self.assertFalse(list(directory.glob('clean-ko-v1.srt')))
 
     def test_transport_failure_is_terminal_without_user_wait(self):
-        def fail(*_a,**_k): raise Stage11DeploymentTransportError('offline Hermes outage')
+        def fail(*_a,**_k): raise Stage11DeploymentTransportError(
+            'CT120 review failed',
+            diagnostic={'stage':'review_execution','state':'REMOTE_CHILD_NONZERO',
+                'child_returncode':7,'unbounded_stderr':'private Hermes output'})
         with self.assertRaises(Stage11DeploymentTransportError): self.run_title(first_pass_runner=fail)
         state=json.loads(next(self.artifacts.glob('*/normal-failure-*.json')).read_bytes())
         self.assertEqual(state['status'],'FAILED'); self.assertEqual(state['user_intervention'],0)
+        self.assertEqual(state['execution_diagnostic']['state'],'REMOTE_CHILD_NONZERO')
+        self.assertNotIn('unbounded_stderr',state['execution_diagnostic'])
+        self.assertNotIn('private Hermes output',json.dumps(state))
 
     def test_identity_or_format_mismatch_cannot_generate_srt(self):
         def wrong(package,**kwargs): return replace(self.first(package,**kwargs),claim_token=2)

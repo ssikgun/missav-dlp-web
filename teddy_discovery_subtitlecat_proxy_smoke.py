@@ -177,8 +177,11 @@ class _NoOpBridge:
         del session_id, include_inactive
         return []
 
-    def launch_quality_review(self, command, *, remote_task, timeout):
-        del command, remote_task, timeout
+    def launch_quality_review(
+        self, command, *, remote_task, timeout, session_id,
+        request_sha256, receipt_nonce,
+    ):
+        del command, remote_task, timeout, session_id, request_sha256, receipt_nonce
         return SimpleNamespace(returncode=0)
 
 

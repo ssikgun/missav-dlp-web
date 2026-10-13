@@ -601,8 +601,12 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
                                           title=title,staging_root=staging)
     except Exception as error:
         # Every failed invocation terminates, with an immutable reason; no user-wait state.
-        store(directory/('normal-failure-'+uuid.uuid4().hex+'.json'),wire({'status':'FAILED','title':title,
-            'error_type':type(error).__name__,'reason':str(error),'user_intervention':0,'automatic_insertion':False}))
+        failure={'status':'FAILED','title':title,'error_type':type(error).__name__,
+            'reason':str(error),'user_intervention':0,'automatic_insertion':False}
+        diagnostic=getattr(error,'safe_diagnostic',None)
+        if isinstance(error,Stage11DeploymentTransportError) and diagnostic:
+            failure['execution_diagnostic']=diagnostic
+        store(directory/('normal-failure-'+uuid.uuid4().hex+'.json'),wire(failure))
         if isinstance(error,(controller.Stage11ControllerError,Stage11DeploymentTransportError,ASRError)):
             raise
         raise controller.Stage11ControllerValidationError('normal core failed: '+type(error).__name__+': '+str(error)) from error

@@ -133,17 +133,39 @@ class FakeRemoteBridge:
             )
         return []
 
-    def launch_quality_review(self, command, *, remote_task, timeout):
+    def launch_quality_review(
+        self, command, *, remote_task, timeout, session_id,
+        request_sha256, receipt_nonce,
+    ):
         self.launch_calls.append((command, remote_task, timeout))
         if self.review_payload_to_result is None:
             raise AssertionError("fake Hybrid result callback was not installed")
         input_path = remote_task + "/" + QUALITY_REVIEW_INPUT_FILENAME
         output_path = remote_task + "/" + QUALITY_REVIEW_RESULT_FILENAME
+        receipt_path = remote_task + "/" + deployment.QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME
+        assert output_path not in self.files and receipt_path not in self.files
+        input_payload = self.files[input_path]
         self.files[output_path] = self.review_payload_to_result(
-            self.files[input_path],
+            input_payload,
             review_session=command[command.index("--resume") + 1],
         )
-        return SimpleNamespace(returncode=0)
+        result_payload = self.files[output_path]
+        return SimpleNamespace(
+            returncode=0,
+            execution_receipt={
+                "schema_version": 1,
+                "session_id": session_id,
+                "task_sha256": deployment.hashlib.sha256(remote_task.encode("utf-8")).hexdigest(),
+                "request_sha256": request_sha256,
+                "input_sha256": deployment.hashlib.sha256(input_payload).hexdigest(),
+                "receipt_nonce": receipt_nonce,
+                "child_outcome": "COMPLETED",
+                "child_returncode": 0,
+                "result_state": "PRESENT",
+                "result_sha256": deployment.hashlib.sha256(result_payload).hexdigest(),
+                "result_size_bytes": len(result_payload),
+            },
+        )
 
 
 class Discovery:
