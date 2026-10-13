@@ -11487,3 +11487,39 @@ P2-D integration candidate: PASS for offline validation only. Actual model
 execution and production applicability remain unverified. Keep P2 undeployed
 and automatic processing paused until a separate approved validation/deployment
 checkpoint.
+
+
+## 2026-10-13 Stage11 P2-E — isolated model E2E (INCOMPLETE)
+
+The P2-D candidate was rechecked at branch
+`codex-stage11-p2d-20261013`, exact SHA
+`b5b79e177a982cb2bc7959b81211a52959f79afd`. The protected dirty worktree was
+left unchanged. Before the isolated run, the retained FNS-247 Japanese
+subtitle SHA-256 was
+`8e645dd1e55304075b03562ae38837012d401a6cb00cb96fc8d54d9df2508598` and the
+cached Whisper baseline SHA-256 was
+`141fbb97dc415c75b5005878204181e06b2f6b5e6f111912b5ee79b282b3d173`. The
+previous read-only source/video identity checks matched; candidate
+reconstruction accepted the retained HYBRID alignment (40 anchors, 40 inliers).
+No SubtitleCat search or full baseline Whisper run was performed.
+
+The candidate's existing direct Normal CLI is running once in an isolated
+temporary output root at `/tmp/stage11-p2e-fns247-vqzJKk`. The local staging
+contains the first-pass package and prompt; a read-only CT120 check found the
+isolated native Hermes task and one active Hermes process. This establishes
+that the translation invocation started, but no validated translation result
+was available at the checkpoint. Review completion and any Targeted ASR call
+are therefore not yet established. No reviewed CLEAN SRT, completion proof or
+report was produced, and the Stage12 artifact preflight could not yet be run.
+This run is INCOMPLETE and must not be treated as a successful or publishable
+result. Its temporary model output remains isolated from production paths.
+
+Read-only production checks still show `current` and `runtime.env` at
+`d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`, Normal timer disabled/inactive,
+Normal service inactive, and no active Stage12 rows. Rollout counts remain
+PUBLISHED=164, PENDING=26, UNRESOLVED=10, FAILED_TERMINAL=5; FNS-247 remains
+PUBLISHED at sequence 4. No production DB/queue, NAS, Jellyfin or existing
+subtitle write was performed. P2 remains undeployed and automatic processing
+remains paused. The next task is to inspect this same isolated run after it
+finishes, validate its review/CLEAN proof and Stage12 artifact bundle read-only,
+and record the resulting status without repeating model execution.
