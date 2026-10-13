@@ -11636,3 +11636,51 @@ queue, NAS, Jellyfin, or existing subtitle was changed, and the protected dirty
 worktree remains untouched. Minimal follow-up: preserve the native child exit
 code and a bounded, sanitized stderr/error class in the existing failure record
 before any separately approved retry.
+
+## 2026-10-13 Stage11 P2-G — Hermes review completion receipt and recovery check
+
+P2-G is based on P2-D `b5b79e177a982cb2bc7959b81211a52959f79afd` and is committed
+as `625ef9cceb10150ffccc0f3717e2af535d4a939a` on
+`codex-stage11-p2g-20261013`. The P2-D branch remains unchanged.
+
+`SSHRemoteHermesBridge` now records a bounded, private, no-overwrite receipt
+after the remote Hermes child exits or times out. It binds the receipt to the
+review session, remote task identity, request/input SHA-256, random receipt
+nonce, child outcome/return code, and result-file state/SHA-256/size. The
+receipt and result are read through the existing regular-file, no-symlink,
+0600, size-bounded path. Hermes stdout/stderr contents remain discarded; the
+bridge records only fixed classifications and numeric status. Local SSH
+startup, timeout and nonzero channel status are distinguished where possible;
+a nonzero SSH exit without a valid receipt remains `UNKNOWN`.
+
+The normal bridge path returns success only after a valid `COMPLETED` child
+receipt, matching task/session/request identity and a matching result hash. A
+channel failure with a receipt remains a failed invocation. The new
+read-only `assess_quality_review_recovery()` separately checks caller-held
+original evidence through the canonical review request parser, source and
+execution sessions, task/request/result identity, and canonical result
+validator. It only reports eligibility; it does not copy or accept a result,
+or materialize CLEAN. The validated result is returned only in memory for an
+explicit follow-up decision. `read_quality_review_result()` still requires a
+successful process exit.
+
+The existing FNS-247 remote review result is **NOT_ELIGIBLE** for recovery: the
+P2-F read-only inspection found only its input and result in the task directory,
+with no completion receipt or numeric Hermes exit status. Its request digest
+and 313-cue shape were structurally consistent, but that does not prove normal
+Hermes termination. No review result was accepted, no CLEAN was generated, and
+`ROOT_CAUSE=UNKNOWN` remains unchanged.
+
+Offline verification passed: review bridge smoke 18/18; deployment smoke
+51/51; Normal Mode 19/19; review runner 86/86; CLEAN 38/38; CLEAN projection,
+targeted review, live adapters, Stage12 batch/bulk/rollout, external subtitle,
+alignment streaming, SubtitleCat proxy, native session and paused deployment
+smokes all passed. Compilation and `git diff --check` passed. No actual Hermes
+or Whisper execution occurred.
+
+Production remains on P1 `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; Normal
+timer remains disabled/inactive and service inactive. No database, queue, NAS,
+Jellyfin, release pointer, or existing FNS-247 artifact changed. The protected
+dirty worktree remains untouched. P2-G is not deployed. Next: separately review
+the P2-G candidate before deciding whether to attempt a read-only recovery
+assessment of any future run that has a valid completion receipt.
