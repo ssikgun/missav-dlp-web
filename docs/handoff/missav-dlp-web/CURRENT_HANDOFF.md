@@ -11720,3 +11720,33 @@ is the only authorized execution state created. Production remains on P1
 disabled/inactive and service inactive. The protected dirty worktree remains
 unchanged. Next: perform one short read-only audit of this same invocation's
 completion receipt and result; do not launch another model call.
+
+## 2026-10-13 Stage11 P2-H2 — FNS-247 review result audit (PASS)
+
+The one-time read-only check found no process matching the new CT120 task or
+session. Its remote completion receipt records Hermes child `COMPLETED`, exit
+code 0, and a present 78,490-byte result. The task, review session, request and
+input identities match the staged request; its result SHA-256 matches both
+the remote result and the local file. The receipt is a regular, single-link,
+0600 file. The exact nonce is intentionally not recorded; the existing bridge
+validated it against the per-call nonce before accepting the result and
+writing the local staged copy. No runner exit-status file was retained, so the
+wrapper's own exit code is unknown; this does not change the child completion
+receipt or result validation.
+
+Using the saved FNS-247 JA, baseline, alignment, package and first-pass result,
+the canonical request was reconstructed with the same request SHA-256 and all
+313 cue IDs/order. `read_quality_review_result()` passed, binding both the
+source translation and new review execution sessions. Decisions: KEEP 304,
+REPAIR 1, OMIT 0, AMBIGUOUS 8. Existing target selection requires Targeted
+ASR for 9 cues; it was not run in this checkpoint. CLEAN materialization and
+Stage12 validation were not started, so the review is not a publishable
+completion.
+
+Production remains on P1 `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; the
+Normal timer is disabled/inactive and the service inactive. FNS-247 remains
+`PUBLISHED`, rollout transition sequence 4; the existing replacement journal
+remains completed. This audit made no production DB/queue, NAS or Jellyfin
+changes. Protected dirty worktree remains unchanged. Next: separately run the
+existing targeted-evidence and CLEAN path for the 9 selected cues, without
+starting publication.
