@@ -11813,3 +11813,40 @@ timer is disabled/inactive and service inactive. FNS-247 remains PUBLISHED at
 sequence 4. This checkpoint made no production DB, queue, NAS, or Jellyfin
 writes. The protected dirty worktree was not modified. Next: investigate the
 saved `StatefulQualityReviewCleanError` reason without generating CLEAN output.
+
+
+## 2026-10-13 Stage11 P2-J — FNS-247 CLEAN failure diagnosis
+
+The saved P2-I status records `FAILED / clean_materialization /
+StatefulQualityReviewCleanError` but contains no exception reason or traceback.
+This diagnosis performed no model rerun and did not re-invoke the CLEAN
+materializer. No CLEAN SRT, proof, or report exists in the saved run.
+
+Read-only checks with the P2-G `625ef9cceb10150ffccc0f3717e2af535d4a939a`
+validators confirmed the P2-I package/result are byte-identical to the earlier
+saved first-pass artifacts. Package, result, boundary evidence, and absorption
+validation passed (313 cues, 312 boundaries, 299 groups including 11 multi-cue
+groups). The review request binds the saved package, result, JA payload, and
+source session; cue identity/text bindings and all 313 affine projected times
+passed. Source quality classified all cues KEEP; no metadata omission intersects
+an absorption group.
+
+The first unsatisfied CLEAN invariant is the existing guard in
+`materialize_stateful_quality_review_clean()`: a multi-cue absorption group may
+contain only KEEP or AMBIGUOUS review actions when `preserve_absorption=True`.
+The validated group at source indexes 142–143 (owner `ja-000144`) has a genuine
+REPAIR at source index 143. The saved final review is KEEP 306 / REPAIR 5 /
+OMIT 0 / AMBIGUOUS 2. This deterministically matches the guard's
+`review decision conflicts with a validated absorption group` failure. The
+original exception message was not persisted; this cause is confirmed by
+revalidating the saved inputs in materializer order, without invoking the
+materializer. This is a general boundary between per-cue REPAIR and preserved
+group absorption, triggered by the saved review data; no cue text was retained
+in this diagnosis.
+
+Production remains on P1 `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; Normal
+timer and service remain disabled/inactive, and FNS-247 remains PUBLISHED at
+sequence 4. No production DB/queue/NAS/Jellyfin writes or source changes were
+made; the protected dirty worktree remains untouched. Next: define and validate
+a generic group-aware REPAIR contract while keeping unsupported group edits
+fail-closed.
