@@ -11921,3 +11921,29 @@ Normal timer remains disabled/inactive and the service inactive. FNS-247 remains
 PUBLISHED at sequence 4. The protected dirty worktree is unchanged. Next: obtain
 a separate approval for a fresh, isolated Hermes group review before any CLEAN
 materialization attempt; this does not authorize deployment or publication.
+
+
+## 2026-10-13 Stage11 P2-M — FNS-247 absorption-group review (RUNNING)
+
+The P2-L candidate `31ab27d26dbd333d5f96a5d1f51ae8946a289bf4` and this
+canonical handoff were rechecked. The protected dirty worktree was left
+untouched. Read-only P2-I reconstruction passed for the external JA/alignment,
+313-cue package and first pass, boundary evidence, whole-title review, targeted
+ASR (9 cues / 8 windows), and merged review (KEEP 306 / REPAIR 5 / OMIT 0 /
+AMBIGUOUS 2). The canonical P2-L builder produced exactly one group scope. No
+P2-I group-review sidecar exists, so its old owner REPAIR remains blocked and
+was not promoted.
+
+A new native review session and unique CT120 task passed the read-only
+freshness/path preflight. One isolated P2-L native-runner invocation was started
+using the saved parent evidence. The single short status check found the runner
+still active; Hermes child completion, group decision, and completion receipt
+are not yet confirmed. No retry or additional model call was made. The isolated
+local run is outside Git; the exact session/task identifiers and artifacts are
+kept there.
+
+CLEAN SRT, proof/report, and Stage12 validation were not run. Production remains
+on P1 `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; the Normal timer is
+disabled/inactive and service inactive. No Normal/Stage12 DB or queue, NAS, or
+Jellyfin writes occurred. Next: perform one read-only audit of this same
+session/task after it is known to have completed; do not rerun the group review.
