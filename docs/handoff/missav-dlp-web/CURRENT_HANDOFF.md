@@ -11780,3 +11780,36 @@ write or publication was performed. Existing P2-E/P2-H evidence was left
 unchanged. Next: once the same targeted Hermes invocation is known to have
 finished, perform a single read-only audit of its receipt/result, then validate
 CLEAN and the Stage12 bundle without publication.
+
+
+## 2026-10-13 Stage11 P2-I3 — FNS-247 Targeted Hermes review audit
+
+The single read-only audit found the P2-I runner marked `FAILED` at
+`clean_materialization`; no matching Hermes child remained. The exact runner
+exit code was not retained. The isolated CT120 task for review session
+`90d0bee6-ad75-4266-85ab-a90b9d576457` has a valid regular, single-link,
+0600 completion receipt and result. The receipt binds the task, request/input
+SHA-256, and result SHA/size; it records Hermes child `COMPLETED`, return code
+0, and result `PRESENT`. The P2-G bridge only writes the local staged result
+after validating the caller nonce and receipt, and the matching staged result
+and downstream review artifacts are present. The original expected nonce was
+not retained separately; it was not reconstructed or exposed.
+
+Read-only canonical validation passed for the existing 313-cue triage, exact
+nine targets, targeted Whisper evidence (9 cues / 8 windows), source/session
+identity, request/result hashes, and targeted review result. Target decisions:
+KEEP 2 / REPAIR 5 / OMIT 0 / AMBIGUOUS 2. The canonical in-memory composition
+reproduced the saved 313-cue final review exactly: KEEP 306 / REPAIR 5 / OMIT 0
+/ AMBIGUOUS 2.
+
+The runner then failed with `StatefulQualityReviewCleanError` during
+`clean_materialization`; its saved status contains no underlying reason.
+CLEAN SRT, completion proof, and report were not created. Stage12 artifact
+validation was not run. The specific clean-materialization cause remains
+UNKNOWN and requires a separate read-only diagnosis.
+
+Production remains at P1 `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; Normal
+timer is disabled/inactive and service inactive. FNS-247 remains PUBLISHED at
+sequence 4. This checkpoint made no production DB, queue, NAS, or Jellyfin
+writes. The protected dirty worktree was not modified. Next: investigate the
+saved `StatefulQualityReviewCleanError` reason without generating CLEAN output.
