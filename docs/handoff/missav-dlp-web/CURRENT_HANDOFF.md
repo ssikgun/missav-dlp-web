@@ -12018,7 +12018,7 @@ Compilation and `git diff --check` passed. The P2-M historical `exit 1` remains
 and this change does not recover that lost evidence. No Hermes/Whisper calls,
 CLEAN generation, production writes, deployment, or timer changes occurred.
 
-Candidate code was pushed as `04a9a4e4531536f7ae780e01589008de948d6a25` on
+Candidate code was pushed as `04a9a4e128181aa594f2bac7fc822a2e6fe8aae3` on
 `codex-stage11-p2m6-20261013`. The existing Normal timer remains disabled and
 inactive; the operational P1 release remains
 `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`. The protected dirty worktree was
