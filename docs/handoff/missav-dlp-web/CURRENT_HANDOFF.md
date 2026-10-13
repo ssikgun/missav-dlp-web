@@ -11616,12 +11616,13 @@ no native stderr/stdout receipt or numeric Hermes exit status was retained.
 The P2-D source confirms that `SSHRemoteHermesBridge.launch_quality_review()`
 checks the private task path, launches the native Hermes command with stdout
 and stderr redirected to `DEVNULL`, and propagates a nonzero child status.
-`SSHRemoteHermesBridge._run()` then maps the SSH command's nonzero exit to the
-local `Stage11DeploymentTransportError: CT120 native command failed`. Since the
-exact task and result exist and the session shows tool execution, the command
-reached Hermes; the failure is at native-command completion, not an observed
-SSH connection exception. The local runner recorded exit status 1, but the
-Hermes child exit code and its lower-level error are unknown. The review runner
+`SSHRemoteHermesBridge._run()` then maps a nonzero SSH subprocess exit to the
+local `Stage11DeploymentTransportError: CT120 native command failed`. The exact
+task and result prove that Hermes ran and wrote the result, but the bridge did
+not persist the SSH subprocess return code. The evidence cannot distinguish a
+nonzero Hermes child status propagated by the remote wrapper from a nonzero SSH
+channel status after the remote write. The local runner recorded exit status 1,
+but neither lower-level status nor error is retained. The review runner
 default timeout is 600 seconds; the recorded session start-to-result interval
 was about 470 seconds, and no timeout exception or timeout record exists.
 Therefore do not attribute this to a model, profile, file, resource, or timeout
