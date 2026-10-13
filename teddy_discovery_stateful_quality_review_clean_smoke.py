@@ -14,7 +14,10 @@ from teddy_discovery_stateful_hybrid import (
 )
 from teddy_discovery_stateful_boundary import bind_stateful_absorption_preparation
 from teddy_discovery_stateful_hybrid_smoke import changed, semantic_result
-from teddy_discovery_stateful_translator import StatefulAbsorptionResult, StatefulCueOutput
+from teddy_discovery_stateful_translator import (
+    StatefulAbsorptionResult,
+    StatefulCueOutput,
+)
 from teddy_discovery_alignment_application import apply_alignment_acceptance
 from teddy_discovery_subtitle_external import ExternalSubtitlePayload
 import teddy_discovery_stateful_quality_review as review
@@ -49,6 +52,16 @@ def main():
                 callback()
             except clean.StatefulQualityReviewCleanError:
                 return True
+            return False
+
+        check(name, rejected)
+
+    def reject_reason(name, expected_reason, callback):
+        def rejected():
+            try:
+                callback()
+            except clean.StatefulQualityReviewCleanError as error:
+                return str(error) == expected_reason
             return False
 
         check(name, rejected)
@@ -351,6 +364,55 @@ def main():
           == expected_absorbed_timing
           and absorbed_clean.source_indexes[:2] == (0, 1))
 
+    ambiguous_member_actions = (
+        review.AMBIGUOUS, review.KEEP,
+        *((review.KEEP,) * (len(absorption_request.cues) - 2)),
+    )
+    ambiguous_member_result = review.QualityReviewResult(
+        review.STATEFUL_QUALITY_REVIEW_SCHEMA_VERSION,
+        review.review_request_sha256(absorption_request),
+        tuple(review.QualityReviewResultCue(
+            cue.cue_id, action,
+            {review.KEEP: "DIALOGUE", review.AMBIGUOUS: "AMBIGUOUS"}[action],
+            "Uncertainty retains the validated absorption group.", None, None,
+        ) for cue, action in zip(
+            absorption_request.cues, ambiguous_member_actions, strict=True)))
+    ambiguous_member_clean = clean.materialize_stateful_quality_review_clean(
+        absorption_package, absorption_first, absorption_preparation,
+        absorption_request, ambiguous_member_result,
+        source_quality=absorption_quality, preserve_absorption=True,
+        omit_metadata=True)
+    check("AMBIGUOUS group member preserves owner and union timing", lambda:
+          ambiguous_member_clean.cues[0].source_indexes == (0, 1)
+          and ambiguous_member_clean.cues[0].original_source_index == 1
+          and (ambiguous_member_clean.cues[0].start_ms,
+               ambiguous_member_clean.cues[0].end_ms) == expected_absorbed_timing)
+
+    owner_repair_actions = (
+        review.KEEP, review.REPAIR,
+        *((review.KEEP,) * (len(absorption_request.cues) - 2)),
+    )
+    owner_repair_result = review.QualityReviewResult(
+        review.STATEFUL_QUALITY_REVIEW_SCHEMA_VERSION,
+        review.review_request_sha256(absorption_request),
+        tuple(review.QualityReviewResultCue(
+            cue.cue_id, action,
+            {review.KEEP: "DIALOGUE", review.REPAIR: "SEMANTIC_REPAIR"}[action],
+            "Owner-only repair lacks explicit group scope in this request.",
+            "修正版" if action == review.REPAIR else None,
+            "수정 번역" if action == review.REPAIR else None,
+        ) for cue, action in zip(
+            absorption_request.cues, owner_repair_actions, strict=True)))
+    reject_reason(
+        "owner-only REPAIR stays blocked without group-scoped review evidence",
+        "owner REPAIR lacks validated absorption-group review authority",
+        lambda: clean.materialize_stateful_quality_review_clean(
+            absorption_package, absorption_first, absorption_preparation,
+            absorption_request, owner_repair_result,
+            source_quality=absorption_quality,
+            preserve_absorption=True, omit_metadata=True),
+    )
+
     for action in (review.REPAIR, review.OMIT):
         actions = (action,) + (review.KEEP,) * (len(absorption_request.cues) - 1)
         conflict_result = review.QualityReviewResult(
@@ -370,6 +432,122 @@ def main():
                    absorption_request, conflict_result,
                    source_quality=absorption_quality,
                    preserve_absorption=True, omit_metadata=True))
+
+    multiple_repair_actions = (
+        review.REPAIR, review.REPAIR,
+        *((review.KEEP,) * (len(absorption_request.cues) - 2)),
+    )
+    multiple_repair_result = review.QualityReviewResult(
+        review.STATEFUL_QUALITY_REVIEW_SCHEMA_VERSION,
+        review.review_request_sha256(absorption_request),
+        tuple(review.QualityReviewResultCue(
+            cue.cue_id, action,
+            {review.KEEP: "DIALOGUE", review.REPAIR: "SEMANTIC_REPAIR"}[action],
+            "Conflicting group repairs remain fail-closed.",
+            "修正版" if action == review.REPAIR else None,
+            "수정 번역" if action == review.REPAIR else None,
+        ) for cue, action in zip(
+            absorption_request.cues, multiple_repair_actions, strict=True)))
+    reject("multiple REPAIR decisions in one absorption group rejected", lambda:
+           clean.materialize_stateful_quality_review_clean(
+               absorption_package, absorption_first, absorption_preparation,
+               absorption_request, multiple_repair_result,
+               source_quality=absorption_quality,
+               preserve_absorption=True, omit_metadata=True))
+
+    ambiguous_owner_repair_actions = (
+        review.AMBIGUOUS, review.REPAIR,
+        *((review.KEEP,) * (len(absorption_request.cues) - 2)),
+    )
+    ambiguous_owner_repair_result = review.QualityReviewResult(
+        review.STATEFUL_QUALITY_REVIEW_SCHEMA_VERSION,
+        review.review_request_sha256(absorption_request),
+        tuple(review.QualityReviewResultCue(
+            cue.cue_id, action,
+            {review.KEEP: "DIALOGUE", review.REPAIR: "SEMANTIC_REPAIR",
+             review.AMBIGUOUS: "AMBIGUOUS"}[action],
+            "Uncertain group member cannot authorize an owner repair.",
+            "修正版" if action == review.REPAIR else None,
+            "수정 번역" if action == review.REPAIR else None,
+        ) for cue, action in zip(
+            absorption_request.cues, ambiguous_owner_repair_actions, strict=True)))
+    reject_reason(
+        "AMBIGUOUS member plus owner REPAIR stays blocked",
+        "owner REPAIR lacks validated absorption-group review authority",
+        lambda: clean.materialize_stateful_quality_review_clean(
+            absorption_package, absorption_first, absorption_preparation,
+            absorption_request, ambiguous_owner_repair_result,
+            source_quality=absorption_quality,
+            preserve_absorption=True, omit_metadata=True),
+    )
+
+    metadata_cues = list(
+        absorption_application.bundle.external_ja_document.cues)
+    metadata_cues[0] = replace(metadata_cues[0], text="字幕作成")
+    metadata_payload = ExternalSubtitlePayload.from_bytes(
+        dvd_id=absorption_bundle.dvd_id,
+        candidate=absorption_bundle.external_ja_payload.candidate,
+        payload=generate_korean_srt(tuple(metadata_cues)).payload,
+    )
+    metadata_bundle = replace(
+        absorption_application.bundle,
+        external_ja_payload=metadata_payload,
+        external_ja_document=metadata_payload.parse(),
+    )
+    metadata_application = apply_alignment_acceptance(
+        metadata_bundle, absorption_application.decision,
+        alignment=absorption_application.alignment)
+    metadata_route = replace(
+        absorption_route, alignment_application=metadata_application)
+    metadata_preparation = prepare_stateful_hybrid(
+        metadata_route, generation_key="clean-absorption-metadata-fixture",
+        claim_token=11)
+    metadata_preparation, metadata_boundary = bind_stateful_absorption_preparation(
+        metadata_preparation)
+    metadata_package = metadata_preparation.package
+    metadata_ordinary = semantic_result(metadata_package)
+    metadata_first = StatefulAbsorptionResult(
+        metadata_ordinary.schema_version, metadata_ordinary.dvd_id,
+        metadata_ordinary.generation_key, metadata_ordinary.claim_token,
+        metadata_ordinary.session_id,
+        tuple(StatefulCueOutput(
+            cue.cue_id, None,
+            None if index == 0 else f"metadata owner translation {index}",
+            absorbed_into=(metadata_package.cues[1].cue_id if index == 0 else None),
+        ) for index, cue in enumerate(metadata_package.cues)), metadata_boundary)
+    metadata_quality = classify_source_document(
+        metadata_application.bundle.external_ja_document)
+    metadata_request = review.build_review_request(
+        preparation=metadata_preparation, package=metadata_package,
+        result=metadata_first, source_quality=metadata_quality)
+    metadata_keep = review.QualityReviewResult(
+        review.STATEFUL_QUALITY_REVIEW_SCHEMA_VERSION,
+        review.review_request_sha256(metadata_request),
+        tuple(review.QualityReviewResultCue(
+            cue.cue_id, review.KEEP, "DIALOGUE",
+            "Metadata group remains fail-closed.", None, None,
+        ) for cue in metadata_request.cues))
+    check("metadata fixture classifies a group member", lambda:
+          metadata_quality[0].action == "OMIT_METADATA")
+    reject_reason(
+        "partial metadata omission in an absorption group rejected",
+        "metadata omission intersects a retained absorption group",
+        lambda: clean.materialize_stateful_quality_review_clean(
+            metadata_package, metadata_first, metadata_preparation,
+            metadata_request, metadata_keep,
+            source_quality=metadata_quality,
+            preserve_absorption=True, omit_metadata=True),
+    )
+
+    def owner_without_korean_rejected():
+        try:
+            StatefulCueOutput(absorption_package.cues[1].cue_id, None, None)
+        except ValueError:
+            return True
+        return False
+
+    check("terminal absorption owner requires Korean translation",
+          owner_without_korean_rejected)
 
     reject("detached package rejected", lambda: materialize(
         package_value=changed(package, generation_key="detached")))

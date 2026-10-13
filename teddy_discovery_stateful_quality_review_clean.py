@@ -386,9 +386,29 @@ def materialize_stateful_quality_review_clean(
                 if cue.cue_id == chain.owner_cue_id
             )
             if len(indexes) > 1:
-                if any(
-                    review_result.cues[index].action not in {KEEP, AMBIGUOUS}
+                group_actions = {
+                    index: review_result.cues[index].action
                     for index in indexes
+                }
+                repair_indexes = {
+                    index for index, action in group_actions.items()
+                    if action == REPAIR
+                }
+                if repair_indexes == {owner_index} and all(
+                    action in {KEEP, AMBIGUOUS}
+                    for index, action in group_actions.items()
+                    if index != owner_index
+                ):
+                    # The validated review request binds per-cue decisions but
+                    # carries no explicit absorption-group repair scope. The
+                    # owner REPAIR therefore cannot authorize rewriting the
+                    # aggregate meaning of this preserved group.
+                    raise StatefulQualityReviewCleanError(
+                        "owner REPAIR lacks validated absorption-group review authority"
+                    )
+                if any(
+                    action not in {KEEP, AMBIGUOUS}
+                    for action in group_actions.values()
                 ):
                     raise StatefulQualityReviewCleanError(
                         "review decision conflicts with a validated absorption group"
