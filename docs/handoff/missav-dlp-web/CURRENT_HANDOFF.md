@@ -11947,3 +11947,21 @@ on P1 `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; the Normal timer is
 disabled/inactive and service inactive. No Normal/Stage12 DB or queue, NAS, or
 Jellyfin writes occurred. Next: perform one read-only audit of this same
 session/task after it is known to have completed; do not rerun the group review.
+
+
+## 2026-10-13 Stage11 P2-M4 — FNS-247 existing execution audit
+
+The supplied strict SSH key and known_hosts connected to CT120 successfully.
+The exact task contains the 129,389-byte group request and a 519-byte native
+receipt; the group result file is absent. The request SHA matches the previously
+saved P2-M preflight request identity. The receipt fields report child
+`NONZERO`, return code `1`, and result `ABSENT`, while the local runner evidence
+records `Stage11DeploymentTransportError`.
+
+The expected receipt nonce was not preserved in the independent local
+preflight, dispatch, or failure records. Therefore P2-L receipt/result
+validation cannot authenticate the remote receipt, the group action remains
+unknown, and no result is accepted. This does not establish the underlying
+Hermes error cause. No new model call, CLEAN generation, or production write
+occurred. Next: inspect only existing native failure diagnostics for this task;
+do not retry or resume it.
