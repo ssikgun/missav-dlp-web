@@ -11988,3 +11988,39 @@ permission, or model failure: `ROOT_CAUSE=UNKNOWN`. For any separately approved
 future invocation, preserve only a bounded allowlisted stderr error category
 and execution phase in the receipt; discard raw output. No model call, source
 change, CLEAN generation, or production write occurred.
+
+
+## 2026-10-13 Stage11 P2-M6 — native Hermes failure diagnostics
+
+P2-M6 is based on P2-L `31ab27d26dbd333d5f96a5d1f51ae8946a289bf4` in the
+separate candidate branch `codex-stage11-p2m6-20261013`. The native wrapper now
+records its last execution phase and the phase where an error was detected.
+Hermes stderr is drained while retaining at most 8 KiB in memory for
+classification; raw output is discarded. Clear CLI, profile/session,
+provider/authentication, permission, executable, and timeout evidence receives
+a bounded stable class. Unclear nonzero exits remain `UNKNOWN_NONZERO`.
+
+Before the remote launch, the local private task stores a versioned intent
+record containing session, task/request fingerprints, and the expected receipt
+nonce. It uses exclusive no-follow creation and mode 0600. The remote wrapper
+writes a separate versioned diagnostic sidecar containing only allowlisted
+phase/class, fingerprints, outcome, bounded stderr byte counts, and a nonce
+hash. The sidecar is bound to the independently stored local intent and the
+existing V1 completion receipt. Receipt V1's exact field set and validator are
+unchanged; diagnostics do not establish success, and receipt plus result
+validation remain required.
+
+Offline checks passed: review bridge 30; deployment 51; CLEAN/group review 62;
+controller 106; Normal Mode 19; review runner 86; paused deployment 8; plus
+live-adapter, native-session, Stage12 bulk, and SubtitleCat proxy smoke checks.
+Compilation and `git diff --check` passed. The P2-M historical `exit 1` remains
+`ROOT_CAUSE=UNKNOWN`: its stderr and independent expected nonce were not saved,
+and this change does not recover that lost evidence. No Hermes/Whisper calls,
+CLEAN generation, production writes, deployment, or timer changes occurred.
+
+Candidate code was pushed as `04a9a4e4531536f7ae780e01589008de948d6a25` on
+`codex-stage11-p2m6-20261013`. The existing Normal timer remains disabled and
+inactive; the operational P1 release remains
+`d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`. The protected dirty worktree was
+left unchanged. Next: separately approve any future isolated Hermes run; the
+new diagnostics do not authorize rerunning the old P2-M task.
