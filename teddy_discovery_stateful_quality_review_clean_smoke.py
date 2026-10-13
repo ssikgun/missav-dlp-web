@@ -12,7 +12,11 @@ from teddy_discovery_stateful_hybrid import (
     materialize_stateful_hybrid_srt,
     prepare_stateful_hybrid,
 )
+from teddy_discovery_stateful_boundary import bind_stateful_absorption_preparation
 from teddy_discovery_stateful_hybrid_smoke import changed, semantic_result
+from teddy_discovery_stateful_translator import StatefulAbsorptionResult, StatefulCueOutput
+from teddy_discovery_alignment_application import apply_alignment_acceptance
+from teddy_discovery_subtitle_external import ExternalSubtitlePayload
 import teddy_discovery_stateful_quality_review as review
 import teddy_discovery_stateful_quality_review_clean as clean
 from teddy_discovery_stateful_translator import (
@@ -116,6 +120,8 @@ def main():
         preparation_value=preparation,
         request_value=request,
         result_value=main_result,
+        preserve_absorption=False,
+        omit_metadata=False,
     ):
         return clean.materialize_stateful_quality_review_clean(
             package_value,
@@ -124,6 +130,8 @@ def main():
             request_value,
             result_value,
             source_quality=source_quality,
+            preserve_absorption=preserve_absorption,
+            omit_metadata=omit_metadata,
         )
 
     full_before = (
@@ -144,6 +152,18 @@ def main():
         for cue in document.cues
     )
     output = materialize()
+
+    null_nonabsorbed = review.QualityReviewRequest(
+        request.schema_version, request.package_sha256, request.first_pass_sha256,
+        request.source_sha256, request.source_translation_session_id,
+        (replace(request.cues[0], first_pass_ko=None),) + request.cues[1:])
+    try:
+        review.validate_review_request(null_nonabsorbed, **originals)
+        null_nonabsorbed_rejected = False
+    except review.QualityReviewError:
+        null_nonabsorbed_rejected = True
+    check("null first-pass Korean remains bound to validated absorption only",
+          lambda: null_nonabsorbed_rejected)
 
     check("KEEP preserves first-pass repaired JA and Korean", lambda:
           output.cues[0].ja == first_pass.cues[0].repaired_ja
@@ -187,9 +207,9 @@ def main():
           and len(package.cues) == len(first_pass.cues) == len(request.cues)
           == len(main_result.cues) == 4
           and main_result.cues[2].action == review.OMIT)
-    check("AMBIGUOUS deterministically keeps first pass", lambda:
+    check("AMBIGUOUS preserves original JA and first-pass Korean", lambda:
           output.cues[2].original_source_index == 3
-          and output.cues[2].ja == first_pass.cues[3].repaired_ja
+          and output.cues[2].ja == package.cues[3].external_ja
           and output.cues[2].ko == first_pass.cues[3].ko
           and output.cues[2].review_action == review.AMBIGUOUS)
     check("source order survives omissions", lambda:
@@ -261,6 +281,95 @@ def main():
           ))
     check("CLEAN models are immutable", lambda:
           _immutable(output, "cues") and _immutable(output.cues[0], "ko"))
+
+    # Opt in the existing absorption contract and make only source 0/1 touch.
+    # Their midpoints remain unchanged, so the accepted alignment witness stays exact.
+    absorption_route = accepted_hybrid_route()
+    absorption_application = absorption_route.alignment_application
+    absorption_bundle = absorption_application.bundle
+    external_cues = list(absorption_bundle.external_ja_document.cues)
+    external_cues[1] = replace(external_cues[1], start_ms=1400, end_ms=2500)
+    external_cues[2] = replace(external_cues[2], text="字幕作成")
+    external_payload = ExternalSubtitlePayload.from_bytes(
+        dvd_id=absorption_bundle.dvd_id,
+        candidate=absorption_bundle.external_ja_payload.candidate,
+        payload=generate_korean_srt(tuple(external_cues)).payload,
+    )
+    absorption_bundle = replace(
+        absorption_bundle, external_ja_payload=external_payload,
+        external_ja_document=external_payload.parse())
+    absorption_application = apply_alignment_acceptance(
+        absorption_bundle, absorption_application.decision,
+        alignment=absorption_application.alignment)
+    absorption_route = replace(absorption_route,
+                               alignment_application=absorption_application)
+    absorption_preparation = prepare_stateful_hybrid(
+        absorption_route, generation_key="clean-absorption-fixture", claim_token=11)
+    absorption_preparation, boundary = bind_stateful_absorption_preparation(
+        absorption_preparation)
+    absorption_package = absorption_preparation.package
+    ordinary = semantic_result(absorption_package)
+    absorption_first = StatefulAbsorptionResult(
+        ordinary.schema_version, ordinary.dvd_id, ordinary.generation_key,
+        ordinary.claim_token, ordinary.session_id,
+        tuple(StatefulCueOutput(
+            cue.cue_id, None,
+            None if index == 0 else f"흡수 번역 {index}",
+            absorbed_into=(absorption_package.cues[1].cue_id if index == 0 else None),
+        ) for index, cue in enumerate(absorption_package.cues)), boundary)
+    absorption_quality = classify_source_document(
+        absorption_application.bundle.external_ja_document)
+    absorption_request = review.build_review_request(
+        preparation=absorption_preparation, package=absorption_package,
+        result=absorption_first, source_quality=absorption_quality)
+    absorption_keep = review.QualityReviewResult(
+        review.STATEFUL_QUALITY_REVIEW_SCHEMA_VERSION,
+        review.review_request_sha256(absorption_request),
+        tuple(review.QualityReviewResultCue(
+            cue.cue_id, review.KEEP, "DIALOGUE", "Retain validated absorption.",
+            None, None)
+              for cue in absorption_request.cues))
+    absorbed_clean = clean.materialize_stateful_quality_review_clean(
+        absorption_package, absorption_first, absorption_preparation,
+        absorption_request, absorption_keep, source_quality=absorption_quality,
+        preserve_absorption=True, omit_metadata=True)
+    check("absorption review input records no standalone member translation",
+          lambda: absorption_request.cues[0].first_pass_ko is None)
+    check("metadata source remains a deterministic CLEAN omission",
+          lambda: absorption_quality[2].action == "OMIT_METADATA"
+          and absorbed_clean.source_indexes == (0, 1, 3))
+    expected_absorbed_timing = (
+        project_affine_timestamp_ms(absorption_application.alignment,
+                                    absorption_application.bundle.external_ja_document.cues[0].start_ms),
+        project_affine_timestamp_ms(absorption_application.alignment,
+                                    absorption_application.bundle.external_ja_document.cues[1].end_ms),
+    )
+    check("CLEAN preserves absorption owner, source indexes and union timing", lambda:
+          absorbed_clean.cues[0].original_source_index == 1
+          and absorbed_clean.cues[0].source_indexes == (0, 1)
+          and (absorbed_clean.cues[0].start_ms, absorbed_clean.cues[0].end_ms)
+          == expected_absorbed_timing
+          and absorbed_clean.source_indexes[:2] == (0, 1))
+
+    for action in (review.REPAIR, review.OMIT):
+        actions = (action,) + (review.KEEP,) * (len(absorption_request.cues) - 1)
+        conflict_result = review.QualityReviewResult(
+            review.STATEFUL_QUALITY_REVIEW_SCHEMA_VERSION,
+            review.review_request_sha256(absorption_request),
+            tuple(review.QualityReviewResultCue(
+                cue.cue_id, item,
+                {review.KEEP: "DIALOGUE", review.REPAIR: "SEMANTIC_REPAIR",
+                 review.OMIT: "SOURCE_NOISE"}[item],
+                "Synthetic conflict must fail closed.",
+                "修正版" if item == review.REPAIR else None,
+                "수정 번역" if item == review.REPAIR else None,
+            ) for cue, item in zip(absorption_request.cues, actions, strict=True)))
+        reject("absorption group rejects partial " + action, lambda conflict_result=conflict_result:
+               clean.materialize_stateful_quality_review_clean(
+                   absorption_package, absorption_first, absorption_preparation,
+                   absorption_request, conflict_result,
+                   source_quality=absorption_quality,
+                   preserve_absorption=True, omit_metadata=True))
 
     reject("detached package rejected", lambda: materialize(
         package_value=changed(package, generation_key="detached")))

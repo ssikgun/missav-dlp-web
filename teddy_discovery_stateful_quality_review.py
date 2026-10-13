@@ -160,7 +160,7 @@ class QualityReviewInputCue:
     external_ja: str
     accepted_stt_ja: str | None
     first_pass_repaired_ja: str | None
-    first_pass_ko: str
+    first_pass_ko: str | None
     source_quality_action: str
     source_quality_reason: str
     raw_asr_context: tuple[str, ...] = ()
@@ -175,7 +175,7 @@ class QualityReviewInputCue:
         _text(self.external_ja)
         _text(self.accepted_stt_ja, optional=True)
         _text(self.first_pass_repaired_ja, optional=True)
-        _text(self.first_pass_ko)
+        _text(self.first_pass_ko, optional=True)
         try:
             SourceQualityDecision(self.source_index, self.source_quality_action,
                                   self.source_quality_reason, self.external_ja)
@@ -880,6 +880,10 @@ def effective_review_action(
         raise QualityReviewError(
             "REPAIR normalization requires a validated review input cue"
         )
+    if first_pass_ko is None:
+        # An absorption member has no standalone translation. The existing
+        # CLEAN materializer will reject any group-level REPAIR conflict.
+        return REPAIR
     if (
         type(first_pass_ko) is not str
         or (
