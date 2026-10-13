@@ -82,8 +82,13 @@ from teddy_discovery_stateful_asr_quality_review_direct_runner import (
 from teddy_discovery_stateful_quality_review import (
     serialize_review_request,
 )
+from teddy_discovery_stateful_absorption_review import (
+    AbsorptionGroupReviewRequest,
+    serialize_absorption_group_review_request,
+)
 from teddy_discovery_stateful_quality_review_runner import (
     run_quality_review, read_quality_review_result,
+    run_absorption_group_review,
 )
 
 
@@ -748,6 +753,38 @@ def build_hybrid_review_adapter(*, originals_provider, runner_options):
     return hybrid_review
 
 
+def build_hybrid_absorption_group_review_adapter(*, runner_options):
+    """Use the same native review session and remote bridge for group scope."""
+    options = dict(runner_options)
+    if {"review_execution_session_id", "session_id"} & options.keys():
+        raise Stage11LiveAdapterError(
+            "group review execution identity is adapter-owned"
+        )
+
+    def group_review(request, *, staging_root):
+        if type(request) is not AbsorptionGroupReviewRequest:
+            raise Stage11LiveAdapterError(
+                "group review runner received an invalid request"
+            )
+        try:
+            request.__post_init__()
+            serialize_absorption_group_review_request(request)
+        except Exception as error:
+            raise Stage11LiveAdapterError(
+                "group review request failed structural validation"
+            ) from error
+        session = new_review_execution_session_id()
+        directory = create_stateful_staging_directory(staging_root, session)
+        return run_absorption_group_review(
+            directory,
+            request,
+            review_execution_session_id=session,
+            **options,
+        )
+
+    return group_review
+
+
 @dataclass(frozen=True)
 class Stage11LiveDependencies:
     holding_resolver: Callable
@@ -758,12 +795,14 @@ class Stage11LiveDependencies:
     asr_review_runner: Callable
     hybrid_review_runner: Callable
     hybrid_targeted_runner: Callable
+    hybrid_absorption_group_review_runner: Callable | None = None
 
 
 def build_stage11_live_dependencies(*, source_provider, whisper, targeted_transport,
                                     discovery, provider, acceptance_policy,
                                     residual_threshold_ms, first_pass_options,
                                     asr_review_options, hybrid_review_options,
+                                    hybrid_absorption_group_review_options=None,
                                     holding_resolver=None,
                                     audio_chunk_iterator=iter_audio_chunks):
     resolver = holding_resolver if holding_resolver is not None else build_holding_resolver()
@@ -783,4 +822,7 @@ def build_stage11_live_dependencies(*, source_provider, whisper, targeted_transp
         build_targeted_adapter(holding_resolver=resolver, source_provider=source_provider,
                                targeted_transport=targeted_transport, hybrid_suspects=True,
                                audio_chunk_iterator=audio_chunk_iterator),
+        (None if hybrid_absorption_group_review_options is None else
+         build_hybrid_absorption_group_review_adapter(
+             **hybrid_absorption_group_review_options)),
     )

@@ -82,6 +82,11 @@ from teddy_discovery_stateful_quality_review import (
     serialize_review_result,
     validate_review_result,
 )
+from teddy_discovery_stateful_absorption_review import (
+    AbsorptionGroupReviewExecutionEvidence,
+    AbsorptionGroupReviewError,
+    build_absorption_group_review_request,
+)
 from teddy_discovery_stateful_quality_review_clean import (
     materialize_stateful_quality_review_clean,
 )
@@ -1606,6 +1611,7 @@ def run_one_title_stage11(
     hybrid_review_runner: Callable,
     targeted_runner: Callable | None = None,
     hybrid_targeted_runner: Callable | None = None,
+    hybrid_absorption_group_review_runner: Callable | None = None,
     holding_resolver: Callable[[str], Mapping[str, object]] | None = None,
     semantic_policy: StatefulSemanticPolicy | str = (
         DEFAULT_STATEFUL_SEMANTIC_POLICY
@@ -1851,6 +1857,35 @@ def run_one_title_stage11(
             staging_root=staging_root_path,
         )
         validate_review_result(review_result, review_request)
+        try:
+            group_review_request = build_absorption_group_review_request(
+                preparation=preparation,
+                package=package,
+                first_pass_result=first_pass,
+                review_request=review_request,
+                review_result=review_result,
+                source_quality=source_quality,
+                raw_asr_context=suspect_context,
+                targeted_second_evidence_artifact=targeted_artifact,
+            )
+        except AbsorptionGroupReviewError as error:
+            raise Stage11ControllerValidationError(
+                "absorption group review scope failed validation"
+            ) from error
+        group_review_execution = None
+        if group_review_request is not None:
+            if not callable(hybrid_absorption_group_review_runner):
+                raise Stage11ControllerValidationError(
+                    "HYBRID owner repairs require a group review runner"
+                )
+            group_review_execution = hybrid_absorption_group_review_runner(
+                group_review_request,
+                staging_root=staging_root_path,
+            )
+            if type(group_review_execution) is not AbsorptionGroupReviewExecutionEvidence:
+                raise Stage11ControllerValidationError(
+                    "group review runner returned invalid completion evidence"
+                )
         clean = materialize_stateful_quality_review_clean(
             package,
             first_pass,
@@ -1860,6 +1895,7 @@ def run_one_title_stage11(
             source_quality=source_quality,
             raw_asr_context=suspect_context,
             targeted_second_evidence_artifact=targeted_artifact,
+            absorption_group_review_execution=group_review_execution,
         )
         review_request_digest = review_request_sha256(review_request)
         review_raw = serialize_review_result(review_result, review_request)

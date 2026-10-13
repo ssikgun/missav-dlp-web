@@ -23,11 +23,19 @@ from collections import Counter
 import teddy_discovery_stage11_controller as controller
 from teddy_discovery_alignment_acceptance import AlignmentAcceptancePolicy
 from teddy_discovery_stage11_deployment import SSHRemoteHermesBridge, Stage11DeploymentTransportError
+from teddy_discovery_stage11_deployment import QUALITY_REVIEW_EXECUTION_RECEIPT_MAX_BYTES
 from teddy_discovery_asr import ASRError
 from teddy_discovery_stage11_live_adapters import _align_external_payload
 from teddy_discovery_stateful_boundary import (
     bind_stateful_absorption_preparation, serialize_stateful_boundary_evidence,
     validate_stateful_absorption,
+)
+from teddy_discovery_stateful_absorption_review import (
+    AbsorptionGroupReviewError,
+    AbsorptionGroupReviewExecutionEvidence,
+    build_absorption_group_review_request,
+    serialize_absorption_group_review_request,
+    validate_absorption_group_review_execution,
 )
 from teddy_discovery_stateful_controller import build_stateful_whole_title_query, build_stateful_part_query
 from teddy_discovery_stateful_hybrid import prepare_stateful_hybrid
@@ -46,6 +54,10 @@ from teddy_discovery_subtitle_text import SubtitleCue, MAX_SUBTITLE_BYTES
 
 PROOF_NAME = 'normal-mode-proof-v1.json'
 SOURCE_NAME = 'normal-mode-source-v1.json'
+GROUP_REVIEW_REQUEST_NAME = 'absorption-group-review-request-v1.json'
+GROUP_REVIEW_RESULT_NAME = 'absorption-group-review-result-v1.json'
+GROUP_REVIEW_RECEIPT_NAME = 'absorption-group-review-receipt-v1.json'
+GROUP_REVIEW_PROVENANCE_NAME = 'absorption-group-review-provenance-v1.json'
 USER_INTERVENTION = 0
 AUTO_INSERT = False
 MAX_NATIVE_PROMPT_BYTES = 128000
@@ -384,13 +396,126 @@ def _normal_review_evidence(directory, preparation, first, baseline, baseline_sh
     return source_quality, request, merged, context, evidence
 
 
+def _normal_group_review_execution(directory, preparation, first, review_request,
+                                  review_result, source_quality, raw_asr_context,
+                                  *, group_review_runner=None, staging_root=None,
+                                  create_missing):
+    """Create or replay only the explicit group-review sidecar, never V1."""
+    try:
+        request = build_absorption_group_review_request(
+            preparation=preparation,
+            package=preparation.package,
+            first_pass_result=first,
+            review_request=review_request,
+            review_result=review_result,
+            source_quality=source_quality,
+            raw_asr_context=raw_asr_context,
+        )
+    except AbsorptionGroupReviewError as error:
+        raise controller.Stage11ControllerArtifactError(
+            'absorption group review scope is invalid') from error
+
+    paths = {
+        'request': directory / GROUP_REVIEW_REQUEST_NAME,
+        'result': directory / GROUP_REVIEW_RESULT_NAME,
+        'receipt': directory / GROUP_REVIEW_RECEIPT_NAME,
+        'provenance': directory / GROUP_REVIEW_PROVENANCE_NAME,
+    }
+    present = {
+        key: path.exists() or path.is_symlink()
+        for key, path in paths.items()
+    }
+    if request is None:
+        if any(present.values()):
+            raise controller.Stage11ControllerArtifactError(
+                'unexpected absorption group review artifacts without repair scope')
+        return None
+
+    if any(present.values()):
+        if not all(present.values()):
+            raise controller.Stage11ControllerArtifactError(
+                'absorption group review evidence is incomplete')
+        request_raw = controller._read_private_file(
+            paths['request'], max_bytes=16 * 1024 * 1024)
+        result_raw = controller._read_private_file(
+            paths['result'], max_bytes=16 * 1024 * 1024)
+        receipt_raw = controller._read_private_file(
+            paths['receipt'], max_bytes=QUALITY_REVIEW_EXECUTION_RECEIPT_MAX_BYTES)
+        metadata_raw = controller._read_private_file(
+            paths['provenance'], max_bytes=64 * 1024)
+        try:
+            metadata = json.loads(metadata_raw.decode('utf-8'))
+        except (UnicodeError, ValueError) as error:
+            raise controller.Stage11ControllerArtifactError(
+                'absorption group review provenance is malformed') from error
+        if (type(metadata) is not dict or set(metadata) != {
+                'schema_version', 'remote_task', 'receipt_nonce',
+                'review_execution_session_id'}
+                or metadata.get('schema_version') != 1
+                or wire(metadata) != metadata_raw):
+            raise controller.Stage11ControllerArtifactError(
+                'absorption group review provenance is noncanonical')
+        execution = AbsorptionGroupReviewExecutionEvidence(
+            request_payload=request_raw,
+            result_payload=result_raw,
+            receipt_payload=receipt_raw,
+            remote_task=metadata.get('remote_task'),
+            receipt_nonce=metadata.get('receipt_nonce'),
+            review_execution_session_id=metadata.get(
+                'review_execution_session_id'),
+        )
+    else:
+        if not create_missing:
+            raise controller.Stage11ControllerArtifactError(
+                'completed owner REPAIR lacks group review evidence')
+        if not callable(group_review_runner):
+            raise controller.Stage11ControllerValidationError(
+                'owner REPAIR requires a group review runner')
+        execution = group_review_runner(request, staging_root=staging_root)
+        if type(execution) is not AbsorptionGroupReviewExecutionEvidence:
+            raise controller.Stage11ControllerValidationError(
+                'group review runner returned invalid evidence')
+
+    try:
+        validate_absorption_group_review_execution(execution, request)
+    except AbsorptionGroupReviewError as error:
+        raise controller.Stage11ControllerArtifactError(
+            'absorption group review receipt or result is invalid') from error
+
+    metadata = {
+        'schema_version': 1,
+        'remote_task': execution.remote_task,
+        'receipt_nonce': execution.receipt_nonce,
+        'review_execution_session_id': execution.review_execution_session_id,
+    }
+    store(paths['request'], execution.request_payload)
+    store(paths['result'], execution.result_payload)
+    store(paths['receipt'], execution.receipt_payload)
+    store(paths['provenance'], wire(metadata))
+    return execution
+
+
+def _group_review_proof_identity(execution):
+    if execution is None:
+        return None
+    return {
+        'request_sha256': sha(execution.request_payload),
+        'result_sha256': sha(execution.result_payload),
+        'receipt_sha256': sha(execution.receipt_payload),
+        'review_execution_session_id_sha256': sha(
+            execution.review_execution_session_id.encode('utf-8')),
+    }
+
+
 def normal_materialization(preparation, result, review_request, review_result,
-                           source_quality, *, raw_asr_context=None):
+                           source_quality, *, raw_asr_context=None,
+                           absorption_group_review_execution=None):
     validate_normal_translation(serialize_stateful_result(result),
                                 preparation.package, result.boundary_evidence)
     clean = controller.materialize_stateful_quality_review_clean(
         preparation.package, result, preparation, review_request, review_result,
         source_quality=source_quality, raw_asr_context=raw_asr_context,
+        absorption_group_review_execution=absorption_group_review_execution,
         preserve_absorption=True, omit_metadata=True,
     )
     playback = clean.cues
@@ -511,9 +636,17 @@ def validate_normal_completion(report_path, clean_path, baseline_path, *, title,
         directory, preparation, result, baseline, sha(baseline_raw),
         staging_root or directory, create_missing=False,
         targeted_reused_hint=targeted_reused_hint)
+    group_review_execution = _normal_group_review_execution(
+        directory, preparation, result, review_request, review_result,
+        source_quality, raw_asr_context, staging_root=staging_root,
+        create_missing=False)
+    if group_review_execution is not None:
+        evidence['absorption_group_review'] = _group_review_proof_identity(
+            group_review_execution)
     artifact,playback,clean=normal_materialization(
         preparation,result,review_request,review_result,source_quality,
-        raw_asr_context=raw_asr_context)
+        raw_asr_context=raw_asr_context,
+        absorption_group_review_execution=group_review_execution)
     clean_raw=controller._read_private_file(clean_path,max_bytes=MAX_SUBTITLE_BYTES)
     expected_proof=_normal_proof(package_raw,result_raw,result,source_quality,
                                   playback,evidence,artifact.sha256)
@@ -543,6 +676,7 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
                              baseline_transcriber, external_ja_attempt, first_pass_runner,
                              acceptance_policy, holding_resolver=None,
                              hybrid_review_runner=None, hybrid_targeted_runner=None,
+                             hybrid_absorption_group_review_runner=None,
                              **unused):
     title=controller._canonical_title(title)
     root=controller._validate_root(artifact_root,field_name='artifact_root')
@@ -586,9 +720,19 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
             hybrid_review_runner=hybrid_review_runner,
             hybrid_targeted_runner=hybrid_targeted_runner,
             create_missing=True)
+        group_review_execution = _normal_group_review_execution(
+            directory, preparation, first, review_request, review_result,
+            source_quality, raw_asr_context,
+            group_review_runner=hybrid_absorption_group_review_runner,
+            staging_root=staging,
+            create_missing=True)
+        if group_review_execution is not None:
+            evidence['absorption_group_review'] = _group_review_proof_identity(
+                group_review_execution)
         artifact,playback,clean=normal_materialization(
             preparation,first,review_request,review_result,source_quality,
-            raw_asr_context=raw_asr_context)
+            raw_asr_context=raw_asr_context,
+            absorption_group_review_execution=group_review_execution)
         proof=_normal_proof(package_raw,result_raw,first,source_quality,
                             playback,evidence,artifact.sha256)
         proof_raw=wire(proof)

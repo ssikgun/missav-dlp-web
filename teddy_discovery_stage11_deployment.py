@@ -66,6 +66,10 @@ from teddy_discovery_stateful_quality_review import (
     review_request_sha256,
     serialize_review_request,
 )
+from teddy_discovery_stateful_absorption_review import (
+    ABSORPTION_GROUP_REVIEW_INPUT_FILENAME,
+    ABSORPTION_GROUP_REVIEW_RESULT_FILENAME,
+)
 from teddy_discovery_stateful_quality_review_runner import (
     QUALITY_REVIEW_INPUT_FILENAME,
     QUALITY_REVIEW_RESULT_FILENAME,
@@ -1307,6 +1311,8 @@ finally:
         session_id: str,
         request_sha256: str,
         receipt_nonce: str,
+        input_filename: str = QUALITY_REVIEW_INPUT_FILENAME,
+        result_filename: str = QUALITY_REVIEW_RESULT_FILENAME,
     ) -> SimpleNamespace:
         remote_task = validate_stateful_remote_task_path(remote_task)
         if type(command) is not list or not command or not all(
@@ -1326,6 +1332,14 @@ finally:
         ):
             raise Stage11DeploymentValidationError(
                 "native review receipt identity or timeout is invalid"
+            )
+        if (input_filename, result_filename) not in {
+            (QUALITY_REVIEW_INPUT_FILENAME, QUALITY_REVIEW_RESULT_FILENAME),
+            (ABSORPTION_GROUP_REVIEW_INPUT_FILENAME,
+             ABSORPTION_GROUP_REVIEW_RESULT_FILENAME),
+        }:
+            raise Stage11DeploymentValidationError(
+                "native review artifact names are unsupported"
             )
         try:
             resume_index = command.index("--resume")
@@ -1347,15 +1361,16 @@ finally:
         ).decode("ascii")
         script = """
 import base64, hashlib, json, os, stat, subprocess, sys
-task, encoded, session_id, request_sha, nonce, timeout_text = sys.argv[1:7]
+task, encoded, session_id, request_sha, nonce, timeout_text, input_name, result_name = sys.argv[1:9]
 timeout = float(timeout_text)
+if any('/' in name or name in ('', '.', '..') for name in (input_name, result_name)):
+    raise SystemExit(10)
 task_fd = os.open(task, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
 info = os.fstat(task_fd)
 if (not stat.S_ISDIR(info.st_mode)
         or info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700):
     raise SystemExit(2)
 task_hash = hashlib.sha256(os.fsencode(task)).hexdigest()
-result_name = "stage11-quality-review-result.json"
 receipt_name = "stage11-quality-review-execution-receipt.json"
 for name in (result_name, receipt_name):
     try:
@@ -1363,7 +1378,7 @@ for name in (result_name, receipt_name):
     except FileNotFoundError:
         continue
     raise SystemExit(5)
-fd = os.open("stage11-quality-review-input.json",
+fd = os.open(input_name,
              os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=task_fd)
 try:
     input_info = os.fstat(fd)
@@ -1469,6 +1484,8 @@ os.close(task_fd)
                 request_sha256,
                 receipt_nonce,
                 str(float(timeout)),
+                input_filename,
+                result_filename,
                 timeout=timeout + 30,
             )
         except Stage11DeploymentTransportError as transport_error:
@@ -1692,24 +1709,40 @@ def _hybrid_launcher_factory(
                 "Hybrid launcher command has no unique query"
             )
         local_task = _local_task_from_fd(cwd)
-        local_input = str(local_task / QUALITY_REVIEW_INPUT_FILENAME)
-        local_result = str(local_task / QUALITY_REVIEW_RESULT_FILENAME)
         query_index = query_indexes[0] + 1
         query = command[query_index]
+        artifact_contracts = (
+            (QUALITY_REVIEW_INPUT_FILENAME, QUALITY_REVIEW_RESULT_FILENAME),
+            (ABSORPTION_GROUP_REVIEW_INPUT_FILENAME,
+             ABSORPTION_GROUP_REVIEW_RESULT_FILENAME),
+        )
+        matching_contracts = [
+            (input_name, result_name)
+            for input_name, result_name in artifact_contracts
+            if str(local_task / input_name) in query
+            and str(local_task / result_name) in query
+        ]
+        if len(matching_contracts) != 1:
+            raise Stage11DeploymentValidationError(
+                "Hybrid query lacks one exact review artifact contract"
+            )
+        input_filename, result_filename = matching_contracts[0]
+        local_input = str(local_task / input_filename)
+        local_result = str(local_task / result_filename)
         if local_input not in query or local_result not in query:
             raise Stage11DeploymentValidationError(
                 "Hybrid query lacks exact local file authority"
             )
         payload = _private_local_read_at(
             cwd,
-            QUALITY_REVIEW_INPUT_FILENAME,
+            input_filename,
             max_bytes=16 * 1024 * 1024,
         )
         request_sha = hashlib.sha256(payload).hexdigest()
         receipt_nonce = secrets.token_hex(32)
         remote_task = remote_task_for_session(session_id)
-        remote_input = remote_task + "/" + QUALITY_REVIEW_INPUT_FILENAME
-        remote_result = remote_task + "/" + QUALITY_REVIEW_RESULT_FILENAME
+        remote_input = remote_task + "/" + input_filename
+        remote_result = remote_task + "/" + result_filename
         ensure_task(remote_task)
         ensure_file(remote_input, payload)
         remote_command = list(command)
@@ -1718,6 +1751,12 @@ def _hybrid_launcher_factory(
             raise Stage11DeploymentValidationError(
                 "Hybrid query retained local file authority"
             )
+        launch_options = {}
+        if input_filename != QUALITY_REVIEW_INPUT_FILENAME:
+            launch_options = {
+                "input_filename": input_filename,
+                "result_filename": result_filename,
+            }
         completed = launch(
             remote_command,
             remote_task=remote_task,
@@ -1725,6 +1764,7 @@ def _hybrid_launcher_factory(
             session_id=session_id,
             request_sha256=request_sha,
             receipt_nonce=receipt_nonce,
+            **launch_options,
         )
         returncode = getattr(completed, "returncode", None)
         if type(returncode) is not int or returncode != 0:
@@ -1799,8 +1839,13 @@ def _hybrid_launcher_factory(
                             "result_sha256": hashlib.sha256(result_payload).hexdigest(),
                             "result_size_bytes": len(result_payload)},
             )
-        _private_local_write_at(cwd, QUALITY_REVIEW_RESULT_FILENAME, result_payload)
-        return SimpleNamespace(returncode=0, execution_receipt=receipt)
+        _private_local_write_at(cwd, result_filename, result_payload)
+        return SimpleNamespace(
+            returncode=0,
+            execution_receipt=receipt,
+            remote_task=remote_task,
+            receipt_nonce=receipt_nonce,
+        )
 
     return launcher
 
@@ -2051,6 +2096,9 @@ class Stage11DeploymentDependencies:
             "asr_review_runner": self.live.asr_review_runner,
             "hybrid_review_runner": self.live.hybrid_review_runner,
             "hybrid_targeted_runner": self.live.hybrid_targeted_runner,
+            "hybrid_absorption_group_review_runner": (
+                getattr(self.live, "hybrid_absorption_group_review_runner", None)
+            ),
         }
 
     def capture_first_pass_runner(self, callback: Callable) -> Callable:
@@ -2079,6 +2127,7 @@ def build_stage11_deployment_dependencies(
     first_pass_options: Mapping[str, object] | None = None,
     asr_review_options: Mapping[str, object] | None = None,
     hybrid_review_options: Mapping[str, object] | None = None,
+    hybrid_absorption_group_review_options: Mapping[str, object] | None = None,
     targeted_artifact_provider: Callable | None = None,
     audio_chunk_iterator: Callable = iter_audio_chunks,
 ) -> Stage11DeploymentDependencies:
@@ -2217,6 +2266,21 @@ def build_stage11_deployment_dependencies(
         hybrid_review_options,
         field_name="hybrid_review_options",
     )
+    hybrid_group_native_defaults = {
+        "fresh_session_db": hybrid_native_defaults["fresh_session_db"],
+        "expected_profile_name": config.expected_profile_name,
+        "launcher": hybrid_launcher,
+    }
+    _reject_owned_option_overrides(
+        hybrid_absorption_group_review_options,
+        hybrid_group_native_defaults,
+        field_name="hybrid_absorption_group_review_options",
+    )
+    hybrid_group_native_options = _merge_options(
+        hybrid_group_native_defaults,
+        hybrid_absorption_group_review_options,
+        field_name="hybrid_absorption_group_review_options",
+    )
 
     live = build_stage11_live_dependencies(
         source_provider=source,
@@ -2236,6 +2300,9 @@ def build_stage11_deployment_dependencies(
         hybrid_review_options={
             "originals_provider": originals_registry.originals_provider,
             "runner_options": hybrid_native_options,
+        },
+        hybrid_absorption_group_review_options={
+            "runner_options": hybrid_group_native_options,
         },
     )
     live = replace(

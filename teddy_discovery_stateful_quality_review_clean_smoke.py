@@ -2,9 +2,15 @@
 
 import ast
 from dataclasses import FrozenInstanceError, fields, replace
+import hashlib
+import json
+import os
 from pathlib import Path
 import re
+import tempfile
+from types import SimpleNamespace
 from unittest.mock import patch
+import uuid
 
 from teddy_discovery_hermes_v2 import HermesV2CueOutput
 from teddy_discovery_ko_srt import generate_korean_srt
@@ -22,6 +28,10 @@ from teddy_discovery_alignment_application import apply_alignment_acceptance
 from teddy_discovery_subtitle_external import ExternalSubtitlePayload
 import teddy_discovery_stateful_quality_review as review
 import teddy_discovery_stateful_quality_review_clean as clean
+import teddy_discovery_stateful_absorption_review as group_review
+import teddy_discovery_stage11_deployment as deployment
+import teddy_discovery_stage11_normal_mode as normal_mode
+import teddy_discovery_stateful_quality_review_runner as review_runner
 from teddy_discovery_stateful_translator import (
     serialize_stateful_package,
     serialize_stateful_result,
@@ -413,6 +423,400 @@ def main():
             preserve_absorption=True, omit_metadata=True),
     )
 
+    parent_review_session = str(uuid.uuid4())
+    bound_owner_repair_result = review.bind_review_execution_provenance(
+        owner_repair_result, absorption_request, parent_review_session)
+    group_request = group_review.build_absorption_group_review_request(
+        preparation=absorption_preparation,
+        package=absorption_package,
+        first_pass_result=absorption_first,
+        review_request=absorption_request,
+        review_result=bound_owner_repair_result,
+        source_quality=absorption_quality,
+    )
+    check("group scope binds deterministic owner, membership, source and provenance",
+          lambda: group_request is not None
+          and group_request.title_context == absorption_request.cues
+          and len(group_request.groups) == 1
+          and group_request.groups[0].scope.owner_cue_id
+          == absorption_package.cues[1].cue_id
+          and group_request.groups[0].scope.cue_ids
+          == (absorption_package.cues[0].cue_id,
+              absorption_package.cues[1].cue_id)
+          and group_request.groups[0].scope.source_indexes == (0, 1)
+          and group_request.groups[0].member_cues[0].first_pass_ko is None
+          and group_request.groups[0].member_cues[1].first_pass_ko
+          == absorption_first.cues[1].ko
+          and group_request.groups[0].member_decisions[-1].action == review.REPAIR)
+
+    group_originals = {
+        "preparation": absorption_preparation,
+        "package": absorption_package,
+        "first_pass_result": absorption_first,
+        "review_request": absorption_request,
+        "review_result": bound_owner_repair_result,
+        "source_quality": absorption_quality,
+    }
+
+    def forged_group_request(**updates):
+        fields = group_review._scope_fields(group_request.groups[0].scope)
+        fields.update(updates)
+        scope = group_review.AbsorptionGroupScope(
+            group_id=group_review._scope_identity(fields), **fields)
+        group = replace(group_request.groups[0], scope=scope)
+        return replace(group_request, groups=(group,))
+
+    check("group boundary identity is rebuilt from original evidence", lambda:
+          _raises_group_error(lambda:
+              group_review.validate_absorption_group_review_request(
+                  forged_group_request(boundary_evidence_sha256="0" * 64),
+                  **group_originals)))
+    check("group owner cannot be reassigned by review evidence", lambda:
+          _raises_group_error(lambda:
+              forged_group_request(
+                  owner_cue_id=absorption_package.cues[0].cue_id)))
+    check("group membership cannot be widened beyond its source cues", lambda:
+          _raises_group_error(lambda:
+              forged_group_request(
+                  cue_ids=tuple(c.cue_id for c in absorption_package.cues[:3]),
+                  source_indexes=(0, 1, 2))))
+
+    def group_execution(action, *, request_value=group_request,
+                        replacement_ja=None, replacement_ko=None,
+                        nonce=None, session_id=None, payload_suffix=b""):
+        session_id = session_id or str(uuid.uuid4())
+        nonce = nonce or uuid.uuid4().hex + uuid.uuid4().hex
+        request_payload = group_review.serialize_absorption_group_review_request(
+            request_value)
+        group_id = request_value.groups[0].scope.group_id
+        decision = group_review.AbsorptionGroupReviewDecision(
+            group_id, action, "Synthetic full-group semantic decision.",
+            replacement_ja, replacement_ko)
+        result_value = group_review.AbsorptionGroupReviewResult(
+            group_review.ABSORPTION_GROUP_REVIEW_SCHEMA_VERSION,
+            group_review.absorption_group_review_request_sha256(request_value),
+            (decision,))
+        result_payload = group_review.serialize_absorption_group_review_result(
+            result_value, request_value,
+            review_execution_session_id=session_id) + payload_suffix
+        task = "/tmp/stage11-p2l-group-review/" + session_id
+        receipt = {
+            "schema_version": 1,
+            "session_id": session_id,
+            "task_sha256": hashlib.sha256(task.encode("utf-8")).hexdigest(),
+            "request_sha256": hashlib.sha256(request_payload).hexdigest(),
+            "input_sha256": hashlib.sha256(request_payload).hexdigest(),
+            "receipt_nonce": nonce,
+            "child_outcome": "COMPLETED",
+            "child_returncode": 0,
+            "result_state": "PRESENT",
+            "result_sha256": hashlib.sha256(result_payload).hexdigest(),
+            "result_size_bytes": len(result_payload),
+        }
+        receipt_payload = json.dumps(
+            receipt, sort_keys=True, separators=(",", ":")) .encode("ascii")
+        return group_review.AbsorptionGroupReviewExecutionEvidence(
+            request_payload, result_payload, receipt_payload, task, nonce, session_id)
+
+    reverse_first = StatefulAbsorptionResult(
+        absorption_first.schema_version, absorption_first.dvd_id,
+        absorption_first.generation_key, absorption_first.claim_token,
+        absorption_first.session_id,
+        tuple(StatefulCueOutput(
+            cue.cue_id, None,
+            "역방향 owner 번역" if index == 0 else None if index == 1
+            else f"다른 번역 {index}",
+            absorbed_into=(absorption_package.cues[0].cue_id if index == 1 else None),
+        ) for index, cue in enumerate(absorption_package.cues)), boundary)
+    reverse_request = review.build_review_request(
+        preparation=absorption_preparation, package=absorption_package,
+        result=reverse_first, source_quality=absorption_quality)
+    reverse_actions = (
+        review.REPAIR, review.KEEP,
+        *((review.KEEP,) * (len(reverse_request.cues) - 2)),
+    )
+    reverse_review_result = review.QualityReviewResult(
+        review.STATEFUL_QUALITY_REVIEW_SCHEMA_VERSION,
+        review.review_request_sha256(reverse_request),
+        tuple(review.QualityReviewResultCue(
+            cue.cue_id, action,
+            "SEMANTIC_REPAIR" if action == review.REPAIR else "DIALOGUE",
+            "Synthetic owner-first group decision.",
+            "修正版" if action == review.REPAIR else None,
+            "역방향 그룹 수정" if action == review.REPAIR else None,
+        ) for cue, action in zip(reverse_request.cues, reverse_actions, strict=True)))
+    reverse_review_result = review.bind_review_execution_provenance(
+        reverse_review_result, reverse_request, str(uuid.uuid4()))
+    reverse_group_request = group_review.build_absorption_group_review_request(
+        preparation=absorption_preparation,
+        package=absorption_package,
+        first_pass_result=reverse_first,
+        review_request=reverse_request,
+        review_result=reverse_review_result,
+        source_quality=absorption_quality,
+    )
+    reverse_execution = group_execution(
+        group_review.GROUP_REVIEW_REPAIR,
+        request_value=reverse_group_request,
+        replacement_ja="逆方向グループ全体の修正文",
+        replacement_ko="역방향 그룹 전체의 수정 번역",
+    )
+    reverse_clean = clean.materialize_stateful_quality_review_clean(
+        absorption_package, reverse_first, absorption_preparation,
+        reverse_request, reverse_review_result,
+        source_quality=absorption_quality,
+        absorption_group_review_execution=reverse_execution,
+        preserve_absorption=True, omit_metadata=True,
+    )
+    check("group scope follows the deterministic owner when it is not last", lambda:
+          reverse_group_request.groups[0].scope.owner_cue_id
+          == absorption_package.cues[0].cue_id
+          and reverse_group_request.groups[0].scope.cue_ids
+          == (absorption_package.cues[0].cue_id,
+              absorption_package.cues[1].cue_id)
+          and reverse_clean.cues[0].cue_id == absorption_package.cues[0].cue_id
+          and reverse_clean.cues[0].original_source_index == 0
+          and reverse_clean.cues[0].source_indexes == (0, 1)
+          and reverse_clean.cues[0].ko == "역방향 그룹 전체의 수정 번역")
+
+    repair_execution = group_execution(
+        group_review.GROUP_REVIEW_REPAIR,
+        replacement_ja="グループ全体の修正文",
+        replacement_ko="흡수 그룹 전체의 수정 번역",
+    )
+    repair_result = group_review.validate_absorption_group_review_execution(
+        repair_execution, group_request)
+    repaired_group_clean = clean.materialize_stateful_quality_review_clean(
+        absorption_package, absorption_first, absorption_preparation,
+        absorption_request, bound_owner_repair_result,
+        source_quality=absorption_quality,
+        absorption_group_review_execution=repair_execution,
+        preserve_absorption=True, omit_metadata=True)
+    expected_group_timing = (
+        min(expected_absorbed_timing[0], expected_absorbed_timing[0]),
+        max(expected_absorbed_timing[1], expected_absorbed_timing[1]),
+    )
+    check("explicit group REPAIR applies both full-group replacements",
+          lambda: repair_result.decisions[0].action == group_review.GROUP_REVIEW_REPAIR
+          and repaired_group_clean.cues[0].ja == "グループ全体の修正文"
+          and repaired_group_clean.cues[0].ko == "흡수 그룹 전체의 수정 번역"
+          and repaired_group_clean.cues[0].review_action == review.REPAIR
+          and repaired_group_clean.cues[0].cue_id == absorption_package.cues[1].cue_id
+          and repaired_group_clean.cues[0].original_source_index == 1
+          and repaired_group_clean.cues[0].source_indexes == (0, 1)
+          and (repaired_group_clean.cues[0].start_ms,
+               repaired_group_clean.cues[0].end_ms) == expected_group_timing)
+
+    class FakeSessionDB:
+        def __init__(self):
+            self.rows = {}
+
+        def get_session(self, session_id):
+            return self.rows.get(session_id)
+
+        def create_session(self, *, session_id, source, profile_name):
+            self.rows[session_id] = {
+                "id": session_id, "source": source,
+                "profile_name": profile_name, "parent_session_id": None,
+            }
+            return session_id
+
+        def get_messages(self, session_id, *, include_inactive=False):
+            return []
+
+    class FakeGroupBridge:
+        def __init__(self):
+            self.files = {}
+            self.group_filenames = None
+
+        def ensure_task(self, remote_task):
+            self.remote_task = remote_task
+
+        def ensure_file(self, remote_path, payload):
+            self.files[remote_path] = payload
+
+        def launch_quality_review(
+            self, command, *, remote_task, timeout, session_id,
+            request_sha256, receipt_nonce, input_filename, result_filename,
+        ):
+            self.group_filenames = (input_filename, result_filename)
+            input_payload = self.files[remote_task + "/" + input_filename]
+            result_payload = repair_execution.result_payload
+            self.files[remote_task + "/" + result_filename] = result_payload
+            return SimpleNamespace(returncode=0, execution_receipt={
+                "schema_version": 1,
+                "session_id": session_id,
+                "task_sha256": hashlib.sha256(remote_task.encode()).hexdigest(),
+                "request_sha256": request_sha256,
+                "input_sha256": hashlib.sha256(input_payload).hexdigest(),
+                "receipt_nonce": receipt_nonce,
+                "child_outcome": "COMPLETED",
+                "child_returncode": 0,
+                "result_state": "PRESENT",
+                "result_sha256": hashlib.sha256(result_payload).hexdigest(),
+                "result_size_bytes": len(result_payload),
+            })
+
+        def read_regular(self, remote_path, *, max_bytes):
+            payload = self.files[remote_path]
+            assert len(payload) <= max_bytes
+            return payload
+
+    bridge = FakeGroupBridge()
+    group_launcher = deployment._hybrid_launcher_factory(
+        bridge,
+        lambda session_id: "/tmp/stage11-p2l-group-review/" + session_id,
+    )
+    with tempfile.TemporaryDirectory(prefix="stage11-group-review-smoke-") as temporary:
+        task_directory = Path(temporary)
+        os.chmod(task_directory, 0o700)
+        bridged_execution = review_runner.run_absorption_group_review(
+            task_directory,
+            group_request,
+            review_execution_session_id=str(uuid.uuid4()),
+            fresh_session_db=FakeSessionDB(),
+            expected_profile_name="subtitle-translator",
+            launcher=group_launcher,
+        )
+    bridged_result = group_review.validate_absorption_group_review_execution(
+        bridged_execution, group_request)
+    check("group runner reuses fresh native session, SSH bridge and receipt",
+          lambda: bridge.group_filenames == (
+              group_review.ABSORPTION_GROUP_REVIEW_INPUT_FILENAME,
+              group_review.ABSORPTION_GROUP_REVIEW_RESULT_FILENAME)
+          and bridged_result.decisions[0].action == group_review.GROUP_REVIEW_REPAIR
+          and bridged_execution.review_execution_session_id
+          != group_request.parent_review_execution_session_id)
+
+    with tempfile.TemporaryDirectory(prefix="stage11-normal-group-proof-") as temporary:
+        artifact_directory = Path(temporary)
+        os.chmod(artifact_directory, 0o700)
+        group_runner_calls = []
+        persisted_execution = normal_mode._normal_group_review_execution(
+            artifact_directory,
+            absorption_preparation,
+            absorption_first,
+            absorption_request,
+            bound_owner_repair_result,
+            absorption_quality,
+            None,
+            group_review_runner=lambda request, *, staging_root: (
+                group_runner_calls.append(request) or repair_execution),
+            staging_root=artifact_directory,
+            create_missing=True,
+        )
+        replayed_execution = normal_mode._normal_group_review_execution(
+            artifact_directory,
+            absorption_preparation,
+            absorption_first,
+            absorption_request,
+            bound_owner_repair_result,
+            absorption_quality,
+            None,
+            create_missing=False,
+        )
+    check("Normal stores and revalidates group receipt without rerunning review",
+          lambda: len(group_runner_calls) == 1
+          and persisted_execution == repair_execution
+          and replayed_execution == repair_execution
+          and normal_mode._group_review_proof_identity(replayed_execution)
+          == normal_mode._group_review_proof_identity(repair_execution))
+    normal_group_artifact, normal_group_playback, _ = normal_mode.normal_materialization(
+        absorption_preparation,
+        absorption_first,
+        absorption_request,
+        bound_owner_repair_result,
+        absorption_quality,
+        absorption_group_review_execution=replayed_execution,
+    )
+    check("Normal materialization passes validated group evidence into CLEAN",
+          lambda: normal_group_artifact.payload is not None
+          and normal_group_playback[0].cue_id == absorption_package.cues[1].cue_id
+          and normal_group_playback[0].source_indexes == (0, 1)
+          and normal_group_playback[0].ko == "흡수 그룹 전체의 수정 번역")
+
+    keep_execution = group_execution(group_review.GROUP_REVIEW_KEEP)
+    keep_group_clean = clean.materialize_stateful_quality_review_clean(
+        absorption_package, absorption_first, absorption_preparation,
+        absorption_request, bound_owner_repair_result,
+        source_quality=absorption_quality,
+        absorption_group_review_execution=keep_execution,
+        preserve_absorption=True, omit_metadata=True)
+    check("group KEEP suppresses per-cue repair and retains owner translation",
+          lambda: keep_group_clean.cues[0].ko == absorption_first.cues[1].ko
+          and keep_group_clean.cues[0].review_action == review.KEEP
+          and keep_group_clean.cues[0].source_indexes == (0, 1))
+    ambiguous_group_execution = group_execution(
+        group_review.GROUP_REVIEW_AMBIGUOUS)
+    ambiguous_group_clean = clean.materialize_stateful_quality_review_clean(
+        absorption_package, absorption_first, absorption_preparation,
+        absorption_request, bound_owner_repair_result,
+        source_quality=absorption_quality,
+        absorption_group_review_execution=ambiguous_group_execution,
+        preserve_absorption=True, omit_metadata=True)
+    check("group AMBIGUOUS preserves first-pass Korean and original owner JA",
+          lambda: ambiguous_group_clean.cues[0].ko == absorption_first.cues[1].ko
+          and ambiguous_group_clean.cues[0].ja
+          == absorption_package.cues[1].external_ja
+          and ambiguous_group_clean.cues[0].review_action == review.AMBIGUOUS)
+
+    missing_receipt = replace(repair_execution, receipt_payload=b"")
+    reject("missing native completion receipt blocks group authority", lambda:
+           clean.materialize_stateful_quality_review_clean(
+               absorption_package, absorption_first, absorption_preparation,
+               absorption_request, bound_owner_repair_result,
+               source_quality=absorption_quality,
+               absorption_group_review_execution=missing_receipt,
+               preserve_absorption=True, omit_metadata=True))
+    mismatched_result = replace(
+        repair_execution,
+        result_payload=repair_execution.result_payload + b" ",
+    )
+    reject("result SHA mismatch against native receipt blocks group authority", lambda:
+           clean.materialize_stateful_quality_review_clean(
+               absorption_package, absorption_first, absorption_preparation,
+               absorption_request, bound_owner_repair_result,
+               source_quality=absorption_quality,
+               absorption_group_review_execution=mismatched_result,
+               preserve_absorption=True, omit_metadata=True))
+    wrong_session = replace(
+        repair_execution, review_execution_session_id=str(uuid.uuid4()))
+    reject("wrong group review session blocks group authority", lambda:
+           clean.materialize_stateful_quality_review_clean(
+               absorption_package, absorption_first, absorption_preparation,
+               absorption_request, bound_owner_repair_result,
+               source_quality=absorption_quality,
+               absorption_group_review_execution=wrong_session,
+               preserve_absorption=True, omit_metadata=True))
+    wrong_parent_result = replace(
+        bound_owner_repair_result,
+        cues=(replace(bound_owner_repair_result.cues[0], reason="Different review evidence."),)
+        + bound_owner_repair_result.cues[1:],
+    )
+    other_group_request = group_review.build_absorption_group_review_request(
+        preparation=absorption_preparation,
+        package=absorption_package,
+        first_pass_result=absorption_first,
+        review_request=absorption_request,
+        review_result=wrong_parent_result,
+        source_quality=absorption_quality,
+    )
+    check("approval from a different parent review cannot be reused", lambda:
+          other_group_request.groups[0].scope.group_id
+          != group_request.groups[0].scope.group_id)
+    check("other parent-review group result is rejected", lambda:
+          _raises_group_error(lambda:
+              group_review.validate_absorption_group_review_execution(
+                  repair_execution, other_group_request)))
+    unsupported_execution = group_execution(group_review.GROUP_REVIEW_UNSUPPORTED)
+    reject("unsupported group decision cannot produce CLEAN", lambda:
+           clean.materialize_stateful_quality_review_clean(
+               absorption_package, absorption_first, absorption_preparation,
+               absorption_request, bound_owner_repair_result,
+               source_quality=absorption_quality,
+               absorption_group_review_execution=unsupported_execution,
+               preserve_absorption=True, omit_metadata=True))
+
     for action in (review.REPAIR, review.OMIT):
         actions = (action,) + (review.KEEP,) * (len(absorption_request.cues) - 1)
         conflict_result = review.QualityReviewResult(
@@ -640,6 +1044,14 @@ def main():
 
     print(f"Quality review CLEAN smoke: PASS={passed} FAIL={failed}")
     return int(failed != 0)
+
+
+def _raises_group_error(callback):
+    try:
+        callback()
+    except group_review.AbsorptionGroupReviewError:
+        return True
+    return False
 
 
 def _immutable(value, field_name):

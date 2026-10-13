@@ -41,6 +41,16 @@ from teddy_discovery_targeted_asr_artifact import TargetedASRArtifact
 from teddy_discovery_targeted_second_evidence_artifact import (
     TargetedSecondEvidenceArtifact,
 )
+from teddy_discovery_stateful_absorption_review import (
+    GROUP_REVIEW_AMBIGUOUS,
+    GROUP_REVIEW_KEEP,
+    GROUP_REVIEW_REPAIR,
+    GROUP_REVIEW_UNSUPPORTED,
+    AbsorptionGroupReviewError,
+    AbsorptionGroupReviewExecutionEvidence,
+    build_absorption_group_review_request,
+    validate_absorption_group_review_execution,
+)
 
 
 class StatefulQualityReviewCleanError(ValueError):
@@ -189,6 +199,9 @@ def materialize_stateful_quality_review_clean(
     proximity_asr_artifact: TargetedASRArtifact | None = None,
     targeted_second_evidence_artifact: (
         TargetedSecondEvidenceArtifact | None
+    ) = None,
+    absorption_group_review_execution: (
+        AbsorptionGroupReviewExecutionEvidence | None
     ) = None,
     preserve_absorption: bool = False,
     omit_metadata: bool = False,
@@ -364,6 +377,67 @@ def materialize_stateful_quality_review_clean(
                 for index in range(len(package.cues))
             )
 
+        group_review_request = None
+        group_review_result = None
+        if preserve_absorption and stateful_absorption_is_enabled(
+            package.generation_key
+        ):
+            try:
+                group_review_request = build_absorption_group_review_request(
+                    preparation=preparation,
+                    package=package,
+                    first_pass_result=first_pass,
+                    review_request=request,
+                    review_result=result,
+                    source_quality=source_quality,
+                    raw_asr_context=raw_asr_context,
+                    proximity_asr_artifact=proximity_asr_artifact,
+                    targeted_second_evidence_artifact=(
+                        targeted_second_evidence_artifact
+                    ),
+                )
+            except AbsorptionGroupReviewError as error:
+                reason = str(error)
+                if reason == "parent review execution provenance is missing":
+                    reason = "owner REPAIR lacks validated absorption-group review authority"
+                if reason in {
+                    "absorption group has unsupported repair or omission conflict",
+                    "metadata omission conflicts with group repair",
+                }:
+                    reason = "review decision conflicts with a validated absorption group"
+                raise StatefulQualityReviewCleanError(reason) from error
+        if group_review_request is None:
+            if absorption_group_review_execution is not None:
+                raise StatefulQualityReviewCleanError(
+                    "group review evidence has no matching repair scope"
+                )
+        elif absorption_group_review_execution is None:
+            raise StatefulQualityReviewCleanError(
+                "owner REPAIR lacks validated absorption-group review authority"
+            )
+        else:
+            try:
+                group_review_result = validate_absorption_group_review_execution(
+                    absorption_group_review_execution,
+                    group_review_request,
+                )
+            except AbsorptionGroupReviewError as error:
+                raise StatefulQualityReviewCleanError(
+                    "absorption group review result or completion receipt is invalid"
+                ) from error
+
+        group_decisions_by_id = {}
+        group_scope_by_owner = {}
+        if group_review_request is not None:
+            group_scope_by_owner = {
+                group.scope.owner_cue_id: group.scope
+                for group in group_review_request.groups
+            }
+            group_decisions_by_id = {
+                decision.group_id: decision
+                for decision in group_review_result.decisions
+            }
+
         clean_cues = []
         source_quality_by_index = {
             decision.source_index: decision for decision in source_quality
@@ -394,21 +468,22 @@ def materialize_stateful_quality_review_clean(
                     index for index, action in group_actions.items()
                     if action == REPAIR
                 }
-                if repair_indexes == {owner_index} and all(
-                    action in {KEEP, AMBIGUOUS}
-                    for index, action in group_actions.items()
-                    if index != owner_index
-                ):
-                    # The validated review request binds per-cue decisions but
-                    # carries no explicit absorption-group repair scope. The
-                    # owner REPAIR therefore cannot authorize rewriting the
-                    # aggregate meaning of this preserved group.
-                    raise StatefulQualityReviewCleanError(
-                        "owner REPAIR lacks validated absorption-group review authority"
+                if (
+                    repair_indexes
+                    and (
+                        repair_indexes != {owner_index}
+                        or any(
+                            action not in {KEEP, AMBIGUOUS}
+                            for index, action in group_actions.items()
+                            if index != owner_index
+                        )
                     )
-                if any(
-                    action not in {KEEP, AMBIGUOUS}
-                    for action in group_actions.values()
+                ) or (
+                    not repair_indexes
+                    and any(
+                        action not in {KEEP, AMBIGUOUS}
+                        for action in group_actions.values()
+                    )
                 ):
                     raise StatefulQualityReviewCleanError(
                         "review decision conflicts with a validated absorption group"
@@ -419,6 +494,53 @@ def materialize_stateful_quality_review_clean(
                         "reviewed absorption owner has no retained translation"
                     )
                 ja, ko, action = owner_value
+                if repair_indexes:
+                    scope = group_scope_by_owner.get(chain.owner_cue_id)
+                    if (
+                        scope is None
+                        or scope.cue_ids != chain.cue_ids
+                        or scope.source_indexes != chain.source_indexes
+                    ):
+                        raise StatefulQualityReviewCleanError(
+                            "validated group scope differs from absorption graph"
+                        )
+                    decision = group_decisions_by_id.get(scope.group_id)
+                    if decision is None:
+                        raise StatefulQualityReviewCleanError(
+                            "owner REPAIR lacks validated absorption-group review authority"
+                        )
+                    if decision.action == GROUP_REVIEW_REPAIR:
+                        ja, ko, action = (
+                            decision.replacement_ja,
+                            decision.replacement_ko,
+                            REPAIR,
+                        )
+                    elif decision.action in {
+                        GROUP_REVIEW_KEEP,
+                        GROUP_REVIEW_AMBIGUOUS,
+                    }:
+                        owner_source = package.cues[owner_index]
+                        owner_first = first_pass.cues[owner_index]
+                        ja = (
+                            owner_first.repaired_ja
+                            if decision.action == GROUP_REVIEW_KEEP
+                            and owner_first.repaired_ja is not None
+                            else owner_source.external_ja
+                        )
+                        ko = owner_first.ko
+                        action = (
+                            AMBIGUOUS
+                            if decision.action == GROUP_REVIEW_AMBIGUOUS
+                            else KEEP
+                        )
+                    elif decision.action == GROUP_REVIEW_UNSUPPORTED:
+                        raise StatefulQualityReviewCleanError(
+                            "group review marked the absorption group unsupported"
+                        )
+                    else:
+                        raise StatefulQualityReviewCleanError(
+                            "validated group review action is unsupported"
+                        )
                 start_ms = min(projected[index][0] for index in indexes)
                 end_ms = max(projected[index][1] for index in indexes)
                 clean_cue_id = chain.owner_cue_id
