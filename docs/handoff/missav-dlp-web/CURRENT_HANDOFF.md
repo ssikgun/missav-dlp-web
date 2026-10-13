@@ -11448,3 +11448,42 @@ have no diff from the operational base. Normal Mode still reports
 `PRIMARY_TRANSLATION_ONLY`; P2-B review/CLEAN wiring was not deployed. This
 successful deployment does not authorize timer reactivation or declare P1
 complete. Automatic processing remains paused pending separate user approval.
+
+
+## 2026-10-13 Stage11 P2-D — P2 quality integration resumed on P1-only
+
+P1 code and the P1-only paused production deployment are complete. The production
+release remains `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; the Normal timer
+remains disabled/inactive and the service inactive. This checkpoint resumes P2
+under the user's instruction; it does not deploy P2 or resume automatic work.
+
+Created and pushed independent candidate branch `codex-stage11-p2d-20261013`
+at `b5b79e177a982cb2bc7959b81211a52959f79afd`, based exactly on P1-only
+`d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`. Reused the source/test deltas
+from P2-B `6fd1a1fa9b5532e112f8072b6283fc193d0063e3` and P2-C
+`8dfbca4a8a8dfadbfa987095b3817850ae3fd652`; the three-way applications were
+clean. The candidate changes nine code/test files. P1 search, validation,
+alignment, diagnostics and paused deploy/rollback scripts remain in its base.
+
+Normal's Stage12 and direct CLI paths now bind the first pass and approved
+external-JA alignment through the existing `_HybridOriginalRegistry`. Normal
+then reuses the existing full-context HYBRID first pass, suspect review,
+KEEP/REPAIR/OMIT/AMBIGUOUS policies, suspect-only Targeted ASR and deterministic
+CLEAN materializer. Review/session/source evidence remains bound into completion
+proof; Stage12 uses the strengthened completion validation and existing
+no-overwrite publication contract. No first-pass translation is repeated.
+
+Offline regression: 25/25 smoke scripts passed in
+`/opt/stage11-stt-venv/bin/python`, including P1 SubtitleCat/JA/URL/alignment
+and paused-deploy regressions; Normal/review/CLEAN/Targeted ASR; Stage12 bulk,
+batch, rollout and inventory; and native-session behavior. In-memory Python
+compilation and `git diff --check` passed. Stored FNS-247 and JUR-750 historical
+artifacts were read-only replayed and rejected: their proof says
+`PRIMARY_TRANSLATION_ONLY` and contains no review evidence. Their saved files
+remained byte-identical. These runs used synthetic inputs/fakes; no Hermes or
+Whisper model, production DB/queue, NAS, Jellyfin, service or timer was used.
+
+P2-D integration candidate: PASS for offline validation only. Actual model
+execution and production applicability remain unverified. Keep P2 undeployed
+and automatic processing paused until a separate approved validation/deployment
+checkpoint.
