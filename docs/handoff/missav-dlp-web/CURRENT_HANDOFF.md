@@ -12024,3 +12024,30 @@ inactive; the operational P1 release remains
 `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`. The protected dirty worktree was
 left unchanged. Next: separately approve any future isolated Hermes run; the
 new diagnostics do not authorize rerunning the old P2-M task.
+
+## 2026-10-13 P2-M7 — isolated absorption-group review attempt
+
+Preflight passed against P2-M6 candidate `04a9a4e128181aa594f2bac7fc822a2e6fe8aae3`.
+Read-only replay validated the stored P2-I source, accepted alignment, 313-cue
+package/first pass, P2-H/P2-I parent review decisions, and 9-cue/8-window
+targeted evidence. Rebuilt group scope contained exactly one target; its
+canonical request matched the preserved P2-M request byte-for-byte. No prior
+group approval sidecar existed. P2-I artifacts and the failed P2-M task were
+left unchanged.
+
+A new isolated one-shot was entered with session
+`b1049280-3d45-4600-8911-296d5b4a1cf6` under
+`/tmp/stage11-p2m7-fns247-b1049280-3d45-4600-8911-296d5b4a1cf6`. The P2-M6
+native runner/bridge path writes its independent local intent before remote
+child launch. At the single bounded observation, the one-shot process was
+still active; Hermes child completion, receipt, diagnostic, result, and action
+have not yet been verified. Treat the attempt as RUNNING/INCOMPLETE and never
+retry this session. The old P2-M session was not resumed.
+
+No full-title translation or Whisper rerun was requested. CLEAN, proof/report,
+Stage12 validation/publication, production writes/deployment, and timer/service
+changes remain zero. Production P1 is still
+`d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; Normal timer remains
+disabled/inactive and service inactive. Next: perform one read-only audit of
+this exact session's completion receipt, diagnostic, and group result; do not
+create another session.
