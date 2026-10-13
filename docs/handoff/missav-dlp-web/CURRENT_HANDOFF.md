@@ -11850,3 +11850,37 @@ sequence 4. No production DB/queue/NAS/Jellyfin writes or source changes were
 made; the protected dirty worktree remains untouched. Next: define and validate
 a generic group-aware REPAIR contract while keeping unsupported group edits
 fail-closed.
+
+
+## 2026-10-13 Stage11 P2-K — absorption group REPAIR contract
+
+P2-K was developed in a separate worktree from P2-G `625ef9cceb10150ffccc0f3717e2af535d4a939a`.
+The review request schema and saved FNS-247 request bind per-cue identity,
+source/session provenance, and full-title order, but contain no explicit
+absorption membership/owner mapping or group-wide REPAIR authorization. The
+review prompt describes null-Korean absorption members and adjacent/full-title
+context; that does not provide a machine-validated owner scope for rewriting an
+aggregate group. The saved FNS-247 request/result validated read-only (313 cues),
+but owner REPAIR remains BLOCKED and no CLEAN dry-run was performed.
+
+The CLEAN materializer now reports a specific fail-closed error for owner-only
+REPAIR on a multi-cue absorption group: `owner REPAIR lacks validated
+absorption-group review authority`. Other group conflicts remain rejected.
+No owner REPAIR was promoted and KEEP/AMBIGUOUS behavior is unchanged. The
+smoke suite covers owner/non-owner/multiple REPAIR, AMBIGUOUS+REPAIR, partial
+OMIT, metadata overlap, missing owner Korean, and preservation of group owner,
+source indexes, and union timing.
+
+Validation passed: CLEAN smoke 45/0; Normal Mode smoke 19/0; CLEAN projection
+smoke 5/0; Stage12 bulk, batch, replacement, and rollout smokes PASS; compile
+and `git diff --check` PASS. No Hermes/Whisper execution occurred. Changes are
+limited to `teddy_discovery_stateful_quality_review_clean.py` and its smoke
+test on P2-K branch `codex-stage11-p2k-20261013`, commit
+`17009e8` (pushed).
+
+Production remains P1 `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; Normal timer
+is disabled/inactive and service inactive; FNS-247 remains PUBLISHED at
+sequence 4. No production DB/queue/NAS/Jellyfin writes occurred, and the
+protected dirty worktree remains unchanged. Next: define a canonical review
+request scope that binds validated absorption group membership and explicit
+group-level REPAIR authority before considering support for owner REPAIR.
