@@ -11884,3 +11884,40 @@ sequence 4. No production DB/queue/NAS/Jellyfin writes occurred, and the
 protected dirty worktree remains unchanged. Next: define a canonical review
 request scope that binds validated absorption group membership and explicit
 group-level REPAIR authority before considering support for owner REPAIR.
+
+
+## 2026-10-13 Stage11 P2-L — explicit absorption-group REPAIR authority
+
+P2-L is based on P2-K `17009e8bd968e027989da2e142b06cd3cca11c40` in the separate
+candidate branch `codex-stage11-p2l-20261013`. It adds a versioned, canonical
+group-review sidecar; the existing V1 review request/result and their historical
+SHA values are unchanged. Deterministic absorption validation supplies the
+owner, ordered cue membership, source indexes, package/first-pass/source and
+boundary identities, and parent review/session hashes. Only multi-cue groups
+with an owner-only V1 REPAIR and otherwise KEEP/AMBIGUOUS decisions request a
+separate group-wide semantic decision. The existing native Hermes session,
+bridge, and completion receipt path is reused with a fresh review session.
+
+CLEAN accepts a group REPAIR only when the group request, result, native
+completion receipt, task/session, parent evidence, and replacement Japanese and
+Korean are all validated. The group-wide replacement retains the deterministic
+owner, member order, source indexes, and union timestamp. Unsupported actions,
+missing or mismatched evidence, metadata conflicts, and V1 owner REPAIR without
+a new group decision remain fail-closed. An owner-first synthetic chain is also
+covered; owner position is not inferred from the final source index.
+
+Offline regression passed: group CLEAN 62 checks; Normal Mode 19; controller
+106; deployment 51; live adapters; review runner 86; review 134; CLEAN projection;
+paused deployment 8; Stage12 bulk, batch, replacement, and rollout; review
+context 41 and proximity 66. Python compilation and `git diff --check` passed.
+No Hermes/Whisper execution was performed. Read-only validation of the saved
+FNS-247 evidence found one owner-REPAIR group but no group-review sidecar; the
+existing evidence therefore remains `BLOCKED` and was not promoted or modified.
+
+Candidate code was pushed as `31ab27d26dbd333d5f96a5d1f51ae8946a289bf4` on
+`codex-stage11-p2l-20261013`. This checkpoint made no production writes. The
+operating release remains P1 `d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; the
+Normal timer remains disabled/inactive and the service inactive. FNS-247 remains
+PUBLISHED at sequence 4. The protected dirty worktree is unchanged. Next: obtain
+a separate approval for a fresh, isolated Hermes group review before any CLEAN
+materialization attempt; this does not authorize deployment or publication.
