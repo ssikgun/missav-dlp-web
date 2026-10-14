@@ -1,6 +1,41 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## 2026-10-14 — GOV-002 approved governance applied; all workstreams inactive
+
+User approval of GOV-001 was applied to canonical `teddy-subtitle-stage11`.
+Canonical HEAD `191d55645890c33c49c9dfeb94de335b8518d772` and candidate
+`8bc1071ed6f0cda2708c92685ed0966f0cdc9871` (based on `634948fb85ee3ac14300596d77dae223968183e9`)
+were joined at merge commit `1a246f0bd4adba6ed605c3f6df08ea26801187c8`;
+GOV-002 application commit is `76555d80a0881bf084e6a8f5f5a176668d9a36d3`.
+
+The common and Stage11 contracts are `APPROVED`. Their goals, Stage11 roles and
+safety policies, Stage12 boundary, and unresolved JA Master versus whole-title
+translation design priority were preserved. Governance and Stage11 routing and
+workstream files now both show `INACTIVE`, `TASK_ID: NONE`. GOV-001/GOV-002
+cannot be run after closure, and an approved Stage11 contract alone does not
+authorize subtitle development. No other workstream was registered.
+
+All-workstream structural preflight PASS; 21/21 offline smoke checks PASS,
+including independent-workstream isolation, shared-contract requirements,
+closed GOV-001, and blocked Stage11 execution. Governance CI run 38501646847
+PASS. Every pull request targeting `teddy-subtitle-stage11` now runs structural
+validation and smoke checks; branch protection and existing Docker/deployment
+workflows were not changed. CI verifies structure and these tests only; it does
+not establish semantic design compliance or subtitle product quality.
+
+The earlier handoff entries remain intact. `/root/.codex/AGENTS.md` and the
+protected dirty worktree were preserved. Product code changes, Hermes/Whisper/
+ASR calls, production writes, deployment, and subtitle publication were zero.
+Stage11 product quality remains unresolved: P2-N is a mechanical validation
+PASS and P2-O remains `NEEDS_HUMAN_REVIEW`.
+
+Next: the user registers `docs/governance/CHATGPT_STARTUP.md` in ChatGPT Project
+Instructions and performs the read-only `/new` session check. No next
+Downloader development task is selected.
+
+
+
 ## 2026-10-14 — GOV-001 workstream-isolated governance candidate; user review pending
 
 Common Downloader policy/routing is separated from the Stage11 subtitle contract
