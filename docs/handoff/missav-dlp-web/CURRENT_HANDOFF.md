@@ -12245,3 +12245,40 @@ modifications occurred. The protected worktree and existing published subtitle
 remain unchanged. Next: human review of the flagged long gaps and sampled
 translation changes, then decide separately whether a replacement checkpoint
 is warranted.
+
+
+## 2026-10-14 Stage11 S11-WX001 — WhisperX independent A/B preflight BLOCKED
+
+User-approved scope was registered without changing either approved project
+contract. The registration validator passed for the shared governance/Stage11
+metadata transition, governance was returned to `INACTIVE/NONE`, and the final
+Stage11-only task authorization check passed. Metadata commit
+`3811d802e2a21c7f3793f9a1fb37d986d80fa7be` was a fast-forward from
+`aa6612200fb183bfcd2a18be557de8c818465a09` to `teddy-subtitle-stage11`.
+
+Read-only audio identity verification matched all 54 existing core/context WAVs
+(27 sample pairs) against the saved SHA manifest and source hash map; the
+existing audio identity audit remains `PASS`. Existing user labels, source
+times, padding records, Whisper/ReazonSpeech evidence, and source truth were not
+changed. The 13 dialogue and 14 non-dialogue sample split remains the existing
+evaluation scope.
+
+WhisperX inference did not start. The authorized SSH preflight to VM122
+(`teddy@192.168.1.134`) reached host authentication but was rejected with
+`Permission denied (publickey,password)`, including after network access was
+allowed. No current `nvidia-smi`, VRAM, RAM/disk, running-service, package, or
+model-cache state could therefore be verified. This fails the resource gate;
+the historical VM122 capacity is not treated as current. No installation,
+model download, fallback to CPU, process termination, or retry was attempted.
+
+Result: `TASK_REGISTRATION=PASS`, `SAMPLE_IDENTITY=PASS`,
+`RESOURCE_GATE=BLOCKED`, `WHISPERX_INSTALL=BLOCKED`, `WHISPERX_RUN=0/27`,
+`ALIGNMENT=NOT_RUN`, `DIARIZATION=NOT_RUN`,
+`DIALOGUE_QUALITY=INCONCLUSIVE`, `SPEAKER_QUALITY=INCONCLUSIVE`, and
+`FALSE_DIALOGUE_RISK=NOT_ASSESSED` because no WhisperX output exists. No
+WhisperX quality or whole-title value is inferred from the blocked run.
+
+Production code changes, production writes, Hermes calls, and full-title ASR
+were all zero. No private experiment artifacts were created. Stage11 is
+returned to `INACTIVE/NONE`; the user decides whether to restore authorized
+VM122 access and approve a later bounded attempt or any whole-title experiment.
