@@ -12108,3 +12108,40 @@ disabled/inactive and service inactive. The protected dirty worktree remains
 unchanged. No new Hermes/Whisper calls or production writes occurred. Next:
 separately authorize isolated CLEAN generation and read-only Stage12 artifact
 validation; this checkpoint does not authorize publishing or deployment.
+
+
+## 2026-10-14 Stage11 P2-N — isolated CLEAN and Stage12 artifact validation
+
+Using the P2-M9 candidate `92cb941b9fde03fd9b286dae80c6dbddbc4f5b31`, the
+saved P2-I first pass, parent review, targeted ASR, and P2-M7 group result were
+revalidated without model calls. The independent P2-M7 intent, native receipt,
+diagnostic, original request/result bytes, source/session identities, and the
+single group-wide REPAIR all passed their existing validators.
+
+The existing `normal_materialization()` path produced a private CLEAN artifact
+at `/tmp/stage11-p2n-fns247-20261014-a74f69e3`. Stage11
+`validate_normal_completion()` passed. The CLEAN contains 299 cues from 313
+source cues, with 299 absorption chains, including 11 multi-source chains and
+the one authorized group REPAIR. Source indexes, group owner/membership,
+union timing, canonical SRT serialization, proof/report hashes, and the copied
+baseline identity validated. Stage12 `_preflight_artifact_bundle()` also passed
+read-only against the isolated artifact bundle and source snapshot.
+
+CLEAN SHA-256 is `dcb63168597ce19118cda47841e945c93c20a7d8a52757d20504169a8bc6972d`.
+The existing NAS subtitle was read-only verified against the effective
+publication SHA `ebed3bc9d195038f5f8be2e6cf54be77fef024cb94f7680aa8b50b4b369fc86f`.
+Both old and new SRTs span 99,261–10,409,578 ms. The old/new cue counts are
+313/299; 288 cue intervals match exactly, with text differing on 215 of those
+intervals, 25 old-only intervals, and 11 new-only intervals. Both have 18
+subtitle-free gaps longer than 120 seconds and the same maximum gap of 853,768
+ms. These are structural comparisons and do not establish improved semantic
+quality.
+
+The rollout row remains `PUBLISHED`, sequence 4, and its effective replacement
+record remains unchanged. Production still points to P1
+`d59bc4fd7baa5e8c7dbfbff63d7acccadd899964`; the Normal timer is
+disabled/inactive and service inactive. The protected dirty worktree still has
+its original 14 dirty entries. No Hermes/Whisper calls, production writes,
+publication, or deployment occurred. The CLEAN, proof, report, and private
+execution evidence remain outside Git. Next: review the isolated result and
+decide separately whether to authorize a Stage12 replacement checkpoint.
