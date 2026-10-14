@@ -12282,3 +12282,41 @@ Production code changes, production writes, Hermes calls, and full-title ASR
 were all zero. No private experiment artifacts were created. Stage11 is
 returned to `INACTIVE/NONE`; the user decides whether to restore authorized
 VM122 access and approve a later bounded attempt or any whole-title experiment.
+
+
+## 2026-10-14 Stage11 S11-WX002 — VM122 preflight BLOCKED
+
+The existing S11-WX002 metadata was validated with both the Stage11 task
+authorization check and the all-workstreams structural check. Registration
+commit `142bb9e493ee7afa3b9ade4d3b514ed262500a21` was a fast-forward from
+`34f340b7e345cf1be3e4ed12c558f18c01ef6d91` and was verified on the canonical
+`teddy-subtitle-stage11` branch before SSH. The previously reported 54/54 WAV
+SHA audit remains PASS; this attempt did not change samples or evaluation
+evidence.
+
+The first SSH attempt was blocked at the sandbox socket boundary before
+authentication. Retrying the same dedicated command with the specified key,
+known_hosts file, and strict host-key options returned `VM122_SSH_OK` for
+`teddy@192.168.1.134`. The read-only snapshot at `2026-10-14T04:03:48Z` showed
+an RTX 3060 12 GB with 4,275 MiB used and 7,637 MiB free, 9.2 GiB RAM
+available, and 42 GB disk free. The Qwen3.6 35B A3B `llama-server` service was
+running; no Whisper/ASR service appeared in the running-service or process
+checks. The designated
+`/home/teddy/stage11-whisper-v3-venv` has `faster-whisper`, but no `torch`,
+`whisperx`, or `pyannote` package. The Hugging Face cache was 384 KiB and the
+existing faster-whisper cache was 2.9 GiB.
+
+WhisperX inference did not start: the designated environment lacks WhisperX
+and Torch. No installation, model download, service stop, CPU fallback, or
+retry was attempted. Japanese alignment, model access/license checks, and
+pyannote diarization were not run. Result: `VM122_SSH=PASS`,
+`WHISPERX_ENVIRONMENT=BLOCKED`, `WHISPERX_RUN=0/27`, `ALIGNMENT=NOT_RUN`,
+`DIARIZATION=NOT_RUN`, `DIALOGUE_QUALITY=INCONCLUSIVE`,
+`SPEAKER_QUALITY=INCONCLUSIVE`, and `FALSE_DIALOGUE_RISK=NOT_ASSESSED`.
+Execution success and quality improvement are not claimed.
+
+Production code/state changes, production writes, full-title ASR, Demucs, and
+Hermes calls were zero. The running llama-server and all other production
+systems were left untouched. Stage11 was returned to `INACTIVE/NONE`; a later
+bounded attempt requires a separately approved task after its isolated
+WhisperX environment and resource gates can pass.
