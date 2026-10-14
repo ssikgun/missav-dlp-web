@@ -1,10 +1,10 @@
 # Stage11 subtitle design contract
 
 CONTRACT_VERSION: 1.0.0
-PROJECT_CONTRACT_STATUS: DRAFT_PENDING_USER_APPROVAL
+PROJECT_CONTRACT_STATUS: APPROVED
 APPLIES_TO: Stage11 subtitle acquisition/generation and its Stage12 publication boundary only
 
-This is the Stage11-specific contract candidate. It applies to subtitle work even when the implementation files are in the repository root. It does not apply to unrelated Discovery, UI, or Downloader operations. It remains a draft until the user approves it.
+This is the approved Stage11-specific contract. It applies to subtitle work even when the implementation files are in the repository root. It does not apply to unrelated Discovery, UI, or Downloader operations. Approval preserves the design goals and safety policies; it does not authorize a Stage11 implementation task.
 
 ## Stage11 subtitle product goals — APPROVED_GOAL
 
@@ -72,4 +72,9 @@ This implementation direction does not erase the coverage-complete Japanese-mast
 
 ## Workstream state
 
-Stage11 development is `PAUSED_FOR_GOVERNANCE` in `docs/governance/stage11/ACTIVE_WORK.md`. A separate user-approved Stage11 task and approved contract state are required to resume it. A Stage11 pause does not pause another registered workstream.
+The approved Stage11 contract remains in force, but the workstream status is
+INACTIVE in docs/governance/stage11/ACTIVE_WORK.md and TASK_ID is NONE. INACTIVE
+means there is no current user-approved Stage11 development task; it does not
+discard the approved design. A separate user-approved task with explicit scope
+and acceptance criteria is required before development resumes. This inactive
+state does not pause another registered workstream.

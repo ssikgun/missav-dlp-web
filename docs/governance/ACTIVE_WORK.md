@@ -3,7 +3,7 @@
 ROUTER_VERSION: 1.0.0
 COMMON_CONTRACT_VERSION: 1.0.0
 
-This file routes a request to its workstream contract and active task. It is not one global task. A paused workstream does not pause an independent workstream. Only the registered workstreams below are currently authorized; adding another requires user approval and its own contract and active-work file.
+This file routes a request to its workstream contract and active task. It is not one global task. A PAUSED_FOR_GOVERNANCE or INACTIVE workstream does not pause an independent workstream. INACTIVE means no user-approved task is currently active; it does not remove or reject the workstream's approved design contract. Only registered workstreams are authorized; adding another requires user approval and its own contract and active-work file.
 
 ## Routing rules
 
@@ -13,8 +13,8 @@ This file routes a request to its workstream contract and active task. It is not
 
 ## WORKSTREAM: governance
 
-STATUS: READY_FOR_USER_REVIEW
-TASK_ID: GOV-001
+STATUS: INACTIVE
+TASK_ID: NONE
 CONTRACT_PATH: docs/governance/PROJECT_CONTRACT.md
 ACTIVE_WORK_PATH: docs/governance/governance/ACTIVE_WORK.md
 AREA_HINTS:
@@ -23,7 +23,7 @@ AREA_HINTS:
 
 ## WORKSTREAM: stage11
 
-STATUS: PAUSED_FOR_GOVERNANCE
+STATUS: INACTIVE
 TASK_ID: NONE
 CONTRACT_PATH: docs/governance/stage11/PROJECT_CONTRACT.md
 ACTIVE_WORK_PATH: docs/governance/stage11/ACTIVE_WORK.md

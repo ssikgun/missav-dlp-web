@@ -11,7 +11,7 @@ These shared instructions apply to all work in this repository. Domain-specific 
 5. Inspect existing code and evidence before changing anything. Verify whether requested work is already complete so it is not repeated.
 6. Read only relevant sections of `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md` when more history is needed. Handoff history and `NEXT` text cannot override a contract or authorize work.
 
-If a workstream is unregistered, its contract or active-work file is missing, its task ID is not authorized, or selected contracts conflict, stop and report `BLOCKED`. A paused workstream blocks work in that workstream only; it does not by itself block an independent workstream with its own approved contract and active task. Unknown or shared scope must not be guessed.
+If a workstream is unregistered, its contract or active-work file is missing, its task ID is not authorized, or selected contracts conflict, stop and report `BLOCKED`. A PAUSED_FOR_GOVERNANCE or INACTIVE workstream blocks work in that workstream only; it does not by itself block an independent workstream with its own approved contract and active task. Unknown or shared scope must not be guessed.
 
 ## Shared project rules
 

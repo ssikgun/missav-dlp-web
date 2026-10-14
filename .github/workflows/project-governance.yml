@@ -2,6 +2,8 @@ name: Project Governance
 
 on:
   push:
+    branches:
+      - teddy-subtitle-stage11
     paths:
       - "AGENTS.md"
       - "docs/governance/**"
@@ -9,12 +11,8 @@ on:
       - "scripts/check_project_governance_smoke.py"
       - ".github/workflows/project-governance.yml"
   pull_request:
-    paths:
-      - "AGENTS.md"
-      - "docs/governance/**"
-      - "scripts/check_project_governance.py"
-      - "scripts/check_project_governance_smoke.py"
-      - ".github/workflows/project-governance.yml"
+    branches:
+      - teddy-subtitle-stage11
 
 permissions:
   contents: read

@@ -1,16 +1,16 @@
 # Downloader common project contract
 
 CONTRACT_VERSION: 1.0.0
-PROJECT_CONTRACT_STATUS: DRAFT_PENDING_USER_APPROVAL
+PROJECT_CONTRACT_STATUS: APPROVED
 APPLIES_TO: all registered workstreams in ssikgun/missav-dlp-web
 
-This is a common-policy review candidate created under the one-time GOV-001 bootstrap authorization. It remains a draft pending user approval. Domain-specific product goals and safeguards live in the selected workstream contract; this document does not make one workstream's rules global to unrelated work.
+This is the approved common Downloader policy. Domain-specific product goals and safeguards live in the selected workstream contract; this document does not make one workstream's rules global to unrelated work.
 
 ## Shared project baseline — DOCUMENTED_BASELINE
 
 The repository README describes a browser-based MissAV downloader: a user submits a URL, video download runs in the background and saves MP4 output, and jobs can resume/retry. This is project context, not authorization to change product behavior. Details for Discovery, UI, subtitle generation, operations, or other areas require their own registered workstream contract and active task.
 
-## Common goals and policies — DRAFT_PENDING_USER_APPROVAL
+## Common goals and policies — APPROVED
 
 - Preserve user-approved product goals for each workstream. Do not reinterpret one domain's goal as the goal of the entire Downloader project.
 - Keep existing user data, job state, source material, and published outputs safe and traceable.
@@ -23,7 +23,7 @@ The repository README describes a browser-based MissAV downloader: a user submit
 
 ## Workstream isolation
 
-`docs/governance/ACTIVE_WORK.md` is the routing registry, not one global task that every area must obey. Each registered workstream points to its own contract and active-work file. A paused task pauses only its workstream. Independent work may proceed only when that workstream is registered, its contract is approved, and its own task is active and authorized.
+`docs/governance/ACTIVE_WORK.md` is the routing registry, not one global task that every area must obey. Each registered workstream points to its own contract and active-work file. A paused or inactive task pauses only its workstream. Independent work may proceed only when that workstream is registered, its contract is approved, and its own task is active and authorized.
 
 Select every workstream affected by the task's purpose and actual files/resources. Shared work requires the same task ID to be active in every affected workstream, and preflight must verify every selected contract. An unregistered workstream or missing task authorization fails closed. The registry is not permission to create new workstreams; user approval is required to register one.
 
@@ -31,4 +31,4 @@ If common and domain-specific policies conflict, stop and report the conflict fo
 
 ## Approval state
 
-This draft records common governance only. Until the user approves it, it is a review candidate and must not be represented as a final project policy. Its status or version changes only through a user-approved governance task.
+This approved common contract records shared Downloader policy only. It does not authorize product work by itself. Its content, status, or version changes only through a user-approved governance task.
