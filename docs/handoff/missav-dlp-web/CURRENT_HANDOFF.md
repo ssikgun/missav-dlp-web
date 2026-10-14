@@ -12145,3 +12145,38 @@ its original 14 dirty entries. No Hermes/Whisper calls, production writes,
 publication, or deployment occurred. The CLEAN, proof, report, and private
 execution evidence remain outside Git. Next: review the isolated result and
 decide separately whether to authorize a Stage12 replacement checkpoint.
+
+
+## 2026-10-14 Stage11 P2-O — existing HYBRID vs isolated CLEAN review
+
+Read-only comparison reconfirmed the existing NAS subtitle SHA
+`ebed3bc9d195038f5f8be2e6cf54be77fef024cb94f7680aa8b50b4b369fc86f` and
+P2-N CLEAN SHA
+`dcb63168597ce19118cda47841e945c93c20a7d8a52757d20504169a8bc6972d`.
+The saved P2-N completion and Stage12 artifact preflight records remain PASS.
+The comparison report, including subtitle excerpts, is private and local only:
+`/tmp/stage11-p2o-fns247-20261014-hdb1iq0y/review-report.md`.
+
+Structural mapping explains all 25 old-only source intervals: they map to
+members of the 11 new multi-source absorption intervals. Each new interval
+matches the stored affine-projected union, and all 313 source indexes remain
+represented exactly once. Among 288 exact-interval matches, 215 texts differ;
+18 representative changes were reviewed. The P2-M7 group REPAIR for owner
+`ja-000144`, source indexes 142–143, matches the approved result and preserves
+owner, membership, and union timing.
+
+The 18 subtitle-free gaps over two minutes are unchanged between old and new.
+Existing baseline ASR has lexical text in 15 intervals (`COVERAGE_GAP_SUSPECTED`)
+and no overlapping text in 3 (`UNVERIFIED`). These are suspicion signals, not
+confirmed omissions. The changed-text sample includes context-dependent or
+potentially shifted translations; speaker identity is not represented in the
+SRT evidence. Recommendation: `NEEDS_HUMAN_REVIEW`; no replacement or
+publication is recommended before reviewing the possible coverage gaps and
+translation context.
+
+No Hermes/Whisper calls, CLEAN regeneration, Stage12 operation, production
+writes, publication, deployment, timer/service changes, or existing artifact
+modifications occurred. The protected worktree and existing published subtitle
+remain unchanged. Next: human review of the flagged long gaps and sampled
+translation changes, then decide separately whether a replacement checkpoint
+is warranted.
