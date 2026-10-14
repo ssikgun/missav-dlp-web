@@ -1,5 +1,35 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+
+## 2026-10-14 — GOV-001 workstream-isolated governance candidate; user review pending
+
+Common Downloader policy/routing is separated from the Stage11 subtitle contract
+and task. GOV-001 is active only in `governance`; Stage11 remains
+`PAUSED_FOR_GOVERNANCE`. Both contracts remain `DRAFT_PENDING_USER_APPROVAL`.
+The candidate adds shared root instructions, common and Stage11 contracts,
+workstream-specific active records, ChatGPT startup guidance, fail-closed
+preflight/smoke checks, and a governance-only CI workflow. It changes no product
+code or deployment workflow.
+
+Candidate branch `codex-governance-gov001-20261014`, commit
+`8bc1071ed6f0cda2708c92685ed0966f0cdc9871`, based on the verified
+`teddy-subtitle-stage11` source `634948fb85ee3ac14300596d77dae223968183e9`.
+Offline task preflight and all-workstream structural preflight PASS; 20/20
+offline governance smoke checks PASS. GitHub Actions run 38499373793 PASS,
+including governance validation and smoke. Workstream isolation coverage PASS:
+Stage11 requires its own contract, unrelated work passes while Stage11 is paused,
+and shared tasks require all declared contracts.
+
+This GOV-001 handoff entry is a separate docs-only commit based on the same
+canonical source SHA. The candidate is not merged. No force push or branch
+protection change was made. No Hermes/Whisper/ASR calls, product-code changes,
+production writes, deployment, or publication occurred. The protected dirty
+worktree and `/root/.codex/AGENTS.md` were preserved.
+
+Next: user reviews the common contract, Stage11 contract, and ChatGPT startup
+instructions. GOV-001 does not approve or start another development task.
+
+
 ## 2026-10-13 — Stage11 P1-I integration and deployment-readiness audit
 
 **P1 runtime wiring and offline regressions: PASS. P1-only deployment readiness:
