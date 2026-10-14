@@ -1,0 +1,35 @@
+name: Project Governance
+
+on:
+  push:
+    paths:
+      - "AGENTS.md"
+      - "docs/governance/**"
+      - "scripts/check_project_governance.py"
+      - "scripts/check_project_governance_smoke.py"
+      - ".github/workflows/project-governance.yml"
+  pull_request:
+    paths:
+      - "AGENTS.md"
+      - "docs/governance/**"
+      - "scripts/check_project_governance.py"
+      - "scripts/check_project_governance_smoke.py"
+      - ".github/workflows/project-governance.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Validate governance metadata and scope
+        run: python3 scripts/check_project_governance.py --all-workstreams
+      - name: Run offline governance smoke checks
+        run: python3 scripts/check_project_governance_smoke.py
