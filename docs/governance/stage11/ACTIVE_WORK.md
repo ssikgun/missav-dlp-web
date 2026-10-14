@@ -2,7 +2,7 @@
 
 WORKSTREAM: stage11
 TASK_ID: S11-WX005
-STATUS: IN_PROGRESS
+STATUS: READY_FOR_USER_REVIEW
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage11
 
@@ -12,7 +12,7 @@ Prepare a private, offline listening and judgment package for ten fixed FNS-247 
 
 ## APPROVED_SCOPE
 
-- Reuse `/home/teddy/stage11-whisperx-ab-private/review/S11-WX004/review.md`, its referenced saved result manifests, and the existing source/core/context WAVs at their manifest-identified paths; verify clip identity, SHA-256, absolute source times, core/context ranges, and padding before use. Do not guess a missing source path.
+- Reuse the user-specified VM122 private S11-WX004 review packet, its referenced saved result manifests, and existing source/core/context WAVs at their manifest-identified paths; verify clip identity, SHA-256, absolute source times, core/context ranges, and padding before use. Do not guess a missing source path.
 - Prepare exactly `clip-003`, `clip-005`, `clip-006`, `clip-008`, `clip-014`, `clip-015`, `clip-017`, `clip-020`, `clip-002`, and `clip-011`; keep core and context playback distinct and preserve existing user labels without changing them.
 - Copy only the necessary existing WAVs into the VM122 private S11-WX005 package, after verifying source hashes. Create an offline HTML review page, provenance manifest, blank judgment template, short instructions, and one ZIP package; keep directories 0700 and files 0600.
 - Show core/context audio before model hypotheses; make model output disclosure user-controlled. Include existing Whisper, WhisperX raw/aligned, and ReazonSpeech evidence only where saved and present, with source ranges and title-absolute times. Do not copy model output into user judgments.
@@ -44,6 +44,11 @@ Prepare a private, offline listening and judgment package for ten fixed FNS-247 
 - Canonical branch `teddy-subtitle-stage11` was at `74b58451f976b3d6933f145f2f33ded458c575b2`; Stage11 contract is APPROVED v1.0.0 and initially INACTIVE/NONE.
 - S11-WX003 saved 27/27 WhisperX outputs and 9/9 alignments; S11-WX004 verified the saved context set and paired core/context audit. Transcript and boundary truth remain unresolved pending user listening.
 - The approved product goal is automated ordinary operation without per-title human review; this task collects evaluation references only and does not claim product quality.
+- Registration commit `7b1bb7f42423a96699f7d6c1451d5ccd516c807c` passed both required governance checks and was confirmed on the canonical remote before VM122 evidence access.
+- The private package contains exactly the ten approved items, twenty core/context WAVs, a provenance manifest, blank judgment template, offline HTML, short README, and one ZIP. All ten context SHA-256 values match; each lossless core crop matches the previously recorded original core SHA-256; ten result JSON hashes and both selected alignment source hashes match.
+- The HTML uses twenty relative WAV references, hides prior labels and model hypotheses until the user marks the core listened, and contains no external resource or transmission code. The actual inline export script executed in isolated V8 with a mock DOM; JSON preserved ten blank/user judgment entries and `UNKNOWN` truth without model text.
+- No GUI browser was available in the build environment, so browser file-open and audible playback were not exercised (`OFFLINE_PLAYER=PARTIAL`). WAV format, relative links, ZIP CRC, file modes, and offline HTML structure passed. No human listening occurred; user judgments remain pending.
+- Existing Whisper/ReazonSpeech text was reused from the verified WX004 private review packet; WX004 records no baseline outputs for the four non-dialogue controls. This task made no new model call.
 
 ## NEXT_DECISION
 
