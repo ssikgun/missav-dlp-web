@@ -2,7 +2,7 @@
 
 WORKSTREAM: stage11
 TASK_ID: S11-WX010
-STATUS: IN_PROGRESS
+STATUS: BLOCKED
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage11
 
@@ -51,6 +51,8 @@ Run the separately approved, isolated FNS-247 whole-title audio evidence evaluat
 
 - User explicitly authorized revision-6 continuation under the existing S11-WX010 task on 2026-10-16 while preserving `R5_EXTRACTION_MANIFEST_PROVENANCE=UNRESOLVED`. The historical digest `05c701eb7dbb71006b8321472c9da2dd2387ee6a0f6ea81c483c18bf9e892e69` and current digest `14f2fdcee2840ff58dd060a778ab489c84f354a8983908e7678c99f2e4ee2050` must remain separately recorded; do not reconcile, overwrite, or relabel them. R5 artifacts remain immutable. Reuse is limited to current original-audio cores and Demucs stems after fresh independent per-file SHA, format, frame-count, time-origin, and source-link validation. Create new private R6 import provenance and lock. The only inference-code correction authorized is the R6 WhisperX distribution-metadata version lookup; model settings, evaluation plan, and sample selection stay unchanged. Run the fixed short smoke only after the R6 lock is verified and this IN_PROGRESS state is confirmed on the canonical remote; resume the remaining WX010 conditions only if every smoke passes.
 
+- The first R6 smoke job (`whisperx:original-vad050`) failed before producing model output: WhisperX reached Silero VAD initialization, but the R6-only cache directory was missing `hubconf.py` (`FileNotFoundError`, return code 1). No additional WhisperX or pyannote smoke ran, and the full controller was not started. The smoke status and log remain in the private R6 directory. No cache repair or retry was attempted; keep the task `BLOCKED / S11-WX010` until a safe next step is decided. The R5 extraction-manifest mismatch remains `UNRESOLVED` and R5 files remain unchanged.
+
 ## NEXT_DECISION
 
-Complete the fresh per-file R5 audio/Demucs integrity verification, create distinct R6 import provenance and immutable lock while leaving the extraction-manifest mismatch `UNRESOLVED`, and make the R6-only WhisperX metadata-version correction. Confirm this `IN_PROGRESS / S11-WX010` task state on the canonical remote before smoke inference. If any source/stem check or smoke fails, preserve evidence and set S11-WX010 to `BLOCKED`. Do not create another task ID. Translation, integration, operational changes, publication, or product-quality claims remain outside this authorization.
+R6 import provenance and immutable lock are complete, and the only runner change is the approved WhisperX distribution-metadata version lookup. The fixed first smoke failed because the isolated R6 Silero cache lacks `hubconf.py`; preserve the lock and private failure log. Do not repair or retry the cache, or start full inference, without a new explicit user decision. The R5 extraction-manifest provenance remains `UNRESOLVED`; R5 files remain unchanged. Do not create another task ID. Translation, integration, operational changes, publication, or product-quality claims remain outside this authorization.
