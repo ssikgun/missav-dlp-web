@@ -2,7 +2,7 @@
 
 WORKSTREAM: stage11
 TASK_ID: S11-WX009
-STATUS: IN_PROGRESS
+STATUS: READY_FOR_USER_REVIEW
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage11
 
@@ -39,7 +39,10 @@ Use the completed S11-WX008 FNS-247 diarization evidence to obtain an independen
 ## EVIDENCE
 
 - S11-WX008 completed and closed on the canonical `teddy-subtitle-stage11` branch at base HEAD `5363b0c96fc98d03003c1ff951f8fbb9b1922f74`; its private source/result hashes and limitations are recorded in the canonical handoff and WX008 manifests.
-- At registration, no WX009 private review package or user judgment has been created. These will be recorded only after registration is confirmed on the canonical remote.
+- Registration commit `f6b5237877a305276c7924cda31628eacbdabd26` is confirmed on the canonical `teddy-subtitle-stage11` remote. The router and this file are both `READY_FOR_USER_REVIEW / S11-WX009`.
+- Both approved windows' four WAV inputs, four WX008 result files, eight WX007 WhisperX output references, and WX007/WX008 provenance manifests match their recorded SHA-256 values. Original and Demucs audio each have 480,000 frames at 16 kHz mono; Demucs input hash and video-time mapping match the source.
+- The four-file offline review package is at `/home/teddy/stage11-whisperx-ab-private/review/S11-WX009/S11-WX009-listening-review.zip`, SHA-256 `5a9ca4e07f8bba3f55c47ec97a369359750fce3ab5d77c97f00ad069feb594c8`. Its archive check passed; the page contains no model predictions or Japanese transcript and makes no external requests.
+- `USER_LISTENING=PENDING`; the package contains no user judgment. No new extraction or model run occurred. `MODEL_RUNS=0`, `PRODUCTION_CHANGES=0`, `NAS_JELLYFIN_WRITES=0`.
 
 ## NEXT_DECISION
 
