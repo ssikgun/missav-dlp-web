@@ -42,7 +42,8 @@ Run the separately approved, isolated FNS-247 whole-title audio evidence evaluat
 
 - User approved S11-WX010 after WX009's whole-title proposal; canonical base is `2d67ac1fe3a5379d627fcba1a0dd91325858296c`. Stage11 contract v1.0.0 is APPROVED.
 - WX007–WX009 protocols, source/evidence hashes, JA timing, saved STT outputs, pyannote evidence, and WX009 listening judgment are recorded in the canonical handoff and private VM122 manifests. Reuse only after the live source files and hashes are reverified.
-- Registration does not mean experiment setup or model execution has started. Model work remains gated on canonical registration confirmation and the pre-inference protocol freeze.
+- Canonical registration and the private pre-inference protocol lock revision 2 are verified. Protocol SHA-256: `de93f3d90c5733fdde1d0d7d206e362b062adf5a374dc1ca5b1f8f1bef7119bf`; core plan: `6343c841d07b9f04e79967b3d406f2d3d35efef260967a08fddbe6e449d68752`; runner: `e6204fe21312b973972f2f95af26b12db3bdeb753047b5a60f6474c1fb2215ff`; lock: `b8764d291e834f9942721edda4ba4a8fc1ba0b8cbc9d7a1a000af88c92e0a246`. The 175-core plan selects 28 stratified random cores and 30 regression-sentinel cores (53 combined evaluation cores). Source SHA and 13 prior evidence manifest references passed revalidation. No WX010 audio extraction or model output existed at this checkpoint.
+- The initial private lock attempt was rejected before extraction/model execution due to a checksum parser defect; it is retained as private history, the parser was corrected, and revision 2 was frozen with the same protocol selection and model settings. At the new pre-run gate, Qwen PID 1005 was active, RAM available was 8,708 MiB, VRAM free was 7,595 MiB, and Whisper Worker port 8091 remained in its pre-existing not-listening state. No service was changed.
 
 ## NEXT_DECISION
 
