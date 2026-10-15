@@ -1,5 +1,44 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-15 — S11-WX008 FNS-247 speaker diarization BLOCKED at model access
+
+S11-WX008 was registered on the canonical `teddy-subtitle-stage11` branch at
+`bebf75a97ba7c9ed3bc4679925d7b532ba68b204`. Registration checks passed and the
+activation commit was confirmed on the remote before model or audio work. The
+router and Stage11 active-work record now both retain `S11-WX008` with status
+`BLOCKED`; the task is not closed because its approved model-access prerequisite
+is unresolved.
+
+Read-only access checks on VM122 found no Hugging Face token available to the
+designated isolated environment. The official
+`pyannote/speaker-diarization-community-1` model is gated and requires the
+account holder to accept its access conditions. No terms were accepted on the
+user's behalf and no access control was bypassed. The inspected Stage11
+environments do not have `pyannote.audio` installed, and no separate diarization
+environment or experiment cache was created while access was blocked.
+
+The VM122 preflight observed 8,390 MiB available RAM and 7,595 MiB free GPU
+memory on the 12 GiB RTX 3060; the existing Qwen `llama-server` remained active
+at PID 1005. These are preflight readings only. No model was loaded or run.
+Because the access gate failed before selection was frozen, zero windows were
+selected, no audio was extracted, and no protocol manifest or diarization
+outputs were created. Original and Demucs diarization, speaker counts/turns,
+WhisperX-speaker linkage, and overlap evaluation are all `NOT_RUN`; speaker
+accuracy and DER remain `UNKNOWN`. No inference resource cost was incurred.
+
+Result: `S11_WX008_REGISTRATION=PASS`, `MODEL_ACCESS=BLOCKED`,
+`ISOLATED_ENVIRONMENT=BLOCKED` for execution, `SELECTED_WINDOWS=0`,
+`ORIGINAL_DIARIZATION=NOT_RUN`, and `DEMUCS_DIARIZATION=NOT_RUN`.
+`FULL_TITLE_READINESS=판단 불가`. Production changes, full-title processing,
+NAS/Jellyfin writes, and publication writes were zero. No model, audio, private
+Japanese text, or credentials were added to Git.
+
+Resume only after the user has accepted any required model terms and an
+authorized token is available to the isolated VM122 process. Then continue the
+approved maximum-four-window experiment, freezing selection before viewing
+diarization output. This blocker does not authorize any fallback model,
+full-title run, production integration, or publication.
+
 ## 2026-10-15 — S11-WX007 FNS-247 controlled experiment completed
 
 S11-WX007 was registered on canonical `teddy-subtitle-stage11` from base

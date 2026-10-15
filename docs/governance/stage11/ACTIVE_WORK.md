@@ -2,7 +2,7 @@
 
 WORKSTREAM: stage11
 TASK_ID: S11-WX008
-STATUS: IN_PROGRESS
+STATUS: BLOCKED
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage11
 
@@ -37,7 +37,7 @@ Run a bounded, isolated FNS-247 speaker-diarization evaluation and connect its s
 
 ## ACCEPTANCE_CRITERIA
 
-- Router and this file register the same `S11-WX008`, `IN_PROGRESS`, `stage11`, and contract `1.0.0`; the existing governance structural and task-authorization checks pass, and the activation commit is confirmed on the canonical remote before audio extraction or model execution.
+- The activation commit registered `S11-WX008` as `IN_PROGRESS` in both files; governance structural, task-authorization, and smoke checks passed, and the activation commit was confirmed on the canonical remote before audio extraction or model execution. If a prerequisite blocks execution, both files retain the same `S11-WX008` and move to `BLOCKED` until the user resolves it.
 - Model terms/access and isolated environment are verified without exposing credentials or accepting terms for the user. Report `MODEL_ACCESS=PASS` or `BLOCKED`; a blocked result causes no fallback model run.
 - The frozen selection contains at most four windows, each at most 120 seconds, with summed duration at most eight minutes. Record selection rationale, interval, duration, and hashes before inspecting diarization output; report fewer eligible windows when evidence is insufficient.
 - For each selected window, compare original and Demucs audio with the same authorized pyannote version/model/settings, or record each failed/unrun condition and reason. Verify input identity and Demucs time correspondence.
@@ -50,8 +50,9 @@ Run a bounded, isolated FNS-247 speaker-diarization evaluation and connect its s
 - The user explicitly approved S11-WX008 for a bounded FNS-247 speaker-diarization experiment, the `pyannote/speaker-diarization-community-1` target, original-versus-Demucs comparison, the listed safeguards, and these completion conditions.
 - Canonical base: `teddy-subtitle-stage11` at `4cccb29c4673bd57cc8bef2d22553e65bba57787`; common and Stage11 contracts are approved at version `1.0.0`.
 - S11-WX007 completed with A=27, B=6, C=0 and all four WhisperX/Demucs conditions; its private VM122 evidence and hashes are documented in the canonical handoff and stored under `/home/teddy/stage11-whisperx-ab-private/analysis/S11-WX007`.
+- S11-WX008 activation commit `bebf75a97ba7c9ed3bc4679925d7b532ba68b204` was confirmed on the canonical remote. Read-only VM122 preflight found no Hugging Face token available to the designated environment and `pyannote.audio` is not installed in the inspected isolated environments. The official community-1 model page is gated and requires the account holder to accept its access conditions. No terms were accepted, no access was bypassed, and no credentials were exposed. The model-access gate therefore stopped selection, extraction, installation, and inference before they began.
 - S11-WX007 product quality is `INCONCLUSIVE`; Japanese transcript and absolute boundary accuracy are `UNKNOWN`. Its candidates remain hypotheses.
 
 ## NEXT_DECISION
 
-After the S11-WX008 report, the user decides whether to authorize any broader FNS-247 isolated validation. This task does not authorize whole-title processing or production integration.
+S11-WX008 remains `BLOCKED` until model access is available through the user's own accepted model terms and an authorized token in the isolated VM122 run context. Then resume only this bounded task and freeze eligible windows before inspecting diarization output. After its report, the user decides whether to authorize any broader FNS-247 isolated validation. This task does not authorize whole-title processing or production integration.
