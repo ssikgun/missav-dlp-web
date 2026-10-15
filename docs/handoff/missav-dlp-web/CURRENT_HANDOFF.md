@@ -1,5 +1,24 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-15 — S11-WX008 resumed after authenticated model-access check
+
+The user made the Hugging Face token available directly on VM122 at
+`/home/teddy/.config/stage11-wx008/hf-token`. Read-only verification as `teddy`
+confirmed a regular, readable file owned by `teddy` with mode `0600`. Its value
+was not printed, copied to CT108, or committed. Authenticated Hugging Face Hub
+checks returned gated model metadata and access to all 10 repository files for
+`pyannote/speaker-diarization-community-1` at revision
+`3533c8cf8e369892e6b79ff1bf80f7b0286a54ee`. This verifies effective account
+access to the gated files; no terms were accepted in this session and no access
+control was bypassed.
+
+The router and Stage11 active-work file were both changed from
+`BLOCKED / S11-WX008` to `IN_PROGRESS / S11-WX008` and must be validated and
+confirmed on the canonical remote before installing a package, creating
+experiment files, downloading model files, extracting audio, or running a
+model. `pyannote.audio` remains absent from the previously inspected isolated
+environments. No model execution or experiment artifact has started.
+
 ## 2026-10-15 — S11-WX008 FNS-247 speaker diarization BLOCKED at model access
 
 S11-WX008 was registered on the canonical `teddy-subtitle-stage11` branch at

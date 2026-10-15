@@ -2,7 +2,7 @@
 
 WORKSTREAM: stage11
 TASK_ID: S11-WX008
-STATUS: BLOCKED
+STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage11
 
@@ -50,9 +50,9 @@ Run a bounded, isolated FNS-247 speaker-diarization evaluation and connect its s
 - The user explicitly approved S11-WX008 for a bounded FNS-247 speaker-diarization experiment, the `pyannote/speaker-diarization-community-1` target, original-versus-Demucs comparison, the listed safeguards, and these completion conditions.
 - Canonical base: `teddy-subtitle-stage11` at `4cccb29c4673bd57cc8bef2d22553e65bba57787`; common and Stage11 contracts are approved at version `1.0.0`.
 - S11-WX007 completed with A=27, B=6, C=0 and all four WhisperX/Demucs conditions; its private VM122 evidence and hashes are documented in the canonical handoff and stored under `/home/teddy/stage11-whisperx-ab-private/analysis/S11-WX007`.
-- S11-WX008 activation commit `bebf75a97ba7c9ed3bc4679925d7b532ba68b204` was confirmed on the canonical remote. Read-only VM122 preflight found no Hugging Face token available to the designated environment and `pyannote.audio` is not installed in the inspected isolated environments. The official community-1 model page is gated and requires the account holder to accept its access conditions. No terms were accepted, no access was bypassed, and no credentials were exposed. The model-access gate therefore stopped selection, extraction, installation, and inference before they began.
+- S11-WX008 activation commit `bebf75a97ba7c9ed3bc4679925d7b532ba68b204` and blocked-state commit `83bf9eededc362e2619630860856de55663ddb2d` were confirmed on the canonical remote. After the user supplied the VM122 token file, read-only checks verified it is a readable regular file owned by `teddy` with mode `0600`; the token value was not printed or copied. Authenticated Hugging Face access returned gated model metadata and HEAD access to all 10 repository files at revision `3533c8cf8e369892e6b79ff1bf80f7b0286a54ee`. This verifies effective access for the account/token; no terms were accepted in this session and no access control was bypassed. `pyannote.audio` is still absent from the inspected environments, so no model execution or experiment-file creation has begun.
 - S11-WX007 product quality is `INCONCLUSIVE`; Japanese transcript and absolute boundary accuracy are `UNKNOWN`. Its candidates remain hypotheses.
 
 ## NEXT_DECISION
 
-S11-WX008 remains `BLOCKED` until model access is available through the user's own accepted model terms and an authorized token in the isolated VM122 run context. Then resume only this bounded task and freeze eligible windows before inspecting diarization output. After its report, the user decides whether to authorize any broader FNS-247 isolated validation. This task does not authorize whole-title processing or production integration.
+Continue only the bounded S11-WX008 task. Pin model revision `3533c8cf8e369892e6b79ff1bf80f7b0286a54ee`, prepare the experiment-only environment/cache after the resumed task state is confirmed on the remote, and freeze eligible windows before inspecting diarization output. After its report, the user decides whether to authorize any broader FNS-247 isolated validation. This task does not authorize whole-title processing or production integration.
