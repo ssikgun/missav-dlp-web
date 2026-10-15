@@ -1,5 +1,36 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-15 — S11-WX008 FNS-247 speaker diarization completed
+
+S11-WX008 was registered, blocked at the initial model-access check, then resumed under the same task ID after the user made a Hugging Face token available directly on VM122. The blocked-state commit `83bf9eededc362e2619630860856de55663ddb2d` and resume commit `cd67cbaf7c2e3c4e82ae5c77d972a9173c351de0` were confirmed on the canonical remote before execution. The token file was owned by `teddy`, mode `0600`, and readable. Authenticated access to the gated Community-1 repository returned all 10 files at revision `3533c8cf8e369892e6b79ff1bf80f7b0286a54ee`; the token was never printed, copied to CT108, or stored in Git. No terms were accepted on the user's behalf. The [official model card](https://huggingface.co/pyannote/speaker-diarization-community-1) describes the gated conditions and local pyannote.audio pipeline.
+
+The isolated VM122 environment used `pyannote.audio 4.0.7`, `torch 2.8.0+cu128`, `torchaudio 2.8.0+cu128`, and the TorchCodec 0.7.0 CPU decoder. The latter avoided an NPP symbol conflict from the CUDA decoder; model inference itself ran on the RTX 3060. The existing private FFmpeg 7.1.5 prefix was referenced read-only. Model assets were downloaded to a WX008-only cache, then loaded from the pinned local snapshot with Hugging Face offline mode and pyannote telemetry disabled.
+
+The pre-output selection reused three existing WX007 JA-indexed windows—one each from the early, middle, and late thirds—and the WX005 user-reviewed `clip-020` mixed-vocalization window. The latter's user review covered core audio only; its surrounding context was not listened to. Raw JA timestamps and affine-mapped video timestamps remain separate in the private protocol. Four windows total 106.36 seconds, with no interval overlap. The four original WAVs and four saved WX007 `htdemucs` vocal stems were hash-verified, mono 16 kHz, and equal in frame count, duration, and time origin. No audio was newly extracted and Demucs was not rerun.
+
+### Diarization and saved STT linkage
+
+| Window (video time) | Original speakers / turns / changes | Demucs speakers / turns / changes | Overlap pairs |
+|---|---:|---:|---:|
+| B-early-JA 00:01:34.575–00:02:04.575 | 3 / 13 / 4 | 2 / 17 / 9 | 0 / 0 |
+| B-middle-JA 01:03:33.601–01:04:03.601 | 1 / 6 / 0 | 2 / 6 / 1 | 0 / 0 |
+| clip-020 01:54:11.220–01:54:27.580 | 1 / 12 / 0 | 1 / 14 / 0 | 0 / 0 |
+| B-late-JA 02:03:31.597–02:04:01.597 | 1 / 7 / 0 | 1 / 4 / 0 | 0 / 0 |
+
+The regular and exclusive outputs had matching speaker and turn counts in all eight runs. No output contained a cross-speaker overlap interval; this does not establish that the audio had no overlap, and the selected set had no independent overlap-labeled window. Across selected windows, diarization turns shorter than one second numbered 27 on original audio and 32 on Demucs vocals. In `clip-020`'s user-reviewed core, five original and seven Demucs turns carried a single temporary speaker label; this is a possible non-speech assignment risk, not a confirmed false speaker.
+
+Saved WX007 candidate-to-speaker intersections were evaluated independently for regular and exclusive output. Original-audio outputs had 7 candidate segments: 5 `SUCCESS`, 2 `AMBIGUOUS`, 0 `FAILURE`; one additional original `clip-020` onset-0.50 condition had no candidate. Demucs outputs had 8 candidate segments: 4 `SUCCESS`, 4 `AMBIGUOUS`, 0 `FAILURE`. Exclusive counts matched these results. The long WX007 candidate intervals often spanned most of a 30-second window, so `SUCCESS` means only that one diarization label intersected the interval; it does not verify that the transcript or speaker assignment is correct. Candidate linkage by window: early original 0/2 success and 2/2 ambiguous, Demucs 0/2 and 2/2; middle original 2/2 and 0/2, Demucs 0/2 and 2/2; late both variants 2/2 success; `clip-020` original 1/1 candidate success plus one no-candidate condition, Demucs 2/2 success.
+
+Japanese transcript truth, speaker accuracy, and DER remain `UNKNOWN` without independent gold. Speaker counts changed between original and Demucs in the early and middle windows; no merge/split direction can be confirmed without speaker truth. The selected sample is small and does not prove full-title readiness or the no-per-title-review product goal. `FULL_TITLE_READINESS` is `추가 검증 필요`.
+
+Inference took 2.935 seconds total on original inputs and 1.955 seconds on reused Demucs inputs; local model load took 0.542 seconds. Pyannote peak CUDA allocation was 1,628.48 MiB, process peak RSS was 1,716 MiB, minimum observed free VRAM was 5,340 MiB, and minimum available RAM was 7,155 MiB. Qwen PID 1005 was active before and after every call and at final verification; no service was stopped or restarted. Inference ran offline with telemetry disabled.
+
+Private VM122 artifacts remain under `/home/teddy/stage11-whisperx-ab-private/analysis/S11-WX008`, outside Git. Source provenance: FNS-247 media SHA-256 `442e19dd0c45df924ecac28c76f4b3c18b19f53f0e5a00e3abd76bb650a84651`; WX007 JA time-index SHA-256 `b63745df3a9bfa3f7ec895b289c12d6b069f7e8d2024355e13e24c63ef21d270`; WX005 user core-only revision SHA-256 `3d52da305de22e816e1426f1823477e02cd029242c8b5e3e19a608f471487dff`. Evidence SHA-256: frozen protocol `2f723de23dc3f06893970cf84c60658fd2a149b3ad1c55d09f85622298a8bc10`; selection manifest `4a34eb0b2a6abfa03ef4d4c01688251739693e116bd489db5ab7905a0f1daf5a`; model snapshot manifest `272eb05c8df4b94dabd3f965855ffb3c4d24af686d6943504ebd3efd6743b346`; package lock `345e9c8eaeaf0b97fa3aaa8c69ae4bbdf9b76e201eba2bdaab0d96673da861dc`; run manifest `7ebc670b025d691f90e2935564fe002c273d60f6e376f56d0f66532182b98409`. All eight output hashes matched their run manifest. No WhisperX run, transcription, other-title test, full-title processing, production change, NAS/Jellyfin write, or publication occurred. The router and Stage11 active-work file are returned to `INACTIVE / TASK_ID NONE`.
+
+Next: the user decides separately whether further isolated FNS-247 diarization validation is warranted. This experiment does not authorize full-title runs or production integration.
+
+
+
 ## 2026-10-15 — S11-WX008 resumed after authenticated model-access check
 
 The user made the Hugging Face token available directly on VM122 at
