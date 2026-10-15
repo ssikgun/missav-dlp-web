@@ -1,5 +1,111 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-15 — S11-WX007 FNS-247 controlled experiment completed
+
+S11-WX007 was registered on canonical `teddy-subtitle-stage11` from base
+`3f8ad44c78012de33567787ad354b07b3d924684`. Registration commit
+`84c07935f236aac8f3a84b056139b9df22bbda23` was confirmed on `origin` before
+audio extraction or model inference. The Stage11 contract stayed at approved
+version 1.0.0. The task is complete; the router and Stage11 active-work file
+are returned to `INACTIVE / TASK_ID NONE`.
+
+### Provenance and frozen selection
+
+- FNS-247 source: `/volume1/video/video2/JAV/FNS/FNS-247/FNS-247.mp4`, SHA-256
+  `442e19dd0c45df924ecac28c76f4b3c18b19f53f0e5a00e3abd76bb650a84651`, duration
+  02:54:20.40, AAC 48 kHz stereo. The original remained read-only.
+- The saved JA source ID is its SHA-256
+  `8e645dd1e55304075b03562ae38837012d401a6cb00cb96fc8d54d9df2508598`; the
+  time index contains 313 valid cues. The 40/40-anchor affine map was
+  `video_ms = raw_ms * 1.0141571005475907 + 239.121464`, median absolute
+  residual 219 ms. Raw JA time and mapped video time remained separate.
+- A reused the 27 existing VM122 inputs and exact BASE results: 13
+  dialogue-labeled and 14 non-dialogue-labeled. All input and result hashes
+  matched the prior evidence.
+- B selected six non-overlapping 30-second model inputs: one mapped JA-cue and
+  one JA-gap window in each third. The frozen rule used a 20-second core,
+  5-second padding on each side, at least 30 seconds between B contexts, and
+  seed `S11-WX007-FNS247-B-20261015-v1`. JA cues had to be at most 20 seconds
+  and fit wholly inside their core; JA-gap cores were scanned on a 5-second
+  grid with no cue overlap. Candidates were ranked by
+  `SHA256(seed|stratum|candidate_id|core_start_ms|core_end_ms)` in fixed
+  early/middle/late JA/gap strata, greedily enforcing A-context exclusion and
+  B spacing without fallback. The gap windows are not no-speech gold.
+- C selected zero windows because no acoustic type had independent original-
+  audio confirmation before STT. No type was inferred from model output.
+- Selection times and private output remain on VM122 at
+  `/home/teddy/stage11-whisperx-ab-private/analysis/S11-WX007`; Git contains no
+  audio, Japanese transcript, or private evidence.
+
+### Conditions and results
+
+| Condition | Input and VAD | Completed comparison |
+|---|---|---|
+| BASE | Original, onset 0.50 / offset 0.363 | A: 27 exact prior results reused; B: 6 run |
+| VAD | Original, onset 0.45 / offset 0.363 | A: 27; B: 6 |
+| DEMUCS | Demucs vocals, onset 0.50 / offset 0.363 | A: 27; B: 6 |
+| COMBINED | Demucs vocals, onset 0.45 / offset 0.363 | A: 27; B: 6 |
+
+WhisperX 3.8.6 large-v3 revision
+`edaa852ec7e145841d8ffdb056a99866b5f0a478`, Japanese, float16, batch 1,
+beam/best-of 5, temperature 0, no prompt or hotwords, Silero chunk 30 seconds.
+Demucs 4.1.0 `htdemucs` vocals used segment 7 seconds, one shift, overlap
+0.25. Every Demucs output retained the input start and exact 16 kHz frame
+count; three outputs needed a one-sample end-only rounding pad.
+
+- A output presence: BASE and VAD each produced candidates in 9/13 dialogue
+  and 4/14 non-dialogue inputs. DEMUCS and COMBINED produced candidates in
+  11/13 dialogue and 4/14 non-dialogue inputs. The Demucs conditions added
+  three dialogue candidates and removed one; the non-dialogue candidate-risk
+  count stayed at four.
+- B mapped JA-cue windows produced candidates in 3/3 windows in all conditions.
+  JA-gap windows produced candidates in 1/3 BASE and VAD windows and 2/3
+  DEMUCS and COMBINED windows. Gap output does not establish a false dialogue
+  or a correct transcript.
+- VAD-only onset 0.45 generated no candidate for `clip-003`, `clip-005`,
+  `clip-006`, or `clip-008`. DEMUCS and COMBINED generated candidates for
+  `clip-003`, `clip-006`, and `clip-008`; `clip-005` remained empty. Candidate
+  generation is not verified recovery.
+- Japanese transcription accuracy and absolute boundary accuracy are UNKNOWN;
+  no independent verified transcript or boundary gold was available.
+  Non-dialogue candidate risk stayed unchanged on A. C special-acoustic risk
+  was not evaluated. Overall product quality is INCONCLUSIVE; no general
+  improvement or no-manual-review goal is established.
+
+### Cost, limits, and integrity
+
+- Demucs CPU processing totaled 444.134 seconds over 33 inputs, with 1,649 MiB
+  process peak RSS and no GPU allocation. WhisperX used about 3,866 MiB process
+  VRAM; minimum observed free VRAM was 3,724 MiB while Qwen remained active at
+  PID 1005. WhisperX process peak RSS was about 3,930 MiB.
+- Onset 0.50 completed in 30.512 seconds including 2.204 seconds model load
+  for the six new original B inputs and 33 Demucs inputs. Onset 0.45 completed
+  in 41.480 seconds including 2.287 seconds model load for 33 original and 33
+  Demucs inputs. Per-sample timing was not persisted for onset 0.50 because of
+  a manifest-key collision; all 39 output files were hash-verified and the
+  manifest was reconstructed without rerunning inference. Onset 0.45 per-sample
+  times were captured.
+- The first Demucs pilot placed an 84 MB public checkpoint in the shared HF
+  cache. That cache entry was left unchanged; its SHA-identical copy was placed
+  in the S11-WX007 private cache, and subsequent Demucs runs used the private
+  cache. Qwen and its service, the Whisper Worker state, operating virtual
+  environments, NAS source, and publication targets were not changed.
+- Evidence SHA-256: protocol `cf27a76d9215bc965d671b1f5559f6a8cb7f17af1dd221d118636f8e2a762db2`;
+  JA index `b63745df3a9bfa3f7ec895b289c12d6b069f7e8d2024355e13e24c63ef21d270`;
+  selection `b91535e4edc35afa3ec3af11d42917107f46a67c826fc2b8706f5eed79cbf139`;
+  A BASE reuse `9607bfba3808aa15594336fecc2a89ae5616fef03c196f3a45a18db3077e91a7`;
+  B extraction `8054715e5ac7fcf85cece7a3635856fca030a6fb591b1f04f562b8a465e2fb66`;
+  Demucs run `6bb765edb5d8b1790467738d4f0ae8db4e6a3f0aa13581bbf563d17a1c80a70b`;
+  WhisperX run `0f42d428fd1f84d7869a99988ab5d0b7ead375d559db6f8a53b263a4fdda7e7e`;
+  evaluation summary `d268dc1a3d97047a4c96dabe01ae8fa757b8e5af16f3a587ea58784c3b173160`.
+- Registration and all 105 new WhisperX output hashes were verified. Production
+  changes, operational subtitle generation, deployment, publication, other-title
+  tests, and NAS/Jellyfin writes were zero. Only governance and handoff records
+  change in Git for closure.
+
+Next: Stage11 remains inactive until the user approves and registers another
+task. S11-WX007 does not authorize production integration or publication.
+
 
 ## 2026-10-14 — GOV-002 approved governance applied; all workstreams inactive
 
