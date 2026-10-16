@@ -2,7 +2,7 @@
 
 WORKSTREAM: stage11
 TASK_ID: S11-WX010
-STATUS: IN_PROGRESS
+STATUS: BLOCKED
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage11
 
@@ -56,7 +56,8 @@ Run the separately approved, isolated FNS-247 whole-title audio evidence evaluat
 - The original R6 lock/runner/protocol and failed smoke status/log remain unchanged. A separate immutable follow-up lock was created at the private `recovery-001` workspace (SHA-256 `229583cade54caa1bb561acd46129589602d54cbd41807eebb5992cd85e16bbd`), but its verifier failed with `KeyError: torch_hub_tree_sha256`: the lock records `repaired_torch_hub_tree_sha256`. At that checkpoint, no smoke or full controller ran and S11-WX010 remained `BLOCKED` pending a user decision. The failed recovery-001 lock and verifier remain unchanged.
 
 - On 2026-10-16, under the user's existing S11-WX010 approval, a new private `r6/successor-002` verifier and generator were created without changing R5, parent R6, or recovery-001 artifacts. The schema correction distinguishes the 124-file full Torch Hub fingerprint (`repaired_torch_hub_tree_sha256`) from the 123-file nested Silero source fingerprint; row type `file`, sorted relative paths, and duplicate rejection are checked. The verifier also follows the actual R6 `source-identity.json` schema (`vm_copy.path` and independent NAS/VM SHA references). Successor lock SHA-256 `576b790565b629333cea476759c528bfab03177b5cae9f253bf865a02f5003c0`; verifier SHA-256 `ff48b3e221053eb95b928905d3bb5452ec2421109615f637886b66796c806f6f`; generator SHA-256 `45281d2d64dc80df29ab53e9bc5ac9ce4efd6e3b88bf4a94babe1b20298c5721`. Independent lock verification passed, including the 175 original and 175 Demucs file hashes, time mapping, model/protocol links, Silero fingerprints, and six fail-closed negative tests. `R5_EXTRACTION_MANIFEST_PROVENANCE=UNRESOLVED` remains unchanged. No smoke has run yet; the next authorized step is only the four WhisperX and two pyannote smoke jobs after the canonical `IN_PROGRESS` state is confirmed. The 175-core run remains unstarted.
+- The canonical state update to `IN_PROGRESS / S11-WX010` was pushed and read back at `78f883daf16af5578c533383377b12fd1c10decb`; governance remains `INACTIVE / NONE`. The six-smoke controller then attempted only `whisperx:original-vad050` and failed with `FileNotFoundError: ffmpeg` in the child process PATH while decoding the smoke WAV. It produced no output JSON (0 outputs); the other three WhisperX and two pyannote jobs were not run. The controller exited, Qwen PID 1005 remained active, 8091 stayed in its pre-existing `NOT_LISTENING` state, RAM/VRAM recovered above the gate, and the 175-core controller was not started. Private result index SHA-256: `51796ff0e70f74b40c5cc8f811587e1f34859a8def519e53cf9e4120cd00ec7e`. The successor lock remains unchanged and PASS; R5 manifest provenance remains `UNRESOLVED`. Per the stop rule, WX010 is now `BLOCKED` pending a decision on the missing pinned FFmpeg executable path; no retry is authorized by this checkpoint.
 
 ## NEXT_DECISION
 
-Run only the six fixed smoke jobs under the independently verified successor lock after canonical state readback. Preserve `R5_EXTRACTION_MANIFEST_PROVENANCE=UNRESOLVED`; do not start the 175-core controller.
+The first WhisperX smoke could not locate the existing pinned FFmpeg executable through the child PATH. Await a user decision before any environment/runner adjustment or smoke retry. Preserve `R5_EXTRACTION_MANIFEST_PROVENANCE=UNRESOLVED`; do not start the remaining smoke jobs or 175-core controller.
