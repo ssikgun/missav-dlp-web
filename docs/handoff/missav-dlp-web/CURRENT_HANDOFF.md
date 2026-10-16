@@ -12832,6 +12832,18 @@ WhisperX used the pinned 3.8.6 / large-v3 revision `edaa852ec7e145841d8ffdb056a9
 
 The approved S11-WX010 evaluation and its reporting criteria are complete. The router and Stage11 `ACTIVE_WORK.md` are now `INACTIVE / TASK_ID NONE`; the approved Stage11 design contract remains `APPROVED`. Any next evaluation or product work requires a separately approved Stage11 task. The next decision is whether to register work that adds independent Japanese transcript, speech/non-speech, and speaker-time references for stronger quality measurement.
 
+### 2026-10-17 — S11-WX011 S04–S16 user listening comparison and S03 timing check
+
+The canonical task remained `IN_PROGRESS / S11-WX011` at `6c319ccd2aec2130c3510c8dce33a92f5ed80481`. The fixed S11-WX011 sample manifest SHA-256 remains `3b4ac21598d3a8f7e01588a760a0b6f88644d3100519705f789641616abbf478`. Read-only checks verified all 16 listening WAVs, 28 referenced original/Demucs source-core files, the six WX010 condition manifests, and 112 referenced condition/core output files. Source, core, lock, output hashes, and audio/video timestamp mappings passed; maximum mapping delta was 0 ms. No existing WX010/WX011 artifacts were modified.
+
+The user's S04–S16 notes were preserved verbatim in the private VM122 archive `/home/teddy/stage11-whisperx-ab-private/analysis/S11-WX011/comparisons/S04-S16-user-listening-wx010-20261016T152030Z/`. Listening time, confidence, and model-exposure status were not supplied, so this pass is not claimed as strictly blind. The notes indicate speech in 10 windows and nonverbal vocalizations without reported speech in 3. Korean phonetic impressions remain auxiliary listening evidence, not Japanese transcription truth.
+
+In Original .50 / Original .45 / Demucs .50 / Demucs .45 order, candidate-occurrence counts across S04–S16 were 15/15/17/17. Candidate presence was 9/13 in either Original condition and 11/13 in either Demucs condition; it was present in 7/10 versus 8/10 speech-noted windows and 2/3 versus 3/3 vocalization-only notes. Two Demucs-only windows include one speech-noted window and one moan-noted window; two speech-noted windows had no candidate in any condition. Candidate presence is not confirmed recovery or confirmed false dialogue. VAD .45 changed no candidate counts; interval positions changed in 1 Original window and 3 Demucs windows. Five windows had time-overlapping output spans from neighboring cores; exact same-text duplication was not scored.
+
+Exclusive pyannote core-local speaker counts differed between Original and Demucs in 4/13 windows; turn counts and regular/exclusive representations also varied. These are output differences, not speaker accuracy. The separate S03 check found existing candidate intervals ending by approximately 4.60 s while the reported Gemini estimates place starts around 5 and 7 s. The user did not confirm those times, so this remains a possible gap only. Japanese transcription accuracy, false-dialogue accuracy, exact boundaries, and speaker DER remain `UNKNOWN`; product quality remains `INCONCLUSIVE`. `R5_EXTRACTION_MANIFEST_PROVENANCE=UNRESOLVED`.
+
+No model inference, audio extraction, Demucs rerun, Hermes execution, production change, NAS/Jellyfin write, or subtitle publication occurred. S11-WX011 remains `IN_PROGRESS / S11-WX011`. If another bounded review is useful, the next most useful evidence is approximate in-WAV timing for the speech-noted windows that had no candidate in any condition; S03 4.5–7.5 s is an optional follow-up, not a verified miss.
+
 
 ### 2026-10-16 — S11-WX011 independent Japanese audio accuracy evaluation registered
 
