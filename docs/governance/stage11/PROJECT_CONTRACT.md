@@ -72,9 +72,12 @@ This implementation direction does not erase the coverage-complete Japanese-mast
 
 ## Workstream state
 
-The approved Stage11 contract remains in force, but the workstream status is
-INACTIVE in docs/governance/stage11/ACTIVE_WORK.md and TASK_ID is NONE. INACTIVE
-means there is no current user-approved Stage11 development task; it does not
-discard the approved design. A separate user-approved task with explicit scope
-and acceptance criteria is required before development resumes. This inactive
-state does not pause another registered workstream.
+The Stage11 design contract remains APPROVED independently of the current
+workstream task state. The current TASK_ID and STATUS are authoritative in
+`docs/governance/stage11/ACTIVE_WORK.md` and must match the Stage11 entry in
+`docs/governance/ACTIVE_WORK.md`. INACTIVE with TASK_ID NONE means no Stage11
+task is currently authorized and leaves the approved design contract in force.
+BLOCKED identifies a registered task whose execution is blocked while the
+approved contract remains in force. Any mismatch between the Stage11 active-work
+record and router must fail closed. A Stage11 state applies only to Stage11 and
+does not pause an independent workstream.
