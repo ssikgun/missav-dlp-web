@@ -2,13 +2,13 @@
 
 WORKSTREAM: stage11
 TASK_ID: S11-WX011
-STATUS: BLOCKED
+STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage11
 
 ## OBJECTIVE
 
-Use a small, independently labeled sample to compare completed S11-WX010 outputs with independent Japanese transcript, speech/non-speech, timing, and speaker references, and report measured accuracy and remaining uncertainty.
+Prepare a blinded listening package from the already frozen S11-WX011 sample so the user can independently note speech presence, approximate speaker count and timing, and Korean phonetic impressions. Use those notes only as listening evidence; they are not Japanese transcript truth. Continue to report which accuracy dimensions remain unknown.
 
 ## APPROVED_SCOPE
 
@@ -17,6 +17,8 @@ Use a small, independently labeled sample to compare completed S11-WX010 outputs
 - Verify the source and independence of transcript, speech/non-speech, speaker, and timing references.
 - Compare only items with verified independent references; report unavailable dimensions as UNKNOWN.
 - Record evaluation uncertainty, regressions, and resource evidence in a new private WX011 location.
+- Prepare blinded WAV copies from verified WX010 original-audio WAVs for the existing frozen 16 windows, with a separate private mapping and blank listening form; initially ask the user to listen only to S01–S03.
+- Preserve the user's first-pass entries unchanged before comparing them with any model or subtitle evidence. Treat Korean phonetic notes as auxiliary listening notes, never as Japanese transcript references.
 
 ## PROHIBITED_SCOPE
 
@@ -26,6 +28,7 @@ Use a small, independently labeled sample to compare completed S11-WX010 outputs
 - No NAS, Jellyfin, or production database writes.
 - No product threshold/default changes.
 - No private Japanese transcripts, audio, personal review records, or detailed speaker results in Git.
+- Do not expose model output, external Japanese subtitles, predicted speaker counts, or answer hints in the user-facing blind package.
 
 ## ACCEPTANCE_CRITERIA
 
@@ -33,6 +36,8 @@ Use a small, independently labeled sample to compare completed S11-WX010 outputs
 - Existing WX010 source and output hashes and provenance links pass read-only verification and remain unchanged.
 - A reproducible, non-duplicated sample of at most 16 windows is selected and frozen with source/core/time references.
 - Each proposed independent reference has a verified source and independence assessment; unavailable references remain explicitly unavailable.
+- The blind package contains exactly the 16 frozen windows, uses only verified original WX010 WAV inputs, and passes source-frame/output-SHA checks; mapping remains private and the user-facing directory contains only blind audio and a blank form.
+- The user is asked to listen to S01–S03 first; Korean phonetic notes are explicitly excluded from Japanese transcript scoring.
 - Evaluations, denominators, unknown items, regressions, and uncertainty are reported from evidence only.
 - No model execution, extraction/Demucs rerun, production change, or subtitle publication occurs.
 
@@ -47,7 +52,9 @@ Use a small, independently labeled sample to compare completed S11-WX010 outputs
 - In these selected windows, existing candidate-occurrence counts were 20/20/23/23 for original/VAD 0.50, original/VAD 0.45, Demucs/VAD 0.50, Demucs/VAD 0.45. Candidate presence occurred in 4/7 speech-labeled windows for each original condition and 5/7 for each Demucs condition; it occurred in 2/3 non-dialogue-labeled windows for each original condition and 3/3 for each Demucs condition. These are interval-overlap risk indicators, not verified transcripts or confirmed hallucinations. VAD thresholds had identical candidate counts in all 16 sample windows.
 - WX007 regression presence: clip-003 had no candidate in any condition; clip-005/006 had candidates in all four; clip-008 had candidates only in the two Demucs conditions. Candidate occurrence does not prove accurate recovery. In the two WX009 speaker-count windows, the user's count was 2; prior WX008 Demucs output also counted 2 while original output counted 3 and 1 respectively. This small comparison does not establish DER or general speaker accuracy.
 - Japanese transcription accuracy, exact boundary accuracy, and speaker accuracy/DER remain `UNKNOWN`; product quality is `INCONCLUSIVE`. `R5_MANIFEST_PROVENANCE=UNRESOLVED`. Model executions, audio extraction reruns, Demucs reruns, Hermes executions, production changes, NAS/Jellyfin writes, and subtitle publication are all 0.
+- User approved a blinded listening evidence package on 2026-10-16 because no Japanese-speaking reviewer is available. The user may record speech presence, approximate speaker count/timing, confidence, and Korean phonetic impressions. Those impressions are not Japanese transcript truth and cannot support CER/WER, exact transcription accuracy, DER, or a product-quality PASS.
+- Frozen sample manifest SHA-256: `3b4ac21598d3a8f7e01588a760a0b6f88644d3100519705f789641616abbf478` (16 windows; no additions or reselection). Package generation is pending canonical status readback.
 
 ## NEXT_DECISION
 
-Provide or authorize an independent Japanese transcript and time-aligned speech/speaker labels for the frozen 16 windows, with the reviewer blind to model outputs. Until then, accuracy evaluation remains incomplete and WX011 stays BLOCKED.
+After canonical `IN_PROGRESS / S11-WX011` readback, prepare and verify the private blind listening package. Ask the user to listen to S01–S03 and return the blank form; Japanese transcript accuracy remains unavailable unless independent Japanese text references are separately obtained.
