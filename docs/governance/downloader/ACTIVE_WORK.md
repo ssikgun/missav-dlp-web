@@ -1,40 +1,48 @@
 # Downloader non-subtitle workstream — active work
 
 WORKSTREAM: downloader
-TASK_ID: NONE
-STATUS: INACTIVE
+TASK_ID: DL-001
+STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader
+REQUIRES_WORKSTREAMS: governance,downloader
 
 ## OBJECTIVE
 
-No Downloader implementation task is active. The approved v1.0.0 contract defines the workstream's design and safeguards but does not itself authorize implementation.
+Stabilize download and MP4 processing concurrency, safe behavior under storage pressure, and preservation of recoverable download fragments. This shared registration phase must complete and be read back from the canonical remote before any product-code work begins.
 
 ## APPROVED_SCOPE
 
-- No product, runtime, operational, deployment, retry, transfer, or data-cleanup task is currently authorized while STATUS is INACTIVE and TASK_ID is NONE.
-- The approved contract applies as design and safety guidance to a future separately approved Downloader task.
+- Inspect the existing download and storage code and actual Docker build/runtime patch path.
+- Verify configured download concurrency and implement globally serialized MP4 conversion, independently of download worker count.
+- Add safe wait/stop behavior for insufficient storage, distinguish ENOSPC, prevent unnecessary TS fallback, and prevent duplicate or repeated automatic retries.
+- Preserve HLS `.parts`, TS segments, filelists, task state, and existing final files until final storage is verified.
+- Analyze code-level reuse/recovery paths for the four existing failed jobs; use synthetic fixtures for offline remux/recovery tests only.
+- Add offline tests and verify the final Docker build patch path in an isolated worktree; prepare a reviewable implementation candidate.
 
 ## PROHIBITED_SCOPE
 
-- Do not treat this registration, the approved contract, or the proposed DL-001 below as authorization to change code or run operational jobs.
-- Do not restart containers, retry failed downloads, move/delete files, alter Proxmox or NAS configuration, or change production services.
-- Do not modify Stage11 subtitle contracts, state, code, model environments, or artifacts.
-- Do not deploy, publish, or write to production systems without a separately approved task that explicitly allows it.
+- Do not restart or deploy production containers; run or retry real downloads; or perform real MP4 recovery on the four failed jobs.
+- Do not modify operational `.tasks.json` or `.settings.json`, real `.parts`/TS/MP4 files, NAS/Jellyfin data, or Proxmox settings.
+- Do not move or delete operational data, write to NAS, or perform production cleanup.
+- Do not modify Stage11 contracts, state, code, model environments, or artifacts.
+- Do not treat this task as authorization for production deployment or operational recovery.
 
 ## ACCEPTANCE_CRITERIA
 
-- The approved contract remains v1.0.0 and APPROVED; the router and this file remain INACTIVE / NONE until a task is separately approved and registered.
-- Governance preflight must reject implementation requests while this workstream is INACTIVE / NONE.
-- Proposed task DL-001 remains inactive unless separately approved and registered with its full scope and checks.
+- Download concurrency settings of 2 and 4 are verified without changing worker count to simulate MP4 serialization.
+- For both settings, MP4 remux/conversion is globally limited to one active job; lock acquisition failure, wait, cancellation, release, and duplicate-job behavior fail safely.
+- Insufficient space at download start/resume or remux time, ENOSPC during remux, and retry suppression are tested; no redundant TS fallback is produced on ENOSPC.
+- Recoverable source fragments and task/resume state remain intact after FFmpeg, storage, NAS/publish-validation, collision, cancellation, restart, or duplicate-task failures.
+- MP4 conversion success is distinct from verified final storage; `.parts` cleanup is disallowed until final-storage verification succeeds.
+- Existing normal download, HLS resume, duplicate protection, normal MP4/TS fallback, NAS publish protections, UI/API compatibility, and final Docker patch behavior pass applicable offline regression checks.
+- The four real failed jobs are not accessed or modified; production changes, retries, NAS writes, and data deletions remain zero.
+- Unverified properties are reported as UNKNOWN; registration readback precedes code work.
 
 ## EVIDENCE
 
-- User approved registering the non-subtitle Downloader workstream and its v1.0.0 contract, including the global one-at-a-time MP4 policy, on 2026-10-17.
-- The operational snapshot below was supplied by the user for possible DL-001 planning and was not independently revalidated during GOV-004.
+- User approved DL-001 code implementation and offline validation, but not deployment or operational recovery, on 2026-10-17.
+- User-approved incident evidence concerns four ENOSPC-failed jobs with existing fragments. This registration phase does not access or modify those operational files; detailed incident facts remain user-supplied until independently verified within a separately permitted read-only investigation.
 
 ## NEXT_DECISION
 
-After separate user approval and task registration, consider DL-001 — “Downloader storage and MP4 processing reliability.” Proposed goals are: verify configured download concurrency; ensure MP4 conversion runs globally one job at a time; wait safely when storage is insufficient; prevent unnecessary TS fallback after ENOSPC; preserve the existing four failed jobs' fragments; validate MP4 recovery using those fragments; and clean temporary material only after verified NAS final storage.
-
-The supplied incident snapshot says: Proxmox LXC 108 storage was expanded from 64 GB to 100 GB (98 GB filesystem; 34 GB free after expansion); configured `max_concurrent=2` and `auto_retry=True`; the download container is stopped; four jobs failed with ENOSPC; their download segments are present with no missing or zero-byte segments; MP4 recovery has not run; final storage uses `TEDDY_FINAL_BACKEND=ssh`. This snapshot was supplied for planning and has not been independently revalidated here. DL-001 is not active; this file authorizes no retry, recovery, cleanup, service change, or deployment.
+Review the implementation candidate and offline validation. Any production deployment, service change, retry/recovery of the four real jobs, NAS transfer, or data cleanup requires a separate explicit user approval.

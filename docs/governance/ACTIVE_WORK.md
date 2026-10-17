@@ -13,8 +13,8 @@ This file routes a request to its workstream contract and active task. It is not
 
 ## WORKSTREAM: governance
 
-STATUS: INACTIVE
-TASK_ID: NONE
+STATUS: IN_PROGRESS
+TASK_ID: DL-001
 CONTRACT_PATH: docs/governance/PROJECT_CONTRACT.md
 ACTIVE_WORK_PATH: docs/governance/governance/ACTIVE_WORK.md
 AREA_HINTS:
@@ -33,8 +33,8 @@ AREA_HINTS:
 
 ## WORKSTREAM: downloader
 
-STATUS: INACTIVE
-TASK_ID: NONE
+STATUS: IN_PROGRESS
+TASK_ID: DL-001
 CONTRACT_PATH: docs/governance/downloader/PROJECT_CONTRACT.md
 ACTIVE_WORK_PATH: docs/governance/downloader/ACTIVE_WORK.md
 AREA_HINTS:
