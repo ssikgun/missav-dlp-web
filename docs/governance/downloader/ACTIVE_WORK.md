@@ -4,7 +4,7 @@ WORKSTREAM: downloader
 TASK_ID: DL-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance,downloader
+REQUIRES_WORKSTREAMS: downloader
 
 ## OBJECTIVE
 
@@ -42,6 +42,7 @@ Stabilize download and MP4 processing concurrency, safe behavior under storage p
 
 - User approved DL-001 code implementation and offline validation, but not deployment or operational recovery, on 2026-10-17.
 - User-approved incident evidence concerns four ENOSPC-failed jobs with existing fragments. This registration phase does not access or modify those operational files; detailed incident facts remain user-supplied until independently verified within a separately permitted read-only investigation.
+- Governance and Downloader shared registration was read back from canonical `teddy-subtitle-stage11` at `eebe6a22f2d102e85e4638c21a91f0a1189c4c4e`; Governance participation was then closed, leaving this Downloader task active alone.
 
 ## NEXT_DECISION
 
