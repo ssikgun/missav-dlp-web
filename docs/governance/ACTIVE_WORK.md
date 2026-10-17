@@ -13,8 +13,8 @@ This file routes a request to its workstream contract and active task. It is not
 
 ## WORKSTREAM: governance
 
-STATUS: IN_PROGRESS
-TASK_ID: GOV-004
+STATUS: INACTIVE
+TASK_ID: NONE
 CONTRACT_PATH: docs/governance/PROJECT_CONTRACT.md
 ACTIVE_WORK_PATH: docs/governance/governance/ACTIVE_WORK.md
 AREA_HINTS:
@@ -30,3 +30,23 @@ ACTIVE_WORK_PATH: docs/governance/stage11/ACTIVE_WORK.md
 AREA_HINTS:
 - Subtitle acquisition, Japanese/audio evidence, ASR, Hermes translation/review, subtitle quality, and Stage11-to-Stage12 subtitle publication.
 - Stage11 scripts also live at the repository root; do not route them to generic Downloader work by path alone.
+
+## WORKSTREAM: downloader
+
+STATUS: INACTIVE
+TASK_ID: NONE
+CONTRACT_PATH: docs/governance/downloader/PROJECT_CONTRACT.md
+ACTIVE_WORK_PATH: docs/governance/downloader/ACTIVE_WORK.md
+AREA_HINTS:
+- General video downloads.
+- Download job queues and concurrency control.
+- HLS downloads and MP4 remux/conversion.
+- Download retries and resume behavior.
+- Local storage capacity management.
+- NAS final-file transfer and storage.
+- Non-subtitle download UI and APIs.
+- Non-subtitle Discovery functions.
+- Other general Downloader functions not assigned to another registered workstream.
+- Stage11 subtitle work stays in Stage11 even when its files are at the repository root.
+- If another independent workstream is registered later, its contract governs the work assigned to it.
+- Classify by purpose and actual affected files/resources; do not route by file location alone.

@@ -1,51 +1,40 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: GOV-004
-STATUS: IN_PROGRESS
+TASK_ID: NONE
+STATUS: INACTIVE
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: governance
 
 ## OBJECTIVE
 
-Register and approve the independently scoped non-subtitle Downloader workstream in the canonical routing registry, while preserving the completed GOV-001, GOV-002, and GOV-003 history and the active Stage11 task.
+No governance task is currently active. GOV-001, GOV-002, GOV-003, and GOV-004 are completed; INACTIVE means there is no current approved governance task and does not withdraw the common project contract.
 
 ## APPROVED_SCOPE
 
-- Review and apply the user-reviewed Downloader workstream candidate.
-- Approve the Downloader PROJECT_CONTRACT v1.0.0, including globally serial MP4 remux/conversion: one job at a time, independently of configured download concurrency; changing this policy requires explicit user approval.
-- Add the Downloader route and inactive Downloader ACTIVE_WORK record.
-- Run governance structure checks, smoke checks, and the specified authorization-denial checks.
-- Record GOV-004 registration and closure in the existing canonical handoff, then restore Governance to INACTIVE / NONE.
-- Apply only approved governance/Downloader registration documents to canonical `teddy-subtitle-stage11` after remote-head checks and verify remote readback.
+- No governance task scope is currently authorized.
+- Future governance changes require a separate user-approved task with explicit scope and acceptance criteria.
 
 ## PROHIBITED_SCOPE
 
-- Do not modify Downloader product code or operational configuration.
-- Do not alter Stage11 code, contract, ACTIVE_WORK, artifacts, model environment, or S11-WX011 state.
-- Do not restart services, retry downloads, convert MP4 files, move or delete download data, write to NAS/Jellyfin, change Proxmox, or deploy.
-- Do not change the common project contract, governance enforcement, or any unrelated workstream contract.
-- Do not reuse or rewrite the completed GOV-001, GOV-002, or GOV-003 history.
-- Do not activate DL-001 or infer implementation authorization from this registration.
+- Do not treat GOV-001, GOV-002, GOV-003, or GOV-004 completion as authorization for another task.
+- Do not change approved contracts, register workstreams, or alter governance enforcement without explicit user approval.
 
 ## ACCEPTANCE_CRITERIA
 
-- GOV-004 is registered as `IN_PROGRESS` in both the Governance router and Governance ACTIVE_WORK before downstream registration changes.
-- Governance task preflight for GOV-004 passes before contract or Downloader route changes.
-- Downloader contract is v1.0.0 / APPROVED and states global one-at-a-time MP4 remux/conversion separately from download concurrency.
-- Downloader router and ACTIVE_WORK both end at INACTIVE / NONE; Stage11 remains IN_PROGRESS / S11-WX011 unchanged.
-- All-workstreams structure validation, governance smoke, `git diff --check`, Stage11 task preflight, and DL-001 denial pass.
-- Only authorized governance/Downloader registration documents change; canonical remote readback confirms the final states.
-- GOV-004 is closed with Governance restored to INACTIVE / NONE, and its evidence is recorded in the handoff.
+- Preflight rejects every requested task ID while Governance is INACTIVE and TASK_ID is NONE.
+- A future governance task may run only after the user approves and records its task ID, scope, and acceptance criteria.
 
 ## EVIDENCE
 
-- User approved this registration and contract approval under GOV-004 on 2026-10-17; product implementation, operational recovery, and deployment remain excluded.
-- Base canonical `teddy-subtitle-stage11` SHA: `45981e12f405e56498fc72f3f2d6ddc9cc740e0d`; latest fetched remote SHA matched this base before worktree creation.
-- GOV-004 did not appear in the inspected current router, active-work records, handoff, or reachable Git commit subjects before registration.
-- GOV-003 remains the completed 2026-10-16 Stage11 contract state-paragraph alignment task; GOV-001 and GOV-002 history is unchanged.
-- The user-reviewed local candidate is preserved at `/tmp/downloader-registration-candidate-20261017`; this task uses a separate clean worktree.
+- GOV-001 candidate was applied to the canonical branch and the approved common/domain contracts were recorded under GOV-002; prior handoff history is preserved.
+- GOV-003 completed the 2026-10-16 Stage11 contract state-paragraph alignment. Its ID and history were preserved and not reused.
+- GOV-004 was user-approved on 2026-10-17. Its registration commit `d64da2011c33b2b1f7f9c9d46355145025dbb278` was read back from canonical `teddy-subtitle-stage11` before applying the approved Downloader contract and route.
+- Downloader v1.0.0 is APPROVED, with globally serialized MP4 remux/conversion independent of download concurrency; Downloader remains INACTIVE / NONE.
+- Final structural validation passed: all-workstreams check, governance smoke 21/21, Stage11 S11-WX011 task preflight, and `git diff --check`. DL-001 preflight was rejected as expected while Downloader is INACTIVE / NONE.
+- Stage11 contract and ACTIVE_WORK remain unchanged at IN_PROGRESS / S11-WX011. GOV-001 through GOV-003 history is unchanged.
+- GOV-004 made no product or operational changes: no download retries, data deletions, service/Proxmox changes, NAS/Jellyfin writes, or deployment.
 
 ## NEXT_DECISION
 
-After GOV-004 registration is verified from canonical remote, apply the approved Downloader contract and inactive route, run final validation, close GOV-004, and verify the final remote readback. DL-001 requires a separate user-approved task and registration.
+The user separately approves and registers DL-001 before any Downloader implementation, operational recovery, retry, storage transfer, or cleanup begins.
