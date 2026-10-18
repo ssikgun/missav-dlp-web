@@ -1,41 +1,33 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: GOV-005
-STATUS: IN_PROGRESS
+TASK_ID: NONE
+STATUS: INACTIVE
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: governance
 
 ## OBJECTIVE
 
-Register the approved discovery-writer-safety workstream with a narrowly routed contract and inactive initial task state, then close GOV-005 and restore Governance to INACTIVE / NONE.
+No Governance task is active. GOV-005 completed the registration of the independent discovery-writer-safety workstream; DWS-001 remains inactive.
 
 ## APPROVED_SCOPE
 
-- Activate GOV-005 in Governance and validate its task registration.
-- Add the approved discovery-writer-safety v1.0.0 contract and an INACTIVE / NONE ACTIVE_WORK file.
-- Route only Discovery Writer Unix socket lifecycle and stale-socket safety to the new workstream; leave other non-subtitle Discovery in Downloader.
-- Preserve Downloader DL-001 and Stage11 S11-WX011 without editing their contracts or ACTIVE_WORK files.
-- Run the existing governance, Downloader, and Stage11 checks; record safe registration evidence in the canonical handoff.
-- Close GOV-005 after successful registration readback and restore Governance to INACTIVE / NONE.
+- No further Governance task is authorized while Governance is INACTIVE / NONE.
+- Preserve GOV-005 registration and closure evidence; future Governance work requires its own user-approved task.
 
 ## PROHIBITED_SCOPE
 
-- Do not modify product code, teddy_library_discovery_writer.py, Writer smoke tests, or the DL-001 implementation candidate.
-- Do not run socket-reproduction tests or build Docker images.
-- Do not change Downloader or Stage11 contracts, ACTIVE_WORK files, or task states.
-- Do not change production services, operational download jobs, NAS/Jellyfin data, or user files.
-- Do not activate DWS-001 as part of GOV-005.
+- Do not treat DL-001's Downloader authorization as authorization for Governance changes.
+- Do not modify product code, Writer smoke tests, Stage11, production services, operational download jobs, sockets, databases, NAS/Jellyfin data, or user files under this inactive record.
+- Do not activate DWS-001 without its own approved and registered task.
 
 ## ACCEPTANCE_CRITERIA
 
-- GOV-005 preflight passes before registration work; final Governance router and ACTIVE_WORK are INACTIVE / NONE with REQUIRES_WORKSTREAMS: governance.
-- The new route points to the new v1.0.0 APPROVED contract and INACTIVE / NONE ACTIVE_WORK file.
-- The new route covers only Writer Unix socket lifecycle/stale cleanup safety; all other non-subtitle Discovery remains in Downloader.
-- All-workstreams governance validation and smoke, Downloader DL-001 preflight, Stage11 S11-WX011 preflight, and git diff --check pass.
-- GOV-005 is rejected by Governance preflight after closure; DWS-001 is not runnable while the new workstream is INACTIVE / NONE.
-- Downloader DL-001 and Stage11 S11-WX011 remain unchanged; historical GOV-001 through GOV-004 evidence remains preserved.
-- Remote readback confirms registration and closure; no product or production changes occur.
+- Governance router and this file are INACTIVE / NONE with REQUIRES_WORKSTREAMS: governance.
+- Governance preflight rejects GOV-005 after closure.
+- The discovery-writer-safety workstream is registered with APPROVED v1.0.0 contract and INACTIVE / NONE task state.
+- Downloader remains IN_PROGRESS / DL-001 and Stage11 remains IN_PROGRESS / S11-WX011.
+- Historical GOV-001 through GOV-005 evidence is preserved.
 
 ## EVIDENCE
 
@@ -52,7 +44,10 @@ Register the approved discovery-writer-safety workstream with a narrowly routed 
 - Baseline checks at the approved base passed for all-workstreams structure, governance smoke (21/21), Downloader DL-001 preflight, and Stage11 S11-WX011 preflight. Governance GOV-005 preflight correctly failed before activation because Governance was INACTIVE / NONE.
 - After registering the inactive workstream candidate, the all-workstreams check, Governance GOV-005 preflight, Downloader DL-001 preflight, Stage11 S11-WX011 preflight, and governance smoke (21/21) passed. DWS-001 preflight correctly rejected the inactive workstream.
 - No product code, Writer smoke, DL-001 candidate, Stage11 files, or production resources are in GOV-005 scope.
+- Registration commit `33432e965292610e3cfe3f909438ec2fe5fe588b` was read back from canonical `teddy-subtitle-stage11`: discovery-writer-safety contract v1.0.0 APPROVED and ACTIVE_WORK INACTIVE / NONE. Its route is limited to Writer socket lifecycle/stale-socket safety; other non-subtitle Discovery remains Downloader-owned.
+- Final all-workstreams validation, governance smoke (21/21), Downloader DL-001 preflight, Stage11 S11-WX011 preflight, and `git diff --check` passed before closure. Governance GOV-005 and DWS-001 preflights both rejected their tasks after closure/inactive registration as expected.
+- GOV-005 closure restores Governance to INACTIVE / NONE. Downloader DL-001 and Stage11 S11-WX011 are preserved. No product code, Writer smoke, Docker, production service, socket, database, download, NAS/Jellyfin, or user data was changed.
 
 ## NEXT_DECISION
 
-After registration and closure are read back from the canonical remote, DWS-001 remains INACTIVE / NONE until separately activated and approved.
+No further Governance action is active. DWS-001 requires separate user-approved task activation before investigation or reproduction work begins.
