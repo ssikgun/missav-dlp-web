@@ -45,8 +45,20 @@ AREA_HINTS:
 - Local storage capacity management.
 - NAS final-file transfer and storage.
 - Non-subtitle download UI and APIs.
-- Non-subtitle Discovery functions.
+- Non-subtitle Discovery functions except Discovery Writer Unix socket lifecycle and stale-socket safety, which route to `discovery-writer-safety`.
 - Other general Downloader functions not assigned to another registered workstream.
 - Stage11 subtitle work stays in Stage11 even when its files are at the repository root.
 - If another independent workstream is registered later, its contract governs the work assigned to it.
 - Classify by purpose and actual affected files/resources; do not route by file location alone.
+
+## WORKSTREAM: discovery-writer-safety
+
+STATUS: INACTIVE
+TASK_ID: NONE
+CONTRACT_PATH: docs/governance/discovery-writer-safety/PROJECT_CONTRACT.md
+ACTIVE_WORK_PATH: docs/governance/discovery-writer-safety/ACTIVE_WORK.md
+AREA_HINTS:
+- Discovery Writer Unix socket lifecycle, including socket-path preparation and stale-socket cleanup.
+- Active socket protection, inode reuse, path-replacement races, process-wide socket lifetime serialization, and forced-termination/restart safety.
+- Isolated synthetic tests for the socket lifecycle and its protection boundaries.
+- General Discovery database behavior, download processing, MP4 conversion, NAS storage, and Stage11 subtitles remain outside this workstream.

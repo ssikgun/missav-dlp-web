@@ -39,7 +39,6 @@ Register the approved discovery-writer-safety workstream with a narrowly routed 
 
 ## EVIDENCE
 
-
 - GOV-001 candidate was applied to the canonical branch and the approved common/domain contracts were recorded under GOV-002; prior handoff history is preserved.
 - GOV-003 completed the 2026-10-16 Stage11 contract state-paragraph alignment. Its ID and history were preserved and not reused.
 - GOV-004 was user-approved on 2026-10-17. Its registration commit `d64da2011c33b2b1f7f9c9d46355145025dbb278` was read back from canonical `teddy-subtitle-stage11` before applying the approved Downloader contract and route.
@@ -49,7 +48,9 @@ Register the approved discovery-writer-safety workstream with a narrowly routed 
 - Shared preflight, all-workstreams structural validation, governance smoke (21/21), Stage11 S11-WX011 preflight, and `git diff --check` passed before shared registration was applied.
 - Governance participation was closed after shared registration readback. Downloader remains IN_PROGRESS / DL-001 with REQUIRES_WORKSTREAMS: downloader. No product code, operational files, services, real downloads, retries, NAS/Jellyfin data, or user files were changed.
 - User approved GOV-005 for registering discovery-writer-safety on 2026-10-19. Canonical base SHA: `30fb83e1c6b2a80eee67cef5bac8192bf6fa719b`.
+- The GOV-005 activation commit `68d25dc2626ea3edd687925dea85565102283fd7` was read back from canonical `teddy-subtitle-stage11` with Governance IN_PROGRESS / GOV-005 before adding the new workstream.
 - Baseline checks at the approved base passed for all-workstreams structure, governance smoke (21/21), Downloader DL-001 preflight, and Stage11 S11-WX011 preflight. Governance GOV-005 preflight correctly failed before activation because Governance was INACTIVE / NONE.
+- After registering the inactive workstream candidate, the all-workstreams check, Governance GOV-005 preflight, Downloader DL-001 preflight, Stage11 S11-WX011 preflight, and governance smoke (21/21) passed. DWS-001 preflight correctly rejected the inactive workstream.
 - No product code, Writer smoke, DL-001 candidate, Stage11 files, or production resources are in GOV-005 scope.
 
 ## NEXT_DECISION
