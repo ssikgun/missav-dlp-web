@@ -1,37 +1,33 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: DWS-001
-STATUS: IN_PROGRESS
+TASK_ID: NONE
+STATUS: INACTIVE
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance,discovery-writer-safety
+REQUIRES_WORKSTREAMS: governance
 
 ## OBJECTIVE
 
-Use temporary user-approved Governance participation to register DWS-001 as the same shared task ID in Governance and Discovery Writer Safety. Read back the exact registration on the canonical remote, then close Governance alone; DWS-001 stays active in its independent workstream.
+No Governance task is active. GOV-005 completed the independent discovery-writer-safety workstream registration; subsequent user-approved DWS-001 shared registration was read back and Governance-only closure completed. DWS-001 remains active solely in discovery-writer-safety.
 
 ## APPROVED_SCOPE
 
-- Change the workstream routing registry and both Governance and Discovery Writer Safety ACTIVE_WORK records for the shared DWS-001 registration.
-- Verify exact canonical remote readback with both workstreams IN_PROGRESS / DWS-001 and the complete REQUIRES_WORKSTREAMS: governance,discovery-writer-safety set.
-- After registration readback, restore Governance INACTIVE / NONE and leave Discovery Writer Safety IN_PROGRESS / DWS-001 under only its own workstream.
-- Preserve previous GOV-005 history, the approved v1.0.0 contracts, and existing DL-001 and S11-WX011 state.
-- Update the existing canonical handoff with important registration and closure evidence.
+- No further Governance task is authorized while Governance is INACTIVE / NONE.
+- Preserve GOV-005 registration and closure evidence; future Governance work requires its own user-approved task.
 
 ## PROHIBITED_SCOPE
 
-- No Writer product code, existing Writer smoke, synthetic socket reproduction, Docker build, or production deployment during shared registration.
-- No changes to DL-001, S11-WX011, their contracts, source files, or existing candidates.
-- No production socket probing/removal, Writer restart, downloads/retries/remux, operational files, service state, database, NAS/Jellyfin, or user-data changes.
-- No new Governance ID, no reuse of closed GOV IDs, and no Writer design or implementation authorization inferred from registration.
+- Do not treat DL-001's Downloader authorization as authorization for Governance changes.
+- Do not modify product code, Writer smoke tests, Stage11, production services, operational download jobs, sockets, databases, NAS/Jellyfin data, or user files under this inactive record.
+- Do not change or extend the separately approved DWS-001 task, its route, or any workstream contract under inactive Governance.
 
 ## ACCEPTANCE_CRITERIA
 
-- Canonical remote shows Governance and Discovery Writer Safety both IN_PROGRESS / DWS-001 with matching full REQUIRES_WORKSTREAMS in router and ACTIVE_WORK files.
-- Exact shared-registration remote readback precedes Governance closure.
-- Final state has Governance INACTIVE / NONE and Discovery Writer Safety IN_PROGRESS / DWS-001 with only discovery-writer-safety required.
-- Downloader DL-001, Stage11 S11-WX011, all approved contracts, product code and existing evidence remain unchanged.
-- The canonical handoff preserves both registration and closure evidence. Any unavailable runtime/structural check is reported as unverified.
+- Governance router and this file are INACTIVE / NONE with REQUIRES_WORKSTREAMS: governance.
+- Governance task preflight rejects the completed GOV-005 and closed shared DWS-001 Governance participation.
+- The discovery-writer-safety workstream has an APPROVED v1.0.0 contract and independently remains IN_PROGRESS / DWS-001 with REQUIRES_WORKSTREAMS: discovery-writer-safety.
+- Downloader remains IN_PROGRESS / DL-001 and Stage11 remains IN_PROGRESS / S11-WX011.
+- Historical GOV-001 through GOV-005 evidence is preserved.
 
 ## EVIDENCE
 
@@ -51,8 +47,8 @@ Use temporary user-approved Governance participation to register DWS-001 as the 
 - Registration commit `33432e965292610e3cfe3f909438ec2fe5fe588b` was read back from canonical `teddy-subtitle-stage11`: discovery-writer-safety contract v1.0.0 APPROVED and ACTIVE_WORK INACTIVE / NONE. Its route is limited to Writer socket lifecycle/stale-socket safety; other non-subtitle Discovery remains Downloader-owned.
 - Final all-workstreams validation, governance smoke (21/21), Downloader DL-001 preflight, Stage11 S11-WX011 preflight, and `git diff --check` passed before closure. Governance GOV-005 and DWS-001 preflights both rejected their tasks after closure/inactive registration as expected.
 - GOV-005 closure restores Governance to INACTIVE / NONE. Downloader DL-001 and Stage11 S11-WX011 are preserved. No product code, Writer smoke, Docker, production service, socket, database, download, NAS/Jellyfin, or user data was changed.
-- 2026-10-19: The user explicitly approved option A, using the same DWS-001 task ID shared by Governance and Discovery Writer Safety, registration remote readback, then Governance-only closure. Subsequent read-only Writer inspection and isolated synthetic Unix socket reproduction are approved solely under active DWS-001; no product or operational changes.
+- On 2026-10-19 the user explicitly approved shared DWS-001 registration with Governance and Discovery Writer Safety and Governance-only closure after exact remote readback. The canonical shared registration was verified at `383d96606f5c727f0cef23eee35fbe06fc37edba` with both workstreams IN_PROGRESS / DWS-001 and matching REQUIRES_WORKSTREAMS: governance,discovery-writer-safety. Governance was then closed to INACTIVE / NONE; DWS-001 remains active only in its independent workstream. DL-001 and S11-WX011 were preserved, with no product or operational changes.
 
 ## NEXT_DECISION
 
-Read back the shared registration from canonical GitHub, then close Governance only. Socket investigation may begin under DWS-001 only after that closure.
+No Governance task is active. DWS-001 is now authorized for read-only Writer source analysis and isolated synthetic socket reproduction in discovery-writer-safety only; further Governance work requires its own separately approved task.

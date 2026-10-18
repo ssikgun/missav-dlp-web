@@ -4,7 +4,7 @@ WORKSTREAM: discovery-writer-safety
 TASK_ID: DWS-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance,discovery-writer-safety
+REQUIRES_WORKSTREAMS: discovery-writer-safety
 
 ## OBJECTIVE
 
@@ -39,7 +39,8 @@ After shared registration readback and Governance closure, investigate the Disco
 - This workstream was registered under user-approved GOV-005 on 2026-10-19.
 - GOV-005 registers this workstream only; it does not activate DWS-001 or authorize product, socket, database, or production work.
 - 2026-10-19: User explicitly approved shared DWS-001 registration with Governance and Discovery Writer Safety, canonical remote readback, Governance-only closure, then read-only Writer analysis and isolated synthetic socket reproduction. Product and operational changes remain prohibited.
+- The user-approved shared DWS-001 registration commit `383d96606f5c727f0cef23eee35fbe06fc37edba` was read back from the canonical remote with matching Governance + Discovery Writer Safety task IDs and required-workstream sets. Governance participation then closed; DWS-001 remains IN_PROGRESS only under discovery-writer-safety, without any product-code, Writer-smoke, Docker or operational changes.
 
 ## NEXT_DECISION
 
-Complete exact shared registration readback and Governance-only closure, then start bounded read-only source inspection and isolated synthetic socket reproduction. Return design choices for user approval before any Writer implementation.
+Begin the authorized read-only Writer source inspection followed by bounded isolated synthetic Unix socket reproduction. Report actual versus hypothesized races and compare design candidates. Obtain separate explicit approval before any Writer product/smoke modification, Docker build, or operational action.
