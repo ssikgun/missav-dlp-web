@@ -56,6 +56,8 @@ Stabilize download and MP4 processing concurrency, safe behavior under storage p
 
 - 2026-10-19: CT108 read-only interpreter audit found only `/usr/bin/python3` among the five checked interpreter paths; Python version `3.13.5`, `yt_dlp=NO`, `flask=NO`, `curl_cffi=NO` in isolated `-I` import checks; `PYTHON_ENV_AUDIT=COMPLETE`. This is not an exhaustive scan of all machine environments. Canonical `Dockerfile` uses `python:3.10-slim` and `requirements.txt` includes `yt-dlp`, Flask, curl_cffi, typing_extensions and werkzeug. Previous MP4 smoke stopped at import with ModuleNotFoundError, not a functional test failure. Future testing must use a strictly isolated test-only interpreter/dependency environment and distinguish a host 3.13 smoke from a production Docker Python 3.10 build; do not alter system packages, operational containers, or user data.
 
+- 2026-10-19: User CT108 read-only environment-tool audit found `python3.10=/root/.local/bin/python3.10`, `docker=/usr/bin/docker`, `python3.11=NOT_FOUND`, `python3.12=NOT_FOUND`, `uv=NOT_FOUND`, `pip3=NOT_FOUND`. The *default* Python (previously confirmed 3.13.5) accepted `python3 -m venv --help` with `VENV_MODULE_RC=0`; this does NOT prove the Python 3.10 venv/ensurepip modules are present. `/usr/bin/python3` symlinks to python3.13. No installation, Docker build, or test was run. Next read-only check the discovered Python 3.10 `yt_dlp`, `flask`, `curl_cffi`, `venv` and `ensurepip` readiness, then use only a disposable test environment if further dependencies are required.
+
 ## NEXT_DECISION
 
 Review the implementation candidate and offline validation. Any production deployment, service change, retry/recovery of the four real jobs, NAS transfer, or data cleanup requires a separate explicit user approval.
