@@ -289,3 +289,43 @@ The existing `missav-dlp-web` container remains exited (137) with its pinned ima
 Operational files changed: `/etc/systemd/system/teddy-library-discovery-writer.socket`, `/etc/systemd/system/teddy-library-discovery-writer.service.d/30-systemd-socket-activation.conf`, and the socket enablement symlink. Current-state rollback snapshot: `/var/backups/dldws001-writer-final-retry-20261019` (root-owned mode 0700; file hashes and readback verified). The pre-existing rollback backup remains preserved.
 
 NEXT_DECISION: Stop after this Writer transition. Full Downloader application integration and Downloader container deployment remain outside this approval and require separate authorization.
+
+## SEPARATE APPROVED EXECUTION — isolated Downloader startup validation and minimum safety fix
+
+APPROVAL_DATE: 2026-10-19
+AUTHORIZATION: Explicit user approval in the DLDWS-001 isolated startup validation and minimum safety fix request.
+EXECUTION_STATUS: AUTHORIZED; no Downloader production deployment is authorized.
+
+This is a separate DLDWS-001 execution phase. It authorizes isolated startup validation against synthetic data and, only if a concrete safety hazard or untestable side effect is confirmed, a minimal fix in a new isolated candidate. It preserves the completed Writer transition result and its evidence. It does not authorize operating the existing Downloader container.
+
+### PINNED_INPUTS_AND_PRESERVATION
+
+- Canonical base: `teddy-subtitle-stage11` at `1a91f4a8ae5785c3a2636e2c481c6b9a670de749`; active shared task remains `DLDWS-001`, contract `1.0.0`, requires `downloader,discovery-writer-safety`.
+- Reuse only the existing integration image ID `sha256:c39ae7d47feddeb4c2df4bb6712eb5d61ffb59549c3c7f4ab26b19706d19a827`, tag `missav-dlp-web:dldws001-integration-20261019`, and its context/evidence at `/tmp/dldws001-integration-20261019`. Do not modify, rebuild, retag, or pull this image or context.
+- Preserve the production `missav-dlp-web` container and image, `/opt/missav-dlp-web/work`, task/settings files, `.parts`, Writer service/systemd configuration, protected DL-001/DWS-001 candidates, Stage11, NAS, and Jellyfin.
+- Create a new unique isolated candidate and synthetic test directory under `/tmp`; record source and output hashes. Do not copy production job names, URLs, secrets, DB state, or real fragments.
+
+### AUTHORIZED_SCOPE
+
+- Inspect the final runtime code in the pinned image and compare it with the integration context, accounting for Docker build-time patches.
+- Create only synthetic test data representing four error tasks at retry count 30, `auto_retry=true`, `auto_retry_max=30`, `max_concurrent=2`, synthetic task IDs, fake `.parts` directories, small synthetic TS fragments, and minimum settings.
+- Run the pinned image only in a disposable test container with no network, no published ports, no Writer socket/DB/NAS/download-data mounts, nonessential privileges removed, explicit resource and runtime limits, and writable paths restricted to the synthetic test directory. Verify process and temporary-resource cleanup.
+- Record startup state changes and side effects: task-state reads/writes, temp cleanup, download/retry workers, MP4 recovery, proxy refresh/external connection attempts, health availability, and synthetic fragment preservation. Distinguish expected file serialization from data loss.
+- Apply a minimal change only if the isolated evidence establishes a safety hazard or an untestable side effect. Make it in a separate candidate, preserve default normal startup/download/retry/MP4 behavior, and provide an explicit safe startup/health-only path if needed. Do not alter the pinned image or original integration candidate.
+- Run only relevant offline synthetic regressions against the final patched runtime. A separate test-only image layer is permitted; preserve the original integration image tag and ID. Report any gap between the test layer and deployable Dockerfile integration.
+
+### PROHIBITED_SCOPE
+
+- No start/restart/create/recreate of production `missav-dlp-web`; no production image deployment, build, pull, or Compose edit.
+- No mount, read, or write of production work data, `.tasks.json`, `.settings.json`, `.parts`, TS/MP4, operational DB, NAS, Jellyfin, Writer socket, or Stage11 data during isolated execution.
+- No production downloads, retries, recovery, MP4 work, Writer/systemd changes, protected-candidate changes, or product-code merge/push to the canonical branch.
+- Do not weaken, skip, delete, or bypass an existing safety test. If network isolation prevents startup, report the environment limitation rather than declaring a product defect.
+
+### ACCEPTANCE_AND_NEXT_DECISION
+
+- Preserve before/after synthetic task JSON and `.parts` evidence; identify each startup side effect and whether any synthetic data is altered or removed.
+- Confirm whether retries/download workers, MP4 recovery, proxy/network activity, and health start; bound conclusions to the tested image and environment.
+- If no fix is needed, preserve existing behavior and report `MINIMAL_FIX=NOT_NEEDED`. If a fix is made, show safe-mode behavior and relevant normal-mode regressions pass without changing normal startup semantics.
+- Production deployment remains unapproved and requires a separate user decision.
+
+NEXT_DECISION: Complete the isolated startup test only after this authorization is read back from the canonical branch; if container access or an acceptance condition is unavailable, stop and report the exact blocker without operating production resources.
