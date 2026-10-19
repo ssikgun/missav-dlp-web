@@ -1,0 +1,12 @@
+# DWS-001 review-only service drop-in; DO NOT install.
+# Clear service-owned directory to prevent cleanup of systemd-owned socket.
+[Unit]
+Requires=teddy-library-discovery-writer.socket
+After=teddy-library-discovery-writer.socket
+
+[Service]
+RuntimeDirectory=
+RuntimeDirectoryPreserve=no
+# INCOMPLETE: deployment must also override the existing 20-execstart
+# pinned-release command with a reviewed new release and --systemd-socket.
+# Existing security sandbox and database protections must remain intact.

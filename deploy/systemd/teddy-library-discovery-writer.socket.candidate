@@ -1,18 +1,21 @@
-# Candidate template only. NEVER install before approved deployment preflight.
-# SocketUser/SocketGroup MUST be set from the actual current service/client
-# identity and existing permissions before a deployable unit is prepared.
+# DWS-001 review-only socket template; DO NOT install or enable.
+# CT108 systemd 257.13 and existing group/path permissions verified read-only.
 [Unit]
-Description=Discovery Writer systemd-owned Unix listening socket (DWS-001 candidate)
+Description=Discovery Writer systemd-owned Unix socket (DWS-001 candidate)
 
 [Socket]
+# On cold boot, prepare a group-traversable directory BEFORE binding.
+ExecStartPre=/usr/bin/install -d -o root -g teddy-library-discovery-writer -m 0750 /run/teddy-library-discovery-writer
 ListenStream=/run/teddy-library-discovery-writer/writer.sock
 Service=teddy-library-discovery-writer.service
 Accept=no
 FileDescriptorName=writer
+SocketUser=root
+SocketGroup=teddy-library-discovery-writer
 SocketMode=0660
 DirectoryMode=0750
-# REVIEW_REQUIRED: SocketUser=...
-# REVIEW_REQUIRED: SocketGroup=...
+# Review stale-path failure behavior before deploy; no active-socket unlink.
+RemoveOnStop=no
 
 [Install]
 WantedBy=sockets.target

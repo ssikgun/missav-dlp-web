@@ -27,3 +27,11 @@ CT108, the DL-001 candidate, the Stage11 worktree, or operational data.
 
 Offline test (on an isolated fully checked out candidate):
 `python3 teddy_library_discovery_writer_socket_activation_smoke.py`
+
+## CT108 systemd 257.13 permissions/ownership candidate checkpoint
+
+- Verified from user-supplied read-only CT108 commands: systemd 257.13; service User=root, Group=teddy-library-discovery-writer, RuntimeDirectory=teddy-library-discovery-writer, RuntimeDirectoryMode=0750, RuntimeDirectoryPreserve=restart.
+- Actual parent path /run/teddy-library-discovery-writer is root:teddy-library-discovery-writer 0750; writer.sock is root:teddy-library-discovery-writer 0660.
+- The revised NON-INSTALLABLE socket template explicitly sets socket user/group, node and directory modes, and ExecStartPre=/usr/bin/install -d ... before ListenStream binds. This guards the cold-start parent group but is untested under PID1.
+- The accompanying NON-INSTALLABLE service drop-in candidate clears RuntimeDirectory and records socket ordering, protecting the directory from service-owned cleanup on stop. A later approval must safely change the pinned ExecStart to the validated release with --systemd-socket.
+- Socket unit stop/restart stale pathname, actual new parent ownership under PID1, final systemd-analyze verify, full smoke regression and any live migration are NOT VERIFIED; operation remains prohibited.
