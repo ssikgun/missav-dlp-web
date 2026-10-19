@@ -153,3 +153,46 @@ HEALTH_FRAME_COUNT: 1; protocol_version: 1; status: READY.
 EXISTING_CONTAINER: missav-dlp-web remained exited (137), unchanged.
 WRITER_STATE: service PID and socket path/inode/ownership/mode unchanged.
 WRITER_DEPLOYMENT: BLOCKED_PREFLIGHT; this probe does not authorize or resume production transition.
+
+## SEPARATE APPROVED EXECUTION — Writer socket-activation final production transition
+
+APPROVAL_DATE: 2026-10-19
+AUTHORIZATION: Explicit user authorization in the final DLDWS-001 Writer operations transition request.
+EXECUTION_STATUS: AUTHORIZED; preflight pending; no production operation has started.
+PRIOR_BLOCK_OVERRIDE: The user accepts the previously passed read-only host GID 988 health check and previously passed isolated Docker health probe as substitutes only for health through the exited missav-dlp-web client before transition. This does not waive any other required preflight or rollback check.
+
+This is a one-time DLDWS-001 Writer operations phase. The existing task remains active in Downloader and Discovery Writer Safety with contract version 1.0.0 and `REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety`. This approval supplements the earlier transition record; it does not erase its `BLOCKED_PREFLIGHT` evidence or authorize general Downloader validation.
+
+### PINNED_CANDIDATES
+
+- Writer package source: `/tmp/dldws001-writer-release-package-20261019`; verify all six manifest entries and their SHA-256 values. The entry-point SHA-256 is `709999d4c10701a284a9e96f7facdf3b41ac3179fd5bf944c6cb8bf400fbf83d`.
+- Immutable target release: `/opt/missav-dlp-web/teddy-library-discovery-writer/releases/sha256-709999d4c10701a284a9e96f7facdf3b41ac3179fd5bf944c6cb8bf400fbf83d/`. Do not overwrite an existing file or release; a mismatch blocks the transition.
+- systemd candidates: `/tmp/dldws001-systemd-ops-candidate-20261019/units/teddy-library-discovery-writer.socket` and `units/teddy-library-discovery-writer.service.d/30-systemd-socket-activation.conf` only. Their installation targets are `/etc/systemd/system/teddy-library-discovery-writer.socket` and `/etc/systemd/system/teddy-library-discovery-writer.service.d/30-systemd-socket-activation.conf`.
+- The existing `missav-dlp-web` container must remain exited and unchanged. It is not the Writer client-health test target and must never be started, restarted, replaced, or modified in this phase.
+
+### REQUIRED_PREFLIGHT_AND_BACKUP
+
+Before the first Writer service stop, verify all of the following: the existing Downloader container remains exited with the pinned local image; current Writer service health is READY; effective ExecStart, process identity, group, all drop-ins, enablement and active states; socket path and parent ownership, modes, and listener identity; no in-flight Writer request or work; all six package hashes; merged systemd candidate compatibility; and the previous release and rollback path. Reuse the earlier successful host and isolated Docker health results only for the direct existing-client health condition. The full application integration test remains NOT_RUN.
+
+Before stopping Writer, copy the exact existing unit/drop-in files and required prior-release references into a restricted operations backup location. Record hashes, ownership/modes, enabled/active states, prior ExecStart, and socket metadata. Read the backup back and verify the rollback commands and paths. If any item is missing, unreadable, or uncertain, do not stop Writer and report `BLOCKED_PREFLIGHT`.
+
+### AUTHORIZED_SCOPE
+
+- Stage only the six verified package files in the pinned immutable release path and verify the installed SHA-256 values.
+- After every preflight and backup check passes, stop the existing Writer service, confirm the old process and listener have exited, and inspect the exact existing socket pathname. Remove only that exact file if it is conclusively stale and no active listener exists. Never delete an active or uncertain socket.
+- Install only the two pinned systemd files, run static verification, perform `daemon-reload`, activate/listen on the socket unit, and start the Writer through the approved socket-activation configuration. Preserve the existing Writer service automatic-start policy.
+- Verify the running release SHA/path, `--systemd-socket`, socket FD name `writer`, `Accept=no`, service/socket active state, socket owner/group/mode, parent mode, local read-only Writer health, logs, and socket path stability.
+- After transition, run exactly one isolated Docker health probe using only image `sha256:da1e46073bb94b1f942b67b2fead20cc00656922b65f446ef7316b48d706aa0f`: `--rm`, `--network none`, `--read-only`, UID:GID `65534:65534`, supplementary GID `988`, all capabilities dropped, `no-new-privileges`, 128 MiB memory, 16 PIDs, 0.5 CPU, 15-second outer timeout, bytecode disabled, and only `/run/teddy-library-discovery-writer` mounted read-only. Override the entrypoint to `python`; never run the image's default bootstrap command. Send exactly one newline-terminated `{"protocol_version":1,"operation":"health"}` frame, accept only protocol version 1 and `READY`, and confirm `--rm` cleanup. No retry is authorized.
+- If any post-transition check fails, perform only the recorded rollback. If listener state or socket ownership is uncertain, do not unlink; report `BLOCKED_MANUAL_RECOVERY`.
+
+### PROHIBITED_SCOPE_AND_ACCEPTANCE
+
+- No starting, restarting, replacing, or modifying the existing `missav-dlp-web` container; no Downloader image deployment or build.
+- No download, retry, recovery, `.tasks.json`, `.parts`, TS/MP4, database, NAS/Jellyfin, Stage11, or existing DL-001/DWS-001 candidate changes.
+- No product code/test changes, unrelated service changes, or full Downloader application validation. Actual application integration remains `NOT_RUN` even if the isolated Docker health request passes.
+- This one-time approval overrides only the prior block on using the successful host and isolated Docker health evidence in place of direct health through the exited existing Downloader client, and the earlier prohibition on the exact Writer service/socket/systemd transition and one post-transition isolated Docker health probe defined above. All other boundaries remain in force.
+- Success requires all pinned files, preflight and backup checks, Writer/systemd/socket checks, local health, and the single post-transition isolated Docker health readback to pass. A successful Writer transition does not establish Downloader product or container health.
+
+## NEXT_DECISION
+
+Proceed only while both workstream copies contain this exact approval section and the full preflight plus verified rollback backup pass. On success, stop after reporting Writer results; keep the Downloader container exited and the full Downloader application integration explicitly NOT_RUN.
