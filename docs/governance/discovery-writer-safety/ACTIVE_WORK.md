@@ -340,3 +340,37 @@ OFFLINE_REGRESSION: PASS with evidence scope recorded. The test-only image's hea
 TEST_ONLY_IMAGE: `missav-dlp-web:dldws001-startup-guard-test-20261019`, `sha256:2d0ab22770d25652f30919c8f75e3a560958944391ab0b3b021091d8c361c944`. The original integration image remains `sha256:c39ae7d47feddeb4c2df4bb6712eb5d61ffb59549c3c7f4ab26b19706d19a827`; all 470 original context files still match the recorded audit.
 DEPLOYMENT_GATE: BLOCKED. The guard exists only in an isolated test-layer candidate and has not been integrated into the deployable Dockerfile. Production deployment remains unapproved.
 OPERATIONS: NONE. The production Downloader container remains exited (137); Writer service/configuration, download data, database, NAS/Jellyfin, and Stage11 were not changed.
+
+## SEPARATE APPROVED EXECUTION — deployable health-only integration and final offline regression
+
+APPROVAL_DATE: 2026-10-20
+AUTHORIZATION: Explicit user approval in the DLDWS-001 deployable health-only Docker integration and final regression request.
+EXECUTION_STATUS: AUTHORIZED, NOT_STARTED. Production Downloader deployment and operational changes are not authorized.
+SHARED_TASK: DLDWS-001
+REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
+CANONICAL_BASE: `teddy-subtitle-stage11` at `3f8a4499920e7bd6aa0014de60c10e8a82198063`.
+
+### AUTHORIZED_SCOPE
+
+- Create a new isolated candidate by hash-verifying and copying the preserved 470-file DL-001 integration context. Do not alter its original context, evidence, image tag, or image ID.
+- Integrate only the already-validated opt-in `TEDDY_STARTUP_MODE=health-only` changes to `app.py` and `teddy_bootstrap.py` and their minimal Dockerfile build-stage hook. Verify patch order so later Downloader/MP4 patches do not overwrite the guard. Keep unset/default mode behavior unchanged.
+- Build one new, uniquely tagged isolated Docker image; record inputs, final runtime source hashes, image ID, and build evidence.
+- Run final-image isolated synthetic health-only and normal-startup compatibility checks with network disabled, no published ports, no production/Writer/DB/NAS mounts, and bounded resources. Run the relevant DL-001 safety and MP4 regressions at their correct patch stages; report tests executed on the final image separately from reused historical evidence.
+- Preserve every test assertion. If a smoke helper cannot run against the final layer because it expects an earlier patch stage, report the limitation and its stage-correct alternative evidence without disabling or weakening the test.
+- Record the execution result in both affected ACTIVE_WORK files and the canonical handoff after validation.
+
+### PROHIBITED_SCOPE
+
+- No start/restart/recreate/replace of production `missav-dlp-web`; no Compose change, operational image replacement, or deployment.
+- No real downloads, retries, MP4 conversion, operational data/DB access, Writer service/socket/systemd changes, NAS/Jellyfin changes, or Stage11 changes.
+- Do not modify the original integration context/image/evidence, prior health-only candidate, protected DL-001/DWS-001 worktrees, or production data.
+- No weakening, skipping, deleting, or bypassing existing tests; no product-code merge/push to the canonical branch.
+
+### ACCEPTANCE_AND_NEXT_DECISION
+
+- Verify all copied source hashes against the preserved integration audit and verify the new final image contains the intended health-only runtime after the full patch chain.
+- Verify `/healthz` READY and byte-identical synthetic state in health-only mode; verify default mode retains normal startup and synthetic `.parts` preservation without running a download.
+- Report final-image MP4 regression and DL-001 safety regression separately, including exact test stage, results, or remaining incompleteness.
+- Production resources remain untouched. A successful candidate build does not authorize production deployment.
+
+NEXT_DECISION: Begin implementation only after this approval block is read back byte-for-byte from the canonical remote at the expected base SHA.
