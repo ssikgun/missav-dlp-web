@@ -243,7 +243,10 @@ def main():
         # A new AF_UNIX pathname may reuse the previous inode. Verify that a
         # socket was rebound; the health and replay assertions below verify
         # it is actually usable, independent of inode allocation.
-        assert stat.S_ISSOCK(sock_path.lstat().st_mode)
+        restarted_socket = sock_path.lstat()
+        assert stat.S_ISSOCK(restarted_socket.st_mode)
+        assert stat.S_IMODE(restarted_socket.st_mode) == 0o660
+        assert restarted_socket.st_uid == os.geteuid()
         thread2 = threading.Thread(target=server2.serve_forever, daemon=True); thread2.start()
         assert UnixSocketDiscoveryWriterClient(str(sock_path)).request("health")["status"] == "READY"
         assert database_restart_snapshot(f["db_path"]) == restart_db_before
@@ -324,7 +327,10 @@ def main():
         stale_server = _UnixServer(str(stale_path), f["writer"])
         # Inode values can be recycled; verify the socket pathname and
         # health endpoint, not a guaranteed identity inequality.
-        assert stat.S_ISSOCK(stale_path.lstat().st_mode)
+        rebound_socket = stale_path.lstat()
+        assert stat.S_ISSOCK(rebound_socket.st_mode)
+        assert stat.S_IMODE(rebound_socket.st_mode) == 0o660
+        assert rebound_socket.st_uid == os.geteuid()
         stale_thread = threading.Thread(target=stale_server.serve_forever, daemon=True); stale_thread.start()
         assert UnixSocketDiscoveryWriterClient(str(stale_path)).request("health")["status"] == "READY"
         stale_server.shutdown(); stale_server.server_close(); stale_thread.join(timeout=2)

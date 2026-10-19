@@ -53,3 +53,7 @@ Offline test (on an isolated fully checked out candidate):
 - Remote-only code review can confirm the intended source edit;
   Python syntax and execution regression remain `NOT_RUN` until a fresh
   SHA-pinned isolated worktree test on CT108.
+
+## 2026-10-19: Restore previous permission and ownership assertions
+
+CT108 user read-only comparison with the independent DL-001 candidate revealed the preceding DWS-001 test edit unintentionally removed the existing `0660` socket-mode and `os.geteuid()` owner checks in two legacy smoke cases. This isolated DWS-001 correction reinstates those exact checks while keeping the invalid inode-inequality assumptions removed. The active replacement rejection and direct connect/accept invariants remain unchanged. No changes to the DL-001 candidate or its build context, Stage11, deployed Writer, or production data. This revised commit requires a new SHA-pinned offline smoke run; earlier PASS does not certify the restored assertions.
