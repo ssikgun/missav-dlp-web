@@ -52,7 +52,7 @@ After exact remote registration readback, perform a read-only, SHA-pinned compar
 
 APPROVAL_DATE: 2026-10-19
 AUTHORIZATION: Explicit user approval in the DLDWS-001 Writer operations transition request.
-EXECUTION_STATUS: IN_PROGRESS; execution is gated on the read-only preflight and recoverable backup below.
+EXECUTION_STATUS: BLOCKED_PREFLIGHT; the existing missav-dlp-web client container is exited (137), so its approved client-health path is unavailable. No Writer operations were changed.
 
 This is a separately approved, one-time DLDWS-001 execution phase. It authorizes only transition of the Discovery Writer service to the exact socket-activation candidate and read-only client health validation. It does not authorize the Downloader Docker deployment or any download recovery.
 
@@ -80,4 +80,4 @@ Before stopping the service, verify and preserve: current service health; effect
 
 ## NEXT_DECISION
 
-Perform the required read-only preflight and create and verify the restricted rollback backup. Do not stop the Writer service until every preflight item and rollback path is confirmed; report `BLOCKED_PREFLIGHT` for any UNKNOWN or failed item.
+Resume only after separate explicit authorization makes the existing client-health path available for read-only validation. Then repeat the full preflight and verify the restricted rollback backup. Do not stop the Writer service until every preflight item and rollback path passes.
