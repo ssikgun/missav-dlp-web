@@ -240,7 +240,10 @@ def main():
         assert (sock_path.parent.stat().st_dev, sock_path.parent.stat().st_ino) == parent_identity_before
         assert not sock_path.exists()
         server2 = _UnixServer(str(sock_path), DiscoveryHoldingWriter(f["db_path"], str(f["provenance_path"])))
-        assert socket_identity(sock_path) != socket_identity_before
+        # A new AF_UNIX pathname may reuse the previous inode. Verify that a
+        # socket was rebound; the health and replay assertions below verify
+        # it is actually usable, independent of inode allocation.
+        assert stat.S_ISSOCK(sock_path.lstat().st_mode)
         thread2 = threading.Thread(target=server2.serve_forever, daemon=True); thread2.start()
         assert UnixSocketDiscoveryWriterClient(str(sock_path)).request("health")["status"] == "READY"
         assert database_restart_snapshot(f["db_path"]) == restart_db_before
@@ -314,13 +317,14 @@ def main():
         stale_path = unsafe / "stale.sock"
         stale = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         stale.bind(str(stale_path)); stale.close()
-        stale_identity = socket_identity(stale_path)
         parent_identity = (unsafe.stat().st_dev, unsafe.stat().st_ino)
         _prepare_socket_parent(str(stale_path))
         assert not stale_path.exists()
         assert (unsafe.stat().st_dev, unsafe.stat().st_ino) == parent_identity
         stale_server = _UnixServer(str(stale_path), f["writer"])
-        assert socket_identity(stale_path) != stale_identity
+        # Inode values can be recycled; verify the socket pathname and
+        # health endpoint, not a guaranteed identity inequality.
+        assert stat.S_ISSOCK(stale_path.lstat().st_mode)
         stale_thread = threading.Thread(target=stale_server.serve_forever, daemon=True); stale_thread.start()
         assert UnixSocketDiscoveryWriterClient(str(stale_path)).request("health")["status"] == "READY"
         stale_server.shutdown(); stale_server.server_close(); stale_thread.join(timeout=2)
@@ -367,7 +371,6 @@ def main():
         race_path = unsafe / "race.sock"
         stale = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         stale.bind(str(race_path)); stale.close()
-        stale_race_identity = socket_identity(race_path)
         replacement = []
         def replace_during_probe(path):
             Path(path).unlink()
@@ -380,8 +383,12 @@ def main():
                 lambda: _prepare_socket_parent(str(race_path)),
                 "replacement socket passed the identity recheck",
             )
+        # The replacement must remain an active, reachable socket even if
+        # its dev/inode tuple happens to match the stale socket's identity.
+        # expect_writer_unavailable() above must still fail if legacy
+        # cleanup unlinks an active replacement.
         replacement_identity = socket_identity(race_path)
-        assert replacement_identity != stale_race_identity
+        assert stat.S_ISSOCK(race_path.lstat().st_mode)
         probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); probe.settimeout(1)
         probe.connect(str(race_path)); accepted, _ = replacement[0].accept(); accepted.close(); probe.close()
         assert socket_identity(race_path) == replacement_identity

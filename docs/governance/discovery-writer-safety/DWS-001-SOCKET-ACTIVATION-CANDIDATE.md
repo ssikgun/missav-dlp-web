@@ -35,3 +35,21 @@ Offline test (on an isolated fully checked out candidate):
 - The revised NON-INSTALLABLE socket template explicitly sets socket user/group, node and directory modes, and ExecStartPre=/usr/bin/install -d ... before ListenStream binds. This guards the cold-start parent group but is untested under PID1.
 - The accompanying NON-INSTALLABLE service drop-in candidate clears RuntimeDirectory and records socket ordering, protecting the directory from service-owned cleanup on stop. A later approval must safely change the pinned ExecStart to the validated release with --systemd-socket.
 - Socket unit stop/restart stale pathname, actual new parent ownership under PID1, final systemd-analyze verify, full smoke regression and any live migration are NOT VERIFIED; operation remains prohibited.
+
+## DWS-001 legacy smoke inode-inequality correction (isolated candidate)
+
+- Three assertions that newly bound Unix sockets must have a different
+  `dev/inode` identity were removed because POSIX filesystems may reuse inodes.
+- Each affected case now requires an actual socket type. The associated
+  live health checks, database restart/replay invariants, active-socket
+  `expect_writer_unavailable` rejection, direct `connect()/accept()`
+  liveness check and replacement pathname identity preservation remain.
+- **Known legacy bug is NOT fixed or bypassed**: if the old direct-mode
+  cleanup unlinks a replacement listener on an identity collision, the
+  active-listener safety test still fails. The previous isolated
+  pre-unlink-delete and simulated identity-collision FAILs remain evidence.
+- The B-option systemd-owned listener path avoids Writer-side unlink;
+  this smoke change does not make unsafe direct mode production-approved.
+- Remote-only code review can confirm the intended source edit;
+  Python syntax and execution regression remain `NOT_RUN` until a fresh
+  SHA-pinned isolated worktree test on CT108.
