@@ -242,8 +242,8 @@ WRITER_DEPLOYMENT: ROLLED_BACK_UNCHANGED. This probe does not establish full Dow
 
 APPROVAL_DATE: 2026-10-19
 AUTHORIZATION: Explicit user approval in the DLDWS-001 Writer operations final one-time retry request.
-EXECUTION_STATUS: AUTHORIZED; preflight and publication pending; this retry has not changed operations.
-RETRY_LIMIT: Exactly one transition attempt. Preserve the prior transition failure and rollback, and the corrected Docker health PASS recorded above.
+EXECUTION_STATUS: PASS; the single authorized Writer transition and its one post-transition Docker health check passed.
+RETRY_LIMIT: Exactly one transition attempt; consumed. Preserve the prior transition failure and rollback, and the corrected Docker health PASS recorded above.
 
 This is a separately approved Writer-only operations attempt. It does not authorize Downloader container startup, deployment, rebuild, download work, database writes, or Stage11 changes. Publish this approval in both workstreams and verify exact remote readback before any Writer service stop.
 
@@ -278,3 +278,14 @@ This is a separately approved Writer-only operations attempt. It does not author
 - The passed isolated health request does not prove full Downloader application integration.
 
 This one-time approval overrides only the earlier block against retrying the exact Writer transition and its defined post-transition Docker health check. All other boundaries remain in force.
+
+### EXECUTION_RESULT
+
+WRITER_DEPLOYMENT: PASS. SYSTEMD_SOCKET: PASS. WRITER_HEALTH: READY. DOCKER_HEALTH: READY. ROLLBACK: NOT_NEEDED.
+FRAME_HEX: `7b2270726f746f636f6c5f76657273696f6e223a312c226f7065726174696f6e223a226865616c7468227d0a`; final byte 10; newline count 1. The previously validated source SHA-256 `b2fe18b32631e8b6f0ccc2e8026c29649c87d6e50b032253d7b58b29bceb12ee` was reused unchanged for the frame-only preflight and exactly one Docker `run`; response was protocol 1 READY and the temporary container was removed.
+WRITER_SHA256: `709999d4c10701a284a9e96f7facdf3b41ac3179fd5bf944c6cb8bf400fbf83d`. All six installed release files matched the package manifest; no recopy was needed.
+The service is active on the pinned `--systemd-socket` release; the socket unit is enabled and listening with `Accept=no`, `FileDescriptorName=writer`, and socket `root:teddy-library-discovery-writer` mode `0660`; parent directory is mode `0750`. Existing service enabled state remains enabled. No startup errors or path replacement markers were found.
+The existing `missav-dlp-web` container remains exited (137) with its pinned image. No download, database mutation, or Stage11 operation was performed. Full Downloader application integration remains NOT_RUN.
+Operational files changed: `/etc/systemd/system/teddy-library-discovery-writer.socket`, `/etc/systemd/system/teddy-library-discovery-writer.service.d/30-systemd-socket-activation.conf`, and the socket enablement symlink. Current-state rollback snapshot: `/var/backups/dldws001-writer-final-retry-20261019` (root-owned mode 0700; file hashes and readback verified). The pre-existing rollback backup remains preserved.
+
+NEXT_DECISION: Stop after this Writer transition. Full Downloader application integration and Downloader container deployment remain outside this approval and require separate authorization.
