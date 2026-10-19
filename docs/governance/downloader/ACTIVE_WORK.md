@@ -345,7 +345,7 @@ OPERATIONS: NONE. The production Downloader container remains exited (137); Writ
 
 APPROVAL_DATE: 2026-10-20
 AUTHORIZATION: Explicit user approval in the DLDWS-001 deployable health-only Docker integration and final regression request.
-EXECUTION_STATUS: AUTHORIZED, NOT_STARTED. Production Downloader deployment and operational changes are not authorized.
+EXECUTION_STATUS: COMPLETED; isolated build and final-image regression finished. Production Downloader deployment and operational changes remain unauthorized.
 SHARED_TASK: DLDWS-001
 REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
 CANONICAL_BASE: `teddy-subtitle-stage11` at `3f8a4499920e7bd6aa0014de60c10e8a82198063`.
@@ -373,4 +373,19 @@ CANONICAL_BASE: `teddy-subtitle-stage11` at `3f8a4499920e7bd6aa0014de60c10e8a821
 - Report final-image MP4 regression and DL-001 safety regression separately, including exact test stage, results, or remaining incompleteness.
 - Production resources remain untouched. A successful candidate build does not authorize production deployment.
 
-NEXT_DECISION: Begin implementation only after this approval block is read back byte-for-byte from the canonical remote at the expected base SHA.
+NEXT_DECISION: Review the isolated result and decide separately whether to approve an operating backup, rollback and deployment procedure for the exact tested image.
+
+### EXECUTION_RESULT — deployable health-only image (2026-10-20)
+
+CANONICAL_APPROVAL_READBACK: PASS; the separate approval was read back from the canonical branch in both ACTIVE_WORK files before implementation at commit f206ba0e52d8c7280bc5f63e0909aec4dde82553.
+DEPLOYABLE_IMAGE_BUILD: PASS; `missav-dlp-web:dldws001-deployable-startup-20261020`, image ID `sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573`.
+HEALTH_ONLY: PASS; final-image `/healthz` returned protocol 1 READY, and the synthetic task/settings/proxy/fragment manifest stayed byte-identical. No worker or proxy-pool startup marker appeared.
+NORMAL_STARTUP: PASS; final-image HTTP returned 200 with startup mode unset. The four capped synthetic errors retained their task meaning and all eight `.parts` fragments matched; `.tasks.json` bytes changed only through normal serialization. No retry or download ran. Network was disabled; normal startup's proxy refresh attempt could not access the network.
+MP4_REGRESSION: PASS; final-image smoke passed all 9 groups with a 256 MiB synthetic `/tmp`.
+DOWNLOAD_SAFETY_REGRESSION: PASS at Docker build stage 60/84, immediately after the DL-001 safety patch and before the MP4 patch, where the phase-sensitive existing smoke passed. The final post-patch image also passed the MP4 and final build verifiers; no assertion was removed or weakened.
+FINAL_IMAGE_INTEGRITY: PASS; exact build context had 472 files, all 470 source files match the preserved audit, and the only changed original file was Dockerfile. Final runtime source SHA-256: `app.py=5912b09955493ce74919eb0e017f9e09a842e88ef30c778c9bfeee7b73676287`, `teddy_bootstrap.py=0bddf29291379fa01b529429303460f85e7c863887d856e99502d5e2e3ae87d4`, `teddy_entrypoint.py=a538f2087ff6466d60ee750551605087932d041ae1667f11951875fb02022916`, `teddy_mp4_queue.py=85e8078c9aa6f27f3ceae13f9202617d14133fa83a1e3cf06687b558e13a1767`, `teddy_proxy_pool.py=9076e7b1ffd94f7868ea3b80aaa3c226233978d8566b7bcc70f7b4c2afcdf41e`.
+DOCKERFILE_REPRODUCIBILITY: NOT_DETERMINISTIC; floating base/uv tags, apt metadata, SpoofDPI main installer and lower-bound Python requirements can resolve differently later. The gate applies to this exact tested artifact; a later rebuild is not covered by these results.
+DEPLOYMENT_GATE: READY for this exact image only. The image remains isolated and has not been published or deployed.
+OPERATIONS: NONE. Production `missav-dlp-web` remains exited (137); no Compose, Writer, DB, download data, NAS/Jellyfin or Stage11 resource changed. Test containers and synthetic runtime fixtures were removed.
+
+NEXT_DECISION: Review a separate operating backup, rollback and deployment procedure for this exact image. Production deployment still requires its own approval.
