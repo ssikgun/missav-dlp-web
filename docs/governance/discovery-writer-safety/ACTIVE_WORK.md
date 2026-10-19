@@ -43,7 +43,7 @@ Share DLDWS-001 with Downloader to safely investigate the Writer socket smoke fa
 - Socket-unit static syntax verification passed for the recorded candidate, but full service/socket integration, clean-start directory ownership, and production suitability remain unverified. The Docker build and DL-001 integration remain NOT_RUN.
 - Registration preflight at base `34dede0af5bc205ff11af4275727e11627de680b` passed for the existing DWS-001 task.
 
-## NEXT_DECISION
+## PREVIOUS_STAGE_NEXT_DECISION
 
 After exact remote registration readback, perform a read-only, SHA-pinned comparison with the DL-001 smoke and produce the cross-workstream failure analysis. Request explicit execution authorization before changing or running Writer tests, product code, or a Docker build candidate.
 
@@ -78,6 +78,6 @@ Before stopping the service, verify and preserve: current service health; effect
 - This one-time approval overrides only earlier registration-phase prohibitions against the exact Writer service, socket, systemd, and read-only health actions listed above. It does not authorize Downloader container replacement/restart, downloads/retries/recovery, DB writes, changes to `.parts`, TS/MP4, NAS/Jellyfin, Stage11, existing DL-001/DWS-001 candidates, or unrelated product code; all other prior boundaries remain in force.
 - No Docker build or product Git merge is part of this operations transition.
 
-## NEXT_DECISION — Writer operations transition
+## NEXT_DECISION
 
 Perform the required read-only preflight and create and verify the restricted rollback backup. Do not stop the Writer service until every preflight item and rollback path is confirmed; report `BLOCKED_PREFLIGHT` for any UNKNOWN or failed item.
