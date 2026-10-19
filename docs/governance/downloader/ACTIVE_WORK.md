@@ -108,3 +108,38 @@ This separate approval authorizes creation and removal of exactly one temporary,
 - Treating this isolated probe as existing-client health or as clearance for Writer production deployment.
 
 This one-time approval overrides only prior prohibitions to the extent required for the single isolated Docker health probe above. All other boundaries remain in force.
+
+### PRIOR EXECUTION RESULT — first isolated Docker attempt
+
+RESULT: FAIL_BEFORE_REQUEST; HEALTH_RESPONSE: NOT_RUN.
+
+The single prior attempt exited with code 127 because the image did not contain /usr/bin/python3. The Python process never started, so no socket connection or health frame was sent. The --rm container was removed. The existing missav-dlp-web container remained exited (137), and the Writer service and socket metadata were unchanged.
+
+## SEPARATE APPROVED EXECUTION — one-time PATH-python Docker Writer health recheck
+
+APPROVAL_DATE: 2026-10-19
+AUTHORIZATION: Explicit user approval in the DLDWS-001 Docker Writer Health one-time recheck request.
+EXECUTION_STATUS: AUTHORIZED; result not yet established; Writer production transition remains BLOCKED_PREFLIGHT.
+REEXECUTION_COUNT: exactly one retry is authorized after the prior entrypoint failure.
+
+This authorization covers only one isolated Docker client run against the existing Writer socket. It does not authorize starting or changing the existing missav-dlp-web container, changing Writer operations, or resuming production transition.
+
+### AUTHORIZED_SCOPE
+
+- Use only the already-local image ID sha256:da1e46073bb94b1f942b67b2fead20cc00656922b65f446ef7316b48d706aa0f referenced by the existing missav-dlp-web container. Do not build or pull.
+- Before execution, confirm the existing container remains exited, the exact image ID and PATH, GroupAdd 988 and read-only Writer socket mount, Writer service/PID and health, socket metadata, and absence of a probe-name collision or leftover prior temporary container.
+- Run exactly one docker run --rm with network none, read-only root filesystem, UID:GID 65534:65534, supplementary GID 988, all capabilities dropped, no-new-privileges, 128 MiB memory, PIDs 16, CPU 0.5, and a 15-second total time limit.
+- Bind-mount only /run/teddy-library-discovery-writer at the same path read-only. Do not inherit the existing container's volumes or environment. Set PYTHONDONTWRITEBYTECODE=1.
+- Explicitly override the image entrypoint to python and the command to a Python standard-library -c program; do not execute the image's default CMD python teddy_bootstrap.py or import application/bootstrap code.
+- Send exactly one newline-terminated request: {"protocol_version":1,"operation":"health"}. Limit socket I/O to 5 seconds and response size to 4096 bytes. Accept only protocol_version 1 and status READY.
+- Do not issue preflight_holding, mark_absent, or any database mutation request. Rely on --rm and verify the temporary container is absent afterward; confirm the existing container and Writer service/socket state are unchanged.
+- If this single retry fails or cannot start, stop without another attempt. A successful isolated probe does not establish health through the existing missav-dlp-web container and does not clear WRITER_DEPLOYMENT=BLOCKED_PREFLIGHT.
+
+### PROHIBITED_SCOPE
+
+- Starting, restarting, replacing, or modifying the existing missav-dlp-web container.
+- Creating any additional container, building or pulling images, or changing Writer service/socket/systemd configuration.
+- Downloads, retries, recovery, database writes, file cleanup, NAS/Jellyfin, or Stage11 changes.
+- Treating this probe as production readiness or automatically resuming Writer transition.
+
+This approval overrides only prior prohibitions to the extent needed for the single PATH-python Docker health recheck. All other boundaries remain in force.
