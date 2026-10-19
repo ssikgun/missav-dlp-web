@@ -1,32 +1,35 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: NONE
-STATUS: INACTIVE
+TASK_ID: GOV-006
+STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: governance
 
 ## OBJECTIVE
 
-No Governance task is active. GOV-005 completed the independent discovery-writer-safety workstream registration; subsequent user-approved DWS-001 shared registration was read back and Governance-only closure completed. DWS-001 remains active solely in discovery-writer-safety.
+Activate GOV-006 as the Governance-only gate for a future DLDWS-001 shared registration covering DL-001 and DWS-001. This activation stage does not register DLDWS-001 or change either workstream's task.
 
 ## APPROVED_SCOPE
 
-- No further Governance task is authorized while Governance is INACTIVE / NONE.
-- Preserve GOV-005 registration and closure evidence; future Governance work requires its own user-approved task.
+- Activate GOV-006 in the Governance router and this active-work record only.
+- Preserve the approved common, Downloader, Discovery Writer Safety, and Stage11 contracts and the existing DL-001, DWS-001, and S11-WX011 task records and evidence.
+- Run the all-workstreams structural check, governance smoke, existing task preflights, GOV-006 preflight, and `git diff --check` on an isolated candidate branch.
+- Prepare and publish the candidate only after explicit user approval, all required checks, and a push-time remote SHA recheck; use normal fast-forward push only.
 
 ## PROHIBITED_SCOPE
 
-- Do not treat DL-001's Downloader authorization as authorization for Governance changes.
-- Do not modify product code, Writer smoke tests, Stage11, production services, operational download jobs, sockets, databases, NAS/Jellyfin data, or user files under this inactive record.
-- Do not change or extend the separately approved DWS-001 task, its route, or any workstream contract under inactive Governance.
+- Do not register DLDWS-001 in the router or either Downloader/Discovery Writer Safety active-work file in this stage.
+- Do not change the DL-001, DWS-001, or S11-WX011 task IDs, scopes, statuses, contracts, evidence, or next decisions.
+- Do not modify product code or tests, build Docker images, deploy or restart services, access or change operational downloads, sockets, databases, NAS/Jellyfin data, Stage11 data, or user files.
+- Do not force-push or push when the remote SHA differs from the verified base.
 
 ## ACCEPTANCE_CRITERIA
 
-- Governance router and this file are INACTIVE / NONE with REQUIRES_WORKSTREAMS: governance.
-- Governance task preflight rejects the completed GOV-005 and closed shared DWS-001 Governance participation.
-- The discovery-writer-safety workstream has an APPROVED v1.0.0 contract and independently remains IN_PROGRESS / DWS-001 with REQUIRES_WORKSTREAMS: discovery-writer-safety.
-- Downloader remains IN_PROGRESS / DL-001 and Stage11 remains IN_PROGRESS / S11-WX011.
+- Governance router and this file agree on IN_PROGRESS / GOV-006, CONTRACT_VERSION 1.0.0, and REQUIRES_WORKSTREAMS: governance.
+- Downloader remains IN_PROGRESS / DL-001 with REQUIRES_WORKSTREAMS: downloader; Discovery Writer Safety remains IN_PROGRESS / DWS-001 with REQUIRES_WORKSTREAMS: discovery-writer-safety; Stage11 remains IN_PROGRESS / S11-WX011.
+- All-workstreams structural validation, the governance smoke, the three existing task preflights, the GOV-006 preflight, and `git diff --check` pass.
+- DLDWS-001 remains unregistered and no product or operational change is made.
 - Historical GOV-001 through GOV-005 evidence is preserved.
 
 ## EVIDENCE
@@ -48,7 +51,8 @@ No Governance task is active. GOV-005 completed the independent discovery-writer
 - Final all-workstreams validation, governance smoke (21/21), Downloader DL-001 preflight, Stage11 S11-WX011 preflight, and `git diff --check` passed before closure. Governance GOV-005 and DWS-001 preflights both rejected their tasks after closure/inactive registration as expected.
 - GOV-005 closure restores Governance to INACTIVE / NONE. Downloader DL-001 and Stage11 S11-WX011 are preserved. No product code, Writer smoke, Docker, production service, socket, database, download, NAS/Jellyfin, or user data was changed.
 - On 2026-10-19 the user explicitly approved shared DWS-001 registration with Governance and Discovery Writer Safety and Governance-only closure after exact remote readback. The canonical shared registration was verified at `383d96606f5c727f0cef23eee35fbe06fc37edba` with both workstreams IN_PROGRESS / DWS-001 and matching REQUIRES_WORKSTREAMS: governance,discovery-writer-safety. Governance was then closed to INACTIVE / NONE; DWS-001 remains active only in its independent workstream. DL-001 and S11-WX011 were preserved, with no product or operational changes.
+- On 2026-10-19 the user approved GOV-006 activation as a Governance-only stage for a later DLDWS-001 shared registration, explicitly deferring that registration and all product changes. The verified base was `9773c64398f611f771203b2cdec9c0d56af9d4ce`; GitHub's read-only branch endpoint, local HEAD, and local `origin/teddy-subtitle-stage11` all reported that SHA. Baseline all-workstreams structure, DL-001, DWS-001, and S11-WX011 preflights passed; GOV-006 preflight correctly rejected Governance while it was INACTIVE / NONE; governance smoke passed 21/21.
 
 ## NEXT_DECISION
 
-No Governance task is active. DWS-001 is now authorized for read-only Writer source analysis and isolated synthetic socket reproduction in discovery-writer-safety only; further Governance work requires its own separately approved task.
+After publication and exact canonical readback, the DLDWS-001 shared-registration stage remains separate from this activation stage; preserve the current DL-001, DWS-001, and S11-WX011 records and do not start product or operational work.
