@@ -237,3 +237,44 @@ FRAME_PREFLIGHT: PASS. REQUEST_FRAME_HEX: `7b2270726f746f636f6c5f76657273696f6e2
 HOST_WRITER_HEALTH: READY. DOCKER_HEALTH: READY; exactly one `docker run` with the pinned image returned `{"protocol_version":1,"status":"READY"}`. TEMP_CONTAINER_CLEANUP: PASS.
 EXISTING_CONTAINER: `missav-dlp-web` remained exited (137) with the pinned image. WRITER PID 43713, socket path/inode/owner/group/mode, parent-directory metadata, and systemd socket-unit state were unchanged. No Writer transition was retried; no database-mutation request or download operation was sent.
 WRITER_DEPLOYMENT: ROLLED_BACK_UNCHANGED. This probe does not establish full Downloader application integration or authorize resuming the production transition.
+
+## SEPARATE APPROVED EXECUTION — final Writer operations transition retry (one time)
+
+APPROVAL_DATE: 2026-10-19
+AUTHORIZATION: Explicit user approval in the DLDWS-001 Writer operations final one-time retry request.
+EXECUTION_STATUS: AUTHORIZED; preflight and publication pending; this retry has not changed operations.
+RETRY_LIMIT: Exactly one transition attempt. Preserve the prior transition failure and rollback, and the corrected Docker health PASS recorded above.
+
+This is a separately approved Writer-only operations attempt. It does not authorize Downloader container startup, deployment, rebuild, download work, database writes, or Stage11 changes. Publish this approval in both workstreams and verify exact remote readback before any Writer service stop.
+
+### PINNED_CANDIDATES
+
+- Writer package: `/tmp/dldws001-writer-release-package-20261019`; entry-point SHA-256 `709999d4c10701a284a9e96f7facdf3b41ac3179fd5bf944c6cb8bf400fbf83d`. The six-file package manifest and installed immutable release must match exactly. Do not recopy matching files or overwrite any mismatch.
+- Installed release: `/opt/missav-dlp-web/teddy-library-discovery-writer/releases/sha256-709999d4c10701a284a9e96f7facdf3b41ac3179fd5bf944c6cb8bf400fbf83d/`.
+- systemd candidates: `/tmp/dldws001-systemd-ops-candidate-20261019/units/teddy-library-discovery-writer.socket` and `/tmp/dldws001-systemd-ops-candidate-20261019/units/teddy-library-discovery-writer.service.d/30-systemd-socket-activation.conf` only.
+- Docker health image: `sha256:da1e46073bb94b1f942b67b2fead20cc00656922b65f446ef7316b48d706aa0f`; the existing `missav-dlp-web` container must remain exited and unchanged.
+- Reuse only the previously passing Python source `/tmp/dldws001-health-client-20261019.py`, SHA-256 `b2fe18b32631e8b6f0ccc2e8026c29649c87d6e50b032253d7b58b29bceb12ee`, and the prior validated argument array recorded below. Do not rewrite its frame generation or build a shell-escaped substitute.
+
+### REQUIRED_PREFLIGHT_AND_BACKUP
+
+- Confirm current Writer service health, effective ExecStart, identity, drop-ins, enablement/active state, listener, socket and parent metadata, GID 988 access, absence of in-flight work, and unchanged exited Downloader container.
+- Verify all six package files and hashes against the manifest. If the immutable installed release already matches, leave it in place; a mismatch blocks without overwrite.
+- Verify the exact two systemd candidates and static syntax. Inspect and read back the existing rollback backup at `/var/backups/dldws001-writer-transition-20261019`; do not overwrite it.
+- Record the current live service/systemd/socket state in a new restricted, non-existing backup path if it differs from the existing rollback backup. Read back the copies, hashes, metadata, and restoration procedure. Do not stop Writer until rollback is verified.
+- Before stopping Writer, compile the pinned health source without socket I/O and assert the exact frame hex `7b2270726f746f636f6c5f76657273696f6e223a312c226f7065726174696f6e223a226865616c7468227d0a`, final byte 10, and one newline byte. Verify the probe container name is free and the exact image is local.
+
+### AUTHORIZED_SCOPE
+
+- After canonical approval readback and every preflight/backup check passes, perform exactly one transition using only the pinned package and two systemd files. Preserve existing service automatic-start policy. Never remove a socket with an active listener or uncertain identity.
+- Verify service health, running file SHA, `--systemd-socket`, active/listening socket unit, `FileDescriptorName=writer`, `Accept=no`, socket `root:teddy-library-discovery-writer` mode `0660`, and parent mode `0750`.
+- After those checks, run exactly one isolated Docker health probe using the pinned image and the unchanged source SHA above. Reuse this validated argument array: `timeout --signal=TERM --kill-after=1s 14s docker run --rm --name dldws001-health-newline-20261019 --network none --read-only --user 65534:65534 --group-add 988 --cap-drop ALL --security-opt no-new-privileges --memory 128m --memory-swap 128m --pids-limit 16 --cpus 0.5 --env PYTHONDONTWRITEBYTECODE=1 --mount type=bind,source=/run/teddy-library-discovery-writer,target=/run/teddy-library-discovery-writer,readonly --entrypoint python sha256:da1e46073bb94b1f942b67b2fead20cc00656922b65f446ef7316b48d706aa0f -c <the exact pinned source>`. The source sends one `sendall(payload)`, uses a five-second socket timeout and 4096-byte response limit, and accepts only protocol 1 READY. Verify automatic temporary-container cleanup.
+- If a post-transition check fails, use the verified current-state backup to perform the specified rollback once; never retry the transition. If socket state is uncertain, stop and report `BLOCKED_MANUAL_RECOVERY` without unlinking.
+
+### PROHIBITED_SCOPE
+
+- Do not start, restart, replace, or modify the existing `missav-dlp-web` container. No Docker image build, pull, or Downloader deployment.
+- No downloads, retries, recovery, `.tasks.json`, `.parts`, TS/MP4, database writes, NAS/Jellyfin, or Stage11 access/change.
+- No product code or test changes, no edits to protected DL-001/DWS-001 candidates, no unrelated service/systemd changes, and no second transition attempt.
+- The passed isolated health request does not prove full Downloader application integration.
+
+This one-time approval overrides only the earlier block against retrying the exact Writer transition and its defined post-transition Docker health check. All other boundaries remain in force.
