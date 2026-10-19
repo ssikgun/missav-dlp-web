@@ -209,7 +209,7 @@ The approved rollback stopped the candidate service and socket, verified that no
 
 APPROVAL_DATE: 2026-10-19
 AUTHORIZATION: Explicit user approval in the DLDWS-001 Docker Health newline-fix and one-time recheck request.
-EXECUTION_STATUS: AUTHORIZED; probe pending; Writer production transition remains rolled back and is not authorized to resume.
+EXECUTION_STATUS: PASS; the corrected frame preflight and single isolated Docker health probe passed; Writer production transition remains rolled back and is not authorized to resume.
 
 This is a separate, single read-only health probe against the existing Writer socket. It supplements the prior failed transition and successful rollback evidence without changing either result. It does not authorize another Writer transition attempt.
 
@@ -230,3 +230,10 @@ This is a separate, single read-only health probe against the existing Writer so
 - A successful health probe does not establish full Downloader application integration and does not authorize resuming Writer production transition.
 
 This approval overrides only prior prohibitions to the extent required for this single corrected isolated Docker health probe. All other boundaries remain in force.
+
+### EXECUTION_RESULT
+
+FRAME_PREFLIGHT: PASS. REQUEST_FRAME_HEX: `7b2270726f746f636f6c5f76657273696f6e223a312c226f7065726174696f6e223a226865616c7468227d0a`; final byte 10; newline count 1. Frame preflight made no socket connection.
+HOST_WRITER_HEALTH: READY. DOCKER_HEALTH: READY; exactly one `docker run` with the pinned image returned `{"protocol_version":1,"status":"READY"}`. TEMP_CONTAINER_CLEANUP: PASS.
+EXISTING_CONTAINER: `missav-dlp-web` remained exited (137) with the pinned image. WRITER PID 43713, socket path/inode/owner/group/mode, parent-directory metadata, and systemd socket-unit state were unchanged. No Writer transition was retried; no database-mutation request or download operation was sent.
+WRITER_DEPLOYMENT: ROLLED_BACK_UNCHANGED. This probe does not establish full Downloader application integration or authorize resuming the production transition.
