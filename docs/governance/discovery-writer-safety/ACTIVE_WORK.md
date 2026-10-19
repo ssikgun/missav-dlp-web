@@ -196,3 +196,37 @@ Before stopping Writer, copy the exact existing unit/drop-in files and required 
 ## NEXT_DECISION
 
 Proceed only while both workstream copies contain this exact approval section and the full preflight plus verified rollback backup pass. On success, stop after reporting Writer results; keep the Downloader container exited and the full Downloader application integration explicitly NOT_RUN.
+
+## PRIOR EXECUTION RESULT — Writer socket-activation final production transition (2026-10-19)
+
+RESULT: FAIL; SYSTEMD_SOCKET: PASS_DURING_ATTEMPT; WRITER_HEALTH: READY_DURING_ATTEMPT; DOCKER_HEALTH: FAIL; ROLLBACK: PASS.
+
+The candidate socket-activation service was started and passed its local Writer health and socket checks. The one post-transition isolated Docker probe sent an incorrectly escaped frame; the Writer returned `PROTOCOL_INVALID` before request dispatch. This was a probe framing failure, not evidence that the candidate health operation reached the database. The temporary Docker container was removed. The existing `missav-dlp-web` container remained exited (137) with image `sha256:da1e46073bb94b1f942b67b2fead20cc00656922b65f446ef7316b48d706aa0f`.
+
+The approved rollback stopped the candidate service and socket, verified that no listener remained and that the exact socket pathname was stale, removed only `/run/teddy-library-discovery-writer/writer.sock`, removed the candidate socket unit and service drop-in, and restored the prior direct-mode service configuration and enabled state. The prior Writer service was active again with local health READY; the socket-activation unit is not installed. The six-file candidate release remains staged at its pinned release path but is unused. The restricted rollback backup at `/var/backups/dldws001-writer-transition-20261019` was preserved and read back. No database write, download operation, or download-data change occurred.
+
+## SEPARATE APPROVED EXECUTION — corrected one-time Docker Writer health probe
+
+APPROVAL_DATE: 2026-10-19
+AUTHORIZATION: Explicit user approval in the DLDWS-001 Docker Health newline-fix and one-time recheck request.
+EXECUTION_STATUS: AUTHORIZED; probe pending; Writer production transition remains rolled back and is not authorized to resume.
+
+This is a separate, single read-only health probe against the existing Writer socket. It supplements the prior failed transition and successful rollback evidence without changing either result. It does not authorize another Writer transition attempt.
+
+### AUTHORIZED_SCOPE
+
+- Before execution, read-only verify the canonical task authorization, the existing `missav-dlp-web` container is still exited (137), the exact local image ID is `sha256:da1e46073bb94b1f942b67b2fead20cc00656922b65f446ef7316b48d706aa0f`, the old direct-mode Writer is active and health READY, the socket permissions permit supplementary GID 988, and no temporary probe container/name collision remains.
+- Generate the sole request payload using `json.dumps({"protocol_version": 1, "operation": "health"}, separators=(",", ":")).encode("utf-8") + bytes([10])`. Before any socket connection, verify exact payload bytes, final byte 10, and exactly one byte 10. Use the same Python source for local frame-only preflight and the Docker probe; the local preflight performs no socket I/O.
+- Run exactly one `docker run --rm` using only the exact already-local image ID above, with `--network none`, `--read-only`, UID:GID `65534:65534`, supplementary GID `988`, all capabilities dropped, `no-new-privileges`, 128 MiB memory, 16 PIDs, 0.5 CPU, 15-second outer timeout, and bytecode generation disabled. Bind-mount only `/run/teddy-library-discovery-writer` read-only at the same path.
+- Explicitly use `--entrypoint python` and only standard-library `-c` code. Do not run the image's default bootstrap command or copy the existing container's environment, volumes, or settings.
+- Send exactly one `sendall(payload)`, with a five-second socket I/O timeout and maximum response size 4096 bytes. Require a newline-terminated response with `protocol_version == 1` and `status == "READY"`. Do not retry on any failure.
+- Verify the temporary container is removed and the existing container, Writer PID, socket metadata, and systemd state remain unchanged after the probe.
+
+### PROHIBITED_SCOPE
+
+- No Writer service/socket/systemd changes or socket-activation transition retry.
+- No starting, restarting, replacing, or modifying the existing `missav-dlp-web` container; no Docker build or pull and no additional probe container.
+- No database mutation, downloads/retries/recovery, `.tasks.json`, `.parts`, TS/MP4, NAS/Jellyfin, or Stage11 changes.
+- A successful health probe does not establish full Downloader application integration and does not authorize resuming Writer production transition.
+
+This approval overrides only prior prohibitions to the extent required for this single corrected isolated Docker health probe. All other boundaries remain in force.
