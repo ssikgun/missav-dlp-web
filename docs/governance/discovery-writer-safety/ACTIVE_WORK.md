@@ -81,3 +81,30 @@ Before stopping the service, verify and preserve: current service health; effect
 ## NEXT_DECISION
 
 Resume only after separate explicit authorization makes the existing client-health path available for read-only validation. Then repeat the full preflight and verify the restricted rollback backup. Do not stop the Writer service until every preflight item and rollback path passes.
+
+## SEPARATE APPROVED EXECUTION — one-time isolated Docker Writer health probe
+
+APPROVAL_DATE: 2026-10-19
+AUTHORIZATION: Explicit user approval in the DLDWS-001 one-time isolated Docker Writer health probe request.
+EXECUTION_STATUS: AUTHORIZED; the separate Writer production transition remains BLOCKED_PREFLIGHT.
+
+This separate approval authorizes creation and removal of exactly one temporary, isolated Docker client container for exactly one read-only health request to the existing Writer socket. It does not authorize starting, restarting, or replacing the existing missav-dlp-web container, changing the Writer service or socket, or resuming the production transition.
+
+### AUTHORIZED_SCOPE
+
+- Before the probe, verify the existing missav-dlp-web container is still exited; record its exact image ID, Config.User, GroupAdd, and socket mount; verify that exact image is already local and has no unexpected declared VOLUME.
+- Verify the Writer service remains active and health-ready, the socket and parent directory ownership and modes, and that the unique probe container name is unused.
+- Use only the exact local image ID referenced by the existing exited container. Do not build or pull an image.
+- Run one docker run --rm temporary container with network disabled, a read-only root filesystem, UID:GID 65534:65534, supplementary GID 988, all capabilities dropped, no-new-privileges, 128 MiB memory, 16-process limit, 0.5 CPU limit, and a 15-second outer timeout.
+- Bind-mount only /run/teddy-library-discovery-writer into the same path as read-only. Do not copy the existing container's volumes or environment. Override its entrypoint and command to run only Python standard-library code with bytecode generation disabled.
+- Send exactly one newline-terminated request: {"protocol_version":1,"operation":"health"}. Bound connection/read time and response size. Accept only protocol_version 1 and status READY.
+- Do not issue preflight_holding, mark_absent, or any database mutation request. Remove the temporary container automatically and verify its removal and that existing operational resources remain unchanged.
+
+### PROHIBITED_SCOPE
+
+- Starting, restarting, or modifying the existing missav-dlp-web container.
+- Creating any additional container, building or pulling images, or changing Writer service/socket/systemd configuration.
+- Downloads, retries, recovery, database writes, changes to download files, NAS/Jellyfin, or Stage11.
+- Treating this isolated probe as existing-client health or as clearance for Writer production deployment.
+
+This one-time approval overrides only prior prohibitions to the extent required for the single isolated Docker health probe above. All other boundaries remain in force.
