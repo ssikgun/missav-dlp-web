@@ -58,6 +58,8 @@ Stabilize download and MP4 processing concurrency, safe behavior under storage p
 
 - 2026-10-19: User CT108 read-only environment-tool audit found `python3.10=/root/.local/bin/python3.10`, `docker=/usr/bin/docker`, `python3.11=NOT_FOUND`, `python3.12=NOT_FOUND`, `uv=NOT_FOUND`, `pip3=NOT_FOUND`. The *default* Python (previously confirmed 3.13.5) accepted `python3 -m venv --help` with `VENV_MODULE_RC=0`; this does NOT prove the Python 3.10 venv/ensurepip modules are present. `/usr/bin/python3` symlinks to python3.13. No installation, Docker build, or test was run. Next read-only check the discovered Python 3.10 `yt_dlp`, `flask`, `curl_cffi`, `venv` and `ensurepip` readiness, then use only a disposable test environment if further dependencies are required.
 
+- 2026-10-19: User's read-only CT108 Python 3.10 verification confirms `/root/.local/bin/python3.10` is version `3.10.22`, `venv=YES`, `ensurepip=YES`, `pip=YES` (pip 23.0.1), `PY310_VENV_RC=0`, while `yt_dlp=NO`, `flask=NO`, `curl_cffi=NO` using isolated `-I` import checks. This is a viable baseline for a new disposable, isolated Python 3.10 virtualenv without altering host packages or production containers; dependencies are NOT_INSTALLED and MP4/storage smokes remain NOT_RUN after prior missing-module error. Before installing only under /tmp, preflight adequate free space and integrity of checked-out requirements.txt; no Docker build or operational service/data action is authorized.
+
 ## NEXT_DECISION
 
 Review the implementation candidate and offline validation. Any production deployment, service change, retry/recovery of the four real jobs, NAS transfer, or data cleanup requires a separate explicit user approval.
