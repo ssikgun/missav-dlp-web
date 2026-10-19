@@ -4,7 +4,7 @@ WORKSTREAM: discovery-writer-safety
 TASK_ID: DLDWS-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
 ## OBJECTIVE
 
@@ -32,12 +32,13 @@ Share DLDWS-001 with Downloader to safely investigate the Writer socket smoke fa
 - Prior B-option evidence is retained with its exact candidate SHA; a scoped smoke PASS is never presented as complete production or cross-workstream safety.
 - The proposed isolated synthetic matrix retains active listener, replacement-before-unlink, ownership, mode, restart, and no-unlink checks without weakening prior coverage.
 - Unverified systemd lifecycle and deployment properties remain UNKNOWN until separately authorized and tested.
-- Governance, Downloader, and Discovery Writer Safety registration fields match exactly; Stage11 remains independent and unchanged.
+- After the separate Governance closure, Downloader and Discovery Writer Safety both show `IN_PROGRESS / DLDWS-001`, contract version `1.0.0`, and exactly `downloader,discovery-writer-safety` in `REQUIRES_WORKSTREAMS`; Stage11 remains independent and unchanged.
 
 ## EVIDENCE
 
 - The complete prior `DWS-001` active record, candidate history, and verification evidence are preserved byte-for-byte in `docs/governance/history/DLDWS-001-registration-base-34dede0/discovery-writer-safety-ACTIVE_WORK.md` (base blob `d1d6316280cac5b87ad3de4a0c4dfacf10298d91`).
 - The B-option candidate is `b0831048b3788b9a86a180f040b0152145a079c7`. User-provided isolated runs report syntax, legacy smoke, and socket-activation smoke PASS at that SHA. These are scoped offline results only.
+- The registration-phase commit `6014164c395be31fe4bb30c32062e1a3be08d37f` was read back with Governance, Downloader, and Discovery Writer Safety participating. After the separately verified Governance closure, this DLDWS-001 task requires only Downloader and Discovery Writer Safety.
 - Direct-mode pre-unlink replacement and simulated identity-collision evidence remain safety FAIL findings. Actual inode reuse was not observed in the recorded trials; its possibility remains distinct from the observed unsafe path replacement.
 - Socket-unit static syntax verification passed for the recorded candidate, but full service/socket integration, clean-start directory ownership, and production suitability remain unverified. The Docker build and DL-001 integration remain NOT_RUN.
 - Registration preflight at base `34dede0af5bc205ff11af4275727e11627de680b` passed for the existing DWS-001 task.
