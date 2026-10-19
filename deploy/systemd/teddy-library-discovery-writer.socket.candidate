@@ -1,0 +1,18 @@
+# Candidate template only. NEVER install before approved deployment preflight.
+# SocketUser/SocketGroup MUST be set from the actual current service/client
+# identity and existing permissions before a deployable unit is prepared.
+[Unit]
+Description=Discovery Writer systemd-owned Unix listening socket (DWS-001 candidate)
+
+[Socket]
+ListenStream=/run/teddy-library-discovery-writer/writer.sock
+Service=teddy-library-discovery-writer.service
+Accept=no
+FileDescriptorName=writer
+SocketMode=0660
+DirectoryMode=0750
+# REVIEW_REQUIRED: SocketUser=...
+# REVIEW_REQUIRED: SocketGroup=...
+
+[Install]
+WantedBy=sockets.target
