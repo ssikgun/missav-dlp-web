@@ -460,7 +460,7 @@ NEXT_DECISION: Select/approve an independent persistent backup target and decide
 
 APPROVAL_DATE: 2026-10-20
 AUTHORIZATION: Explicit user approval in the DLDWS-001 Synology NAS backup target verification and future container-ID decision request.
-EXECUTION_STATUS: APPROVED_PENDING_READ_ONLY_INSPECTION; no production backup or deployment is authorized in this phase.
+EXECUTION_STATUS: BLOCKED; no NAS target could be verified from CT108 and no Proxmox host inspection path was identified.
 SHARED_TASK: DLDWS-001
 REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
 WORKSTREAM_STATUS: IN_PROGRESS
@@ -494,3 +494,15 @@ This separate phase records the user's decision that Synology is the preferred f
 - If an eligible share is found, stop after recommending it. Actual backup and restore verification require a separate explicit execution approval.
 
 NEXT_DECISION: Complete the authorized read-only NAS mount and capacity inspection, publish the factual result in both workstream records and the canonical handoff, then stop before any backup or deployment.
+
+### EXECUTION_RESULT — Synology NAS read-only target check (2026-10-20)
+
+NAS_ACCESS: UNKNOWN. No NFS, NFS4, CIFS, or SMB3 mount or remote source was visible in CT108. The current LXC environment exposes no Proxmox management tools, configured SSH host alias, or Proxmox hostname mapping; no remote host connection was attempted.
+BACKUP_TARGET: BLOCKED. No existing Synology share or eligible backup directory could be identified. No directory was created and no write test was performed.
+FREE_SPACE: UNKNOWN for NAS. For comparison only, /opt/missav-dlp-web/work and /var/backups resolve to the same local /dev/loop4 ext4 filesystem; the latest read-only measurement showed 31,988,432,896 bytes available, below the 40 GB requirement.
+FREE_INODES: UNKNOWN for NAS. The same local source filesystem showed 6,128,302 free inodes; this is not a NAS target measurement.
+STORAGE_INDEPENDENCE: UNKNOWN. No NAS filesystem was visible to compare with the source; /var/backups is on the same filesystem as the source and is not an eligible destination.
+CONTAINER_ID_CHANGE: APPROVED_FOR_FUTURE_DEPLOYMENT only. No container operation was performed.
+PRODUCTION_BACKUP: NOT_RUN. PRODUCTION_DEPLOYMENT: NOT_RUN. OPERATIONS: NONE.
+
+NEXT_DECISION: Provide an authorized read-only Proxmox host access path or identify an existing Synology share already visible to CT108; then repeat only the read-only mount, capacity, inode, and independence checks. Any new mount requires separate authorization.

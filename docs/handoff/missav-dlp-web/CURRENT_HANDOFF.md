@@ -13087,3 +13087,16 @@ OPERATIONS: NONE. No production data, container, image, Compose, Writer, DB, NAS
 PLAN_ARTIFACT: `/tmp/dldws001-ops-plan-20261020/deployment-plan.md`; sanitized evidence: `/tmp/dldws001-ops-plan-20261020/evidence/read-only-preflight.json`.
 
 NEXT_DECISION: Select/approve an independent persistent backup target and decide whether losing the old container ID on Compose recreation is acceptable; only after those blockers are resolved request a separate actual-backup execution.
+
+## 2026-10-20 — DLDWS-001 Synology NAS backup target read-only check
+
+CANONICAL_APPROVAL_READBACK: PASS. The same one-time read-only NAS inspection approval and future Compose container-ID decision were recorded in both workstream ACTIVE_WORK files and read back from canonical commit d41f2f5f48a2bf5a384a8c90d38d1e3104251ac5. Both workstreams remain IN_PROGRESS / DLDWS-001, contract 1.0.0, requiring downloader,discovery-writer-safety.
+
+NAS_ACCESS: UNKNOWN. CT108 is an LXC environment named downloader. No NFS/NFS4/CIFS/SMB3 mount or recognized remote source was visible. The current environment has no Proxmox management tools, configured SSH host alias, or Proxmox hostname mapping; no remote host connection was attempted.
+BACKUP_TARGET: BLOCKED. No existing Synology share or eligible path could be identified. No directory was created and no write test was performed.
+CAPACITY: NAS free space and inode count are UNKNOWN. For comparison only, /opt/missav-dlp-web/work and /var/backups resolve to the same local /dev/loop4 ext4 filesystem. The latest read-only sample was 31,988,432,896 bytes available and 6,128,302 free inodes; the byte threshold is unmet and this filesystem is not independent.
+STORAGE_INDEPENDENCE: UNKNOWN for NAS; /var/backups is not independent.
+CONTAINER_ID_CHANGE: APPROVED_FOR_FUTURE_APPROVED_COMPOSE_DEPLOYMENT only; this is not current deployment authorization.
+PRODUCTION_BACKUP: NOT_RUN. PRODUCTION_DEPLOYMENT: NOT_RUN. OPERATIONS: NONE.
+
+NEXT_DECISION: Provide an authorized read-only Proxmox host access path or identify an existing Synology share already visible to CT108; then repeat only the read-only mount, capacity, inode, and independence checks. Any new mount requires separate authorization.
