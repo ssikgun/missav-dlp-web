@@ -858,3 +858,19 @@ Focused validation used an isolated synthetic filesystem/app and no production j
 Helper installation, live restart, Docker build/deploy, production download/retry, and canonical product-code merge were not run. The existing 4 production error jobs, 8,637 fragments, `max_concurrent=4`, Writer/Gluetun, NAS/Jellyfin and Stage11 remain outside this execution and unchanged.
 
 NEXT: Decide separately whether to authorize canonical publication of the remaining bulk-retry and SpoofDPI candidate changes; no helper installation or production deployment follows automatically.
+
+
+## SEPARATE APPROVED EXECUTION — Publish bulk retry and SpoofDPI (2026-10-20)
+
+USER_APPROVAL: The user explicitly approved publishing only the verified failed-download bulk retry UI/API and SpoofDPI early-exit diagnostics to the canonical branch. This approval supersedes the earlier prohibition on canonical product-code publication for these two functions only.
+CANONICAL_BASE: fd22b55e4ec2fd1bd4846c852d7b3577e97b2544
+CANDIDATE: /tmp/dldws001-ui-convenience-20261020, branch codex/dldws001-ui-convenience-20261020, HEAD 37cb16030930f7fe7edd7c8fa9423b4e0f90e9dc.
+TASK: DLDWS-001; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+APPROVED_SCOPE:
+- Publish the failed-download bulk retry UI/API, shared queue-admission locking and duplicate prevention, ENOSPC/inode fail-closed checks, and synthetic fragment preservation checks.
+- Publish bounded, redacted SpoofDPI early-exit diagnostics without changing its launch arguments or network route.
+- Include only the necessary Dockerfile/UI patch integration and focused tests.
+- Preserve existing Selkies restart behavior, individual download retry behavior, settings save behavior, and max_concurrent=4.
+PROHIBITED: Do not publish any Downloader server-restart UI/API, Docker restart helper, service/socket, privilege or management control path. Do not build/deploy images, restart or replace production containers, run downloads/retries, or change Writer, Gluetun, Stage11, NAS/Jellyfin, or operational data.
+VALIDATION: Reuse the recorded Flask route integration and Chromium 10-scenario evidence; run focused syntax, bulk retry/SpoofDPI smoke, final UI patch validation, and git diff --check for the exact selected publication set.
+EXECUTION_STATUS: AUTHORIZED; canonical code publication pending approval-record readback and focused prepublication validation.
