@@ -13216,3 +13216,37 @@ rollback-image.json:
 
 PLAN_ARTIFACT: /tmp/dldws001-compose-final-20261020-r1zmpp5n/execution-plan.md
 FINAL_EVIDENCE: /tmp/dldws001-compose-final-20261020-r1zmpp5n/verification-final.json
+
+
+## DLDWS-001 — production Downloader deployment completed (2026-10-20)
+
+Canonical deployment approval: f7b2a9020c3cbe0fa429ede4a3707936b6ac7514. Identical user-clarification/continuation approval: 8db43cd72dca47eb681df9dd76ced4fe59196dbb. Both exact GitHub readbacks passed before their respective operations. The following result supersedes the earlier read-only NOT_RUN phase only for this separately approved production execution; all prior results remain historical evidence.
+
+### FINAL EXECUTION RESULT — Downloader production deployment (2026-10-20)
+
+PRE_DEPLOY_GATE: PASS.
+BACKUP_RECHECK: PASS from fresh user-submitted pve evidence: HOST, DATA_5TB_MOUNT, BACKUP_ARCHIVE_READABLE, SOURCE_MANIFEST_SHA256 and PVE_BACKUP_RECHECK all PASS. Codex did not access pve or perform the host backup/restore. The prior 8640/8640 restoration and configuration checks were reused, not repeated.
+COMPOSE_RECHECK: PASS, including 36 original and immediate pre-deploy comparisons. Only the target image changed; all 31 service environment values, 14 mounts, port 58000:5000, Writer RO mount/GID 988, dependency, network/DNS, restart and security/resource settings matched. No secrets were printed or persisted.
+PRODUCTION_DEPLOYMENT: PASS. Exactly one service-only Compose up used --no-deps --pull never --no-build. No build, pull, retag, second deployment or dependency recreation.
+RUNNING_IMAGE: sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573.
+NEW_CONTAINER: 0ea7bb918b1b8095dabd93c70729c45bd5bbca7f857c788b4199bff32274ed28; running; RestartCount 0. The old exited object 880cf97a6a3dece8e5ea51def22900c3aa41c32c2b73ba8f098c3025d7e9d4ca was replaced as approved. Its exact old image remains local.
+CONTINUATION: The initial deployment checks passed, then a settings-hash change caused one precautionary stop. The user teddy confirmed their intentional max_concurrent 2-to-4 change and requested continuation. After identical canonical approval readback at 8db43cd72dca47eb681df9dd76ced4fe59196dbb and all fresh resume gates, the exact same new container was started once at 2026-10-20 04:57:33 UTC. No Compose command, image replacement or data restore was repeated. Same-container resume verification completed PASS at 04:58:10 UTC; final checkpoint PASS at 04:58:37 UTC.
+USER_SETTING: max_concurrent=4 preserved. The in-memory reversal of only this field exactly reproduced the old settings bytes/hash, proving no other saved setting changed. Codex did not rewrite settings. Live GET /api/settings confirmed 4, auto_retry=true and auto_retry_max=30. No state-changing HTTP request was observed after the resume.
+DOWNLOADER_HTTP: PASS. Host /login and authenticated application / returned HTTP 200; /api/tasks and /api/settings returned HTTP 200; /auth/check returned 204. The read-only maintenance probe used an ephemeral in-memory standard Flask session with existing protected credentials; live authentication guard unchanged, interactive login flow not tested. No app/bootstrap import was executed by the probe.
+JOB_STATE_PRESERVED: PASS. All four ENOSPC error tasks and retry counts [30,30,30,30] match persisted/API state. Task bytes and semantic content were unchanged. No pending/running task, retry-eligible error or queued MP4 recovery was present.
+FRAGMENTS_PRESERVED: PASS. Four task-linked .parts directories, 8637 files and 16996662891 bytes match full pre-deploy SHA-256 and metadata checks after the resume. This includes 8633 TS fragments and four known filelist.txt metadata files. Ownership/modes, directory metadata and other existing root entries match. No orphan .parts, loose temporary TS, unexpected download/retry/remux process or corresponding activity log was observed. At least 35 seconds of monitoring covered two retry-monitor periods.
+WRITER_APP_INTEGRATION: PASS strictly for the installed application UnixSocketDiscoveryWriterClient health path from the deployed container using its actual mount/environment/permissions; protocol_version=1 and status=READY. Downloader HTTP/task functionality was verified separately. Library mutation, discovery catalog workflows and full business integration were not exercised; no preflight_holding or mark_absent request was sent.
+RUNTIME_INTEGRITY: PASS; all six final application/bootstrap/entrypoint/MP4/proxy/Writer source hashes match the verified image evidence.
+ROLLBACK: NOT_NEEDED; zero rollback attempts. Old image/config/backup references remain preserved. Any later restore must account for the user-approved concurrency=4 rather than blindly overwriting it with the older backup value.
+REAL_DOWNLOAD_TEST: NOT_RUN. REAL_MP4_TEST: NOT_RUN. Existing four-error-job recovery and Stage11 subtitle quality are outside this PASS.
+OPERATIONAL_CHANGES: Only the Downloader container was recreated once, safely stopped once on the subsequently explained setting change, then the same object resumed once. Existing Compose/env/image files were not edited. Normal startup initialized the empty MP4 queue directory/lock and refreshed the proxy pool; no queue job, fragment loss or task mutation occurred. User teddy's settings write is explicitly preserved. Writer PID/socket metadata, Gluetun ID/PID/start state and all other container identities remained unchanged. Codex issued no DB writes, NAS/Jellyfin actions or Stage11 changes.
+REMAINING_WARNING: SpoofDPI startup failed and the successful proxy pool refresh reported failed speed measurement. These existing startup warnings did not prevent HTTP/jobs/Writer health or preservation checks; actual download/network behavior remains unverified. No unapproved fix or network/media test was attempted.
+DOCUMENT_VALIDATION_NOTE: The first governance check exposed repeated CONTRACT_VERSION field labels in execution history, including three inherited from earlier canonical phases. Their values all remained 1.0.0. Only those execution annotations were renamed EXECUTION_CONTRACT_VERSION, preserving the single authoritative header, contracts, task IDs, prior evidence and authorization meaning. Validation code and safety assertions were not changed.
+EVIDENCE_ROOT: /tmp/dldws001-deploy-gate-20261020-bw5kkspl; restricted local evidence, prior checkpoints/failures retained.
+RESUME_RESULT_SHA256: de3a33678055823a451886f80725d6fb9a887db5c16501bd25838c375e25660f (resume-result.json).
+FINAL_CHECKPOINT_SHA256: 1afda045ebddb619467d49bbad0728fd50dd98eff2f49d6c9583799142596bab (final-after-user-clarification.json).
+FULL_POST_RESUME_SOURCE_EVIDENCE_SHA256: bc81d19498dbf790c24509e833f18d8583bcbc331b8019cd198c2ef98e2e0f36 (resume-source-after.json; filenames represented only by digests).
+
+FINAL_NEXT_DECISION: This approved Downloader production transition phase is complete. A separate read-only investigation of the remaining SpoofDPI startup warning is the next proposed task. No download/recovery/MP4/NAS action is authorized by this result. DLDWS-001 remains registered IN_PROGRESS for separately approved follow-up; Governance remains INACTIVE/NONE and Stage11 S11-WX011 is unchanged.
+
+FINAL_DOCUMENT_CHECKS: PASS; all-workstream structure, shared DLDWS-001 preflight, unchanged S11-WX011 preflight, Governance smoke 21/21 and git diff --check. No router/contract/Stage11/validation-script change.
