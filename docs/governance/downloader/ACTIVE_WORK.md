@@ -617,7 +617,7 @@ NEXT_DECISION: User decision on production deployment of exact image sha256:8332
 
 APPROVAL_DATE: 2026-10-20
 AUTHORIZATION: Explicit final user approval in the DLDWS-001 one-time Downloader production deployment and safe rollback request.
-EXECUTION_STATUS: AUTHORIZED_PENDING_PREFLIGHT; no deployment attempt has been made.
+EXECUTION_STATUS: DEPLOYED_ONCE_SAFELY_STOPPED_PENDING_CONTINUATION; intentional user settings change confirmed.
 SHARED_TASK: DLDWS-001
 REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
 CONTRACT_VERSION: 1.0.0
@@ -645,3 +645,14 @@ OLD_IMAGE_ID: sha256:da1e46073bb94b1f942b67b2fead20cc00656922b65f446ef7316b48d70
 No download/retry/recovery trigger, forced job resume, real MP4/NAS transfer test, database direct write, fragment/task deletion, backup modification, Writer/systemd/socket change, Gluetun or other container change, NAS/Jellyfin/Stage11 change, protected candidate edit, image build/pull/retag/delete, repeated deployment/rollback or unrelated product/code change.
 
 NEXT_DECISION: Execute only after all mandatory gates pass. Missing fresh backup evidence or any other unknown prerequisite stops before deployment. Report real download/MP4 testing NOT_RUN regardless of deployment outcome.
+
+### USER CLARIFICATION — intentional max_concurrent change and continuation
+
+The user teddy explicitly confirmed that they changed max_concurrent from 2 to 4 and requested continuation. Preserve 4; do not restore 2. The application log records one non-loopback PUT /api/settings with HTTP 200 at 2026-10-20 04:49:54 UTC. Reversing only that field in memory with the existing serializer reproduces the exact prior settings SHA-256, proving all other saved settings are unchanged. No production setting was rewritten by Codex.
+
+The single Compose deployment had succeeded and the initial HTTP/job/Writer/source checks passed. A later settings-hash checkpoint caused a safety stop before this clarification. The existing candidate container 0ea7bb918b1b8095dabd93c70729c45bd5bbca7f857c788b4199bff32274ed28 is stopped on the approved new image.
+
+CONTINUATION_SCOPE: Under the user's request to continue with the intentional setting, start this exact already-deployed container once after verifying its unchanged identity/config, source and approved max_concurrent=4. This is a single resume of the same object; do not rerun Compose, recreate the container, change an image, restore settings/data, or trigger downloads. Repeat actual read-only post-start validation. The original conditional single rollback authority remains subject to safe-data and no-conflict checks.
+DEPLOYMENT_ATTEMPTS_USED: 1 of 1.
+RESUME_LIMIT: One necessary start of the same stopped candidate object; no automatic retry.
+ROLLBACK_ATTEMPTS_USED: 0 of 1.
