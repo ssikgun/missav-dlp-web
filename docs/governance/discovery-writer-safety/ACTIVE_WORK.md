@@ -566,3 +566,32 @@ PRODUCTION_DEPLOYMENT: NOT_RUN.
 OPERATIONS: NONE. No container, storage, source data, service, or deployment resource was changed.
 
 NEXT_DECISION: Rerun this approved backup-only phase from an authorized shell on the actual Proxmox host pve; first repeat every read-only preflight. Do not resume from Downloader LXC or guess a host route.
+
+## SEPARATE APPROVED EXECUTION — production Compose reproduction and rollback readiness
+
+APPROVAL_DATE: 2026-10-20
+AUTHORIZATION: Explicit user approval in the DLDWS-001 production Compose reproduction and final rollback readiness request.
+EXECUTION_STATUS: AUTHORIZED_READ_ONLY; production deployment remains unauthorized.
+SHARED_TASK: DLDWS-001
+REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
+CONTRACT_VERSION: 1.0.0
+CANONICAL_BASE: 1cc201361471de85769e008e9faf7c3ad83da010.
+
+### APPROVED_SCOPE_AND_ACCEPTANCE
+
+- After identical canonical approval readback, inspect the actual Downloader LXC container, the three existing Compose files in their original order, interpolation sources, local pinned images, and relevant configuration metadata.
+- Resolve Compose using sensitive values only in memory; never print or persist inspect environments, full resolved configuration, credentials, URLs, or secret values. Do not assume the Downloader container contains every interpolation input.
+- Validate a final image-only override for new image sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573 and rollback image sha256:da1e46073bb94b1f942b67b2fead20cc00656922b65f446ef7316b48d706aa0f. Compare all other service/project settings and effective container values.
+- Verify a reproducible configuration source and recovery route for the /tmp Compose override. Prepare isolated verification material and exact future deployment/rollback commands targeting only missav-dlp-web with no dependency recreation.
+- No container lifecycle command, image/tag/build/pull change, operational Compose/env write, data restore/write, download/retry/MP4 operation, Writer/Gluetun change, NAS/Jellyfin/Stage11 change, or protected-worktree modification is authorized.
+- Preserve history. Record results in both ACTIVE_WORK files and the existing handoff. Successful configuration validation does not authorize deployment or establish full application health.
+
+### USER_SUBMITTED_BACKUP_EVIDENCE
+
+DATA_BACKUP: PASS, based solely on the user's submitted Proxmox host execution results, not a Codex host verification.
+BACKUP_PATH: /mnt/pve/Data_5TB/dldws001-backups/backup-20261020-110732-TbdQOd.
+Reported results: BACKUP_ARCHIVE PASS; ARCHIVE_SAFETY PASS; RESTORE_CONTENT_HASHES 8640/8640; SOURCE_RECHECK PASS; RESTORE_METADATA PASS; CONFIG_BACKUP PASS; CONFIG_RESTORE PASS.
+SOURCE_MANIFEST_SHA256: 252491423da01d4f1eeabad3e7caeaeac3e8cb23b2eb46818aba91b7be178d16.
+Do not repeat these completed backup/restore tests. Reconfirm source/backup state immediately before any later approved deployment.
+
+NEXT_DECISION: Complete only the read-only Compose/interpolation/image-only override and rollback validation; actual deployment requires separate approval. Ordinary startup can save task state, start retry/MP4 recovery workers, clean temporary files, and refresh proxies; health-only READY does not verify production data or application integration.
