@@ -945,3 +945,13 @@ OPERATIONAL_RESOURCES_CHANGED=NONE_BY_THIS_EXECUTION.
 
 No Docker permission workaround, privilege escalation, service/configuration change, backup access, build, or deployment was attempted after the access denial. The production state and backup were not re-inspected because the required Docker API/CT108 preflight could not be completed. The deployment remains blocked until an authorized execution session can verify CT108 and access its Docker API without changing or bypassing permissions.
 NEXT: Resume the approved preflight from a verified CT108 session with its existing authorized Docker access; rerun the full read-only gates before any build or deployment.
+
+
+## SEPARATE APPROVED EXECUTION — Writer smoke inode reuse validation (2026-10-21)
+
+TASK_ID: DLDWS-001
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+USER_APPROVAL: Isolated modification and offline verification of teddy_library_discovery_writer_smoke.py only, based on c4c00605af6ea7ae9109a99ae39e8ecf76fd5c30. Replace inode-inequality assumptions with real socket type/mode, shutdown/cleanup, health, DB/replay and active-listener preservation evidence. Exercise replacement races, including reused/colliding identities, without weakening or skipping safety assertions. Preserve all prior evidence and protected candidates.
+BOUNDARY: Use a new isolated working tree, temporary synthetic sockets and databases, preferably Python 3.10. No production Writer code edits, canonical test-code publication, Docker build/deployment, service restart, operational socket/DB/data changes, Stage11 or NAS/Jellyfin work. Record any actual unsafe unlink as FAIL/BLOCKED; do not manufacture a pass.
+EXECUTION_STATUS: AUTHORIZED; implementation starts only after matching approval records are remotely read back.
