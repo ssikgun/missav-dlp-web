@@ -858,4 +858,3 @@ Focused validation used an isolated synthetic filesystem/app and no production j
 Helper installation, live restart, Docker build/deploy, production download/retry, and canonical product-code merge were not run. The existing 4 production error jobs, 8,637 fragments, `max_concurrent=4`, Writer/Gluetun, NAS/Jellyfin and Stage11 remain outside this execution and unchanged.
 
 NEXT: Decide separately whether to authorize canonical publication of the remaining bulk-retry and SpoofDPI candidate changes; no helper installation or production deployment follows automatically.
-
