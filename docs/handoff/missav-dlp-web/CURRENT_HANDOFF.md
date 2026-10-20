@@ -13250,3 +13250,45 @@ FULL_POST_RESUME_SOURCE_EVIDENCE_SHA256: bc81d19498dbf790c24509e833f18d8583bcbc3
 FINAL_NEXT_DECISION: This approved Downloader production transition phase is complete. A separate read-only investigation of the remaining SpoofDPI startup warning is the next proposed task. No download/recovery/MP4/NAS action is authorized by this result. DLDWS-001 remains registered IN_PROGRESS for separately approved follow-up; Governance remains INACTIVE/NONE and Stage11 S11-WX011 is unchanged.
 
 FINAL_DOCUMENT_CHECKS: PASS; all-workstream structure, shared DLDWS-001 preflight, unchanged S11-WX011 preflight, Governance smoke 21/21 and git diff --check. No router/contract/Stage11/validation-script change.
+
+
+## DLDWS-001 — read-only SpoofDPI/proxy warning investigation (2026-10-20)
+
+Canonical approval readback: 1fcb2306714c297149e4eaeba45211143b4ff0c1; identical scope in both workstreams, verified before operational inspection. Prior production deployment PASS remains unchanged.
+
+### EXECUTION_RESULT — read-only network warning investigation (2026-10-20)
+
+SPOOFDPI_ROOT_CAUSE: UNKNOWN. The failure stage is confirmed, but the reason for process termination cannot be recovered from the retained output.
+PROXY_SPEED_ROOT_CAUSE: CONFIRMED for the warning/selection condition; the underlying individual bandwidth-request exception category remains UNKNOWN.
+ERROR_RELATION: NOT_ESTABLISHED.
+DOWNLOAD_IMPACT: UNKNOWN for real downloads; static fallback and remaining working proxy inventory do not prove real-use success or a global download block.
+PRODUCTION_CONTAINER: UNCHANGED.
+DATA_PRESERVATION: NO_WRITES_BY_INVESTIGATION.
+PRODUCTION_DEPLOYMENT: NO_NEW_DEPLOYMENT.
+REAL_DOWNLOAD_TEST: NOT_RUN.
+
+#### SpoofDPI evidence and bounded impact
+
+- Existing Docker logs contain [System] SpoofDPI 가동 실패 at 2026-10-20T04:46:52.959857000Z and 04:57:35.770829000Z. The deployed app.py:124-142 spawns exactly [spoofdpi], waits two seconds and emits that message only when poll() is not None. This proves child termination by the poll, not a binary-not-found branch. The actual return code, termination signal and child diagnostic are UNKNOWN.
+- Binary /usr/local/bin/spoofdpi exists, executable mode 0755, uid/gid 501:50, ELF linux/amd64, SHA-256 73336b61fb2c4439352a19b2e397e956d3318a098cbc339207b5441198de93d0. Static Go build metadata reports github.com/xvzc/spoofdpi v1.5.5+dirty, revision 0b49eafe80fca3636fdf58a338b405f663c9c37d. The binary was read, never executed. The application process UID/GID is 0:0; no current SpoofDPI process or TCP 8080 listener exists. Current port state cannot establish whether there was a startup-time collision. No argument, config, port, network, Docker permission or version incompatibility is proven.
+- app.py:128-137 redirects stdout to PIPE and stderr to that same pipe, but never reads/forwards the pipe or records the return code. The deployed teddy_logging capture does not intercept subprocess pipes. Thus the existing generic message cannot identify DNS/TLS/listen/config/permission failure; no reproduction was attempted.
+- SpoofDPI is the optional local HTTP proxy leg for custom MissAV HTML extraction, expected on loopback port 8080. Normal startup attempts it regardless of spoofdpi_enabled; health-only suppresses the spawn. The setting controls the extraction proxy preference. app.py:241-258 tries local proxy then None with per-request error handling. Actual deployed teddy_entrypoint.py:389-403 uses that custom extractor. teddy_bootstrap.py wraps task requests with teddy_routing.request_route; teddy_routing.py:40-44 overrides explicit request proxies for selected public-proxy/VPN routes. Generic downloads and proxy-pool initialization do not require the SpoofDPI process. The missing local leg may reduce reachability for sites requiring it, but actual download impact is untested.
+
+#### Proxy measurement evidence and bounded impact
+
+- The two retained refresh-completion logs report 48 candidates -> 12 healthy at 04:47:23 UTC and 48 -> 7 healthy at 04:58:08 UTC, both with the speed warning. They are completion, not pool-initialization-failure logs. A single read-only local GET /api/proxy/status (existing snapshot-only handler) confirmed enabled=true, ready=true, refreshing=false, candidate_count=48, healthy_count=7, speed_tested_count=4, selected current_speed_bps=0 and current_learned_speed_bps=0. last_error is empty; all three feed sources report no error. No endpoint, exit IP, credential or raw error text was retained.
+- Therefore four retained proxies have successful bandwidth measurements: this is not total speed-test failure or a failed proxy pool. teddy_proxy_pool.py:375-383 decides the warning only from healthy[0].speed_bps, ignoring the successful measurements of other rows. snapshot():624 counts all positive measurements, explaining the apparent disagreement between the log and live state.
+- _measure_bandwidth():251-281 requires HTTP 200 and at least 256 KiB of the requested 512 KiB within timeout=10; it otherwise leaves speed_bps=0 and stores a truncated bandwidth_error on the in-memory row. Possible failures include HTTP status, short body and request exceptions, but no existing evidence identifies which of timeout/connect/DNS/TLS/auth/proxy-format categories occurred for the selected row. snapshot() does not expose bandwidth_error, refresh logs omit it, and _save():107-116 does not persist measurement rows. No measurement was rerun or process memory probed.
+- _rank_by_real_speed():318-338 intentionally keeps HTTPS-verified candidates even when benchmarking fails. _selection_key():303-315 substitutes max(1,1000000-latency_ms) when measured/learned speed is unavailable, then applies failure/success weights. It does not prioritize successful measurement as a separate tier. An unmeasured/failed row can therefore precede measured rows, as the current selected zero-speed row and four other positive measurements demonstrate. The log reports the selected row rather than aggregate measurement success.
+- ensure_ready():428-448 and current_proxy():546-555 use enabled/healthy inventory, not a positive speed requirement. A benchmark failure does not by itself disable the proxy download path. Actual site accessibility, throughput and correct best-proxy choice remain unverified; ranking behavior was not modified.
+- _check_proxy and _measure_bandwidth pass each candidate proxy explicitly, in independent worker threads without a SpoofDPI route context. SpoofDPI uses its separate child/local-listener path. No direct code or retained runtime evidence establishes a common failure cause; shared environmental causes cannot be ruled out.
+
+#### Preservation, next decision and evidence
+
+- Container 0ea7bb918b1b8095dabd93c70729c45bd5bbca7f857c788b4199bff32274ed28 remains running on sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573, same PID/start timestamp and RestartCount 0. User setting max_concurrent=4 was observed and not changed. Prior deployment, HTTP, job/fragment preservation and Writer-client health PASS remain historical results, not repeated tests in this investigation.
+- No lifecycle, SpoofDPI execution, proxy refresh/measurement, external network test, production data/DB write, Writer/Gluetun/NAS/Jellyfin/Stage11 change, or protected-worktree edit occurred. The one local snapshot GET caused no refresh and used an ephemeral in-memory standard Flask session; no app/bootstrap import or secret persistence. Production state/task/parts preservation tests were not rerun.
+- ONE_MINIMAL_FOLLOWUP_PROPOSAL: With separate approval, add only the child's return code and bounded, redacted child-output diagnostics to app.py:start_spoofdpi(), so the actual early-exit cause can be identified. Keep startup arguments, routing, proxy selection and normal behavior unchanged. This is a proposal only; no patch, deployment, restart or real-use test is authorized or performed here.
+- EVIDENCE_ROOT: /tmp/dldws001-network-warning-audit-20261020-a2i6tx4f (0700; files 0600). findings.json SHA-256: 8b8e0d3a0c2f9916e0b591a024b668c43efa720e70e6a63f845a6a4a23ad4cc1.
+- Deployed source SHA-256: app.py 5912b09955493ce74919eb0e017f9e09a842e88ef30c778c9bfeee7b73676287; teddy_proxy_pool.py 9076e7b1ffd94f7868ea3b80aaa3c226233978d8566b7bcc70f7b4c2afcdf41e; teddy_routing.py e1c0c63b4ac360d927873adc5fd5ea6ac4b23743eef4fb55c9d20802932f2254; teddy_bootstrap.py 0bddf29291379fa01b529429303460f85e7c863887d856e99502d5e2e3ae87d4; teddy_entrypoint.py a538f2087ff6466d60ee750551605087932d041ae1667f11951875fb02022916. Sources came from the running container filesystem without import, not assumed from canonical product code.
+
+NEXT_WARNING_DECISION: Read-only investigation complete. The only proposed next action is the separately approved minimal SpoofDPI diagnostic change above; no remediation or real-use test follows automatically.
