@@ -506,3 +506,63 @@ CONTAINER_ID_CHANGE: APPROVED_FOR_FUTURE_DEPLOYMENT only. No container operation
 PRODUCTION_BACKUP: NOT_RUN. PRODUCTION_DEPLOYMENT: NOT_RUN. OPERATIONS: NONE.
 
 NEXT_DECISION: Provide an authorized read-only Proxmox host access path or identify an existing Synology share already visible to CT108; then repeat only the read-only mount, capacity, inode, and independence checks. Any new mount requires separate authorization.
+
+## SEPARATE APPROVED EXECUTION — Proxmox Data_5TB production backup and restore verification
+
+APPROVAL_DATE: 2026-10-20
+AUTHORIZATION: Explicit user approval in the DLDWS-001 Proxmox 5TB HDD actual backup and restore verification request.
+EXECUTION_STATUS: BLOCKED_HOST_ACCESS; no production backup, archive verification, or restore command was run.
+SHARED_TASK: DLDWS-001
+REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
+WORKSTREAM_STATUS: IN_PROGRESS
+CONTRACT_VERSION: 1.0.0
+CANONICAL_BASE: teddy-subtitle-stage11 at f116284f90aa920f56fbb4abda7d3ab00e00b37b.
+
+The approved execution is limited to creating and verifying a backup of the Downloader work data on the separately attached Proxmox Data_5TB disk, then restoring it into a new temporary validation directory on that disk. The paired Discovery Writer Safety record documents the shared DLDWS-001 authorization only; it does not authorize Writer, socket, or systemd changes.
+
+### USER_PROVIDED_TARGETS — NOT REVERIFIED
+
+- Source: Data_2TB, /dev/nvme1n1p1, /mnt/pve/Data_2TB; CT108 path /opt/missav-dlp-web/work.
+- Destination: Data_5TB, /dev/sda1, ext4, /mnt/pve/Data_5TB, under /mnt/pve/Data_5TB/dldws001-backups/.
+- The stated approximately 2.9 TB free space and 151,919,155 free inodes are user-provided prior observations, not measurements from this execution.
+- The only permitted execution host is the actual Proxmox host pve. Downloader LXC is not a substitute. Do not guess an SSH target or alter/mount storage.
+
+### AUTHORIZED_SCOPE
+
+- Only from a confirmed pve host, perform the read-only preflight for CT108 identity, existing Docker container state, source stability, source and destination mounts/devices, free space/inodes, and backup-stream error propagation.
+- If every preflight passes, create one uniquely named root-owned mode-0700 backup run directory without overwriting existing files. Read source data through pct exec 108 or another verified read-only method; write only the approved backup and exact-run verification files under Data_5TB.
+- Preserve paths, contents, numeric ownership, permissions, available ACL/xattr and sparse-file metadata, and symlink identity without permitting archive path traversal. Capture pipeline errors, use a partial filename until success, and do not auto-retry or force-clean on failure.
+- Compare source state before and after, verify archive SHA-256, and restore the archive only to a new empty scratch directory in the same run area. Verify restored file contents, paths, counts, sizes, ownership/modes, and metadata.
+- Keep the verified archive. Remove only a verification directory created by this exact run if safe and needed; never remove any pre-existing file.
+- Record the final result in both ACTIVE_WORK files and the canonical handoff. Production restore and deployment remain unauthorized.
+
+### PROHIBITED_SCOPE
+
+- Do not run any backup or storage command from Downloader LXC or an unverified host. If the active host is not pve or access is unavailable, stop with BLOCKED_HOST_ACCESS.
+- No production container start, stop, restart, recreation, replacement, image or Compose change; no restore into the operational path.
+- No changes to source data, Docker/Compose, Writer/systemd/socket, DB, downloads/retries/MP4, NAS/Jellyfin, Stage11, other VM/LXC, or protected candidates.
+- No mount/unmount, LXC shutdown, system service interruption, automatic retry, overwrite, or cleanup outside the exact new verification directory.
+- Never publish task/settings contents, URLs, tokens, identifiers, or full source listings to GitHub or logs.
+
+### ACCEPTANCE_CRITERIA
+
+- The identical approval scope is present in both active workstreams and read back from the exact canonical commit before any operation.
+- PASS requires a stable source, a verified separate Data_5TB device with at least 40 GB and 20,000 free inodes, complete archive integrity, and a real restore comparison.
+- If host identity, source stability, device separation, metadata preservation, streaming errors, archive verification, or restore comparison is unknown or fails, stop without asserting backup readiness.
+- Report BACKUP_TARGET, SOURCE_STABILITY, PRODUCTION_BACKUP, ARCHIVE_INTEGRITY, RESTORE_VERIFICATION, DATA_PRESERVATION, and PRODUCTION_DEPLOYMENT separately.
+
+### EXECUTION_RESULT — host access preflight (2026-10-20)
+
+CANONICAL_BASE_CONFIRMED: f116284f90aa920f56fbb4abda7d3ab00e00b37b.
+CURRENT_EXECUTION_HOST: hostname downloader; systemd-detect-virt reports lxc; root filesystem is /dev/loop4 ext4. This is not Proxmox host pve.
+PVE_ACCESS: NOT_AVAILABLE_IN_CURRENT_CONTEXT. No pct or pvesh command, configured SSH host alias, or Proxmox hostname mapping is present. No remote connection was attempted and no storage path was accessed.
+SOURCE_STABILITY: UNKNOWN. The production container status and source write activity were not inspected from this non-pve context.
+BACKUP_TARGET: BLOCKED. Data_5TB mount, device, available space, free inodes, and separation from Data_2TB were not verified.
+PRODUCTION_BACKUP: NOT_RUN.
+ARCHIVE_INTEGRITY: NOT_RUN.
+RESTORE_VERIFICATION: NOT_RUN.
+DATA_PRESERVATION: UNKNOWN. No operational source or destination data was accessed.
+PRODUCTION_DEPLOYMENT: NOT_RUN.
+OPERATIONS: NONE. No container, storage, source data, service, or deployment resource was changed.
+
+NEXT_DECISION: Rerun this approved backup-only phase from an authorized shell on the actual Proxmox host pve; first repeat every read-only preflight. Do not resume from Downloader LXC or guess a host route.

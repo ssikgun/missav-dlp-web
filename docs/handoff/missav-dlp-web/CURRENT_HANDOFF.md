@@ -13100,3 +13100,15 @@ CONTAINER_ID_CHANGE: APPROVED_FOR_FUTURE_APPROVED_COMPOSE_DEPLOYMENT only; this 
 PRODUCTION_BACKUP: NOT_RUN. PRODUCTION_DEPLOYMENT: NOT_RUN. OPERATIONS: NONE.
 
 NEXT_DECISION: Provide an authorized read-only Proxmox host access path or identify an existing Synology share already visible to CT108; then repeat only the read-only mount, capacity, inode, and independence checks. Any new mount requires separate authorization.
+
+## 2026-10-20 — DLDWS-001 Proxmox Data_5TB backup and restore verification
+
+The user's backup-and-restore-only authorization was recorded in both DLDWS-001 ACTIVE_WORK files. The canonical baseline was f116284f90aa920f56fbb4abda7d3ab00e00b37b; approval publication/readback must be confirmed before any operation.
+
+RESULT: BLOCKED_HOST_ACCESS. The available execution environment reports hostname downloader, virtualization lxc, and root filesystem /dev/loop4 ext4, not Proxmox host pve. No pct/pvesh command, configured SSH alias, or Proxmox hostname mapping was available; no remote connection was attempted. No Data_5TB or operational data path was accessed.
+
+SOURCE_STABILITY: UNKNOWN. BACKUP_TARGET: BLOCKED. PRODUCTION_BACKUP: NOT_RUN. ARCHIVE_INTEGRITY: NOT_RUN. RESTORE_VERIFICATION: NOT_RUN. DATA_PRESERVATION: UNKNOWN. PRODUCTION_DEPLOYMENT: NOT_RUN. OPERATIONS: NONE.
+
+The Data_2TB/Data_5TB paths and capacity figures remain user-provided inputs, not measurements from this execution. No container, data, storage, service, or deployment resource changed.
+
+NEXT_DECISION: Rerun the approved read-only preflight and backup/restore verification from an authorized shell on actual Proxmox host pve. Do not use Downloader LXC as a substitute or guess an SSH target.
