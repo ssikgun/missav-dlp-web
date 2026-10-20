@@ -955,3 +955,39 @@ REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 USER_APPROVAL: Isolated modification and offline verification of teddy_library_discovery_writer_smoke.py only, based on c4c00605af6ea7ae9109a99ae39e8ecf76fd5c30. Replace inode-inequality assumptions with real socket type/mode, shutdown/cleanup, health, DB/replay and active-listener preservation evidence. Exercise replacement races, including reused/colliding identities, without weakening or skipping safety assertions. Preserve all prior evidence and protected candidates.
 BOUNDARY: Use a new isolated working tree, temporary synthetic sockets and databases, preferably Python 3.10. No production Writer code edits, canonical test-code publication, Docker build/deployment, service restart, operational socket/DB/data changes, Stage11 or NAS/Jellyfin work. Record any actual unsafe unlink as FAIL/BLOCKED; do not manufacture a pass.
 EXECUTION_STATUS: AUTHORIZED; implementation starts only after matching approval records are remotely read back.
+
+
+## SEPARATE APPROVED EXECUTION RESULT — Writer smoke inode reuse validation (2026-10-21)
+
+TASK_ID: DLDWS-001
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+WRITER_SMOKE_ROOT_CAUSE=CONFIRMED
+INODE_REUSE_ASSUMPTION=REMOVED
+ACTIVE_LISTENER_SAFETY=FAIL
+REPLACEMENT_RACE_SAFETY=FAIL
+STALE_SOCKET_RECOVERY=PASS
+WRITER_SMOKE=FAIL
+EXISTING_REGRESSIONS_BEFORE_COLLISION=PASS
+UNCHANGED_ACTIVE_LISTENER_GUARD=PASS
+UNSAFE_UNLINK_MUTATION_DETECTION=PASS
+PYTHON_SYNTAX=PASS
+GIT_DIFF_CHECK=PASS
+BUILD_FILESYSTEM_REPRODUCTION=INCOMPLETE
+PRODUCTION_WRITER_CODE=UNCHANGED
+DOCKER_IMAGE_BUILD=NOT_RUN
+PRODUCTION_DEPLOYMENT=NOT_RUN
+TEST_CODE_CANONICAL_PUBLICATION=NOT_RUN
+OPERATIONAL_RESOURCE_CHANGES=NONE
+
+CANDIDATE: /tmp/dldws001-writer-smoke-20261021, branch codex/dldws001-writer-smoke-20261021, base c4c00605af6ea7ae9109a99ae39e8ecf76fd5c30. Only teddy_library_discovery_writer_smoke.py is modified and uncommitted. Existing release worktree remains clean; protected candidates were not edited.
+
+ROOT CAUSE: The supplied CT108 build log fails at original line 243's inode-inequality assertion after the old pathname was removed and a new server bound. A new socket generation need not have a different identity tuple. The restart and stale-recovery checks now verify closed old FD/thread, cleanup and parent boundaries, real socket type/0660/UID/GID/listening FD/health, and the existing DB snapshot/ALREADY_RECONCILED checks. The race inequality was replaced with actual replacement bind/listen/READY, unchanged path/parent/metadata, post-cleanup health, no cleanup unlink and required fail-closed response.
+
+SAFETY FAILURE: Python 3.10.22 executed all existing protocol, DB/replay, restart, stale recovery, active-listener, wrong-type/symlink, ownership, probe-error, distinct replacement and parent-directory race assertions successfully. The added mandatory identity-collision race then FAILS: the replacement was listening and health READY before cleanup, but unchanged canonical _prepare_socket_parent performed one actual dir_fd-based unlink and removed the active listener's pathname while its FD was still listening. Only the identity-key function was aliased to model reuse; bind/listen/health, stat type/owner and unlink were real. A separate unsafe-unlink mutant that even returned WRITER_UNAVAILABLE was also detected. This full smoke failure is preserved; production code was not edited or mocked into a pass.
+
+ENVIRONMENT: The local baseline passed on tmpfs with Python 3.10.22; 32 physical unlink/rebind observations produced 0 equal identities. Docker's filesystem condition was not reproduced, and no Docker rebuild ran. The colliding-key case is deterministic synthetic evidence of the implementation defect, not a claim of locally observed physical inode reuse. The initial sandbox bind denial was recorded separately; socket-enabled isolated tests used temporary paths and synthetic DBs only. No production Writer safety conclusion is inferred for its separately deployed implementation.
+
+EVIDENCE: /tmp/dldws001-writer-smoke-evidence-20261021-8u4jd832/validation-summary.json (SHA-256 6ce9c4d503231c5fef864077da0b6cb83260a6ad76bb0d69d663fceb963b77f2); modified-python310-full.log (b8e69a40ca8e3e1407e7093cda88d68605b3e9a50368ba23ebc13592329686df); collision-mutation-controls.json (8becbb282dd6845b20ddbbb9fc0b3e23a0dc3a69c27fde244759f0697d662a84); comparison.md and writer-smoke.patch. Candidate smoke SHA-256: d1a20a2ad8435499914d5faf238a8f9da5a693b27c0304f40b22d92f854d34b4. Unchanged Writer source SHA-256: 8898087c4830a6e2729c5593377224a9cfa518147aa0ec40bdc554cba392410e. Supplied build log SHA-256: 525ea73e7df2f9f617a767cfffb92b8f9622edf85347dc3648b1868f12057b7a.
+
+NEXT: Obtain separate scope approval to fix or replace the canonical direct socket cleanup path so it refuses active replacement cleanup even when identity keys collide. Do not build/deploy or publish this failing test candidate automatically.
