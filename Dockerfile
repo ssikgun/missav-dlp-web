@@ -25,7 +25,8 @@ COPY . .
 
 # Source + patch scripts must all parse before any build-time mutation.
 RUN python -m py_compile \
-    app.py teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py teddy_subtitle_status.py \
+    app.py teddy_spoofdpi.py teddy_downloader_admin.py teddy_downloader_admin_smoke.py teddy_patch_downloader_admin.py \
+    teddy_entrypoint.py teddy_network.py teddy_vpn_health.py teddy_proxy_pool.py teddy_subtitle_status.py \
     teddy_routing.py teddy_duplicates.py teddy_ownership.py teddy_ownership_smoke.py teddy_logging.py teddy_storage.py teddy_browser_config.py teddy_auth.py \
     teddy_discovery_runtime.py teddy_discovery_download_api.py teddy_discovery_runtime_smoke.py teddy_library_api.py teddy_public_origin.py teddy_title_exclusion.py teddy_title_exclusion_smoke.py teddy_library_delete_dryrun.py teddy_library_delete_commit.py teddy_library_discovery_writer.py teddy_library_delete_activity.py teddy_library_delete_dryrun_smoke.py teddy_library_delete_commit_smoke.py teddy_library_discovery_writer_smoke.py teddy_library_delete_activity_smoke.py teddy_library_delete_jellyfin_smoke.py teddy_discovery_ui_shell_smoke.py teddy_library_ui_smoke.py teddy_file_management_navigation_smoke.py teddy_subtitle_status_ui_smoke.py teddy_discovery_download_api_smoke.py \
     deploy/stage13-f2m/reconcile_discovery_pending.py deploy/stage13-f2m/reconcile_discovery_pending_smoke.py \
@@ -109,6 +110,9 @@ RUN python teddy_patch_browser.py
 RUN python teddy_patch_split_storage.py
 RUN python teddy_patch_browser_runtime.py
 RUN python teddy_patch_auth.py
+RUN python teddy_patch_downloader_admin.py
+RUN python -m py_compile teddy_bootstrap.py teddy_downloader_admin.py teddy_spoofdpi.py
+RUN python teddy_downloader_admin_smoke.py
 RUN grep -Fq 'data-page="browser"' templates/index.html && \
     grep -Fq 'id="page-browser"' templates/index.html && \
     grep -Fq '/static/teddy-browser.css' templates/index.html && \
@@ -137,6 +141,12 @@ RUN grep -Fq 'rel="manifest" href="/static/teddy-manifest.webmanifest"' template
     grep -Fq '"display": "standalone"' templates/teddy-manifest.webmanifest && \
     test -s templates/teddy-icon-180.png && \
     test -s templates/teddy-icon.svg
+RUN grep -Fq 'id="retryFailedTasks"' templates/index.html && \
+    ! grep -Fq 'id="restartDownloader"' templates/index.html && \
+    ! grep -Fq 'restartDownloaderStatus' templates/index.html && \
+    ! grep -Fq '/api/downloader/restart' templates/teddy-reliability.js && \
+    grep -Fq '/static/teddy-reliability.js' templates/index.html && \
+    grep -Fq 'max-width: 720px' templates/index.html
 
 RUN python teddy_discovery_ui_shell_smoke.py templates/index.html templates/teddy-discovery.css templates/teddy-discovery.js
 RUN python teddy_library_ui_smoke.py
@@ -153,7 +163,7 @@ RUN grep -Fq "TEDDY_FINAL_DIR" teddy_storage.py && \
     grep -Fq "Final directory:" teddy_bootstrap.py
 
 RUN python -m py_compile \
-    teddy_bootstrap.py teddy_browser_config.py teddy_auth.py teddy_storage.py \
+    teddy_bootstrap.py teddy_browser_config.py teddy_auth.py teddy_downloader_admin.py teddy_spoofdpi.py teddy_storage.py \
     teddy_routing.py teddy_duplicates.py teddy_ownership.py teddy_ownership_smoke.py teddy_discovery_runtime.py teddy_discovery_download_api.py \
     teddy_generic.py teddy_123av.py teddy_entrypoint.py teddy_patch_pwa.py
 RUN python teddy_verify_build.py final

@@ -5,6 +5,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import app as core
+import teddy_downloader_admin
 
 
 SEGMENT_TIMEOUT_SECONDS = 45
@@ -282,15 +283,16 @@ def _install_routes():
 
     @core.app.route('/api/tasks/<task_id>/resume', methods=['POST'])
     def teddy_resume_task(task_id):
-        task = core.tasks.get(task_id)
-        if not task:
-            return core.jsonify({'status': 'error', 'message': '작업 없음'}), 404
-        if task.get('status') != '일시정지':
-            return core.jsonify({'status': 'error', 'message': '일시정지된 작업만 재개할 수 있습니다.'}), 400
-        task['status'] = '대기 중'
-        task['speed_bps'] = 0
-        core.save_tasks()
-        core.download_queue.put(task_id)
+        with core.queue_admission_lock:
+            task = core.tasks.get(task_id)
+            if not task:
+                return core.jsonify({'status': 'error', 'message': '작업 없음'}), 404
+            if task.get('status') != '일시정지':
+                return core.jsonify({'status': 'error', 'message': '일시정지된 작업만 재개할 수 있습니다.'}), 400
+            task['status'] = '대기 중'
+            task['speed_bps'] = 0
+            core.save_tasks()
+            core.download_queue.put(task_id)
         print(f"[Resume] 재개 큐 추가: {task.get('url')}", flush=True)
         return core.jsonify({'status': 'success', 'message': '재개 대기 중'})
 
@@ -326,24 +328,12 @@ def _install_routes():
         core.app.view_functions['delete_task'] = safe_delete_task
 
     def safe_retry_task(task_id):
-        task = core.tasks.get(task_id)
-        if not task:
-            return core.jsonify({'status': 'error', 'message': '작업 없음'}), 404
-        current = task.get('status', '')
-        if current in ('다운로드 중', '대기 중', '일시정지 요청 중'):
-            return core.jsonify({'status': 'error', 'message': '이미 진행 중인 작업'}), 400
-        if current == '일시정지':
-            return core.jsonify({'status': 'error', 'message': '일시정지 작업은 재개 버튼을 사용하세요.'}), 400
-        task['status'] = '대기 중'
-        task['speed_bps'] = 0
-        task['retries'] = 0
-        core.save_tasks()
-        core.download_queue.put(task_id)
-        print(f"[Retry] 재시도 큐 추가: {task.get('url')}", flush=True)
-        return core.jsonify({'status': 'success', 'message': '재시도 대기 중'})
+        body, status_code = teddy_downloader_admin.manual_retry(core, task_id)
+        return core.jsonify(body), status_code
 
     if 'retry_task' in core.app.view_functions:
         core.app.view_functions['retry_task'] = safe_retry_task
+        core._teddy_safe_retry_task = safe_retry_task
 
 
 def install():

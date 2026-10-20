@@ -324,24 +324,31 @@ def enqueue_download(
         override=override,
     )
 
-    core.tasks[task_id] = {
-        'url': url,
-        'status': '대기 중',
-        'progress': '0%',
-        'speed_bps': 0,
-        'downloaded_bytes': 0,
-        'total_bytes_estimate': 0,
-        'network_override': override,
-        'network_mode': decision['mode'],
-        'network_route_source': decision['source'],
-        'network_site': decision['site'],
-        'network_fallbacks': 0,
-    }
+    lock = getattr(core, 'queue_admission_lock', None)
+    if lock is None:
+        return core.jsonify({
+            'status': 'error',
+            'message': '다운로드 큐 보호 상태를 확인할 수 없습니다.',
+        }), 503
+    with lock:
+        core.tasks[task_id] = {
+            'url': url,
+            'status': '대기 중',
+            'progress': '0%',
+            'speed_bps': 0,
+            'downloaded_bytes': 0,
+            'total_bytes_estimate': 0,
+            'network_override': override,
+            'network_mode': decision['mode'],
+            'network_route_source': decision['source'],
+            'network_site': decision['site'],
+            'network_fallbacks': 0,
+        }
 
-    core.save_tasks()
-    core.download_queue.put(
-        task_id
-    )
+        core.save_tasks()
+        core.download_queue.put(
+            task_id
+        )
 
     return core.jsonify({
         'status': 'success',

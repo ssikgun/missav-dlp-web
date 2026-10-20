@@ -266,4 +266,80 @@
         window.__teddyCompletedCleanupObserver = observer;
         ensureCompletedCleanupButton();
     }
+
+    function setActionStatus(id, message) {
+        const node = document.getElementById(id);
+        if (node) node.textContent = message;
+    }
+
+    function updateFailedRetryControl(tasks) {
+        const button = document.getElementById('retryFailedTasks');
+        const countNode = document.getElementById('retryFailedCount');
+        if (!button || !countNode) return;
+        const count = Object.values(tasks || {}).filter(task =>
+            String((task && task.status) || '').startsWith('에러')
+        ).length;
+        countNode.textContent = String(count);
+        button.disabled = count === 0 || button.dataset.busy === 'true';
+    }
+
+    // The existing task renderer owns the task request. Observe its response
+    // without adding a second polling loop or changing its rendering behavior.
+    if (!window.__teddyRetryFetchWrapped) {
+        window.fetch = function(input, init) {
+            const result = originalFetch(input, init);
+            const url = typeof input === 'string' ? input : (input && input.url) || '';
+            if (url.split('?')[0] === '/api/tasks') {
+                result.then(response => {
+                    response.clone().json().then(updateFailedRetryControl).catch(() => {});
+                }).catch(() => {});
+            }
+            return result;
+        };
+        window.__teddyRetryFetchWrapped = true;
+    }
+
+    const failedRetryButton = document.getElementById('retryFailedTasks');
+    if (failedRetryButton) {
+        failedRetryButton.addEventListener('click', async () => {
+            if (failedRetryButton.dataset.busy === 'true') return;
+            const count = Number(document.getElementById('retryFailedCount')?.textContent) || 0;
+            if (!count) return;
+            if (!window.confirm(
+                `실패한 다운로드 ${count}건을 다시 대기열에 넣을까요? 기존 다운로드 조각은 유지됩니다.`
+            )) return;
+
+            failedRetryButton.dataset.busy = 'true';
+            failedRetryButton.disabled = true;
+            const label = document.getElementById('retryFailedLabel');
+            if (label) label.textContent = '실패 작업 확인 중…';
+            setActionStatus('bulkRetryStatus', '저장 공간과 작업 상태를 확인하고 있습니다.');
+            try {
+                const tokenResponse = await originalFetch('/api/downloader/action-token', { cache: 'no-store' });
+                const tokenData = await tokenResponse.json();
+                if (!tokenResponse.ok || !tokenData.token) throw new Error(tokenData.message || '요청 검증 토큰을 가져오지 못했습니다.');
+                const response = await originalFetch('/api/tasks/retry-failed', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-Token': tokenData.token },
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message || '실패 작업 재시작을 차단했습니다.');
+                const summary = `성공 ${data.succeeded || 0} · 건너뜀 ${data.skipped || 0} · 실패 ${data.failed || 0}`;
+                setActionStatus('bulkRetryStatus', summary);
+                if (typeof showToast === 'function') {
+                    showToast(summary, data.failed ? 'error' : 'success');
+                }
+                if (typeof fetchTasks === 'function') fetchTasks();
+            } catch (error) {
+                const message = error && error.message ? error.message : '실패 작업 재시작 요청에 실패했습니다.';
+                setActionStatus('bulkRetryStatus', message);
+                if (typeof showToast === 'function') showToast(message, 'error');
+            } finally {
+                failedRetryButton.dataset.busy = 'false';
+                if (label) label.textContent = '↻ 실패 작업 모두 재시작';
+                if (typeof fetchTasks === 'function') fetchTasks();
+            }
+        });
+    }
+
 })();

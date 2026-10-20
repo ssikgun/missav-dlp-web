@@ -110,19 +110,14 @@ SPOOFDPI_PORT = 8080
 SPOOFDPI_PROXY = f"http://127.0.0.1:{SPOOFDPI_PORT}"
 
 def start_spoofdpi():
-    try:
-        proc = subprocess.Popen(
-            ["spoofdpi"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-        )
-        time.sleep(2)
-        if proc.poll() is None:
-            print(f"[System] SpoofDPI 엔진 가동 성공 (Port: {SPOOFDPI_PORT})", flush=True)
-        else:
-            print(f"[System] SpoofDPI 가동 실패", flush=True)
-    except FileNotFoundError:
-        print("[System] SpoofDPI 바이너리를 찾을 수 없습니다.", flush=True)
+    from teddy_spoofdpi import start_spoofdpi as start_with_diagnostics
+
+    start_with_diagnostics(
+        popen=subprocess.Popen,
+        sleep=time.sleep,
+        port=SPOOFDPI_PORT,
+        log=lambda message: print(message, flush=True),
+    )
 
 start_spoofdpi()
 
@@ -132,6 +127,9 @@ teddy_subtitle_status.install_routes(app, jsonify)
 
 download_queue = queue.Queue()
 tasks = {}
+# Serialize queue admission transitions so manual and automatic retry
+# requests cannot enqueue the same task from a stale error state.
+queue_admission_lock = threading.RLock()
 
 # --- 작업 목록 영속화 (재시작 시 중단된 다운로드를 재시도할 수 있도록) ---
 TASKS_FILE = os.path.join(DOWNLOAD_DIR, '.tasks.json')
@@ -588,19 +586,20 @@ def auto_retry_monitor():
             if not settings.get('auto_retry', True):
                 continue
             cap = int(settings.get('auto_retry_max', 30))
-            for tid, t in list(tasks.items()):
-                if not t.get('status', '').startswith('에러'):
-                    continue
-                n = t.get('retries', 0)
-                if n >= cap:
-                    continue
-                t['retries'] = n + 1
-                t['status'] = '대기 중'
-                t['progress'] = '0%'
-                t['speed_bps'] = 0
-                save_tasks()
-                download_queue.put(tid)
-                print(f"[자동재시도] ({t['retries']}/{cap}) {t.get('url')}", flush=True)
+            with queue_admission_lock:
+                for tid, t in list(tasks.items()):
+                    if not t.get('status', '').startswith('에러'):
+                        continue
+                    n = t.get('retries', 0)
+                    if n >= cap:
+                        continue
+                    t['retries'] = n + 1
+                    t['status'] = '대기 중'
+                    t['progress'] = '0%'
+                    t['speed_bps'] = 0
+                    save_tasks()
+                    download_queue.put(tid)
+                    print(f"[자동재시도] ({t['retries']}/{cap}) {t.get('url')}", flush=True)
         except Exception as e:
             print(f'[자동재시도] 오류: {e}', flush=True)
 
@@ -621,17 +620,18 @@ def handle_download():
     url = request.form.get('url', '').strip()
     if not url:
         return jsonify({"status": "error", "message": "URL 입력"}), 400
-    task_id = str(uuid.uuid4())
-    tasks[task_id] = {
-        'url': url,
-        'status': '대기 중',
-        'progress': '0%',
-        'speed_bps': 0,
-        'downloaded_bytes': 0,
-        'total_bytes_estimate': 0,
-    }
-    save_tasks()
-    download_queue.put(task_id)
+    with queue_admission_lock:
+        task_id = str(uuid.uuid4())
+        tasks[task_id] = {
+            'url': url,
+            'status': '대기 중',
+            'progress': '0%',
+            'speed_bps': 0,
+            'downloaded_bytes': 0,
+            'total_bytes_estimate': 0,
+        }
+        save_tasks()
+        download_queue.put(task_id)
     return jsonify({"status": "success", "task_id": task_id})
 
 @app.route('/api/tasks', methods=['GET'])
@@ -650,17 +650,18 @@ def delete_task(task_id):
 @app.route('/api/tasks/<task_id>/retry', methods=['POST'])
 def retry_task(task_id):
     """실패/취소된 작업을 같은 URL로 다시 큐에 넣어 재시도한다."""
-    if task_id not in tasks:
-        return jsonify({"status": "error", "message": "작업 없음"}), 404
-    cur = tasks[task_id].get('status', '')
-    if cur in ('다운로드 중', '대기 중'):
-        return jsonify({"status": "error", "message": "이미 진행 중인 작업"}), 400
-    tasks[task_id]['status'] = '대기 중'
-    tasks[task_id]['progress'] = '0%'
-    tasks[task_id]['speed_bps'] = 0
-    tasks[task_id]['retries'] = 0   # 수동 재시작은 자동 재시도 예산을 초기화
-    save_tasks()
-    download_queue.put(task_id)
+    with queue_admission_lock:
+        if task_id not in tasks:
+            return jsonify({"status": "error", "message": "작업 없음"}), 404
+        cur = tasks[task_id].get('status', '')
+        if cur in ('다운로드 중', '대기 중'):
+            return jsonify({"status": "error", "message": "이미 진행 중인 작업"}), 400
+        tasks[task_id]['status'] = '대기 중'
+        tasks[task_id]['progress'] = '0%'
+        tasks[task_id]['speed_bps'] = 0
+        tasks[task_id]['retries'] = 0   # 수동 재시작은 자동 재시도 예산을 초기화
+        save_tasks()
+        download_queue.put(task_id)
     print(f"[Retry] 재시도 큐 추가: {tasks[task_id].get('url')}", flush=True)
     return jsonify({"status": "success"})
 

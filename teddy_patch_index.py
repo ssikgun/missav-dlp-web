@@ -322,4 +322,14 @@ replace_between(
 )
 
 INDEX.write_text(text, encoding='utf-8')
+final_text = INDEX.read_text(encoding='utf-8')
+for required_marker in (
+    'id="retryFailedTasks"',
+    'id="retryFailedCount"',
+):
+    if final_text.count(required_marker) != 1:
+        raise SystemExit(f'patch failed: administrative UI marker missing or duplicated: {required_marker}')
+for forbidden_marker in ('id="restartDownloader"', 'restartDownloaderStatus'):
+    if forbidden_marker in final_text:
+        raise SystemExit(f'patch failed: Downloader restart UI remains: {forbidden_marker}')
 print('teddy index patch: OK')
