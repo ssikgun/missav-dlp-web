@@ -685,3 +685,31 @@ FULL_POST_RESUME_SOURCE_EVIDENCE_SHA256: bc81d19498dbf790c24509e833f18d8583bcbc3
 FINAL_NEXT_DECISION: This approved Downloader production transition phase is complete. A separate read-only investigation of the remaining SpoofDPI startup warning is the next proposed task. No download/recovery/MP4/NAS action is authorized by this result. DLDWS-001 remains registered IN_PROGRESS for separately approved follow-up; Governance remains INACTIVE/NONE and Stage11 S11-WX011 is unchanged.
 
 FINAL_DOCUMENT_CHECKS: PASS; all-workstream structure, shared DLDWS-001 preflight, unchanged S11-WX011 preflight, Governance smoke 21/21 and git diff --check. No router/contract/Stage11/validation-script change.
+
+
+## SEPARATE APPROVED EXECUTION — read-only SpoofDPI and proxy-speed warning investigation
+
+APPROVAL_DATE: 2026-10-20
+AUTHORIZATION: Explicit user approval to investigate the two remaining production network warnings, without reproduction or repair.
+EXECUTION_STATUS: AUTHORIZED_READ_ONLY; publish and exact canonical readback required before inspection.
+SHARED_TASK: DLDWS-001
+REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
+EXECUTION_CONTRACT_VERSION: 1.0.0
+CANONICAL_BASE: e7323e553c625163c9ff0eb97d7438713a0cde9f.
+
+### AUTHORIZED_SCOPE
+
+- Read existing relevant Docker logs, deployed source/binary metadata and execution configuration, and current process/listener/network metadata. Reuse prior evidence; do not repeat successful deployment or data-preservation tests.
+- Trace SpoofDPI startup conditions, actual failure stage, optional/required role and fallback behavior; distinguish evidence from unverified hypotheses.
+- Trace successful proxy-list refresh separately from speed measurement, including actual failure handling, selection fallback, and any proven relationship to SpoofDPI. Report UNKNOWN when logs cannot distinguish timeout, DNS, TLS, authentication or other causes.
+- Preserve running image sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573 and user-approved max_concurrent=4. Preserve prior production deployment/data/Writer PASS and REAL_DOWNLOAD_TEST=NOT_RUN.
+- Writer Safety participates only for shared-task authorization consistency; Writer itself is outside this investigation.
+- Record sanitized findings identically in both ACTIVE_WORK files and existing canonical handoff, with exact remote readback. Suggest at most one smallest scoped follow-up; apply no fix.
+
+### PROHIBITED_SCOPE
+
+No lifecycle/Compose command, SpoofDPI execution/restart, proxy speed rerun, new external connection test, settings/environment/source edit, image build/pull/replace, actual download/retry/MP4 action, download/DB write, Writer/Gluetun/NAS/Jellyfin/Stage11 change, or protected candidate edit. Do not expose proxy endpoints, credentials, URLs, cookies or tokens. Only these approved records/handoff and isolated sanitized evidence may be written.
+
+### ACCEPTANCE_AND_NEXT_DECISION
+
+Identify exact log/code/config locations and bounded impact for both warnings. Report root cause CONFIRMED/LIKELY/UNKNOWN, relationship CONFIRMED/NOT_ESTABLISHED and download impact BLOCKING/DEGRADED/NO_IMPACT_CONFIRMED/UNKNOWN; preserve uncertainty without an active reproduction. Finish after read-only findings; repairs and real-use tests require separate user approval.
