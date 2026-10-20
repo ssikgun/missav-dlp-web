@@ -829,3 +829,33 @@ CANONICAL_APPROVAL_READBACK: PASS at 26b35a4ef48d283a37343617921dff8e079b3f72; t
 CANDIDATE: /tmp/dldws001-ui-convenience-20261020, branch codex/dldws001-ui-convenience-20261020, HEAD 37cb16030930f7fe7edd7c8fa9423b4e0f90e9dc. Its dirty changes were preserved. Helper SHA-256 a2699e7dd512f73d44c9fa49a8ca7014a2cf277a593cc5a1059ce63135c54776; smoke SHA-256 0c33cfcf4eb8f415bef2c98e0bc8cbdb3ef3c205c3616b3570bff720084b25e7; socket unit SHA-256 055520d6b49c0db7b8506833cbed3d7e43cf39eb01c084eff1474f84096b162b; service unit SHA-256 f8131bed81acff2257179bafef495e64bb84fd07686ee32c411258a222b5cf67.
 VALIDATION: Existing candidate mock-backend control smoke passed; it did not contact Docker or a socket. No production status/data, Writer, Gluetun, download, image, Compose, or Stage11 resource was changed. Remote outcome record readback follows in this execution.
 NEXT: Close the helper caller-identity/replay and execution-time permit gaps, then repeat preflight from a verified CT108 session with Docker/systemd access. Do not enable a live restart endpoint before both gates pass.
+
+## SEPARATE APPROVED EXECUTION — Downloader server restart excluded (2026-10-20)
+
+USER DECISION: Exclude the new Downloader server restart feature from this isolated candidate. This scope reduction supersedes the prior helper-install approval. Preserve the earlier approval and blocked helper preflight as historical records; do not infer helper installation or restart authorization from them.
+
+SERVER_RESTART_FEATURE=EXCLUDED
+HELPER_INSTALL=NOT_RUN
+BULK_RETRY=PASS
+FLASK_ROUTE_INTEGRATION=PASS
+ENOSPC_INODE_BLOCKS=PASS
+PARTS_PRESERVATION=PASS
+SPOOFDPI_DIAGNOSTIC=PASS
+UI_BROWSER=PASS
+DESKTOP_LAYOUT=PASS (1440x900)
+MOBILE_LAYOUT=PASS (390x844)
+SELKIES_SETTINGS_INDIVIDUAL_RETRY=PASS
+FINAL_DOCKERFILE_UI_PATCH=PASS
+DOWNLOADER_RESTART_CODE_REMAINS=NO
+PRODUCTION_DEPLOYMENT=NOT_RUN
+REAL_DOWNLOAD_TEST=NOT_RUN
+OPERATING_RESOURCES_CHANGED=NONE
+
+The candidate at `/tmp/dldws001-ui-convenience-20261020`, branch `codex/dldws001-ui-convenience-20261020`, HEAD `37cb16030930f7fe7edd7c8fa9423b4e0f90e9dc`, was edited in place without reset, clean, rebase, or commit. Removed the Downloader-only settings button/client handler/API routes, restart-pending flag and its queue gates, helper transport code, helper smoke cases, Docker helper units/service/socket, helper-only ignore entry, and restart-only styling/build markers. The shared `queue_admission_lock` remains around download admission, automatic retry, manual retry, and bulk retry; existing Selkies restart controls remain. The settings copy still says changes require a restart.
+
+Focused validation used an isolated synthetic filesystem/app and no production jobs. The actual Flask test_client covered bulk-route auth/CSRF, failed-only selection, already-queued and MP4 exclusions, duplicate protection against the automatic retry lock race, byte/inode fail-closed behavior, partial results, retry state, and synthetic fragment hashes. Synthetic admin smoke retained SpoofDPI early-exit diagnostics and bulk retry checks. The Dockerfile UI patch was replayed in `/tmp/dldws001-ui-restart-excluded-20261020`; the resulting UI retained the bulk button, Selkies controls and settings guidance, and had no Downloader restart button or request handler. Node.js v24.22.0 and Chromium 156.0.8078.4 ran 10 synthetic browser scenarios. Unexpected console errors: 0; external/production requests: 0. Browser result: `/tmp/dldws001-ui-restart-excluded-20261020/evidence/browser-results.json`, SHA-256 `8241077e96b880a29e425a7fb6a22283d5cbb9ce65c788d724d48bf2d1ea0fa6`. Python syntax and `git diff --check` passed.
+
+Helper installation, live restart, Docker build/deploy, production download/retry, and canonical product-code merge were not run. The existing 4 production error jobs, 8,637 fragments, `max_concurrent=4`, Writer/Gluetun, NAS/Jellyfin and Stage11 remain outside this execution and unchanged.
+
+NEXT: Decide separately whether to authorize canonical publication of the remaining bulk-retry and SpoofDPI candidate changes; no helper installation or production deployment follows automatically.
+
