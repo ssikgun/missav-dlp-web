@@ -389,3 +389,42 @@ DEPLOYMENT_GATE: READY for this exact image only. The image remains isolated and
 OPERATIONS: NONE. Production `missav-dlp-web` remains exited (137); no Compose, Writer, DB, download data, NAS/Jellyfin or Stage11 resource changed. Test containers and synthetic runtime fixtures were removed.
 
 NEXT_DECISION: Review a separate operating backup, rollback and deployment procedure for this exact image. Production deployment still requires its own approval.
+
+## SEPARATE APPROVED EXECUTION — Downloader production backup, rollback, and deployment-plan review
+
+APPROVAL_DATE: 2026-10-20
+AUTHORIZATION: Explicit user approval in the DLDWS-001 Downloader production backup, rollback, and deployment-plan final review request.
+EXECUTION_STATUS: AUTHORIZED; READ_ONLY_REVIEW_IN_PROGRESS. Production backup and deployment are not authorized.
+SHARED_TASK: DLDWS-001
+REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
+CANONICAL_BASE: `teddy-subtitle-stage11` at `0ed3544fa8c944719c22cc8cbbaa3e86b2d36517`.
+PINNED_CANDIDATE_IMAGE: `missav-dlp-web:dldws001-deployable-startup-20261020`, `sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573`.
+
+This separate phase authorizes read-only inspection of the pinned local image, existing Downloader container, actual production Compose configuration, Writer integration state, and current data metadata; drafting and limited synthetic validation of backup, deployment, and rollback procedures; and recording the result in both workstream ACTIVE_WORK files and the canonical handoff. It does not authorize creating a production backup, changing production files or settings, stopping/starting/recreating/renaming/removing containers, deploying the candidate image, or changing Writer, DB, download data, NAS/Jellyfin, or Stage11.
+
+### AUTHORIZED_SCOPE
+
+- Confirm canonical identity and the matching DLDWS-001 approval in both required workstreams before operational inspection.
+- Read only the exact candidate and current production image metadata; do not tag, pull, rebuild, prune, or delete images.
+- Read only the existing container, actual Compose inputs and merged configuration, relevant auto-start configuration, Writer/socket state, and non-secret work-data metadata. Do not print secret values, URLs, task identifiers, or full download listings.
+- Assess whether existing container identity can be retained, whether exact Compose/image settings are compatible, current retry/partial-file state, backup feasibility, and rollback boundaries.
+- Produce a plan and limited verification evidence without writing to production resources. Existing image build and offline regression PASS evidence is reused and is not rerun.
+- Append the final review result to both ACTIVE_WORK files and `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md`; no product code, contract, router, or Stage11 file may change.
+
+### PROHIBITED_SCOPE
+
+- Production backup creation or restore; any write to `/opt/missav-dlp-web/work`, Compose/env/unit files, task/settings/queue/fragment files, or databases.
+- Downloader container start, stop, restart, recreate, rename, remove, or new operational container creation; no candidate image deployment.
+- Downloads, retries, recovery, MP4 work, NAS/Jellyfin changes, Writer or systemd changes, Stage11 changes, product-code changes, image build/pull/prune/tag/delete, and Git product merge/push.
+- Never treat `TEDDY_STARTUP_MODE=health-only` READY as proof that production task/settings data or Writer integration is safe.
+- Do not allow ordinary startup before a verified backup and a task-specific retry/partial-file decision.
+
+### ACCEPTANCE_CRITERIA
+
+- Exact canonical head and approval readback are confirmed before operational inspection.
+- Candidate image pin and the existing container/Compose/runtime/data facts are reported with secrets redacted.
+- Backup and rollback plans specify source/destination, consistency, capacity/inode, metadata/symlink preservation, readback/restore verification, collision handling, and abort conditions without creating a production backup.
+- Any unresolved container-identity, Compose compatibility, data safety, or retry control is reported as a deployment gate, not assumed away.
+- Result records `PRODUCTION_BACKUP=NOT_RUN` and `PRODUCTION_DEPLOYMENT=NOT_RUN`; operations remain unchanged.
+
+NEXT_DECISION: Finish the read-only production preflight and produce the plan; any actual backup or deployment requires separate explicit approval.
