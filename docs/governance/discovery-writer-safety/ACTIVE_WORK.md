@@ -779,3 +779,34 @@ No production Docker or other service lifecycle operation, helper installation/p
 ### ACCEPTANCE_AND_NEXT_DECISION
 
 Focused tests cover restart authentication/CSRF/fixed target/activity gates/single-flight/readiness semantics; bulk state eligibility/duplicates/auto-retry race/ENOSPC/partial outcomes/fragment preservation/individual retry regression; SpoofDPI normal/early exit/missing executable/redaction/output bounds; and final patched UI presence/responsive behavior. Any unavailable browser or operational integration evidence stays UNKNOWN/BLOCKED rather than being inferred. Report implementation and test results separately from operational availability. A separately approved host-helper integration and production deployment are future decisions.
+
+
+## SEPARATE APPROVED EXECUTION — Downloader restart helper installation and safe connection
+
+APPROVAL_DATE: 2026-10-20
+AUTHORIZATION: Explicit user approval in the DLDWS-001 Downloader restart helper installation request.
+EXECUTION_STATUS: AUTHORIZED; operational preflight pending; no helper files or services installed.
+SHARED_TASK: DLDWS-001
+REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
+EXECUTION_CONTRACT_VERSION: 1.0.0
+CANONICAL_BASE: 37cb16030930f7fe7edd7c8fa9423b4e0f90e9dc.
+
+### AUTHORIZED_SCOPE
+
+- Reuse the existing isolated helper candidate at /tmp/dldws001-ui-convenience-20261020 without changing its dirty worktree; verify the exact execution environment and Docker-engine boundary before any installation.
+- Install only a Downloader-specific helper and minimum required settings on the verified Downloader Docker-engine host, and connect only a restricted local client path if this can be done without recreating or changing the production Downloader container.
+- Enforce a fixed missav-dlp-web target, authenticated/restricted local communication, no arbitrary command or target input, no Docker socket exposure to the web application, and read-only identity/status checks.
+- Validate synthetic requests and use a mock backend for any restart-shaped test. Never invoke a real Docker restart.
+- Reassess active, queued, pause-transition, MP4/recovery, and auto-retry state at the execution boundary. If the existing guard cannot guarantee no work starts between the app check and helper execution, keep the restart operation unavailable and report BLOCKED_SAFETY_GAP.
+- Record sanitized results in both affected ACTIVE_WORK files and the canonical handoff, then verify exact remote readback. Discovery Writer Safety participates for shared-task consistency; no Writer resource is in scope.
+
+### PROHIBITED_SCOPE
+
+No docker restart, compose lifecycle command, production container stop/start/recreate/replace, image build/pull/deployment, real download/retry/MP4 work, task or fragment change, Writer/Gluetun/Selkies/NAS/Jellyfin/Stage11 change, Docker socket exposure to the web app, or product-code publication. If connection requires changing Compose, image, mount, or the existing container, stop without making that change. If installation fails, only resources created by this execution may be disabled or removed.
+
+### ACCEPTANCE_AND_NEXT_DECISION
+
+- Confirm the target is the Downloader LXC/host with the Docker engine; do not infer CT identity or install on the Proxmox host.
+- Verify helper ownership, permissions, fixed target, caller restriction, duplicate/replay behavior, read-only status, client connectivity, and mock-backend behavior without changing the production container.
+- Do not leave a real restart interface enabled unless the no-work condition is guaranteed through the actual execution point. Otherwise report RESTART_RACE_SAFETY=BLOCKED and keep restart unavailable.
+- Report installation/connectivity separately from production UI deployment and real restart; the latter remain NOT_RUN/NOT_DEPLOYED.
