@@ -13370,3 +13370,31 @@ PUBLISHED_FILES:
 
 VALIDATION: Reused the recorded Flask route integration and 10-scenario Chromium evidence. Focused synthetic bulk-retry/SpoofDPI smoke, Python syntax, JavaScript syntax (Node.js v24.22.0), ordered Dockerfile UI patch-chain validation, and git diff --check passed. No Docker image was built; no production container, download, queue, or operational data was changed. Existing Selkies restart and individual-download retry remain; max_concurrent=4 is preserved.
 NEXT: Any Docker image build or production deployment requires a separate user approval.
+
+
+## SEPARATE APPROVED EXECUTION RESULT — Final Docker image deployment (2026-10-20)
+
+USER_APPROVAL: The user explicitly approved one canonical Docker image build, replacement of the Downloader container only, operational HTTP/UI/data checks, and one safe rollback if required.
+APPROVAL_RECORD=PASS; APPROVAL_COMMIT=d307ddac86c94f1741d72f5afb07893ea94c1690; APPROVED_SOURCE_PRODUCT_COMMIT=453011a0f9c71ccf7a4ab6cfef96b375213211a1.
+PRE_DEPLOY_GATE=FAIL
+BLOCK_REASON: The available shell reports hostname `downloader` and LXC virtualization, but its cgroup does not establish CT108 identity. The default Docker daemon endpoint is `unix:///var/run/docker.sock` and read-only `docker info`/inspect requests returned permission denied. The execution environment therefore cannot confirm or query the authorized CT108 Docker engine.
+IMAGE_BUILD=NOT_RUN
+IMAGE_VERIFICATION=NOT_RUN
+PRODUCTION_DEPLOYMENT=NOT_RUN
+BACKUP_RECHECK=NOT_RUN
+DOWNLOADER_HTTP=NOT_RUN
+BULK_RETRY_UI=NOT_RUN
+SPOOFDPI_DIAGNOSTIC=NOT_RUN
+SERVER_RESTART_FEATURE=EXCLUDED
+JOB_STATE_PRESERVED=UNKNOWN
+FRAGMENTS_PRESERVED=UNKNOWN
+MAX_CONCURRENT=UNKNOWN
+WRITER_INTEGRATION=NOT_RUN
+GLUETUN_PRESERVED=UNKNOWN
+REAL_DOWNLOAD_TEST=NOT_RUN
+ROLLBACK=NOT_NEEDED (no deployment attempt)
+OLD_IMAGE_ID=NOT_VERIFIED; NEW_IMAGE_ID=NOT_BUILT; DEPLOYED_SOURCE_SHA=NONE.
+OPERATIONAL_RESOURCES_CHANGED=NONE_BY_THIS_EXECUTION.
+
+No Docker permission workaround, privilege escalation, service/configuration change, backup access, build, or deployment was attempted after the access denial. The production state and backup were not re-inspected because the required Docker API/CT108 preflight could not be completed. The deployment remains blocked until an authorized execution session can verify CT108 and access its Docker API without changing or bypassing permissions.
+NEXT: Resume the approved preflight from a verified CT108 session with its existing authorized Docker access; rerun the full read-only gates before any build or deployment.
