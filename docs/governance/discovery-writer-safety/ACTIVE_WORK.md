@@ -455,3 +455,42 @@ OPERATIONS: NONE. No production data, container, image, Compose, Writer, DB, NAS
 PLAN_ARTIFACT: `/tmp/dldws001-ops-plan-20261020/deployment-plan.md`; sanitized evidence: `/tmp/dldws001-ops-plan-20261020/evidence/read-only-preflight.json`.
 
 NEXT_DECISION: Select/approve an independent persistent backup target and decide whether losing the old container ID on Compose recreation is acceptable; only after those blockers are resolved request a separate actual-backup execution.
+
+## SEPARATE APPROVED EXECUTION — Synology NAS backup target read-only verification and future container-ID decision
+
+APPROVAL_DATE: 2026-10-20
+AUTHORIZATION: Explicit user approval in the DLDWS-001 Synology NAS backup target verification and future container-ID decision request.
+EXECUTION_STATUS: APPROVED_PENDING_READ_ONLY_INSPECTION; no production backup or deployment is authorized in this phase.
+SHARED_TASK: DLDWS-001
+REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
+WORKSTREAM_STATUS: IN_PROGRESS
+CONTRACT_VERSION: 1.0.0
+CANONICAL_BASE: teddy-subtitle-stage11 at c738ef22ec3b888dbde9bcdf07e1caef2dbff7cd.
+CONTAINER_ID_CHANGE: APPROVED_FOR_FUTURE_APPROVED_COMPOSE_DEPLOYMENT_ONLY; this is not authorization to replace a container now.
+
+This separate phase records the user's decision that Synology is the preferred future Downloader backup destination and that a later separately approved Compose deployment may replace the existing Downloader container ID. NAS target inspection is a Downloader backup prerequisite; the Discovery Writer Safety copy records the shared task authorization and does not authorize Writer, socket, or systemd changes.
+
+### AUTHORIZED_SCOPE
+
+- After exact canonical approval readback in both workstreams, perform read-only inspection of existing NAS mounts visible in CT108; if none is visible there, read-only inspection of existing NAS mounts on an accessible Proxmox host is allowed.
+- Identify an actual Synology mount and existing shared-folder path from mount metadata, including mount path, filesystem type, NAS/export identity, mount options, and permission metadata. Do not assume an arbitrary directory is a NAS share.
+- Compare the candidate filesystem/source with /opt/missav-dlp-web/work to establish whether storage is independent.
+- Read actual free space and, where exactly supported, free inode count. Require at least 40 GB free and 20,000 free inodes. If exact capacity, inode, persistence, independence, or access metadata is unavailable, report UNKNOWN and do not infer PASS.
+- Inspect only existing mount and directory metadata. Do not enumerate or read NAS file contents, create a directory, or perform a write test.
+- Record the measured result in both ACTIVE_WORK files and the canonical handoff. Reuse the prior production plan and image evidence; do not repeat completed build or regression work.
+
+### PROHIBITED_SCOPE
+
+- No NAS mount/unmount or share configuration change; no directory creation, file write, backup, restore, or cleanup.
+- No Downloader container start, stop, restart, replacement, rename, or removal; no Docker build, image change, or Compose edit.
+- No download, retry, recovery, MP4 operation, operational database write, Writer service/socket/systemd change, Stage11, NAS/Jellyfin data change, or modification of protected candidate worktrees.
+- The future container-ID decision does not waive the independent-backup, restore-verification, pinned-image, data-preservation, or rollback requirements and does not authorize current deployment.
+
+### ACCEPTANCE_CRITERIA
+
+- Confirm the approval record has matching task ID, status, contract version, and required workstreams in both copies and read it back from the exact canonical commit before NAS inspection.
+- Report NAS_ACCESS, BACKUP_TARGET, measured free space and free inodes or UNKNOWN, STORAGE_INDEPENDENCE, one recommended existing-share backup path, and any remaining blockers.
+- Preserve all prior DLDWS-001 results and the current production state. Record PRODUCTION_BACKUP=NOT_RUN and PRODUCTION_DEPLOYMENT=NOT_RUN.
+- If an eligible share is found, stop after recommending it. Actual backup and restore verification require a separate explicit execution approval.
+
+NEXT_DECISION: Complete the authorized read-only NAS mount and capacity inspection, publish the factual result in both workstream records and the canonical handoff, then stop before any backup or deployment.
