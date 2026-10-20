@@ -612,3 +612,36 @@ PLAN: /tmp/dldws001-compose-final-20261020-r1zmpp5n/execution-plan.md; SHA-256 0
 FINAL_EVIDENCE: /tmp/dldws001-compose-final-20261020-r1zmpp5n/verification-final.json; SHA-256 a6abebb5d123db6ca464f9105962c17268dbef68e8a4d5fab45e2e9c9148e866.
 
 NEXT_DECISION: User decision on production deployment of exact image sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573 under the recorded backup/rollback and fresh pre-start gates. No execution is authorized by this review result.
+
+## SEPARATE APPROVED EXECUTION — one-time Downloader production deployment and conditional rollback
+
+APPROVAL_DATE: 2026-10-20
+AUTHORIZATION: Explicit final user approval in the DLDWS-001 one-time Downloader production deployment and safe rollback request.
+EXECUTION_STATUS: AUTHORIZED_PENDING_PREFLIGHT; no deployment attempt has been made.
+SHARED_TASK: DLDWS-001
+REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
+CONTRACT_VERSION: 1.0.0
+CANONICAL_BASE: 48d511e0555062c8cc9a737a3cb5d182f209dae3.
+ATTEMPT_LIMITS: One candidate deployment; at most one conditional old-image rollback; no automatic retry.
+NEW_IMAGE_ID: sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573.
+OLD_IMAGE_ID: sha256:da1e46073bb94b1f942b67b2fead20cc00656922b65f446ef7316b48d706aa0f.
+
+### AUTHORIZED_SCOPE_AND_MANDATORY_GATES
+
+- Publish identical approval scope in both workstreams and verify exact canonical readback before operational preflight or change.
+- Reuse the verified execution plan (SHA-256 0dc8c5189abcf1a300915ba9756e87d171c74b1fb8623e44765d542a3b0a63be) and evidence (SHA-256 a6abebb5d123db6ca464f9105962c17268dbef68e8a4d5fab45e2e9c9148e866) in /tmp/dldws001-compose-final-20261020-r1zmpp5n.
+- Reconfirm backup disk, archive and source-manifest availability on pve immediately before deployment. The existing successful backup/restore evidence is user-submitted, not Codex-executed. If pve is inaccessible, require fresh user read-only evidence; absent or insufficient evidence blocks as BLOCKED_BACKUP_PREFLIGHT.
+- Backup run: /mnt/pve/Data_5TB/dldws001-backups/backup-20261020-110732-TbdQOd; source-manifest SHA-256 252491423da01d4f1eeabad3e7caeaeac3e8cb23b2eb46818aba91b7be178d16. Preserve the archive and prior evidence; do not repeat backup or restore.
+- Reconfirm correct CT108/Downloader environment, old container ID/image and exited status, no duplicate/source-writing process or conflicting restart automation, Writer/socket and Gluetun stability, and unchanged ports/mounts/network.
+- Read-only recheck tasks and fragments. Block ordinary start on running/pending work, error retries below cap, changed/unknown partial files, orphan/loose temporary files, queued MP4 recovery, damaged source or unexplained backup differences.
+- Re-render the exact three-file Compose order with --env-file /opt/missav-dlp-web/gluetun.env, project/service missav-dlp-web, then apply only the validated final image override. Confirm all 31 environment values, 14 mounts, port 58000:5000, Writer RO/GID 988, dependency, network/DNS, security/resources and restart settings. Any drift blocks.
+- After every gate passes, execute the single validated candidate command targeting only missav-dlp-web with --no-deps --pull never --no-build. Container ID replacement is approved. No image pull/build/tag change or dependency recreation.
+- Inspect actual image/config/restarts, HTTP and application job state, fragment preservation, unexpected download/retry/MP4 activity, read-only Writer application integration and startup logs. Distinguish task serialization from semantic damage; health-only/socket READY alone is insufficient.
+- On a critical post-start failure, safely stop only the new Downloader to prevent repeated startup. A single old-image override rollback is allowed only when backup access, old image/config, understood compatible state and no conflicting new data are established. Unknown/conflicting changes block as BLOCKED_MANUAL_RECOVERY; never automatically unpack over production data.
+- Preserve source data, backup, old image/config and all prior records. Record the final result in both ACTIVE_WORK files and canonical handoff with remote readback.
+
+### PROHIBITED_SCOPE
+
+No download/retry/recovery trigger, forced job resume, real MP4/NAS transfer test, database direct write, fragment/task deletion, backup modification, Writer/systemd/socket change, Gluetun or other container change, NAS/Jellyfin/Stage11 change, protected candidate edit, image build/pull/retag/delete, repeated deployment/rollback or unrelated product/code change.
+
+NEXT_DECISION: Execute only after all mandatory gates pass. Missing fresh backup evidence or any other unknown prerequisite stops before deployment. Report real download/MP4 testing NOT_RUN regardless of deployment outcome.
