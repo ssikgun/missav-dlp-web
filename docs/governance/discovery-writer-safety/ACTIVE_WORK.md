@@ -810,3 +810,22 @@ No docker restart, compose lifecycle command, production container stop/start/re
 - Verify helper ownership, permissions, fixed target, caller restriction, duplicate/replay behavior, read-only status, client connectivity, and mock-backend behavior without changing the production container.
 - Do not leave a real restart interface enabled unless the no-work condition is guaranteed through the actual execution point. Otherwise report RESTART_RACE_SAFETY=BLOCKED and keep restart unavailable.
 - Report installation/connectivity separately from production UI deployment and real restart; the latter remain NOT_RUN/NOT_DEPLOYED.
+
+
+### EXECUTION_RESULT — Downloader restart helper preflight (2026-10-20)
+
+HELPER_INSTALL: BLOCKED. No helper file, service, socket, or production setting was installed or changed.
+HELPER_AUTH: FAIL for production readiness. The candidate checks only SO_PEERCRED uid==0 with a root:root 0600 socket; it does not bind callers to the Downloader container identity. Its duplicate/replay registry is in-memory and is reset on helper restart/eviction. The synthetic non-root rejection passed, but operational peer mapping and caller isolation were not verified.
+FIXED_TARGET_CONTROL: PASS for isolated mock only. The protocol rejects an extra target field, hard-codes missav-dlp-web, checks the Compose service label, and the mock asserted the exact inspect/restart argv. It does not pin the expected container ID or image; no operational container identity was read.
+RESTART_RACE_SAFETY: BLOCKED. The UI route candidate performs its no-work check under queue_admission_lock and sets downloader_restart_pending, and supported queue admission paths check that flag. However, the host helper itself has no one-time app-issued permit/state recheck and accepts a restart from any peer that passes uid==0; execution-time safety and the deployed path were not established. Do not enable the restart operation.
+HELPER_CLIENT_CONNECTIVITY: BLOCKED. Runtime was hostname downloader and virtualization type LXC, but CT108 identity was not independently confirmed. /usr/bin/docker exists; Docker API access returned permission denied even as uid 0, so read-only inspect of missav-dlp-web and its mounts could not run. systemctl could not access the system bus. Static systemd verification was blocked by “SO_PASSCRED failed: Operation not permitted”.
+REAL_RESTART: NOT_RUN.
+RESTART_UI_PRODUCTION: NOT_DEPLOYED.
+BULK_RETRY_PRODUCTION: NOT_DEPLOYED.
+PRODUCTION_CONTAINER: UNCHANGED; no lifecycle command succeeded or was issued.
+PRODUCTION_DEPLOYMENT: NOT_RUN.
+
+CANONICAL_APPROVAL_READBACK: PASS at 26b35a4ef48d283a37343617921dff8e079b3f72; the approval entry is identical in both workstreams. The local checkout is branch codex-stage11-wx001-20261014 at 761fcdce563b32edfa31f5f44f09eb11535e9d8f, not the canonical branch; GitHub connector readback was used for canonical state.
+CANDIDATE: /tmp/dldws001-ui-convenience-20261020, branch codex/dldws001-ui-convenience-20261020, HEAD 37cb16030930f7fe7edd7c8fa9423b4e0f90e9dc. Its dirty changes were preserved. Helper SHA-256 a2699e7dd512f73d44c9fa49a8ca7014a2cf277a593cc5a1059ce63135c54776; smoke SHA-256 0c33cfcf4eb8f415bef2c98e0bc8cbdb3ef3c205c3616b3570bff720084b25e7; socket unit SHA-256 055520d6b49c0db7b8506833cbed3d7e43cf39eb01c084eff1474f84096b162b; service unit SHA-256 f8131bed81acff2257179bafef495e64bb84fd07686ee32c411258a222b5cf67.
+VALIDATION: Existing candidate mock-backend control smoke passed; it did not contact Docker or a socket. No production status/data, Writer, Gluetun, download, image, Compose, or Stage11 resource was changed. Remote outcome record readback follows in this execution.
+NEXT: Close the helper caller-identity/replay and execution-time permit gaps, then repeat preflight from a verified CT108 session with Docker/systemd access. Do not enable a live restart endpoint before both gates pass.
