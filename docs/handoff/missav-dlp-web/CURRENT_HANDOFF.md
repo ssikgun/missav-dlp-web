@@ -13112,3 +13112,107 @@ SOURCE_STABILITY: UNKNOWN. BACKUP_TARGET: BLOCKED. PRODUCTION_BACKUP: NOT_RUN. A
 The Data_2TB/Data_5TB paths and capacity figures remain user-provided inputs, not measurements from this execution. No container, data, storage, service, or deployment resource changed.
 
 NEXT_DECISION: Rerun the approved read-only preflight and backup/restore verification from an authorized shell on actual Proxmox host pve. Do not use Downloader LXC as a substitute or guess an SSH target.
+
+## 2026-10-20 — DLDWS-001 production Compose reproduction and rollback readiness
+
+CANONICAL_APPROVAL_READBACK: PASS at ed9b8596bfcd03e0f6f60e9a2312fd88674139f1. Both ACTIVE_WORK approval sections were identical before inspection. Prior host-access block remains historical; the later backup PASS below is user-submitted evidence.
+
+COMPOSE_REPRODUCTION=PASS; ENV_INTERPOLATION=PASS; IMAGE_ONLY_OVERRIDE=PASS; OLD_IMAGE_ROLLBACK=READY; ROLLBACK_READINESS=READY for configuration and procedure.
+DATA_BACKUP=PASS (user-submitted Proxmox results; not independently host-verified by Codex).
+PRODUCTION_DEPLOYMENT=NOT_RUN. All fresh pre-start gates below remain mandatory under a separate execution approval.
+
+### Verified sources
+
+Project/service: missav-dlp-web. Existing container remains exited (137). Original Compose order is the first three paths below. All hashes match the prior audit. Both exact image IDs are local; the original resolved image reference points to the old image.
+
+| Input | SHA-256 | Mode |
+|---|---|---|
+| /opt/missav-dlp-web/compose.yaml | 3fd488ece06cb4d117a28f272b52205c7e4624766090d686f7156e1ef5b3f912 | 0644 |
+| /tmp/e4b-web-image-override.yaml | 880cfcc3a249898091e5589470f7d4f36d1f0893501a7b5dbf374903575c0a94 | 0600 |
+| /opt/missav-dlp-web/stage13-ui-24fc73a.override.yaml | 22d43e6da73878007ef8483d458652622d7a703ea7747ac25a251c828ea29559 | 0600 |
+| /opt/missav-dlp-web/gluetun.env | c32d4340c4b39997a1fd6e811995c45f7eaebeea2ac940d6e17c532e9738977d | 0600 |
+| /opt/missav-selkies-browser-config/selkies-auth.env | cd4b9c5dd0c94ea322def9e09020d7be2263293df31756f771e97a4b882f7040 | 0600 |
+
+Use --env-file /opt/missav-dlp-web/gluetun.env explicitly. That is the actual recorded Compose interpolation source. With ambient interpolation variables removed, config resolves and all 31 service environment values match inspect. Old/new image defaults overlaid with Compose reproduce the full effective environment. No secret values were printed or persisted. The Selkies env-file is an existing model dependency for rendering even though its services are not targeted. Do not create a new secret file or assume Downloader inspect env contains every interpolation value.
+
+The entire model, including other services and networks, changes only services.missav-dlp-web.image for both overrides. All 14 mounts, Writer RO mount/GID 988, port, network, DNS, execution defaults, resource/security defaults and restart policy match. Dependency evidence is Compose gluetun/service_started/required plus its running state; the live Docker dependency label is empty and Docker does not enforce Compose dependency relationships.
+
+### User-submitted backup evidence
+
+Run: /mnt/pve/Data_5TB/dldws001-backups/backup-20261020-110732-TbdQOd.
+Source manifest SHA-256: 252491423da01d4f1eeabad3e7caeaeac3e8cb23b2eb46818aba91b7be178d16.
+Reported PASS: BACKUP_ARCHIVE, ARCHIVE_SAFETY, RESTORE_CONTENT_HASHES 8640/8640, SOURCE_RECHECK, RESTORE_METADATA, CONFIG_BACKUP, CONFIG_RESTORE.
+Codex did not access pve or repeat these completed tests.
+
+### Recovery of the transient original override
+
+Exact UTF-8 content with final newline:
+
+~~~yaml
+services:
+  missav-dlp-web:
+    image: missav-dlp-web:stage13f2md10-52aa3f4
+~~~
+
+Path /tmp/e4b-web-image-override.yaml; SHA-256 880cfcc3a249898091e5589470f7d4f36d1f0893501a7b5dbf374903575c0a94; root:root mode 0600. Isolated reconstruction matches the exact hash. This non-secret recipe is also preserved in canonical handoff for reboot recovery. A later approved operation may restore a missing file from this recipe or the user-verified configuration backup. An existing different file blocks restoration; never overwrite it automatically. No production file was restored now.
+
+The two image-only JSON overrides in this plan directory were parsed by Compose. Their contents are also in canonical handoff for future reconstruction. These references are local Docker image IDs, confirmed by docker image inspect, and not repository@registry-digest references. Always use --pull never --no-build.
+
+### Pre-start gates for a separately approved deployment
+
+1. Reconfirm exact images, project/service, original file order and input/env-file hashes. Re-render using the explicit env-file and repeat the image-only comparison. Any mismatch blocks application.
+2. Confirm access to the Proxmox backup and existing verification/checksum records. Reconcile current source against backup-time state and the submitted manifest. Do not repeat backup/restore unless changes require it.
+3. Confirm the old container is still exited and no source writer is active. Recheck no pending/running jobs; four known errors remain at retry cap 30; auto_retry_max remains 30; parts are task-linked and intact; no orphan/loose temporary file would be cleaned; no MP4 recovery work is queued. Any mismatch blocks ordinary startup. Do not edit settings or retry tasks.
+4. Establish an agreed maintenance/no-new-download-request window and no competing restart/Compose automation. If ingress or automatic work cannot be controlled within the eventual approval, hold ordinary start. Keep Writer and Gluetun running.
+5. Reuse completed offline/health-only evidence. If a new canary is needed, include it in later approval: no production/Writer/DB/NAS mounts or network. READY is only liveness.
+6. After explicit deployment/rollback approval, use only the candidate command below. No compose down, orphan removal, dependency recreation, broad service targets, image tagging/pulling/building or container renaming. Container ID changes are already approved.
+7. Inspect resulting image/config and read-only HTTP/queue/log state. Check task/fragment preservation, retry cap, MP4 inactivity and Writer socket configuration/access without changing Writer. Send no download/retry/recovery/MP4 request.
+
+Ordinary startup can rewrite .tasks.json, start download/retry and MP4 recovery workers, clean temporary files and refresh proxies. Health-only READY does not establish production data or full application safety.
+
+### Validated future command arrays
+
+The config models for these argument arrays were validated. The up commands were NOT_EXECUTED. Reconstruct/revalidate isolated files if they are lost.
+
+Future deploy (NOT EXECUTED):
+
+~~~sh
+docker compose --project-directory /opt/missav-dlp-web -p missav-dlp-web --env-file /opt/missav-dlp-web/gluetun.env -f /opt/missav-dlp-web/compose.yaml -f /tmp/e4b-web-image-override.yaml -f /opt/missav-dlp-web/stage13-ui-24fc73a.override.yaml -f /tmp/dldws001-compose-final-20261020-r1zmpp5n/candidate-image.json up -d --no-deps --pull never --no-build missav-dlp-web
+~~~
+
+Future rollback (NOT EXECUTED):
+
+~~~sh
+docker compose --project-directory /opt/missav-dlp-web -p missav-dlp-web --env-file /opt/missav-dlp-web/gluetun.env -f /opt/missav-dlp-web/compose.yaml -f /tmp/e4b-web-image-override.yaml -f /opt/missav-dlp-web/stage13-ui-24fc73a.override.yaml -f /tmp/dldws001-compose-final-20261020-r1zmpp5n/rollback-image.json up -d --no-deps --pull never --no-build missav-dlp-web
+~~~
+
+### Failure and rollback
+
+Stop further requests and verify the new container identity. Under future rollback approval, stop only the new missav-dlp-web service gracefully and verify workers exited. Keep Writer, Gluetun, all other services and LXC running.
+
+Compare current work state against the backup. Preserve new tasks/outputs/fragments. Never unpack over work, delete deltas or overwrite parts automatically. If changes are understood compatible state serialization only, use image rollback without data restore. If state is incompatible, validate staged backup and select only explicitly approved restoration. Unknown deltas or restoration authority block startup and require a user decision. Old-image startup has side effects too, so retry/cleanup/queue gates apply again.
+
+When state is safe, apply only the rollback command above. Recheck old image ID, effective config, port/network, Writer RO mount/GID, read-only health/logs and task/fragment state. Old-image recreation alone does not prove data recovery. New container IDs are allowed; no rename workaround is needed.
+
+### Evidence and limits
+
+verification-final.json records passing final comparisons. verification.json preserves the first helper result: false differences came from unstable Docker Mounts array order and an unavailable dependency label. The final helper compares complete sorted mount sets and actual Compose dependency semantics; product behavior and safety assertions were unchanged.
+
+Compose/env sources, Downloader ID/state/config, Gluetun identity/PID/start state and Writer PID/socket metadata stayed unchanged. No work data was read or modified. No lifecycle command, deployment or full application integration test ran.
+
+### Durable image-only override contents (not installed)
+
+candidate-image.json:
+
+~~~json
+{"services": {"missav-dlp-web": {"image": "sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573"}}}
+~~~
+
+rollback-image.json:
+
+~~~json
+{"services": {"missav-dlp-web": {"image": "sha256:da1e46073bb94b1f942b67b2fead20cc00656922b65f446ef7316b48d706aa0f"}}}
+~~~
+
+PLAN_ARTIFACT: /tmp/dldws001-compose-final-20261020-r1zmpp5n/execution-plan.md
+FINAL_EVIDENCE: /tmp/dldws001-compose-final-20261020-r1zmpp5n/verification-final.json

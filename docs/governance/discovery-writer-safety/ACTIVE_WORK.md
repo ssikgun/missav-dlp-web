@@ -571,7 +571,7 @@ NEXT_DECISION: Rerun this approved backup-only phase from an authorized shell on
 
 APPROVAL_DATE: 2026-10-20
 AUTHORIZATION: Explicit user approval in the DLDWS-001 production Compose reproduction and final rollback readiness request.
-EXECUTION_STATUS: AUTHORIZED_READ_ONLY; production deployment remains unauthorized.
+EXECUTION_STATUS: COMPLETED_READ_ONLY; configuration reproduction and rollback procedure PASS. Production deployment remains unauthorized.
 SHARED_TASK: DLDWS-001
 REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
 CONTRACT_VERSION: 1.0.0
@@ -595,3 +595,20 @@ SOURCE_MANIFEST_SHA256: 252491423da01d4f1eeabad3e7caeaeac3e8cb23b2eb46818aba91b7
 Do not repeat these completed backup/restore tests. Reconfirm source/backup state immediately before any later approved deployment.
 
 NEXT_DECISION: Complete only the read-only Compose/interpolation/image-only override and rollback validation; actual deployment requires separate approval. Ordinary startup can save task state, start retry/MP4 recovery workers, clean temporary files, and refresh proxies; health-only READY does not verify production data or application integration.
+
+### EXECUTION_RESULT — read-only Compose reproduction and rollback readiness (2026-10-20)
+
+CANONICAL_APPROVAL_READBACK: PASS at ed9b8596bfcd03e0f6f60e9a2312fd88674139f1; both approval sections matched.
+COMPOSE_REPRODUCTION: PASS. Original project/service and all three Compose inputs match the existing container. All file hashes match the prior audit.
+ENV_INTERPOLATION: PASS. The actual recorded interpolation source is --env-file /opt/missav-dlp-web/gluetun.env. It resolves without ambient interpolation values; all 31 service environment values and the full effective old/new-image environment match inspect. No secret values were printed or persisted.
+IMAGE_ONLY_OVERRIDE: PASS. Both candidate and rollback full models differ from the original only at services.missav-dlp-web.image; exact local image IDs are present. Ports, 14 mounts, Writer RO socket/GID 988, network/DNS, restart, resource/security and execution defaults match.
+OLD_IMAGE_ROLLBACK: READY. Explicit env-file, project, original file order, exact old image override and service-only --no-deps --pull never --no-build argument array are validated, not executed.
+DATA_BACKUP: PASS solely from the user's submitted Proxmox execution results; not a Codex host verification. The reported 8640/8640 restore hashes and config restore PASS were reused without repeating backup tests.
+ROLLBACK_READINESS: READY for configuration and procedure; source/backup/task/parts/queue state and maintenance conditions must be reconfirmed immediately before any separately approved ordinary start.
+TEMP_OVERRIDE_RECOVERY: PASS. Exact non-secret contents and SHA-256 880cfcc3a249898091e5589470f7d4f36d1f0893501a7b5dbf374903575c0a94 are preserved in canonical handoff. Isolated reconstruction matched; no production restore ran.
+FINAL_VERIFICATION: PASS, 36 checks. The initial helper result is retained: unordered inspect Mounts and an empty dependency label caused false comparisons. The final helper compares complete sorted mount sets and actual Compose dependency semantics; no product behavior or safety check was relaxed.
+PRODUCTION_DEPLOYMENT: NOT_RUN. Container 880cf97a6a3dece8e5ea51def22900c3aa41c32c2b73ba8f098c3025d7e9d4ca remained exited (137). Compose/env inputs, Writer PID/socket metadata and Gluetun ID/PID/start state were unchanged. No work data, database, NAS/Jellyfin or Stage11 resource was accessed or changed.
+PLAN: /tmp/dldws001-compose-final-20261020-r1zmpp5n/execution-plan.md; SHA-256 0dc8c5189abcf1a300915ba9756e87d171c74b1fb8623e44765d542a3b0a63be.
+FINAL_EVIDENCE: /tmp/dldws001-compose-final-20261020-r1zmpp5n/verification-final.json; SHA-256 a6abebb5d123db6ca464f9105962c17268dbef68e8a4d5fab45e2e9c9148e866.
+
+NEXT_DECISION: User decision on production deployment of exact image sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573 under the recorded backup/rollback and fresh pre-start gates. No execution is authorized by this review result.
