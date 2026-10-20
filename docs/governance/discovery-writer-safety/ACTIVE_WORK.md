@@ -750,3 +750,32 @@ REAL_DOWNLOAD_TEST: NOT_RUN.
 - Deployed source SHA-256: app.py 5912b09955493ce74919eb0e017f9e09a842e88ef30c778c9bfeee7b73676287; teddy_proxy_pool.py 9076e7b1ffd94f7868ea3b80aaa3c226233978d8566b7bcc70f7b4c2afcdf41e; teddy_routing.py e1c0c63b4ac360d927873adc5fd5ea6ac4b23743eef4fb55c9d20802932f2254; teddy_bootstrap.py 0bddf29291379fa01b529429303460f85e7c863887d856e99502d5e2e3ae87d4; teddy_entrypoint.py a538f2087ff6466d60ee750551605087932d041ae1667f11951875fb02022916. Sources came from the running container filesystem without import, not assumed from canonical product code.
 
 NEXT_WARNING_DECISION: Read-only investigation complete. The only proposed next action is the separately approved minimal SpoofDPI diagnostic change above; no remediation or real-use test follows automatically.
+
+
+## SEPARATE APPROVED EXECUTION — isolated Downloader restart/bulk retry UI and SpoofDPI diagnostics
+
+APPROVAL_DATE: 2026-10-20
+AUTHORIZATION: Explicit user approval for implementation and isolated tests of the three features listed below.
+EXECUTION_STATUS: AUTHORIZED_ISOLATED_IMPLEMENTATION; no production connection or deployment authorized.
+SHARED_TASK: DLDWS-001
+REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
+EXECUTION_CONTRACT_VERSION: 1.0.0
+CANONICAL_BASE: 3a4eed998f99d55433c40b27f1f4715d182e4825.
+
+### AUTHORIZED_SCOPE
+
+- Add a settings-screen button to restart only the Downloader container after explicit confirmation and only when the app can prove no queued/running/paused-transition/MP4 work exists. Require authenticated CSRF-protected requests, fixed target identity, one in-flight operation, and verification of a real post-restart application response before the UI reports success. Reuse existing constrained helper patterns where applicable.
+- If no least-privilege controller already exists, implement and test only an isolated host-side control-helper candidate with a fixed Downloader target/protocol. The web app must not receive the Docker socket or arbitrary command/target API. Do not install, grant privileges to, or connect an operational helper. Mark production restart integration BLOCKED_PENDING_APPROVAL until separately approved host wiring exists.
+- Add a download-list button and server bulk-retry operation that rechecks current state, includes only failed tasks, avoids duplicate/auto-retry queue races, preserves the existing manual-retry retry-budget reset semantics and all .parts/resume data, reports per-item success/skipped/failure, and fails closed when state or available bytes/inodes are insufficient. Keep max_concurrent=4. Use only synthetic files/tasks in tests; never enqueue or trigger an actual download.
+- Add bounded, redacted SpoofDPI early-exit diagnostics in app.py without changing its command arguments, routing, automatic restart behavior, or network behavior.
+- Update both source UI and the existing build-time UI patch path so the buttons survive Dockerfile patch ordering. Preserve the existing authenticated UI, individual retry, and settings-save behavior.
+- Run focused isolated unit/smoke checks and diff validation. Keep all product changes on an isolated candidate branch and do not push product code or build/deploy Docker images.
+- Publish this same authorization and final evidence in both workstreams and canonical handoff. Discovery Writer Safety participates for shared-task authorization only; no Writer code/resource is in scope.
+
+### PROHIBITED_SCOPE
+
+No production Docker or other service lifecycle operation, helper installation/privilege grant, Compose/systemd/host setting change, real download/retry/MP4 task, proxy measurement or external test request, DB/production work-file change, Writer/Gluetun/Selkies/NAS/Jellyfin/Stage11 change, verified image build/deployment, or product-code push to canonical. Do not alter max_concurrent=4 or the existing four failed tasks and 8,637 fragments. Do not implement broader proxy routing or automatic SpoofDPI recovery.
+
+### ACCEPTANCE_AND_NEXT_DECISION
+
+Focused tests cover restart authentication/CSRF/fixed target/activity gates/single-flight/readiness semantics; bulk state eligibility/duplicates/auto-retry race/ENOSPC/partial outcomes/fragment preservation/individual retry regression; SpoofDPI normal/early exit/missing executable/redaction/output bounds; and final patched UI presence/responsive behavior. Any unavailable browser or operational integration evidence stays UNKNOWN/BLOCKED rather than being inferred. Report implementation and test results separately from operational availability. A separately approved host-helper integration and production deployment are future decisions.
