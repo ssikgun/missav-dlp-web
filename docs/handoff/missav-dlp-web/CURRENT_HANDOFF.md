@@ -13292,3 +13292,21 @@ REAL_DOWNLOAD_TEST: NOT_RUN.
 - Deployed source SHA-256: app.py 5912b09955493ce74919eb0e017f9e09a842e88ef30c778c9bfeee7b73676287; teddy_proxy_pool.py 9076e7b1ffd94f7868ea3b80aaa3c226233978d8566b7bcc70f7b4c2afcdf41e; teddy_routing.py e1c0c63b4ac360d927873adc5fd5ea6ac4b23743eef4fb55c9d20802932f2254; teddy_bootstrap.py 0bddf29291379fa01b529429303460f85e7c863887d856e99502d5e2e3ae87d4; teddy_entrypoint.py a538f2087ff6466d60ee750551605087932d041ae1667f11951875fb02022916. Sources came from the running container filesystem without import, not assumed from canonical product code.
 
 NEXT_WARNING_DECISION: Read-only investigation complete. The only proposed next action is the separately approved minimal SpoofDPI diagnostic change above; no remediation or real-use test follows automatically.
+
+
+## DLDWS-001 — Downloader restart helper installation preflight (2026-10-20)
+
+Canonical authorization for the separately approved helper-installation phase was read back identically from Downloader and Discovery Writer Safety at commit 26b35a4ef48d283a37343617921dff8e079b3f72 before operational preflight.
+
+### RESULT
+
+- HELPER_INSTALL=BLOCKED; no service, socket, helper file, Compose setting, or production resource was changed.
+- HELPER_AUTH=FAIL for production readiness. Candidate access control is SO_PEERCRED uid==0 plus a root:root 0600 socket; no distinct Downloader-container identity or durable replay defense is verified. The request cache is in-memory and bounded.
+- FIXED_TARGET_CONTROL=PASS in isolated mock only: extra target input is rejected; Docker calls are hard-coded to missav-dlp-web and the Compose service label; mock asserted exact inspect/restart argv. Runtime ID/image pin was not verified.
+- RESTART_RACE_SAFETY=BLOCKED: candidate app preflight sets downloader_restart_pending under queue_admission_lock, but the host helper has no one-time permit/state check and accepts a restart from any uid-0 peer. Do not expose/enable a live restart endpoint.
+- HELPER_CLIENT_CONNECTIVITY=BLOCKED: environment reported hostname downloader and LXC, but CT108 identity was not independently confirmed. Docker API access was denied; systemd system bus was inaccessible; static unit verification was blocked by SO_PASSCRED permission error.
+- REAL_RESTART=NOT_RUN; RESTART_UI_PRODUCTION=NOT_DEPLOYED; BULK_RETRY_PRODUCTION=NOT_DEPLOYED; PRODUCTION_CONTAINER=UNCHANGED; PRODUCTION_DEPLOYMENT=NOT_RUN.
+
+Candidate /tmp/dldws001-ui-convenience-20261020 remained on branch codex/dldws001-ui-convenience-20261020 at HEAD 37cb16030930f7fe7edd7c8fa9423b4e0f90e9dc with all pre-existing dirty files preserved. Its mock-backend smoke passed with PYTHONDONTWRITEBYTECODE=1; no Docker API or socket request occurred. The local checkout was a different branch/HEAD, so canonical state was verified and updated through the GitHub connector. No Downloader data, image, Compose, Writer, Gluetun, NAS/Jellyfin or Stage11 resource was changed.
+
+NEXT: Close the helper caller-identity/replay and execution-time permit gaps, then repeat read-only preflight from a verified CT108 session with Docker and systemd access. No live restart or UI connection follows automatically.
