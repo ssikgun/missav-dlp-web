@@ -13310,3 +13310,33 @@ Canonical authorization for the separately approved helper-installation phase wa
 Candidate /tmp/dldws001-ui-convenience-20261020 remained on branch codex/dldws001-ui-convenience-20261020 at HEAD 37cb16030930f7fe7edd7c8fa9423b4e0f90e9dc with all pre-existing dirty files preserved. Its mock-backend smoke passed with PYTHONDONTWRITEBYTECODE=1; no Docker API or socket request occurred. The local checkout was a different branch/HEAD, so canonical state was verified and updated through the GitHub connector. No Downloader data, image, Compose, Writer, Gluetun, NAS/Jellyfin or Stage11 resource was changed.
 
 NEXT: Close the helper caller-identity/replay and execution-time permit gaps, then repeat read-only preflight from a verified CT108 session with Docker and systemd access. No live restart or UI connection follows automatically.
+
+## SEPARATE APPROVED EXECUTION — Downloader server restart excluded (2026-10-20)
+
+USER DECISION: Exclude the new Downloader server restart feature from this isolated candidate. This scope reduction supersedes the prior helper-install approval. Preserve the earlier approval and blocked helper preflight as historical records; do not infer helper installation or restart authorization from them.
+
+SERVER_RESTART_FEATURE=EXCLUDED
+HELPER_INSTALL=NOT_RUN
+BULK_RETRY=PASS
+FLASK_ROUTE_INTEGRATION=PASS
+ENOSPC_INODE_BLOCKS=PASS
+PARTS_PRESERVATION=PASS
+SPOOFDPI_DIAGNOSTIC=PASS
+UI_BROWSER=PASS
+DESKTOP_LAYOUT=PASS (1440x900)
+MOBILE_LAYOUT=PASS (390x844)
+SELKIES_SETTINGS_INDIVIDUAL_RETRY=PASS
+FINAL_DOCKERFILE_UI_PATCH=PASS
+DOWNLOADER_RESTART_CODE_REMAINS=NO
+PRODUCTION_DEPLOYMENT=NOT_RUN
+REAL_DOWNLOAD_TEST=NOT_RUN
+OPERATING_RESOURCES_CHANGED=NONE
+
+The candidate at `/tmp/dldws001-ui-convenience-20261020`, branch `codex/dldws001-ui-convenience-20261020`, HEAD `37cb16030930f7fe7edd7c8fa9423b4e0f90e9dc`, was edited in place without reset, clean, rebase, or commit. Removed the Downloader-only settings button/client handler/API routes, restart-pending flag and its queue gates, helper transport code, helper smoke cases, Docker helper units/service/socket, helper-only ignore entry, and restart-only styling/build markers. The shared `queue_admission_lock` remains around download admission, automatic retry, manual retry, and bulk retry; existing Selkies restart controls remain. The settings copy still says changes require a restart.
+
+Focused validation used an isolated synthetic filesystem/app and no production jobs. The actual Flask test_client covered bulk-route auth/CSRF, failed-only selection, already-queued and MP4 exclusions, duplicate protection against the automatic retry lock race, byte/inode fail-closed behavior, partial results, retry state, and synthetic fragment hashes. Synthetic admin smoke retained SpoofDPI early-exit diagnostics and bulk retry checks. The Dockerfile UI patch was replayed in `/tmp/dldws001-ui-restart-excluded-20261020`; the resulting UI retained the bulk button, Selkies controls and settings guidance, and had no Downloader restart button or request handler. Node.js v24.22.0 and Chromium 156.0.8078.4 ran 10 synthetic browser scenarios. Unexpected console errors: 0; external/production requests: 0. Browser result: `/tmp/dldws001-ui-restart-excluded-20261020/evidence/browser-results.json`, SHA-256 `8241077e96b880a29e425a7fb6a22283d5cbb9ce65c788d724d48bf2d1ea0fa6`. Python syntax and `git diff --check` passed.
+
+Helper installation, live restart, Docker build/deploy, production download/retry, and canonical product-code merge were not run. The existing 4 production error jobs, 8,637 fragments, `max_concurrent=4`, Writer/Gluetun, NAS/Jellyfin and Stage11 remain outside this execution and unchanged.
+
+NEXT: Decide separately whether to authorize canonical publication of the remaining bulk-retry and SpoofDPI candidate changes; no helper installation or production deployment follows automatically.
+
