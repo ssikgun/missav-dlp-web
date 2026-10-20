@@ -874,3 +874,34 @@ APPROVED_SCOPE:
 PROHIBITED: Do not publish any Downloader server-restart UI/API, Docker restart helper, service/socket, privilege or management control path. Do not build/deploy images, restart or replace production containers, run downloads/retries, or change Writer, Gluetun, Stage11, NAS/Jellyfin, or operational data.
 VALIDATION: Reuse the recorded Flask route integration and Chromium 10-scenario evidence; run focused syntax, bulk retry/SpoofDPI smoke, final UI patch validation, and git diff --check for the exact selected publication set.
 EXECUTION_STATUS: AUTHORIZED; canonical code publication pending approval-record readback and focused prepublication validation.
+
+
+## SEPARATE APPROVED EXECUTION RESULT — Canonical publication (2026-10-20)
+
+USER_APPROVAL: The user explicitly approved publishing only the verified failed-download bulk retry UI/API and bounded SpoofDPI early-exit diagnostics.
+CANONICAL_CODE_PUBLISH=PASS
+CODE_COMMIT=453011a0f9c71ccf7a4ab6cfef96b375213211a1
+BULK_RETRY=PASS
+SPOOFDPI_DIAGNOSTIC=PASS
+SERVER_RESTART_FEATURE=EXCLUDED
+CANONICAL_READBACK=PASS (12/12 published product/build/test files read back with matching Git blob hashes)
+PRODUCTION_DEPLOYMENT=NOT_RUN
+REAL_DOWNLOAD_TEST=NOT_RUN
+OPERATING_RESOURCE_CHANGES=NONE
+
+PUBLISHED_FILES:
+- Dockerfile
+- app.py
+- teddy_entrypoint.py
+- teddy_patch_index.py
+- teddy_routing.py
+- teddy_downloader_admin.py
+- teddy_patch_downloader_admin.py
+- teddy_downloader_admin_smoke.py
+- teddy_downloader_admin_flask_smoke.py
+- teddy_spoofdpi.py
+- templates/index.html
+- templates/teddy-reliability.js
+
+VALIDATION: Reused the recorded Flask route integration and 10-scenario Chromium evidence. Focused synthetic bulk-retry/SpoofDPI smoke, Python syntax, JavaScript syntax (Node.js v24.22.0), ordered Dockerfile UI patch-chain validation, and git diff --check passed. No Docker image was built; no production container, download, queue, or operational data was changed. Existing Selkies restart and individual-download retry remain; max_concurrent=4 is preserved.
+NEXT: Any Docker image build or production deployment requires a separate user approval.

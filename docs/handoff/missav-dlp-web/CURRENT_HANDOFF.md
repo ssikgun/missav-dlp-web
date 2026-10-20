@@ -13339,3 +13339,34 @@ Focused validation used an isolated synthetic filesystem/app and no production j
 Helper installation, live restart, Docker build/deploy, production download/retry, and canonical product-code merge were not run. The existing 4 production error jobs, 8,637 fragments, `max_concurrent=4`, Writer/Gluetun, NAS/Jellyfin and Stage11 remain outside this execution and unchanged.
 
 NEXT: Decide separately whether to authorize canonical publication of the remaining bulk-retry and SpoofDPI candidate changes; no helper installation or production deployment follows automatically.
+
+
+## SEPARATE APPROVED EXECUTION RESULT — Canonical publication (2026-10-20)
+
+USER_APPROVAL: The user explicitly approved publishing only the verified failed-download bulk retry UI/API and bounded SpoofDPI early-exit diagnostics.
+CANONICAL_CODE_PUBLISH=PASS
+CODE_COMMIT=453011a0f9c71ccf7a4ab6cfef96b375213211a1
+BULK_RETRY=PASS
+SPOOFDPI_DIAGNOSTIC=PASS
+SERVER_RESTART_FEATURE=EXCLUDED
+CANONICAL_READBACK=PASS (12/12 published product/build/test files read back with matching Git blob hashes)
+PRODUCTION_DEPLOYMENT=NOT_RUN
+REAL_DOWNLOAD_TEST=NOT_RUN
+OPERATING_RESOURCE_CHANGES=NONE
+
+PUBLISHED_FILES:
+- Dockerfile
+- app.py
+- teddy_entrypoint.py
+- teddy_patch_index.py
+- teddy_routing.py
+- teddy_downloader_admin.py
+- teddy_patch_downloader_admin.py
+- teddy_downloader_admin_smoke.py
+- teddy_downloader_admin_flask_smoke.py
+- teddy_spoofdpi.py
+- templates/index.html
+- templates/teddy-reliability.js
+
+VALIDATION: Reused the recorded Flask route integration and 10-scenario Chromium evidence. Focused synthetic bulk-retry/SpoofDPI smoke, Python syntax, JavaScript syntax (Node.js v24.22.0), ordered Dockerfile UI patch-chain validation, and git diff --check passed. No Docker image was built; no production container, download, queue, or operational data was changed. Existing Selkies restart and individual-download retry remain; max_concurrent=4 is preserved.
+NEXT: Any Docker image build or production deployment requires a separate user approval.
