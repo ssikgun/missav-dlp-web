@@ -394,7 +394,7 @@ NEXT_DECISION: Review a separate operating backup, rollback and deployment proce
 
 APPROVAL_DATE: 2026-10-20
 AUTHORIZATION: Explicit user approval in the DLDWS-001 Downloader production backup, rollback, and deployment-plan final review request.
-EXECUTION_STATUS: AUTHORIZED; READ_ONLY_REVIEW_IN_PROGRESS. Production backup and deployment are not authorized.
+EXECUTION_STATUS: COMPLETED_READ_ONLY_REVIEW; production backup and deployment remain unauthorized.
 SHARED_TASK: DLDWS-001
 REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
 CANONICAL_BASE: `teddy-subtitle-stage11` at `0ed3544fa8c944719c22cc8cbbaa3e86b2d36517`.
@@ -428,3 +428,30 @@ This separate phase authorizes read-only inspection of the pinned local image, e
 - Result records `PRODUCTION_BACKUP=NOT_RUN` and `PRODUCTION_DEPLOYMENT=NOT_RUN`; operations remain unchanged.
 
 NEXT_DECISION: Finish the read-only production preflight and produce the plan; any actual backup or deployment requires separate explicit approval.
+
+### EXECUTION_RESULT — Downloader production backup, rollback, and deployment-plan review (2026-10-20)
+
+EXECUTION_STATUS: COMPLETED_READ_ONLY_REVIEW. Production backup and deployment remain unauthorized and NOT_RUN.
+DEPLOYMENT_PLAN: BLOCKED; durable backup destination and container-identity decision remain unresolved.
+IMAGE_PIN: PASS; exact local candidate tag and image ID match. Existing image ID also remains present.
+COMPOSE_COMPATIBILITY: PASS; live three-file Compose configuration resolved using current inspect environment matched the exited container on image, service/name, restart, GID 988, port, all 14 mounts, and all 31 service environment keys; no secret values were recorded.
+BACKUP_PLAN: BLOCKED; `/var/backups` shares the source `/dev/loop4` filesystem; `/tmp` is volatile tmpfs and cannot hold a verified archive-plus-restore. No approved separate persistent target was identified.
+ROLLBACK_PLAN: BLOCKED; restore data has not been created or verified. Standard Compose image replacement recreates the existing container, so exact container ID preservation is not available in the standard path.
+DATA_PROTECTION: UNKNOWN until an independent backup and restore check pass.
+PRODUCTION_BACKUP: NOT_RUN. PRODUCTION_DEPLOYMENT: NOT_RUN.
+
+OBSERVED_STATE: existing `missav-dlp-web` container ID `880cf97a6a3dece8e5ea51def22900c3aa41c32c2b73ba8f098c3025d7e9d4ca` remains `exited (137)` on image `sha256:da1e46073bb94b1f942b67b2fead20cc00656922b65f446ef7316b48d706aa0f`; candidate image is `missav-dlp-web:dldws001-deployable-startup-20261020`, `sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573`. Current production work has 4 ENOSPC-error tasks, each retry count 30; saved settings are `auto_retry=true`, cap 30, concurrency 2; four task-linked `.parts` directories contain 8,637 files / 16,996,662,891 bytes; no orphan parts, loose `.*.part.ts`, or MP4 queue task record was found. These current counts are read-only observations and must be rechecked before any later execution.
+
+COMPOSE_INPUTS (actual order): `/opt/missav-dlp-web/compose.yaml`, `/tmp/e4b-web-image-override.yaml`, `/opt/missav-dlp-web/stage13-ui-24fc73a.override.yaml`. The Downloader service is `unless-stopped`, `58000:5000`, default bridge network, depends on the currently running `gluetun-missav`, and has a read-write `/downloads` bind plus read-only Writer socket mount and GID 988. `docker.service` is enabled/running; no Downloader-specific systemd unit was found. Writer service/socket remains active/listening with systemd socket FD `writer`, `Accept=no`, `0660`, parent `0750`; it was not changed.
+
+BACKUP/DEPLOYMENT PLAN: first obtain an approved separate persistent destination with at least 40 GB free and 20,000 free inodes for archive plus scratch restore verification of the current partial set. After a separate execution approval, hold Docker auto-start in a known state, confirm the container is exited and no process changes `/opt/missav-dlp-web/work`, then archive only `.tasks.json`, `.settings.json`, `.proxy-pool.json`, and all direct-child `.*.parts` with numeric owner, ACL, xattr, sparse-file, and symlink preservation. Save Compose inputs and effective container metadata in a restricted location; do not expose environment values. Verify one archive checksum, private member-count/readback, and extraction into scratch before any ordinary start. Do not use `/var/backups` or `/tmp` for that purpose.
+
+Before normal start, recheck there are no pending/running tasks, all error retries remain at cap, all parts are task-linked, loose temp files are absent, and MP4 queue state is empty. If any task is below retry cap while `auto_retry=true`, or any temp/orphan part exists, hold normal start; use the existing setting only after explicit authorization, or remain blocked. Health-only canary must be a separate data-less/network-disabled container and proves only image liveness. Ordinary startup writes `.tasks.json`, starts download/retry and MP4 recovery workers, may clean temp/orphan files, and may refresh proxies.
+
+For a later approved data transition, add an image-only override after all current Compose files and target only `missav-dlp-web` with `--no-deps --pull never --no-build`; immediately re-render and compare all non-image settings. Compose will stop/recreate the existing service; `--no-recreate` leaves the old image in place. An alternate rename/side-by-side plan has not been validated against the fixed name, project labels, and port; user must decide whether to accept a new container ID or separately approve another tested cutover plan. Rollback must stop the new container, compare against backup, preserve new output/parts, and restore only after proving no conflicting post-start work; never unpack over `/work` wholesale. Recreate the old image by its exact ID and current Compose configuration; Writer remains untouched.
+
+LIMITED_VERIFICATION: `git diff --check` passed for the approval record; synthetic tar archive/restore round-trip preserved state files, synthetic fragment, file mode and symlink. Existing final-image build and offline regression PASS were reused, not rerun.
+OPERATIONS: NONE. No production data, container, image, Compose, Writer, DB, NAS/Jellyfin, or Stage11 resource changed.
+PLAN_ARTIFACT: `/tmp/dldws001-ops-plan-20261020/deployment-plan.md`; sanitized evidence: `/tmp/dldws001-ops-plan-20261020/evidence/read-only-preflight.json`.
+
+NEXT_DECISION: Select/approve an independent persistent backup target and decide whether losing the old container ID on Compose recreation is acceptable; only after those blockers are resolved request a separate actual-backup execution.
