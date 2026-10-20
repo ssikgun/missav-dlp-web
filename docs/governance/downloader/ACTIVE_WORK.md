@@ -905,3 +905,15 @@ PUBLISHED_FILES:
 
 VALIDATION: Reused the recorded Flask route integration and 10-scenario Chromium evidence. Focused synthetic bulk-retry/SpoofDPI smoke, Python syntax, JavaScript syntax (Node.js v24.22.0), ordered Dockerfile UI patch-chain validation, and git diff --check passed. No Docker image was built; no production container, download, queue, or operational data was changed. Existing Selkies restart and individual-download retry remain; max_concurrent=4 is preserved.
 NEXT: Any Docker image build or production deployment requires a separate user approval.
+
+
+## SEPARATE APPROVED EXECUTION — Final Docker image build and Downloader deployment (2026-10-20)
+
+USER_APPROVAL: The user explicitly approved building a new Docker image from canonical source, replacing only the existing Downloader container, validating HTTP/UI/data preservation, and one safe rollback if required.
+CANONICAL_BASE: b3494130fcf504bf468113dede75e86b17655b98
+PRODUCT_COMMIT: 453011a0f9c71ccf7a4ab6cfef96b375213211a1
+TASK: DLDWS-001; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+APPROVED_SCOPE: Build and inspect the verified bulk-retry/SpoofDPI candidate from a clean canonical worktree; if all required preflight checks pass, deploy that exact image to Downloader service `missav-dlp-web` only; verify runtime/UI/data and roll back once if material failure requires it.
+PROHIBITED: Downloader server-restart UI/API/helper; bulk-retry execution or real downloads; modifying existing jobs/fragments/settings; changing Writer, Gluetun, Selkies, NAS/Jellyfin or Stage11; replacing any service other than Downloader; altering or deleting the existing backup.
+PRECONDITIONS: Confirm CT108 identity and Docker engine access; verify the pinned prior/new image, actual Compose inputs and secrets without disclosure, backup archive/readback, current task/fragment hashes and storage capacity; no in-flight download/retry/MP4 work; compose delta is image-only; build output excludes Downloader server restart control. Stop without operational mutation if any check is unknown or fails.
+EXECUTION_STATUS=AUTHORIZED; approval-record readback required before build/deploy. Deployment is allowed only after all preconditions PASS.
