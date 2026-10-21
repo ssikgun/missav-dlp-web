@@ -1096,3 +1096,19 @@ EVIDENCE: /tmp/dldws001-legacy-overlay-20261021/tests/state_persistence_probe.py
 PRODUCTION_DEPLOYMENT=NOT_RUN; REAL_DOWNLOAD_TEST=NOT_RUN; production resource writes NONE; canonical product publication NOT_RUN. Existing Downloader, settings/max_concurrent=4, task records, fragments, Writer/Gluetun/Selkies, backups and Stage11 remain untouched by this work.
 
 NEXT: Approve the minimal persistence/admission safety correction and revalidate the preserved failing ENOSPC regression. Do not build or deploy this candidate while the safety gate is FAIL.
+
+## SEPARATE APPROVED EXECUTION — Retry state persistence failure correction (2026-10-21)
+
+Shared task DLDWS-001; contract version 1.0.0; required workstreams downloader,discovery-writer-safety. User-approved isolated correction follows the preserved ENOSPC failure recorded in the previous result. Existing failure evidence must remain unchanged.
+
+OBJECTIVE: A retry may enter the download queue only after its updated task state has been durably and verifiably saved. On storage failure, reject queue admission and preserve the prior task file bytes, in-memory task record/retry count, and existing parts data.
+
+ALLOWED PRODUCT SCOPE: Modify only the minimum existing files among the already approved eight-file legacy overlay runtime set, specifically app.py, teddy_entrypoint.py, teddy_downloader_admin.py if necessary. A retry-only checked/atomic state persistence path is permitted; a global rewrite of save_tasks or a general persistence framework is not. Keep changes isolated under /tmp/dldws001-legacy-overlay-persist-20261021. Existing failure test/evidence under /tmp/dldws001-legacy-overlay-20261021 are immutable. New synthetic tests, test-only gate changes, and evidence are permitted.
+
+REQUIRED CHECKS: Retain and pass state_persistence_probe.py semantics; cover ENOSPC at open, partial write, flush/fsync, replace, and post-replace durability failure where safely injectable; confirm prior task-file bytes/hash, per-task memory state, queue, and parts hashes; exercise successful retry; retain auth/CSRF, MP4, capacity/inode, shared-lock and duplicate-queue checks. Do not overwrite unrelated task state during rollback. If restoration after an uncertain replace cannot be proven, fail closed and report the precise remaining limitation.
+
+PRESERVE: Existing 12 synthetic host PASS results, ten Chromium scenarios, the original failing probe/result, all prior approvals and Writer failure history. UI/SpoofDPI/Writer changes are excluded. Maximum download concurrency stays 4. No Downloader server restart control is added.
+
+PROHIBITED: Docker build, production deployment/restart/retry/download, production or NAS/Jellyfin/Stage11/Writer data/service changes, canonical product publication, test deletion/skip/weakening, global save_tasks policy change, or widening beyond the existing eight runtime files.
+
+EXECUTION_STATUS: AUTHORIZED only after this matching approval block is remotely read back from both workstreams. The previous build failure remains unresolved until the retained persistence regression passes. Even if this correction passes, no image build is authorized in this execution.
