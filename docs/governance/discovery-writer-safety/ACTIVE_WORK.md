@@ -1003,3 +1003,40 @@ APPROVED_SCOPE: teddy_library_discovery_writer.py and teddy_library_discovery_wr
 SAFETY_BOUNDARY: Neither extra stat/connect checks nor advisory locks prove protection against a noncooperating replacement. If safe automatic stale cleanup cannot be proved, fail closed and report the stale-recovery/design conflict as BLOCKED; retain the recovery test failure instead of redefining it as PASS. Reuse existing verified lifetime mechanisms only within this scope; do not invent a broad architecture.
 PROHIBITED: Canonical product-code publication, Docker build/deployment, operational socket/service/systemd/DB/download/data changes, modifications to protected candidates, Stage11, NAS/Jellyfin, test skips or weakened safety expectations.
 EXECUTION_STATUS: AUTHORIZED; implementation begins after matching approval records are remotely read back.
+
+
+## SEPARATE APPROVED EXECUTION RESULT — Active socket replacement race fix (2026-10-21)
+
+TASK_ID: DLDWS-001
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+WRITER_RACE_FIX=BLOCKED
+ACTIVE_LISTENER_SAFETY=PASS
+IDENTITY_COLLISION_SAFETY=PASS
+REPLACEMENT_RACE_SAFETY=PASS
+MULTIPROCESS_SAFETY=PASS
+STALE_SOCKET_RECOVERY=FAIL
+WRITER_SMOKE=FAIL
+DB_REPLAY_REGRESSION=PASS
+UNSAFE_UNLINK_MUTATION_DETECTION=PASS
+PYTHON_SYNTAX=PASS
+GIT_DIFF_CHECK=PASS
+PRODUCTION_WRITER=UNCHANGED
+CANONICAL_PRODUCT_CODE=NOT_PUBLISHED
+DOCKER_IMAGE_BUILD=NOT_RUN
+PRODUCTION_DEPLOYMENT=NOT_RUN
+OPERATIONAL_RESOURCE_CHANGES=NONE
+
+CANDIDATE: /tmp/dldws001-writer-race-fix-20261021, branch codex/dldws001-writer-race-fix-20261021, base 6d02dbcc22367cd184017a6e0b5d451f0cd3e9d1. Only teddy_library_discovery_writer.py, teddy_library_discovery_writer_smoke.py and the new Writer-only teddy_library_discovery_writer_race_smoke.py differ; all remain uncommitted in the isolated candidate. The previous failing smoke was transplanted exactly (SHA-256 d1a20a2ad8435499914d5faf238a8f9da5a693b27c0304f40b22d92f854d34b4), without deleting/skipping/changing its requirements. Prior failure evidence hashes still match; release and B-option working trees remain clean.
+
+SAFE BOUNDARY: Replaced only _prepare_socket_parent's automatic unlink block with WRITER_UNAVAILABLE. Existing type/owner/parent/probe and already-disappeared-path handling remain. There is no unlink call left in the Writer implementation, so this cleanup path cannot delete a noncooperating replacement after the last check, with or without colliding metadata. No advisory lock or repeated stat/connect is claimed to make deletion atomic. Fresh Unix bind arbitrates competing creators without deleting the losing process's path. This does not prevent unrelated processes from deleting a path themselves.
+
+VERIFICATION: Python 3.10.22 ran 8 focused tests successfully: real active-listener preservation; both unchanged distinct/colliding replacement fixtures; real replacement after the final lstat result was captured; parent/type/symlink/owner and EACCES/EAGAIN/ETIMEDOUT/EIO boundaries; DB preflight/RECONCILED/replay/ALREADY_RECONCILED; and detection of an unsafe unlink mutant even if it returns WRITER_UNAVAILABLE. Real path/listen/health and no-unlink checks passed. Six independent spawned Python processes exercised two simultaneous fresh starts (one listener, one EADDRINUSE), two cleanup attempts against that active winner, and two against its retained stale path after shutdown. All exited normally with zero unlink calls; the winner kept its path and health READY after concurrent cleanup attempts. Syscall spy wrappers passed through real operations; no mock socket/backend replaced these checks.
+
+COMPATIBILITY BLOCK: The preserved entire Writer smoke returns 1 at line 316, where direct-mode restart requires automatic stale cleanup. The safe candidate refuses the retained stale socket with WRITER_UNAVAILABLE. Thus normal direct-mode restart after a retained path and automatic stale recovery are not restored: STALE_SOCKET_RECOVERY=FAIL, WRITER_SMOKE=FAIL and overall BLOCKED. The recovery test has not been relaxed. DB_REPLAY_REGRESSION=PASS is scoped to a separate synthetic test using explicit fixture-owned cleanup after its sole server was closed; it is not automatic Writer recovery evidence.
+
+DESIGN DECISION REQUIRED: The current direct-mode interface has no exclusive pathname-lifecycle authority against noncooperating replacements. Safe automatic unlink was not demonstrated. The existing B-option delegates path ownership to systemd and adopts an inherited FD, but its legacy cleanup is unchanged; it was inspected read-only and not imported or deployed. Decide whether to retire direct-mode automatic reclamation and align canonical startup with the already tested systemd-owned lifecycle before implementing compatibility changes. Do not publish/build/deploy this blocked candidate.
+
+EVIDENCE: /tmp/dldws001-writer-race-fix-evidence-20261021-8_n_7ns6/validation-summary.json, SHA-256 d7a7adee3ddc2570e5b770904304bb1947e05388a4286fb1334602cac0ce45d4; race-safety-python310.log (4c5935c8b94f57d1852d9c415202b91c2412f7150214f447ec22bb27b853056a); preserved-full-writer-smoke-python310.log (10377bfa5c5812db715d6ed9cc7ae13c78dc77176a575fb8675ad7ccea790635); safety-and-compatibility.md plus both candidate patches. Candidate Writer SHA-256 b8f6f638231bb13bb8dabcb5a3bb28907d515985c3ab8d17109cb801311c5c55; new race smoke SHA-256 bf004f58dde5e96c231602f2f86fff8f297fef4fdf526b01909eba38e60e5662.
+
+NEXT: User decision on retiring automatic direct-mode stale cleanup and using the existing systemd-owned socket lifecycle; no further implementation or operational change follows automatically.
