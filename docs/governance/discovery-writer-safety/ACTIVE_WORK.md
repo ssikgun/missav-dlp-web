@@ -1040,3 +1040,15 @@ DESIGN DECISION REQUIRED: The current direct-mode interface has no exclusive pat
 EVIDENCE: /tmp/dldws001-writer-race-fix-evidence-20261021-8_n_7ns6/validation-summary.json, SHA-256 d7a7adee3ddc2570e5b770904304bb1947e05388a4286fb1334602cac0ce45d4; race-safety-python310.log (4c5935c8b94f57d1852d9c415202b91c2412f7150214f447ec22bb27b853056a); preserved-full-writer-smoke-python310.log (10377bfa5c5812db715d6ed9cc7ae13c78dc77176a575fb8675ad7ccea790635); safety-and-compatibility.md plus both candidate patches. Candidate Writer SHA-256 b8f6f638231bb13bb8dabcb5a3bb28907d515985c3ab8d17109cb801311c5c55; new race smoke SHA-256 bf004f58dde5e96c231602f2f86fff8f297fef4fdf526b01909eba38e60e5662.
 
 NEXT: User decision on retiring automatic direct-mode stale cleanup and using the existing systemd-owned socket lifecycle; no further implementation or operational change follows automatically.
+
+
+## SEPARATE APPROVED EXECUTION — Legacy image eight-file overlay candidate (2026-10-21)
+
+TASK_ID: DLDWS-001
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+USER_APPROVAL: Prepare and verify an isolated derivative of parent image sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573 for failed-download bulk retry UI/API and bounded redacted SpoofDPI diagnostics, using final runtime snapshot /tmp/dldws001-legacy-runtime-20261021 and feature commit 453011a0f9c71ccf7a4ab6cfef96b375213211a1.
+RUNTIME_ALLOWLIST: /app/app.py, /app/teddy_entrypoint.py, /app/teddy_routing.py, /app/teddy_bootstrap.py, /app/templates/index.html, /app/templates/teddy-reliability.js, /app/teddy_downloader_admin.py, /app/teddy_spoofdpi.py only. Keep build recipe, tests and manifests outside copied runtime. Preserve authentication/CSRF, shared queue/state locks on all admission routes, MP4/ENOSPC/fragment protections, health-only, routing, Selkies and max_concurrent=4.
+BOUNDARY: New isolated directory; no changes to original snapshots/candidates. Allow an isolated no-network Docker build and synthetic tests only, with exact parent and final filesystem-difference verification. If Docker access is denied, do not escalate or change permissions: record build BLOCKED and provide an operator build command; host-only evidence does not count as final-image evidence.
+PROHIBITED: Production container/image/Compose/service/data changes, real retry/download/MP4 work, Docker pull or package installation, docker commit, canonical product publication, any Writer change or Writer safety PASS/full canonical-build PASS claim, reintroduction of Downloader server restart, Stage11/NAS/Jellyfin/backup changes.
+EXECUTION_STATUS: AUTHORIZED; candidate edits start only after matching approval records are remotely read back. Writer race and full canonical-build findings remain unresolved and preserved.
