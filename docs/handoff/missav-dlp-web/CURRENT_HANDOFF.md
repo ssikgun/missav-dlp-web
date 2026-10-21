@@ -13526,3 +13526,14 @@ Evidence: retained failure replay yielded succeeded=0, failed=1, queue_entries=0
 The persistent directory-fsync failure case fails closed: retry is denied, tested live bytes/memory and queue are restored, but crash durability remains UNKNOWN while the filesystem rejects both sync attempts; manual reconciliation is required. Writer safety issue remains unresolved.
 
 Docker build and production deployment were NOT_RUN. No production resources changed and no product code was published. Next step requires separate approval for Docker build and final-image offline verification.
+
+
+## DLDWS-001 — Existing-image overlay build blocked (2026-10-22)
+
+The separate build approval was registered identically in Downloader and Discovery Writer Safety. Static candidate preflight passed: the pinned parent image ID and all eight allowlisted runtime hashes matched the manifest; the source candidate remained unchanged. A separate byte-verified copy was prepared at /tmp/dldws001-overlay-build-20261022 with tag missav-dlp-web:dldws001-legacy-overlay-persist-20261022.
+
+The overlay build did not start. Read-only docker info was denied at /var/run/docker.sock in the downloader LXC even for UID 0; no permission change or escalation was attempted. Parent-image/container inspect, image build, final-image layer proof and final-image tests are NOT_RUN. New image ID: NONE. No Docker-mutating command or production change occurred.
+
+Prior candidate checks remain evidence only: persistence fault injection 11/11, Python host suite 12/12, retained state-save probe PASS, and Chromium 10/10 on the exact UI asset hashes. These are not final-image verification. Writer race and canonical Dockerfile smoke failure remain unresolved.
+
+Execution evidence: /tmp/dldws001-overlay-build-20261022/evidence/overlay-build-result.json and docker-access-preflight.json. Exact continuation command, subject to the build script's full fail-closed preflight: cd /tmp/dldws001-overlay-build-20261022 && python3 build_candidate.py. No deployment is authorized.

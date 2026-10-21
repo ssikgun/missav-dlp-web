@@ -1162,3 +1162,30 @@ No production deployment, Downloader container start/restart/replace, download o
 
 ### ACCEPTANCE_AND_BOUNDARIES
 Report the exact parent and new image IDs, allowlisted runtime diff, final-image offline test results, UI evidence and its provenance, Writer-file immutability, existing production container immutability, and unresolved gaps. Keep this approval active only for this one isolated build/verification execution. It does not authorize operational deployment.
+
+
+## EXECUTION RESULT — DLDWS-001 overlay build and final offline verification (2026-10-22)
+
+OVERLAY_BUILD=BLOCKED
+PARENT_IMAGE_ID=sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573 (pinned in manifest; local daemon inspect NOT_RUN)
+NEW_IMAGE_ID=NONE
+RUNTIME_FILE_DIFF=INCOMPLETE (source context contains exactly the eight allowlisted files with matching hashes; final image layer proof NOT_RUN)
+FLASK_AUTH_CSRF=INCOMPLETE (candidate host suite included this and passed 12/12; final image NOT_RUN)
+STATE_PERSISTENCE_SAFETY=INCOMPLETE (candidate fault suite 11/11 and retained ENOSPC probe PASS; final image NOT_RUN)
+QUEUE_RACE_SAFETY=INCOMPLETE (candidate host suite PASS; final image NOT_RUN)
+MP4_ENOSPC_FRAGMENT_SAFETY=INCOMPLETE (candidate host suite PASS; final image NOT_RUN)
+SPOOFDPI_DIAGNOSTIC=INCOMPLETE (candidate host suite PASS; final image NOT_RUN)
+UI_VALIDATION=INCOMPLETE (prior Chromium 10/10 PASS reused candidate UI hashes; final image linkage NOT_RUN)
+WRITER_FILES_UNCHANGED=YES in the source overlay allowlist; final image NOT_VERIFIED
+PRODUCTION_CONTAINER_UNCHANGED=YES (no Docker-mutating command was issued; live state inspection NOT_RUN)
+PRODUCTION_DEPLOYMENT=NOT_RUN
+REAL_DOWNLOAD_TEST=NOT_RUN
+WRITER_SAFETY_ISSUE=UNRESOLVED
+
+The source candidate manifest SHA-256 is a2b5c134528aea387fc93fd8d25c56e88c5c1a47c6408562536dd4fd9ab60b7f. All eight runtime hashes and the nine-file Docker context (Dockerfile plus eight runtime inputs) matched; the earlier failing-probe evidence SHA-256 d32e553ce3150f8bd7727e9066ad54b656174962531ef8f0d366e8d18909e3f1 remains preserved. The source candidate was not modified.
+
+Docker access was denied by a read-only docker info call in hostname downloader, LXC, UID 0/GID 0: permission denied connecting to /var/run/docker.sock (mode 0660, owner 0:65534). No permission change or escalation was attempted. Parent image and production container inspect, build, image run, and final-image tests therefore were not run.
+
+A separate byte-verified build copy is prepared at /tmp/dldws001-overlay-build-20261022. Its only build-script change is the unique candidate tag missav-dlp-web:dldws001-legacy-overlay-persist-20261022; its Docker context retains the eight manifest hashes. Exact command: cd /tmp/dldws001-overlay-build-20261022 && python3 build_candidate.py. The script reruns all preflight gates, builds with pull disabled and network none, proves image layers, and runs only bounded synthetic final-image tests. It stops on any mismatch or Docker API denial.
+
+Evidence: /tmp/dldws001-overlay-build-20261022/BUILD_EXECUTION.md; evidence/static-build-preflight.json; evidence/docker-access-preflight.json; evidence/overlay-build-result.json. Existing Writer race and full canonical Dockerfile smoke failure remain unresolved. No image was created and no production resource was changed.
