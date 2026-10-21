@@ -949,9 +949,9 @@ NEXT: Resume the approved preflight from a verified CT108 session with its exist
 
 ## SEPARATE APPROVED EXECUTION — Writer smoke inode reuse validation (2026-10-21)
 
-TASK_ID: DLDWS-001
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+> TASK_ID: DLDWS-001
+> CONTRACT_VERSION: 1.0.0
+> REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 USER_APPROVAL: Isolated modification and offline verification of teddy_library_discovery_writer_smoke.py only, based on c4c00605af6ea7ae9109a99ae39e8ecf76fd5c30. Replace inode-inequality assumptions with real socket type/mode, shutdown/cleanup, health, DB/replay and active-listener preservation evidence. Exercise replacement races, including reused/colliding identities, without weakening or skipping safety assertions. Preserve all prior evidence and protected candidates.
 BOUNDARY: Use a new isolated working tree, temporary synthetic sockets and databases, preferably Python 3.10. No production Writer code edits, canonical test-code publication, Docker build/deployment, service restart, operational socket/DB/data changes, Stage11 or NAS/Jellyfin work. Record any actual unsafe unlink as FAIL/BLOCKED; do not manufacture a pass.
 EXECUTION_STATUS: AUTHORIZED; implementation starts only after matching approval records are remotely read back.
@@ -959,9 +959,9 @@ EXECUTION_STATUS: AUTHORIZED; implementation starts only after matching approval
 
 ## SEPARATE APPROVED EXECUTION RESULT — Writer smoke inode reuse validation (2026-10-21)
 
-TASK_ID: DLDWS-001
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+> TASK_ID: DLDWS-001
+> CONTRACT_VERSION: 1.0.0
+> REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 WRITER_SMOKE_ROOT_CAUSE=CONFIRMED
 INODE_REUSE_ASSUMPTION=REMOVED
 ACTIVE_LISTENER_SAFETY=FAIL
@@ -995,9 +995,9 @@ NEXT: Obtain separate scope approval to fix or replace the canonical direct sock
 
 ## SEPARATE APPROVED EXECUTION — Active socket replacement race fix (2026-10-21)
 
-TASK_ID: DLDWS-001
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+> TASK_ID: DLDWS-001
+> CONTRACT_VERSION: 1.0.0
+> REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 USER_APPROVAL: Implement and verify an isolated fix for active-listener unlink caused by stale-check/path-replacement races and colliding socket identities. Use a new working tree based on 6d02dbcc22367cd184017a6e0b5d451f0cd3e9d1; preserve the failed smoke candidate/evidence and all existing protected candidates.
 APPROVED_SCOPE: teddy_library_discovery_writer.py and teddy_library_discovery_writer_smoke.py, plus a narrowly scoped Writer-only synthetic safety test if necessary. Transplant the mandatory prior replacement/collision checks without weakening them. Validate actual listener/path/health preservation, no unlink, last-check races, parent/type/owner/probe boundaries, Python 3.10 multiprocess contention and DB replay.
 SAFETY_BOUNDARY: Neither extra stat/connect checks nor advisory locks prove protection against a noncooperating replacement. If safe automatic stale cleanup cannot be proved, fail closed and report the stale-recovery/design conflict as BLOCKED; retain the recovery test failure instead of redefining it as PASS. Reuse existing verified lifetime mechanisms only within this scope; do not invent a broad architecture.
@@ -1007,9 +1007,9 @@ EXECUTION_STATUS: AUTHORIZED; implementation begins after matching approval reco
 
 ## SEPARATE APPROVED EXECUTION RESULT — Active socket replacement race fix (2026-10-21)
 
-TASK_ID: DLDWS-001
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+> TASK_ID: DLDWS-001
+> CONTRACT_VERSION: 1.0.0
+> REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 WRITER_RACE_FIX=BLOCKED
 ACTIVE_LISTENER_SAFETY=PASS
 IDENTITY_COLLISION_SAFETY=PASS
@@ -1044,11 +1044,37 @@ NEXT: User decision on retiring automatic direct-mode stale cleanup and using th
 
 ## SEPARATE APPROVED EXECUTION — Legacy image eight-file overlay candidate (2026-10-21)
 
-TASK_ID: DLDWS-001
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+> TASK_ID: DLDWS-001
+> CONTRACT_VERSION: 1.0.0
+> REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 USER_APPROVAL: Prepare and verify an isolated derivative of parent image sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573 for failed-download bulk retry UI/API and bounded redacted SpoofDPI diagnostics, using final runtime snapshot /tmp/dldws001-legacy-runtime-20261021 and feature commit 453011a0f9c71ccf7a4ab6cfef96b375213211a1.
 RUNTIME_ALLOWLIST: /app/app.py, /app/teddy_entrypoint.py, /app/teddy_routing.py, /app/teddy_bootstrap.py, /app/templates/index.html, /app/templates/teddy-reliability.js, /app/teddy_downloader_admin.py, /app/teddy_spoofdpi.py only. Keep build recipe, tests and manifests outside copied runtime. Preserve authentication/CSRF, shared queue/state locks on all admission routes, MP4/ENOSPC/fragment protections, health-only, routing, Selkies and max_concurrent=4.
 BOUNDARY: New isolated directory; no changes to original snapshots/candidates. Allow an isolated no-network Docker build and synthetic tests only, with exact parent and final filesystem-difference verification. If Docker access is denied, do not escalate or change permissions: record build BLOCKED and provide an operator build command; host-only evidence does not count as final-image evidence.
 PROHIBITED: Production container/image/Compose/service/data changes, real retry/download/MP4 work, Docker pull or package installation, docker commit, canonical product publication, any Writer change or Writer safety PASS/full canonical-build PASS claim, reintroduction of Downloader server restart, Stage11/NAS/Jellyfin/backup changes.
 EXECUTION_STATUS: AUTHORIZED; candidate edits start only after matching approval records are remotely read back. Writer race and full canonical-build findings remain unresolved and preserved.
+
+## RESULT — Legacy image eight-file overlay candidate, Docker access blocked (2026-10-21)
+
+Shared task DLDWS-001; contract 1.0.0; matching scope downloader,discovery-writer-safety. Execution approval was published and read back at 09ccfa8fb1f618af1c5c6409b9c4b0e574acd6a7. Existing approvals, failures, deployment evidence and Writer race findings remain preserved.
+
+OVERLAY_BUILD=BLOCKED. A read-only image inspection was denied at unix:///var/run/docker.sock. No Docker permission change or escalation was attempted; no build, image creation, image save, test container or production container operation occurred. The approved parent sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573 could not be independently inspected in the current Docker session. NEW_IMAGE_ID=NONE. Planned tag only: missav-dlp-web:dldws001-legacy-overlay-20261021 (not created).
+
+CANDIDATE: /tmp/dldws001-legacy-overlay-20261021. Exactly eight runtime files are staged in context/runtime: app.py, teddy_entrypoint.py, teddy_routing.py, teddy_bootstrap.py, templates/index.html, templates/teddy-reliability.js, teddy_downloader_admin.py, teddy_spoofdpi.py. All six protected snapshot SHA-256 values match; original clean release checkout at c4c00605af6ea7ae9109a99ae39e8ecf76fd5c30 includes feature 453011a0f9c71ccf7a4ab6cfef96b375213211a1 and remains clean. No whole-file canonical replacement was applied over the built runtime. Eight candidate hashes and source/parent provenance are in manifest.json. Eighty-seven other existing Python function bodies remain unchanged.
+
+HOST-ONLY VALIDATION: Python 3.10.22 synthetic suite PASS, 12 test methods. Actual Flask test_client + existing auth + installed bulk routes exercise login, session CSRF, selection, actual legacy MP4-aware retry callback, shared existing task-state lock, auto/manual/bulk admission race, routing/new-task/resume serialization, queue deduplication, unknown lock/MP4 fail-closed, storage/inode failures, partial results and fragment preservation. The unchanged MP4 queue lock was exercised by three separate synthetic processes without media conversion. Existing health-only guards and bootstrap authentication order remain intact. SpoofDPI fake-process tests preserve argv and two-second observation, bounded output, exit-code diagnostics and credential/URL/IP redaction. No normal app import, download/MP4 worker, operational data mount or external network request was used.
+
+BROWSER: Chromium 156.0.8078.4 / Node v24.22.0, ten synthetic mock-API scenarios PASS, desktop 1440x900 and mobile 390x844. Confirm/cancel, duplicate-click protection, partial results, storage/inode errors, refresh, existing individual retry/settings save and absence of Downloader server restart were verified. Zero uncaught JavaScript errors or unexpected console errors; three console events were expected negative HTTP responses. The initial sandbox loopback bind EPERM and successful isolated localhost run are separately preserved. Existing tool dependencies were reused without installation.
+
+BUILD-PROOF TOOLING: Explicit eight-COPY, local image-ID FROM Dockerfile; no package install, repository COPY, pull, RUN, docker commit or full canonical Dockerfile. build_candidate.py is prepared but not executed: checks parent/image-store space/tag collision/input hashes, performs one offline build, validates saved-image parent layers/eight-file delta/Writer hashes, then runs the same synthetic suite against the final image without normal app startup. Its archive verifier passed two host synthetic tests, rejecting five unsafe mutations. This tooling is not evidence of an actual image build or final-image PASS.
+
+FINAL-IMAGE STATUS: Parent local-presence verification BLOCKED; filesystem delta, Writer hash readback and image-internal execution NOT_RUN. FLASK_AUTH_CSRF=PASS, QUEUE_RACE_SAFETY=PASS, MP4_ENOSPC_FRAGMENT_SAFETY=PASS, SPOOFDPI_DIAGNOSTIC=PASS and UI_DESKTOP_MOBILE=PASS refer only to the executed host candidate checks. No Writer file was changed or included in the overlay; WRITER_SAFETY_ISSUE=UNRESOLVED. SERVER_RESTART_FEATURE=EXCLUDED. This is not a full canonical-build PASS.
+
+EVIDENCE: manifest.json; evidence/result.json; evidence/artifact-audit.json; evidence/runtime.patch; evidence/host-offline-results.json and host-offline.log; evidence/browser/browser-results.json and synthetic desktop/mobile screenshots; evidence/build-proof-tests.log; evidence/artifact-hashes.json. Syntax and runtime diff whitespace checks PASS. README.md explains all limits and the unexecuted operator path.
+
+PRODUCTION_DEPLOYMENT=NOT_RUN; REAL_DOWNLOAD_TEST=NOT_RUN; canonical product publication NOT_RUN; operational writes by this execution NONE. Existing Downloader/Writer/Gluetun/Selkies, user max_concurrent=4, download records/fragments, backup, NAS/Jellyfin and Stage11 were not touched.
+
+NEXT: In an authorized root@downloader session with existing Docker access, run once:
+python3 /tmp/dldws001-legacy-overlay-20261021/build_candidate.py
+Preserve the new image ID and final-image evidence; do not deploy. If the fixed local-image-ID legacy builder or any safety verification fails, stop without fallback, pull or automatic retry.
+
+RECORD FORMAT: Structural validation found historical TASK_ID/CONTRACT_VERSION/REQUIRES_WORKSTREAMS lines duplicated as live metadata in both existing ACTIVE_WORK records (five copies before this execution approval, six afterwards). Every value matched the current DLDWS-001 / 1.0.0 / downloader,discovery-writer-safety metadata. Historical copies are now blockquoted without changing their values or evidence; only the first live header remains machine metadata. No contract, router, workstream state or authorization scope was changed.
