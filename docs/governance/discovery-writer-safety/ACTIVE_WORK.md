@@ -1189,3 +1189,27 @@ Docker access was denied by a read-only docker info call in hostname downloader,
 A separate byte-verified build copy is prepared at /tmp/dldws001-overlay-build-20261022. Its only build-script change is the unique candidate tag missav-dlp-web:dldws001-legacy-overlay-persist-20261022; its Docker context retains the eight manifest hashes. Exact command: cd /tmp/dldws001-overlay-build-20261022 && python3 build_candidate.py. The script reruns all preflight gates, builds with pull disabled and network none, proves image layers, and runs only bounded synthetic final-image tests. It stops on any mismatch or Docker API denial.
 
 Evidence: /tmp/dldws001-overlay-build-20261022/BUILD_EXECUTION.md; evidence/static-build-preflight.json; evidence/docker-access-preflight.json; evidence/overlay-build-result.json. Existing Writer race and full canonical Dockerfile smoke failure remain unresolved. No image was created and no production resource was changed.
+
+
+## SEPARATE APPROVED EXECUTION — overlay evidence record and read-only deployment preflight
+
+APPROVAL_DATE: 2026-10-22
+AUTHORIZATION: Explicit user approval in the DLDWS-001 overlay build success record and deployment preflight request.
+CANONICAL_BASE: 10e1e332c3333451c05c16c9181cf88a242d2081
+TASK_ID: DLDWS-001
+REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
+
+This separate execution authorizes (1) recording the operator-supplied overlay build and final UI extraction results with their provenance and limitations, and (2) read-only inspection of the existing CT108 Docker/Compose configuration, backup metadata/integrity evidence, rollback prerequisites, and Writer restart/socket-lifecycle risk. Read the operator evidence if accessible; otherwise label it user-provided and do not claim direct verification. Do not inspect or expose secret values.
+
+### AUTHORIZED_SCOPE
+- Record the reported parent image sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573, overlay image sha256:14f8c831d692db0a0d4f0f3b70eac0ca840b1daf0a66927aebc578eaf6541c4d, tag missav-dlp-web:dldws001-legacy-overlay-persist-20261022, build result, and extracted UI hashes, distinguishing operator-provided evidence from locally read-back evidence and from prior Chromium results.
+- Read-only CT108 inspection of the named Compose files, current Downloader image/container, effective topology and dependencies, relevant backup path metadata and existing verification records, and rollback feasibility.
+- Append results to both workstream active files and the canonical handoff after inspection; preserve all prior history.
+
+### PROHIBITED_SCOPE
+No Docker container/image mutation, build, run, exec, start, stop, restart, recreate, Compose apply, retry/download, production data access beyond read-only metadata specifically listed above, backup extraction/modification, Writer socket cleanup/systemd change, Gluetun/Selkies/Stage11/NAS/Jellyfin changes, product code, contract/router changes, or deployment. No privilege escalation or permission workaround. Do not infer Writer restart safety from unchanged overlay files alone.
+
+### ACCEPTANCE_AND_BOUNDARIES
+Record PRODUCTION_DEPLOYMENT=NOT_RUN. If CT108, Docker, Compose, or backup evidence is unavailable, report the relevant gate as INCOMPLETE/BLOCKED without guessing. Keep the known Writer socket race unresolved. A deployment readiness conclusion must account for unverified Writer restart safety and backup recovery; this approval does not authorize deployment.
+
+EXECUTION_STATUS: AUTHORIZED only after this matching block is remotely read back from both workstreams.
