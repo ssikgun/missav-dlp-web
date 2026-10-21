@@ -13537,3 +13537,37 @@ The overlay build did not start. Read-only docker info was denied at /var/run/do
 Prior candidate checks remain evidence only: persistence fault injection 11/11, Python host suite 12/12, retained state-save probe PASS, and Chromium 10/10 on the exact UI asset hashes. These are not final-image verification. Writer race and canonical Dockerfile smoke failure remain unresolved.
 
 Execution evidence: /tmp/dldws001-overlay-build-20261022/evidence/overlay-build-result.json and docker-access-preflight.json. Exact continuation command, subject to the build script's full fail-closed preflight: cd /tmp/dldws001-overlay-build-20261022 && python3 build_candidate.py. No deployment is authorized.
+
+
+## EXECUTION RESULT — overlay evidence record and read-only deployment preflight (2026-10-22)
+
+BUILD_EVIDENCE_RECORDED=PASS
+UI_EVIDENCE_RECORDED=PASS
+COMPOSE_PREFLIGHT=INCOMPLETE
+BACKUP_ACCESS=INCOMPLETE
+BACKUP_INTEGRITY=INCOMPLETE
+ROLLBACK_PLAN=INCOMPLETE
+ROLLBACK_TEST=NOT_RUN
+WRITER_RESTART_SAFETY=INCOMPLETE
+DEPLOYMENT_READINESS=BLOCKED
+PRODUCTION_DEPLOYMENT=NOT_RUN
+PRODUCTION_CONTAINER_UNCHANGED=YES for this inspection only; live daemon state could not be read
+GITHUB_READBACK=pending
+
+The recorded build result is operator-originated. The evidence directory was accessible and its artifacts were read back locally at /tmp/dldws001-overlay-build-20261022/evidence/operator-build-oylfwt00. image-integrity.json reports PASS, parent image sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573, new image sha256:14f8c831d692db0a0d4f0f3b70eac0ca840b1daf0a66927aebc578eaf6541c4d, tag missav-dlp-web:dldws001-legacy-overlay-persist-20261022, exactly eight changed runtime files, exact parent layers preserved, and Writer files unchanged. The candidate-image.tar is 342,911,488 bytes with SHA-256 96853b690cc099fe006350b00d45c99249dfe754bbcf02dd73de54db6066f1e4. final-image-tests.json reports 23 synthetic tests, 0 failures/errors, app_imported=false, workers_started=false, production_mounts=false and external_requests=0. These artifacts substantiate the operator run but are not a fresh Docker daemon reproduction.
+
+UI extraction at /tmp/dldws001-final-ui-20261022.Eenyxd was read back. index.html SHA-256 a09930a0dd298e11ec12d891da13cc7a38b1a80a2d1bbb313234ea389dcbad7b and teddy-reliability.js SHA-256 b8204eee2c668c9c1fb8bcd780bd7301a61a0c1b2b5f2f153af7f7c77d698ae9 match both the stated hashes and the final image-runtime assets byte-for-byte. The bulk retry label is present and the Downloader restart label/API markers checked are absent. This is static asset verification; Chromium was not run against the final image. The earlier Chromium 10/10 result remains prior evidence, not a final-image browser run.
+
+Read-only docker info/image inspect/container inspect calls were denied by permission on /var/run/docker.sock in hostname downloader, UID/GID 0:0. No permission change or escalation was attempted. Therefore the current container ID/state/image, live Compose labels, local availability of either image, current max_concurrent value, and live Gluetun/Selkies states remain unverified. No Docker-mutating call was issued.
+
+All four supplied Compose/env paths exist. A read-only docker compose config using the specified file order and gluetun.env resolved successfully: project missav-dlp-web; Downloader service missav-dlp-web declares image missav-dlp-web:stage13-ui-24fc73a, 31 environment keys, 14 mounts, port 58000:5000, group_add 988, the /run/teddy-library-discovery-writer directory as a read-only mount, and depends_on gluetun. Both Selkies services declare dependencies on the Downloader. Secret values were not emitted. This proves the supplied files parse together, not that they are the files currently applied to the live container. The new overlay image is not the image currently named in this resolved configuration. Compose compatibility and live drift comparison remain incomplete.
+
+The Data_5TB backup path /mnt/pve/Data_5TB/dldws001-backups/backup-20261020-110732-TbdQOd/data.tar and mount are absent in this LXC; no archive listing, checksum, extraction or restore was attempted. Earlier user-submitted Proxmox backup/restore results remain historical evidence only and do not establish current accessibility or integrity.
+
+Rollback plan (not executed): if a separately approved deployment later fails, first stop further Downloader actions and capture the then-current task/settings/fragments state; do not run compose down or restore an old backup over changed data. Verify the exact currently running image, original Compose inputs and backup accessibility. If state is safe for the older application, apply an image-only override to the exact verified old image ID and target only missav-dlp-web with dependency handling disabled; leave Writer, Gluetun and Selkies untouched. Then verify Downloader health and the unchanged dependency/socket state. Do not restore data unless a separate comparison proves it is necessary and safe. This plan is INCOMPLETE until the old image is confirmed locally, live Compose identity is verified, backup is accessible, and Writer reconnection risk is resolved.
+
+Writer risk remains unresolved. The parsed Compose contains no Writer service; it only mounts the Writer socket directory read-only. In this LXC, lstat sees a socket path with mode 0660, uid 0 and gid 65534, while Compose adds supplementary GID 988. systemctl queries did not establish Writer unit state and ss showed no matching listener line; neither proves the live Writer state. The known active-socket cleanup race is still unresolved, and no evidence proves restart/reconnection is safe. Do not infer safety from unchanged Writer files in the overlay.
+
+No production container, image, data, backup, Writer, Gluetun, Selkies or Stage11 resource was intentionally changed. The result is blocked for deployment approval because the live Docker state, backup access/integrity, max_concurrent value and Writer restart safety are not verified. The prior build BLOCKED record remains historical; this operator build PASS record supplements it and does not resolve the Writer issue.
+
+Next action: from an authorized Proxmox/CT108 operator session, provide read-only confirmation of the exact live Downloader image/container/Compose labels, Data_5TB archive availability and checksum record, current max_concurrent=4, and Writer listener/service state; then reassess deployment separately.
