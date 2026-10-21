@@ -991,3 +991,15 @@ ENVIRONMENT: The local baseline passed on tmpfs with Python 3.10.22; 32 physical
 EVIDENCE: /tmp/dldws001-writer-smoke-evidence-20261021-8u4jd832/validation-summary.json (SHA-256 6ce9c4d503231c5fef864077da0b6cb83260a6ad76bb0d69d663fceb963b77f2); modified-python310-full.log (b8e69a40ca8e3e1407e7093cda88d68605b3e9a50368ba23ebc13592329686df); collision-mutation-controls.json (8becbb282dd6845b20ddbbb9fc0b3e23a0dc3a69c27fde244759f0697d662a84); comparison.md and writer-smoke.patch. Candidate smoke SHA-256: d1a20a2ad8435499914d5faf238a8f9da5a693b27c0304f40b22d92f854d34b4. Unchanged Writer source SHA-256: 8898087c4830a6e2729c5593377224a9cfa518147aa0ec40bdc554cba392410e. Supplied build log SHA-256: 525ea73e7df2f9f617a767cfffb92b8f9622edf85347dc3648b1868f12057b7a.
 
 NEXT: Obtain separate scope approval to fix or replace the canonical direct socket cleanup path so it refuses active replacement cleanup even when identity keys collide. Do not build/deploy or publish this failing test candidate automatically.
+
+
+## SEPARATE APPROVED EXECUTION — Active socket replacement race fix (2026-10-21)
+
+TASK_ID: DLDWS-001
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+USER_APPROVAL: Implement and verify an isolated fix for active-listener unlink caused by stale-check/path-replacement races and colliding socket identities. Use a new working tree based on 6d02dbcc22367cd184017a6e0b5d451f0cd3e9d1; preserve the failed smoke candidate/evidence and all existing protected candidates.
+APPROVED_SCOPE: teddy_library_discovery_writer.py and teddy_library_discovery_writer_smoke.py, plus a narrowly scoped Writer-only synthetic safety test if necessary. Transplant the mandatory prior replacement/collision checks without weakening them. Validate actual listener/path/health preservation, no unlink, last-check races, parent/type/owner/probe boundaries, Python 3.10 multiprocess contention and DB replay.
+SAFETY_BOUNDARY: Neither extra stat/connect checks nor advisory locks prove protection against a noncooperating replacement. If safe automatic stale cleanup cannot be proved, fail closed and report the stale-recovery/design conflict as BLOCKED; retain the recovery test failure instead of redefining it as PASS. Reuse existing verified lifetime mechanisms only within this scope; do not invent a broad architecture.
+PROHIBITED: Canonical product-code publication, Docker build/deployment, operational socket/service/systemd/DB/download/data changes, modifications to protected candidates, Stage11, NAS/Jellyfin, test skips or weakened safety expectations.
+EXECUTION_STATUS: AUTHORIZED; implementation begins after matching approval records are remotely read back.
