@@ -1138,3 +1138,27 @@ Evidence: retained failure replay now reports succeeded=0, failed=1, queue_entri
 Limitation: if directory fsync fails after replacement and also during rollback, retry is denied and the tested live task bytes/memory and queue are restored, but crash durability remains UNKNOWN while the filesystem persistently rejects fsync; manual reconciliation is required.
 
 No production resource changed. Canonical product code was not published. Next action requires a separate approval for Docker build and final-image offline verification; this execution does not authorize either.
+
+
+## SEPARATE APPROVED EXECUTION — legacy image overlay build and final offline verification
+
+APPROVAL_DATE: 2026-10-22
+AUTHORIZATION: Explicit user approval in the DLDWS-001 overlay-build request.
+CANONICAL_BASE: e4460e140d4bb7882b0fdea64a09dca90c610809
+TASK_ID: DLDWS-001
+REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
+
+This separate execution authorizes only an isolated overlay build based on the verified candidate /tmp/dldws001-legacy-overlay-persist-20261021 and final-image offline verification. The source candidate is immutable. Build and evidence output must go to a fresh isolated copy at /tmp/dldws001-overlay-build-20261022 and its own evidence directory. Use the exact local parent image ID sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573; reserve only the new tag missav-dlp-web:dldws001-legacy-overlay-persist-20261022.
+
+### AUTHORIZED_SCOPE
+- Verify the source candidate manifest, hashes, prior persistence/host/browser evidence, parent image, disk and inode capacity, and existing Downloader container state before building.
+- Reuse only the allowlisted eight runtime files. Prove the final image adds/replaces exactly those eight files, preserves the exact parent layers and inherited runtime configuration, and leaves Discovery Writer files unchanged.
+- Build one isolated candidate image with no pull, external network, package installation, docker commit, production volume, or source-candidate mutation.
+- Run only bounded, network-disabled synthetic tests against that final image. Record any verification that cannot safely be completed as INCOMPLETE.
+- If Docker API access is denied or any preflight is unknown, stop without privilege escalation and record BLOCKED_DOCKER_ACCESS or the specific gate.
+
+### PROHIBITED_SCOPE
+No production deployment, Downloader container start/restart/replace, download or bulk retry, production data or parts access, Writer/Gluetun/Selkies/Stage11/NAS/Jellyfin changes, existing image deletion, canonical product code publication, or Writer safety fix. The known Writer race and full canonical Dockerfile smoke failure remain unresolved; this overlay cannot be reported as resolving them. No retry of a failed build or test without a new decision.
+
+### ACCEPTANCE_AND_BOUNDARIES
+Report the exact parent and new image IDs, allowlisted runtime diff, final-image offline test results, UI evidence and its provenance, Writer-file immutability, existing production container immutability, and unresolved gaps. Keep this approval active only for this one isolated build/verification execution. It does not authorize operational deployment.
