@@ -1112,3 +1112,29 @@ PRESERVE: Existing 12 synthetic host PASS results, ten Chromium scenarios, the o
 PROHIBITED: Docker build, production deployment/restart/retry/download, production or NAS/Jellyfin/Stage11/Writer data/service changes, canonical product publication, test deletion/skip/weakening, global save_tasks policy change, or widening beyond the existing eight runtime files.
 
 EXECUTION_STATUS: AUTHORIZED only after this matching approval block is remotely read back from both workstreams. The previous build failure remains unresolved until the retained persistence regression passes. Even if this correction passes, no image build is authorized in this execution.
+
+
+## EXECUTION RESULT — DLDWS-001 ENOSPC retry state persistence correction (2026-10-21)
+
+ISOLATED_RESULT=PASS
+STATE_PERSISTENCE_SAFETY=PASS
+ENOSPC_RETRY_BLOCK=PASS
+MEMORY_STATE_PRESERVED=PASS
+TASK_FILE_PRESERVED=PASS
+QUEUE_UNCHANGED_ON_FAILURE=PASS
+FRAGMENTS_PRESERVED=PASS
+AUTO_MANUAL_BULK_RACE=PASS
+FLASK_AUTH_CSRF=PASS
+MP4_ENOSPC_SAFETY=PASS
+OVERLAY_SAFETY_GATE=PASS
+DOCKER_IMAGE_BUILD=NOT_RUN
+PRODUCTION_DEPLOYMENT=NOT_RUN
+WRITER_SAFETY_ISSUE=UNRESOLVED
+
+The isolated candidate is `/tmp/dldws001-legacy-overlay-persist-20261021`. Only `app.py` and `teddy_entrypoint.py` changed among the eight allowlisted runtime files. Retry persistence is checked through same-directory temporary write, flush/fsync, readback, atomic replacement and directory fsync before queue admission. On tested failures, the affected in-memory task and retry count, previous task-file bytes, queue, and synthetic parts remain unchanged. The legacy global `save_tasks()` policy is unchanged.
+
+Evidence: retained failure replay now reports succeeded=0, failed=1, queue_entries=0; persistence fault injection 11/11 PASS; existing Python 3.10.22 host regression suite 12/12 PASS. Existing Chromium 10-scenario PASS was reused without rerun because no HTML/JavaScript changed. Prior failing evidence remains preserved with SHA-256 `d32e553ce3150f8bd7727e9066ad54b656174962531ef8f0d366e8d18909e3f1`.
+
+Limitation: if directory fsync fails after replacement and also during rollback, retry is denied and the tested live task bytes/memory and queue are restored, but crash durability remains UNKNOWN while the filesystem persistently rejects fsync; manual reconciliation is required.
+
+No production resource changed. Canonical product code was not published. Next action requires a separate approval for Docker build and final-image offline verification; this execution does not authorize either.

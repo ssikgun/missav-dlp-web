@@ -13515,3 +13515,14 @@ EVIDENCE: /tmp/dldws001-legacy-overlay-20261021/tests/state_persistence_probe.py
 PRODUCTION_DEPLOYMENT=NOT_RUN; REAL_DOWNLOAD_TEST=NOT_RUN; production resource writes NONE; canonical product publication NOT_RUN. Existing Downloader, settings/max_concurrent=4, task records, fragments, Writer/Gluetun/Selkies, backups and Stage11 remain untouched by this work.
 
 NEXT: Approve the minimal persistence/admission safety correction and revalidate the preserved failing ENOSPC regression. Do not build or deploy this candidate while the safety gate is FAIL.
+
+
+## DLDWS-001 — ENOSPC retry state persistence correction (2026-10-21)
+
+Isolated validation completed in `/tmp/dldws001-legacy-overlay-persist-20261021`. Result: retry state persistence, ENOSPC admission blocking, per-task memory restoration, task-file and synthetic fragment preservation, queue unchanged on failure, auto/manual/bulk serialization, Flask auth/CSRF and MP4/capacity safety PASS. Only `app.py` and `teddy_entrypoint.py` changed among the eight allowlisted runtime files; the global `save_tasks()` policy was left unchanged.
+
+Evidence: retained failure replay yielded succeeded=0, failed=1, queue_entries=0; persistence fault suite 11/11 PASS; existing Python 3.10.22 host suite 12/12 PASS. Prior Chromium 10-scenario PASS was reused (no HTML/JS changed). Original failing evidence SHA-256 remains `d32e553ce3150f8bd7727e9066ad54b656174962531ef8f0d366e8d18909e3f1`. Evidence files: `evidence/state-persistence-probe.json`, `evidence/state-persistence-regression.json`, `evidence/host-offline-persistfix.json`, and `evidence/artifact-audit.json` under the candidate.
+
+The persistent directory-fsync failure case fails closed: retry is denied, tested live bytes/memory and queue are restored, but crash durability remains UNKNOWN while the filesystem rejects both sync attempts; manual reconciliation is required. Writer safety issue remains unresolved.
+
+Docker build and production deployment were NOT_RUN. No production resources changed and no product code was published. Next step requires separate approval for Docker build and final-image offline verification.
