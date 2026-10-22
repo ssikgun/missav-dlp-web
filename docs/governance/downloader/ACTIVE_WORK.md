@@ -1568,3 +1568,36 @@ TASK_ID: DLDWS-001; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,di
 - PRODUCTION_UNCHANGED=YES; PRODUCTION_PREFLIGHT/EXECUTE/POSTCHECK=NOT_RUN; CANONICAL_PRODUCT_CODE=NOT_PUBLISHED; WRITER_SAFETY_ISSUE=UNRESOLVED. The candidate operational wrapper/CLI and `/downloads` execute are explicitly blocked. Synthetic success is not operational retry approval; the old preflight ID is never reusable.
 
 NEXT: operator collects the documented CT108 read-only inventory and media evidence, including failed-run cleanup state. Actual recovery retry requires a separate explicit approval and review of that evidence before any operational guard is released.
+
+
+## SEPARATE APPROVED EXECUTION — GANA-3223 HLS local-result collection fix (2026-10-22)
+
+TASK_ID: DLDWS-001
+STATUS: IN_PROGRESS
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+
+AUTHORIZATION: User-approved isolated implementation and regression tests for the reported custom-HLS post-processing bug. This approval does not authorize production code/data changes, Docker build/deployment, download/retry, or recovery of GANA-3223 or any other task.
+
+LIVE_RUNTIME_EVIDENCE: Read-only inspection confirmed container ID 9a5b729335bfd20460bea2e02e1f8a36b6c057c2111ec84fc06f1a33718a5f00, image sha256:7200290e8af11d9f253a5efd028bf3be2a2757af9049f0bb9e43bd04f821f2d8, state running. The live container source files were copied read-only to a restricted /tmp snapshot. SHA-256 values: teddy_mp4_queue.py 85e8078c9aa6f27f3ceae13f9202617d14133fa83a1e3cf06687b558e13a1767; teddy_entrypoint.py 2ae993695eaacc6dfbf60867996f3b83a914ca3d16211af927b1a6ce14567260; teddy_bootstrap.py b96850dbfaa585f5cf2abb3fdbe328030706fc159aba8875656fe2c775e433f3; teddy_download_safety.py 1ca4da68cb7689f0dab8343f6b1224f71fb94278640685024398bb5b080d9112.
+
+APPROVED_SCOPE:
+- Preserve the live-runtime baseline and existing candidate/evidence.
+- In a new isolated /tmp candidate, make the smallest change needed so HLS result collection does not scan or require the yt-dlp-only home directory. HLS may attach only the verified main queue output and any explicitly validated, HLS-approved auxiliary output; no yt-dlp directory artifacts are implicitly included.
+- Preserve yt-dlp home/temp scanning and the existing failure behavior when required yt-dlp output is absent or unsafe.
+- Exercise normal HLS completion, output-ready restart/replay, pause/cancel/failure paths, path/symlink/collision protections, yt-dlp behavior, and existing MP4 lock/reservation/no-clobber regressions with synthetic data.
+- Preserve file ownership/SHA/final-storage/task-state ordering and existing source/fragment retention.
+
+PROHIBITED_SCOPE:
+- No production container, image, task, file, result MP4, TS/HLS fragment, filelist, or settings modification; no production download, retry, remux, publish, or cleanup.
+- No Docker build/deployment/restart; no Writer, Stage11, Gluetun, Selkies, NAS/Jellyfin changes; no canonical product-code publication.
+- Do not weaken yt-dlp validation, path/symlink checks, output ownership/hash validation, MP4 global/task locks, space reservations, collision/no-clobber handling, or existing queue/restart/cancel behavior.
+
+ACCEPTANCE_CRITERIA:
+- HLS with a valid queued result succeeds when its yt-dlp home directory is absent; missing/unsafe HLS output still fails closed.
+- yt-dlp continues to collect its home outputs and fails closed on missing, unreadable, symlinked, or out-of-root required paths.
+- HLS, yt-dlp, restart/replay, pause/cancel/error and publication handoff are exercised without production data.
+- Existing lock, reservation, no-clobber, source/task preservation tests remain passing.
+- Report the exact changed candidate files and hashes; production remains unchanged.
+
+NEXT_DECISION: Review the isolated candidate and tests. Any production image rebuild or deployment requires separate authorization.
