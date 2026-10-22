@@ -1469,3 +1469,28 @@ No production recovery execution by Codex; no production MP4 generation during t
 - All required synthetic scenarios pass, including preserving source/task bytes and stopping after a later item fails.
 - Operator commands derive targets from read-only task state and require a successful fresh preflight artifact before execution; any runtime identity, lock, work-state, storage, or provenance precondition not verifiable on CT108 fails closed.
 - Codex performs no operation against /downloads and no production recovery.
+
+## EXECUTION RESULT — legacy HLS MP4 recovery mode (2026-10-22)
+
+LEGACY_MODE=PASS_SYNTHETIC
+CANDIDATE=/tmp/dldws001-mp4-recovery-legacy-20261022
+RECOVERY_TOOL_SHA256=8cc90a8247da0320c9269acf519331748b5f4ddd18685977f2f3dea33f95e5ff
+RUN_WRAPPER_SHA256=5a686162cfc903459620042acd39ecab40641df7ce90421069461b27875b811b
+TESTS=PASS; Python 3.10.22 suite 35/35 and wrapper mock guards 3/3
+STATIC_CHECKS=PASS; Python compile, shell syntax, and help
+PRODUCTION_PREFLIGHT=NOT_RUN
+PRODUCTION_RECOVERY=NOT_RUN
+PRODUCTION_CHANGES_BY_CODEX=NONE
+REAL_FFMPEG_MEDIA_CHECK=NOT_RUN; ffmpeg/ffprobe unavailable in Codex environment
+LIVE_IMAGE_AND_RUNTIME=NOT_RUN; CT108 wrapper/tool must match the pinned image and all five runtime fingerprints or fail closed
+WRITER_SAFETY_ISSUE=UNRESOLVED
+CANONICAL_PRODUCT_CODE_PUBLISHED=NO
+
+The explicit legacy mode preserves strict manifest-mode validation. Its source/fragment SHA-256 values are inspection-time baselines only, not download-time provenance. It keeps the existing task claim, global RemuxTransaction lock, free-space/inode reservation, active-work checks, and atomic no-clobber publication. All synthetic tests use fake media runners; no /downloads path or production FFmpeg was used.
+
+Operator sequence (only after copying the pinned tool and wrapper to CT108 and verifying both hashes):
+1. `./run-on-downloader.sh preflight --evidence-mode legacy --auto-targets`
+2. Only after JSON `result=PREFLIGHT_PASS`, review the four exact mappings and pass its `preflight_id` once to `./run-on-downloader.sh execute --evidence-mode legacy --auto-targets --preflight-id '<PREFLIGHT_ID>' --confirm DLDWS-001-MP4-RECOVERY-20261022`.
+3. Only after `RECOVERY_COMPLETE`, run `./run-on-downloader.sh postcheck --evidence-mode legacy --auto-targets --preflight-id '<PREFLIGHT_ID>'`.
+
+The detailed gates and full commands are in the isolated candidate README. No retry, new preflight workaround, or source/task mutation is authorized if a gate fails.
