@@ -1508,3 +1508,20 @@ This is a follow-up bug fix within the already approved one-time legacy MP4 reco
 - `run-on-downloader.sh` SHA-256: `afc7f260a9dc146fb7fef5b2e581c0b17d526334cfa71ad59cee792ad887cad9`; its pinned tool SHA matches the script above.
 - PRODUCTION_UNCHANGED=YES; Codex did not access operational download data or run CT108 preflight, execute, or postcheck. No MP4 was created. Docker, container, service, Writer, and task data were not changed. Writer safety remains UNRESOLVED.
 - Canonical product code was not changed or published. CT108 operator action remains: transfer the two pinned files, verify both hashes, run the documented legacy preflight, and proceed only if it returns `PREFLIGHT_PASS` with the expected four mappings.
+
+
+## EXECUTION RESULT — DLDWS-001 legacy MP4 status truncation compatibility (2026-10-22)
+
+AUTHORIZATION: Follow-up bug fix within the existing approved one-time legacy MP4 recovery. Isolated tool changes and synthetic validation only; no new design or production execution was introduced.
+
+- ERROR_PATH_FIX=PASS. The pinned runtime snapshot `parent-image-files/teddy_entrypoint.py` records `status = prefix + str(exc)[:100]` and `last_error_detail = str(exc)[:1000]`. The test exercises the exact extracted recording assignments with a fake core. This source check is not a new live CT108 inspection.
+- Only a known runtime status prefix, consistent error kind, and exact message equality with `last_error_detail[:100]` permit the truncated duplicate status to defer to the full detailed record. The detailed record must contain a complete target-validated path. Contradictory status/detail, wrong cut length, missing/incomplete detail, the potentially clipped 1,000-character detail limit, unknown status formats, and unsafe other error fields remain blocked.
+- FULL_PREFLIGHT_TEST=PASS_SYNTHETIC. A single synthetic fixture includes four failed UUID targets, status lengths 105/111/117 characters, full detailed errors, Korean filenames, a 60-character title ending in a space, and the unrelated fifth TS. It completes legacy preflight without changing source/task bytes; the fifth TS stays untouched.
+- SAFETY_REGRESSION=PASS. Python 3.10.22 recovery suite 78/78 and wrapper mock 3/3 passed. The same fixture also runs existing active-lock, storage/inode, source-change, symlink, filelist, no-clobber, FFmpeg-failure, partial-stop, mock-execute, and postcheck cases. The original manifest-mode tests remain included and PASS.
+- Existing functions other than `_legacy_error_path_values` are AST-identical to the prior candidate; `_legacy_status_duplicates_full_detail` is the only added tool function. Global MP4/task locks, space reservation, no-clobber publication, manifest-mode validation, and the four-of-five TS mapping are unchanged.
+- Candidate: `/tmp/dldws001-mp4-recovery-legacy-20261022`. Evidence: `evidence/status-truncation-20261022-xi1bi5vx/`, including the preserved pre-fix failure, before snapshots, final tests, static checks, and code diffs.
+- `recover_mp4.py` SHA-256: `fe6a7ef2fa31737aa459969be87fd607feaeaf004dc1c1eb54fd4dec576df563`.
+- `run-on-downloader.sh` SHA-256: `55b1c2066a90035bf7fc3397df794dd97f61660e7d0e2df475dc8cc778ff74c3`. Its pinned tool SHA and the README verification commands match these artifacts.
+- PRODUCTION_UNCHANGED=YES. Codex ran no operational preflight, MP4 generation/recovery, download, Docker lifecycle/build/deployment, or operational data/service change. Media tests use fake runners and synthetic data only. Writer safety remains UNRESOLVED; canonical product code was not published.
+
+Operator next action remains the approved CT108 sequence in the candidate README: verify the two updated hashes, run legacy automatic-target preflight, review its four mappings, and execute only after a fresh `PREFLIGHT_PASS`; postcheck follows successful completion. Synthetic PASS does not claim operational preflight or recovery PASS.
