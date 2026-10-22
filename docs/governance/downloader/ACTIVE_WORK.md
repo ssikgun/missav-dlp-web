@@ -1246,3 +1246,34 @@ Writer risk remains unresolved. The parsed Compose contains no Writer service; i
 No production container, image, data, backup, Writer, Gluetun, Selkies or Stage11 resource was intentionally changed. The result is blocked for deployment approval because the live Docker state, backup access/integrity, max_concurrent value and Writer restart safety are not verified. The prior build BLOCKED record remains historical; this operator build PASS record supplements it and does not resolve the Writer issue.
 
 Next action: from an authorized Proxmox/CT108 operator session, provide read-only confirmation of the exact live Downloader image/container/Compose labels, Data_5TB archive availability and checksum record, current max_concurrent=4, and Writer listener/service state; then reassess deployment separately.
+
+## SEPARATE APPROVED EXECUTION — Downloader-only overlay deployment
+
+APPROVAL_DATE: 2026-10-22
+AUTHORIZATION: Explicit user approval for one production replacement of the missav-dlp-web Downloader container using the verified overlay image, only if every stated safety gate passes.
+CANONICAL_BASE: bc238f2ff79a07fa1dcc40133affdde54782bb8d
+TASK_ID: DLDWS-001
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+
+### AUTHORIZED_SCOPE
+- Read-only preflight of the exact CT108 container, original four Compose files in their recorded order, environment file, pinned old/new image IDs, download state, max_concurrent, dependencies, Writer socket/unit/listener, and backup evidence.
+- If all mandatory gates pass, at most one Compose replacement of the missav-dlp-web service only, with --no-deps --no-build --pull never, and post-deployment read-only checks. If Codex lacks Docker API access, prepare and statically validate a guarded deployment script and a separate rollback script for the operator; do not bypass access controls.
+- Roll back the Downloader only once if the approved conditions make it safe. Never restore a backup over changed data automatically.
+
+### FIXED_TARGETS
+Old image: sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573
+New image: sha256:14f8c831d692db0a0d4f0f3b70eac0ca840b1daf0a66927aebc578eaf6541c4d
+New tag: missav-dlp-web:dldws001-legacy-overlay-persist-20261022
+Compose project/service: missav-dlp-web / missav-dlp-web
+
+### PROHIBITED_SCOPE
+No Writer, Gluetun or Selkies restart/recreation; no download/retry, task or parts mutation, settings change, data cleanup, backup restore, image build/pull/delete/prune, Compose source modification, Stage11/NAS/Jellyfin work, or privilege escalation. The unresolved Writer socket cleanup race remains a hard gate; do not infer safety from unchanged Writer files.
+
+### MANDATORY_GATES
+Fail closed if exact image/container IDs or status differ; Compose file order, project/service, or image-only diff is not exact; max_concurrent is not 4; running/queued/MP4 work or automatic retry risk exists; tasks/fragments cannot be verified preserved; Writer socket listener/systemd socket is not healthy; Gluetun/Selkies status is unknown; old image is unavailable; the backup file and SHA-256 cannot be matched; or overlay image integrity is not verified. Do not stop work or alter settings to make a gate pass.
+
+### ACCEPTANCE_AND_BOUNDARIES
+Deployment is authorized only after all mandatory gates pass. If Docker API access is denied, no deployment call is permitted; provide the guarded scripts and exact operator command. Preserve historical BLOCKED records. Keep Writer safety status separate from Downloader feature validation.
+
+EXECUTION_STATUS: AUTHORIZED only after this matching approval block is remotely read back from both workstreams.
