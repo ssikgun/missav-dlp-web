@@ -1622,3 +1622,23 @@ ACCEPTANCE:
 - Preserve original data, queue records, HLS result fix, yt-dlp compatibility and MP4 locking/reservation/collision guarantees; report all unverified conditions.
 
 NEXT_CHECKPOINT: Review the isolated implementation and evidence; no build, deployment or operating recovery is authorized by this phase.
+
+
+## EXECUTION RESULT — MP4 startup recovery safety candidate: INCOMPLETE / focused test FAIL (2026-10-22)
+
+TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+
+- The user-approved policy was registered identically in both ACTIVE_WORK files and read back at 869aa33e5c4ab3c0f24905d1211182e2db82bda2. Implementation/testing was isolated at /tmp/dldws001-mp4-startup-safety-20261022/. Existing HLS candidate and all previous evidence were preserved.
+- IMPLEMENTATION=INCOMPLETE; SYNTHETIC_SMOKE=FAIL. One focused invocation ran 23 unittest methods in 0.721s, reporting failures=3 and errors=23 (includes subtests), exit 1. Per the explicit stop-on-failure instruction, no runtime/test edits or test reruns followed this failure.
+- Twenty-three reported errors originate in the synthetic HLS fixture constructor: it writes remux-stage.mp4 before prepare_hls_resume creates the source-plan binding. The unchanged HLS safety guard correctly rejects that non-empty, unbound directory before the intended assertions run.
+- The normal yt-dlp queued/running and late-postprocessor-failure assertions also failed. The test invocation mocked _make_ytdlp but did not isolate actual _rehydrate_additional_pps import; yt_dlp is absent in this Python 3.13.5 environment. No rerun/instrumented execution was performed to claim a final product-level outcome.
+- Some yt-dlp failure-preservation, unchanged raw MP4 load, incomplete-descriptor hold, final-publication rejection, pre-publication failure and unmarked-queue preservation checks passed. These partial results do not establish GANA/HLS failure preservation, normal-interruption resume, ambiguity handling or overall regression PASS.
+- Runtime candidate changes are app.py (MP4-owned load/auto-retry handling and checked persistence option), teddy_mp4_queue.py (non-mutating startup, failure/ambiguity admission at selection/execution/result boundaries and checked explicit retry), and teddy_download_safety.py (shared MP4 hold classification/final publication guard). All remain isolated and unvalidated for deployment.
+- Candidate runtime SHA-256: app.py bbf306ef39cd57c63a09a672624cc243ef58fa99716f15bd78d3c6dbd2dccba3; teddy_mp4_queue.py cb583308c4b3a73b4580fb29dd4d0c63899e3d07fa33561bfc9843fb1ddc7649; teddy_download_safety.py 56c9a868736443fd05ec51b776dd948727d54495296dc254c8dc54fd1fad1ee9.
+- Evidence: candidate README.md, evidence/startup-recovery-smoke.log and evidence/failure-result.json. The latter records exact hashes of three runtime and three changed/added test-support files, changed functions, partial results and unexecuted coverage. Before snapshots are under before/.
+- Full 13-group HLS/yt-dlp regression, existing 12-case offline auth/queue suite, 11-case persistence regression and remaining required lock/reservation/mutation checks were NOT_RUN on this candidate after the failure. Prior candidates' PASS evidence is not transferred.
+- Runtime source provenance: queue/safety/entrypoint/bootstrap from the preserved actual read-only live snapshot and HLS candidate; app.py matches the operator-verified 14f8c8 overlay at SHA a906e1013ebb7a0ee70b08b77ec32b7dd4fc99dbf5f4450904418abf2163bca2. Fresh live Docker/runtime identity was not reverified. Raw canonical app.py is not the final patched runtime and canonical root teddy_mp4_queue.py is absent; never overwrite deployed runtime wholesale from old local/canonical raw code.
+- PRODUCTION_CHANGED=NO; BUILD=NOT_RUN; DEPLOY=NOT_RUN; DEPLOYMENT_GATE=BLOCKED; CANONICAL_PRODUCT_CODE=NOT_PUBLISHED. No operating state/source/file/service/Docker operation was performed. Owned synthetic temporary directories were cleaned by their test lifetime; no existing data was deleted.
+- This Writer-workstream entry is coordination only. Existing Docker access, backup/source-manifest/live-configuration and Writer safety blockers remain unchanged and UNRESOLVED where previously recorded.
+
+NEXT_CHECKPOINT: correct only the HLS fixture initialization order and test-only yt-dlp import isolation, retaining this failure log and every safety assertion; rerun the same focused suite, then execute the unrun regressions only if it passes. This correction/retest was not performed in this stopped checkpoint. No operational retry or deployment follows from partial results.
