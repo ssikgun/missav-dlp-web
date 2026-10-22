@@ -13644,3 +13644,8 @@ For CT108 to accept evidence without mounting/copying the 17-GB archive, a futur
 NEXT: Supply the actual source-manifest path and provenance, plus an independently verifiable PVE attestation trust-anchor/challenge-transfer method; then reassess the minimal paired deploy/rollback verifier change.
 
 PRODUCTION_DEPLOYMENT=NOT_RUN; ROLLBACK_EXECUTED=NO; WRITER_SAFETY_ISSUE=UNRESOLVED.
+
+
+## MANIFEST ROLE CLARIFICATION — DLDWS-001 backup evidence review (2026-10-22)
+
+A broader local read-only search found /tmp/dldws001-integration-20261019/evidence/source-manifest.json (102,407 bytes; SHA-256 313213a9bed9aacf41c5b3bc55dc7c3b86875def387886c57605f2a989cd44c0). Its top-level keys describe build_result, dl001_context, dws001_b, final_candidate_files, integration_changes, integration_root, notes, and offline_results. It is an integration-candidate provenance manifest, not the Proxmox backup source manifest: its SHA-256 does not match the required 252491423da01d4f1eeabad3e7caeaeac3e8cb23b2eb46818aba91b7be178d16. The separate overlay manifest remains SHA-256 a2b5c134528aea387fc93fd8d25c56e88c5c1a47c6408562536dd4fd9ab60b7f. No path/role for the required backup source manifest was established. The original scripts, absence of verifier changes, and all blocked gate conclusions remain unchanged.
