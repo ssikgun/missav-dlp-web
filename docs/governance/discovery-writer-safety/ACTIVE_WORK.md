@@ -1347,3 +1347,8 @@ The exact source-manifest path and meaning are absent from the available origina
 No authenticated PVE attestation key, pinned trust anchor, challenge/nonce exchange, or evidence-transfer mechanism is established. A plain JSON document or operator-set PASS/hash environment variable would be forgeable and is not an acceptable gate. Therefore no backup-verifier code change or synthetic verifier test was started; the explicit missing-manifest precondition requires BLOCKED. No PVE backup result is claimed by Codex.
 
 NEXT: From the original Proxmox backup-generation records, identify the exact source-manifest path and its role, and establish an independently verifiable PVE signing/trust-anchor and one-time challenge delivery path before authorizing a verifier change.
+
+
+## MANIFEST ROLE CLARIFICATION — DLDWS-001 backup evidence review (2026-10-22)
+
+A broader read-only search found /tmp/dldws001-integration-20261019/evidence/source-manifest.json (102,407 bytes; SHA-256 313213a9bed9aacf41c5b3bc55dc7c3b86875def387886c57605f2a989cd44c0). Its top-level keys are build_result, dl001_context, dws001_b, final_candidate_files, integration_changes, integration_root, notes, and offline_results. This is integration-candidate provenance, not the Proxmox backup source manifest: its digest does not match the required 252491423da01d4f1eeabad3e7caeaeac3e8cb23b2eb46818aba91b7be178d16. The separate overlay manifest remains a third, distinct artifact at SHA-256 a2b5c134528aea387fc93fd8d25c56e88c5c1a47c6408562536dd4fd9ab60b7f. No file path/role for the required backup source manifest was established; all blocked gates and conclusions remain unchanged.
