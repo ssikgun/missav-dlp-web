@@ -1591,3 +1591,34 @@ TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKS
 - Unified next-chat handoff: /tmp/TEDDY_DOWNLOADER_UNIFIED_NEXT_CHAT_HANDOFF_20261022_AFTER_DEPLOY.md, finalized with the result commit readback SHA. Canonical CURRENT_HANDOFF includes the integrated state, blockers, legacy recovery and Stage11 scope.
 
 NEXT: resolve the GANA startup-replay authorization/safety conflict and obtain fresh trusted Docker/backup/config/idle/rollback evidence before any operational action. Do not mutate GANA state, retry legacy recovery, reuse receipts, or treat historical NEXT text as approval.
+
+
+## SEPARATE APPROVED EXECUTION — MP4 startup recovery safety implementation (2026-10-22)
+
+TASK_ID: DLDWS-001
+STATUS: IN_PROGRESS
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+
+USER_APPROVED_POLICY: Preserve explicitly failed MP4 jobs until the user explicitly retries; automatically resume only verifiably interrupted, normally incomplete work.
+
+AUTHORIZED_SCOPE:
+- Inspect the preserved actual runtime, startup/load/recovery/selection/execution/result/publication boundaries and existing evidence read-only.
+- Prepare a NEW isolated candidate, preserving the prior HLS result fix candidate and its teddy_mp4_queue.py SHA-256 593b3ad77f50e2af64589d84a005fad5ce79495e4280011f3e240a6961ba9730.
+- Implement the approved general policy without UUID/title-specific exceptions. Preserve explicit failures, ambiguous legacy records, source/output/queue hashes, normal consistent interruption resume, HLS/yt-dlp behavior and existing locks/reservations/no-clobber/retry safety.
+- Use only synthetic temporary tasks and files for focused startup/repeated-startup, explicit-failure/ambiguity/paused/cancelled, execution/result/publication boundary, lock/reservation and HLS/yt-dlp regressions.
+- Record candidate files, exact hashes, test outcomes and limitations. Only approval/result governance and handoff documentation may be published; product code remains isolated.
+
+PROHIBITED_SCOPE:
+- No Docker build/deploy/access workaround, container/service restart, operating task/queue/settings mutation, GANA or legacy-four-job recovery/retry, real download/production FFmpeg/NAS publication, source cleanup or receipt reuse.
+- No Writer code/socket/systemd change; no Stage11, Gluetun, Selkies, Jellyfin/NAS change; no existing candidate or dirty-worktree overwrite/reset/clean; no canonical product-code commit/push; no weakening/skipping safety tests.
+- Discovery Writer Safety records the shared-task authorization only; the implementation is Downloader MP4/startup scope and does not extend the Writer contract.
+- Existing Docker access, backup/live-config and Writer safety blockers remain; isolated PASS never authorizes production deployment.
+
+ACCEPTANCE:
+- Explicit ERROR/failed jobs remain unchanged and unselected even with output_ready queue records.
+- Consistent normal interruption resumes once, without converting real failures or ambiguous history into successful/retryable work.
+- Failed-job policy is enforced at startup, selection, execution, result storage and publication boundaries; normal explicit retry remains possible only through its existing authorized path.
+- Preserve original data, queue records, HLS result fix, yt-dlp compatibility and MP4 locking/reservation/collision guarantees; report all unverified conditions.
+
+NEXT_CHECKPOINT: Review the isolated implementation and evidence; no build, deployment or operating recovery is authorized by this phase.
