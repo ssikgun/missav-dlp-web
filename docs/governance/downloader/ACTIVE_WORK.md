@@ -1642,3 +1642,20 @@ PROHIBITED_SCOPE:
 - No legacy MP4 recovery reexecution or old receipt reuse. Handoff NEXT text is never new authorization.
 
 ACCEPTANCE: Report actual build/image/runtime/smoke/deployment/health/data/other-service/rollback evidence separately. A synthetic PASS is not operational download PASS. Complete the unified handoff even if deployment is BLOCKED.
+
+
+## EXECUTION RESULT — GANA-3223 HLS overlay build/deployment BLOCKED (2026-10-22)
+
+TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+
+- Approval was identically registered and read back at 2908594f21b00589bb63f82a1ab557d5c0d2732b. Candidate teddy_mp4_queue.py SHA-256 matched 593b3ad77f50e2af64589d84a005fad5ce79495e4280011f3e240a6961ba9730.
+- BUILD=NOT_RUN; DEPLOY=NOT_RUN; FINAL_IMAGE_SMOKE=NOT_RUN; NEW_IMAGE=NONE. A read-only Docker inspect failed with permission denied at unix:///var/run/docker.sock. No privilege escalation, alternate Docker endpoint, socket permission change or operational command was attempted.
+- A separate safety blocker was found in read-only host work data: five ERROR tasks, max_concurrent=4; GANA task remains failed without local result, but its valid sealed queue job is output_ready and references a regular 2,353,735,715-byte output. Current Docker mount identity could not be reverified, so host-path evidence is not a fresh live-container identity proof.
+- Actual unchanged _recover() and _eligible_job() were exercised in a temporary synthetic ERROR/output_ready fixture: startup changed status to MP4 waiting, saved task state once, and made one job eligible. No worker, remux or publication ran. Thus restarting the Downloader can itself violate the explicit no-GANA-state-change boundary. DEPLOYMENT_GATE=BLOCKED_GANA_STARTUP_REPLAY independently of Docker access. No source/hash/state bypass was introduced.
+- Existing PVE data.tar is not visible at its host mount path in CT108; fresh trusted backup/source-manifest evidence is unavailable. Live Compose labels/config, current work/lock/retry idleness, dependency state and rollback compatibility remain INCOMPLETE. Historical deploy/rollback scripts pin obsolete 83322e/14f8c8 images and exactly four tasks; they were preserved and must not run unchanged.
+- Prior offline smoke 13 groups PASS is reused; it used external import stubs and is not final-image or real-download verification. Current three small task/settings/GANA-job file hashes were equal before/after this investigation. Full fragment content hashes and production health were not retested.
+- PRODUCTION_WRITES=NONE; CONTAINER_SERVICE_LIFECYCLE=NOT_RUN; ROLLBACK=NOT_RUN; CANONICAL_PRODUCT_CODE=NOT_PUBLISHED. Writer/Gluetun/Selkies/Stage11/NAS/Jellyfin and previous candidates/evidence were not changed. Writer safety issue remains UNRESOLVED. This Writer workstream record is shared-task coordination only.
+- Evidence: /tmp/dldws001-hls-deploy-20261022.0P7fvZWM/execution-result.json, current-readonly-snapshot.json, state-readback.json, gana-startup-replay-synthetic.json and docker-access.txt.
+- Unified next-chat handoff: /tmp/TEDDY_DOWNLOADER_UNIFIED_NEXT_CHAT_HANDOFF_20261022_AFTER_DEPLOY.md, finalized with the result commit readback SHA. Canonical CURRENT_HANDOFF includes the integrated state, blockers, legacy recovery and Stage11 scope.
+
+NEXT: resolve the GANA startup-replay authorization/safety conflict and obtain fresh trusted Docker/backup/config/idle/rollback evidence before any operational action. Do not mutate GANA state, retry legacy recovery, reuse receipts, or treat historical NEXT text as approval.
