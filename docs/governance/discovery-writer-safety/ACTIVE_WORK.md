@@ -1377,3 +1377,30 @@ PRODUCTION_TARGET: missav-dlp-web Downloader container only
 No real bulk retry or new download; no data cleanup or modification; no Writer/Gluetun/Selkies restart or change; no Stage11, NAS, or Jellyfin change; no Compose/environment-file edits; no additional image build or deployment attempt beyond this one approved image and one Downloader replacement; no weakening of any preflight or rollback safety gate.
 
 THIS CODEX EXECUTION: approval registration and remote readback only. Docker build, product-code edit, and production deployment/restart are NOT AUTHORIZED IN THIS EXECUTION.
+
+## SEPARATE APPROVED EXECUTION — one-time operational MP4 recovery from retained fragments (2026-10-22)
+
+APPROVAL_DATE: 2026-10-22
+AUTHORIZATION: Explicit user approval for a one-time, operator-run recovery of four MP4 files from the already retained and verified TS/HLS fragments; Codex may inspect runtime safety rules and prepare an isolated recovery tool and synthetic tests only.
+TASK_ID: DLDWS-001
+STATUS: IN_PROGRESS
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+CANONICAL_BASE: teddy-subtitle-stage11 at 5c73d284f7c3203f966e07d0d554982f0f98e8d7
+AFFECTED_WORKSTREAMS: downloader,discovery-writer-safety
+PRODUCTION_IMAGE: sha256:7200290e8af11d9f253a5efd028bf3be2a2757af9049f0bb9e43bd04f821f2d8
+RECOVERY_TARGETS: four existing ERROR jobs whose named TS and verified HLS fragment sets are present
+
+### AUTHORIZED_SCOPE
+- Inspect the actual deployed runtime files and current MP4 locking, space reservation, and validation rules; do not infer runtime behavior from GitHub source alone.
+- Prepare an isolated one-time recovery utility under /tmp/dldws001-mp4-recovery-20261022/ with separate read-only preflight and explicit execution modes.
+- Use only the four already verified filelists and retained fragments; create and validate one new temporary MP4 at a time using stream copy.
+- Preserve source TS files, HLS fragment directories, filelists, and task records. Finalize only a validated MP4 when its destination is absent, using atomic no-clobber semantics.
+- If the existing MP4 serialization lock cannot be shared, active downloads/MP4 work cannot be excluded, or current reserved-space checks cannot be proven, stop without creating output.
+- Do not mark application tasks complete unless an existing safe state-update path is identified; report any required state reconciliation separately.
+- The actual production recovery command is to be run by the user from root@downloader. Codex must not execute against production.
+
+### PROHIBITED_SCOPE
+No source-fragment, filelist, task-record, or existing-output deletion/overwrite; no new download or retry; no disabling or weakening MP4 safety, locks, or storage reservations; no Docker build/deployment/restart; no Writer, Gluetun, Selkies, Stage11, NAS, or Jellyfin change. The existing Writer safety defect remains UNRESOLVED. This approval is distinct from the prior image build/deployment approval and authorizes no container lifecycle action.
+
+THIS CODEX EXECUTION: approval recording/readback, runtime safety analysis, isolated recovery-tool implementation, and offline synthetic tests only. No production preflight execution that mutates state, no MP4 generation in /downloads, and no production task-state change.
