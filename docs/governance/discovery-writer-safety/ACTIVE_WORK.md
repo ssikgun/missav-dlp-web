@@ -1544,3 +1544,8 @@ REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
 This entry records the shared DLDWS-001 approval for traceability only. The approved HLS local-result collection fix belongs to the Downloader workstream; this workstream contract explicitly excludes MP4 conversion and download processing. No Discovery Writer Safety product code, tests, services, sockets, databases, or operational state are in scope or authorized to change. The unresolved Writer socket issue and its existing evidence remain untouched. Production deployment and all Downloader operational actions remain unauthorized.
 
+
+
+## COORDINATION RESULT — DLDWS-001 GANA-3223 HLS post-processing follow-up (2026-10-22)
+
+The approved HLS post-processing correction was implemented and tested only in an isolated Downloader candidate. This workstream's contract excludes MP4/download processing; no Discovery Writer Safety product code, tests, service, socket, database, or operational state was changed. The existing Writer socket safety issue and all prior evidence remain unresolved and untouched. Production deployment, downloads, and task-state changes were not performed. Candidate result and hashes are recorded in the Downloader ACTIVE_WORK and canonical handoff.
