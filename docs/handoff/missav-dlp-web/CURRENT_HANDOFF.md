@@ -13661,3 +13661,27 @@ Chromium 156.0.8078.4 synthetic full-page test PASS at 1440x900 and 390x844. Des
 IMAGE_BUILD=NOT_RUN; PRODUCTION_DEPLOYMENT=NOT_RUN; PRODUCTION_RESTART=NOT_RUN. No product code was published. Writer, queue, API, JavaScript, and production state were not changed.
 
 NEXT: review the isolated HTML/CSS candidate; image rebuild and production rollout require separate approval.
+
+## EXECUTION RESULT — DLDWS-001 legacy HLS MP4 recovery implementation (2026-10-22)
+
+User-approved isolated implementation is complete at `/tmp/dldws001-mp4-recovery-legacy-20261022`. Original candidate `/tmp/dldws001-mp4-recovery-20261022` remains unchanged (original tool SHA-256 `8f890d7b246b0cc5864324fed1c3f54391f0c188f11dadf6b56bac6abca834dd`; original wrapper SHA-256 `e4813786373b72a745502ec33d03e53d0ea995feecf9193f999c4f80912be8f4`).
+
+- Legacy mode is opt-in; strict manifest mode and its metadata checks remain in place.
+- Legacy auto-mapping binds exactly four ERROR UUID task records, four UUID `.parts` directories, and four unique top-level TS files using the prior extractor's URL-ID output prefix rule. It rejects ambiguity, extra/missing files, unsafe names, symlinks, filelist/order/index mismatch, and task/settings/input changes.
+- Current TS/fragment SHA values are inspection-time fingerprints only, never download-time provenance. No fake `hls_parts_path` or `resume-plan.json` is created.
+- Recovery reuses the deployed runtime's task claims, global `RemuxTransaction` lock, space/inode checks and durable reservations, active-work checks, validation, and atomic no-clobber publication. One item is processed at a time; any failure stops further items. Task records, source TS, fragments, and filelists are preserved.
+- Synthetic tests: Python 3.10.22 recovery suite 35/35 PASS; offline wrapper guard tests 3/3 PASS. Python compile, shell syntax and help checks PASS. Synthetic media runners were used; real `ffmpeg`/`ffprobe` are unavailable in Codex.
+- Live CT108 preflight, target image/runtime inspection, live storage/lock inspection, actual media conversion and postcheck were NOT_RUN by Codex. Runtime fingerprints came from the read-only overlay OCI artifact sha256:14f8c831d692db0a0d4f0f3b70eac0ca840b1daf0a66927aebc578eaf6541c4d; the wrapper/tool require the live container image sha256:7200290e8af11d9f253a5efd028bf3be2a2757af9049f0bb9e43bd04f821f2d8 and five exact runtime hashes, otherwise they fail closed. CT108 must pass that gate before any operator execution.
+- No production container, service, task, TS, fragment, filelist, MP4, Writer, Gluetun, Selkies, NAS, or Stage11 resource was accessed or changed. No product code was published. Writer safety issue remains UNRESOLVED.
+
+Pinned operator files:
+- `recover_mp4.py`: `8cc90a8247da0320c9269acf519331748b5f4ddd18685977f2f3dea33f95e5ff`
+- `run-on-downloader.sh`: `5a686162cfc903459620042acd39ecab40641df7ce90421069461b27875b811b`
+
+CT108 sequence (full instructions in the isolated candidate README):
+1. `./run-on-downloader.sh preflight --evidence-mode legacy --auto-targets`
+2. Only on `PREFLIGHT_PASS), inspect the four returned mappings and use its one-time `preflight_id` with the explicit `execute --evidence-mode legacy --auto-targets --preflight-id '<PREFLIGHT_ID>' --confirm DLDWS-001-MP4-RECOVERY-20261022` command.
+3. Only after `RECOVERY_COMPLETE`, run the read-only `postcheck --evidence-mode legacy --auto-targets --preflight-id '<PREFLIGHT_ID>'` command.
+Any blocked, expired, partial, or failed result stops the one-time execution; do not retry or modify source/task metadata.
+
+Evidence: candidate `evidence/final-validation.json`, `evidence/legacy-tests-python310.txt`, `evidence/wrapper-mock-tests.txt`, and `evidence/checksums.json`.
