@@ -13763,3 +13763,128 @@ AUTHORIZATION: User approved an isolated fix and tests for the HLS post-processi
 - PRODUCTION_UNCHANGED=YES; no container/service/image lifecycle, production file/task/result change, real retry/download, Docker build/deploy, or canonical product-code publication. Existing Writer safety issue remains unresolved.
 
 NEXT: review the isolated patch; any image build and operational deployment require separate authorization.
+
+
+# TEDDY Downloader — 다음 대화방 통합 인계 (2026-10-22, 배포 BLOCKED)
+
+## A. 정본과 현재 작업
+
+- Repository: ssikgun/missav-dlp-web; canonical branch: teddy-subtitle-stage11.
+- 사용자 승인 기준 SHA: cabec2a9ca8f9578f6009f051183f12d1a33386d.
+- 이번 동일 승인 기록의 원격 readback SHA: 2908594f21b00589bb63f82a1ab557d5c0d2732b.
+- 결과 기록 최종 GitHub SHA: 이 항목을 포함한 commit; 정확한 최종 readback SHA는 로컬 통합 인계파일과 최종 응답에 기록한다..
+- 공통/Downloader/Discovery Writer Safety 계약 버전: 1.0.0 / APPROVED.
+- downloader와 discovery-writer-safety: DLDWS-001 / IN_PROGRESS; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+- Stage11: S11-WX011 / IN_PROGRESS; CONTRACT_VERSION 1.0.0; REQUIRES_WORKSTREAMS: stage11. 이 작업에서는 계약/상태만 읽었다.
+- Codex 실제 cwd/Git root: /tmp/downloader-stage11-wx001.
+- 실제 local branch: codex-stage11-wx001-20261014; local HEAD: 761fcdce563b32edfa31f5f44f09eb11535e9d8f. 시작 시 작업 트리 clean. 이 오래된 로컬 브랜치를 canonical로 오인하지 말 것.
+- origin: https://github.com/ssikgun/missav-dlp-web.git. Canonical 문서는 GitHub connector로 읽고 승인/결과 문서만 갱신했다. 제품 코드 canonical 게시는 하지 않았다.
+- 최신 AGENTS.md, 공통 계약/라우터, 양쪽 계약/ACTIVE_WORK, Stage11 계약/ACTIVE_WORK를 읽었다. 계약/라우터/Stage11 상태는 변경하지 않았다.
+
+## B. 이번 빌드·배포 실행 결과
+
+사용자는 한 파일 overlay 빌드와 안전 게이트 통과 시 Downloader 단독 배포를 승인했다. 승인 자체는 양쪽 ACTIVE_WORK에 동일하게 등록하고 원격 readback했다. 하지만 다음 실제 차단 조건으로 빌드/배포를 실행하지 않았다.
+
+- BUILD=NOT_RUN / BLOCKED_DOCKER_ACCESS.
+- DEPLOY=NOT_RUN / BLOCKED.
+- 새 이미지/태그: 생성하지 않음.
+- Docker 읽기 전용 inspect가 exit 1: permission denied while trying to connect to the docker API at unix:///var/run/docker.sock.
+- 현재 shell hostname은 downloader, uid는 0이지만 Docker 접근 권한이 있다고 간주하지 않는다. 권한 상승, socket chmod/chown, 다른 daemon endpoint, docker exec 우회 등을 하지 않았다.
+- 최신 live 이미지/컨테이너 ID, 실제 Compose 라벨/마운트/네트워크, active 작업/프로세스/잠금, Writer/Gluetun/Selkies 상태, 로그인/UI/API는 이번 실행에서 재확인하지 못했다. 운영 health PASS가 아니다.
+- 직전 실행에서 read-only inspect/cp로 관찰한 이미지: sha256:7200290e8af11d9f253a5efd028bf3be2a2757af9049f0bb9e43bd04f821f2d8.
+- 직전 관찰 컨테이너: 9a5b729335bfd20460bea2e02e1f8a36b6c057c2111ec84fc06f1a33718a5f00 / missav-dlp-web / running. 이번 현재값으로 확정하지 말 것.
+- 승인 후보: /tmp/dldws001-gana3223-hls-result-fix-20261022/teddy_mp4_queue.py.
+- 후보 SHA-256 재확인 PASS: 593b3ad77f50e2af64589d84a005fad5ce79495e4280011f3e240a6961ba9730.
+- 직전 실제 runtime 원본 SHA-256: 85e8078c9aa6f27f3ceae13f9202617d14133fa83a1e3cf06687b558e13a1767. 원본 snapshot: /tmp/dldws001-gana3223-live-snapshot-20261022/.
+- 변경은 _local_outputs, _store_local_result, _complete_job의 HLS/yt-dlp 결과 수집 분리뿐이다. HLS는 검증된 main MP4만 수집하고 ytdlp-home을 강제하지 않는다. yt-dlp home/부가 결과와 실패 보호, 잠금/예약/no-clobber는 유지한다.
+- 이전 합성 smoke 13개 그룹 PASS를 재사용했다. Python 3.13.5, 외부 yt_dlp/teddy_hls_transport import stub 사용. 최종 이미지 smoke는 NOT_RUN이며 실제 다운로드 PASS가 아니다.
+- 후보 테스트 SHA: teddy_mp4_queue_smoke.py = b0341d26b96c9b242817bf8f3409ae9f7cd09609a8e6aa0d5e46c3a9f4f20199.
+- 이전 smoke/evidence: 후보의 evidence/hls-result-fix-final-20261022/full-smoke.log 및 final-validation.json.
+- 이번 증거 디렉터리: /tmp/dldws001-hls-deploy-20261022.0P7fvZWM/. docker-access.txt, execution-result.json, current-readonly-snapshot.json, state-readback.json, gana-startup-replay-synthetic.json.
+- 운영 파일/컨테이너/이미지/서비스 변경, 실제 다운로드/후처리/게시/재시도는 전혀 실행하지 않았다. 운영 후 데이터 전체 해시/다른 서비스 상태 검증은 NOT_RUN/INCOMPLETE. 읽은 소형 상태 파일의 byte hash는 조사 전후 동일했다.
+- ROLLBACK=NOT_RUN; 배포하지 않아 필요 없었다. 현재 rollback readiness는 INCOMPLETE. 무조건 옛 이미지로 시작하는 것도 아래 GANA replay 위험 때문에 안전하다고 가정할 수 없다.
+
+### 현재 Compose/백업/롤백 재개 조건
+
+- 다음 과거 네 파일은 현재 호스트에서 regular/non-symlink 존재와 hash만 확인했다. live container의 실제 config_files 순서를 새로 확인한 것은 아니다. 이후 UI overlay 배포에서 추가한 override가 있을 수 있으므로 실제 Docker 라벨이 우선이다.
+  1. /opt/missav-dlp-web/compose.yaml — SHA 3fd488ece06cb4d117a28f272b52205c7e4624766090d686f7156e1ef5b3f912
+  2. /tmp/e4b-web-image-override.yaml — SHA 880cfcc3a249898091e5589470f7d4f36d1f0893501a7b5dbf374903575c0a94
+  3. /opt/missav-dlp-web/stage13-ui-24fc73a.override.yaml — SHA 22d43e6da73878007ef8483d458652622d7a703ea7747ac25a251c828ea29559
+  4. /tmp/dldws001-compose-final-20261020-r1zmpp5n/candidate-image.json — SHA 505631dd1ac504fb0c4a7c905b08f693ba320f60aa7be6d7e91b63cec3bd858a
+- /opt/missav-dlp-web/gluetun.env는 존재/readable 확인만 했다. 비밀값은 출력/기록하지 않았다.
+- 기존 /tmp/dldws001-downloader-deploy-20261022/deploy.py와 rollback.py는 OLD=83322e..., NEW=14f8c8... 및 정확히 4개 실패 작업 기준을 고정한다. 현재 부모 720029... 및 5개 작업에 그대로 실행하면 안 된다. 원본 스크립트는 보존했고 실행/수정하지 않았다.
+- 기존 배포 방식의 경계는 유지: 실제 프로젝트/파일 순서를 검증한 뒤 마지막 image-only override, Downloader missav-dlp-web 하나만 compose up -d --no-deps --no-build --pull never. 전체 stack down/up, 의존서비스 재생성은 금지.
+- PVE 백업: /mnt/pve/Data_5TB/dldws001-backups/backup-20261020-110732-TbdQOd/data.tar.
+- 이 경로는 CT108에서 현재 FileNotFoundError. Proxmox /dev/sda1 ext4 Data_5TB의 기존 백업/복원 PASS는 사용자 제출 PVE 실행 증거이며 Codex 직접 검증이 아니다.
+- 사용자 제공 아카이브 크기 17,012,172,800 bytes; tar SHA-256 7c7e4f5adae91064e503d480f8463776dc3e94f84390d2167fae20ef860422f7.
+- 원본 backup source manifest SHA-256 252491423da01d4f1eeabad3e7caeaeac3e8cb23b2eb46818aba91b7be178d16. 실제 source manifest 위치와 신뢰된 PVE→CT108 증거 전달 경로는 미확정이다.
+- 별개 overlay manifest a2b5c134528aea387fc93fd8d25c56e88c5c1a47c6408562536dd4fd9ab60b7f와 혼동 금지. /tmp/dldws001-backup-attestation-20261022/evidence/review.json은 이 미해결 차단을 기록한다.
+- 백업은 새 GANA 작업보다 과거 자료다. 현재 데이터를 옛 백업으로 덮어쓰거나 과거 동시성 2를 현재 4 위에 복원하지 않는다. 현재 추가 데이터와 설정을 보존하는 수단을 먼저 확인해야 한다. 이번에 새 백업/복원은 실행하지 않았다.
+- 최신 backup 접근/고정 hash/원본 manifest, live image/runtime/config, active downloads/retries/MP4/locks/reservations, Writer socket/listener, Gluetun/Selkies, 데이터/rollback 호환성 게이트가 모두 실제 확인될 때까지 배포 금지.
+
+## C. GANA-3223 기존 결과와 새로 확인된 배포 차단
+
+대상 UUID: 088a91a7-701f-45d1-a38e-5e1c92cd1f56.
+
+- 사용자 장애 증거: ERROR, mp4_queue_kind=hls, mp4_stage=failed, local_result_path/local_result_paths 없음. MP4 2,353,735,715 bytes, ffprobe PASS, duration 4499.328375초, H.264/AAC. ytdlp-home 부재로 결과 기록이 실패했다.
+- 이번 호스트 /opt/missav-dlp-web/work 읽기 전용 조사에서도 동일한 task failed/empty local result와 2,353,735,715-byte regular output을 확인했다. 단, 현재 Docker mount와의 연결은 Docker 접근 거부로 새로 증명하지 못했다. MP4 내용 전체/stream SHA/full decode 검증은 하지 않았다.
+- 매우 중요한 추가 차단: 해당 UUID의 sealed queue job은 stage=output_ready이고 record hash가 유효하다. task의 failed와 queue의 output_ready가 다르다.
+- 부모와 후보에서 AST가 같은 _recover()는 startup 때 output_ready job의 task를 mp4_stage=output_ready / status=MP4 변환 대기로 바꾸고 save_tasks()를 호출한다. 이어 _eligible_job()의 처리 대상이 된다.
+- 실제 _recover 및 _eligible_job을 합성 ERROR/output_ready fixture에 실행해 이 동작을 확인했다: 상태 변경, save_tasks 1회, eligible job 1개. worker/FFmpeg/publish는 실행하지 않았다. 증거: gana-startup-replay-synthetic.json.
+- 따라서 Docker 접근이 생겨도 일반 컨테이너 교체만으로 GANA 상태 변경 및 후처리/게시가 시작될 위험이 있다. 이번 승인은 GANA 기존 상태 변경/재처리/원본 정리를 금지하므로 DEPLOYMENT_GATE는 별도로 BLOCKED_GANA_STARTUP_REPLAY이다.
+- _recover를 임의 변경하거나 UUID 전용 예외, fake metadata, task/queue 파일 조작, health-only 환경변수 추가로 우회하지 않았다. 이 승인된 한 파일 SHA를 바꾸지 않았다.
+- GANA 기존 MP4의 전체 검증 및 상태 정합성 복구는 미완료. 사용자 결정 없이 자동/수동 재시도 또는 완료 상태 조작 금지.
+- 다음 진행에는 이 자동 replay와 no-GANA-state-change 경계를 해결하는 명시적 사용자 결정/별도 안전 조치가 필요하다. 빌드 승인 자체는 기존 결과 재처리 승인으로 확대되지 않는다.
+
+### 이번 현재 데이터 관찰 (전체 무결성 PASS 아님)
+
+- task 5개, 모두 ERROR; max_concurrent=4; auto_retry=true; auto_retry_max=30.
+- parts metadata 집계: 5개 디렉터리, regular file 9,749개, TS 9,742개, 합계 21,775,870,417 bytes, 관찰된 file symlink 0.
+- work filesystem: 총 105,089,568,768 bytes, free 25,983,664,128 bytes, free inode 6,113,565. 순간 관찰치이며 예약/필요 용량 PASS가 아니다.
+- .tasks.json SHA b287727a103c6b44a99aebf2394efa1af59a990a834caf584787eb664ef1657a.
+- .settings.json SHA 6c11ebcb949b0ad0c65a74af503bb421b2ee41979d72cde53e84c63b0fe115ee.
+- GANA sealed job SHA c971e4e6089c2bf9ae184819b4054e4dc1648b1a6615e04e9a95e65bf8fc007c.
+- 위 세 소형 상태 파일은 조사 후 readback hash 동일. 전체 조각의 content SHA를 반복 계산하지 않았고 정지/quiet window 또는 무변경 snapshot을 증명한 것은 아니다.
+
+## D. 기존 실패 4건과 일회성 복구의 현재 경계
+
+- FNS-258, SNOS-403, PPPE-446, START-649. 기존 TS 4개와 과거 검증된 HLS 조각 8,633개, filelist/작업 기록은 보호 대상이다. 이번에 수정/삭제/재시도하지 않았다. 현재 전체 parts 수가 신규 GANA를 포함해 늘어난 값을 과거 수치로 되돌리지 않는다.
+- 구형 도구의 실제 CT108 legacy preflight는 대상 4개/조각 8,633개로 PASS했다는 운영자 증거가 있다. 첫 execute PPPE-446에서 source verification 후 신규 MP4와 기존 TS duration 비교로 BLOCKED됐다.
+- 기존 TS duration=4644.021334초, HLS concat null out_time=9092.295789초/exit0. out_time만으로 완전성/영상길이를 확정하지 않으며 실패 임시 MP4의 정확한 duration은 미확정이다. 최종 MP4가 없었다는 당시 관찰을 현재 생성 허가로 해석하지 않는다.
+- 실패한 preflight_id/receipt는 재사용 불가. 부분 출력, 잠금, 예약, receipts/result/used 잔여물의 현재 상태는 운영 읽기 전용 증거가 필요하다. 삭제/강제 해제/복구 재실행 금지.
+- 구형 후보: /tmp/dldws001-mp4-recovery-legacy-20261022/. recover_mp4.py SHA fe6a7ef2fa31737aa459969be87fd607feaeaf004dc1c1eb54fd4dec576df563; wrapper SHA 55b1c2066a90035bf7fc3397df794dd97f61660e7d0e2df475dc8cc778ff74c3.
+- 새 독립 미디어 검증 후보: /tmp/dldws001-mp4-recovery-media-20261022/. recover_mp4.py SHA 27b8d181b8201c50ccc876b7d9652ce6b33adb63039468643c5347b732fd9528; 실행 차단 wrapper SHA abfe7c334f0dd44d78fabf0ccda2231642d2878d4c6323799d659a45df618200.
+- 격리 실제 FFmpeg 7.1.5 H.264/AAC media 18개 시나리오, 실제 합성 4건 sequential recovery/postcheck와 mutation/short-output 차단, mocked regression 78개, static/read-only 7개가 PASS한 기록이다. 정상 manifest 모드, 글로벌/작업 잠금, 예약/no-clobber 원형은 유지한다. 이는 CT108 기존 작품의 복구 PASS/재실행 승인이 아니다.
+- /tmp/dldws001-real-media-20261022/collect_ct108_readonly.py SHA abc60b4634417342b42eeb07e9125b67691646271c5fd4c61109a8f459f734c4.
+- 운영자에 따르면 CT108 증거 수집 도구도 RecoveryBlocked였다. 실제 원인은 미확정. /tmp/dldws001-readonly-evidence-9VKYB3sZ/inventory.jsonl은 이번 읽기에서 비어 있었다. 이것으로 cleanup/미디어/잠금 상태 PASS를 주장하지 않는다.
+- 이번 배포 승인은 legacy recovery retry, receipt 재발급/재사용, 기존 MP4 생성/작업 정합성 복구 승인이 아니다.
+
+## E. 독립 Stage11 상태 (읽기 전용 확인)
+
+- S11-WX011 / IN_PROGRESS. 16개 고정 sample/청취 기록 보존; sample manifest SHA 3b4ac21598d3a8f7e01588a760a0b6f88644d3100519705f789641616abbf478.
+- S04/S08/S13의 기존 일본어 후보를 사용자 청취와 함께 형식 검토하는 것이 현재 NEXT다. 일본어 문장을 Git에 복사하거나 후보 존재만으로 정확/환각을 판정하지 않는다.
+- S03 후반 대화 누락은 STRONGLY_SUSPECTED, NOT_CONFIRMED. S11/S15는 사용자 speech 보고와 후보 부재가 있어 omission-risk로 유지한다.
+- Japanese transcription accuracy / exact timing / speaker DER는 UNKNOWN; final subtitle product quality INCONCLUSIVE. 한국어 음차 청취 메모는 일본어 전사 정답이 아니다. R5_MANIFEST_PROVENANCE=UNRESOLVED.
+- private 자료 기반은 VM122의 /home/teddy/stage11-whisperx-ab-private/analysis/S11-WX011/이며 현재 정확 경로는 기존 active/evidence 참조로 확인한다. 보호 worktree /opt/missav-pwa-subtitle-stage11 및 관련 후보를 변경하지 않는다.
+- 현 WX011 승인 범위를 넘어 Hermes/번역/ASR/model/Demucs 재실행, 음원 재추출, 자막 생성/수정/게시, Stage12/NAS/Jellyfin 쓰기는 금지다. 새 승인이 필요하며 과거 NEXT가 승인이 아니다.
+
+## F. Writer와 보존 경계
+
+- Writer direct-socket cleanup의 식별값 충돌/TOCTOU 활성 리스너 unlink 안전성 문제는 UNRESOLVED다. overlay와 smoke PASS로 해결됐다고 표현하지 않는다.
+- 현재 운영은 과거 socket activation 전환 PASS 기록이 있으나 이번 실행에서 unit/listener/PID/소켓을 새로 검증하지 못했다. Writer/service/socket/systemd/DB는 변경/재시작/정리하지 않았다.
+- /tmp/dldws001-writer-smoke-20261021와 /tmp/dldws001-writer-smoke-evidence-20261021-8u4jd832의 실패 증거, /tmp/dldws001-writer-race-fix-20261021와 관련 evidence, 기존 B-option /tmp/dws001-b-permissions-20261019, DL-001 dirty 후보, UI 후보, release 및 모든 이전 복구 후보는 보존한다.
+- /tmp/dldws001-release-20261021, /tmp/dldws001-ui-convenience-20261020, /tmp/dldws001-ui-alignment-20261022, legacy overlay/persist 후보를 reset/clean/rebase/덮어쓰기하지 않는다.
+- 보호 대상: 운영 /opt/missav-dlp-web/work 전부, .tasks/.settings/.parts/filelist/TS/MP4, max_concurrent=4, 기존 5TB backup, Writer/Gluetun/Selkies, Stage11 및 NAS/Jellyfin.
+- 서버 재시작 UI/API/Docker helper는 사용자 결정으로 제외됐다. 기존 Selkies 및 개별 재시도 기능과 혼동하지 말 것.
+
+## G. 다음 대화방 재개와 권한
+
+완료: 승인 등록/readback, 후보 hash 확인, Docker access 실패 기록, 현재 host state read-only 요약과 소형 파일 불변 확인, startup replay 위험의 실제 코드 합성 재현, 문서 및 통합 인계.
+
+미실행: Docker build/final-image smoke/배포/롤백/로그인·HTTP·운영 UI·서비스 상태 검증, GANA MP4 전체검증/상태복구, legacy recovery retry, Writer 수정, Stage11 추론/자막 작업.
+
+현재 일회성 image-build/Downloader-only-deploy 승인은 안전 게이트가 모두 충족된 범위에만 유효하다. Docker 권한 차단, GANA replay 범위 충돌, 백업 증거 및 최신 live configuration/idle/rollback 확인을 우회할 수 없다. 먼저 읽기 전용 증거와 사용자 결정으로 차단을 해소한다. 임의 GANA 상태 수정 또는 recovery 실행으로 해결하지 않는다.
+
+다음 대화방에 복사할 첫 메시지:
+
+이어서 DLDWS-001을 진행해 줘. /tmp/TEDDY_DOWNLOADER_UNIFIED_NEXT_CHAT_HANDOFF_20261022_AFTER_DEPLOY.md와 GitHub ssikgun/missav-dlp-web의 teddy-subtitle-stage11 최신 정본/AGENTS/계약/ACTIVE_WORK를 먼저 읽어. 이번 빌드·배포는 Docker API permission denied로 NOT_RUN이고, GANA-3223 failed task의 sealed queue가 output_ready여서 일반 시작이 자동 상태 변경/후처리를 유발하는 별도 차단도 확인됐어. 기존 배포 승인은 안전 게이트 충족 조건부이며 GANA 상태복구·legacy 복구 재실행·Writer/Stage11 변경 승인은 아니야. 기존 후보와 데이터는 그대로 보존하고, 이 차단 및 최신 백업/운영 구성 증거를 먼저 확인해. 안전 조건이나 승인 경계가 풀리지 않으면 빌드·배포·재시도를 실행하지 마.
