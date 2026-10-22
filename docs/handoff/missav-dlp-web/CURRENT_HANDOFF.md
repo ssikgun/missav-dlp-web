@@ -13685,3 +13685,17 @@ CT108 sequence (full instructions in the isolated candidate README):
 Any blocked, expired, partial, or failed result stops the one-time execution; do not retry or modify source/task metadata.
 
 Evidence: candidate `evidence/final-validation.json`, `evidence/legacy-tests-python310.txt`, `evidence/wrapper-mock-tests.txt`, and `evidence/checksums.json`.
+
+
+## EXECUTION RESULT — DLDWS-001 legacy MP4 automatic mapping correction (2026-10-22)
+
+This is a follow-up bug fix within the already approved one-time legacy MP4 recovery scope. It covered isolated candidate changes and synthetic tests only; no production recovery was run.
+
+- MAPPING_FIX=PASS. A 60-character title ending in a space before `.ts` is preserved and accepted while path separators, control characters, malformed legacy names, symlinks, and duplicate media IDs remain rejected. Four failed task UUIDs are mapped by URL media ID, UUID parts folder, recorded error path, and `filename` when present. A fifth top-level TS is excluded only when it has a unique safe ID and conflicts with none of the four targets; it is left untouched.
+- FULL_PREFLIGHT_TEST=PASS. The observed-shape synthetic fixture ran the complete legacy `build_preflight` path with four targets, the trailing-space title, and an unrelated fifth TS.
+- SAFETY_REGRESSION=PASS. Python 3.10.22 suite 43/43 and wrapper mock 3/3 passed. Coverage retains duplicate/ambiguous IDs, unsafe names, error-path mismatch/traversal, filename mismatch, symlink, missing/tampered fragments and filelists, active locks, space/inode shortage, destination collision, FFmpeg failure, and partial-stop checks. Strict manifest mode and shared MP4 locks, task claims, reservations, no-clobber publication, and source/task preservation were not changed.
+- Candidate: `/tmp/dldws001-mp4-recovery-legacy-20261022`; evidence: `evidence/mapping-fix-20261022/`.
+- `recover_mp4.py` SHA-256: `e77fb6b6903ffac93440f8c3512641b095c141757884e4c51fc50ac9171f43d9`.
+- `run-on-downloader.sh` SHA-256: `afc7f260a9dc146fb7fef5b2e581c0b17d526334cfa71ad59cee792ad887cad9`; its pinned tool SHA matches the script above.
+- PRODUCTION_UNCHANGED=YES; Codex did not access operational download data or run CT108 preflight, execute, or postcheck. No MP4 was created. Docker, container, service, Writer, and task data were not changed. Writer safety remains UNRESOLVED.
+- Canonical product code was not changed or published. CT108 operator action remains: transfer the two pinned files, verify both hashes, run the documented legacy preflight, and proceed only if it returns `PREFLIGHT_PASS` with the expected four mappings.
