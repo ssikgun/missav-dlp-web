@@ -1322,3 +1322,28 @@ REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 No production deployment, rollback execution, Docker image/product-code change, image/container lifecycle action, data or settings change, Writer/Gluetun/Selkies change, download/retry, backup creation/restoration, Stage11/NAS/Jellyfin change, contract/router edit, or permission workaround. Do not weaken or bypass any existing safety gate. The known Writer socket cleanup race remains UNRESOLVED.
 
 EXECUTION_STATUS: AUTHORIZED only after matching approval readback from both workstreams. This approval does not make the deployment or rollback gates PASS and authorizes no lifecycle command.
+
+
+## EXECUTION RESULT — DLDWS-001 backup-evidence gate minimum-change review (2026-10-22)
+
+BACKUP_GATE_DESIGN=INCOMPLETE (blocked before verifier modification because the source-manifest file path/role and trusted Proxmox-to-CT108 attestation root were not established).
+PVE_ATTESTATION=NOT_RUN.
+SOURCE_MANIFEST_VERIFIED=NOT_RUN (the recorded digest exists, but the actual source-manifest file and its role were not identified).
+CT108_EVIDENCE_VALIDATION=INCOMPLETE.
+TAMPER_REJECTION=INCOMPLETE (no new verifier was implemented; no unsigned JSON was treated as trusted).
+EXISTING_SAFETY_GATES_PRESERVED=YES (deployment and rollback scripts were copied unchanged; no guard or lifecycle path was edited).
+DEPLOY_SCRIPT_STATIC_TEST=PASS (read-only AST syntax parse of isolated copy only; backup-attestation behavior was not tested).
+ROLLBACK_SCRIPT_STATIC_TEST=PASS (read-only AST syntax parse of isolated copy only; backup-attestation behavior was not tested).
+PRODUCTION_DEPLOYMENT=NOT_RUN.
+ROLLBACK_EXECUTED=NO.
+WRITER_SAFETY_ISSUE=UNRESOLVED.
+
+The isolated review copy is /tmp/dldws001-backup-attestation-20261022. Original /tmp/dldws001-downloader-deploy-20261022/deploy.py and rollback.py remain unchanged at SHA-256 cb91439a1ff1eb390628224ba71f7bafe3baaff32d86a35bf5dd0f901f9d9d32 and ed481ef0609683007b9850c79f2eb822bdfaaf5cf65a80ece117412cb0055078. The copied files have the same hashes. No deployment state file was created.
+
+The existing deploy.py:backup_gate() requires DLDWS_SOURCE_MANIFEST_FILE, hashes that local file against 252491423da01d4f1eeabad3e7caeaeac3e8cb23b2eb46818aba91b7be178d16, then assumes /mnt/pve/Data_5TB and the archive are mounted inside CT108. rollback.py:current_download_state() calls the same gate and compares its two-digest result to the saved deployment state. The current state schema stores archive and source-manifest hashes only. Existing Compose, task, fragment, MP4, Writer, dependency, quiet-window, one-shot and service-only protections were not changed.
+
+The exact source-manifest path and meaning are absent from the available original scripts, deployment evidence, and canonical handoff. The known /tmp/dldws001-overlay-build-20261022/manifest.json hashes to a2b5c134528aea387fc93fd8d25c56e88c5c1a47c6408562536dd4fd9ab60b7f and has overlay fields (before, after, canonical_sha, feature_commit, parent_image_id); it is a different Docker overlay manifest and was not substituted for the backup source manifest. This CT108 session has no /mnt/pve/Data_5TB mount and did not access pve.
+
+No authenticated PVE attestation key, pinned trust anchor, challenge/nonce exchange, or evidence-transfer mechanism is established. A plain JSON document or operator-set PASS/hash environment variable would be forgeable and is not an acceptable gate. Therefore no backup-verifier code change or synthetic verifier test was started; the explicit missing-manifest precondition requires BLOCKED. No PVE backup result is claimed by Codex.
+
+NEXT: From the original Proxmox backup-generation records, identify the exact source-manifest path and its role, and establish an independently verifiable PVE signing/trust-anchor and one-time challenge delivery path before authorizing a verifier change.
