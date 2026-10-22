@@ -13595,3 +13595,52 @@ Blocking evidence: hostname is `downloader`, UID/GID 0:0, but `docker info` and 
 Fail-closed operator scripts were prepared at `/tmp/dldws001-downloader-deploy-20261022` (deploy.py SHA-256 `cb91439a1ff1eb390628224ba71f7bafe3baaff32d86a35bf5dd0f901f9d9d32`; rollback.py SHA-256 `ed481ef0609683007b9850c79f2eb822bdfaaf5cf65a80ece117412cb0055078`). Python syntax compilation passed. Static review found exactly one service-only Compose `up` in each script, with `--no-deps --pull never --no-build`; no stop/down/restart/run/exec/prune or escalation call exists. Neither script was executed. The archive SHA and verified source-manifest path needed by the command are not available, and rollback is disabled unless a deployment attempt state file exists and all state remains unchanged. See the adjacent README for the operator command template and gate list.
 
 Next action: obtain a fresh read-only snapshot from the authorized CT108/Proxmox operator environment, including Docker/image/container and dependency identity, the mounted Data_5TB archive checksum plus source-manifest path, and Writer unit/listener/socket-client access evidence. Do not run deployment or rollback until all gates pass.
+
+
+## EXECUTION RESULT — DLDWS-001 backup-evidence gate minimum-change review (2026-10-22)
+
+USER_APPROVAL: 2026-10-22; isolated backup-evidence verifier review/minimum modification and synthetic offline validation only. No deployment, rollback, Docker/image/product-code change, or operational data mutation was authorized.
+CANONICAL_APPROVAL_READBACK: b77cc59399c70b8370c06a400a50e12b586c4e03 (matching approval block recorded in both active workstreams before this review).
+
+### RESULT
+
+- BACKUP_GATE_DESIGN=INCOMPLETE; the mandatory source-manifest file identity/role and an authenticated PVE-to-CT108 attestation trust path are unverified, so the backup verifier was not modified.
+- PVE_ATTESTATION=NOT_RUN; Codex ran in hostname downloader and has no /mnt/pve/Data_5TB mount or PVE access. No host verification is claimed.
+- SOURCE_MANIFEST_VERIFIED=NOT_RUN; the digest 252491423da01d4f1eeabad3e7caeaeac3e8cb23b2eb46818aba91b7be178d16 is recorded in prior evidence, but no actual file path or role was found in the scripts, relevant local evidence, or handoff.
+- CT108_EVIDENCE_VALIDATION=INCOMPLETE; TAMPER_REJECTION=INCOMPLETE because there is no trusted verifier implementation.
+- EXISTING_SAFETY_GATES_PRESERVED=YES; deploy and rollback copies are byte-identical to their originals. Both isolated copies pass Python AST syntax parsing; this checks syntax only, not a new evidence policy.
+- PRODUCTION_DEPLOYMENT=NOT_RUN; ROLLBACK_EXECUTED=NO; no Docker lifecycle command or deployment state file was created.
+- WRITER_SAFETY_ISSUE=UNRESOLVED.
+
+### PRESERVED SCRIPT AND MANIFEST IDENTITIES
+
+Original scripts remain unchanged:
+- deploy.py: cb91439a1ff1eb390628224ba71f7bafe3baaff32d86a35bf5dd0f901f9d9d32
+- rollback.py: ed481ef0609683007b9850c79f2eb822bdfaaf5cf65a80ece117412cb0055078
+
+Review copy: /tmp/dldws001-backup-attestation-20261022; evidence/review.json records the blocked scope and syntax-only results.
+
+Recorded Proxmox backup identifiers supplied by the user: archive /mnt/pve/Data_5TB/dldws001-backups/backup-20261020-110732-TbdQOd/data.tar, size 17,012,172,800 bytes, expected SHA-256 7c7e4f5adae91064e503d480f8463776dc3e94f84390d2167fae20ef860422f7, source-manifest SHA-256 252491423da01d4f1eeabad3e7caeaeac3e8cb23b2eb46818aba91b7be178d16. These remain supplied/historical values, not reverified by Codex. The separate overlay manifest at /tmp/dldws001-overlay-build-20261022/manifest.json has SHA-256 a2b5c134528aea387fc93fd8d25c56e88c5c1a47c6408562536dd4fd9ab60b7f and is not the backup source manifest.
+
+Existing deploy.py:backup_gate() hashes a caller-selected DLDWS_SOURCE_MANIFEST_FILE, directly requires the Data_5TB mount/archive in CT108, and returns only the archive and source-manifest digests. rollback.py reuses this same check and requires equality with the two-field saved backup identity. These call boundaries and every other deploy/rollback safety gate are unchanged.
+
+### READ-ONLY PVE CHECK TEMPLATE — NOT EXECUTED
+
+After identifying the source-manifest path from the original backup-generation record (do not guess it), an operator session on root@pve can collect read-only evidence:
+
+~~~sh
+set -eu
+ARCHIVE=/mnt/pve/Data_5TB/dldws001-backups/backup-20261020-110732-TbdQOd/data.tar
+findmnt -n -o SOURCE,FSTYPE,TARGET --target /mnt/pve/Data_5TB
+stat -c 'size=%s mode=%a uid=%u gid=%g mtime=%Y dev=%d inode=%i' -- "$ARCHIVE"
+sha256sum -- "$ARCHIVE"
+find "$(dirname "$ARCHIVE")" -maxdepth 1 -type f -printf '%f\\t%s\\t%T@\\n'
+~~~
+
+Then run stat and sha256sum on the exact source-manifest path established by those original records and provide the path plus the record that explains its role. This read-only output is not, by itself, a trusted CT108 attestation.
+
+For CT108 to accept evidence without mounting/copying the 17-GB archive, a future gate must bind the fixed archive path, size, digest, mount identity, exact manifest path/digest/role, verified time, and a unique CT-generated one-time challenge in an authenticated PVE signature. CT108 must verify a pre-established pinned public-key trust anchor, freshness, exact path/identity, and one-time challenge consumption in both deploy and rollback. No such signing key, pinning channel, or challenge-transfer procedure is presently verified, so unsigned JSON or environment-variable assertions must remain fail-closed.
+
+NEXT: Supply the actual source-manifest path and provenance, plus an independently verifiable PVE attestation trust-anchor/challenge-transfer method; then reassess the minimal paired deploy/rollback verifier change.
+
+PRODUCTION_DEPLOYMENT=NOT_RUN; ROLLBACK_EXECUTED=NO; WRITER_SAFETY_ISSUE=UNRESOLVED.
