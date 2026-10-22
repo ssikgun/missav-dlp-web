@@ -1439,3 +1439,33 @@ RECOVERY_TARGETS: four existing ERROR jobs whose named TS and verified HLS fragm
 No source-fragment, filelist, task-record, or existing-output deletion/overwrite; no new download or retry; no disabling or weakening MP4 safety, locks, or storage reservations; no Docker build/deployment/restart; no Writer, Gluetun, Selkies, Stage11, NAS, or Jellyfin change. The existing Writer safety defect remains UNRESOLVED. This approval is distinct from the prior image build/deployment approval and authorizes no container lifecycle action.
 
 THIS CODEX EXECUTION: approval recording/readback, runtime safety analysis, isolated recovery-tool implementation, and offline synthetic tests only. No production preflight execution that mutates state, no MP4 generation in /downloads, and no production task-state change.
+
+
+## SEPARATE APPROVED EXECUTION — legacy HLS MP4 recovery compatibility mode (2026-10-22)
+
+APPROVAL_DATE: 2026-10-22
+AUTHORIZATION: Explicit user approval for an isolated legacy recovery mode, synthetic validation, and operator-ready CT108 commands within the previously approved one-time recovery of four MP4s.
+TASK_ID: DLDWS-001
+STATUS: IN_PROGRESS
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+CANONICAL_BASE: teddy-subtitle-stage11 at d76982afc705087096721f568b361b0d3fd2c861
+PRODUCTION_IMAGE: sha256:7200290e8af11d9f253a5efd028bf3be2a2757af9049f0bb9e43bd04f821f2d8
+
+### AUTHORIZED_SCOPE
+- Prepare a separate isolated copy of the existing one-time MP4 recovery candidate with an explicit legacy-evidence mode. Preserve the existing manifest-backed mode and its validation unchanged.
+- For legacy jobs, validate task UUID and ERROR state, the UUID-derived .parts directory, explicit source TS mapping, existing filelist order, contiguous zero-based fragment indices, regular non-symlink files, sizes, and contemporaneous SHA-256 values; validate source media streams and duration.
+- State clearly that current SHA-256 values establish only the present inspection baseline and later non-change checks, not download-time provenance. Never create or write a synthetic resume-plan.json or fake task metadata.
+- Preserve the existing runtime's per-task claim locks, global RemuxTransaction MP4 lock, storage reservation/free-space/inode checks, active-work exclusion, source rechecks, and atomic no-clobber finalization.
+- Prepare synthetic tests for valid legacy input and rejection of missing/changed fragments, filelist mismatch, active locks/work, insufficient capacity, task-state changes, symlinks, destination collisions, FFmpeg failure, and stop-after-partial-success.
+- Provide exact operator commands for target auto-mapping, read-only preflight, preflight-gated explicit execution, and post-run read-only verification on CT108.
+
+### PROHIBITED_SCOPE
+No production recovery execution by Codex; no production MP4 generation during tests; no changes to task records, source TS/fragments/filelists, or existing outputs; no downloads/retries, Docker lifecycle/build/deployment, Writer/Gluetun/Selkies/Stage11/NAS/Jellyfin changes, or weakening of existing safety checks. Only synthetic fixtures may be changed.
+
+### ACCEPTANCE_CRITERIA
+- Legacy mode is separate and opt-in; normal manifest validation is not relaxed.
+- The legacy evidence limitation is explicit and current hashes are not represented as historical provenance.
+- All required synthetic scenarios pass, including preserving source/task bytes and stopping after a later item fails.
+- Operator commands derive targets from read-only task state and require a successful fresh preflight artifact before execution; any runtime identity, lock, work-state, storage, or provenance precondition not verifiable on CT108 fails closed.
+- Codex performs no operation against /downloads and no production recovery.
