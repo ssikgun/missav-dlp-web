@@ -1601,3 +1601,19 @@ ACCEPTANCE_CRITERIA:
 - Report the exact changed candidate files and hashes; production remains unchanged.
 
 NEXT_DECISION: Review the isolated candidate and tests. Any production image rebuild or deployment requires separate authorization.
+
+
+## EXECUTION RESULT — DLDWS-001 GANA-3223 HLS post-processing fix (2026-10-22)
+
+AUTHORIZATION: User-approved isolated code correction and synthetic regression tests. No operational deployment or task recovery.
+
+- ROOT_CAUSE=CONFIRMED from a read-only snapshot of the actual running container image sha256:7200290e8af11d9f253a5efd028bf3be2a2757af9049f0bb9e43bd04f821f2d8. _complete_job() routed both HLS and yt-dlp through _local_outputs(), which unconditionally scanned .<task_id>.ytdlp-home; the HLS queue has a validated main MP4 but does not create that yt-dlp directory. This explains the reported ENOENT path. The one-time MP4 recovery was not identified as the cause.
+- HLS_FIX=PASS_IN_ISOLATED_CANDIDATE. _local_outputs() now branches on explicit result kind: HLS accepts the validated main output without scanning yt-dlp home and rejects unapproved auxiliary paths; yt-dlp keeps its home/sidecar collection and fails closed for missing, unreadable, symlinked, or unsafe paths. _complete_job() validates and propagates only hls / ytdlp.
+- YTDLP_REGRESSION=PASS. Existing collection/filtering and required-home failure behavior are exercised and retained.
+- SAFETY_TESTS=PASS. Offline smoke passed 9 existing groups plus 4 new HLS result groups. Coverage includes HLS replay without yt-dlp home, missing/tampered/symlinked/escaped/colliding/unsupported auxiliary outputs, pause/cancel/replay preservation, and strict yt-dlp behavior. AST/diff checks passed; only _local_outputs, _store_local_result, and _complete_job differ in the runtime file. Other extracted runtime files match the read-only snapshot hashes.
+- Test environment was Python 3.13.5. External yt_dlp and teddy_hls_transport imports were stubbed for offline-only tests; the real production queue source and synthetic filesystem fixtures were exercised. This is not a real download or production integration test.
+- Candidate and evidence: /tmp/dldws001-gana3223-hls-result-fix-20261022/; full output: evidence/hls-result-fix-final-20261022/full-smoke.log; validation record: evidence/hls-result-fix-final-20261022/final-validation.json.
+- Changed candidate runtime file SHA-256: teddy_mp4_queue.py = 593b3ad77f50e2af64589d84a005fad5ce79495e4280011f3e240a6961ba9730. Test file SHA-256: teddy_mp4_queue_smoke.py = b0341d26b96c9b242817bf8f3409ae9f7cd09609a8e6aa0d5e46c3a9f4f20199.
+- PRODUCTION_UNCHANGED=YES. No production files, tasks, MP4s, TS/HLS fragments, settings, services, container lifecycle, or image were modified. No actual download/retry, Docker build/deployment, or canonical product-code publication occurred.
+
+NEXT: review the isolated candidate; any image build and production rollout requires separate authorization.
