@@ -1288,11 +1288,12 @@ DOWNLOAD_DATA_PRESERVED=INCOMPLETE (read-only state matched the recorded baselin
 WRITER_UNCHANGED=INCOMPLETE (no Writer lifecycle operation was issued; systemd and listener state could not be read. The observed socket path was mode 0660, uid 0, gid 65534; the required client GID 988 access was not proven.)
 GLUETUN_SELKIES_UNCHANGED=YES (no lifecycle operation was issued; live IDs/status could not be independently inspected)
 LOGIN_UI_API=INCOMPLETE
+NO_SUBMISSION_WINDOW=NOT_CONFIRMED (the scripts require explicit operator acknowledgement but do not disable admission)
 ROLLBACK_READY=NO (guarded script prepared; live image/config/data, backup and Writer gates are not established)
 ROLLBACK_EXECUTED=NO
 WRITER_SAFETY_ISSUE=UNRESOLVED
 
-The candidate scripts are isolated under `/tmp/dldws001-downloader-deploy-20261022`: deploy.py SHA-256 `f19702f1ee2b6c3659644e82d71dce6bbb93374d4a2b889304994f5e9abcbcfd`; rollback.py SHA-256 `d32d2805eae1b0b512ca8b884414a70d26a508c7aaacc8e4acafc9d91d4faf2e`. Both passed Python syntax compilation and static command review; neither was executed. The only Compose lifecycle calls in those scripts are one service-targeted `up` per script, with `--no-deps --pull never --no-build`. No stop/down/restart/run/exec/prune or privilege escalation is present.
+The candidate scripts are isolated under `/tmp/dldws001-downloader-deploy-20261022`: deploy.py SHA-256 `cb91439a1ff1eb390628224ba71f7bafe3baaff32d86a35bf5dd0f901f9d9d32`; rollback.py SHA-256 `ed481ef0609683007b9850c79f2eb822bdfaaf5cf65a80ece117412cb0055078`. Both passed Python syntax compilation and static command review; neither was executed. The only Compose lifecycle calls in those scripts are one service-targeted `up` per script, with `--no-deps --pull never --no-build`. No stop/down/restart/run/exec/prune or privilege escalation is present.
 
 Blocking evidence: Docker API access is denied; the Data_5TB mount and `data.tar` are absent in this LXC and the archive SHA-256 is not available in the recorded handoff; systemd Writer state and a matching socket listener are not readable; the MP4 lock holder cannot be established in this environment. Historical operator build/image/UI evidence remains provenance-labeled and does not resolve these live gates.
 
