@@ -1533,3 +1533,14 @@ TASK_ID: DLDWS-001; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,di
 - PRODUCTION_UNCHANGED=YES; PRODUCTION_PREFLIGHT/EXECUTE/POSTCHECK=NOT_RUN; CANONICAL_PRODUCT_CODE=NOT_PUBLISHED; WRITER_SAFETY_ISSUE=UNRESOLVED. The candidate operational wrapper/CLI and `/downloads` execute are explicitly blocked. Synthetic success is not operational retry approval; the old preflight ID is never reusable.
 
 NEXT: operator collects the documented CT108 read-only inventory and media evidence, including failed-run cleanup state. Actual recovery retry requires a separate explicit approval and review of that evidence before any operational guard is released.
+
+
+## CROSS-WORKSTREAM RECORD — GANA-3223 HLS post-processing follow-up (2026-10-22)
+
+TASK_ID: DLDWS-001
+STATUS: IN_PROGRESS
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+
+This entry records the shared DLDWS-001 approval for traceability only. The approved HLS local-result collection fix belongs to the Downloader workstream; this workstream contract explicitly excludes MP4 conversion and download processing. No Discovery Writer Safety product code, tests, services, sockets, databases, or operational state are in scope or authorized to change. The unresolved Writer socket issue and its existing evidence remain untouched. Production deployment and all Downloader operational actions remain unauthorized.
+
