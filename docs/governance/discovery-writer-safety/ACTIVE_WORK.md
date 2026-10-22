@@ -1642,3 +1642,15 @@ TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKS
 - This Writer-workstream entry is coordination only. Existing Docker access, backup/source-manifest/live-configuration and Writer safety blockers remain unchanged and UNRESOLVED where previously recorded.
 
 NEXT_CHECKPOINT: correct only the HLS fixture initialization order and test-only yt-dlp import isolation, retaining this failure log and every safety assertion; rerun the same focused suite, then execute the unrun regressions only if it passes. This correction/retest was not performed in this stopped checkpoint. No operational retry or deployment follows from partial results.
+
+
+## SEPARATE APPROVED CHECKPOINT — focused startup test fixture/import correction (2026-10-22)
+
+TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+AUTHORIZATION: Explicit user instruction for focused test recovery; canonical baseline ba1a53a64dc79e867fe13653ef6fee3526b91984.
+
+AUTHORIZED_SCOPE: Correct only the HLS synthetic fixture creation order and test-only external yt-dlp import isolation in /tmp/dldws001-mp4-startup-safety-20261022/. Preserve all existing assertions and add/preserve the negative unbound-precreated-output check. Execute the same tests/startup_recovery_smoke.py suite exactly once after correction; stop immediately on any failure/error. Record test hashes and actual results.
+FROZEN_RUNTIME: app.py bbf306ef39cd57c63a09a672624cc243ef58fa99716f15bd78d3c6dbd2dccba3; teddy_mp4_queue.py cb583308c4b3a73b4580fb29dd4d0c63899e3d07fa33561bfc9843fb1ddc7649; teddy_download_safety.py 56c9a868736443fd05ec51b776dd948727d54495296dc254c8dc54fd1fad1ee9.
+PROHIBITED: No runtime edits, full regression, Docker/build/deploy/restart, package installation/network test, operating task/queue/settings/media change, GANA/legacy recovery, Writer/Stage11/dependency change, canonical product-code commit/push, prior evidence overwrite or weakened safety assertion. Writer workstream participation is shared-task traceability only.
+ACCEPTANCE: One focused result, unchanged runtime hashes and original failure evidence, preserved safety assertions; full regression remains NOT_RUN and deployment gate remains BLOCKED regardless of focused PASS.
+NEXT_CHECKPOINT: Full regression requires the next separately scoped checkpoint; no operational action is authorized here.
