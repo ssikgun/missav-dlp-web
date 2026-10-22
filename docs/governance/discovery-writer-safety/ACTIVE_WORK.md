@@ -1300,3 +1300,25 @@ Blocking evidence: Docker API access is denied; the Data_5TB mount and `data.tar
 PRODUCTION_CONTAINER_CHANGED_BY_THIS_EXECUTION=NO
 
 Next action: from the authorized CT108/Proxmox operator environment, collect current read-only Docker/image/container and dependency state, the mounted backup archive SHA-256 plus source-manifest path, and Writer socket/unit/listener/client-GID evidence. Rerun no lifecycle command unless all gates then pass.
+
+
+## SEPARATE APPROVED EXECUTION — Downloader deployment backup evidence gate correction (2026-10-22)
+
+APPROVAL_DATE: 2026-10-22
+AUTHORIZATION: Explicit user approval for isolated review and minimum modification of the Downloader deploy/rollback scripts’ backup-evidence verification path, with synthetic offline validation only.
+CANONICAL_BASE: beff9da5480e4581c9816855f51d02975d5e6755
+TASK_ID: DLDWS-001
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+
+### AUTHORIZED_SCOPE
+- Preserve the original scripts and work only in a fresh isolated copy.
+- Inspect the existing backup gate, state-file contract, manifest role, and deploy/rollback call boundaries.
+- If the actual source-manifest identity and a trusted Proxmox-to-CT108 evidence path can be established, make only the minimum backup-evidence verifier change and run synthetic offline tests for valid evidence and tamper/replay/path rejection. Keep every other deployment and rollback gate unchanged.
+- If manifest provenance or attestation trust cannot be established, fail closed and document the blocker without claiming a passing gate.
+- Record the result and provenance in this file and the canonical handoff.
+
+### PROHIBITED_SCOPE
+No production deployment, rollback execution, Docker image/product-code change, image/container lifecycle action, data or settings change, Writer/Gluetun/Selkies change, download/retry, backup creation/restoration, Stage11/NAS/Jellyfin change, contract/router edit, or permission workaround. Do not weaken or bypass any existing safety gate. The known Writer socket cleanup race remains UNRESOLVED.
+
+EXECUTION_STATUS: AUTHORIZED only after matching approval readback from both workstreams. This approval does not make the deployment or rollback gates PASS and authorizes no lifecycle command.
