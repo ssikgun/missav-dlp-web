@@ -1539,3 +1539,13 @@ AUTHORIZATION: User-approved isolated failure analysis, legacy-only validation d
 - Required operational read-only evidence remains NOT_RUN: failed receipt and used/result sidecars; committed-output status; owned temporary-directory residue; FFmpeg child processes; existing MP4/task lock holders; storage reservations; original-file preservation and available space. Code cleanup paths do not prove actual cleanup. Do not delete receipts/locks/reservations or use mutating runtime helpers for inspection.
 
 NEXT: establish and verify the independent media-evidence collector in an isolated capable environment before an executable patch. No retry or new preflight workaround is authorized by these test results; separate explicit operational retry approval and cleanup evidence are required.
+
+
+## SEPARATE APPROVED EXECUTION — real FFmpeg HLS/MP4 equivalence validation (2026-10-22)
+
+TASK_ID: DLDWS-001
+STATUS: IN_PROGRESS
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+
+User authorizes preparing an isolated functioning FFmpeg/ffprobe environment, generating real synthetic H.264/AAC TS fragments and MP4, validating content/count/timeline/full-decode equivalence with bounded resources, and preparing a legacy-only recovery patch candidate only after real-media tests pass. Preserve manifest-mode behavior, all original locks/reservations/no-clobber/input rechecks, existing candidates/evidence and source data. Provide separate CT108 read-only evidence and failed-run residual/lock/reservation/receipt inspection procedures. No CT108 preflight/execute retry, old receipt reuse, operational MP4 creation, source/task mutation, Docker lifecycle/build/deployment, Writer/Stage11/NAS or other-service change is authorized. Isolated test success is not retry authorization or operational recovery PASS.
