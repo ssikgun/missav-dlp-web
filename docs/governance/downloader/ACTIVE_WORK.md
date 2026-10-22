@@ -1277,3 +1277,25 @@ Fail closed if exact image/container IDs or status differ; Compose file order, p
 Deployment is authorized only after all mandatory gates pass. If Docker API access is denied, no deployment call is permitted; provide the guarded scripts and exact operator command. Preserve historical BLOCKED records. Keep Writer safety status separate from Downloader feature validation.
 
 EXECUTION_STATUS: AUTHORIZED only after this matching approval block is remotely read back from both workstreams.
+
+## EXECUTION RESULT — Downloader-only deployment (2026-10-22)
+
+DEPLOYMENT_PREFLIGHT=BLOCKED
+PRODUCTION_DEPLOYMENT=NOT_RUN
+LIVE_IMAGE_ID=UNKNOWN (Docker inspect was denied by /var/run/docker.sock permissions)
+COMPOSE_PRESERVED=YES (the four recorded source files and environment file were unchanged; read-only Compose parsing and the image-only model comparison passed; comparison to the live container remains unavailable)
+DOWNLOAD_DATA_PRESERVED=INCOMPLETE (read-only state matched the recorded baseline: max_concurrent=4; four failed ENOSPC jobs at retry limit 30; four .parts directories, 8,637 fragments and 16,996,662,891 bytes. No deployment or data write occurred.)
+WRITER_UNCHANGED=INCOMPLETE (no Writer lifecycle operation was issued; systemd and listener state could not be read. The observed socket path was mode 0660, uid 0, gid 65534; the required client GID 988 access was not proven.)
+GLUETUN_SELKIES_UNCHANGED=YES (no lifecycle operation was issued; live IDs/status could not be independently inspected)
+LOGIN_UI_API=INCOMPLETE
+ROLLBACK_READY=NO (guarded script prepared; live image/config/data, backup and Writer gates are not established)
+ROLLBACK_EXECUTED=NO
+WRITER_SAFETY_ISSUE=UNRESOLVED
+
+The candidate scripts are isolated under `/tmp/dldws001-downloader-deploy-20261022`: deploy.py SHA-256 `f19702f1ee2b6c3659644e82d71dce6bbb93374d4a2b889304994f5e9abcbcfd`; rollback.py SHA-256 `d32d2805eae1b0b512ca8b884414a70d26a508c7aaacc8e4acafc9d91d4faf2e`. Both passed Python syntax compilation and static command review; neither was executed. The only Compose lifecycle calls in those scripts are one service-targeted `up` per script, with `--no-deps --pull never --no-build`. No stop/down/restart/run/exec/prune or privilege escalation is present.
+
+Blocking evidence: Docker API access is denied; the Data_5TB mount and `data.tar` are absent in this LXC and the archive SHA-256 is not available in the recorded handoff; systemd Writer state and a matching socket listener are not readable; the MP4 lock holder cannot be established in this environment. Historical operator build/image/UI evidence remains provenance-labeled and does not resolve these live gates.
+
+PRODUCTION_CONTAINER_CHANGED_BY_THIS_EXECUTION=NO
+
+Next action: from the authorized CT108/Proxmox operator environment, collect current read-only Docker/image/container and dependency state, the mounted backup archive SHA-256 plus source-manifest path, and Writer socket/unit/listener/client-GID evidence. Rerun no lifecycle command unless all gates then pass.
