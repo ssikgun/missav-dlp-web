@@ -1372,3 +1372,18 @@ AFFECTED_WORKSTREAM: downloader
 No JavaScript/API/download-queue/MP4/Writer/SpoofDPI change; no product-code canonical publication; no image build, production image/container modification, deployment, or restart; no production data, Stage11, NAS/Jellyfin, Gluetun or Selkies change. No widening beyond the listed HTML/CSS alignment.
 
 EXECUTION_STATUS: AUTHORIZED for one isolated candidate and verification only. Deployment/build/publication remain NOT_RUN.
+
+## EXECUTION RESULT — Downloader UI alignment only (2026-10-22)
+
+UI_ALIGNMENT=PASS.
+DESKTOP_MOBILE=PASS (Chromium 156.0.8078.4; 1440x900 desktop and 390x844 mobile; error badge and action button centerY both 376.78px on desktop; mobile button full-width at 44px minimum height; no horizontal overflow).
+FUNCTION_REGRESSION=PASS (synthetic browser run: zero-error disabled state; 4-error count and confirmation; cancel sends no request; confirm sends one CSRF-bearing bulk request; partial success counts and list refresh; storage-block response is not shown as success; console/page errors 0).
+PRODUCTION_UNCHANGED=YES (no production image/container/service/data operation was performed).
+
+The isolated candidate is /tmp/dldws001-ui-alignment-20261022. Its only changed runtime file is templates/index.html (source image template SHA-256 a09930a0dd298e11ec12d891da13cc7a38b1a80a2d1bbb313234ea389dcbad7b; candidate SHA-256 4d379e37c76e25781ea4eda8d169af5f24d70a4d53ef74808dc088c37b85766f). The existing teddy-reliability.js is unchanged at SHA-256 b8204eee2c668c9c1fb8bcd780bd7301a61a0c1b2b5f2f153af7f7c77d698ae9. The existing stats, retryFailedTasks, retryFailedCount, and bulkRetryStatus IDs remain unique; bulkRetryStatus retains role=status and aria-live=polite. JavaScript blocks were byte-for-byte unchanged.
+
+Image-source provenance: the supplied OCI archive was read from /tmp/dldws001-overlay-build-20261022/evidence/operator-build-oylfwt00/candidate-image.tar; its OCI manifest digest matched sha256:14f8c831d692db0a0d4f0f3b70eac0ca840b1daf0a66927aebc578eaf6541c4d. Docker API inspection was unavailable in this environment. Browser evidence: /tmp/dldws001-ui-alignment-20261022/evidence/browser-fullpage-results.json, desktop-fullpage.png, mobile-fullpage.png. Whitespace check emitted no diagnostics.
+
+IMAGE_BUILD=NOT_RUN; PRODUCTION_DEPLOYMENT=NOT_RUN; PRODUCTION_RESTART=NOT_RUN. The isolated candidate is not published as product code.
+
+NEXT: review the isolated templates/index.html candidate; any image rebuild or production rollout requires a separate approval.
