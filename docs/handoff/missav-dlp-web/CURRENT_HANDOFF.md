@@ -13680,7 +13680,7 @@ Pinned operator files:
 
 CT108 sequence (full instructions in the isolated candidate README):
 1. `./run-on-downloader.sh preflight --evidence-mode legacy --auto-targets`
-2. Only on `PREFLIGHT_PASS), inspect the four returned mappings and use its one-time `preflight_id` with the explicit `execute --evidence-mode legacy --auto-targets --preflight-id '<PREFLIGHT_ID>' --confirm DLDWS-001-MP4-RECOVERY-20261022` command.
+2. Only on `PREFLIGHT_PASS`, inspect the four returned mappings and use its one-time `preflight_id` with the explicit `execute --evidence-mode legacy --auto-targets --preflight-id '<PREFLIGHT_ID>' --confirm DLDWS-001-MP4-RECOVERY-20261022` command.
 3. Only after `RECOVERY_COMPLETE`, run the read-only `postcheck --evidence-mode legacy --auto-targets --preflight-id '<PREFLIGHT_ID>'` command.
 Any blocked, expired, partial, or failed result stops the one-time execution; do not retry or modify source/task metadata.
 
