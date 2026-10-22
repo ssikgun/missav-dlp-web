@@ -13749,3 +13749,17 @@ TASK_ID: DLDWS-001; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,di
 - PRODUCTION_UNCHANGED=YES; PRODUCTION_PREFLIGHT/EXECUTE/POSTCHECK=NOT_RUN; CANONICAL_PRODUCT_CODE=NOT_PUBLISHED; WRITER_SAFETY_ISSUE=UNRESOLVED. The candidate operational wrapper/CLI and `/downloads` execute are explicitly blocked. Synthetic success is not operational retry approval; the old preflight ID is never reusable.
 
 NEXT: operator collects the documented CT108 read-only inventory and media evidence, including failed-run cleanup state. Actual recovery retry requires a separate explicit approval and review of that evidence before any operational guard is released.
+
+
+## EXECUTION RESULT — DLDWS-001 GANA-3223 HLS post-processing failure (2026-10-22)
+
+AUTHORIZATION: User approved an isolated fix and tests for the HLS post-processing folder dependency. No production deployment, actual download/retry, or existing task-state change was authorized.
+
+- ROOT_CAUSE=CONFIRMED: read-only inspection of running container 9a5b729335bfd20460bea2e02e1f8a36b6c057c2111ec84fc06f1a33718a5f00 on image sha256:7200290e8af11d9f253a5efd028bf3be2a2757af9049f0bb9e43bd04f821f2d8 confirmed _complete_job() routes HLS and yt-dlp through _local_outputs(), which always scanned .<task_id>.ytdlp-home. HLS jobs have a verified main MP4 but do not create that yt-dlp directory, so its absence was incorrectly raised as a post-processing failure. No evidence establishes that the earlier one-time MP4 recovery caused this condition.
+- HLS_FIX=PASS_IN_ISOLATED_CANDIDATE: explicit result kind now separates HLS from yt-dlp collection. HLS takes only its validated main output and rejects any unapproved auxiliary paths; it does not require or scan yt-dlp home. yt-dlp home scanning, partial filtering, sidecar collection, and failure on missing/unreadable home remain. Symlink/path and output checks remain fail-closed.
+- YTDLP_REGRESSION=PASS; SAFETY_TESTS=PASS: full offline smoke passed 9 existing groups and 4 HLS-specific groups. It covers output-ready replay without yt-dlp home; missing, tampered, symlinked, escaped, colliding, or unsupported HLS outputs; pause/cancel/replay preservation; and yt-dlp home/sidecar compatibility and required-output failures. AST parse passed; the only changed top-level runtime functions are _local_outputs, _store_local_result, and _complete_job; git diff --no-index --check passed. Other runtime files copied from the live snapshot are hash-identical.
+- Candidate: /tmp/dldws001-gana3223-hls-result-fix-20261022/. Evidence: evidence/hls-result-fix-final-20261022/full-smoke.log and evidence/hls-result-fix-final-20261022/final-validation.json. Test runtime was Python 3.13.5; external yt_dlp and teddy_hls_transport imports were stubbed offline. This does not constitute a real download or production application test.
+- Candidate SHA-256: teddy_mp4_queue.py 593b3ad77f50e2af64589d84a005fad5ce79495e4280011f3e240a6961ba9730; teddy_mp4_queue_smoke.py b0341d26b96c9b242817bf8f3409ae9f7cd09609a8e6aa0d5e46c3a9f4f20199.
+- PRODUCTION_UNCHANGED=YES; no container/service/image lifecycle, production file/task/result change, real retry/download, Docker build/deploy, or canonical product-code publication. Existing Writer safety issue remains unresolved.
+
+NEXT: review the isolated patch; any image build and operational deployment require separate authorization.
