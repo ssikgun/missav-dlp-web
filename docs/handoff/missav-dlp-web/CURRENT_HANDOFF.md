@@ -13649,3 +13649,15 @@ PRODUCTION_DEPLOYMENT=NOT_RUN; ROLLBACK_EXECUTED=NO; WRITER_SAFETY_ISSUE=UNRESOL
 ## MANIFEST ROLE CLARIFICATION — DLDWS-001 backup evidence review (2026-10-22)
 
 A broader local read-only search found /tmp/dldws001-integration-20261019/evidence/source-manifest.json (102,407 bytes; SHA-256 313213a9bed9aacf41c5b3bc55dc7c3b86875def387886c57605f2a989cd44c0). Its top-level keys describe build_result, dl001_context, dws001_b, final_candidate_files, integration_changes, integration_root, notes, and offline_results. It is an integration-candidate provenance manifest, not the Proxmox backup source manifest: its SHA-256 does not match the required 252491423da01d4f1eeabad3e7caeaeac3e8cb23b2eb46818aba91b7be178d16. The separate overlay manifest remains SHA-256 a2b5c134528aea387fc93fd8d25c56e88c5c1a47c6408562536dd4fd9ab60b7f. No path/role for the required backup source manifest was established. The original scripts, absence of verifier changes, and all blocked gate conclusions remain unchanged.
+
+## 2026-10-22 DLDWS-001 Downloader UI alignment — PASS
+
+User-authorized isolated HTML/CSS alignment based on the supplied OCI image artifact. The artifact manifest digest matched sha256:14f8c831d692db0a0d4f0f3b70eac0ca840b1daf0a66927aebc578eaf6541c4d. Docker API inspection was unavailable; no production resource was accessed or changed.
+
+Candidate: /tmp/dldws001-ui-alignment-20261022/templates/index.html. The sole changed runtime file is the candidate index.html; original template SHA-256 a09930a0dd298e11ec12d891da13cc7a38b1a80a2d1bbb313234ea389dcbad7b, candidate SHA-256 4d379e37c76e25781ea4eda8d169af5f24d70a4d53ef74808dc088c37b85766f. Existing teddy-reliability.js remains unchanged at b8204eee2c668c9c1fb8bcd780bd7301a61a0c1b2b5f2f153af7f7c77d698ae9; existing IDs, behavior, and live status semantics remain intact.
+
+Chromium 156.0.8078.4 synthetic full-page test PASS at 1440x900 and 390x844. Desktop error badge and button share centerY 376.78px. Mobile action is full width (44px high) with no horizontal overflow. Bulk retry regression PASS: zero-error disabled, four-error confirm/cancel, exactly one CSRF request on confirmation, partial result counts/list refresh, and blocked storage response. Console/page errors: 0. Evidence: /tmp/dldws001-ui-alignment-20261022/evidence/browser-fullpage-results.json and desktop/mobile screenshots.
+
+IMAGE_BUILD=NOT_RUN; PRODUCTION_DEPLOYMENT=NOT_RUN; PRODUCTION_RESTART=NOT_RUN. No product code was published. Writer, queue, API, JavaScript, and production state were not changed.
+
+NEXT: review the isolated HTML/CSS candidate; image rebuild and production rollout require separate approval.
