@@ -6,6 +6,8 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
+**Historical metadata normalization (2026-10-23, DLDWS-001):** Only the five unquoted fields above define the live workstream task. Older approvals and execution evidence below remain in this document; their repeated metadata labels are quoted solely so the unchanged governance validator does not mistake historical declarations for live ones. The exact complete pre-normalization file is preserved byte-for-byte at `docs/governance/downloader/history/DLDWS-001_ACTIVE_WORK_before_field_normalization_ac476f4.md` (Git blob `5a4a886596fae7e56ed8a2940a24ce07e6892728`). Future historical entries must quote metadata lines or express them as prose. This changes no task authorization, safety boundary or execution result.
+
 ## OBJECTIVE
 
 Coordinate with Discovery Writer Safety to investigate the Writer smoke failure that blocks the DL-001 Docker build candidate, while preserving the existing Downloader implementation candidate, its download/MP4/ENOSPC goals, and all existing evidence.
@@ -1145,7 +1147,7 @@ No production resource changed. Canonical product code was not published. Next a
 APPROVAL_DATE: 2026-10-22
 AUTHORIZATION: Explicit user approval in the DLDWS-001 overlay-build request.
 CANONICAL_BASE: e4460e140d4bb7882b0fdea64a09dca90c610809
-TASK_ID: DLDWS-001
+> TASK_ID: DLDWS-001
 REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
 
 This separate execution authorizes only an isolated overlay build based on the verified candidate /tmp/dldws001-legacy-overlay-persist-20261021 and final-image offline verification. The source candidate is immutable. Build and evidence output must go to a fresh isolated copy at /tmp/dldws001-overlay-build-20261022 and its own evidence directory. Use the exact local parent image ID sha256:83322ee82e736b5ba026b8d98d5709b9685ca9c6b051c2a7f4c7b9bf8d058573; reserve only the new tag missav-dlp-web:dldws001-legacy-overlay-persist-20261022.
@@ -1196,7 +1198,7 @@ Evidence: /tmp/dldws001-overlay-build-20261022/BUILD_EXECUTION.md; evidence/stat
 APPROVAL_DATE: 2026-10-22
 AUTHORIZATION: Explicit user approval in the DLDWS-001 overlay build success record and deployment preflight request.
 CANONICAL_BASE: 10e1e332c3333451c05c16c9181cf88a242d2081
-TASK_ID: DLDWS-001
+> TASK_ID: DLDWS-001
 REQUIRED_WORKSTREAMS: downloader,discovery-writer-safety
 
 This separate execution authorizes (1) recording the operator-supplied overlay build and final UI extraction results with their provenance and limitations, and (2) read-only inspection of the existing CT108 Docker/Compose configuration, backup metadata/integrity evidence, rollback prerequisites, and Writer restart/socket-lifecycle risk. Read the operator evidence if accessible; otherwise label it user-provided and do not claim direct verification. Do not inspect or expose secret values.
@@ -1252,9 +1254,9 @@ Next action: from an authorized Proxmox/CT108 operator session, provide read-onl
 APPROVAL_DATE: 2026-10-22
 AUTHORIZATION: Explicit user approval for one production replacement of the missav-dlp-web Downloader container using the verified overlay image, only if every stated safety gate passes.
 CANONICAL_BASE: bc238f2ff79a07fa1dcc40133affdde54782bb8d
-TASK_ID: DLDWS-001
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+> TASK_ID: DLDWS-001
+> CONTRACT_VERSION: 1.0.0
+> REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
 ### AUTHORIZED_SCOPE
 - Read-only preflight of the exact CT108 container, original four Compose files in their recorded order, environment file, pinned old/new image IDs, download state, max_concurrent, dependencies, Writer socket/unit/listener, and backup evidence.
@@ -1307,9 +1309,9 @@ Next action: from the authorized CT108/Proxmox operator environment, collect cur
 APPROVAL_DATE: 2026-10-22
 AUTHORIZATION: Explicit user approval for isolated review and minimum modification of the Downloader deploy/rollback scripts’ backup-evidence verification path, with synthetic offline validation only.
 CANONICAL_BASE: beff9da5480e4581c9816855f51d02975d5e6755
-TASK_ID: DLDWS-001
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+> TASK_ID: DLDWS-001
+> CONTRACT_VERSION: 1.0.0
+> REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
 ### AUTHORIZED_SCOPE
 - Preserve the original scripts and work only in a fresh isolated copy.
@@ -1358,8 +1360,8 @@ A broader read-only search found /tmp/dldws001-integration-20261019/evidence/sou
 
 APPROVAL_DATE: 2026-10-22
 AUTHORIZATION: Explicit user approval for one isolated HTML/CSS alignment change to the Downloader download-list UI, based on the template from the supplied image artifact sha256:14f8c831d692db0a0d4f0f3b70eac0ca840b1daf0a66927aebc578eaf6541c4d.
-TASK_ID: DLDWS-001
-CONTRACT_VERSION: 1.0.0
+> TASK_ID: DLDWS-001
+> CONTRACT_VERSION: 1.0.0
 AFFECTED_WORKSTREAM: downloader
 
 ### AUTHORIZED_SCOPE
@@ -1392,10 +1394,10 @@ NEXT: review the isolated templates/index.html candidate; any image rebuild or p
 
 APPROVAL_DATE: 2026-10-22
 AUTHORIZATION: Explicit user approval for one overlay image build from the isolated UI-alignment candidate and, only if every production safety gate passes, replacement of the Downloader container only.
-TASK_ID: DLDWS-001
-STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+> TASK_ID: DLDWS-001
+> STATUS: IN_PROGRESS
+> CONTRACT_VERSION: 1.0.0
+> REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 CANONICAL_BASE: teddy-subtitle-stage11 at 0352f6785b0dc978f29b4aeace8980fba4ad4cf1
 AFFECTED_WORKSTREAMS: downloader,discovery-writer-safety
 PRODUCTION_TARGET: missav-dlp-web Downloader container only
@@ -1417,10 +1419,10 @@ THIS CODEX EXECUTION: approval registration and remote readback only. Docker bui
 
 APPROVAL_DATE: 2026-10-22
 AUTHORIZATION: Explicit user approval for a one-time, operator-run recovery of four MP4 files from the already retained and verified TS/HLS fragments; Codex may inspect runtime safety rules and prepare an isolated recovery tool and synthetic tests only.
-TASK_ID: DLDWS-001
-STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+> TASK_ID: DLDWS-001
+> STATUS: IN_PROGRESS
+> CONTRACT_VERSION: 1.0.0
+> REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 CANONICAL_BASE: teddy-subtitle-stage11 at 5c73d284f7c3203f966e07d0d554982f0f98e8d7
 AFFECTED_WORKSTREAMS: downloader,discovery-writer-safety
 PRODUCTION_IMAGE: sha256:7200290e8af11d9f253a5efd028bf3be2a2757af9049f0bb9e43bd04f821f2d8
@@ -1445,10 +1447,10 @@ THIS CODEX EXECUTION: approval recording/readback, runtime safety analysis, isol
 
 APPROVAL_DATE: 2026-10-22
 AUTHORIZATION: Explicit user approval for an isolated legacy recovery mode, synthetic validation, and operator-ready CT108 commands within the previously approved one-time recovery of four MP4s.
-TASK_ID: DLDWS-001
-STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+> TASK_ID: DLDWS-001
+> STATUS: IN_PROGRESS
+> CONTRACT_VERSION: 1.0.0
+> REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 CANONICAL_BASE: teddy-subtitle-stage11 at d76982afc705087096721f568b361b0d3fd2c861
 PRODUCTION_IMAGE: sha256:7200290e8af11d9f253a5efd028bf3be2a2757af9049f0bb9e43bd04f821f2d8
 
@@ -1543,17 +1545,17 @@ NEXT: establish and verify the independent media-evidence collector in an isolat
 
 ## SEPARATE APPROVED EXECUTION — real FFmpeg HLS/MP4 equivalence validation (2026-10-22)
 
-TASK_ID: DLDWS-001
-STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+> TASK_ID: DLDWS-001
+> STATUS: IN_PROGRESS
+> CONTRACT_VERSION: 1.0.0
+> REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
 User authorizes preparing an isolated functioning FFmpeg/ffprobe environment, generating real synthetic H.264/AAC TS fragments and MP4, validating content/count/timeline/full-decode equivalence with bounded resources, and preparing a legacy-only recovery patch candidate only after real-media tests pass. Preserve manifest-mode behavior, all original locks/reservations/no-clobber/input rechecks, existing candidates/evidence and source data. Provide separate CT108 read-only evidence and failed-run residual/lock/reservation/receipt inspection procedures. No CT108 preflight/execute retry, old receipt reuse, operational MP4 creation, source/task mutation, Docker lifecycle/build/deployment, Writer/Stage11/NAS or other-service change is authorized. Isolated test success is not retry authorization or operational recovery PASS.
 
 
 ## EXECUTION RESULT — real FFmpeg HLS/MP4 equivalence validator (2026-10-22)
 
-TASK_ID: DLDWS-001; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety. This is the authorized isolated media-validation follow-up. It authorizes no operational recovery retry or receipt reuse.
+> TASK_ID: DLDWS-001; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety. This is the authorized isolated media-validation follow-up. It authorizes no operational recovery retry or receipt reuse.
 
 - REAL_FFMPEG_TEST=PASS. FFmpeg and ffprobe 7.1.5-0+deb13u1 were extracted under `/tmp/dldws001-real-media-20261022/sysroot/` from official Debian packages with signed-index/package SHA verification; no system installation, production image or runtime environment change. Obsolete-index/package download failures and corrected tool preparation provenance remain in evidence.
 - INPUT_OUTPUT_EQUIVALENCE=PASS_TESTED_FORMATS. Eighteen actual generated H.264/yuv420p + AAC scenarios passed (48kHz mono; 44.1/48kHz stereo). The bounded validator compares full decoded video/audio content, frame/PCM byte-sample quantities, packet counts, normalized timelines, A/V relative start, output decoded span/container duration and full decode success. The retained TS duration and progress out_time are not output-completeness references. Partial retained TS with complete HLS is a tested success; missing/duplicate segments, changed video/audio, shifted A/V, early EOF and truncated output are tested rejections.
@@ -1572,10 +1574,10 @@ NEXT: operator collects the documented CT108 read-only inventory and media evide
 
 ## SEPARATE APPROVED EXECUTION — GANA-3223 HLS local-result collection fix (2026-10-22)
 
-TASK_ID: DLDWS-001
-STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+> TASK_ID: DLDWS-001
+> STATUS: IN_PROGRESS
+> CONTRACT_VERSION: 1.0.0
+> REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
 AUTHORIZATION: User-approved isolated implementation and regression tests for the reported custom-HLS post-processing bug. This approval does not authorize production code/data changes, Docker build/deployment, download/retry, or recovery of GANA-3223 or any other task.
 
@@ -1621,10 +1623,10 @@ NEXT: review the isolated candidate; any image build and production rollout requ
 
 ## SEPARATE APPROVED EXECUTION — GANA-3223 HLS result fix overlay build and Downloader-only deployment (2026-10-22)
 
-TASK_ID: DLDWS-001
-STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+> TASK_ID: DLDWS-001
+> STATUS: IN_PROGRESS
+> CONTRACT_VERSION: 1.0.0
+> REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 AUTHORIZATION: Explicit user approval dated 2026-10-22; authorization-time canonical HEAD cabec2a9ca8f9578f6009f051183f12d1a33386d.
 
 AUTHORIZED_SCOPE:
@@ -1646,7 +1648,7 @@ ACCEPTANCE: Report actual build/image/runtime/smoke/deployment/health/data/other
 
 ## EXECUTION RESULT — GANA-3223 HLS overlay build/deployment BLOCKED (2026-10-22)
 
-TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+> TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
 
 - Approval was identically registered and read back at 2908594f21b00589bb63f82a1ab557d5c0d2732b. Candidate teddy_mp4_queue.py SHA-256 matched 593b3ad77f50e2af64589d84a005fad5ce79495e4280011f3e240a6961ba9730.
 - BUILD=NOT_RUN; DEPLOY=NOT_RUN; FINAL_IMAGE_SMOKE=NOT_RUN; NEW_IMAGE=NONE. A read-only Docker inspect failed with permission denied at unix:///var/run/docker.sock. No privilege escalation, alternate Docker endpoint, socket permission change or operational command was attempted.
@@ -1663,10 +1665,10 @@ NEXT: resolve the GANA startup-replay authorization/safety conflict and obtain f
 
 ## SEPARATE APPROVED EXECUTION — MP4 startup recovery safety implementation (2026-10-22)
 
-TASK_ID: DLDWS-001
-STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+> TASK_ID: DLDWS-001
+> STATUS: IN_PROGRESS
+> CONTRACT_VERSION: 1.0.0
+> REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
 USER_APPROVED_POLICY: Preserve explicitly failed MP4 jobs until the user explicitly retries; automatically resume only verifiably interrupted, normally incomplete work.
 
@@ -1694,7 +1696,7 @@ NEXT_CHECKPOINT: Review the isolated implementation and evidence; no build, depl
 
 ## EXECUTION RESULT — MP4 startup recovery safety candidate: INCOMPLETE / focused test FAIL (2026-10-22)
 
-TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+> TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
 
 - The user-approved policy was registered identically in both ACTIVE_WORK files and read back at 869aa33e5c4ab3c0f24905d1211182e2db82bda2. Implementation/testing was isolated at /tmp/dldws001-mp4-startup-safety-20261022/. Existing HLS candidate and all previous evidence were preserved.
 - IMPLEMENTATION=INCOMPLETE; SYNTHETIC_SMOKE=FAIL. One focused invocation ran 23 unittest methods in 0.721s, reporting failures=3 and errors=23 (includes subtests), exit 1. Per the explicit stop-on-failure instruction, no runtime/test edits or test reruns followed this failure.
@@ -1714,7 +1716,7 @@ NEXT_CHECKPOINT: correct only the HLS fixture initialization order and test-only
 
 ## SEPARATE APPROVED CHECKPOINT — focused startup test fixture/import correction (2026-10-22)
 
-TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+> TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
 AUTHORIZATION: Explicit user instruction for focused test recovery; canonical baseline ba1a53a64dc79e867fe13653ef6fee3526b91984.
 
 AUTHORIZED_SCOPE: Correct only the HLS synthetic fixture creation order and test-only external yt-dlp import isolation in /tmp/dldws001-mp4-startup-safety-20261022/. Preserve all existing assertions and add/preserve the negative unbound-precreated-output check. Execute the same tests/startup_recovery_smoke.py suite exactly once after correction; stop immediately on any failure/error. Record test hashes and actual results.
@@ -1726,7 +1728,7 @@ NEXT_CHECKPOINT: Full regression requires the next separately scoped checkpoint;
 
 ## EXECUTION RESULT — focused startup fixture/import retest PASS (2026-10-22)
 
-TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+> TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
 
 - Narrow test-only authorization was identically registered and remotely read back at 6c98351db922e1ff25394b3a53cb49516e3ee423. The previous failed checkpoint and its evidence remain unchanged; this later result does not rewrite that failure.
 - TEST_FIXTURE_CORRECTION=PASS: the HLS fixture now creates its actual source-plan binding before segments, records their actual SHA, revalidates the binding/hash, then creates synthetic remux output. A negative subtest confirms a precreated unbound output is still rejected and its directory/files remain unchanged.
@@ -1744,7 +1746,7 @@ NEXT_CHECKPOINT: the separately scoped full regression on this frozen runtime ca
 
 ## SEPARATE APPROVED CHECKPOINT — frozen MP4 startup safety full offline regression (2026-10-22)
 
-TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+> TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
 AUTHORIZATION: Explicit user approval for verification only; canonical baseline f89985a0d7d05c8e663af68f939d9695691d9990.
 TARGET: /tmp/dldws001-mp4-startup-safety-20261022/. Verify frozen hashes before/after: app.py bbf306ef39cd57c63a09a672624cc243ef58fa99716f15bd78d3c6dbd2dccba3; teddy_mp4_queue.py cb583308c4b3a73b4580fb29dd4d0c63899e3d07fa33561bfc9843fb1ddc7649; teddy_download_safety.py 56c9a868736443fd05ec51b776dd948727d54495296dc254c8dc54fd1fad1ee9; teddy_mp4_queue_smoke.py bca56172e1bd98bfd016cfef043967a4d143fd56691695d0a574fddd0e61a981; tests/startup_recovery_smoke.py 77ffda038b0346cd760032aa2ba78ccfd5a345c236a14244e3b7ae9a946b6470.
 AUTHORIZED_SCOPE: Inspect the original commands and offline dependencies; execute each existing suite at most once in order: HLS/yt-dlp 13 groups, auth/queue 12 cases, persistence 11 cases, then existing applicable MP4 lock/reservation/concurrency safety checks. Use only synthetic isolated files and external dependency isolation; never replace product safety checks with mocks. Stop subsequent suites on any failure/error. Missing safe dependencies block execution without install/network workarounds. Record actual counts, gaps, hashes and fresh unique evidence; reuse the prior focused 23/23 PASS without claiming unexecuted coverage.
@@ -1755,7 +1757,7 @@ NEXT_CHECKPOINT: Review the actual regression outcome; no production action foll
 
 ## EXECUTION RESULT — frozen MP4 startup full regression stopped on caught test-harness error (2026-10-22)
 
-TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+> TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
 
 - Full offline verification approval was identically registered in both ACTIVE_WORK files and remotely read back at 519ec0d70e7b7315d9f37dfeebd0a4fc91aff846. Frozen runtime/test hashes and prior evidence matched before execution. No runtime or test code was edited.
 - FULL_REGRESSION=FAIL; HLS_YTDLP_13_GROUPS=PASS; AUTH_QUEUE_12_CASES=FAIL (invalid automatic-retry coverage); PERSISTENCE_11_CASES=NOT_RUN; LOCK_RESERVATION_CONCURRENCY=INCOMPLETE; DEPLOYMENT_GATE=BLOCKED.
@@ -1774,7 +1776,7 @@ NEXT_CHECKPOINT: separately authorize the minimal test-only AST namespace compat
 
 ## SEPARATE APPROVED CHECKPOINT — auth/queue AST test environment repair (2026-10-23)
 
-TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+> TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
 AUTHORIZATION: User explicitly approved test-only AST namespace repair and hidden-exception detection, followed by one existing 12-case auth/queue suite invocation; baseline 3bb1544eb6ed528dca4ec7a20a4eed3c818f3da1.
 AUTHORIZED_SCOPE: Work only on a NEW evidence-area copy of the legacy auth/queue test. Bind actual frozen candidate teddy_mp4_queue and owned synthetic DOWNLOAD_DIR; inspect other globals; retain real automatic-retry/selection/admission logic. Add independent execution/admission/state evidence and detection of internally caught errors, preserving existing race/duplicate and safety assertions. Negative detector checks may run inside the same test. Read the persistence suite namespace only; do not modify or execute it. Reuse Python 3.10.22 offline environment; execute only the 12-case suite once, stop on failure without fixes/reruns.
 FROZEN: Preserve app.py bbf306ef39cd57c63a09a672624cc243ef58fa99716f15bd78d3c6dbd2dccba3; teddy_mp4_queue.py cb583308c4b3a73b4580fb29dd4d0c63899e3d07fa33561bfc9843fb1ddc7649; teddy_download_safety.py 56c9a868736443fd05ec51b776dd948727d54495296dc254c8dc54fd1fad1ee9; teddy_mp4_queue_smoke.py bca56172e1bd98bfd016cfef043967a4d143fd56691695d0a574fddd0e61a981; tests/startup_recovery_smoke.py 77ffda038b0346cd760032aa2ba78ccfd5a345c236a14244e3b7ae9a946b6470.
@@ -1784,7 +1786,7 @@ ACCEPTANCE: 12 cases pass with zero unexpected caught errors and independent rea
 
 ## EXECUTION RESULT — auth/queue AST test repair and one 12-case retest PASS (2026-10-23)
 
-TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+> TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
 
 - The separate test-only approval was identically registered and remotely read back at b03a63187504bb119b7ed6e4974592fce96d3a6c. Previous failure evidence under evidence/full-regression-jt5u5cxi/ remains byte-identical; the old caught NameError has no stored traceback because the real monitor caught/logged it.
 - AST_NAMESPACE_FIX=PASS: only the new evidence-area tests/offline_tests.py copy was changed. The real auto_retry_monitor is AST-extracted unchanged and receives the actual frozen candidate teddy_mp4_queue plus the fixture-owned temporary DOWNLOAD_DIR. Static symbol-table review found no remaining non-builtin global dependency missing from this namespace. Frozen mp4/safety/admin module paths and hashes were checked in the existing Python 3.10 environment before execution; app startup was never imported.
@@ -1799,3 +1801,12 @@ TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKS
 - Only approval/result governance and handoff documents were published; no canonical product/test source was committed. No operating data/service/queue/media or Docker action, real download, Writer/Stage11/dependency change or package installation occurred. Docker access, fresh backup/live configuration and unresolved Writer socket safety remain blockers. Writer workstream participation is history tracking only.
 
 NEXT_CHECKPOINT: separately scoped test-only repair of the persistence suite's missing globals and proof that injected storage faults are actually reached, then one 11-case execution. This 12-case PASS does not complete full regression or authorize deployment.
+
+
+## DOCUMENT-FORMAT MAINTENANCE — DLDWS-001 (2026-10-23)
+
+- User-approved records-only repair for repeated historical workstream fields; canonical HEAD at preflight `ac476f4a822317576d9963a638e78ee8abe14344`.
+- Original document preserved byte-for-byte at `docs/governance/downloader/history/DLDWS-001_ACTIVE_WORK_before_field_normalization_ac476f4.md`, verified against original blob `5a4a886596fae7e56ed8a2940a24ce07e6892728`.
+- Unchanged five-line current-state metadata: `downloader / IN_PROGRESS / DLDWS-001 / contract 1.0.0 / downloader,discovery-writer-safety`.
+- Historical field lines quoted only; every original approval/result value and chronology remain present. Governance checker, router, contracts, Stage11 and operating product files untouched.
+- Do not repeat raw column-zero metadata labels in later historical checkpoints; this is not new operational approval. Docker, backup, live configuration and Writer safety gates remain BLOCKED.
