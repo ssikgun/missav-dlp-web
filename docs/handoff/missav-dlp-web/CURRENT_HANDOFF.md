@@ -13571,3 +13571,26 @@ Writer risk remains unresolved. The parsed Compose contains no Writer service; i
 No production container, image, data, backup, Writer, Gluetun, Selkies or Stage11 resource was intentionally changed. The result is blocked for deployment approval because the live Docker state, backup access/integrity, max_concurrent value and Writer restart safety are not verified. The prior build BLOCKED record remains historical; this operator build PASS record supplements it and does not resolve the Writer issue.
 
 Next action: from an authorized Proxmox/CT108 operator session, provide read-only confirmation of the exact live Downloader image/container/Compose labels, Data_5TB archive availability and checksum record, current max_concurrent=4, and Writer listener/service state; then reassess deployment separately.
+
+## DLDWS-001 — Downloader-only overlay deployment execution (2026-10-22)
+
+The user explicitly authorized one replacement of only the Downloader container with overlay image `sha256:14f8c831d692db0a0d4f0f3b70eac0ca840b1daf0a66927aebc578eaf6541c4d`, subject to all preflight gates. The matching authorization was recorded and read back in both workstreams before this execution.
+
+DEPLOYMENT_PREFLIGHT=BLOCKED
+PRODUCTION_DEPLOYMENT=NOT_RUN
+LIVE_IMAGE_ID=UNKNOWN
+COMPOSE_PRESERVED=YES (the supplied Compose/env files were not changed; read-only config parsing succeeded and the image-only model comparison passed; live-container comparison was not available)
+DOWNLOAD_DATA_PRESERVED=INCOMPLETE (read-only work data matched the recorded baseline: max_concurrent=4, four ENOSPC error jobs at retries=30, four .parts directories, 8,637 fragments, 16,996,662,891 bytes; no deployment/data write was performed)
+WRITER_UNCHANGED=INCOMPLETE (no Writer lifecycle command was issued; systemd and listener checks were unavailable. Observed socket metadata: mode 0660, uid 0, gid 65534; client GID 988 access remains unproven)
+GLUETUN_SELKIES_UNCHANGED=YES for this execution (no lifecycle calls; current IDs/status could not be inspected)
+LOGIN_UI_API=INCOMPLETE
+ROLLBACK_READY=NO
+ROLLBACK_EXECUTED=NO
+WRITER_SAFETY_ISSUE=UNRESOLVED
+PRODUCTION_CONTAINER_CHANGED_BY_THIS_EXECUTION=NO
+
+Blocking evidence: hostname is `downloader`, UID/GID 0:0, but `docker info` and Docker inspect are denied on `/var/run/docker.sock`; the Data_5TB mount and archive are absent in this LXC, and the archive SHA-256 is not recorded in this handoff; systemd could not reach the system bus and `ss` did not establish a matching Writer listener; the MP4 lock holder could not be established. The local read-only Compose render resolved the expected project and four services; the new image override changed only the Downloader image. Current live container/dependency state and local image availability remain unknown. Historical operator build/UI evidence is retained as provenance and does not satisfy these live gates.
+
+Fail-closed operator scripts were prepared at `/tmp/dldws001-downloader-deploy-20261022` (deploy.py SHA-256 `f19702f1ee2b6c3659644e82d71dce6bbb93374d4a2b889304994f5e9abcbcfd`; rollback.py SHA-256 `d32d2805eae1b0b512ca8b884414a70d26a508c7aaacc8e4acafc9d91d4faf2e`). Python syntax compilation passed. Static review found exactly one service-only Compose `up` in each script, with `--no-deps --pull never --no-build`; no stop/down/restart/run/exec/prune or escalation call exists. Neither script was executed. The archive SHA and verified source-manifest path needed by the command are not available, and rollback is disabled unless a deployment attempt state file exists and all state remains unchanged. See the adjacent README for the operator command template and gate list.
+
+Next action: obtain a fresh read-only snapshot from the authorized CT108/Proxmox operator environment, including Docker/image/container and dependency identity, the mounted Data_5TB archive checksum plus source-manifest path, and Writer unit/listener/socket-client access evidence. Do not run deployment or rollback until all gates pass.
