@@ -1549,3 +1549,28 @@ This entry records the shared DLDWS-001 approval for traceability only. The appr
 ## COORDINATION RESULT — DLDWS-001 GANA-3223 HLS post-processing follow-up (2026-10-22)
 
 The approved HLS post-processing correction was implemented and tested only in an isolated Downloader candidate. This workstream's contract excludes MP4/download processing; no Discovery Writer Safety product code, tests, service, socket, database, or operational state was changed. The existing Writer socket safety issue and all prior evidence remain unresolved and untouched. Production deployment, downloads, and task-state changes were not performed. Candidate result and hashes are recorded in the Downloader ACTIVE_WORK and canonical handoff.
+
+
+## SEPARATE APPROVED EXECUTION — GANA-3223 HLS result fix overlay build and Downloader-only deployment (2026-10-22)
+
+TASK_ID: DLDWS-001
+STATUS: IN_PROGRESS
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+AUTHORIZATION: Explicit user approval dated 2026-10-22; authorization-time canonical HEAD cabec2a9ca8f9578f6009f051183f12d1a33386d.
+
+AUTHORIZED_SCOPE:
+- Verify the actual current Docker engine, running Downloader identity, image/runtime fingerprints, existing Compose configuration, backups, data, active-work and rollback conditions read-only.
+- Build one isolated minimal overlay using exact parent image sha256:7200290e8af11d9f253a5efd028bf3be2a2757af9049f0bb9e43bd04f821f2d8. Replace only /app/teddy_mp4_queue.py with the approved candidate SHA-256 593b3ad77f50e2af64589d84a005fad5ce79495e4280011f3e240a6961ba9730 from /tmp/dldws001-gana3223-hls-result-fix-20261022/.
+- Validate the final image's HLS/yt-dlp result handling, unchanged runtime files and existing safety protections using isolated synthetic tests.
+- Only if every current protection gate passes, replace the missav-dlp-web service alone using the verified existing Compose/image-only procedure; preserve all other settings, dependencies, data and old image. Safe Downloader-only rollback is authorized if required and data compatibility is established.
+- Record actual outcomes in both ACTIVE_WORK files and CURRENT_HANDOFF.md with remote readback. Prepare /tmp/TEDDY_DOWNLOADER_UNIFIED_NEXT_CHAT_HANDOFF_20261022_AFTER_DEPLOY.md for the next conversation.
+
+PROHIBITED_SCOPE:
+- No real download or failed-job retry, no GANA-3223 state repair, no original MP4/TS/HLS/filelist/task cleanup or overwrite.
+- No Writer, Gluetun, Selkies, Stage11 S11-WX011, NAS/Jellyfin change or restart; no protected dirty-worktree/candidate modification; no canonical product-code publication.
+- Do not bypass Docker access restrictions, missing backup evidence, active-work risks, lock/reservation/no-clobber/retry guards or any unknown required gate. Stop and report BLOCKED if required evidence cannot be established.
+- This record authorizes Downloader operations only; Discovery Writer Safety participates for shared-task traceability and preservation, not Writer implementation or operation. Existing Writer safety issue remains UNRESOLVED.
+- No legacy MP4 recovery reexecution or old receipt reuse. Handoff NEXT text is never new authorization.
+
+ACCEPTANCE: Report actual build/image/runtime/smoke/deployment/health/data/other-service/rollback evidence separately. A synthetic PASS is not operational download PASS. Complete the unified handoff even if deployment is BLOCKED.
