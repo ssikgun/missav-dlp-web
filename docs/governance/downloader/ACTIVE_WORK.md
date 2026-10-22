@@ -1387,3 +1387,28 @@ Image-source provenance: the supplied OCI archive was read from /tmp/dldws001-ov
 IMAGE_BUILD=NOT_RUN; PRODUCTION_DEPLOYMENT=NOT_RUN; PRODUCTION_RESTART=NOT_RUN. The isolated candidate is not published as product code.
 
 NEXT: review the isolated templates/index.html candidate; any image rebuild or production rollout requires a separate approval.
+
+## SEPARATE APPROVED EXECUTION — UI alignment overlay build and Downloader-only production deployment (2026-10-22)
+
+APPROVAL_DATE: 2026-10-22
+AUTHORIZATION: Explicit user approval for one overlay image build from the isolated UI-alignment candidate and, only if every production safety gate passes, replacement of the Downloader container only.
+TASK_ID: DLDWS-001
+STATUS: IN_PROGRESS
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+CANONICAL_BASE: teddy-subtitle-stage11 at 0352f6785b0dc978f29b4aeace8980fba4ad4cf1
+AFFECTED_WORKSTREAMS: downloader,discovery-writer-safety
+PRODUCTION_TARGET: missav-dlp-web Downloader container only
+
+### AUTHORIZED_SCOPE
+- Use only /tmp/dldws001-ui-alignment-20261022/templates/index.html with SHA-256 4d379e37c76e25781ea4eda8d169af5f24d70a4d53ef74808dc088c37b85766f as the sole overlay file.
+- Build one new overlay image using parent image sha256:14f8c831d692db0a0d4f0f3b70eac0ca840b1daf0a66927aebc578eaf6541c4d; verify image identity and integrity before considering deployment.
+- If all current production safety gates pass, replace the Downloader container only, using the existing four Compose files and Gluetun environment file without changing their contents.
+- Preserve the existing image, job records, downloaded fragments, and all existing data.
+- Keep Writer, Gluetun, and Selkies services unchanged and do not restart or modify them.
+- Keep the existing Writer safety defect UNRESOLVED.
+
+### PROHIBITED_SCOPE
+No real bulk retry or new download; no data cleanup or modification; no Writer/Gluetun/Selkies restart or change; no Stage11, NAS, or Jellyfin change; no Compose/environment-file edits; no additional image build or deployment attempt beyond this one approved image and one Downloader replacement; no weakening of any preflight or rollback safety gate.
+
+THIS CODEX EXECUTION: approval registration and remote readback only. Docker build, product-code edit, and production deployment/restart are NOT AUTHORIZED IN THIS EXECUTION.
