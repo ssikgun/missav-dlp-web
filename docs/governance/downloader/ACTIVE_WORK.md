@@ -1352,3 +1352,23 @@ NEXT: From the original Proxmox backup-generation records, identify the exact so
 ## MANIFEST ROLE CLARIFICATION — DLDWS-001 backup evidence review (2026-10-22)
 
 A broader read-only search found /tmp/dldws001-integration-20261019/evidence/source-manifest.json (102,407 bytes; SHA-256 313213a9bed9aacf41c5b3bc55dc7c3b86875def387886c57605f2a989cd44c0). Its top-level keys are build_result, dl001_context, dws001_b, final_candidate_files, integration_changes, integration_root, notes, and offline_results. This is integration-candidate provenance, not the Proxmox backup source manifest: its digest does not match the required 252491423da01d4f1eeabad3e7caeaeac3e8cb23b2eb46818aba91b7be178d16. The separate overlay manifest remains a third, distinct artifact at SHA-256 a2b5c134528aea387fc93fd8d25c56e88c5c1a47c6408562536dd4fd9ab60b7f. No file path/role for the required backup source manifest was established; all blocked gates and conclusions remain unchanged.
+
+
+## SEPARATE APPROVED EXECUTION — Downloader UI alignment only (2026-10-22)
+
+APPROVAL_DATE: 2026-10-22
+AUTHORIZATION: Explicit user approval for one isolated HTML/CSS alignment change to the Downloader download-list UI, based on the template from the supplied image artifact sha256:14f8c831d692db0a0d4f0f3b70eac0ca840b1daf0a66927aebc578eaf6541c4d.
+TASK_ID: DLDWS-001
+CONTRACT_VERSION: 1.0.0
+AFFECTED_WORKSTREAM: downloader
+
+### AUTHORIZED_SCOPE
+- Inspect the exact image artifact's final templates/index.html and make only the minimum HTML/CSS change in a fresh isolated candidate.
+- Place the statistics badges and bulk-retry action in one flex container, vertically center-align on desktop, and adjust mobile wrapping/width while preserving the existing stats, retryFailedTasks, retryFailedCount, and bulkRetryStatus IDs, behavior, and accessibility.
+- Run focused Chromium desktop/mobile rendering checks and bulk-retry UI regression checks if the isolated environment supports them. Report unavailable browser validation as INCOMPLETE.
+- Record the result and evidence provenance in this active file.
+
+### PROHIBITED_SCOPE
+No JavaScript/API/download-queue/MP4/Writer/SpoofDPI change; no product-code canonical publication; no image build, production image/container modification, deployment, or restart; no production data, Stage11, NAS/Jellyfin, Gluetun or Selkies change. No widening beyond the listed HTML/CSS alignment.
+
+EXECUTION_STATUS: AUTHORIZED for one isolated candidate and verification only. Deployment/build/publication remain NOT_RUN.
