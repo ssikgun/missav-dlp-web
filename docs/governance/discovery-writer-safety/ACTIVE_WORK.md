@@ -2046,3 +2046,13 @@ NEXT_CHECKPOINT: decide whether to separately authorize a test-only fixture-isol
 - **ACCEPTANCE**: `LIVE_PREFLIGHT`, `BACKUP_ROLLBACK`, `HLS_RESULT_FIX`, `OLD_FAILED_REPLAY_HOLD`, `WRITER_COMPATIBILITY`, `IMAGE_BUILD`, `DOWNLOADER_ONLY_DEPLOY`, `FOUR_OLD_JOBS_PRESERVED`, `GANA_ORIGINAL_PRESERVED`, `NEW_JOB_DOWNLOAD`, `GLOBAL_MP4_SERIAL`, `NEW_JOB_NAS_NOCLOBBER`, `NEW_JOB_COMPLETE_DURABLE`, `NORMAL_NEW_DOWNLOAD_PIPELINE`, `GANA_NAS_PUBLISHED`. Each PASS/FAIL/INCOMPLETE/NOT_RUN individually with evidence. If no live CT108 access is available, report `DEPLOY=BLOCKED_NO_LIVE_ACCESS` with precise minimal operator commands; do NOT claim it shipped. If any precondition fails, STOP without deploy/restart/partial production edits.
 - **NEXT DECISION**: Once new-product canary is PASS, separately plan the already conditionally authorized preservation-safe GANA-3223 NAS completion without local original deletion; do not let it block new-job normal operation or expand this approval to other four failed tasks.
 
+
+
+## COORDINATION RESULT — DLDWS-001 urgent Downloader pipeline normalization (2026-10-23)
+
+> TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+
+- Shared-work tracking only; no Writer code, socket, service, or state was changed. The approved isolated HLS fix has 13/13 prior HLS/yt-dlp groups PASS and the generic failed/ambiguous MP4 startup hold has a separate 23/23 synthetic PASS. These results do not establish live Writer compatibility or release readiness.
+- Live CT108/PVE/NAS configuration and Writer socket liveness could not be checked. Docker image inspection was denied by the local Docker socket permissions. `BACKUP=INCOMPLETE`; `BUILD=NOT_RUN`; `DEPLOY=BLOCKED`; `NEW_DOWNLOAD_E2E=NOT_RUN`. No production write or service action was performed; current GANA and four historical job bytes are UNKNOWN because they were not re-read.
+- Evidence: `/tmp/dldws001-urgent-pipeline-20261023-codex/result.md`, SHA-256 `705002bf27e1453d24e2300188bec237759b9cde48bce983f5668465ed0c57c6`. Writer socket safety remains UNRESOLVED.
+- NEXT: request fresh redacted read-only CT108 evidence for Writer socket and deployment dependencies before any release re-evaluation.
