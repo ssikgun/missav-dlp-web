@@ -14124,3 +14124,21 @@ The user separately approved a minimum isolated correction and focused regressio
 - `PRODUCTION_CHANGED=NO`; `BUILD=NOT_RUN`; `DEPLOY=NOT_RUN`; `DEPLOYMENT_GATE=BLOCKED`. Docker, live tasks/queues/media, Writer, Stage11, Gluetun, Selkies, NAS/Jellyfin, and previous evidence were not changed.
 
 Next decision: review the volatile-only failed-route record limitation and candidate diff; separately authorize any caller rollback extension, further testing, canonical publication, or operations.
+
+
+## EXECUTION RESULT — DLDWS-001 GANA-3223 safe recovery preparation (2026-10-23)
+
+Approval was verified at canonical `teddy-subtitle-stage11` SHA `fe9a61fc0bae31075da5160a800580f83f0ea6a7`; both selected ACTIVE_WORK files already contained the matching one-job conditional approval. The local checkout is stale (`codex-stage11-wx001-20261014`, HEAD `761fcdce563b32edfa31f5f44f09eb11535e9d8f`) and was not used as source. No CT108/PVE/NAS connection tool is available here, so the live preflight could not be re-run; previous operator evidence in ACTIVE_WORK remains historical, not a fresh readback.
+
+Read-only review of the preserved operator snapshot `/tmp/dldws001-gana3223-live-snapshot-20261022/` confirms why no safe one-off operation can be prepared from this environment:
+
+- Snapshot `teddy_mp4_queue.py` SHA-256 `85e8078c9aa6f27f3ceae13f9202617d14133fa83a1e3cf06687b558e13a1767`: the old HLS completion route calls `_local_outputs()`, which scans `.<UUID>.ytdlp-home`; the isolated HLS-only correction is still unapplied. Snapshot `teddy_bootstrap.py` SHA-256 `b96850dbfaa585f5cf2abb3fdbe328030706fc159aba8875656fe2c775e433f3` shows the normal publish callback's state path.
+- The known failed-task / sealed `output_ready` mismatch is unsafe on startup: `_recover()` changes task state, and the queue worker can then select that output record. Service restart/redeploy is not authorized by this checkpoint.
+- Normal `_publish_pending_result()` calls the standard publisher, then HLS fragment cleanup and MP4 queue cleanup. The SSH publisher has a verified partial-transfer/hash plus `ln` no-clobber step, but deletes the local source on success. It cannot satisfy the explicit requirement to retain the original MP4, TS and fragments.
+- An external task-file or queue-journal edit cannot update the running app's in-memory task map safely; its later save can overwrite the external state. No reviewed in-process route provides a one-job, no-cleanup reconciliation across app memory, `.tasks.json`, and the MP4 journal.
+
+Result: `GANA_RECOVERY_PREFLIGHT=BLOCKED`; `NAS_NO_CLOBBER=INCOMPLETE`; `LOCAL_MP4_PRESERVED=YES` / `FRAGMENTS_PRESERVED=YES` only in the limited sense that this investigation made no writes (live bytes not re-read); `TASK_QUEUE_CONSISTENCY=BLOCKED`; `STARTUP_REPLAY_SAFETY=BLOCKED`; `GANA_NAS_PUBLISHED=NOT_RUN`; `NORMAL_NEW_DOWNLOAD_PIPELINE=INCOMPLETE`; `PRODUCTION_CHANGED=NO` (no Codex operation; current state not rechecked); `BUILD=NOT_RUN`; `DEPLOY=NOT_RUN`. No one-off recovery tool was created because a NAS-only script could leave an orphaned final file and cannot safely persist the matching live task/queue transition. No task, queue, MP4, TS, fragment, NAS, or service was changed.
+
+Evidence: `/tmp/dldws001-gana-recovery-preflight-20261023-codex/result.md`, SHA-256 `0b1ed3f8db9179f233a098e6a56c79622304ac1782bafa9987fa021a86f623c7`. The recorded candidate remains `/tmp/dldws001-gana3223-hls-result-fix-20261022/teddy_mp4_queue.py`, SHA-256 `593b3ad77f50e2af64589d84a005fad5ce79495e4280011f3e240a6961ba9730`; its prior 13-group synthetic/offline PASS is not production verification.
+
+Minimum next decision: separately authorize a narrow single-task in-process or explicitly quiesced completion path that holds/coordinates the app task and MP4 queue locks, suppresses output-ready replay during the transition, uses remote temporary transfer plus verified atomic no-clobber registration, updates durable task and queue state consistently, and preserves local MP4/TS/fragments. Any image/service activation or restart needed for that path requires its own exact approval. Obtain fresh read-only CT108/NAS/backup/lock evidence before any external write. Do not treat this handoff or existing one-job publication approval as authorization for restart, redeploy, or manual state editing.
