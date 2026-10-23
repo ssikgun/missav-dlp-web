@@ -14069,3 +14069,44 @@ NEXT_CHECKPOINT: decide whether to separately authorize a test-only fixture-isol
 - Frozen runtime SHA-256 remained unchanged: `app.py` `bbf306ef39cd57c63a09a672624cc243ef58fa99716f15bd78d3c6dbd2dccba3`; `teddy_mp4_queue.py` `cb583308c4b3a73b4580fb29dd4d0c63899e3d07fa33561bfc9843fb1ddc7649`; `teddy_download_safety.py` `8588cf34936aba6936ab943aaa845919a51e8bd68b58e0c2e5ef87e6eecb830d`. `ORIGINAL_EVIDENCE_PRESERVED=YES`, including the prior failed result SHA-256 `5f6857cbec5085ff039eebeb8553d958266c2580f9c6b79a431019d8b990c54f`.
 - `FULL_REGRESSION=INCOMPLETE`: persistent directory-fsync crash durability and independent operational-readiness gates remain unverified. `PRODUCTION_CHANGED=NO`; `BUILD=NOT_RUN`; `DEPLOY=NOT_RUN`; `DEPLOYMENT_GATE=BLOCKED`. No further tests or operational actions were performed.
 
+
+
+## 2026-10-23 — DLDWS-001 MP4 directory-fsync failure and reload verification
+
+> TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+
+The user-approved checkpoint covered isolated investigation and verification only. No product change, production state change, Docker build, or deployment was authorized or performed.
+
+### Result
+
+- `DIRECTORY_FSYNC_FAULT_PATH=PASS`: actual frozen `persist_retry_state_and_enqueue()` reached the parent-directory fsync after state replacement and again during rollback; both injected EIO failures were observed at the expected calls.
+- `IN_PROCESS_ROLLBACK=PASS` within the live test filesystem: the transaction raised its explicit manual-reconciliation error; memory, original task-file bytes and inode were restored/read back; no download queue admission occurred.
+- `PROCESS_RESTART_RECOVERY=PASS` for application reload: a fresh Python 3.10.22 process ran the actual candidate `load_tasks()` and `teddy_mp4_queue.owns_task_record()` against the test-owned file and retained the explicit failed MP4 task without rewriting it. This was a new process on the same live kernel/filesystem, not a power-loss test.
+- `CRASH_DURABILITY=UNKNOWN`: no host crash, power cut, reboot, unmount, controller-cache failure, or physical storage fault was performed.
+- `QUEUE_STATE_CONSISTENCY=INCOMPLETE`: the in-memory download queue remained empty before and after failure, and task reload preserved failure ownership. This new fixture did not contain a pre-existing durable MP4 queue journal; its behavior under this exact fsync failure sequence was not jointly exercised.
+- `PROTECTED_BYTES_PRESERVED=YES` for synthetic inputs: `.tasks.json` SHA-256 `67ff3690cb2641c15816b840689d9b4cc3920139cfbc2519d881ab8a410a4a2d` and inode were identical before/after; synthetic fragment SHA-256 `26ecf32a60ae88575d54747b8b132c13266f8dd7fc5378591c3d7573fa67e56f`; existing-output sentinel SHA-256 `229f135b7f4fb2b0b7488a285ceafcacae1b3a5a192fe54deecb2d3f52728555`; no `.tasks.json.retry-*` files remained.
+- `TESTS_RUN=1 / PASSES=1 / FAILURES=0 / ERRORS=0`; unexpected caught errors: 0. Existing 11-case persistence and prior failed-job hold results were reused, not rerun. `RUNTIME_SHA_UNCHANGED=YES`; all three pinned runtime hashes match the approved values. `ORIGINAL_EVIDENCE_PRESERVED=YES`.
+- `FULL_REGRESSION=INCOMPLETE`; `PRODUCTION_CHANGED=NO`; `BUILD=NOT_RUN`; `DEPLOY=NOT_RUN`; `DEPLOYMENT_GATE=BLOCKED`.
+
+### Failure-window matrix
+
+| Failure point | Expected behavior | Observed / coverage | Result |
+|---|---|---|---|
+| Temporary state open, partial write, flush, or regular-file fsync before replacement | Refuse admission; preserve old task state and queue | Existing persistence 11/11 evidence covers these; reused without rerun | PASS (historical) |
+| Recovery hard-link creation and its first parent-directory fsync | Do not replace task file; fail closed | This exact directory-fsync call was not fault-injected in the reviewed suite | INCOMPLETE |
+| Atomic replace fails before rename | Refuse admission and preserve old bytes | Existing persistence evidence covers replace failure | PASS (historical) |
+| Post-replace directory fsync fails once; rollback fsync succeeds | Restore old bytes/inode/memory, no queue admission | Existing persistence evidence covers transient failure/rollback | PASS (historical) |
+| Post-replace fsync and rollback fsync both fail | Refuse admission; flag manual reconciliation; inspect live state and reload | New one-test evidence: errors at calls 2/3; live old bytes/inode and task restored; queue empty; fresh-process reload retained failed MP4 state | PASS for process/live-FS behavior; durability UNKNOWN |
+| Queue append mutates then fails | Restore state and queue | Existing persistence evidence covers this case | PASS (historical) |
+| Owned temp or backup-link unlink itself fails | Preserve safe evidence and report cleanup uncertainty | No unlink failure was injected; the new run had no retry temp/link residue | INCOMPLETE |
+| Actual process power loss or storage-device/cache failure around rename/fsync | Correct durable directory entry after reboot | Not performed and cannot be inferred from same-kernel reload | UNKNOWN |
+
+### Evidence and remaining limits
+
+New evidence: `/tmp/dldws001-mp4-fsync-restart-20261023-xly07iqy/`.
+- Test file SHA-256: `9aed6a42b45763ef56e53208ead3da85a8669a219601824381400555d4d016dd`.
+- Result SHA-256: `eea8f64d323373ee120c2aa25db691a8350cad6bf4fd289e636b7d51cb74ff42`.
+- Failure-window matrix SHA-256: `865cbd3286a1a3ae9bf8d35f8b3dca392f9e341d45b5c0dead5ff4f3010056e0`.
+- Prior persistence result SHA `db0926d46237764084f5905f23d3b9e369298835a710831e251ce844c4bc1677` and prior hold-refresh result SHA `1d65228213d6c2d05f9b605e4206b08b00e4039a947c39fade03e040ea16d044` still match their recorded values.
+
+No code was changed. `save_tasks()`'s separate non-fsync behavior remains untouched. Physical crash durability and first recovery-link directory-fsync / cleanup-unlink failure paths remain unverified. This result does not authorize any additional test, product fix, deployment, or operational recovery; follow the next explicit user checkpoint only.
