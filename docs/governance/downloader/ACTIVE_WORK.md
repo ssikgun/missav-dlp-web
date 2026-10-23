@@ -1893,3 +1893,15 @@ NEXT_CHECKPOINT: review supported ownership/lifetime of inherited MP4 lock descr
 - PROHIBITED: no change to `app.py` or `teddy_mp4_queue.py`, protected preexisting candidate/evidence/worktrees or canonical code; no Docker/Compose build/restart/deploy/socket change, permission bypass, network/package install, GANA/legacy reprocessing, operating tasks/queue/settings/MP4/TS/parts/NAS/Jellyfin; no Writer socket/module/tests, Stage11 or other service modification; no weakening any test or changing governance contracts/router/CI. Writer participation is shared-task coordination only.
 - ACCEPTANCE: inherited child `release()` must not open parent's critical section; true owner normal release and subsequent independent contender work; cross-process exclusion; thread serialization, cancel/error cleanup, ownership identity and no unexpected swallowed exception evidence. Report actual PASS/FAIL/INCOMPLETE, changed candidate SHA, retained failure evidence, test counts/hashes and all unresolved gaps. `PRODUCTION_CHANGED=NO; BUILD=NOT_RUN; DEPLOY=NOT_RUN; DEPLOYMENT_GATE=BLOCKED` irrespective of focused outcome.
 - NEXT_DECISION: review corrected lock-focused evidence; remaining reservation/ENOSPC/no-clobber/real retry-concurrency tests require separate checkpoint. Docker access, backup/source manifest/live configuration, Writer safety and crash durability remain independent unresolved blockers.
+
+
+## DLDWS-001 isolated lock ownership correction — result (2026-10-23)
+
+> TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+
+- `LOCK_ROOT_CAUSE=CONFIRMED`; `LOCK_OWNER_FIX=PASS`; `INHERITED_RELEASE_GUARD=PASS`; `PARENT_LOCK_PRESERVED=YES`; `NORMAL_ACQUIRE_RELEASE=PASS`; focused lock regression `PASS`.
+- One Python 3.10.22 run: 6 tests, 6 PASS, 0 FAIL, 0 ERROR; unexpected caught errors 0. Fork child release closed only its inherited descriptor; the parent remained locked until its own release. A child independently acquired/released after the owner released. Context exception cleanup and the force-killed-parent subprocess FD guard passed.
+- Isolated candidate only: `teddy_download_safety.py` SHA-256 `8588cf34936aba6936ab943aaa845919a51e8bd68b58e0c2e5ef87e6eecb830d`. `app.py` and `teddy_mp4_queue.py` hashes unchanged. New focused test SHA-256 `1f4e6d7dd235e19da2fe7222c1bc052a95d1d197eceaa10142144b6fefbd2fe3`.
+- Evidence: `/tmp/dldws001-mp4-startup-safety-20261022/evidence/lock-owner-fix-vhzoco2j/`; result JSON SHA-256 `55a739f9a85c6140c710335caaf8a2c275f0c0897738f77b1bd174ce54015ed9`. The original failure evidence and all 95 preexisting candidate files outside the allowed runtime were verified unchanged.
+- `PRODUCTION_CHANGED=NO`; `BUILD=NOT_RUN`; `DEPLOY=NOT_RUN`; `DEPLOYMENT_GATE=BLOCKED`. Reservation/ENOSPC, ownership/no-clobber/publication, real retry concurrency and persistent directory-fsync crash durability remain unresolved. No product/test code publication.
+- Next checkpoint: separately approved remaining isolated safety regressions; retain the original failure evidence.
