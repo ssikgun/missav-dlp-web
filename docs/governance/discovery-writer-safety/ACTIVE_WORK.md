@@ -1825,3 +1825,14 @@ NEXT_CHECKPOINT: review supported ownership/lifetime of inherited MP4 lock descr
 - PROHIBITED: no change to `app.py` or `teddy_mp4_queue.py`, protected preexisting candidate/evidence/worktrees or canonical code; no Docker/Compose build/restart/deploy/socket change, permission bypass, network/package install, GANA/legacy reprocessing, operating tasks/queue/settings/MP4/TS/parts/NAS/Jellyfin; no Writer socket/module/tests, Stage11 or other service modification; no weakening any test or changing governance contracts/router/CI. Writer participation is shared-task coordination only.
 - ACCEPTANCE: inherited child `release()` must not open parent's critical section; true owner normal release and subsequent independent contender work; cross-process exclusion; thread serialization, cancel/error cleanup, ownership identity and no unexpected swallowed exception evidence. Report actual PASS/FAIL/INCOMPLETE, changed candidate SHA, retained failure evidence, test counts/hashes and all unresolved gaps. `PRODUCTION_CHANGED=NO; BUILD=NOT_RUN; DEPLOY=NOT_RUN; DEPLOYMENT_GATE=BLOCKED` irrespective of focused outcome.
 - NEXT_DECISION: review corrected lock-focused evidence; remaining reservation/ENOSPC/no-clobber/real retry-concurrency tests require separate checkpoint. Docker access, backup/source manifest/live configuration, Writer safety and crash durability remain independent unresolved blockers.
+
+
+## DLDWS-001 shared-checkpoint coordination — MP4 lock correction result (2026-10-23)
+
+> TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
+
+- This workstream participated only in shared task documentation; no Writer code, test, socket, systemd service or runtime was changed.
+- The Downloader candidate's inherited MP4 lock ownership correction passed its focused isolated regression: 6 tests, 6 PASS, 0 FAIL, 0 ERROR, Python 3.10.22. Candidate `teddy_download_safety.py` SHA-256 `8588cf34936aba6936ab943aaa845919a51e8bd68b58e0c2e5ef87e6eecb830d`; no canonical product/test code was published.
+- Evidence: `/tmp/dldws001-mp4-startup-safety-20261022/evidence/lock-owner-fix-vhzoco2j/`; result JSON SHA-256 `55a739f9a85c6140c710335caaf8a2c275f0c0897738f77b1bd174ce54015ed9`. The earlier failure record is retained.
+- Production changed: NO; build/deploy: NOT_RUN; deployment gate: BLOCKED. Writer socket safety remains unresolved and was not retested or modified.
+- Next checkpoint: separately authorize the remaining isolated Downloader reservation/ENOSPC, ownership/publication and retry-concurrency regressions.
