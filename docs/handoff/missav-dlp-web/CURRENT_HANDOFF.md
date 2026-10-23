@@ -14158,7 +14158,7 @@ The user authorized a conditional Downloader-only release and exactly one new do
 
 **Next action:** obtain a fresh redacted read-only CT108 packet (container/image and Compose identity, mount inventory, task/journal hashes and sanitized counts, current backup/restore proof, Writer socket liveness, Gluetun/Selkies state, NAS target/capacity); reassess release only after every gate is evidenced. Do not restart or trigger the canary from this result.
 
-## DLDWS-001 — DLDWS-001 SSH NAS no-clobber isolated candidate (2026-10-23)
+## DLDWS-001 — SSH NAS no-clobber isolated candidate (2026-10-23)
 
 > TASK_ID: DLDWS-001; STATUS: IN_PROGRESS; CONTRACT_VERSION: 1.0.0; REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety.
 
