@@ -1,47 +1,54 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: NONE
-STATUS: INACTIVE
+TASK_ID: GOV-007
+STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: governance
 
 ## OBJECTIVE
 
-Governance participation in DLDWS-001 is closed after the shared registration was published and confirmed by exact canonical remote readback. No Governance task is currently active.
+Activate a single Governance task to register the independent `stage9-media` workstream and its approved design contract. The proposed Stage9 task ID `STG9-MEDIA-001` is not active and this registration grants no product implementation authority. Close GOV-007 after the separate registration commit is confirmed by exact canonical remote readback.
 
 ## APPROVED_SCOPE
 
-- Record Governance as INACTIVE / NONE in the router and this active-work file after the shared registration readback completed.
-- Preserve the full pre-registration GOV-006, DL-001, and DWS-001 records and restoration identifiers in the committed history archive.
-- Keep the shared DLDWS-001 task active only in Downloader and Discovery Writer Safety, with their matching required-workstream set.
-- Verify final structure, Downloader + Discovery Writer Safety preflight, Stage11 preflight, governance smoke, and `git diff --check` before publishing this separate closure commit.
+- Activate GOV-007 in the Governance router and this active-work file, then verify its Governance preflight.
+- Register `stage9-media` with its own v1.0.0 design contract, an `INACTIVE / NONE` active-work record, and an independent router entry.
+- Record `STG9-MEDIA-001` as a proposed, unapproved task only; keep Stage9 `INACTIVE / NONE` so no implementation task is authorized.
+- Route Stage9 media metadata, NFO/poster, and Jellyfin item-state behavior to `stage9-media`, carving that purpose-specific area out of the general Downloader route without changing Downloader task authorization.
+- Preserve Downloader and Discovery Writer Safety `DLDWS-001`, Stage11 `S11-WX011`, their contracts, active records, and evidence; preserve the common project contract.
+- Run governance-only structural and routing validation, existing task preflights, and `git diff --check`; publish activation, registration, and closure as normal fast-forward commits only after the expected canonical SHA is confirmed.
+- Close GOV-007 and restore Governance to `INACTIVE / NONE` after exact remote readback of the Stage9 registration.
 
 ## PROHIBITED_SCOPE
 
-- Do not change Downloader or Discovery Writer Safety task state, scope, candidate references, or evidence as part of Governance closure.
-- Governance closure does not authorize product-code or test changes, product-specific test execution, Docker builds, service/socket changes, deployments, or operational data access or modification.
-- Do not change Stage11, the preserved DL-001 or DWS-001 candidates, downloads, `.parts`, TS/MP4 files, task state, NAS, Jellyfin, or operational Writer resources.
-- Do not reset, clean, rebase, merge, or force-push. Stop if the remote changes or any required check/readback fails.
+- No Stage9 or other product source edits, product tests, Docker builds, deployment, runtime release changes, services or timers, downloads or recovery.
+- No production database, NAS, Jellyfin, Writer socket, or other operational writes or mutations.
+- Do not change the common project contract, Downloader or Discovery Writer Safety contracts/active-work records, `DLDWS-001` state or evidence, or Stage11 contract/code/`S11-WX011`.
+- Do not modify existing candidate worktrees or Git history; do not reset, clean, rebase, merge, or force-push. Stop on any remote SHA drift or failed required check.
+- This task does not authorize implementation under `STG9-MEDIA-001`; obtain a separate explicit user approval before activating that task or changing product files.
 
 ## ACCEPTANCE_CRITERIA
 
-- Governance router and active record both show `INACTIVE / NONE`, contract version `1.0.0`, and `REQUIRES_WORKSTREAMS: governance`.
-- The exact shared registration commit is read back from the canonical branch with Governance, Downloader, and Discovery Writer Safety all `IN_PROGRESS / DLDWS-001`, version `1.0.0`, and the exact shared `REQUIRES_WORKSTREAMS` value.
-- Downloader and Discovery Writer Safety remain `IN_PROGRESS / DLDWS-001`; Stage11 remains unchanged at `IN_PROGRESS / S11-WX011`.
-- Archived GOV-006, DL-001, DWS-001, and pre-registration router contents remain byte-for-byte verifiable against base `34dede0af5bc205ff11af4275727e11627de680b`.
-- All-workstreams structure, post-closure Downloader + Discovery Writer Safety DLDWS-001 preflight, Stage11 preflight, governance smoke, and `git diff --check` pass.
-- Governance closure is published as a separate normal fast-forward commit and verified by exact-SHA GitHub readback.
+- GOV-007 passes Governance preflight only while Governance is `IN_PROGRESS / GOV-007`; after closure Governance returns to `INACTIVE / NONE`.
+- The Stage9 contract and active-work file are present at the exact registered paths, agree on contract version 1.0.0, and the router independently registers `stage9-media`.
+- Stage9 remains `INACTIVE / NONE`; `STG9-MEDIA-001` is explicitly marked proposed and unapproved, with implementation authorization `NO`.
+- The Downloader route excludes the newly assigned Stage9 Media purpose; Downloader and Discovery Writer Safety remain exactly `IN_PROGRESS / DLDWS-001` with `REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety`; Stage11 remains exactly `IN_PROGRESS / S11-WX011`.
+- All-workstream governance structure, governance smoke, Downloader + Discovery Writer Safety preflight, Stage11 preflight, GOV-007 preflight at the active stage, and `git diff --check` pass. No product-specific tests run.
+- Activation, Stage9 registration, and Governance closure are separate normal fast-forward commits; each push starts from the exact verified remote SHA and each final tree is confirmed by exact canonical SHA readback.
+- No product or operational changes occur.
 
 ## EVIDENCE
 
-- Shared registration commit `6014164c395be31fe4bb30c32062e1a3be08d37f` is based on approved canonical base `34dede0af5bc205ff11af4275727e11627de680b` and was pushed by normal fast-forward.
-- GitHub branch readback reported `teddy-subtitle-stage11` at `6014164c395be31fe4bb30c32062e1a3be08d37f`. Exact-commit reads confirmed the router and all three ACTIVE_WORK files.
-- Governance, Downloader, and Discovery Writer Safety each read back as `IN_PROGRESS / DLDWS-001`, `CONTRACT_VERSION: 1.0.0`, `REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety`.
-- Stage11 ACTIVE_WORK read back with its original blob SHA `39b7440f92c38e406a2aa1b0d266d1cab5ddc848`; it is unchanged.
-- The complete pre-registration GOV-006, DL-001, DWS-001, and router records are archived at `docs/governance/history/DLDWS-001-registration-base-34dede0/`, with their exact base commit and blob SHAs. The existing PASS evidence remains scoped and unresolved safety findings remain open.
-- This registration and closure changed governance documents only. No product code, product tests, Docker build, service, socket, download, or operational data was changed.
+- Existing shared DLDWS-001 registration commit `6014164c395be31fe4bb30c32062e1a3be08d37f` was previously read back from the canonical branch with Governance, Downloader, and Discovery Writer Safety participating.
+- Existing Governance, Downloader, and Discovery Writer Safety records were read back as `IN_PROGRESS / DLDWS-001`, contract version `1.0.0`, with `REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety` at registration.
+- Stage11 active-work blob `39b7440f92c38e406a2aa1b0d266d1cab5ddc848` was preserved in the prior registration, and the complete pre-registration Governance, Downloader, Discovery Writer Safety, and router records remain archived at `docs/governance/history/DLDWS-001-registration-base-34dede0/`.
+- Prior DLDWS-001 registration and closure changed governance documents only; no product code, product tests, Docker build, service, socket, download, or operational data was changed.
+- User explicitly approved Governance activation and Stage9 Media governance registration on 2026-10-25. Canonical base and freshly rechecked `origin/teddy-subtitle-stage11` SHA: `e6e1a12eee6c8adfdb6bf09cdfe15ece34b6d515`. A clean isolated clone was created at `/tmp/downloader-stage9-media-registration-20261025`; the existing dirty worktree was not touched.
+- GOV-007 is the next available Governance task ID: prior active/history records use GOV-001 through GOV-006; no GOV-007 occurrence exists in the canonical base tree or history. `STG9-MEDIA-001` likewise has no prior registration or use in the canonical base.
+- Baseline all-workstreams structural validation passed; governance smoke passed 21/21; DLDWS-001 and S11-WX011 preflights passed. Governance GOV-007 preflight failed as expected while Governance was `INACTIVE / NONE`.
+- This activation phase changes only the Governance router and Governance active-work metadata.
 
 ## NEXT_DECISION
 
-No Governance task is active. The next DLDWS-001 step belongs to Downloader and Discovery Writer Safety after exact remote closure readback; obtain explicit execution authorization before product-code or test edits, product-specific test runs, or Docker candidate verification.
+Complete the approved Stage9 registration and exact remote readback, then close GOV-007. Keep Stage9 inactive until the user separately approves a task for implementation; no product implementation is authorized by this registration.
