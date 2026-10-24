@@ -33,6 +33,7 @@ Activate a single Governance task to register the independent `stage9-media` wor
 - GOV-007 passes Governance preflight only while Governance is `IN_PROGRESS / GOV-007`; after closure Governance returns to `INACTIVE / NONE`.
 - The Stage9 contract and active-work file are present at the exact registered paths, agree on contract version 1.0.0, and the router independently registers `stage9-media`.
 - Stage9 remains `INACTIVE / NONE`; `STG9-MEDIA-001` is explicitly marked proposed and unapproved, with implementation authorization `NO`.
+- The current task-ID validator rejects the proposed two-hyphen `STG9-MEDIA-001` form; this registration does not change validator policy or activate that ID.
 - The Downloader route excludes the newly assigned Stage9 Media purpose; Downloader and Discovery Writer Safety remain exactly `IN_PROGRESS / DLDWS-001` with `REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety`; Stage11 remains exactly `IN_PROGRESS / S11-WX011`.
 - All-workstream governance structure, governance smoke, Downloader + Discovery Writer Safety preflight, Stage11 preflight, GOV-007 preflight at the active stage, and `git diff --check` pass. No product-specific tests run.
 - Activation, Stage9 registration, and Governance closure are separate normal fast-forward commits; each push starts from the exact verified remote SHA and each final tree is confirmed by exact canonical SHA readback.
@@ -48,6 +49,8 @@ Activate a single Governance task to register the independent `stage9-media` wor
 - GOV-007 is the next available Governance task ID: prior active/history records use GOV-001 through GOV-006; no GOV-007 occurrence exists in the canonical base tree or history. `STG9-MEDIA-001` likewise has no prior registration or use in the canonical base.
 - Baseline all-workstreams structural validation passed; governance smoke passed 21/21; DLDWS-001 and S11-WX011 preflights passed. Governance GOV-007 preflight failed as expected while Governance was `INACTIVE / NONE`.
 - This activation phase changes only the Governance router and Governance active-work metadata.
+- GOV-007 activation commit `5aed5316fbef0d6105fd0fd93798e322724522cd` was published by normal fast-forward from the verified base and read back as the exact canonical branch SHA.
+- Registration preflight passed for active GOV-007; Downloader + Discovery Writer Safety DLDWS-001 and Stage11 S11-WX011 preflights still pass. The Stage9 registration commit and final Governance closure remain pending.
 
 ## NEXT_DECISION
 

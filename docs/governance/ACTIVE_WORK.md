@@ -45,7 +45,7 @@ AREA_HINTS:
 - Local storage capacity management.
 - NAS final-file transfer and storage.
 - Non-subtitle download UI and APIs.
-- Non-subtitle Discovery functions except Discovery Writer Unix socket lifecycle and stale-socket safety, which route to `discovery-writer-safety`.
+- Non-subtitle Discovery functions except Stage9 Media metadata/NFO/poster/Jellyfin item-state behavior and Discovery Writer Unix socket lifecycle/stale-socket safety, which route to `stage9-media` and `discovery-writer-safety` respectively.
 - Other general Downloader functions not assigned to another registered workstream.
 - Stage11 subtitle work stays in Stage11 even when its files are at the repository root.
 - If another independent workstream is registered later, its contract governs the work assigned to it.
@@ -62,3 +62,15 @@ AREA_HINTS:
 - Active socket protection, inode reuse, path-replacement races, process-wide socket lifetime serialization, and forced-termination/restart safety.
 - Isolated synthetic tests for the socket lifecycle and its protection boundaries.
 - General Discovery database behavior, download processing, MP4 conversion, NAS storage, and Stage11 subtitles remain outside this workstream.
+
+## WORKSTREAM: stage9-media
+
+STATUS: INACTIVE
+TASK_ID: NONE
+CONTRACT_PATH: docs/governance/stage9-media/PROJECT_CONTRACT.md
+ACTIVE_WORK_PATH: docs/governance/stage9-media/ACTIVE_WORK.md
+AREA_HINTS:
+- Stage9 media metadata and NFO generation, canonical poster handling, deferred poster completion, and publication state.
+- Jellyfin existing-item versus unregistered-item handling and duplicate-notification prevention for Stage9 media.
+- Route by purpose and actual affected resources; general downloads, Discovery Writer socket safety, and Stage11 subtitle work remain in their existing workstreams.
+- No Stage9 task is active; `STG9-MEDIA-001` is only a proposed, unapproved task ID.
