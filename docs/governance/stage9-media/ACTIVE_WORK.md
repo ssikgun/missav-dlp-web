@@ -23,12 +23,13 @@ Implement safe Stage9 media completion for works without a canonical poster: gen
 - Preserve maximum 5 attempts, 3,600-second backoff, 7,200-second stale-running policy, title lock, DB lock, `BEGIN IMMEDIATE`, and restart safety.
 - Use only temporary SQLite databases, temporary directories, and fake SSH/NAS/Jellyfin boundaries for product tests. Run the Stage9-specific smoke tests within this isolated offline scope.
 - Preserve all unknown operational outcomes as UNKNOWN. Keep any implementation candidate local; no product-source push, merge, or deployment is authorized.
+- One-time read-only deployment preflight approved by the user on 2026-10-25: only after this exact authorization record is committed and read back from canonical `teddy-subtitle-stage11`, inspect CT108/CT112 Stage9 release and service/container/runtime metadata, Stage9 DB schema and required aggregate state, identified Stage9 NAS video/NFO/poster path metadata and small-sidecar hashes, and Jellyfin library/item visibility using required GET requests. DB access is limited to a SQLite read-only URI with `PRAGMA query_only=ON` and `SELECT`/`PRAGMA`; NAS access is limited to the identified Stage9 paths; Jellyfin is GET-only. Do not execute a Python runner, job, download, retry, scan, or recovery. This one-time preflight does not authorize deployment, migration, service changes, or any write.
 
 ## PROHIBITED_SCOPE
 
-- No production deployment, release change, service or timer change, Docker build, or operation on CT108/CT112.
-- No production DB access or write, NAS access or write, Jellyfin access or write, actual download, retry, repair, recovery, or user-data mutation.
-- No changes to common or Stage9 contracts, Governance records, Downloader or Discovery Writer Safety `DLDWS-001`, Stage11 `S11-WX011`, or their evidence/artifacts.
+- No production deployment, release change, service or timer change, Docker build, Python runner/job execution, or mutable operation on CT108/CT112. CT108/CT112 read-only access is allowed only for the one-time preflight above and only after canonical commit readback.
+- No production DB mutation; no DB query outside the one-time read-only SQLite/`query_only` scope above. No NAS write or path outside the identified Stage9 sidecar scope. No Jellyfin write; only required GET requests are allowed for the one-time preflight.
+- No changes to common or Stage9 contracts, the common router, other Governance records, Downloader or Discovery Writer Safety `DLDWS-001`, Stage11 `S11-WX011`, or their evidence/artifacts. The only governance change authorized by this approval is this file's one-time preflight exception and its evidence/next-decision update; it does not create a Governance workstream task or authorize a broader policy change.
 - Do not overwrite or replace existing NFO, poster, video, NAS file, or metadata; do not generate a fake/placeholder poster or use a video scene.
 - Do not weaken/delete/bypass a safety assertion to make a test pass; do not use per-title hardcoding or temporary title-specific behavior.
 - Do not push or merge product source changes. Preserve the candidate as a local reviewable commit only.
@@ -55,7 +56,8 @@ Implement safe Stage9 media completion for works without a canonical poster: gen
 - `STG9-MEDIA-001` was the prior unapproved proposal and is retained as historical context only. The current active ID is the validator-compatible `STG9MEDIA-001`.
 - Before activation, all-workstreams structure, Downloader + Discovery Writer Safety `DLDWS-001` preflight, and Stage11 `S11-WX011` preflight passed. Stage9 preflight rejected the task while the route was `INACTIVE / NONE`, as expected.
 - Product implementation and test evidence will be appended here after the exact activation commit is read back from the canonical remote. No implementation or product test starts before that readback.
+- On 2026-10-25 the user separately approved one read-only Stage9 deployment preflight. At authorization-record preparation, `origin/teddy-subtitle-stage11` was rechecked at `08f012f8fcc398d2a31d7c971240fe40aced929a`. This exception is effective only after the approval-record commit is pushed fast-forward and its exact content is read back; no operational access is authorized before then. It does not authorize a product-code change, deployment, operational migration, or write. Append the preflight evidence and remaining risks here after inspection.
 
 ## NEXT_DECISION
 
-After all offline criteria pass, request a separate user approval for any production application. No deployment, operational DB/NAS/Jellyfin access or write, real download, or recovery is authorized by this task.
+After the one-time read-only preflight, append its findings and request separate user approval before any production deployment, DB migration/write, service change, NAS publication, Jellyfin mutation, real download, retry, or recovery.
