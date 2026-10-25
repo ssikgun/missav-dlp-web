@@ -65,12 +65,12 @@ AREA_HINTS:
 
 ## WORKSTREAM: stage9-media
 
-STATUS: INACTIVE
-TASK_ID: NONE
+STATUS: IN_PROGRESS
+TASK_ID: STG9MEDIA-001
 CONTRACT_PATH: docs/governance/stage9-media/PROJECT_CONTRACT.md
 ACTIVE_WORK_PATH: docs/governance/stage9-media/ACTIVE_WORK.md
 AREA_HINTS:
 - Stage9 media metadata and NFO generation, canonical poster handling, deferred poster completion, and publication state.
 - Jellyfin existing-item versus unregistered-item handling and duplicate-notification prevention for Stage9 media.
 - Route by purpose and actual affected resources; general downloads, Discovery Writer socket safety, and Stage11 subtitle work remain in their existing workstreams.
-- No Stage9 task is active; `STG9-MEDIA-001` is only a proposed, unapproved task ID.
+- Active task: `STG9MEDIA-001`. `STG9-MEDIA-001` is a historical unapproved proposal and is not the active task ID.
