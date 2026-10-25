@@ -17,10 +17,10 @@ from teddy_discovery_jellyfin_visibility import (
 from teddy_discovery_media_jobs import MEDIA_SCHEMA
 
 
-ROOT_ID = "virtual-adult"
+ROOT_ID = "11111111111141118111111111111111"
 # Canonical GUID for the separate filesystem-adult Folder.
 FILESYSTEM_ID = "d59216ecad5753389303717a879b33ad"
-FAMILY_ID = "family-folder"
+FAMILY_ID = "22222222222242228222222222222222"
 RELATIVE = "ABC/ABC-123/ABC-123.mp4"
 MEDIA_PATH = "/media/adult/" + RELATIVE
 
@@ -134,7 +134,15 @@ def actual_client_smoke(temp):
     key.write_text("fixture-key", encoding="utf-8")
     calls = []
 
-    def exercise(title_items, *, family_items=None, parent_item=None, parent_response=None, reconcile_root=None):
+    def exercise(
+        title_items,
+        *,
+        family_items=None,
+        parent_item=None,
+        parent_response=None,
+        reconcile_root=None,
+        library_id=ROOT_ID,
+    ):
         parent_item = parent_item if parent_item is not None else {
             "Id": FILESYSTEM_ID, "Type": "Folder", "Path": "/media/adult",
         }
@@ -143,7 +151,7 @@ def actual_client_smoke(temp):
             calls.append((request.get_method(), request.full_url, timeout))
             parsed = urllib.parse.urlsplit(request.full_url)
             if parsed.path == "/Library/VirtualFolders":
-                payload = [{"Name": "Adult", "ItemId": ROOT_ID, "Locations": ["/media/adult"]}]
+                payload = [{"Name": "Adult", "ItemId": library_id, "Locations": ["/media/adult"]}]
             elif parsed.path == "/Items":
                 params = urllib.parse.parse_qs(parsed.query)
                 if "Ids" in params:
@@ -177,17 +185,34 @@ def actual_client_smoke(temp):
             }, client)
         return client.exact_media_visibility(MEDIA_PATH)
 
-    movie = {"Id": "movie-1", "Type": "Movie", "Path": MEDIA_PATH, "ParentId": FAMILY_ID}
+    movie = {
+        "Id": "33333333333343338333333333333333",
+        "Type": "Movie",
+        "Path": MEDIA_PATH,
+        "ParentId": FAMILY_ID,
+    }
     assert exercise([])["status"] == "PENDING"
-    assert exercise([movie]) == {"status": "VISIBLE", "reason": None, "item_id": "movie-1"}
+    assert exercise([movie]) == {
+        "status": "VISIBLE",
+        "reason": None,
+        "item_id": movie["Id"],
+    }
     assert exercise([movie, movie])["reason"] == "DUPLICATE_EXACT_PATH"
     assert exercise([{**movie, "Type": "Video"}])["reason"] == "WRONG_ITEM_TYPE"
     assert exercise([{**movie, "ParentId": "unexpected-parent"}])["reason"] == "AMBIGUOUS_MOVIE_PARENT"
+    assert exercise([{**movie, "Id": "movie-1"}])["reason"] == "INVALID_MOVIE_ITEM_ID"
+    assert exercise([], library_id="not-a-guid")["reason"] == "INVALID_LIBRARY_ITEM_ID"
+    assert exercise([movie], family_items=[{
+        "Id": "family-folder",
+        "Type": "Folder",
+        "Path": "/media/adult/ABC",
+        "ParentId": FILESYSTEM_ID,
+    }])["reason"] == "INVALID_FAMILY_ITEM_ID"
     bad_family = [{"Id": FAMILY_ID, "Type": "Folder", "Path": "/media/adult/ABC", "ParentId": ""}]
     assert exercise([movie], family_items=bad_family)["reason"] == "AMBIGUOUS_FAMILY_PARENT"
     ambiguous = [
-        {"Id": "family-1", "Type": "Folder", "Path": "/media/adult/ABC", "ParentId": FILESYSTEM_ID},
-        {"Id": "family-2", "Type": "Folder", "Path": "/media/adult/ABC", "ParentId": FILESYSTEM_ID},
+        {"Id": "44444444444444448444444444444444", "Type": "Folder", "Path": "/media/adult/ABC", "ParentId": FILESYSTEM_ID},
+        {"Id": "55555555555545558555555555555555", "Type": "Folder", "Path": "/media/adult/ABC", "ParentId": FILESYSTEM_ID},
     ]
     assert exercise([movie], family_items=ambiguous)["reason"] == "AMBIGUOUS_FAMILY_FOLDER"
 

@@ -110,6 +110,7 @@ REMOTE_PUBLISH_SCRIPT = r'''
 import hashlib
 import json
 import os
+import stat
 import struct
 import sys
 import uuid
@@ -163,10 +164,7 @@ if (
         "invalid nfo size"
     )
 
-if (
-    poster_size < 1
-    or poster_size > MAX_POSTER
-):
+if poster_size > MAX_POSTER:
     raise SystemExit(
         "invalid poster size"
     )
@@ -200,10 +198,8 @@ if (
         "nfo payload hash mismatch"
     )
 
-if (
-    hashlib.sha256(
-        poster_data
-    ).hexdigest()
+if poster_size and (
+    hashlib.sha256(poster_data).hexdigest()
     != expected_poster_sha
 ):
     raise SystemExit(
@@ -211,29 +207,66 @@ if (
     )
 
 
-video = os.path.join(
-    root,
-    video_relative,
-)
-
-video_real = os.path.realpath(
-    video
-)
-
-if not inside(
-    video_real,
-    root,
+video_parts = video_relative.split("/")
+if (
+    not video_relative
+    or video_relative.startswith("/")
+    or "\\" in video_relative
+    or any(part in {"", ".", ".."} for part in video_parts)
 ):
     raise SystemExit(
-        "video escapes library root"
+        "invalid video relative path"
     )
 
+video = os.path.join(
+    root,
+    *video_parts,
+)
+video_real = os.path.realpath(video)
+if not inside(video_real, root) or video_real != video:
+    raise SystemExit(
+        "video path is unsafe"
+    )
+
+current = root
+for index, part in enumerate(video_parts):
+    current = os.path.join(current, part)
+    try:
+        component_stat = os.stat(
+            current,
+            follow_symlinks=False,
+        )
+    except OSError as exc:
+        raise SystemExit(
+            "video path component is unavailable"
+        ) from exc
+
+    if stat.S_ISLNK(component_stat.st_mode):
+        raise SystemExit(
+            "video path contains a symlink"
+        )
+
+    is_video = index == len(video_parts) - 1
+    if is_video and not stat.S_ISREG(component_stat.st_mode):
+        raise SystemExit(
+            "video is not a regular file"
+        )
+    if not is_video and not stat.S_ISDIR(component_stat.st_mode):
+        raise SystemExit(
+            "video parent is not a directory"
+        )
+
+video_stat = os.stat(
+    video,
+    follow_symlinks=False,
+)
+
 if (
-    os.path.islink(video)
-    or not os.path.isfile(video)
+    not stat.S_ISREG(video_stat.st_mode)
+    or video_stat.st_uid != os.geteuid()
 ):
     raise SystemExit(
-        "video is not a regular file"
+        "video ownership or file type mismatch"
     )
 
 parent = os.path.dirname(
@@ -262,12 +295,18 @@ def publish_one(
     )
 
     if os.path.lexists(target):
-        if (
-            os.path.islink(target)
-            or not os.path.isfile(target)
-        ):
+        if os.path.islink(target):
             raise RuntimeError(
                 "metadata target is unsafe"
+            )
+
+        target_stat = os.stat(target, follow_symlinks=False)
+        if (
+            not stat.S_ISREG(target_stat.st_mode)
+            or target_stat.st_uid != video_stat.st_uid
+        ):
+            raise RuntimeError(
+                "metadata ownership or file type mismatch"
             )
 
         with open(
@@ -320,14 +359,18 @@ def publish_one(
                 handle.fileno()
             )
 
-        stat = os.stat(
+        partial_stat = os.stat(
             partial,
             follow_symlinks=False,
         )
 
-        if int(stat.st_size) != len(data):
+        if (
+            not stat.S_ISREG(partial_stat.st_mode)
+            or partial_stat.st_uid != video_stat.st_uid
+            or int(partial_stat.st_size) != len(data)
+        ):
             raise RuntimeError(
-                "partial size mismatch"
+                "partial ownership, file type, or size mismatch"
             )
 
         with open(
@@ -354,14 +397,18 @@ def publish_one(
             linked = True
 
         except FileExistsError:
-            if (
-                os.path.islink(target)
-                or not os.path.isfile(
-                    target
-                )
-            ):
+            if os.path.islink(target):
                 raise RuntimeError(
                     "metadata target appeared unsafe"
+                )
+
+            target_stat = os.stat(target, follow_symlinks=False)
+            if (
+                not stat.S_ISREG(target_stat.st_mode)
+                or target_stat.st_uid != video_stat.st_uid
+            ):
+                raise RuntimeError(
+                    "metadata target ownership or file type mismatch"
                 )
 
             with open(
@@ -417,7 +464,8 @@ def publish_one(
             final_data = handle.read()
 
         if (
-            len(final_data) != len(data)
+            os.stat(target, follow_symlinks=False).st_uid != video_stat.st_uid
+            or len(final_data) != len(data)
             or hashlib.sha256(
                 final_data
             ).hexdigest()
@@ -451,17 +499,30 @@ nfo_result = publish_one(
     expected_nfo_sha,
 )
 
-poster_result = publish_one(
-    poster_name,
-    poster_data,
-    expected_poster_sha,
-)
+if poster_size:
+    try:
+        poster_result = publish_one(
+            poster_name,
+            poster_data,
+            expected_poster_sha,
+        )
+        result_status = "METADATA_READY"
+    except Exception as exc:
+        poster_result = {
+            "status": "ATTENTION",
+            "error": str(exc)[:500],
+        }
+        result_status = "METADATA_PARTIAL"
+else:
+    poster_result = {
+        "status": "NOT_ATTEMPTED",
+    }
+    result_status = "NFO_READY"
 
 print(
     json.dumps(
         {
-            "status":
-                "METADATA_READY",
+            "status": result_status,
             "nfo":
                 nfo_result,
             "poster":
@@ -581,20 +642,28 @@ class MediaMetadataSSHMutator:
                 "invalid nfo filename"
             )
 
-        if (
-            bundle.poster.filename
-            not in POSTER_FILENAMES
-        ):
+        if bundle.poster is not None:
+            if bundle.poster.filename not in POSTER_FILENAMES:
+                raise MediaMetadataPublishError(
+                    "invalid poster filename"
+                )
+        elif bundle.poster_status not in {
+            "PENDING",
+            "FAILED",
+            "ATTENTION",
+        }:
             raise MediaMetadataPublishError(
-                "invalid poster filename"
+                "invalid missing poster status"
             )
 
         nfo_data = bytes(
             bundle.nfo_data
         )
 
-        poster_data = bytes(
-            bundle.poster.data
+        poster_data = (
+            bytes(bundle.poster.data)
+            if bundle.poster is not None
+            else b""
         )
 
         if not nfo_data:
@@ -602,7 +671,7 @@ class MediaMetadataSSHMutator:
                 "empty nfo"
             )
 
-        if not poster_data:
+        if bundle.poster is not None and not poster_data:
             raise MediaMetadataPublishError(
                 "empty poster"
             )
@@ -611,9 +680,11 @@ class MediaMetadataSSHMutator:
             nfo_data
         ).hexdigest()
 
-        poster_sha = hashlib.sha256(
-            poster_data
-        ).hexdigest()
+        poster_sha = (
+            hashlib.sha256(poster_data).hexdigest()
+            if poster_data
+            else ""
+        )
 
         payload = (
             struct.pack(
@@ -639,7 +710,7 @@ class MediaMetadataSSHMutator:
                     self.ssh.library_root,
                     video_relative,
                     bundle.nfo_filename,
-                    bundle.poster.filename,
+                    bundle.poster.filename if bundle.poster is not None else "",
                     nfo_sha,
                     poster_sha,
                 )
@@ -680,11 +751,27 @@ class MediaMetadataSSHMutator:
                 "invalid metadata publish response"
             ) from exc
 
-        if value.get(
-            "status"
-        ) != "METADATA_READY":
+        if value.get("status") not in {
+            "METADATA_READY",
+            "METADATA_PARTIAL",
+            "NFO_READY",
+        }:
             raise MediaMetadataPublishError(
                 "metadata publish verification failed"
             )
+
+        if value.get("nfo", {}).get("status") not in {
+            "CREATED",
+            "ALREADY_PRESENT",
+        }:
+            raise MediaMetadataPublishError(
+                "nfo publish verification failed"
+            )
+
+        if bundle.poster is None:
+            value["poster"] = {
+                "status": bundle.poster_status,
+                "error": bundle.poster_error,
+            }
 
         return value

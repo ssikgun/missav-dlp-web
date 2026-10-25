@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from contextvars import ContextVar
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import fcntl
 import sqlite3
@@ -44,6 +45,27 @@ CREATE TABLE IF NOT EXISTS media_jobs (
 
     error TEXT,
 
+    nfo_status TEXT NOT NULL DEFAULT 'UNKNOWN'
+        CHECK (nfo_status IN ('UNKNOWN', 'PENDING', 'COMPLETE', 'ATTENTION')),
+
+    poster_status TEXT NOT NULL DEFAULT 'UNKNOWN'
+        CHECK (poster_status IN ('UNKNOWN', 'PENDING', 'RUNNING', 'FAILED', 'COMPLETE', 'ATTENTION')),
+
+    poster_error TEXT,
+
+    jellyfin_notification_status TEXT NOT NULL DEFAULT 'UNKNOWN'
+        CHECK (jellyfin_notification_status IN ('UNKNOWN', 'ATTEMPTED', 'NOTIFIED', 'VISIBLE', 'ATTENTION')),
+
+    jellyfin_error TEXT,
+
+    jellyfin_recovery_status TEXT NOT NULL DEFAULT 'UNKNOWN'
+        CHECK (jellyfin_recovery_status IN (
+            'UNKNOWN', 'CHECK_PENDING', 'VISIBLE', 'ATTENTION',
+            'MANUAL_ACTION_REQUIRED'
+        )),
+
+    jellyfin_next_check_at TEXT,
+
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -59,6 +81,156 @@ ON media_jobs(
 DEFAULT_MEDIA_MAX_ATTEMPTS = 5
 DEFAULT_MEDIA_RETRY_BACKOFF_SECONDS = 3600
 DEFAULT_MEDIA_RUNNING_STALE_SECONDS = 7200
+
+_MEDIA_JOB_CONTEXT = ContextVar("stage9_media_job_context", default=None)
+
+
+def current_media_job_context():
+    """Return the active retry context for Stage9 pipeline integrations."""
+    return _MEDIA_JOB_CONTEXT.get()
+
+
+def _utc_after(seconds: int, now=None) -> str:
+    base = _now_utc(now) if now is not None else datetime.now(timezone.utc)
+    return (base + timedelta(seconds=int(seconds))).isoformat(
+        timespec="seconds"
+    )
+
+
+@contextmanager
+def _bind_media_job_context(context):
+    token = _MEDIA_JOB_CONTEXT.set(context)
+    try:
+        yield
+    finally:
+        _MEDIA_JOB_CONTEXT.reset(token)
+
+
+def claim_jellyfin_created_notification() -> bool:
+    """Persist an at-most-once Created intent before calling Jellyfin."""
+    context = current_media_job_context()
+    if context is None:
+        return True
+    if context.get("jellyfin_notification_status") != "UNKNOWN":
+        return False
+
+    with _media_transaction(
+        context["db_path"],
+        context["writer_lock_path"],
+    ) as db:
+        cursor = db.execute(
+            """UPDATE media_jobs
+               SET jellyfin_notification_status='ATTEMPTED',
+                   jellyfin_recovery_status='CHECK_PENDING',
+                   jellyfin_next_check_at=?,
+                   jellyfin_error=NULL
+               WHERE media_job_id=?
+                 AND jellyfin_notification_status='UNKNOWN'
+                 AND jellyfin_recovery_status='UNKNOWN'""",
+            (
+                _utc_after(
+                    DEFAULT_MEDIA_RETRY_BACKOFF_SECONDS,
+                    context.get("now"),
+                ),
+                int(context["media_job_id"]),
+            ),
+        )
+    if cursor.rowcount == 1:
+        context["jellyfin_notification_status"] = "ATTEMPTED"
+        context["jellyfin_recovery_status"] = "CHECK_PENDING"
+        return True
+    return False
+
+
+def record_jellyfin_notification_status(
+    status: str,
+    error: str | None = None,
+) -> None:
+    context = current_media_job_context()
+    if context is None:
+        return
+    if status not in {"NOTIFIED", "VISIBLE", "ATTENTION"}:
+        raise ValueError("invalid Jellyfin notification state")
+
+    with _media_transaction(
+        context["db_path"],
+        context["writer_lock_path"],
+    ) as db:
+        recovery_status = "CHECK_PENDING" if status == "NOTIFIED" else status
+        next_check = (
+            _utc_after(
+                DEFAULT_MEDIA_RETRY_BACKOFF_SECONDS,
+                context.get("now"),
+            )
+            if status == "NOTIFIED"
+            else None
+        )
+        cursor = db.execute(
+            """UPDATE media_jobs
+               SET jellyfin_notification_status=?, jellyfin_error=?,
+                   jellyfin_recovery_status=?, jellyfin_next_check_at=?
+               WHERE media_job_id=?""",
+            (
+                status,
+                str(error or "")[:500] or None,
+                recovery_status,
+                next_check,
+                int(context["media_job_id"]),
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("Jellyfin recovery state changed concurrently")
+    context["jellyfin_notification_status"] = status
+    context["jellyfin_recovery_status"] = recovery_status
+    context["jellyfin_next_check_at"] = next_check
+
+
+def record_jellyfin_visibility_pending(error: str | None = None) -> str:
+    """Schedule a bounded exact-visibility recheck; never resend Created."""
+    context = current_media_job_context()
+    if context is None:
+        return "CHECK_PENDING"
+    attempts = int(context.get("attempt_count", 0))
+    max_attempts = int(context.get("max_attempts", DEFAULT_MEDIA_MAX_ATTEMPTS))
+    recovery_status = (
+        "MANUAL_ACTION_REQUIRED" if attempts >= max_attempts else "CHECK_PENDING"
+    )
+    next_check = (
+        None
+        if recovery_status == "MANUAL_ACTION_REQUIRED"
+        else _utc_after(
+            DEFAULT_MEDIA_RETRY_BACKOFF_SECONDS,
+            context.get("now"),
+        )
+    )
+    detail = str(error or "EXACT_PATH_NOT_VISIBLE")
+    if recovery_status == "MANUAL_ACTION_REQUIRED":
+        detail = "MANUAL_ACTION_REQUIRED: " + detail
+    detail = detail[:500]
+
+    with _media_transaction(
+        context["db_path"],
+        context["writer_lock_path"],
+    ) as db:
+        cursor = db.execute(
+            """UPDATE media_jobs
+               SET jellyfin_recovery_status=?, jellyfin_next_check_at=?,
+                   jellyfin_error=?
+               WHERE media_job_id=?
+                 AND jellyfin_notification_status IN ('ATTEMPTED', 'NOTIFIED')
+                 AND jellyfin_recovery_status IN ('UNKNOWN', 'CHECK_PENDING')""",
+            (
+                recovery_status,
+                next_check,
+                detail,
+                int(context["media_job_id"]),
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("Jellyfin recovery state changed concurrently")
+    context["jellyfin_recovery_status"] = recovery_status
+    context["jellyfin_next_check_at"] = next_check
+    return recovery_status
 
 
 def normalize_media_target_dvd_id(
@@ -119,7 +291,44 @@ def _connect_media(
         MEDIA_SCHEMA
     )
 
+    _migrate_media_artifact_columns(db)
+
     return db
+
+
+def _migrate_media_artifact_columns(db: sqlite3.Connection) -> None:
+    """Additive migration: legacy artifact outcomes remain explicitly unknown."""
+    required = {
+        "nfo_status": "TEXT NOT NULL DEFAULT 'UNKNOWN' CHECK (nfo_status IN ('UNKNOWN', 'PENDING', 'COMPLETE', 'ATTENTION'))",
+        "poster_status": "TEXT NOT NULL DEFAULT 'UNKNOWN' CHECK (poster_status IN ('UNKNOWN', 'PENDING', 'RUNNING', 'FAILED', 'COMPLETE', 'ATTENTION'))",
+        "poster_error": "TEXT",
+        "jellyfin_notification_status": "TEXT NOT NULL DEFAULT 'UNKNOWN' CHECK (jellyfin_notification_status IN ('UNKNOWN', 'ATTEMPTED', 'NOTIFIED', 'VISIBLE', 'ATTENTION'))",
+        "jellyfin_error": "TEXT",
+        "jellyfin_recovery_status": "TEXT NOT NULL DEFAULT 'UNKNOWN' CHECK (jellyfin_recovery_status IN ('UNKNOWN', 'CHECK_PENDING', 'VISIBLE', 'ATTENTION', 'MANUAL_ACTION_REQUIRED'))",
+        "jellyfin_next_check_at": "TEXT",
+    }
+    existing = {
+        str(row[1])
+        for row in db.execute("PRAGMA table_info(media_jobs)")
+    }
+    missing = [name for name in required if name not in existing]
+    db.execute("BEGIN IMMEDIATE")
+    try:
+        for name in missing:
+            db.execute(
+                "ALTER TABLE media_jobs ADD COLUMN "
+                + name
+                + " "
+                + required[name]
+            )
+        db.execute(
+            """CREATE INDEX IF NOT EXISTS idx_media_jobs_poster_retry
+               ON media_jobs(status, nfo_status, poster_status, updated_at)"""
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 @contextmanager
@@ -240,6 +449,9 @@ def reconcile_media_jobs(
                     status,
                     attempt_count,
                     error,
+                    nfo_status,
+                    poster_status,
+                    jellyfin_notification_status,
                     created_at,
                     updated_at
                 )
@@ -248,6 +460,9 @@ def reconcile_media_jobs(
                     'PENDING',
                     0,
                     NULL,
+                    'PENDING',
+                    'PENDING',
+                    'UNKNOWN',
                     ?,
                     ?
                 )
@@ -286,6 +501,13 @@ def list_retryable_media_jobs(
                 status,
                 attempt_count,
                 error,
+                nfo_status,
+                poster_status,
+                poster_error,
+                jellyfin_notification_status,
+                jellyfin_error,
+                jellyfin_recovery_status,
+                jellyfin_next_check_at,
                 created_at,
                 updated_at
             FROM media_jobs
@@ -294,6 +516,12 @@ def list_retryable_media_jobs(
                 'FAILED',
                 'RUNNING'
             )
+               OR (status='COMPLETED'
+                   AND nfo_status='COMPLETE'
+                   AND (poster_status IN ('PENDING', 'FAILED', 'RUNNING')
+                        OR jellyfin_recovery_status='CHECK_PENDING'
+                        OR (jellyfin_recovery_status='UNKNOWN'
+                            AND jellyfin_notification_status IN ('ATTEMPTED', 'NOTIFIED'))))
             ORDER BY media_job_id
             """
         ).fetchall()
@@ -330,6 +558,13 @@ def _get_media_job_for_target(
                 status,
                 attempt_count,
                 error,
+                nfo_status,
+                poster_status,
+                poster_error,
+                jellyfin_notification_status,
+                jellyfin_error,
+                jellyfin_recovery_status,
+                jellyfin_next_check_at,
                 created_at,
                 updated_at
             FROM media_jobs
@@ -354,6 +589,16 @@ def _as_utc(value):
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         return None
     return parsed.astimezone(timezone.utc)
+
+
+def _jellyfin_visibility_due(job, retry_backoff_seconds):
+    raw_due = job.get("jellyfin_next_check_at")
+    if raw_due is not None:
+        return _as_utc(raw_due)
+    updated = _as_utc(job.get("updated_at"))
+    if updated is None:
+        return None
+    return updated + timedelta(seconds=retry_backoff_seconds)
 
 
 def _now_utc(value=None):
@@ -390,22 +635,80 @@ def retry_eligibility(
     ):
         return "HELD_INVALID_STATE"
     status = job.get("status")
+    notification_status = job.get("jellyfin_notification_status", "UNKNOWN")
+    recovery_status = job.get("jellyfin_recovery_status", "UNKNOWN")
+    legacy_notification_pending = (
+        recovery_status == "UNKNOWN"
+        and notification_status in {"ATTEMPTED", "NOTIFIED"}
+    )
+    visibility_check_pending = (
+        recovery_status == "CHECK_PENDING" or legacy_notification_pending
+    )
     if status == "COMPLETED":
-        return "COMPLETED"
+        poster_status = job.get("poster_status", "UNKNOWN")
+        poster_retry_pending = (
+            job.get("nfo_status") == "COMPLETE"
+            and poster_status in {"PENDING", "FAILED", "RUNNING"}
+        )
+        if not poster_retry_pending and not visibility_check_pending:
+            return "COMPLETED"
+        if attempts >= max_attempts:
+            return "EXHAUSTED"
+        if visibility_check_pending:
+            due = _jellyfin_visibility_due(job, retry_backoff_seconds)
+            if due is None and not poster_retry_pending:
+                return "HELD_INVALID_TIMESTAMP"
+            if due is not None and now_utc >= due:
+                return "ELIGIBLE"
+            if not poster_retry_pending:
+                return "HELD_BACKOFF"
+        if poster_status == "PENDING":
+            return "ELIGIBLE"
+        updated = _as_utc(job.get("updated_at"))
+        if updated is None:
+            return "HELD_INVALID_TIMESTAMP"
+        age = (now_utc - updated).total_seconds()
+        if poster_status == "FAILED":
+            return "ELIGIBLE" if age >= retry_backoff_seconds else "HELD_BACKOFF"
+        if poster_status == "RUNNING":
+            return "ELIGIBLE" if age >= running_stale_seconds else "HELD_FRESH_RUNNING"
+        return "HELD_INVALID_STATE"
     if status not in {"PENDING", "FAILED", "RUNNING"}:
         return "HELD_INVALID_STATE"
     if attempts >= max_attempts:
         return "EXHAUSTED"
     if status == "PENDING":
+        if visibility_check_pending:
+            due = _jellyfin_visibility_due(job, retry_backoff_seconds)
+            if due is None:
+                return "HELD_INVALID_TIMESTAMP"
+            if now_utc < due:
+                return "HELD_BACKOFF"
         return "ELIGIBLE"
     updated = _as_utc(job.get("updated_at"))
     if updated is None:
         return "HELD_INVALID_TIMESTAMP"
     age = (now_utc - updated).total_seconds()
     if status == "FAILED":
-        return "ELIGIBLE" if age >= retry_backoff_seconds else "HELD_BACKOFF"
+        if age < retry_backoff_seconds:
+            return "HELD_BACKOFF"
+        if visibility_check_pending:
+            due = _jellyfin_visibility_due(job, retry_backoff_seconds)
+            if due is None:
+                return "HELD_INVALID_TIMESTAMP"
+            if now_utc < due:
+                return "HELD_BACKOFF"
+        return "ELIGIBLE"
     if status == "RUNNING":
-        return "ELIGIBLE" if age >= running_stale_seconds else "HELD_FRESH_RUNNING"
+        if age < running_stale_seconds:
+            return "HELD_FRESH_RUNNING"
+        if visibility_check_pending:
+            due = _jellyfin_visibility_due(job, retry_backoff_seconds)
+            if due is None:
+                return "HELD_INVALID_TIMESTAMP"
+            if now_utc < due:
+                return "HELD_BACKOFF"
+        return "ELIGIBLE"
     return "HELD_INVALID_STATE"
 
 
@@ -425,7 +728,9 @@ def _mark_running_if_unchanged(
     ) as db:
         current = db.execute(
             """
-            SELECT media_job_id, dvd_id, status, attempt_count, updated_at
+            SELECT media_job_id, dvd_id, status, attempt_count, updated_at,
+                   nfo_status, poster_status, jellyfin_notification_status,
+                   jellyfin_recovery_status, jellyfin_next_check_at
             FROM media_jobs
             WHERE media_job_id = ?
             """,
@@ -434,7 +739,18 @@ def _mark_running_if_unchanged(
         if current is None:
             return "HELD_CONFLICT"
         current = dict(current)
-        expected = ("media_job_id", "dvd_id", "status", "attempt_count", "updated_at")
+        expected = (
+            "media_job_id",
+            "dvd_id",
+            "status",
+            "attempt_count",
+            "updated_at",
+            "nfo_status",
+            "poster_status",
+            "jellyfin_notification_status",
+            "jellyfin_recovery_status",
+            "jellyfin_next_check_at",
+        )
         if any(current[key] != candidate.get(key) for key in expected):
             return "HELD_CONFLICT"
         eligibility = retry_eligibility(
@@ -447,6 +763,80 @@ def _mark_running_if_unchanged(
         if eligibility != "ELIGIBLE":
             return eligibility
         now_stamp = now.astimezone(timezone.utc).isoformat(timespec="seconds")
+        if (
+            current["status"] == "COMPLETED"
+            and current["nfo_status"] == "COMPLETE"
+            and current["poster_status"] in {"PENDING", "FAILED", "RUNNING"}
+        ):
+            cursor = db.execute(
+                """UPDATE media_jobs
+                   SET poster_status='RUNNING',
+                       attempt_count=attempt_count+1, updated_at=?,
+                       jellyfin_recovery_status=CASE
+                           WHEN jellyfin_recovery_status='UNKNOWN'
+                            AND jellyfin_notification_status IN ('ATTEMPTED','NOTIFIED')
+                           THEN 'CHECK_PENDING'
+                           ELSE jellyfin_recovery_status END,
+                       jellyfin_next_check_at=CASE
+                           WHEN jellyfin_recovery_status='UNKNOWN'
+                            AND jellyfin_notification_status IN ('ATTEMPTED','NOTIFIED')
+                            AND jellyfin_next_check_at IS NULL
+                           THEN ? ELSE jellyfin_next_check_at END
+                   WHERE media_job_id=? AND dvd_id=? AND status='COMPLETED'
+                     AND attempt_count=? AND updated_at=?
+                     AND nfo_status='COMPLETE' AND poster_status=?
+                     AND jellyfin_notification_status=?
+                     AND jellyfin_recovery_status=?
+                     AND jellyfin_next_check_at IS ?""",
+                (
+                    now_stamp,
+                    now_stamp,
+                    int(candidate["media_job_id"]),
+                    candidate["dvd_id"],
+                    int(candidate["attempt_count"]),
+                    candidate["updated_at"],
+                    candidate["poster_status"],
+                    candidate["jellyfin_notification_status"],
+                    candidate["jellyfin_recovery_status"],
+                    candidate["jellyfin_next_check_at"],
+                ),
+            )
+            return "MARKED_RUNNING" if cursor.rowcount == 1 else "HELD_CONFLICT"
+        if current["status"] == "COMPLETED" and current["nfo_status"] == "COMPLETE":
+            cursor = db.execute(
+                """UPDATE media_jobs
+                   SET status='RUNNING', attempt_count=attempt_count+1,
+                       error=NULL, updated_at=?,
+                       jellyfin_recovery_status=CASE
+                           WHEN jellyfin_recovery_status='UNKNOWN'
+                            AND jellyfin_notification_status IN ('ATTEMPTED','NOTIFIED')
+                           THEN 'CHECK_PENDING'
+                           ELSE jellyfin_recovery_status END,
+                       jellyfin_next_check_at=CASE
+                           WHEN jellyfin_recovery_status='UNKNOWN'
+                            AND jellyfin_notification_status IN ('ATTEMPTED','NOTIFIED')
+                            AND jellyfin_next_check_at IS NULL
+                           THEN ? ELSE jellyfin_next_check_at END
+                   WHERE media_job_id=? AND dvd_id=? AND status='COMPLETED'
+                     AND attempt_count=? AND updated_at=?
+                     AND nfo_status='COMPLETE' AND poster_status=?
+                     AND jellyfin_notification_status=?
+                     AND jellyfin_recovery_status=?
+                     AND jellyfin_next_check_at IS ?""",
+                (
+                    now_stamp,
+                    now_stamp,
+                    int(candidate["media_job_id"]),
+                    candidate["dvd_id"],
+                    int(candidate["attempt_count"]),
+                    candidate["updated_at"],
+                    candidate["poster_status"],
+                    candidate["jellyfin_notification_status"],
+                    candidate["jellyfin_recovery_status"],
+                    candidate["jellyfin_next_check_at"],
+                ),
+            )
+            return "MARKED_RUNNING" if cursor.rowcount == 1 else "HELD_CONFLICT"
         cursor = db.execute(
             """
             UPDATE media_jobs
@@ -461,6 +851,11 @@ def _mark_running_if_unchanged(
               AND status = ?
               AND attempt_count = ?
               AND updated_at = ?
+                AND nfo_status = ?
+                AND poster_status = ?
+                AND jellyfin_notification_status = ?
+                AND jellyfin_recovery_status = ?
+                AND jellyfin_next_check_at IS ?
             """,
             (
                 now_stamp,
@@ -469,6 +864,11 @@ def _mark_running_if_unchanged(
                 candidate["status"],
                 int(candidate["attempt_count"]),
                 candidate["updated_at"],
+                candidate["nfo_status"],
+                candidate["poster_status"],
+                candidate["jellyfin_notification_status"],
+                candidate["jellyfin_recovery_status"],
+                candidate["jellyfin_next_check_at"],
             ),
         )
         return "MARKED_RUNNING" if cursor.rowcount == 1 else "HELD_CONFLICT"
@@ -481,7 +881,8 @@ def _finish(
     *,
     status,
     error=None,
-) -> None:
+    result=None,
+) -> str:
     if status not in {
         "COMPLETED",
         "FAILED",
@@ -494,28 +895,95 @@ def _finish(
         media_db_path,
         writer_lock_path,
     ) as db:
+        result = result if isinstance(result, dict) else {}
+        current = db.execute(
+            """SELECT status, nfo_status, poster_status
+               FROM media_jobs WHERE media_job_id=?""",
+            (int(media_job_id),),
+        ).fetchone()
+        if current is None:
+            raise RuntimeError("media job missing")
 
-        cursor = db.execute(
-            """
-            UPDATE media_jobs
-            SET
-                status = ?,
-                error = ?,
-                updated_at = ?
-            WHERE media_job_id = ?
-            """,
-            (
-                status,
-                error,
-                _utc_now(),
-                int(media_job_id),
-            ),
-        )
+        final_status = status
+        if status == "COMPLETED":
+            nfo_status = (result or {}).get("nfo_status")
+            poster_status = (result or {}).get("poster_status")
+            poster_error = (result or {}).get("poster_error")
+            if nfo_status not in {"UNKNOWN", "PENDING", "COMPLETE", "ATTENTION"}:
+                nfo_status = current["nfo_status"]
+            if poster_status not in {
+                "UNKNOWN", "PENDING", "RUNNING", "FAILED", "COMPLETE", "ATTENTION"
+            }:
+                poster_status = current["poster_status"]
+            if poster_status == "COMPLETE":
+                poster_error = None
+            cursor = db.execute(
+                """UPDATE media_jobs
+                   SET status='COMPLETED', error=NULL, nfo_status=?,
+                       poster_status=?, poster_error=?, updated_at=?
+                   WHERE media_job_id=?""",
+                (
+                    nfo_status,
+                    poster_status,
+                    str(poster_error or "")[:500] or None,
+                    _utc_now(),
+                    int(media_job_id),
+                ),
+            )
+        elif (
+            current["status"] == "COMPLETED"
+            and current["nfo_status"] == "COMPLETE"
+            and current["poster_status"] == "RUNNING"
+        ):
+            final_status = "COMPLETED"
+            cursor = db.execute(
+                """UPDATE media_jobs
+                   SET status='COMPLETED', error=NULL, poster_status='FAILED',
+                       poster_error=?, updated_at=? WHERE media_job_id=?""",
+                (
+                    str(error or "poster attempt outcome unknown")[:500],
+                    _utc_now(),
+                    int(media_job_id),
+                ),
+            )
+        else:
+            cursor = db.execute(
+                """UPDATE media_jobs
+                   SET status='FAILED', error=?, updated_at=?
+                   WHERE media_job_id=?""",
+                (
+                    error,
+                    _utc_now(),
+                    int(media_job_id),
+                ),
+            )
 
         if cursor.rowcount != 1:
             raise RuntimeError(
                 "media job missing"
             )
+        return final_status
+
+
+def _mark_jellyfin_manual_action_if_exhausted(
+    media_db_path,
+    writer_lock_path,
+    media_job_id,
+    max_attempts,
+) -> None:
+    """Persist a terminal manual state when bounded recovery is exhausted."""
+    with _media_transaction(media_db_path, writer_lock_path) as db:
+        db.execute(
+            """UPDATE media_jobs
+               SET jellyfin_recovery_status='MANUAL_ACTION_REQUIRED',
+                   jellyfin_next_check_at=NULL,
+                   jellyfin_error='MANUAL_ACTION_REQUIRED: retry limit reached'
+               WHERE media_job_id=? AND attempt_count>=?
+                 AND (jellyfin_recovery_status='CHECK_PENDING'
+                      OR (jellyfin_recovery_status='UNKNOWN'
+                          AND jellyfin_notification_status IN ('ATTEMPTED','NOTIFIED')))""",
+            (int(media_job_id), int(max_attempts)),
+        )
 
 
 def run_retryable_media_jobs(
@@ -612,6 +1080,8 @@ def run_retryable_media_jobs(
         "held_metadata_not_found": 0,
         "held_cover_url_missing": 0,
         "held_cover_url_invalid": 0,
+        "poster_pending": 0,
+        "poster_attention": 0,
         "exhausted": sum(state == "EXHAUSTED" for _, state in states),
         "jobs": [],
     }
@@ -623,6 +1093,13 @@ def run_retryable_media_jobs(
         if result["attempted"] >= int(max_items):
             break
         if initial_state != "ELIGIBLE":
+            if initial_state == "EXHAUSTED":
+                _mark_jellyfin_manual_action_if_exhausted(
+                    db_path,
+                    writer_lock_path,
+                    int(job["media_job_id"]),
+                    max_attempts,
+                )
             if target is not None:
                 result["jobs"].append(
                     {
@@ -653,14 +1130,34 @@ def run_retryable_media_jobs(
             if discovery_db_path is not None:
                 input_state = media_input_eligibility(discovery_db_path, dvd_id)
                 if input_state != "READY":
-                    counters = {
-                        "HELD_METADATA_NOT_FOUND": "held_metadata_not_found",
-                        "HELD_COVER_URL_MISSING": "held_cover_url_missing",
-                        "HELD_COVER_URL_INVALID": "held_cover_url_invalid",
-                    }
-                    result[counters[input_state]] += 1
-                    result["jobs"].append({"dvd_id": dvd_id, "status": input_state})
-                    continue
+                    notification_pending = (
+                        job.get("jellyfin_recovery_status") == "CHECK_PENDING"
+                        or (
+                            job.get("jellyfin_recovery_status", "UNKNOWN") == "UNKNOWN"
+                            and job.get("jellyfin_notification_status") in {"ATTEMPTED", "NOTIFIED"}
+                        )
+                    )
+                    check_due = False
+                    if notification_pending:
+                        due = _jellyfin_visibility_due(job, retry_backoff_seconds)
+                        check_due = due is not None and now_utc >= due
+                    if (
+                        input_state == "HELD_COVER_URL_MISSING"
+                        and (
+                            job.get("nfo_status") != "COMPLETE"
+                            or (notification_pending and check_due)
+                        )
+                    ):
+                        input_state = "READY"
+                    else:
+                        counters = {
+                            "HELD_METADATA_NOT_FOUND": "held_metadata_not_found",
+                            "HELD_COVER_URL_MISSING": "held_cover_url_missing",
+                            "HELD_COVER_URL_INVALID": "held_cover_url_invalid",
+                        }
+                        result[counters[input_state]] += 1
+                        result["jobs"].append({"dvd_id": dvd_id, "status": input_state})
+                        continue
             marked = _mark_running_if_unchanged(
                 db_path,
                 writer_lock_path,
@@ -688,18 +1185,50 @@ def run_retryable_media_jobs(
 
             result["attempted"] += 1
             try:
-                payload = processor(dvd_id)
+                context = {
+                    "db_path": db_path,
+                    "writer_lock_path": writer_lock_path,
+                    "media_job_id": job_id,
+                    "dvd_id": dvd_id,
+                    "jellyfin_notification_status": job.get(
+                        "jellyfin_notification_status", "UNKNOWN"
+                    ),
+                    "jellyfin_recovery_status": (
+                        "CHECK_PENDING"
+                        if job.get("jellyfin_recovery_status", "UNKNOWN") == "UNKNOWN"
+                        and job.get("jellyfin_notification_status") in {"ATTEMPTED", "NOTIFIED"}
+                        else job.get("jellyfin_recovery_status", "UNKNOWN")
+                    ),
+                    "jellyfin_next_check_at": job.get("jellyfin_next_check_at"),
+                    "attempt_count": int(job["attempt_count"]) + 1,
+                    "max_attempts": int(max_attempts),
+                    "now": now_utc,
+                }
+                with _bind_media_job_context(context):
+                    payload = processor(dvd_id)
             except Exception as exc:
                 message = str(exc)[:2000]
-                _finish(
+                final_status = _finish(
                     db_path,
                     writer_lock_path,
                     job_id,
                     status="FAILED",
                     error=message,
                 )
-                result["failed"] += 1
-                result["jobs"].append({"dvd_id": dvd_id, "status": "FAILED"})
+                if final_status == "COMPLETED":
+                    result["completed"] += 1
+                    result["poster_pending"] += 1
+                    result["jobs"].append(
+                        {
+                            "dvd_id": dvd_id,
+                            "status": "COMPLETED",
+                            "poster_status": "FAILED",
+                            "error": message,
+                        }
+                    )
+                else:
+                    result["failed"] += 1
+                    result["jobs"].append({"dvd_id": dvd_id, "status": "FAILED"})
                 continue
 
             _finish(
@@ -707,8 +1236,14 @@ def run_retryable_media_jobs(
                 writer_lock_path,
                 job_id,
                 status="COMPLETED",
+                result=payload,
             )
             result["completed"] += 1
+            if isinstance(payload, dict):
+                if payload.get("poster_status") in {"PENDING", "FAILED"}:
+                    result["poster_pending"] += 1
+                elif payload.get("poster_status") == "ATTENTION":
+                    result["poster_attention"] += 1
             result["jobs"].append(
                 {"dvd_id": dvd_id, "status": "COMPLETED", "result": payload}
             )

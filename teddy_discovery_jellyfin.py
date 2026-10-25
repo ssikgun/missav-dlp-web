@@ -20,6 +20,16 @@ class JellyfinPathError(JellyfinError):
     """A path is outside the canonical Adult media tree."""
 
 
+def _canonical_item_id(value):
+    try:
+        parsed = uuid.UUID(value) if isinstance(value, str) else None
+    except (ValueError, AttributeError):
+        parsed = None
+    if parsed is None or value not in {parsed.hex, str(parsed)}:
+        return None
+    return parsed
+
+
 def validate_adult_media_path(media_path: str) -> PurePosixPath:
     raw = str(media_path or "")
     path = PurePosixPath(raw)
@@ -328,11 +338,8 @@ class JellyfinClient:
 
     def item_by_id(self, item_id: str) -> dict:
         """GET one exact item, accepting only Jellyfin's canonical GUID forms."""
-        try:
-            parsed_id = uuid.UUID(item_id) if isinstance(item_id, str) else None
-        except (ValueError, AttributeError):
-            parsed_id = None
-        if parsed_id is None or item_id not in {parsed_id.hex, str(parsed_id)}:
+        parsed_id = _canonical_item_id(item_id)
+        if parsed_id is None:
             raise JellyfinResponseError("invalid Jellyfin item ID")
         query = urllib.parse.urlencode({
             "Ids": parsed_id.hex,
@@ -371,6 +378,8 @@ class JellyfinClient:
         root_id = str(library.get("ItemId") or "").strip()
         if not root_id:
             raise JellyfinResponseError("Adult library ItemId missing")
+        if _canonical_item_id(root_id) is None:
+            return {"status": "ATTENTION", "reason": "INVALID_LIBRARY_ITEM_ID"}
 
         family_path = path.parents[1].as_posix()
         family_items = self.items_by_parent(root_id, limit=1000)
@@ -382,6 +391,8 @@ class JellyfinClient:
         family = family_matches[0]
         if family.get("Type") != "Folder" or not str(family.get("Id") or "").strip():
             return {"status": "ATTENTION", "reason": "INVALID_FAMILY_FOLDER"}
+        if _canonical_item_id(family.get("Id")) is None:
+            return {"status": "ATTENTION", "reason": "INVALID_FAMILY_ITEM_ID"}
         if not family.get("ParentId"):
             return {"status": "ATTENTION", "reason": "AMBIGUOUS_FAMILY_PARENT"}
         # CollectionFolder queries expose children of a separate filesystem
@@ -404,6 +415,8 @@ class JellyfinClient:
             return {"status": "ATTENTION", "reason": "WRONG_ITEM_TYPE"}
         if not str(item.get("Id") or "").strip():
             return {"status": "ATTENTION", "reason": "MOVIE_ID_MISSING"}
+        if _canonical_item_id(item.get("Id")) is None:
+            return {"status": "ATTENTION", "reason": "INVALID_MOVIE_ITEM_ID"}
         if str(item.get("ParentId") or "") != str(family["Id"]):
             return {"status": "ATTENTION", "reason": "AMBIGUOUS_MOVIE_PARENT"}
         return {"status": "VISIBLE", "reason": None, "item_id": str(item["Id"])}

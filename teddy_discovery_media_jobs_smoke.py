@@ -9,6 +9,9 @@ from teddy_discovery_db import (
 )
 from teddy_discovery_media_jobs import (
     MEDIA_SCHEMA,
+    _media_transaction,
+    _bind_media_job_context,
+    claim_jellyfin_created_notification,
     list_retryable_media_jobs,
     normalize_media_target_dvd_id,
     reconcile_media_jobs,
@@ -89,6 +92,40 @@ def retry_policy_smoke(root):
     assert called == ["XYZ-789"]
     assert read_job(db_path, "ABC-123")["attempt_count"] == 17161
 
+    artifact_old = {
+        "status": "COMPLETED",
+        "nfo_status": "COMPLETE",
+        "poster_status": "FAILED",
+        "attempt_count": 1,
+        "updated_at": backoff,
+    }
+    assert retry_eligibility(artifact_old, now=now) == "ELIGIBLE"
+    artifact_old["updated_at"] = fresh
+    assert retry_eligibility(artifact_old, now=now) == "HELD_BACKOFF"
+    artifact_old["poster_status"] = "RUNNING"
+    artifact_old["updated_at"] = fresh
+    assert retry_eligibility(artifact_old, now=now) == "HELD_FRESH_RUNNING"
+    artifact_old["updated_at"] = stale
+    assert retry_eligibility(artifact_old, now=now) == "ELIGIBLE"
+    artifact_old["attempt_count"] = 5
+    assert retry_eligibility(artifact_old, now=now) == "EXHAUSTED"
+
+    jellyfin_check = {
+        "status": "COMPLETED",
+        "nfo_status": "COMPLETE",
+        "poster_status": "COMPLETE",
+        "attempt_count": 2,
+        "jellyfin_notification_status": "NOTIFIED",
+        "jellyfin_recovery_status": "CHECK_PENDING",
+        "jellyfin_next_check_at": (now + timedelta(seconds=3600)).isoformat(),
+        "updated_at": backoff,
+    }
+    assert retry_eligibility(jellyfin_check, now=now) == "HELD_BACKOFF"
+    jellyfin_check["jellyfin_next_check_at"] = (now - timedelta(seconds=1)).isoformat()
+    assert retry_eligibility(jellyfin_check, now=now) == "ELIGIBLE"
+    jellyfin_check["attempt_count"] = 5
+    assert retry_eligibility(jellyfin_check, now=now) == "EXHAUSTED"
+
 
 def title_lock_smoke(root):
     db_path = root / "locks.sqlite3"
@@ -159,6 +196,161 @@ def title_lock_smoke(root):
     after = try_acquire_title_lock("QWE-456", lock_dir=lock_root)
     assert after.status == ACQUIRED
     after.release()
+
+
+def artifact_retry_and_migration_smoke(root):
+    now = datetime.now(timezone.utc)
+    db_path = root / "artifact-retry.sqlite3"
+    writer = root / "artifact-retry.writer.lock"
+    locks = root / "artifact-retry-locks"
+    locks.mkdir()
+    old = (now - timedelta(seconds=3601)).isoformat()
+    add_job(db_path, "RST-333", "COMPLETED", 1, old)
+    db = sqlite3.connect(db_path)
+    db.execute(
+        """UPDATE media_jobs SET nfo_status='COMPLETE', poster_status='FAILED',
+           poster_error='POSTER_FETCH_FAILED:TimeoutError' WHERE dvd_id='RST-333'"""
+    )
+    db.commit()
+    db.close()
+
+    failed = run_retryable_media_jobs(
+        db_path=db_path,
+        writer_lock_path=writer,
+        title_lock_dir=locks,
+        processor=lambda _dvd_id: (_ for _ in ()).throw(TimeoutError("retry failure")),
+        target_dvd_id="RST-333",
+        now=now,
+    )
+    assert failed["completed"] == 1 and failed["failed"] == 0
+    row = read_job(db_path, "RST-333")
+    assert row["status"] == "COMPLETED"
+    assert row["nfo_status"] == "COMPLETE"
+    assert row["poster_status"] == "FAILED"
+    assert row["attempt_count"] == 2
+
+    held = run_retryable_media_jobs(
+        db_path=db_path,
+        writer_lock_path=writer,
+        title_lock_dir=locks,
+        processor=lambda _dvd_id: {"unexpected": True},
+        target_dvd_id="RST-333",
+        now=now,
+    )
+    assert held["held_backoff"] == 1 and held["attempted"] == 0
+
+    completed = run_retryable_media_jobs(
+        db_path=db_path,
+        writer_lock_path=writer,
+        title_lock_dir=locks,
+        processor=lambda _dvd_id: {
+            "nfo_status": "COMPLETE",
+            "poster_status": "COMPLETE",
+        },
+        target_dvd_id="RST-333",
+        now=datetime.now(timezone.utc) + timedelta(seconds=3601),
+    )
+    assert completed["completed"] == 1
+    row = read_job(db_path, "RST-333")
+    assert row["status"] == "COMPLETED"
+    assert row["nfo_status"] == "COMPLETE"
+    assert row["poster_status"] == "COMPLETE"
+    assert row["attempt_count"] == 3
+
+    notice_db = root / "notice-state.sqlite3"
+    notice_lock = root / "notice-state.lock"
+    add_job(notice_db, "UVW-555", "PENDING", 0, now.isoformat())
+    notice_row = read_job(notice_db, "UVW-555")
+    context = {
+        "db_path": notice_db,
+        "writer_lock_path": notice_lock,
+        "media_job_id": notice_row["media_job_id"],
+        "dvd_id": "UVW-555",
+        "jellyfin_notification_status": "UNKNOWN",
+    }
+    with _bind_media_job_context(context):
+        assert claim_jellyfin_created_notification()
+        assert not claim_jellyfin_created_notification()
+    notice = read_job(notice_db, "UVW-555")
+    assert notice["jellyfin_notification_status"] == "ATTEMPTED"
+    assert notice["jellyfin_recovery_status"] == "CHECK_PENDING"
+    assert notice["jellyfin_next_check_at"] is not None
+
+    # Simulate a pre-change database. Migration adds UNKNOWN state without
+    # changing completed status or the historical retry counter.
+    legacy_db = root / "legacy-media.sqlite3"
+    legacy_lock = root / "legacy-media.lock"
+    connection = sqlite3.connect(legacy_db)
+    connection.executescript(
+        """CREATE TABLE media_jobs (
+               media_job_id INTEGER PRIMARY KEY AUTOINCREMENT,
+               dvd_id TEXT NOT NULL UNIQUE,
+               status TEXT NOT NULL,
+               attempt_count INTEGER NOT NULL DEFAULT 0,
+               error TEXT,
+               created_at TEXT NOT NULL,
+               updated_at TEXT NOT NULL
+           );
+           CREATE INDEX idx_media_jobs_status ON media_jobs(status,media_job_id);"""
+    )
+    connection.execute(
+        """INSERT INTO media_jobs
+           (dvd_id,status,attempt_count,error,created_at,updated_at)
+           VALUES('OLD-777','COMPLETED',4,NULL,?,?)""",
+        (now.isoformat(), now.isoformat()),
+    )
+    for dvd_id, status, attempts, error in (
+        ("OLD-778", "PENDING", 2, "pending-evidence"),
+        ("OLD-779", "FAILED", 3, "failed-evidence"),
+        ("OLD-780", "RUNNING", 1, "running-evidence"),
+    ):
+        connection.execute(
+            """INSERT INTO media_jobs
+               (dvd_id,status,attempt_count,error,created_at,updated_at)
+               VALUES(?,?,?,?,?,?)""",
+            (dvd_id, status, attempts, error, now.isoformat(), now.isoformat()),
+        )
+    connection.commit()
+    connection.close()
+    with _media_transaction(legacy_db, legacy_lock) as migrated:
+        migrated_row = dict(
+            migrated.execute(
+                "SELECT * FROM media_jobs WHERE dvd_id='OLD-777'"
+            ).fetchone()
+        )
+    assert migrated_row["status"] == "COMPLETED"
+    assert migrated_row["attempt_count"] == 4
+    assert migrated_row["nfo_status"] == "UNKNOWN"
+    assert migrated_row["poster_status"] == "UNKNOWN"
+    assert migrated_row["jellyfin_notification_status"] == "UNKNOWN"
+    assert migrated_row["jellyfin_recovery_status"] == "UNKNOWN"
+    assert migrated_row["jellyfin_next_check_at"] is None
+    connection = sqlite3.connect(legacy_db)
+    connection.execute(
+        """INSERT INTO media_jobs
+           (dvd_id,status,attempt_count,error,nfo_status,poster_status,
+            jellyfin_notification_status,created_at,updated_at)
+           VALUES('OLD-781','COMPLETED',2,NULL,'COMPLETE','COMPLETE',
+                  'ATTEMPTED',?,?)""",
+        (now.isoformat(), old),
+    )
+    connection.commit()
+    connection.close()
+    migrated_rows = {row["dvd_id"]: row for row in list_retryable_media_jobs(legacy_db)}
+    assert set(migrated_rows) == {"OLD-778", "OLD-779", "OLD-780", "OLD-781"}
+    for dvd_id, status, attempts, error in (
+        ("OLD-778", "PENDING", 2, "pending-evidence"),
+        ("OLD-779", "FAILED", 3, "failed-evidence"),
+        ("OLD-780", "RUNNING", 1, "running-evidence"),
+    ):
+        migrated = migrated_rows[dvd_id]
+        assert (migrated["status"], migrated["attempt_count"], migrated["error"]) == (
+            status, attempts, error
+        )
+    legacy_notification = migrated_rows["OLD-781"]
+    assert legacy_notification["jellyfin_notification_status"] == "ATTEMPTED"
+    assert legacy_notification["jellyfin_recovery_status"] == "UNKNOWN"
+    assert retry_eligibility(legacy_notification, now=now) == "ELIGIBLE"
 
 
 def conditional_race_smoke(root):
@@ -442,14 +634,29 @@ def current_input_guard_smoke(root):
         before = read_job(media, "HMN-904")
         unrelated = read_job(media, "AAA-111") if other else None
         called = []
+
+        def processor(dvd_id):
+            called.append(dvd_id)
+            if expected == "NFO_ONLY":
+                return {
+                    "nfo_status": "COMPLETE",
+                    "poster_status": "PENDING",
+                    "poster_error": "COVER_URL_MISSING",
+                }
+            return {"ok": True}
+
         result = run_retryable_media_jobs(
             db_path=media, discovery_db_path=discovery, writer_lock_path=writer,
             title_lock_dir=locks, target_dvd_id="HMN-904", max_items=1,
-            processor=lambda dvd_id: called.append(dvd_id) or {"ok": True}, now=now,
+            processor=processor, now=now,
         )
-        assert media_input_eligibility(discovery, "HMN-904") == expected
-        assert result["jobs"][0]["status"] == ("COMPLETED" if expected == "READY" else expected)
-        if expected == "READY":
+        expected_input = (
+            "HELD_COVER_URL_MISSING" if expected == "NFO_ONLY" else expected
+        )
+        assert media_input_eligibility(discovery, "HMN-904") == expected_input
+        runnable = expected in {"READY", "NFO_ONLY"}
+        assert result["jobs"][0]["status"] == ("COMPLETED" if runnable else expected)
+        if runnable:
             assert result["attempted"] == 1 and called == ["HMN-904"]
             assert read_job(media, "HMN-904")["attempt_count"] == attempts + 1
         else:
@@ -466,7 +673,7 @@ def current_input_guard_smoke(root):
 
     # Old error text is never used for current input decisions.
     discovery, media, writer, locks = run_case(
-        "old-missing-still-missing", "FAILED", None, "HELD_COVER_URL_MISSING",
+        "old-missing-still-missing", "FAILED", None, "NFO_ONLY",
         error="cover_url missing: HMN-904", other=True,
     )
     db = sqlite3.connect(discovery)
@@ -477,28 +684,32 @@ def current_input_guard_smoke(root):
     result = run_retryable_media_jobs(
         db_path=media, discovery_db_path=discovery, writer_lock_path=writer,
         title_lock_dir=locks, target_dvd_id="HMN-904", max_items=1,
-        processor=lambda dvd_id: {"ok": dvd_id}, now=now,
+        processor=lambda dvd_id: {
+            "nfo_status": "COMPLETE",
+            "poster_status": "COMPLETE",
+        }, now=now,
     )
-    assert result["completed"] == 1 and read_job(media, "HMN-904")["attempt_count"] == 2
+    assert result["completed"] == 1 and read_job(media, "HMN-904")["attempt_count"] == 3
     assert read_job(media, "AAA-111")["attempt_count"] == 0
 
     run_case("reset-ready", "FAILED", "https://cover.example/poster.jpg", "READY", error="Connection reset by peer")
-    run_case("reset-missing", "FAILED", None, "HELD_COVER_URL_MISSING", error="Connection reset by peer")
-    run_case("pending-missing", "PENDING", "", "HELD_COVER_URL_MISSING", attempts=0)
+    run_case("reset-missing", "FAILED", None, "NFO_ONLY", error="Connection reset by peer")
+    run_case("pending-missing", "PENDING", "", "NFO_ONLY", attempts=0)
     run_case("pending-ready", "PENDING", "http://cover.example/poster.png", "READY", attempts=0)
     for index, value in enumerate(("ftp://cover.example/a", "https:///a", "https://cover.example:bad/a", "https://cover.example/a b", "https://user:pass@cover.example/a", "https://cover.example/%ZZ")):
         run_case("invalid-" + str(index), "FAILED", value, "HELD_COVER_URL_INVALID", other=True)
     run_case("metadata-missing", "PENDING", "NO_TITLE", "HELD_METADATA_NOT_FOUND", attempts=0, other=True)
 
-    # Normal selection skips an input hold and reaches the next eligible job.
+    # A missing cover does not hold first-time NFO generation.
     discovery, media, writer, locks = setup("normal-selection", "PENDING", None, attempts=0, other=True)
     called = []
     result = run_retryable_media_jobs(
         db_path=media, discovery_db_path=discovery, writer_lock_path=writer,
         title_lock_dir=locks, processor=lambda dvd_id: called.append(dvd_id), max_items=1, now=now,
     )
-    assert result["held_cover_url_missing"] == 1 and result["attempted"] == 1
-    assert called == ["AAA-111"] and read_job(media, "HMN-904")["attempt_count"] == 0
+    assert result["held_cover_url_missing"] == 0 and result["attempted"] == 1
+    assert called == ["HMN-904"] and read_job(media, "HMN-904")["attempt_count"] == 1
+    assert read_job(media, "AAA-111")["attempt_count"] == 0
 
     # The current input is read under the title lock, after retry eligibility.
     import teddy_discovery_media_jobs as media_module
@@ -538,6 +749,27 @@ def current_input_guard_smoke(root):
     finally:
         media_module.media_input_eligibility = real_guard
     assert result["held_backoff"] == 1 and result["attempted"] == 0
+
+    # A completed NFO with no current cover waits without consuming attempts.
+    discovery, media, writer, locks = setup("completed-nfo-missing", "COMPLETED", None)
+    db = sqlite3.connect(media)
+    db.execute(
+        """UPDATE media_jobs SET nfo_status='COMPLETE', poster_status='PENDING'
+           WHERE dvd_id='HMN-904'"""
+    )
+    db.commit()
+    db.close()
+    called = []
+    result = run_retryable_media_jobs(
+        db_path=media, discovery_db_path=discovery, writer_lock_path=writer,
+        title_lock_dir=locks, target_dvd_id="HMN-904",
+        processor=lambda dvd_id: called.append(dvd_id), now=now,
+    )
+    assert result["held_cover_url_missing"] == 1
+    assert result["attempted"] == 0 and called == []
+    assert read_job(media, "HMN-904")["status"] == "COMPLETED"
+    assert read_job(media, "HMN-904")["attempt_count"] == 1
+
     print("CURRENT_INPUT_GUARD_SMOKE=PASS")
 
 
@@ -744,6 +976,7 @@ def main():
 
         retry_policy_smoke(root)
         title_lock_smoke(root)
+        artifact_retry_and_migration_smoke(root)
         conditional_race_smoke(root)
         exact_target_selector_smoke(root)
         current_input_guard_smoke(root)

@@ -43,7 +43,9 @@ class MediaBundle:
     dvd_id: str
     nfo_filename: str
     nfo_data: bytes
-    poster: PosterPayload
+    poster: PosterPayload | None
+    poster_status: str = "PENDING"
+    poster_error: str | None = None
 
 
 def _normalize_dvd_id(value: str) -> str:
@@ -118,6 +120,30 @@ def _extract_original_title(
             return str(value).strip()
 
     return ""
+
+
+def _validate_raw_dvd_id(
+    raw_metadata: str,
+    dvd_id: str,
+) -> None:
+    if not raw_metadata:
+        return
+
+    try:
+        payload = json.loads(raw_metadata)
+    except Exception:
+        return
+
+    if not isinstance(payload, dict):
+        return
+
+    item = payload.get("item")
+    if not isinstance(item, dict):
+        return
+
+    raw_dvd_id = str(item.get("dvd_id") or "").strip()
+    if raw_dvd_id and _normalize_dvd_id(raw_dvd_id) != dvd_id:
+        raise ValueError("metadata dvd_id mismatch")
 
 
 def load_media_metadata(
@@ -238,6 +264,11 @@ def load_media_metadata(
                     or ""
                 )
             )
+        )
+
+        _validate_raw_dvd_id(
+            str(row["raw_metadata"] or ""),
+            dvd_id,
         )
 
         return MediaMetadata(
@@ -665,20 +696,37 @@ def build_media_bundle(
         dvd_id,
     )
 
-    if not metadata.cover_url:
-        raise ValueError(
-            "cover_url missing: "
-            + metadata.dvd_id
-        )
-
     nfo = build_nfo_bytes(
         metadata
     )
 
-    poster = fetch_poster(
-        metadata.cover_url,
-        fetcher=fetcher,
-    )
+    if not metadata.cover_url:
+        return MediaBundle(
+            dvd_id=metadata.dvd_id,
+            nfo_filename=metadata.dvd_id + ".nfo",
+            nfo_data=nfo,
+            poster=None,
+            poster_status="PENDING",
+            poster_error="COVER_URL_MISSING",
+        )
+
+    try:
+        poster = fetch_poster(
+            metadata.cover_url,
+            fetcher=fetcher,
+        )
+    except Exception as exc:
+        return MediaBundle(
+            dvd_id=metadata.dvd_id,
+            nfo_filename=metadata.dvd_id + ".nfo",
+            nfo_data=nfo,
+            poster=None,
+            poster_status="FAILED",
+            poster_error=(
+                "POSTER_FETCH_FAILED:"
+                + type(exc).__name__
+            ),
+        )
 
     return MediaBundle(
         dvd_id=metadata.dvd_id,
@@ -688,4 +736,5 @@ def build_media_bundle(
         ),
         nfo_data=nfo,
         poster=poster,
+        poster_status="COMPLETE",
     )

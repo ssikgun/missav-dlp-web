@@ -623,17 +623,52 @@ def main():
         db.commit()
         db.close()
         missing_cover_fetches = []
-        try:
-            build_media_bundle(
-                db_path,
-                "ABC-123",
-                fetcher=lambda url: missing_cover_fetches.append(url),
-            )
-        except ValueError as exc:
-            assert str(exc) == "cover_url missing: ABC-123"
-        else:
-            raise AssertionError("missing cover URL was accepted")
+        missing_cover = build_media_bundle(
+            db_path,
+            "ABC-123",
+            fetcher=lambda url: missing_cover_fetches.append(url),
+        )
+        assert missing_cover.nfo_data
+        assert missing_cover.poster is None
+        assert missing_cover.poster_status == "PENDING"
+        assert missing_cover.poster_error == "COVER_URL_MISSING"
+        assert missing_cover.nfo_filename == "ABC-123.nfo"
         assert missing_cover_fetches == []
+
+        db = sqlite3.connect(db_path)
+        db.execute(
+            "UPDATE titles SET cover_url = ? WHERE dvd_id = ?",
+            ("https://example.invalid/fails.jpg", "ABC-123"),
+        )
+        db.commit()
+        db.close()
+
+        failed_poster = build_media_bundle(
+            db_path,
+            "ABC-123",
+            fetcher=lambda _url: (_ for _ in ()).throw(TimeoutError()),
+        )
+        assert failed_poster.nfo_data
+        assert failed_poster.poster is None
+        assert failed_poster.poster_status == "FAILED"
+        assert failed_poster.poster_error == "POSTER_FETCH_FAILED:TimeoutError"
+
+        db = sqlite3.connect(db_path)
+        db.execute(
+            "UPDATE titles SET raw_metadata = ? WHERE dvd_id = ?",
+            (
+                json.dumps({"item": {"dvd_id": "OTHER-999", "title": "Original Title"}}),
+                "ABC-123",
+            ),
+        )
+        db.commit()
+        db.close()
+        try:
+            build_media_bundle(db_path, "ABC-123", fetcher=lambda _url: None)
+        except ValueError as exc:
+            assert str(exc) == "metadata dvd_id mismatch"
+        else:
+            raise AssertionError("conflicting source DVD-ID was accepted")
 
     proxy_fetcher_smoke()
 
