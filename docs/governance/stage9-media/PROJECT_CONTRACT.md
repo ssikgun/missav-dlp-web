@@ -11,7 +11,7 @@ This contract approves the Stage9 Media design and safety goals only. It does no
 - Own Stage9 metadata handling and NFO/poster generation and publication state, including cases where the canonical poster is unavailable and later becomes available.
 - Own the Stage9 Jellyfin boundary for distinguishing an existing registered item from an unregistered item and suppressing duplicate registration notifications.
 - Route by purpose and affected resources. General downloads, Discovery Writer Unix socket lifecycle and stale-socket safety, and Stage11 subtitle work remain in their separately registered workstreams.
-- A task that changes a shared area must be registered and authorized in every affected workstream. No Stage9 task is currently active.
+- Shared work must be registered and authorized in every affected workstream under the same task ID. The current Stage9 task ID and status are determined by the common routing registry and this workstream's `ACTIVE_WORK.md`; those records must agree.
 
 ## Approved design goals and safety policies
 
@@ -35,4 +35,4 @@ This contract approves the Stage9 Media design and safety goals only. It does no
 
 ## Workstream state
 
-The Stage9 Media design contract remains APPROVED independently of task state. The router and `docs/governance/stage9-media/ACTIVE_WORK.md` must agree on status and task ID. Until a separately approved active task is created, Stage9 remains `INACTIVE / NONE`; the proposed `STG9-MEDIA-001` is not active and authorizes no product work.
+The Stage9 Media design contract approves only Stage9 design goals and safety policies. The current task ID and status are determined by the common routing registry and `docs/governance/stage9-media/ACTIVE_WORK.md`; those records must agree. `INACTIVE / NONE` means no Stage9 product task is authorized. The current approved task ID is `STG9MEDIA-001`; `STG9-MEDIA-001` remains a historical unapproved proposal. Production deployment, operational database writes, and NAS/Jellyfin writes require separate explicit approval.
