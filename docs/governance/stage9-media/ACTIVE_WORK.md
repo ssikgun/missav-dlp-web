@@ -32,6 +32,8 @@ Implement safe Stage9 media completion for works without a canonical poster: gen
 
 - Separate one-time Stage9 timer-resumption approval granted by the user on 2026-10-25 under `STG9MEDIA-001`: after this exact record is committed and read back, inspect the actual Stage9 timer/service/runner/release and prove the scheduled path can perform Stage9 Media work only; if that gate and all pre-resume checks pass, normally resume only the existing Stage9 timer and observe its first regular scheduled run. Inspect only the minimum Stage9 state needed to verify that run. This approval does not authorize manual runner/service execution or any work outside Stage9 Media.
 
+- Separate Stage9 Media-only automatic-runner implementation and offline verification authorized by the user on 2026-10-25 under the unchanged `STG9MEDIA-001`, based on the latest canonical `teddy-subtitle-stage11` SHA `3013f1a74197803bdfe8d4bc24ffc0c02e6c3cd6`. This scope is effective only after this exact record is committed and read back. Add only `teddy_discovery_media_only_runner.py` and `teddy_discovery_media_only_runner_smoke.py`; minimally extend `teddy_discovery_media_jobs.py`, `teddy_discovery_jellyfin_visibility.py`, or their Stage9 smoke files only where the existing APIs cannot provide bounded registration/seeding or the required tests. Reuse the existing metadata, publication, retry, title-lock, DB-lock, pipeline, Jellyfin and visibility functions. The dedicated path must not call the general Completion Runner `run_once()` or `main()`. Require explicit apply confirmation, default media-attempt cap 1, independently bounded registration, visibility seeding and Jellyfin GET counts, optional exact DVD-ID selection, and fail-closed configuration/schema checks. Keep the candidate in a new isolated worktree and preserve it as a local reviewable commit only; product-source push, merge, activation and deployment are not authorized.
+
 ## PROHIBITED_SCOPE
 
 - No production deployment, release change, service or timer change, Docker build, Python runner/job execution, or mutable operation on CT108/CT112, except the separately approved one-time Stage9 timer resumption expressly limited below and contingent on exact authorization-record readback plus every scope and safety gate passing. CT108/CT112 reads are allowed only within the separately recorded deployment preflight, post-event review, or timer-resumption scope check, and only after the applicable authorization record is committed and read back.
@@ -47,6 +49,8 @@ Implement safe Stage9 media completion for works without a canonical poster: gen
 - Do not modify the original `d6ab573e2007510de87375e7bdd324310c0aa39d` candidate; no implementation candidate may be pushed, merged, activated, or deployed.
 
 - For the separately approved one-time timer-resumption check, if the actual service can execute general downloads, Organizer, new metadata recovery, or other non-Stage9-Media work, fail closed and leave the timer unchanged; do not modify the wrapper, systemd unit, schedule, or enabled state to narrow or bypass it. Do not start the timer before exact approval-record readback. Do not change another service/timer, force-run/terminate a runner, reset counters, reprocess completed jobs, or alter an existing video/NFO/poster. If any safety gate fails after an approved start, stop only the Stage9 timer when safe and report enabled-on-boot implications.
+
+- For the newly authorized dedicated-runner work, do not access or write production DB, backups, NAS or Jellyfin; do not change or install systemd services/timers, change the active wrapper/release, resume the timer, deploy, run real downloads/Organizer/metadata recovery, invoke an operational runner, or execute a live media job. Do not push or merge product source. Do not modify the existing `d6ab573e2007510de87375e7bdd324310c0aa39d` candidate, DLDWS-001, S11-WX011, or any Stage11 dirty worktree.
 
 ## ACCEPTANCE_CRITERIA
 
@@ -126,6 +130,13 @@ Implement safe Stage9 media completion for works without a canonical poster: gen
 - No timer/service/runner was started, stopped, or changed by this task. `FIRST_AUTO_RUN=NOT_OBSERVED`; current timer state is UNKNOWN (the last recorded canary state was inactive and enabled). No operational DB/NAS/Jellyfin reads or writes were performed after authorization readback.
 
 
+### Dedicated Stage9 Media-only runner authorization (2026-10-25)
+
+- The user approved a new Stage9 Media-only execution entrypoint and offline tests only, under existing `STG9MEDIA-001`. Latest canonical base and remote readback before this approval record: `3013f1a74197803bdfe8d4bc24ffc0c02e6c3cd6`.
+- Pre-implementation inspection found both proposed new runner/smoke files absent from canonical. The existing `teddy_discovery_completion_runner.py` combines generic completion planning, media work and metadata recovery; its `run_once()` is expressly out of scope for the new entrypoint. Existing `reconcile_media_jobs()` can insert every missing completed-organizer job in one call. Existing `reconcile_jellyfin_visibility(max_items=...)` bounds GET checks but seeds all completed jobs before that bound. Minimal, backward-compatible limit parameters may therefore be needed in the already-authorized Stage9 jobs and visibility modules.
+- No product implementation may start until this approval record is committed and its exact content is read back from canonical `teddy-subtitle-stage11`.
+
+
 ## NEXT_DECISION
 
-The approved one-time GANA-3223 canary is complete. Timer resumption is blocked: the current CT108 scope could not be freshly read, and the latest recorded wrapper invokes the general completion runner without media-only or exact-target arguments. The next decision is whether to authorize a separate Stage9-Media-only scheduled path; keep the current timer unchanged until that path is reviewed and a fresh live scope check passes.
+The one-time GANA-3223 canary is complete and the timer remains outside this task. After the dedicated-runner approval record is read back, implement and validate the runner only in an isolated local candidate. Any systemd service/timer installation, timer resumption, live job, or production deployment requires a separate user approval.
