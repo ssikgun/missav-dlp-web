@@ -1,8 +1,8 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: GOV-008
-STATUS: IN_PROGRESS
+TASK_ID: NONE
+STATUS: INACTIVE
 CONTRACT_VERSION: 1.0.1
 REQUIRES_WORKSTREAMS: governance
 
@@ -28,13 +28,16 @@ Record the user's approved personal-use, right-sized development and validation 
 
 ## EVIDENCE
 
+- GOV-008 CLOSED after exact remote readback; common project contract updated to v1.0.1 and AGENTS.md updated with personal-use development priorities, minimal validation, and retained essential no-overwrite/fail-closed safeguards.
+- Policy commit: 61d38019e746b4c0e079b302f9a9089ac21e7faa. Canonical branch: teddy-subtitle-stage11.
+- Validation: four updated policy/metadata files exactly read back; existing Stage9, Stage11, Downloader and Writer Safety task routes unchanged; no runtime/product/NAS/DB/service changes.
 - User explicitly approved GOV-008 in chat on 2026-10-27 KST.
 - Activation base 77b3c388c2e31d311321883001c86200d3482e6d on teddy-subtitle-stage11.
 - Product and runtime modifications are outside this approval.
 
 ## NEXT_DECISION
 
-Apply minimal policy edit, verify and close GOV-008, then resume Stage9 separately.
+GOV-008 is CLOSED; Governance is INACTIVE / NONE. Stage9 remains a separate approved task; any future governance policy change needs its own approval.
 
 ## PREVIOUS GOVERNANCE RECORD (PRESERVED)
 
