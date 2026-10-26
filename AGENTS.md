@@ -13,6 +13,15 @@ These shared instructions apply to all work in this repository. Domain-specific 
 
 If a workstream is unregistered, its contract or active-work file is missing, its task ID is not authorized, or selected contracts conflict, stop and report `BLOCKED`. A PAUSED_FOR_GOVERNANCE or INACTIVE workstream blocks work in that workstream only; it does not by itself block an independent workstream with its own approved contract and active task. Unknown or shared scope must not be guessed.
 
+## Personal-use delivery and proportionate validation — GOV-008 (APPROVED)
+
+- Downloader is for one person's actual use, not commercial sale. Prioritize useful functionality, completion, maintainability, and dependable everyday operation over exhaustive test infrastructure or theoretical edge-case defenses.
+- Essential safeguards remain mandatory: protect existing videos, NFOs, posters, other user data and job/DB state from unauthorized deletion or replacement; verify intended target paths and ownership; and stop with an understandable error when an operation is unsafe or uncertain.
+- Prefer reusing working protections and a small, representative test (ideally one bounded end-to-end check). Do not repeatedly expand ACL laboratories, mocked integrations, forensic steps, layered guards, or bespoke test scripts unless a concrete, consequential risk cannot be addressed by a simpler measure.
+- If validation/tooling effort becomes disproportionate to the benefit, pause expansion, briefly explain the remaining risk and a simpler option, and let the user choose the trade-off. Do not turn debugging the test harness into the primary project.
+- Within already approved work, combine related steps and avoid redundant check-ins; retain explicit authorization for new workstreams, changed contracts, production writes, deletion, or deployment.
+- This guides effort and prioritization only. It does not override workstream contracts, weaken no-overwrite/fail-closed requirements, authorize operational mutations, or convert a technical test PASS into a product/production PASS.
+
 ## Shared project rules
 
 - Work only within the selected workstream task(s). Do not add features or change the approved scope.

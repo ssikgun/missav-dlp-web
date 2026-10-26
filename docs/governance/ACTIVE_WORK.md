@@ -1,7 +1,7 @@
 # Workstream routing registry
 
 ROUTER_VERSION: 1.0.0
-COMMON_CONTRACT_VERSION: 1.0.0
+COMMON_CONTRACT_VERSION: 1.0.1
 
 This file routes a request to its workstream contract and active task. It is not one global task. A PAUSED_FOR_GOVERNANCE or INACTIVE workstream does not pause an independent workstream. INACTIVE means no user-approved task is currently active; it does not remove or reject the workstream's approved design contract. Only registered workstreams are authorized; adding another requires user approval and its own contract and active-work file.
 

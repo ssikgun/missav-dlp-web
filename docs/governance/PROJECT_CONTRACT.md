@@ -1,6 +1,6 @@
 # Downloader common project contract
 
-CONTRACT_VERSION: 1.0.0
+CONTRACT_VERSION: 1.0.1
 PROJECT_CONTRACT_STATUS: APPROVED
 APPLIES_TO: all registered workstreams in ssikgun/missav-dlp-web
 
@@ -20,6 +20,15 @@ The repository README describes a browser-based MissAV downloader: a user submit
 - Treat code/test success as evidence for the tested technical property only; assess each workstream's product goals separately.
 - Do not deploy, publish, delete, replace, mutate production data, or write to external systems unless the selected task explicitly authorizes that action.
 - Do not change the common contract or a workstream contract without explicit user approval.
+
+## Personal-use development and right-sized verification — APPROVED (GOV-008, 2026-10-27)
+
+- This is a personal-use Downloader, not a commercial product. Complete practical features and enable dependable everyday use without spending disproportionate effort building defensive infrastructure.
+- Preserve essential safeguards for existing MP4, NFO, poster, other user files and state: target-path and ownership checks, no unauthorized delete/overwrite, and fail-closed handling of material errors or uncertainty.
+- Reuse existing protections; favor a minimal representative check over proliferating synthetic labs, ACL scenarios, mocks, diagnostics, or multiple independent guard layers when they do not materially reduce a concrete risk.
+- If testing or safety-tooling work becomes longer or more complex than the feature it protects, report what is already verified, what remains uncertain, the real consequence, and the least complex safe alternative. Seek the user's choice before materially expanding that effort.
+- Do not request repetitive approvals for steps already authorized within an active task, but preserve required consent for new scope, contract changes, production deployment, file deletion or replacement.
+- This priority rule does not repeal any existing per-workstream protection, authorization gate, source-of-truth policy, or independent quality/safety acceptance criterion; unresolved unsafe operations still stop.
 
 ## Workstream isolation
 
