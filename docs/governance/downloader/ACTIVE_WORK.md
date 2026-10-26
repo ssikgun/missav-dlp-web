@@ -1,12 +1,17 @@
 # Downloader non-subtitle workstream — active work
 
 WORKSTREAM: downloader
-TASK_ID: DLDWS-001
+TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
 
 **Historical metadata normalization (2026-10-23, DLDWS-001):** Only the five unquoted fields above define the live workstream task. Older approvals and execution evidence below remain in this document; their repeated metadata labels are quoted solely so the unchanged governance validator does not mistake historical declarations for live ones. The exact complete pre-normalization file is preserved byte-for-byte at `docs/governance/downloader/history/DLDWS-001_ACTIVE_WORK_before_field_normalization_ac476f4.md` (Git blob `5a4a886596fae7e56ed8a2940a24ce07e6892728`). Future historical entries must quote metadata lines or express them as prose. This changes no task authorization, safety boundary or execution result.
+
+## TEMPORARY JOINT TASK PARTICIPATION — STG9MEDIA-001 (2026-10-26)
+
+This is a temporary shared participation record explicitly approved by the user on 2026-10-26. It does not complete, replace, or rewrite DLDWS-001; its objective, approved scope, progress, candidate references, and all evidence below remain preserved. For this integrated task only, Downloader participates in reviewing and implementing the generic Completion Runner's explicit Stage9 Media opt-out while keeping download processing, Organizer, metadata recovery, locks, and existing reliability behavior unchanged. The task-specific authorization overrides only the prior prohibition on this exact shared runner change and its scoped offline/regression and approved transition work; it does not authorize unrelated Downloader changes. Restore the live ID and required set to DLDWS-001 and `downloader,discovery-writer-safety` at closeout.
+
 
 ## OBJECTIVE
 

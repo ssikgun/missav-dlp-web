@@ -4,7 +4,19 @@ WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: stage9-media
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
+
+
+## TEMPORARY JOINT AUTHORIZATION — STG9MEDIA-001 (2026-10-26)
+
+The user explicitly approved one integrated Stage9 Media automation transition on 2026-10-26 KST. This current authorization supersedes earlier no-push/no-deployment/no-operational-change prohibitions only where they directly conflict with the exact scope below; it does not change any contract or authorize another workstream's unrelated operations.
+
+- Authorized: jointly register Governance, Downloader, Discovery Writer Safety, and Stage9 under `STG9MEDIA-001`; add an explicit `--skip-media` branch to the generic Completion Runner while preserving its downloads, Organizer, metadata recovery, and established locks; promote the four verified dedicated-runner candidate files plus the minimum generic-runner test changes; perform read-only CT108 preflight; and, only after all gates pass, install Stage9-only service/timer automation and verify its first scheduled execution.
+- Stage9-only live scope: use a distinct immutable release, preserve the generic Downloader schedule and behavior, avoid double Stage9 scheduling, retain the existing Stage9 task limits and safety policies, and stop at the first-run verification boundary. Do not broaden to other media items or workstreams.
+- Stage9 design and contract remain v1.0.0 / APPROVED. The four Stage9 candidate files and original candidate commit remain unchanged as source evidence. Product promotion must be a new normal fast-forward commit based on current canonical history.
+- Prohibited: any Stage11 or Writer socket change; altering DLDWS-001 purpose/progress/evidence; unrelated Downloader behavior changes; other-workstream service/timer changes; bulk media processing; unsafe file replacement; retry resets; unapproved downloads, Organizer actions beyond the existing Stage9 registration input, or any operation outside the exact Stage9 Media transition.
+- Activation requires joint preflight, full governance structure and smoke, diff checks, and exact canonical readback. Before live changes, current CT108 identity, services, runner/wrapper, paths, locks, schema, backups, NAS/Jellyfin state, and duplicate scheduling must be verified. If CT108 or any required safety fact cannot be verified, do not perform operational changes; preserve candidates and safely restore the original routes.
+- Closeout restores Governance to `INACTIVE / NONE`, Downloader and Discovery Writer Safety to `DLDWS-001` with `downloader,discovery-writer-safety`, and Stage9 to `STG9MEDIA-001` with `stage9-media`, retaining all evidence.
 
 ## OBJECTIVE
 

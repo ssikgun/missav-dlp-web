@@ -1,47 +1,46 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: NONE
-STATUS: INACTIVE
+TASK_ID: STG9MEDIA-001
+STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
 
 ## OBJECTIVE
 
-The temporary shared Governance + Stage9 task `STG9MEDIA-001` is complete and closed after exact canonical readback. No Governance task is currently active.
+Temporarily coordinate Governance, Downloader, Discovery Writer Safety, and Stage9 under the user-approved STG9MEDIA-001 integrated cutover; perform only the scoped governance activation/closure records and the approved Stage9 Media automation transition.
 
 ## APPROVED_SCOPE
 
-- The closed task corrected exactly two stale task-state descriptions in the Stage9 v1.0.0 contract.
-- Governance was activated jointly with Stage9 under `STG9MEDIA-001` and is now restored to `INACTIVE / NONE`.
-- Stage9 remains `IN_PROGRESS / STG9MEDIA-001` with its original single-workstream requirement and contract-change prohibition restored.
-- The prior GOV-007 completion record is preserved below as historical evidence.
+- Record the user's 2026-10-26 joint authorization and temporary four-workstream route under STG9MEDIA-001.
+- Permit only the specified generic-runner Stage9 Media opt-out, Stage9 dedicated runner promotion, live CT108 preflight, Stage9-only service/timer transition, first scheduled-run verification, and evidence/route restoration described in this task.
+- Preserve Downloader DLDWS-001 and Discovery Writer Safety DLDWS-001 objectives, scopes, progress, candidates, and evidence; do not modify Writer socket implementation.
+- Restore Governance to INACTIVE / NONE, Downloader and Discovery Writer Safety to DLDWS-001 with their original required workstream set, and Stage9 to STG9MEDIA-001 after completion or safe blocked closeout.
+- Preserve the GOV-007 completion record below as historical evidence.
 
 ## PROHIBITED_SCOPE
 
-- This Governance task is closed and grants no further authorization.
-- No product source, candidate, product tests, database migration, operational data access/write, service or timer change, deployment, download, NAS, or Jellyfin operation was authorized or performed.
-- No common contract, validator/CI, other workstream contract/task, or Stage9 design policy was changed.
+- No common or workstream contract, validator, or CI policy changes.
+- No Stage11 changes; no Writer socket implementation changes; no unrelated Downloader redesign or data cleanup.
+- No operation outside the exact joint user-approved Stage9 Media transition. In particular, no other workstream deployment or data/service modification.
+- If the active task cannot be validated jointly or an operational safety gate fails, stop operational changes and restore the original workstream routing without erasing evidence.
 
 ## ACCEPTANCE_CRITERIA
 
-- Canonical router reports Governance `INACTIVE / NONE` and Stage9 `IN_PROGRESS / STG9MEDIA-001`.
-- Governance ACTIVE_WORK requires only `governance`; Stage9 ACTIVE_WORK requires only `stage9-media`.
-- The two approved Stage9 contract status descriptions were corrected; version remains 1.0.0 and status remains APPROVED.
-- All-workstreams structure, Stage9 and protected-workstream preflights, governance smoke, and `git diff --check` pass; Governance inactive preflight is rejected as expected.
-- The closure commit is published by normal fast-forward and exactly read back.
+- The four selected workstreams have one matching task ID, `STG9MEDIA-001`, and each declares the full set `governance,downloader,discovery-writer-safety,stage9-media`.
+- Joint preflight and structural/smoke checks pass before product or operational work.
+- DLDWS-001 and S11-WX011 records and protected worktrees remain unchanged.
+- On final closeout, Governance is `INACTIVE / NONE`; Downloader and Discovery Writer Safety are `IN_PROGRESS / DLDWS-001`; Stage9 is `IN_PROGRESS / STG9MEDIA-001`; their original required sets are restored.
+- Any committed stage is normal fast-forwarded and exactly read back; no force push or unverified route transition.
 
 ## EVIDENCE
 
-- User approved the temporary shared Governance + Stage9 correction on 2026-10-25 under the existing task ID `STG9MEDIA-001`; base SHA was `0f1373171a4a384aadc3549d9cd0e12a0e2a6317`.
-- Joint activation commit `9ab50b13b69f1ee30cc31135f60685bbcf43be6b` was published by fast-forward and its three active-work records were exactly read back.
-- Contract correction commit `fd6af7f14a1cf988f574e5c862b026d40057d30d` was published by fast-forward and exactly read back; only the two approved state descriptions changed.
-- GOV-007 completion history is retained below without current authorization.
-- The closure commit containing this record will be verified by exact canonical remote SHA and byte-for-byte readback.
+- User explicitly approved this one integrated transition on 2026-10-26 KST; canonical base SHA `7109e832aa4f38cda01cd1179b441a5a3aa18ab7` was verified on `teddy-subtitle-stage11` before joint activation.
+- Temporary activation is limited to the four workstreams and current task identifier specified above; prior GOV-007 and DLDWS-001 history remains intact.
 
 ## NEXT_DECISION
 
-Governance is inactive. Stage9 remains active under `STG9MEDIA-001`. The previously blocked offline migration rehearsal requires a separate user instruction; this closed Governance correction authorizes no migration or implementation.
+After the integrated task reaches a verified outcome or a safety blocker, restore the original routing and record the exact completed/blocked boundary. This temporary Governance activation authorizes no unrelated governance work.
 
 ## HISTORICAL GOV-007 (CLOSED)
 
