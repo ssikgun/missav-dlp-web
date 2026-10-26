@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-26 — Stage9 integrated automation transition (CT108 preflight blocked)
+
+- Temporary Governance/Downloader/Discovery Writer Safety/Stage9 activation was published and read back at `60acbe8b59db1536bc5644b36c8228829a680a54`. Product promotion `43fa8c034d4c6198507a2e7138829b6f3f6cfc15` adds a generic Completion Runner `--skip-media` opt-out while preserving general download/Organizer/metadata-recovery flow, the dedicated Stage9 Media runner candidate, and focused offline smoke coverage. The original local candidate `9c7df01b88a03f99f873d801447816a1045c8890` was not modified.
+- Offline paired-runner and affected Downloader/Stage9 smoke checks passed. The prior unchanged-candidate 14-test Stage9 evidence was reused rather than repeated.
+- CT108 preflight is blocked: no SSH config or CT108-specific tool was available and `ct108` did not resolve. No CT108 connection or operational command was attempted. Therefore live service/wrapper/release/DB/NAS/Jellyfin state is not verified; no unit/timer was installed or changed, and no first scheduled run occurred.
+- Routing is restored to Governance `INACTIVE / NONE`, Downloader and Discovery Writer Safety `DLDWS-001`, and Stage9 `STG9MEDIA-001`. No Stage11 or Writer-socket changes occurred. The live installation remains pending a supported CT108 access route and complete read-only preflight.
+
 ## 2026-10-23 — NAS access and JAV path continuity (DLDWS-001; read-only facts)
 
 Do not rediscover the NAS access topology from scratch in each chat or infer a new mount. Check the existing, approved methods and classify historical vs current observations:

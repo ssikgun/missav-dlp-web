@@ -1,46 +1,47 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: STG9MEDIA-001
-STATUS: IN_PROGRESS
+TASK_ID: NONE
+STATUS: INACTIVE
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
+REQUIRES_WORKSTREAMS: governance
 
 ## OBJECTIVE
 
-Temporarily coordinate Governance, Downloader, Discovery Writer Safety, and Stage9 under the user-approved STG9MEDIA-001 integrated cutover; perform only the scoped governance activation/closure records and the approved Stage9 Media automation transition.
+The temporary four-workstream STG9MEDIA-001 cutover is closed after Stage9 source promotion and offline validation. The live transition was blocked before any CT108 operation because no sanctioned CT108 access route could be verified. Governance is restored to INACTIVE / NONE.
 
 ## APPROVED_SCOPE
 
-- Record the user's 2026-10-26 joint authorization and temporary four-workstream route under STG9MEDIA-001.
-- Permit only the specified generic-runner Stage9 Media opt-out, Stage9 dedicated runner promotion, live CT108 preflight, Stage9-only service/timer transition, first scheduled-run verification, and evidence/route restoration described in this task.
-- Preserve Downloader DLDWS-001 and Discovery Writer Safety DLDWS-001 objectives, scopes, progress, candidates, and evidence; do not modify Writer socket implementation.
-- Restore Governance to INACTIVE / NONE, Downloader and Discovery Writer Safety to DLDWS-001 with their original required workstream set, and Stage9 to STG9MEDIA-001 after completion or safe blocked closeout.
-- Preserve the GOV-007 completion record below as historical evidence.
+- The user-approved temporary Governance, Downloader, Discovery Writer Safety, and Stage9 activation was used only for the integrated Stage9 Media automation transition.
+- The generic Completion Runner received the explicit Stage9 Media opt-out, and the reviewed Stage9 dedicated runner candidate was promoted in a separate canonical commit; operational installation and first scheduled execution did not occur.
+- Original routing is restored: Governance `INACTIVE / NONE`; Downloader and Discovery Writer Safety `IN_PROGRESS / DLDWS-001`; Stage9 `IN_PROGRESS / STG9MEDIA-001`.
+- The prior GOV-007 completion record is preserved below as historical evidence.
 
 ## PROHIBITED_SCOPE
 
-- No common or workstream contract, validator, or CI policy changes.
-- No Stage11 changes; no Writer socket implementation changes; no unrelated Downloader redesign or data cleanup.
-- No operation outside the exact joint user-approved Stage9 Media transition. In particular, no other workstream deployment or data/service modification.
-- If the active task cannot be validated jointly or an operational safety gate fails, stop operational changes and restore the original workstream routing without erasing evidence.
+- This Governance task is closed and grants no further authorization.
+- No CT108 service/timer, production DB, NAS, Jellyfin, download, or runtime operation was performed. The source promotion does not imply deployment authorization beyond the one-time scope, which is closed at the live-access blocker.
+- No common or workstream contract, validator/CI, Stage11, or Writer socket implementation was changed.
 
 ## ACCEPTANCE_CRITERIA
 
-- The four selected workstreams have one matching task ID, `STG9MEDIA-001`, and each declares the full set `governance,downloader,discovery-writer-safety,stage9-media`.
-- Joint preflight and structural/smoke checks pass before product or operational work.
-- DLDWS-001 and S11-WX011 records and protected worktrees remain unchanged.
-- On final closeout, Governance is `INACTIVE / NONE`; Downloader and Discovery Writer Safety are `IN_PROGRESS / DLDWS-001`; Stage9 is `IN_PROGRESS / STG9MEDIA-001`; their original required sets are restored.
-- Any committed stage is normal fast-forwarded and exactly read back; no force push or unverified route transition.
+- The canonical router and active-work files agree on the restored original workstream IDs, statuses, versions, and required-workstream sets.
+- Joint activation and product promotion commits were published by normal fast-forward and exactly read back.
+- Offline shared-runner checks and governance checks passed; CT108 preflight is explicitly recorded as blocked, not passed.
+- Downloader DLDWS-001 and Discovery Writer Safety DLDWS-001 content/evidence and Stage11 S11-WX011 state remain preserved.
+- Governance remains `INACTIVE / NONE` after closeout.
 
 ## EVIDENCE
 
-- User explicitly approved this one integrated transition on 2026-10-26 KST; canonical base SHA `7109e832aa4f38cda01cd1179b441a5a3aa18ab7` was verified on `teddy-subtitle-stage11` before joint activation.
-- Temporary activation is limited to the four workstreams and current task identifier specified above; prior GOV-007 and DLDWS-001 history remains intact.
+- User approved the one integrated transition on 2026-10-26 KST; canonical base was `7109e832aa4f38cda01cd1179b441a5a3aa18ab7`.
+- Joint activation commit `60acbe8b59db1536bc5644b36c8228829a680a54` and product promotion commit `43fa8c034d4c6198507a2e7138829b6f3f6cfc15` were normal fast-forwards and exactly read back.
+- The generic-runner opt-out smoke, existing Completion Runner and Stage9 dedicated-runner smokes, and affected Completion/Organizer regressions passed; the previous 14 Stage9 smoke evidence was reused where unchanged.
+- CT108 preflight could not establish a supported route: no `~/.ssh/config`, the `ct108` name did not resolve, and no CT108-specific remote tool was available. No CT108 connection or operational command was attempted.
+- No service/timer installation, live runner, DB/NAS/Jellyfin operation, or first scheduled run occurred. Exact command results and the single missing prerequisite are recorded in Stage9 ACTIVE_WORK.
 
 ## NEXT_DECISION
 
-After the integrated task reaches a verified outcome or a safety blocker, restore the original routing and record the exact completed/blocked boundary. This temporary Governance activation authorizes no unrelated governance work.
+Provide a supported CT108 access route or a network-capable authorized execution environment before resuming the live Stage9 installation and first scheduled-run verification. Governance remains inactive; no unrelated governance work is authorized.
 
 ## HISTORICAL GOV-007 (CLOSED)
 
