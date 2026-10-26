@@ -59,27 +59,30 @@ CLOSED at the NAS least-privilege preflight before any operational mutation. The
 
 ## OBJECTIVE
 
-Continue the existing Stage9 Media task while recording that this one-time integrated operations attempt stopped safely at the DSM/NAS identity and trust gate. No service, data, or product change was made.
+Continue the Stage9 Media task with one user-approved, isolated Synology ACL/File Station permission proof test. This is test-only; it does not reopen or authorize the closed production transition.
 
 ## APPROVED_SCOPE
 
-- The integrated operations attempt is closed BLOCKED. This active Stage9 record permits preserving prior approved Stage9 implementation/offline evidence and recording this read-only result only.
-- Preserve canonical Stage9 promotion `43fa8c034d4c6198507a2e7138829b6f3f6cfc15` and prior offline evidence. No product source or transport file changed in this attempt.
-- A new operational attempt requires an explicitly supported, authenticated DSM provisioning path and trusted TLS authority for a non-administrator, path-limited File Station publisher, followed by a new joint activation/readback before any operations.
-- Keep Stage9 contract v1.0.0, historical records, and DLDWS-001/S11-WX011 evidence unchanged.
+- User approved on 2026-10-26 one isolated NAS lab only: create a unique test share/area outside `/volume1/video/video2/JAV`, create synthetic MP4/NFO/poster fixtures, apply candidate ACLs only inside that newly created area, exercise the `stage9_media` File Station identity only against those fixtures, record metadata/hash/ACL evidence, and clean up only task-created lab artifacts.
+- Test cases: synthetic MP4 under a mode-777 parent with file mode 644; synthetic MP4 under a mode-777 parent with file mode 777; and a separate ACL candidate that permits read/new-sidecar creation while denying writes, delete, rename, move, ACL changes, and ownership changes on existing synthetic media/artifacts.
+- This approval is limited to the isolated lab and does not authorize production JAV access for writes, any production ACL/account change, Stage9 product code, services/timers, database, Jellyfin, deployment, or real media processing. Existing operational closure and all prior evidence remain preserved.
+- Current attempt stopped before NAS writes because the available SSH identity cannot perform DSM share administration (`synoshare` is not executable to it; non-interactive `sudo` requires a password). Resume the already-approved lab tests only after a dedicated isolated share is provisioned through DSM's supported administrator UI and its path/ACL boundary is verified.
+- Keep Stage9 contract v1.0.0 and all Downloader, Discovery Writer Safety, Stage11, product candidate, DB, NAS production, and Jellyfin evidence unchanged.
 
 ## PROHIBITED_SCOPE
 
-- The closed joint authorization does not authorize further live access or mutation, account/ACL/credential changes, source publication, deployment, timer/service changes, database access/write, NAS publication, or Jellyfin action.
-- Do not edit DSM SSH policy, `/etc/passwd`, administrators membership, NAS-wide share permissions, or reuse the administrator SSH credential for the Stage9 runtime.
-- Preserve existing video/NFO/poster/database/backup; no completed-job replay, retry reset, bulk work, downloads, Organizer, or metadata-recovery execution.
-- Keep Downloader/MP4 behavior, Writer socket code/service, Stage11, contracts, and validation code unchanged.
+- No test file/folder or ACL change under the production JAV tree or any other existing share/path. No existing production file may be used as a mutation target.
+- No change to any existing account, group, share ACL, DSM SSH policy, `/etc/passwd`, administrator membership, or credentials; do not use the administrator SSH identity as Stage9 runtime authentication.
+- No production DB/backup/NAS/Jellyfin writes, account or service installation, timer/service change, deployment, download, Organizer, metadata recovery, or retry operation.
+- No Stage9 product code, contract, router, Downloader/Writer Safety, Stage11, or validation-code change.
 
 ## ACCEPTANCE_CRITERIA
 
-- The four-way registration was validated and exactly read back, then the integrated attempt stopped before any operational mutation at the NAS authentication/trust gate.
-- Original routes are restored: Governance inactive, Downloader/DWS at DLDWS-001, Stage9 at STG9MEDIA-001; Stage11 remains unchanged.
-- The DSM policy, TLS trust failure, current broad NAS identity/path mode, and absent GANA-3223 directory are recorded as read-only findings; no production safety property is claimed as passed.
+- The lab path is a newly provisioned dedicated share/area, is separate from JAV, has no symlink/mount/path escape, and grants no unrelated service/user access.
+- A/B/C synthetic fixture tests produce recorded before/after file hashes, modes, owners, ACL/inheritance, File Station results, and API/checker consistency; synthetic deletes are limited to the exact fixtures created for this test.
+- Existing-fixture overwrite, MP4 content mutation, delete, rename/move, path escape, and ACL/ownership changes are rejected; any successful forbidden operation is recorded as FAIL.
+- Cleanup removes only the identified lab fixtures and test-only ACL/share, or explicitly reports any residue that could not be safely removed. Production JAV and all non-lab state remain unchanged.
+- No production feasibility or deployment readiness is claimed from a lab result alone.
 
 ## EVIDENCE
 
@@ -90,10 +93,16 @@ Continue the existing Stage9 Media task while recording that this one-time integ
 - Synology's [Terminal help](https://kb.synology.com/en-us/DSM/help/DSM/AdminCenter/system_terminal) documents the administrators-only SSH policy. The official [File Station API guide](https://global.download.synology.com/download/Document/Software/DeveloperGuide/Package/FileStation/All/enu/Synology_File_Station_API_Guide.pdf) documents upload overwrite/skip behavior and create-permission checks; the [ACL management guide](https://kb.synology.com/en-eu/DSM/tutorial/How_to_manage_ACL_settings_on_your_Synology_NAS) documents per-file/folder ACLs. These indicate a possible API-plus-path-ACL design but do not validate an operational principal or TLS trust.
 - `NAS_PUBLISH_BOUNDARY=BLOCKED`: no trusted authenticated DSM provisioning route for a non-admin path-limited account is available from the current authorized credentials. Existing admin SSH identity cannot be used as Stage9 runtime identity. No CT108 account/permission, wrapper, unit/timer, release, backup/DB, NAS file, Jellyfin state, or product source was changed.
 - Closeout restored the original router and workstream metadata and validated/read back the closeout commit. Stage9 contract remains `1.0.0 / APPROVED`; DLDWS-001 and S11-WX011 remain unchanged.
+- User approved one isolated NAS ACL/File Station lab on 2026-10-26 KST; it does not reopen the closed production transition. Canonical base checked: `9c0a9a7424f121a2dc7674f9bc365bac005cdd43`; Stage9 remains `IN_PROGRESS / STG9MEDIA-001`, contract `1.0.0 / APPROVED`.
+- Direct read-only NAS SSH used existing `ssikgun`: `uid=1026`, groups `users,administrators`; DSM `7.2.2-72806 Update 4`. `/usr/syno/sbin/synoshare --enum ALL` was denied (`Permission denied`); `sudo -n -l` reported a password is required. No management action was attempted.
+- FNS-247 parent: directory, mode `777`, owner `admin:users`; MP4 mode `644`, owner `admin:users`, reported by `synoacltool` as Linux mode/no Synology file ACL. GANA-3223 parent: mode `777`, owner `ssikgun:users`; MP4 mode `777`, owner `ssikgun:users`, with inherited Stage9 read-only ACL. `synoacltool -get-perm ... stage9_media` failed on both paths with `failed to initgroup ... gid: 100`; effective ACL is UNKNOWN.
+- Proposed lab path `/volume1/stage9-media-acl-lab-20261026-9c0a9a74` was absent at inspection time; parent resolves to `/volume1`. `findmnt` did not identify a mount record in this shell. No folder, file, ACL, or ownership was created or changed.
+- User-provided previous File Station evidence: `stage9_media` login/list and HTTPS certificate/name validation passed; JAV create check returned 407; API `del:true` conflicted with DSM permission inspection. No authenticated API write or test-file mutation was run in this attempt.
+- Official Synology documentation distinguishes create permission checks from upload overwrite/skip options and lists delete and rename/move as separate APIs. API flags alone are not an OS/ACL boundary; DSM ACL permissions can be set per file/folder, and rename requires create plus delete permission. These facts do not prove current effective rights. `ISOLATED_LAB=BLOCKED` before fixture creation due unavailable DSM share-management privilege. `PRODUCTION_JAV_UNCHANGED=YES`; no NAS/DB/Jellyfin/service/product write occurred.
 
 ## NEXT_DECISION
 
-The integrated operations attempt is closed. Before a new joint operation, provide a supported DSM provisioning path using trusted HTTPS/CA access to create a non-administrator File Station identity and exact-path ACL that can create canonical metadata without overwriting/deleting existing artifacts; then authorize a new joint activation.
+Have a DSM administrator create the empty dedicated test share `stage9-media-acl-lab-20261026-9c0a9a74` on `/volume1` using the supported DSM UI. Limit access to administrators and `ssikgun` for lab administration; do not inherit permissions from the production `video` share or grant unrelated users/services access. Keep `stage9_media` read-only until its per-object lab ACL is explicitly configured. Once the share path and isolation are read-only verified, resume the already-approved synthetic lab; no production transition is authorized.
 
 ## HISTORICAL STAGE9 IMPLEMENTATION OBJECTIVE — PRESERVED
 
