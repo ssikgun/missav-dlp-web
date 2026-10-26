@@ -4,7 +4,7 @@ WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
+REQUIRES_WORKSTREAMS: stage9-media
 
 
 ## TEMPORARY JOINT AUTHORIZATION — STG9MEDIA-001 (2026-10-26)
@@ -59,45 +59,41 @@ CLOSED at the NAS least-privilege preflight before any operational mutation. The
 
 ## OBJECTIVE
 
-Establish a genuinely restricted NAS metadata publication boundary, then safely transition Stage9 Media to its dedicated non-root automation while preserving Downloader behavior and verifying the first natural scheduled run.
+Continue the existing Stage9 Media task while recording that this one-time integrated operations attempt stopped safely at the DSM/NAS identity and trust gate. No service, data, or product change was made.
 
 ## APPROVED_SCOPE
 
-- Temporarily register Governance, Downloader, Discovery Writer Safety, and Stage9 under the identical `STG9MEDIA-001` task and complete shared requirement set; perform required validation and exact remote readback before any operational mutation.
-- Reuse canonical Stage9 source promotion `43fa8c034d4c6198507a2e7138829b6f3f6cfc15`. Make only necessary Stage9-specific transport/source and offline-test changes for a restricted NAS publisher; do not reimplement existing media/Jellyfin behavior.
-- Establish a NAS-side, authenticated, bounded metadata publisher that supports only verified Stage9 video `stat` and canonical NFO/real-poster publication/hash verification. Enforce request/path/name/hash validation, no symlink/path escape, atomic create-only publication, no-overwrite, bounded size/count, and fail-closed conflict handling. Verify both application and operating-system isolation; no arbitrary remote shell/Python command.
-- Verify installed DSM version and documented SSH policy before selecting a NAS mechanism. Do not reuse the administrators-group `ssikgun` key for the Stage9 service. Do not edit DSM `sshd_config`, `/etc/passwd`, administrator membership, or redesign NAS-wide permissions. If supported least privilege cannot be proven without those changes, stop.
-- Create a dedicated CT108 non-login, non-root Stage9 service account with only verified required access; prepare an immutable release, apply the already promoted generic Runner `--skip-media`, and install only the Stage9 service/timer/failure-stop configuration. Keep the ordinary Downloader 60-second schedule and non-media behavior.
-- Create a fresh Stage9 DB backup only if required, verify it and an isolated restore before any live DB change. Do not reinitialize or reset existing work. No migration is expected unless exact live schema evidence shows one is necessary and already authorized.
-- After all preflight gates pass, maintain exactly one Stage9 Media scheduler. Allow at most one eligible normal item per invocation and verify the first natural scheduled run. Never force GANA-3223 or any completed task. Keep actual NFO/poster lifecycle distinct from scheduled-run PASS.
-- Restore original Governance/DLDWS/Stage9 routing after success or a safely documented stop; preserve all existing evidence and Stage11 state.
+- The integrated operations attempt is closed BLOCKED. This active Stage9 record permits preserving prior approved Stage9 implementation/offline evidence and recording this read-only result only.
+- Preserve canonical Stage9 promotion `43fa8c034d4c6198507a2e7138829b6f3f6cfc15` and prior offline evidence. No product source or transport file changed in this attempt.
+- A new operational attempt requires an explicitly supported, authenticated DSM provisioning path and trusted TLS authority for a non-administrator, path-limited File Station publisher, followed by a new joint activation/readback before any operations.
+- Keep Stage9 contract v1.0.0, historical records, and DLDWS-001/S11-WX011 evidence unchanged.
 
 ## PROHIBITED_SCOPE
 
-- NAS-wide share permissions, broad ACL/chown/chmod, DSM SSH policy/account/admin-group edits, administrator credential reuse, generic shell or arbitrary Python execution through SSH, and unverified root/administrator forced-command wrappers.
-- Existing video, NFO, poster, database/backup, or NAS artifact overwrite/delete; completed-job replay; retry reset; bulk processing; downloads or forced Organizer/metadata recovery.
-- Any general Downloader/MP4 policy change, Writer Unix socket code/service change, Stage11 code/data change, unrelated systemd changes, or Stage9 behavior outside the approved design contract.
-- No service/timer/release/account/permission change before joint activation is exactly read back and all relevant preflight and data-preservation gates pass.
-- Stop if installed DSM constraints, OS-level confinement, authenticated publisher identity, exact-path safety, no-overwrite semantics, writer/lock safety, single scheduler ownership, or DB integrity cannot be established. Do not select an insecure fallback.
+- The closed joint authorization does not authorize further live access or mutation, account/ACL/credential changes, source publication, deployment, timer/service changes, database access/write, NAS publication, or Jellyfin action.
+- Do not edit DSM SSH policy, `/etc/passwd`, administrators membership, NAS-wide share permissions, or reuse the administrator SSH credential for the Stage9 runtime.
+- Preserve existing video/NFO/poster/database/backup; no completed-job replay, retry reset, bulk work, downloads, Organizer, or metadata-recovery execution.
+- Keep Downloader/MP4 behavior, Writer socket code/service, Stage11, contracts, and validation code unchanged.
 
 ## ACCEPTANCE_CRITERIA
 
-- Joint activation and closure use the same task ID across all four workstreams and the full required set; both have exact canonical readbacks.
-- NAS publisher cannot run arbitrary commands or access unrelated shares; only verified Stage9 stat and create-only metadata publication are reachable. Existing files remain unaltered on all collisions, errors, and restart cases.
-- Offline tests cover stat, NFO-only, canonical poster, later poster-only, malformed/auth/path/symlink requests, path escape, hash/name/payload validation, collisions, interrupted/duplicate/concurrent requests, and no access to Downloader/Stage11/Jellyfin-write behavior beyond the approved bounded client.
-- CT108 service runs non-root; generic wrapper uses `--skip-media` without losing Downloader work; the dedicated timer has approved bounded limits and exactly one active Stage9 Media scheduler exists.
-- Fresh backup/restore and DB integrity checks pass before any authorized live DB mutation. First natural scheduled run is observed and reports bounded processing, no overwrite, Jellyfin idempotency, and unchanged existing media.
-- If any least-privilege or operational gate fails, no subsequent writes occur; record the block and restore original routing without changing DLDWS-001 or S11-WX011.
+- The four-way registration was validated and exactly read back, then the integrated attempt stopped before any operational mutation at the NAS authentication/trust gate.
+- Original routes are restored: Governance inactive, Downloader/DWS at DLDWS-001, Stage9 at STG9MEDIA-001; Stage11 remains unchanged.
+- The DSM policy, TLS trust failure, current broad NAS identity/path mode, and absent GANA-3223 directory are recorded as read-only findings; no production safety property is claimed as passed.
 
 ## EVIDENCE
 
-- User approved this integrated transition on 2026-10-26 KST. Current canonical base and freshly queried remote SHA: `9c89efe29c5b9af7b5cc70aff305738a9723d2c2`.
-- Existing promoted generic-runner split and dedicated runner commit `43fa8c034d4c6198507a2e7138829b6f3f6cfc15` are already canonical; reuse them. The prior NAS least-privilege stop is historical evidence and must be freshly re-evaluated against the newly approved NAS-boundary work.
-- Stage9 contract remains `1.0.0 / APPROVED`. DLDWS-001 candidates/evidence and S11-WX011 remain protected.
+- User approved this integrated transition on 2026-10-26 KST. Activation base and live remote SHA: `9c89efe29c5b9af7b5cc70aff305738a9723d2c2`; activation commit `ac61cd8df99f98aa7f678f4684b08836d9177e9e` was read back exactly before any operational inspection.
+- Actual CT108: `downloader`, `uid=0(root)`, PID 1 `systemd`. Generic timer inactive/enabled with 60-second triggers; service inactive/static and root; wrapper SHA-256 `e49be466924287f328ea4d482b6a4806f0142cb4b8a71268c25bdb2365552b39`, general completion runner, `--skip-media` absent.
+- Actual NAS DSM version `7.2.2-72806 Update 4`. Official DSM Terminal help says SSH/Telnet login is restricted to local administrators. The existing credential logs in as `ssikgun` in `administrators`; no-password sudo is unavailable. The exact Stage9 library root `/volume1/video/video2/JAV` is mode `777` and its current ACL contains existing `media-readonly` and `ai_agent` read-only principals; no Stage9 publisher principal exists. GANA-3223 directory is absent.
+- An unauthenticated HTTP GET to DSM API Info exposed File Station Info v2, Upload v3, CheckPermission v3, MD5 v2, and CopyMove v3; no credential was sent. HTTPS port 5001 fails system trust with an untrusted issuer. No certificate pin was established over the approved SSH connection because the current SSH identity cannot read the DSM certificate path. No DSM account/ACL mutation was attempted.
+- Synology's [Terminal help](https://kb.synology.com/en-us/DSM/help/DSM/AdminCenter/system_terminal) documents the administrators-only SSH policy. The official [File Station API guide](https://global.download.synology.com/download/Document/Software/DeveloperGuide/Package/FileStation/All/enu/Synology_File_Station_API_Guide.pdf) documents upload overwrite/skip behavior and create-permission checks; the [ACL management guide](https://kb.synology.com/en-eu/DSM/tutorial/How_to_manage_ACL_settings_on_your_Synology_NAS) documents per-file/folder ACLs. These indicate a possible API-plus-path-ACL design but do not validate an operational principal or TLS trust.
+- `NAS_PUBLISH_BOUNDARY=BLOCKED`: no trusted authenticated DSM provisioning route for a non-admin path-limited account is available from the current authorized credentials. Existing admin SSH identity cannot be used as Stage9 runtime identity. No CT108 account/permission, wrapper, unit/timer, release, backup/DB, NAS file, Jellyfin state, or product source was changed.
+- Closeout restored the original router and workstream metadata and validated/read back the closeout commit. Stage9 contract remains `1.0.0 / APPROVED`; DLDWS-001 and S11-WX011 remain unchanged.
 
 ## NEXT_DECISION
 
-If the DSM/NAS cannot provide a verifiable least-privilege publisher boundary, stop before operational changes, restore the original routes, and report the single missing capability needed. Otherwise proceed through the first natural scheduled run and close the joint task.
+The integrated operations attempt is closed. Before a new joint operation, provide a supported DSM provisioning path using trusted HTTPS/CA access to create a non-administrator File Station identity and exact-path ACL that can create canonical metadata without overwriting/deleting existing artifacts; then authorize a new joint activation.
 
 ## HISTORICAL STAGE9 IMPLEMENTATION OBJECTIVE — PRESERVED
 

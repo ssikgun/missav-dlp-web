@@ -1,10 +1,10 @@
 # Downloader non-subtitle workstream — active work
 
 WORKSTREAM: downloader
-TASK_ID: STG9MEDIA-001
+TASK_ID: DLDWS-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
 **Historical metadata normalization (2026-10-23, DLDWS-001):** Only the five unquoted fields above define the live workstream task. Older approvals and execution evidence below remain in this document; their repeated metadata labels are quoted solely so the unchanged governance validator does not mistake historical declarations for live ones. The exact complete pre-normalization file is preserved byte-for-byte at `docs/governance/downloader/history/DLDWS-001_ACTIVE_WORK_before_field_normalization_ac476f4.md` (Git blob `5a4a886596fae7e56ed8a2940a24ce07e6892728`). Future historical entries must quote metadata lines or express them as prose. This changes no task authorization, safety boundary or execution result.
 
@@ -21,44 +21,46 @@ CLOSED on 2026-10-26 at the NAS least-privilege preflight. No wrapper, service, 
 - Prohibited: modify Downloader download/MP4 policy, the DLDWS-001 candidate/evidence, Writer socket implementation, or unrelated service/timer behavior.
 - The single integrated user approval and safety conditions are recorded in Governance ACTIVE_WORK and the Stage9 reactivation record; original DLDWS-001 approval history remains in this file.
 
-## CURRENT SHARED PARTICIPATION — STG9MEDIA-001 (2026-10-26)
+## CLOSED SHARED PARTICIPATION — STG9MEDIA-001 (BLOCKED 2026-10-26)
 
 The user approved a temporary four-workstream Stage9 transition. This routing overlay does not complete, replace, or rewrite DLDWS-001; its objective, candidate, status history, and evidence below remain preserved. Downloader participation is limited to the already promoted `--skip-media` generic-runner boundary and verifying that existing download, MP4, Organizer, and metadata-recovery behavior remains intact.
 
-## OBJECTIVE
+The one-time joint activation was read back, but the transition stopped before any operational mutation because no trusted authenticated DSM provisioning path was available for a restricted non-administrator NAS publisher. The generic wrapper, schedule, downloads, MP4 behavior, Organizer, metadata recovery, and all DLDWS-001 artifacts were unchanged. Original Downloader routing is restored.
+
+## CLOSED STG9MEDIA-001 OBJECTIVE
 
 Preserve the ordinary Downloader path while removing Stage9 Media work from the generic scheduled invocation, and participate only in the shared Stage9 transition boundaries authorized here.
 
-## APPROVED_SCOPE
+## CLOSED STG9MEDIA-001 APPROVED_SCOPE
 
 - Verify and operationally apply the already promoted generic Completion Runner `--skip-media` option in the current wrapper, retaining the existing 60-second schedule and all non-media behavior.
 - Verify the Stage9 dedicated execution path does not call download, MP4, Organizer execution, or metadata-recovery work.
 - Review only the shared Stage9 source/transport boundary and offline checks needed for the dedicated NAS metadata publisher; do not change Downloader download/MP4 logic.
 - Preserve DLDWS-001 objective, progress, candidates, and all evidence. No Writer socket implementation, service, socket, or data changes are part of this participation.
 
-## PROHIBITED_SCOPE
+## CLOSED STG9MEDIA-001 PROHIBITED_SCOPE
 
 - No general download, MP4, retry, queue, storage, Organizer, or metadata-recovery policy change or forced execution.
 - No change to DLDWS-001 candidate/evidence, Writer socket implementation/service, Stage11, or unrelated services/timers.
 - No product source push outside the authorized Stage9 shared promotion, no broad NAS permissions, and no existing media overwrite.
 
-## ACCEPTANCE_CRITERIA
+## CLOSED STG9MEDIA-001 ACCEPTANCE_CRITERIA
 
 - Generic Runner with `--skip-media` makes zero Stage9 calls while preserving prior non-media call order and behavior in offline and live wrapper checks.
 - Exactly one Stage9 Media scheduling owner remains after cutover; ordinary Downloader timer/schedule is retained.
 - Downloader and DLDWS-001 records/candidates/evidence remain intact, with no unrelated operational work run.
 
-## EVIDENCE
+## CLOSED STG9MEDIA-001 EVIDENCE
 
 - User approval received 2026-10-26 KST. Activation base and current remote SHA: `9c89efe29c5b9af7b5cc70aff305738a9723d2c2`.
 - Existing generic-runner opt-out and dedicated-runner promotion `43fa8c034d4c6198507a2e7138829b6f3f6cfc15` are canonical; reuse rather than re-promote.
 - Full operational evidence and any safe-stop finding will be appended without replacing DLDWS-001 evidence.
 
-## NEXT_DECISION
+## CLOSED STG9MEDIA-001 NEXT_DECISION
 
 Continue only within the shared transition while all scope and preservation gates pass; at closure restore the original DLDWS-001 routing and exact required-workstream set.
 
-## DLDWS-001 OBJECTIVE — PRESERVED
+## OBJECTIVE
 
 Coordinate with Discovery Writer Safety to investigate the Writer smoke failure that blocks the DL-001 Docker build candidate, while preserving the existing Downloader implementation candidate, its download/MP4/ENOSPC goals, and all existing evidence.
 
