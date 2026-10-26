@@ -1,38 +1,37 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: STG9MEDIA-001
-STATUS: IN_PROGRESS
+TASK_ID: NONE
+STATUS: INACTIVE
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
+REQUIRES_WORKSTREAMS: governance
 
 ## OBJECTIVE
 
-Coordinate and record the one-time Stage9 Media dedicated-account and automatic-runner cutover approved on 2026-10-26, while preserving the existing Downloader, Discovery Writer Safety, Stage11, and Stage9 contract boundaries.
+The one-time joint Stage9 transition closed at the least-privilege NAS preflight. No service account, permission, wrapper, service, timer, release, or NAS/Jellyfin change was made. Governance is restored to INACTIVE / NONE.
 
 ## APPROVED_SCOPE
 
-- The current Governance work is limited to registering, validating, documenting, and closing the exact four-workstream STG9MEDIA-001 operational transition in the reactivation record below.
-- Preserve the existing DLDWS-001 goal, evidence, and candidate state; do not alter Writer socket implementation or Stage11.
-- Reuse the already promoted Stage9 source and previously passed offline evidence; do not reimplement or re-promote product code.
-- Publish only the five approved governance documents by normal fast-forward and exact readback.
+- The joint authorization was used only to register and validate the exact Stage9 integrated transition, inspect the live CT108 scope, and record the fail-closed result.
+- Preserve the existing DLDWS-001 goal, evidence, and candidate state; no Writer socket implementation or Stage11 change occurred.
+- Reuse the already promoted Stage9 source and prior offline evidence; no product source was changed or re-promoted.
+- Restore the original workstream routes and preserve the complete joint authorization as closed evidence.
 
 ## PROHIBITED_SCOPE
 
-- No common or workstream contract, governance validator/CI, or unrelated governance policy changes.
-- No Stage11 code/data or Writer socket changes; no unrelated Downloader behavior changes.
-- No operation outside the explicit 2026-10-26 Stage9 integrated transition, and no continuation after closeout without new approval.
+- This Governance task is closed and grants no continuing operational authority.
+- No common or workstream contract, governance validator/CI, Stage11 code/data, Writer socket, or unrelated Downloader behavior was changed.
+- No account, permission, wrapper, service, timer, release, production database record, NAS artifact, or Jellyfin state was changed.
 
 ## ACCEPTANCE_CRITERIA
 
-- All four selected workstreams use STG9MEDIA-001, contract version 1.0.0, and the identical four-workstream requirement.
-- Governance structure, joint preflight, existing-workstream protections, smoke checks, and git diff --check pass before publication.
-- Stage9-only automation is installed only after its account, permission, SSH scope, and execution boundaries pass.
-- Final closeout restores the original Governance, Downloader, Discovery Writer Safety, Stage9, and Stage11 routes and is exactly read back.
+- Governance is INACTIVE / NONE; Downloader and Discovery Writer Safety are IN_PROGRESS / DLDWS-001; Stage9 is IN_PROGRESS / STG9MEDIA-001; Stage11 remains IN_PROGRESS / S11-WX011.
+- The NAS least-privilege blocker and SQLite read-only SHM metadata side effect are accurately recorded.
+- Final route and active-work validation passes and the closeout is exactly read back from the canonical branch.
 
 ## EVIDENCE
 
-- ## REACTIVATED JOINT OPERATIONS AUTHORIZATION — STG9MEDIA-001 (2026-10-26)
+- ## CLOSED JOINT OPERATIONS AUTHORIZATION — STG9MEDIA-001 (2026-10-26)
 
 The user explicitly re-authorized the unfinished integrated Stage9 cutover on 2026-10-26 after direct Codex execution-environment verification established access to CT108. This reopens only the exact joint task below; the previous closure remains preserved in the parent commit and is not treated as continuing authority by itself.
 
@@ -60,16 +59,19 @@ The user explicitly re-authorized the unfinished integrated Stage9 cutover on 20
 - User approval received 2026-10-26 KST. Activation base and current remote SHA: 2cc70990460e79eb2e128a1efdcb1846905ae324.
 - The already promoted product change is 43fa8c034d4c6198507a2e7138829b6f3f6cfc15; it will not be reimplemented or re-promoted.
 - Previous joint task closure and its evidence remain in canonical history at parent 2cc70990460e79eb2e128a1efdcb1846905ae324.
-- Direct authorized CT108 identity and systemd reads confirmed downloader, root, PID 1 systemd, Runner SHA-256 e49be466924287f328ea4d482b6a4806f0142cb4b8a71268c25bdb2365552b39, timer inactive/enabled, and existing generic wrapper still lacks --skip-media.
+- Direct authorized CT108 preflight confirmed hostname `downloader`, root operator, PID 1 `systemd`, and the existing Runner SHA-256 `e49be466924287f328ea4d482b6a4806f0142cb4b8a71268c25bdb2365552b39`. The existing generic timer remains inactive/enabled and its wrapper has no `--skip-media`.
+- The cutover stopped before operational writes because the existing NAS SSH identity is `ssikgun` with the `administrators` group and verified writable access to `/volume1/video`, `/volume1/video/video2`, and `/volume1/video/video2/JAV`; the approved minimum-permission condition is not met. No restricted publisher credential was available or created.
+- SQLite was opened with `mode=ro` and `PRAGMA query_only=ON`: integrity was `ok`; 119 jobs were present (109 COMPLETED, 8 FAILED, 2 PENDING, 0 RUNNING), max attempt count 17161, and 109 visibility rows. No DDL/DML was issued. The main DB size/mtime and WAL mtime remained unchanged; SQLite updated the existing SHM file mtime/ctime during the read connection, so SHM metadata side effect is recorded.
+- No service account, ACL, wrapper, service, timer, release, backup, NAS artifact, Jellyfin state, or product source was changed. Activation commit `cff602a261a79f0dce7bc31ed445dd05ded2814f` was read back exactly from the canonical branch before the preflight.
 
-### NEXT_DECISION
+### NEXT_DECISION AT ACTIVATION (SUPERSEDED BY CLOSURE)
 - Keep this joint task active until the first scheduled Stage9 run is verified or a safety gate forces a documented stop; then close it and restore the original routing.
 
-- The prior Governance closure record is retained in the parent commit at 2cc70990460e79eb2e128a1efdcb1846905ae324; historical GOV-007 evidence remains below.
+- The prior Governance closure record is retained in the parent commit at `2cc70990460e79eb2e128a1efdcb1846905ae324`; historical GOV-007 evidence remains below.
 
 ## NEXT_DECISION
 
-Complete the authorized cutover or record the exact fail-closed condition, then restore original routing and publish the closeout evidence.
+Before another operating attempt, provide and explicitly authorize a Stage9 NAS identity whose remote command and write scope are constrained to the metadata publisher and the verified library sidecar paths. Do not reuse the current administrators-group SSH identity for the non-root service.
 
 ## HISTORICAL GOV-007 (CLOSED)
 

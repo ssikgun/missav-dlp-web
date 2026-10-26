@@ -4,7 +4,7 @@ WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
+REQUIRES_WORKSTREAMS: stage9-media
 
 
 ## TEMPORARY JOINT AUTHORIZATION — STG9MEDIA-001 (2026-10-26)
@@ -18,13 +18,15 @@ CLOSED ON 2026-10-26 AT CT108 PREFLIGHT: the user-approved integrated Stage9 Med
 - Activation requires joint preflight, full governance structure and smoke, diff checks, and exact canonical readback. Before live changes, current CT108 identity, services, runner/wrapper, paths, locks, schema, backups, NAS/Jellyfin state, and duplicate scheduling must be verified. If CT108 or any required safety fact cannot be verified, do not perform operational changes; preserve candidates and safely restore the original routes.
 - Closeout restores Governance to `INACTIVE / NONE`, Downloader and Discovery Writer Safety to `DLDWS-001` with `downloader,discovery-writer-safety`, and Stage9 to `STG9MEDIA-001` with `stage9-media`, retaining all evidence.
 
-## REACTIVATED JOINT OPERATIONS AUTHORIZATION — STG9MEDIA-001 (2026-10-26)
+## CLOSED JOINT OPERATIONS AUTHORIZATION — STG9MEDIA-001 (2026-10-26)
 
 The user explicitly re-authorized the previously closed integrated cutover after direct official-permission CT108 verification. This new approval supersedes only the earlier closure for the exact transition below; the previous source promotion, offline evidence, GANA-3223 result, DLDWS-001 evidence, and S11-WX011 remain unchanged.
 
+CLOSED at the NAS least-privilege preflight before any operational mutation. The existing SSH identity is an administrators-group NAS account with broad writable video paths, so it cannot be passed to the dedicated non-root service under the approved minimum-permission boundary. No account, ACL, credential, wrapper, service, timer, release, backup, media DB record, NAS file, or Jellyfin state was changed.
+
 ### APPROVED_SCOPE
 
-- This 2026-10-26 joint Stage9 operations approval is detailed in the reactivated authorization record above and is limited to that exact transition.
+- This closed 2026-10-26 joint Stage9 operations approval was limited to the exact transition documented above.
 - Create a dedicated non-root, non-login service account; grant only necessary access to the Stage9 media state, read-only Discovery input, lock paths, SSH credential, Jellyfin credential, runtime, and journal.
 - Use canonical promoted source 43fa8c034d4c6198507a2e7138829b6f3f6cfc15 and the existing --skip-media opt-out; do not repeat source promotion.
 - Preserve the existing 60-second generic Downloader timer and non-media behavior. Install the Stage9-only oneshot service, hourly randomized timer, and dedicated failure-stop handler with the approved per-run limits.
@@ -52,7 +54,7 @@ The user explicitly re-authorized the previously closed integrated cutover after
 - Official direct CT108 check: hostname downloader, root, PID 1 systemd, Runner SHA-256 e49be466924287f328ea4d482b6a4806f0142cb4b8a71268c25bdb2365552b39; current timer is inactive/enabled and old wrapper lacks --skip-media.
 - Full operational evidence is appended only after its relevant step completes.
 
-### NEXT_DECISION
+### NEXT_DECISION AT AUTHORIZATION (SUPERSEDED BY CLOSURE)
 - Keep the bounded Stage9-only transition active through the first scheduled run; then close the shared routes and preserve the final operational evidence.
 
 ## OBJECTIVE
@@ -212,6 +214,16 @@ Implement safe Stage9 media completion for works without a canonical poster: gen
 - CT108 preflight BLOCKED: no user SSH config was present, `ct108` did not resolve, and no CT108-specific remote tool was available. No CT108 connection or operational command was attempted. Live configuration, release, DB, NAS, Jellyfin, and backup state are NOT_VERIFIED. No service/timer installed or changed; no operational runner, first scheduled run, DB/NAS/Jellyfin operation, or production deployment occurred.
 - Routing closeout restores Governance `INACTIVE / NONE`, Downloader and Discovery Writer Safety `IN_PROGRESS / DLDWS-001` with their original paired requirement, and Stage9 `IN_PROGRESS / STG9MEDIA-001` with `stage9-media`. Stage11 `S11-WX011`, DLDWS-001 candidate/evidence, and the original Stage9 candidate remain unchanged.
 
+### Integrated account/automation transition preflight — CLOSED_BLOCKED (2026-10-26)
+
+- Joint activation commit `cff602a261a79f0dce7bc31ed445dd05ded2814f` was based on and exactly read back after canonical `2cc70990460e79eb2e128a1efdcb1846905ae324`. Governance, Downloader, Discovery Writer Safety, and Stage9 joint preflight passed before access.
+- Direct Codex execution in CT108 confirmed `hostname=downloader`, `uid=0(root)`, PID 1 `systemd`. The active generic timer is `inactive/enabled`, scheduled every 60 seconds; its service runs `/usr/local/sbin/teddy-completion-stage9-runner` as root. Wrapper SHA-256 remains `e49be466924287f328ea4d482b6a4806f0142cb4b8a71268c25bdb2365552b39`, points at old release `a671444bd293fc98a754f7f051acbcbdded4b83a`, and does not pass `--skip-media`.
+- Stage9 DB read-only snapshot (`mode=ro`, `PRAGMA query_only=ON`): journal mode WAL, integrity `ok`, 119 media jobs (109 COMPLETED, 8 FAILED, 2 PENDING, 0 RUNNING), maximum attempt count 17161, 109 visibility rows. The new artifact/Jellyfin fields are already present; no migration was needed or run.
+- Read-only SQLite connection updated the existing DB `-shm` file mtime/ctime. No SQL DDL/DML was issued; the main DB size/mtime and WAL mtime remained unchanged. The SHM metadata effect is disclosed and was not interpreted as a media-row change.
+- NAS identity check using the existing key returned `uid=1026(ssikgun)`, group `users`, supplementary group `administrators`; `/volume1/video`, `/volume1/video/video2`, and `/volume1/video/video2/JAV` are mode `777` and writable by that identity. The promoted publisher invokes an SSH-supplied `python3 -c` command. This credential therefore cannot be delivered to a dedicated service as a path-limited least-privilege credential. `NAS_SSH_SCOPE=BLOCKED`.
+- The non-root account was not created. No ACL/chown/chmod, wrapper change, runner, unit, backup, timer, NAS write, Jellyfin request, or product-source mutation occurred. The old timer remains `inactive/enabled`; no Stage9-only service/timer exists. Existing product promotion `43fa8c034d4c6198507a2e7138829b6f3f6cfc15` remains unchanged.
+- Joint routing was closed and restored: Governance `INACTIVE / NONE`; Downloader and Discovery Writer Safety `IN_PROGRESS / DLDWS-001` with `downloader,discovery-writer-safety`; Stage9 remains `IN_PROGRESS / STG9MEDIA-001` with `stage9-media`; Stage11 remains `IN_PROGRESS / S11-WX011`.
+
 ## NEXT_DECISION
 
-The Stage9 dedicated runner and generic-runner opt-out are promoted and technically validated, but the service/timer is not installed. Resume the live portion only when a supported CT108 access route is available and the exact active service/wrapper, lock, runtime, DB, NAS/Jellyfin, and duplicate-scheduling facts can be verified. Do not treat source promotion or offline PASS as deployment or first-run PASS.
+The Stage9 dedicated runner and generic-runner opt-out are promoted and technically validated, but no dedicated account or service/timer was installed. Resume only after a separately authorized NAS credential/remote command boundary is restricted to Stage9 metadata publication; the current administrators-group identity and mode-777 paths must not be reused. Then repeat the complete live permission and service preflight. Do not treat source promotion or offline PASS as deployment or first-run PASS.
