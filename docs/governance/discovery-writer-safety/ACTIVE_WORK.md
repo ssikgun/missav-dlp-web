@@ -1,16 +1,24 @@
 # Discovery Writer Safety workstream — active work
 
 WORKSTREAM: discovery-writer-safety
-TASK_ID: DLDWS-001
+TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
 
 **Historical metadata normalization (2026-10-23, DLDWS-001):** Only the five unquoted fields above define the live workstream task. Older approvals and execution evidence below remain in this document; their repeated metadata labels are quoted solely so the unchanged governance validator does not mistake historical declarations for live ones. The exact complete pre-normalization file is preserved byte-for-byte at `docs/governance/discovery-writer-safety/history/DLDWS-001_ACTIVE_WORK_before_field_normalization_ac476f4.md` (Git blob `348c0957a5feb0833dfd1467a07cf9f995e373b8`). Future historical entries must quote metadata lines or express them as prose. This changes no task authorization, safety boundary or execution result.
 
 ## TEMPORARY JOINT TASK PARTICIPATION — STG9MEDIA-001 (CLOSED 2026-10-26)
 
 Closed on 2026-10-26 after confirming the integrated Stage9 transition made no Writer socket source, service, socket, or evidence changes. This did not complete or replace DLDWS-001. Its original objective, approved scope, progress, candidate references, and prior evidence remain intact. The live metadata and required workstream set below are restored to `DLDWS-001` / `downloader,discovery-writer-safety`.
+
+## REACTIVATED JOINT PARTICIPATION — STG9MEDIA-001 (2026-10-26)
+
+The user re-authorized limited joint participation to verify that the Stage9 transition leaves Writer Safety untouched. DLDWS-001 remains the original task and all its objective, work, progress, candidate references, and evidence are preserved.
+
+- Allowed: read-only confirmation that the generic and dedicated Stage9 execution paths retain the existing Writer lock and do not change the Writer Unix socket lifecycle.
+- Prohibited: any Writer socket source, service, socket, permission, database, or evidence change; no DLDWS-001 implementation or test change.
+- The joint scope is limited to the one-time Stage9 cutover recorded in Governance ACTIVE_WORK and the Stage9 reactivation record.
 
 ## OBJECTIVE
 

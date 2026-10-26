@@ -1,47 +1,75 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: NONE
-STATUS: INACTIVE
+TASK_ID: STG9MEDIA-001
+STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
 
 ## OBJECTIVE
 
-The temporary four-workstream STG9MEDIA-001 cutover is closed after Stage9 source promotion and offline validation. The live transition was blocked before any CT108 operation because no sanctioned CT108 access route could be verified. Governance is restored to INACTIVE / NONE.
+Coordinate and record the one-time Stage9 Media dedicated-account and automatic-runner cutover approved on 2026-10-26, while preserving the existing Downloader, Discovery Writer Safety, Stage11, and Stage9 contract boundaries.
 
 ## APPROVED_SCOPE
 
-- The user-approved temporary Governance, Downloader, Discovery Writer Safety, and Stage9 activation was used only for the integrated Stage9 Media automation transition.
-- The generic Completion Runner received the explicit Stage9 Media opt-out, and the reviewed Stage9 dedicated runner candidate was promoted in a separate canonical commit; operational installation and first scheduled execution did not occur.
-- Original routing is restored: Governance `INACTIVE / NONE`; Downloader and Discovery Writer Safety `IN_PROGRESS / DLDWS-001`; Stage9 `IN_PROGRESS / STG9MEDIA-001`.
-- The prior GOV-007 completion record is preserved below as historical evidence.
+- The current Governance work is limited to registering, validating, documenting, and closing the exact four-workstream STG9MEDIA-001 operational transition in the reactivation record below.
+- Preserve the existing DLDWS-001 goal, evidence, and candidate state; do not alter Writer socket implementation or Stage11.
+- Reuse the already promoted Stage9 source and previously passed offline evidence; do not reimplement or re-promote product code.
+- Publish only the five approved governance documents by normal fast-forward and exact readback.
 
 ## PROHIBITED_SCOPE
 
-- This Governance task is closed and grants no further authorization.
-- No CT108 service/timer, production DB, NAS, Jellyfin, download, or runtime operation was performed. The source promotion does not imply deployment authorization beyond the one-time scope, which is closed at the live-access blocker.
-- No common or workstream contract, validator/CI, Stage11, or Writer socket implementation was changed.
+- No common or workstream contract, governance validator/CI, or unrelated governance policy changes.
+- No Stage11 code/data or Writer socket changes; no unrelated Downloader behavior changes.
+- No operation outside the explicit 2026-10-26 Stage9 integrated transition, and no continuation after closeout without new approval.
 
 ## ACCEPTANCE_CRITERIA
 
-- The canonical router and active-work files agree on the restored original workstream IDs, statuses, versions, and required-workstream sets.
-- Joint activation and product promotion commits were published by normal fast-forward and exactly read back.
-- Offline shared-runner checks and governance checks passed; CT108 preflight is explicitly recorded as blocked, not passed.
-- Downloader DLDWS-001 and Discovery Writer Safety DLDWS-001 content/evidence and Stage11 S11-WX011 state remain preserved.
-- Governance remains `INACTIVE / NONE` after closeout.
+- All four selected workstreams use STG9MEDIA-001, contract version 1.0.0, and the identical four-workstream requirement.
+- Governance structure, joint preflight, existing-workstream protections, smoke checks, and git diff --check pass before publication.
+- Stage9-only automation is installed only after its account, permission, SSH scope, and execution boundaries pass.
+- Final closeout restores the original Governance, Downloader, Discovery Writer Safety, Stage9, and Stage11 routes and is exactly read back.
 
 ## EVIDENCE
 
-- User approved the one integrated transition on 2026-10-26 KST; canonical base was `7109e832aa4f38cda01cd1179b441a5a3aa18ab7`.
-- Joint activation commit `60acbe8b59db1536bc5644b36c8228829a680a54` and product promotion commit `43fa8c034d4c6198507a2e7138829b6f3f6cfc15` were normal fast-forwards and exactly read back.
-- The generic-runner opt-out smoke, existing Completion Runner and Stage9 dedicated-runner smokes, and affected Completion/Organizer regressions passed; the previous 14 Stage9 smoke evidence was reused where unchanged.
-- CT108 preflight could not establish a supported route: no `~/.ssh/config`, the `ct108` name did not resolve, and no CT108-specific remote tool was available. No CT108 connection or operational command was attempted.
-- No service/timer installation, live runner, DB/NAS/Jellyfin operation, or first scheduled run occurred. Exact command results and the single missing prerequisite are recorded in Stage9 ACTIVE_WORK.
+- ## REACTIVATED JOINT OPERATIONS AUTHORIZATION — STG9MEDIA-001 (2026-10-26)
+
+The user explicitly re-authorized the unfinished integrated Stage9 cutover on 2026-10-26 after direct Codex execution-environment verification established access to CT108. This reopens only the exact joint task below; the previous closure remains preserved in the parent commit and is not treated as continuing authority by itself.
+
+### APPROVED_SCOPE
+- Create a dedicated non-login, non-root Stage9 system account and grant only the verified minimum DB, lock, SSH credential, Jellyfin credential, and runtime access required by the promoted Stage9 runner.
+- Use the already promoted canonical --skip-media Completion Runner path to preserve the existing 60-second Downloader schedule and its existing download, Organizer, and metadata-recovery behavior while removing Stage9 Media work from that path.
+- Install an immutable Stage9 release from already promoted source 43fa8c034d4c6198507a2e7138829b6f3f6cfc15; install and activate only the dedicated Stage9 service/timer and its Stage9-only failure stop.
+- Create a fresh Stage9 DB backup only if required by the validated transition, verify integrity and an isolated copy, then observe at most one item per scheduled Stage9 invocation. Existing GANA-3223 is not to be reprocessed.
+- Verify one normal scheduled run, preserve NFO/poster/video no-overwrite behavior, bounded retry/lock/Jellyfin policies, and the generic Downloader path; restore the original workstream routing at closeout.
+
+### PROHIBITED_SCOPE
+- No root execution for the dedicated Stage9 service, broad recursive ownership or mode changes, credentials in logs/Git/environment examples, NAS-wide permission grants, or permission expansion beyond exact verified paths.
+- No download or MP4 policy changes, forced Downloader/Organizer runs, Writer socket source/service changes, Stage11 changes, other service/timer changes, product-source reimplementation, or unapproved job/file changes.
+- No database initialization, legacy-state/retry reset, automatic backup restore, forced termination of publication, existing NAS artifact replacement, bulk processing, or Jellyfin actions beyond the promoted bounded implementation.
+- Stop if minimum privileges, remote SSH publish scope, concurrent-writer safety, live data integrity, or timer separation cannot be proven.
+
+### ACCEPTANCE_CRITERIA
+- The four selected routes and active-work files authorize exactly STG9MEDIA-001 with the complete required-workstream set and approved contract versions.
+- Dedicated service runs only as the dedicated non-root account, with verified path-limited access; the old generic timer continues its 60-second schedule with --skip-media.
+- No two active schedules can process Stage9 Media; the new hourly timer has its bounded limits and failure-stop behavior.
+- The first observed scheduled run is recorded separately from a successful artifact lifecycle; no unsafe DB, NAS, Jellyfin, Downloader, Writer, or Stage11 change occurs.
+- After success or safe stop, Governance, Downloader, Discovery Writer Safety, Stage9, and Stage11 are left in their authorized final routing states and the remote readback is exact.
+
+### EVIDENCE
+- User approval received 2026-10-26 KST. Activation base and current remote SHA: 2cc70990460e79eb2e128a1efdcb1846905ae324.
+- The already promoted product change is 43fa8c034d4c6198507a2e7138829b6f3f6cfc15; it will not be reimplemented or re-promoted.
+- Previous joint task closure and its evidence remain in canonical history at parent 2cc70990460e79eb2e128a1efdcb1846905ae324.
+- Direct authorized CT108 identity and systemd reads confirmed downloader, root, PID 1 systemd, Runner SHA-256 e49be466924287f328ea4d482b6a4806f0142cb4b8a71268c25bdb2365552b39, timer inactive/enabled, and existing generic wrapper still lacks --skip-media.
+
+### NEXT_DECISION
+- Keep this joint task active until the first scheduled Stage9 run is verified or a safety gate forces a documented stop; then close it and restore the original routing.
+
+- The prior Governance closure record is retained in the parent commit at 2cc70990460e79eb2e128a1efdcb1846905ae324; historical GOV-007 evidence remains below.
 
 ## NEXT_DECISION
 
-Provide a supported CT108 access route or a network-capable authorized execution environment before resuming the live Stage9 installation and first scheduled-run verification. Governance remains inactive; no unrelated governance work is authorized.
+Complete the authorized cutover or record the exact fail-closed condition, then restore original routing and publish the closeout evidence.
 
 ## HISTORICAL GOV-007 (CLOSED)
 

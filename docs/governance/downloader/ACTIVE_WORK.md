@@ -1,16 +1,25 @@
 # Downloader non-subtitle workstream — active work
 
 WORKSTREAM: downloader
-TASK_ID: DLDWS-001
+TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
 
 **Historical metadata normalization (2026-10-23, DLDWS-001):** Only the five unquoted fields above define the live workstream task. Older approvals and execution evidence below remain in this document; their repeated metadata labels are quoted solely so the unchanged governance validator does not mistake historical declarations for live ones. The exact complete pre-normalization file is preserved byte-for-byte at `docs/governance/downloader/history/DLDWS-001_ACTIVE_WORK_before_field_normalization_ac476f4.md` (Git blob `5a4a886596fae7e56ed8a2940a24ce07e6892728`). Future historical entries must quote metadata lines or express them as prose. This changes no task authorization, safety boundary or execution result.
 
 ## TEMPORARY JOINT TASK PARTICIPATION — STG9MEDIA-001 (CLOSED 2026-10-26)
 
 Closed on 2026-10-26 after the scoped generic-runner Stage9 opt-out implementation, offline regression checks, and Stage9 candidate promotion. This did not complete or replace DLDWS-001. Its original objective, approved scope, progress, candidate references, and prior evidence remain intact. The live metadata and required workstream set below are restored to `DLDWS-001` / `downloader,discovery-writer-safety`. No Downloader production operation was performed.
+
+## REACTIVATED JOINT PARTICIPATION — STG9MEDIA-001 (2026-10-26)
+
+The user re-authorized this limited shared Runner boundary as part of the Stage9 integrated cutover. The DLDWS-001 objective, work, progress, candidate references, and all historical evidence remain unchanged; this participation does not complete or replace DLDWS-001.
+
+- Allowed shared boundary: install the already promoted generic Completion Runner with --skip-media in the existing wrapper, retaining the existing 60-second schedule, download, Organizer, metadata-recovery, lock, retry, and error-handling behavior.
+- Allowed operational checks: verify that this generic route invokes zero Stage9 Media functions after the opt-out, without forcing a download, Organizer run, or recovery.
+- Prohibited: modify Downloader download/MP4 policy, the DLDWS-001 candidate/evidence, Writer socket implementation, or unrelated service/timer behavior.
+- The single integrated user approval and safety conditions are recorded in Governance ACTIVE_WORK and the Stage9 reactivation record; original DLDWS-001 approval history remains in this file.
 
 ## OBJECTIVE
 

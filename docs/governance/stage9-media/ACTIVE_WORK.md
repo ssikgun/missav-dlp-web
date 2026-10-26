@@ -4,7 +4,7 @@ WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: stage9-media
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
 
 
 ## TEMPORARY JOINT AUTHORIZATION — STG9MEDIA-001 (2026-10-26)
@@ -17,6 +17,43 @@ CLOSED ON 2026-10-26 AT CT108 PREFLIGHT: the user-approved integrated Stage9 Med
 - Prohibited: any Stage11 or Writer socket change; altering DLDWS-001 purpose/progress/evidence; unrelated Downloader behavior changes; other-workstream service/timer changes; bulk media processing; unsafe file replacement; retry resets; unapproved downloads, Organizer actions beyond the existing Stage9 registration input, or any operation outside the exact Stage9 Media transition.
 - Activation requires joint preflight, full governance structure and smoke, diff checks, and exact canonical readback. Before live changes, current CT108 identity, services, runner/wrapper, paths, locks, schema, backups, NAS/Jellyfin state, and duplicate scheduling must be verified. If CT108 or any required safety fact cannot be verified, do not perform operational changes; preserve candidates and safely restore the original routes.
 - Closeout restores Governance to `INACTIVE / NONE`, Downloader and Discovery Writer Safety to `DLDWS-001` with `downloader,discovery-writer-safety`, and Stage9 to `STG9MEDIA-001` with `stage9-media`, retaining all evidence.
+
+## REACTIVATED JOINT OPERATIONS AUTHORIZATION — STG9MEDIA-001 (2026-10-26)
+
+The user explicitly re-authorized the previously closed integrated cutover after direct official-permission CT108 verification. This new approval supersedes only the earlier closure for the exact transition below; the previous source promotion, offline evidence, GANA-3223 result, DLDWS-001 evidence, and S11-WX011 remain unchanged.
+
+### APPROVED_SCOPE
+
+- This 2026-10-26 joint Stage9 operations approval is detailed in the reactivated authorization record above and is limited to that exact transition.
+- Create a dedicated non-root, non-login service account; grant only necessary access to the Stage9 media state, read-only Discovery input, lock paths, SSH credential, Jellyfin credential, runtime, and journal.
+- Use canonical promoted source 43fa8c034d4c6198507a2e7138829b6f3f6cfc15 and the existing --skip-media opt-out; do not repeat source promotion.
+- Preserve the existing 60-second generic Downloader timer and non-media behavior. Install the Stage9-only oneshot service, hourly randomized timer, and dedicated failure-stop handler with the approved per-run limits.
+- Create and validate a current Stage9 DB backup if the transition requires it. Activate only the dedicated timer after confirming there is no Stage9 execution in the generic path.
+- Observe the first normal scheduled execution, limited to at most one Stage9 media item, and verify its DB/NFO/poster/Jellyfin effects and no-overwrite boundaries.
+
+### PROHIBITED_SCOPE
+
+- The reactivated joint approval above is a narrow current exception only for the dedicated non-root account, exact minimal permissions, --skip-media generic-runner transition, separate Stage9 release/service/timer, necessary validated backup, and one bounded first scheduled run. All other prohibitions below remain in force.
+- No root execution for the dedicated runner; no broad recursive chown/chmod; no NAS-wide write grant, new administrator key, or credential disclosure.
+- No download, MP4, Organizer, metadata-recovery, Writer socket, Stage11, or unrelated service/timer behavior changes.
+- No existing NFO/poster/video overwrite, completed-job replay, retry reset, bulk processing, manual runner execution, forced process termination, or automatic database restore.
+- Stop if exact least privilege, NAS publish scope, Jellyfin call scope, DB integrity, lock ownership, or one-runner ownership cannot be verified.
+
+### ACCEPTANCE_CRITERIA
+- Non-root account and exact permissions pass before service installation; private keys are delivered using a protected credential mechanism and never logged.
+- The generic Completion Runner executes its prior non-media functions and --skip-media excludes all Stage9 Media work.
+- The dedicated Runner is invoked only by the new Stage9 timer and has the approved limits, locks, failure stop, and bounded Jellyfin actions.
+- The first regular scheduled run is observed; any no-work/HOLD result is reported separately from actual metadata publication.
+- Original active files remain intact; all production mutations stay within approved scope and are recorded.
+
+### EVIDENCE
+- User re-authorized this exact integrated scope on 2026-10-26 KST, based on latest remote SHA 2cc70990460e79eb2e128a1efdcb1846905ae324.
+- Prior product promotion 43fa8c034d4c6198507a2e7138829b6f3f6cfc15 and offline validation evidence are already canonical and remain unchanged.
+- Official direct CT108 check: hostname downloader, root, PID 1 systemd, Runner SHA-256 e49be466924287f328ea4d482b6a4806f0142cb4b8a71268c25bdb2365552b39; current timer is inactive/enabled and old wrapper lacks --skip-media.
+- Full operational evidence is appended only after its relevant step completes.
+
+### NEXT_DECISION
+- Keep the bounded Stage9-only transition active through the first scheduled run; then close the shared routes and preserve the final operational evidence.
 
 ## OBJECTIVE
 
