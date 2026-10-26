@@ -99,6 +99,7 @@ def run_once(
     media_writer_lock_path=None,
     media_target_dvd_id=None,
     media_only=False,
+    skip_media=False,
     operation_lock_path=DEFAULT_OPERATION_LOCK_PATH,
     metadata_recovery_max_items=(
         DEFAULT_METADATA_RECOVERY_MAX_ITEMS
@@ -114,6 +115,15 @@ def run_once(
         if media_target_dvd_id is not None
         else None
     )
+
+    if skip_media and media_only:
+        raise RuntimeError(
+            "skip-media cannot be combined with media-only mode"
+        )
+    if skip_media and target_dvd_id is not None:
+        raise RuntimeError(
+            "skip-media cannot be combined with an exact media target"
+        )
 
     if target_dvd_id is not None and not apply:
         raise RuntimeError(
@@ -178,6 +188,14 @@ def run_once(
             "attempted": 0,
         }
 
+    if skip_media:
+        result["media"] = {
+            "status": "SKIPPED_BY_EXPLICIT_OPT_OUT",
+            "reconciled": "SKIPPED",
+            "attempted": 0,
+            "jellyfin_visibility": "SKIPPED",
+        }
+
     if not apply:
         result["metadata_recovery"] = (
             recover_held_metadata(
@@ -222,7 +240,7 @@ def run_once(
 
         result["applied"] += 1
 
-    if media_processor is not None:
+    if media_processor is not None and not skip_media:
         if media_db_path is None:
             raise RuntimeError(
                 "media_db_path required"
@@ -388,6 +406,14 @@ def main():
         ),
     )
     parser.add_argument(
+        "--skip-media",
+        action="store_true",
+        help=(
+            "skip Stage9 Media reconciliation, processing, and "
+            "Jellyfin visibility while preserving generic completion work"
+        ),
+    )
+    parser.add_argument(
         "--media-db",
         type=Path,
     )
@@ -435,6 +461,14 @@ def main():
         parser.error(
             "--media-target-dvd-id requires --apply"
         )
+    if args.skip_media and args.media_only:
+        parser.error(
+            "--skip-media cannot be combined with --media-only"
+        )
+    if args.skip_media and args.media_target_dvd_id is not None:
+        parser.error(
+            "--skip-media cannot be combined with --media-target-dvd-id"
+        )
     if not 1 <= args.jellyfin_visibility_max_items <= 1000:
         parser.error(
             "--jellyfin-visibility-max-items must be between 1 and 1000"
@@ -469,12 +503,14 @@ def main():
                 "--media-only requires Jellyfin configuration"
             )
 
-    try:
-        poster_fetcher = make_poster_fetcher(
-            args.media_poster_proxy_url
-        )
-    except ValueError as exc:
-        parser.error(str(exc))
+    poster_fetcher = None
+    if not args.skip_media:
+        try:
+            poster_fetcher = make_poster_fetcher(
+                args.media_poster_proxy_url
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
 
     ssh = CompletionSSH(
         host=args.host,
@@ -494,8 +530,9 @@ def main():
     )
 
     media_processor = None
+    jellyfin = None
 
-    if args.apply:
+    if args.apply and not args.skip_media:
         if not args.jellyfin_base_url:
             parser.error(
                 "--jellyfin-base-url is "
@@ -577,9 +614,8 @@ def main():
         media_target_dvd_id=
             args.media_target_dvd_id,
         media_only=args.media_only,
-        jellyfin_client=(
-            jellyfin if args.apply else None
-        ),
+        skip_media=args.skip_media,
+        jellyfin_client=jellyfin,
     )
 
     print(

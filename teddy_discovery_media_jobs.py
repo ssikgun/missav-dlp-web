@@ -385,12 +385,25 @@ def reconcile_media_jobs(
     discovery_db_path: str | Path,
     media_db_path: str | Path,
     writer_lock_path: str | Path,
+    *,
+    max_items: int | None = None,
+    target_dvd_id: str | None = None,
 ) -> int:
     """
     Find completed Stage9 organizer jobs in the
     Discovery DB and create missing jobs in the
     separate Media state DB.
     """
+
+    target = (
+        normalize_media_target_dvd_id(target_dvd_id)
+        if target_dvd_id is not None
+        else None
+    )
+    if max_items is not None:
+        max_items = int(max_items)
+        if max_items < 1 or max_items > 1000:
+            raise ValueError("media reconciliation max_items must be between 1 and 1000")
 
     discovery = sqlite3.connect(
         "file:"
@@ -413,13 +426,15 @@ def reconcile_media_jobs(
               ON h.dvd_id = oj.dvd_id
             WHERE oj.status = 'COMPLETED'
               AND oj.dvd_id IS NOT NULL
+              AND (? IS NULL OR oj.dvd_id = ?)
               AND h.storage_root = 'jav'
               AND h.present = 1
               AND h.discovered_by =
                     'completion-stage9'
             GROUP BY oj.dvd_id
             ORDER BY organizer_job_id
-            """
+            """,
+            (target, target),
         ).fetchall()
 
     finally:
@@ -434,6 +449,8 @@ def reconcile_media_jobs(
     ) as media:
 
         for row in rows:
+            if max_items is not None and created >= max_items:
+                break
             dvd_id = str(
                 row["dvd_id"] or ""
             ).strip().upper()
@@ -999,11 +1016,16 @@ def run_retryable_media_jobs(
     retry_backoff_seconds=DEFAULT_MEDIA_RETRY_BACKOFF_SECONDS,
     running_stale_seconds=DEFAULT_MEDIA_RUNNING_STALE_SECONDS,
     target_dvd_id=None,
+    max_manual_action_updates=None,
 ) -> dict:
     if int(max_items) < 1:
         raise RuntimeError(
             "media max_items must be >= 1"
         )
+    if max_manual_action_updates is not None:
+        max_manual_action_updates = int(max_manual_action_updates)
+        if max_manual_action_updates < 0 or max_manual_action_updates > 1000:
+            raise ValueError("max_manual_action_updates must be between 0 and 1000")
 
     target = (
         normalize_media_target_dvd_id(
@@ -1083,6 +1105,8 @@ def run_retryable_media_jobs(
         "poster_pending": 0,
         "poster_attention": 0,
         "exhausted": sum(state == "EXHAUSTED" for _, state in states),
+        "manual_action_updates": 0,
+        "manual_action_updates_deferred": 0,
         "jobs": [],
     }
     if target is not None:
@@ -1094,12 +1118,19 @@ def run_retryable_media_jobs(
             break
         if initial_state != "ELIGIBLE":
             if initial_state == "EXHAUSTED":
-                _mark_jellyfin_manual_action_if_exhausted(
-                    db_path,
-                    writer_lock_path,
-                    int(job["media_job_id"]),
-                    max_attempts,
-                )
+                if (
+                    max_manual_action_updates is None
+                    or result["manual_action_updates"] < max_manual_action_updates
+                ):
+                    _mark_jellyfin_manual_action_if_exhausted(
+                        db_path,
+                        writer_lock_path,
+                        int(job["media_job_id"]),
+                        max_attempts,
+                    )
+                    result["manual_action_updates"] += 1
+                else:
+                    result["manual_action_updates_deferred"] += 1
             if target is not None:
                 result["jobs"].append(
                     {

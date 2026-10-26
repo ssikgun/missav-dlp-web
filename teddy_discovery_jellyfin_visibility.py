@@ -55,19 +55,21 @@ def _media_path(relative_path):
     return validate_adult_media_path(jellyfin_media_path(raw)).as_posix()
 
 
-def _completed_jobs(db, target):
-    if target is None:
-        rows = db.execute(
-            """SELECT media_job_id, dvd_id, updated_at
-               FROM media_jobs WHERE status='COMPLETED'
-               ORDER BY media_job_id"""
-        ).fetchall()
-    else:
-        rows = db.execute(
-            """SELECT media_job_id, dvd_id, updated_at
-               FROM media_jobs WHERE status='COMPLETED' AND dvd_id=?""",
-            (target,),
-        ).fetchall()
+def _completed_jobs(db, target, limit=None):
+    sql = """SELECT j.media_job_id, j.dvd_id, j.updated_at
+             FROM media_jobs AS j
+             WHERE j.status='COMPLETED'
+               AND (? IS NULL OR j.dvd_id=?)
+               AND NOT EXISTS (
+                   SELECT 1 FROM media_jellyfin_visibility AS v
+                   WHERE v.dvd_id=j.dvd_id
+               )
+             ORDER BY j.media_job_id"""
+    params = (target, target)
+    if limit is not None:
+        sql += " LIMIT ?"
+        params += (int(limit),)
+    rows = db.execute(sql, params).fetchall()
     return rows
 
 
@@ -78,12 +80,17 @@ def reconcile_jellyfin_visibility(
     jellyfin,
     *,
     max_items: int = 5,
+    max_seed_items: int | None = None,
     target_dvd_id: str | None = None,
 ) -> dict:
     """Seed completed media visibility and perform bounded Jellyfin GET checks only."""
     max_items = int(max_items)
-    if max_items < 1 or max_items > 1000:
-        raise ValueError("visibility max_items must be between 1 and 1000")
+    if max_items < 0 or max_items > 1000:
+        raise ValueError("visibility max_items must be between 0 and 1000")
+    if max_seed_items is not None:
+        max_seed_items = int(max_seed_items)
+        if max_seed_items < 0 or max_seed_items > 1000:
+            raise ValueError("visibility max_seed_items must be between 0 and 1000")
     target = _target(target_dvd_id)
     now = _now()
     seeded = 0
@@ -102,7 +109,7 @@ def reconcile_jellyfin_visibility(
                 """CREATE INDEX IF NOT EXISTS idx_media_jellyfin_visibility_pending
                    ON media_jellyfin_visibility(status, updated_at, dvd_id)"""
             )
-            jobs = _completed_jobs(media, target)
+            jobs = _completed_jobs(media, target, max_seed_items)
             for job in jobs:
                 dvd_id = str(job["dvd_id"] or "").strip().upper()
                 existing = media.execute(
