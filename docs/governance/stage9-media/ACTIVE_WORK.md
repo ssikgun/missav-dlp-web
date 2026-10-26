@@ -7,6 +7,40 @@ CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
 
+## CURRENT USER-APPROVED FILE STATION IMPLEMENTATION — 2026-10-27
+
+User explicitly approved completing Stage9 with the existing non-administrator `stage9_media` Synology File Station API account, prioritizing minimal implementation and practical use under common contract v1.0.1. This is the CURRENT narrow `STG9MEDIA-001` product-implementation authorization. It supersedes earlier lab-only product-code prohibitions ONLY for the exact Stage9 source and offline-test scope below. Earlier joint operational approvals remain CLOSED and are not revived.
+
+### CURRENT_OBJECTIVE
+
+Replace the dedicated Stage9 media-only runner's SSH-dependent **media read-only stat and NFO/poster publication** with a narrowly scoped Synology File Station API adapter; reuse existing Stage9 metadata, media jobs, Jellyfin visibility, run locks, limits and error behavior. Keep the generic Downloader Completion Runner and its SSH implementation unchanged.
+
+### CURRENT_APPROVED_SCOPE
+
+- Stage9-only production-source candidate paths: `teddy_discovery_media_only_runner.py`, one focused File Station adapter module `teddy_discovery_media_filestation.py`, `teddy_discovery_media_only_runner_smoke.py`, and one focused adapter smoke `teddy_discovery_media_filestation_smoke.py`. Touch the Stage9 `teddy_discovery_media_pipeline.py` only if strictly required for the existing `stat_library`/`publish_bundle` interface; prefer no pipeline modification. Supporting runtime module list, CLI/config, and new password/TLS credential-file validation may be added within the dedicated runner.
+- Reuse already proven Synology API login (format=sid), exact _sid URL query transport, verified HTTPS certificate and hostname, GetInfo/list path checks, and create-only Upload (never overwrite). Provide least-privilege credential-file handling, session cleanup, bounded requests, no secrets in logs, and fail-closed error handling.
+- Preserve existing MP4 and pre-existing NFO/poster contents; validate canonical metadata filenames, root and path identity, and successful new-file bytes/hash. Different existing files are collisions, not replacement targets. If identity, existing content, path permission, or upload outcome is unknown, stop safely without retrying or deleting.
+- Offline implementation, syntax and a small representative fake-HTTP test: read-only video stat; new NFO (optional poster); already-present identical file; conflicting existing sidecar; API failure. Reuse existing smoke and no bespoke multi-layer ACL lab/harness expansion.
+- Use an isolated worktree, produce one minimally scoped candidate diff, and report paths, exact hashes, passed tests, unverified production permission, and remaining blockers.
+
+### CURRENT_PROHIBITED_SCOPE
+
+- No operational write to real NAS JAV, production DB/Jellyfin, service/timer, account, DSM share/ACL, and no real media download, bulk processing, cleanup, or runner apply under this implementation approval. A separate explicit operations authorization is required before cutover.
+- No use of the administrator-group SSH credential in the Stage9 dedicated File Station mode and no new administrator access path.
+- No changes to `teddy_discovery_media_publish.py`, general `teddy_discovery_completion_runner.py`, Downloader/Discovery Writer Safety/Stage11 workstreams, existing retry/lock/Jellyfin rules, or existing stored metadata. Never force-push/replay previous product promotion.
+
+### CURRENT_ACCEPTANCE_CRITERIA
+
+- Dedicated Stage9 runner can use File Station for both file-stat and publish without SSH dependency in that mode; generic Downloader stays on existing behavior.
+- Essentials proven offline using narrow mocks: no MP4 modification, no overwrite of different NFO/poster, exact path/identity restrictions, create-only upload, failure stop; one representative end-to-end success path.
+- Before any real publication, verify the actual `stage9_media` principal's permissions in production JAV; prior isolated-share creation proves neither write access nor delete restrictions in production.
+- Product/source delivery, local validation, and future NAS/CT108 operational readiness are reported as separate statuses.
+
+### CURRENT_NEXT_DECISION
+
+Complete the offline File Station adapter and Stage9-only wiring, then review one bounded operations cutover authorization. Existing earlier test NFO hash mismatch and incomplete lab permissions are disclosed, not reinterpreted as PASS.
+
+
 ## TEMPORARY JOINT AUTHORIZATION — STG9MEDIA-001 (2026-10-26)
 
 CLOSED ON 2026-10-26 AT CT108 PREFLIGHT: the user-approved integrated Stage9 Media transition was used for canonical source promotion and offline validation, then stopped before operations because no supported CT108 access route could be verified. This entry records the one-time authorization and its result; it grants no continuing authority. It superseded prior prohibitions only for the exact scoped actions listed here and changed no contract.
