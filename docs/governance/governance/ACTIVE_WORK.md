@@ -1,10 +1,42 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: NONE
-STATUS: INACTIVE
+TASK_ID: GOV-008
+STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: governance
+
+## OBJECTIVE
+
+Record the user's approved personal-use, right-sized development and validation priority in the canonical common contract and AGENTS.md; close GOV-008 after exact readback.
+
+## APPROVED_SCOPE
+
+- Edit only AGENTS.md and common contract, with minimum routing/active-work metadata needed for GOV-008 activation, version alignment, and closure.
+- Prioritize practical personal use; retain existing files' no-delete/no-overwrite safeguards, scoped paths, and fail-closed behavior; avoid disproportionate validation tooling.
+
+## PROHIBITED_SCOPE
+
+- No product, Stage9, Stage11, Downloader, Writer Safety, NAS, DB, Jellyfin, account, timer, or service changes.
+- No weakening existing data protection or authorization rules; no claimed runtime validation.
+
+## ACCEPTANCE_CRITERIA
+
+- Approved principle appears in both AGENTS.md and the common contract with consistent version and routing metadata.
+- Existing independent workstream states and contracts remain unchanged.
+- Canonical branch fast-forward and exact readback, then Governance restored to INACTIVE / NONE.
+
+## EVIDENCE
+
+- User explicitly approved GOV-008 in chat on 2026-10-27 KST.
+- Activation base 77b3c388c2e31d311321883001c86200d3482e6d on teddy-subtitle-stage11.
+- Product and runtime modifications are outside this approval.
+
+## NEXT_DECISION
+
+Apply minimal policy edit, verify and close GOV-008, then resume Stage9 separately.
+
+## PREVIOUS GOVERNANCE RECORD (PRESERVED)
 
 ## OBJECTIVE
 
