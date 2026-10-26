@@ -4,7 +4,7 @@ WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: stage9-media
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
 
 
 ## TEMPORARY JOINT AUTHORIZATION — STG9MEDIA-001 (2026-10-26)
@@ -58,6 +58,48 @@ CLOSED at the NAS least-privilege preflight before any operational mutation. The
 - Keep the bounded Stage9-only transition active through the first scheduled run; then close the shared routes and preserve the final operational evidence.
 
 ## OBJECTIVE
+
+Establish a genuinely restricted NAS metadata publication boundary, then safely transition Stage9 Media to its dedicated non-root automation while preserving Downloader behavior and verifying the first natural scheduled run.
+
+## APPROVED_SCOPE
+
+- Temporarily register Governance, Downloader, Discovery Writer Safety, and Stage9 under the identical `STG9MEDIA-001` task and complete shared requirement set; perform required validation and exact remote readback before any operational mutation.
+- Reuse canonical Stage9 source promotion `43fa8c034d4c6198507a2e7138829b6f3f6cfc15`. Make only necessary Stage9-specific transport/source and offline-test changes for a restricted NAS publisher; do not reimplement existing media/Jellyfin behavior.
+- Establish a NAS-side, authenticated, bounded metadata publisher that supports only verified Stage9 video `stat` and canonical NFO/real-poster publication/hash verification. Enforce request/path/name/hash validation, no symlink/path escape, atomic create-only publication, no-overwrite, bounded size/count, and fail-closed conflict handling. Verify both application and operating-system isolation; no arbitrary remote shell/Python command.
+- Verify installed DSM version and documented SSH policy before selecting a NAS mechanism. Do not reuse the administrators-group `ssikgun` key for the Stage9 service. Do not edit DSM `sshd_config`, `/etc/passwd`, administrator membership, or redesign NAS-wide permissions. If supported least privilege cannot be proven without those changes, stop.
+- Create a dedicated CT108 non-login, non-root Stage9 service account with only verified required access; prepare an immutable release, apply the already promoted generic Runner `--skip-media`, and install only the Stage9 service/timer/failure-stop configuration. Keep the ordinary Downloader 60-second schedule and non-media behavior.
+- Create a fresh Stage9 DB backup only if required, verify it and an isolated restore before any live DB change. Do not reinitialize or reset existing work. No migration is expected unless exact live schema evidence shows one is necessary and already authorized.
+- After all preflight gates pass, maintain exactly one Stage9 Media scheduler. Allow at most one eligible normal item per invocation and verify the first natural scheduled run. Never force GANA-3223 or any completed task. Keep actual NFO/poster lifecycle distinct from scheduled-run PASS.
+- Restore original Governance/DLDWS/Stage9 routing after success or a safely documented stop; preserve all existing evidence and Stage11 state.
+
+## PROHIBITED_SCOPE
+
+- NAS-wide share permissions, broad ACL/chown/chmod, DSM SSH policy/account/admin-group edits, administrator credential reuse, generic shell or arbitrary Python execution through SSH, and unverified root/administrator forced-command wrappers.
+- Existing video, NFO, poster, database/backup, or NAS artifact overwrite/delete; completed-job replay; retry reset; bulk processing; downloads or forced Organizer/metadata recovery.
+- Any general Downloader/MP4 policy change, Writer Unix socket code/service change, Stage11 code/data change, unrelated systemd changes, or Stage9 behavior outside the approved design contract.
+- No service/timer/release/account/permission change before joint activation is exactly read back and all relevant preflight and data-preservation gates pass.
+- Stop if installed DSM constraints, OS-level confinement, authenticated publisher identity, exact-path safety, no-overwrite semantics, writer/lock safety, single scheduler ownership, or DB integrity cannot be established. Do not select an insecure fallback.
+
+## ACCEPTANCE_CRITERIA
+
+- Joint activation and closure use the same task ID across all four workstreams and the full required set; both have exact canonical readbacks.
+- NAS publisher cannot run arbitrary commands or access unrelated shares; only verified Stage9 stat and create-only metadata publication are reachable. Existing files remain unaltered on all collisions, errors, and restart cases.
+- Offline tests cover stat, NFO-only, canonical poster, later poster-only, malformed/auth/path/symlink requests, path escape, hash/name/payload validation, collisions, interrupted/duplicate/concurrent requests, and no access to Downloader/Stage11/Jellyfin-write behavior beyond the approved bounded client.
+- CT108 service runs non-root; generic wrapper uses `--skip-media` without losing Downloader work; the dedicated timer has approved bounded limits and exactly one active Stage9 Media scheduler exists.
+- Fresh backup/restore and DB integrity checks pass before any authorized live DB mutation. First natural scheduled run is observed and reports bounded processing, no overwrite, Jellyfin idempotency, and unchanged existing media.
+- If any least-privilege or operational gate fails, no subsequent writes occur; record the block and restore original routing without changing DLDWS-001 or S11-WX011.
+
+## EVIDENCE
+
+- User approved this integrated transition on 2026-10-26 KST. Current canonical base and freshly queried remote SHA: `9c89efe29c5b9af7b5cc70aff305738a9723d2c2`.
+- Existing promoted generic-runner split and dedicated runner commit `43fa8c034d4c6198507a2e7138829b6f3f6cfc15` are already canonical; reuse them. The prior NAS least-privilege stop is historical evidence and must be freshly re-evaluated against the newly approved NAS-boundary work.
+- Stage9 contract remains `1.0.0 / APPROVED`. DLDWS-001 candidates/evidence and S11-WX011 remain protected.
+
+## NEXT_DECISION
+
+If the DSM/NAS cannot provide a verifiable least-privilege publisher boundary, stop before operational changes, restore the original routes, and report the single missing capability needed. Otherwise proceed through the first natural scheduled run and close the joint task.
+
+## HISTORICAL STAGE9 IMPLEMENTATION OBJECTIVE — PRESERVED
 
 Implement safe Stage9 media completion for works without a canonical poster: generate an NFO from verified metadata, track poster completion separately for later supplementation, and avoid duplicate Jellyfin notifications while retaining the existing safeguards.
 

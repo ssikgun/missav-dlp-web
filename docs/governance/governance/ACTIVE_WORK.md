@@ -1,35 +1,52 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: NONE
-STATUS: INACTIVE
+TASK_ID: STG9MEDIA-001
+STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
 
 ## OBJECTIVE
 
-The one-time joint Stage9 transition closed at the least-privilege NAS preflight. No service account, permission, wrapper, service, timer, release, or NAS/Jellyfin change was made. Governance is restored to INACTIVE / NONE.
+Temporarily coordinate the user-approved Stage9 integrated transition across Governance, Downloader, Discovery Writer Safety, and Stage9, including a NAS-side restricted metadata publication boundary, dedicated Stage9 automation, and the first scheduled-run verification. This task does not alter or replace DLDWS-001 or S11-WX011.
 
 ## APPROVED_SCOPE
 
-- The joint authorization was used only to register and validate the exact Stage9 integrated transition, inspect the live CT108 scope, and record the fail-closed result.
-- Preserve the existing DLDWS-001 goal, evidence, and candidate state; no Writer socket implementation or Stage11 change occurred.
-- Reuse the already promoted Stage9 source and prior offline evidence; no product source was changed or re-promoted.
-- Restore the original workstream routes and preserve the complete joint authorization as closed evidence.
+- Register all four selected workstreams under the identical task ID `STG9MEDIA-001` and the complete required-workstream set; validate and read back the registration before operational changes.
+- Build and validate a Stage9-only NAS metadata publishing boundary and its required NAS-side authentication/configuration boundary. Permit only verified video stat and bounded, canonical NFO/real-poster no-overwrite publication; preserve existing media and fail closed on ambiguity.
+- Use the already promoted generic-runner `--skip-media` behavior and Stage9 dedicated runner; make only the minimum Stage9 transport/source/test changes needed for the restricted boundary. Preserve ordinary download, Organizer, and metadata-recovery behavior.
+- Create a dedicated non-root CT108 service identity with only proven minimum access; prepare an immutable Stage9 release and the dedicated service, timer, and Stage9-only failure-stop behavior. Preserve the existing generic Downloader 60-second schedule.
+- After all live checks and a fresh validated DB backup if needed, permit at most one normal Stage9 media item per scheduled invocation and observe the first natural scheduled run. Existing completed items, including GANA-3223, must not be forced or bulk-reprocessed.
+- Preserve existing DLDWS-001 objective, evidence, candidates, and status; make no Writer socket implementation/service change. Preserve Stage11 S11-WX011 unchanged. Close the temporary joint registration after success or a safely documented stop and restore original routes.
 
 ## PROHIBITED_SCOPE
 
-- This Governance task is closed and grants no continuing operational authority.
-- No common or workstream contract, governance validator/CI, Stage11 code/data, Writer socket, or unrelated Downloader behavior was changed.
-- No account, permission, wrapper, service, timer, release, production database record, NAS artifact, or Jellyfin state was changed.
+- No NAS-wide permission redesign, administrator SSH identity/key reuse for the Stage9 service, arbitrary shell/Python remote execution, or unverified root/administrator forced-command wrapper.
+- No changes to general download or MP4 policy, Writer Unix socket code/service, Stage11 code/data, unrelated service/timers, common/workstream contracts, or governance validation code.
+- No existing video/NFO/poster overwrite, completed-job replay, retry reset, bulk processing, forced download/Organizer/recovery, database restore, or broader Jellyfin action.
+- Stop if a NAS OS-level least-privilege boundary, authenticated caller, exact path confinement, no-overwrite safety, service identity, DB/writer-lock ownership, timer separation, or data integrity cannot be proven.
 
 ## ACCEPTANCE_CRITERIA
 
-- Governance is INACTIVE / NONE; Downloader and Discovery Writer Safety are IN_PROGRESS / DLDWS-001; Stage9 is IN_PROGRESS / STG9MEDIA-001; Stage11 remains IN_PROGRESS / S11-WX011.
-- The NAS least-privilege blocker and SQLite read-only SHM metadata side effect are accurately recorded.
-- Final route and active-work validation passes and the closeout is exactly read back from the canonical branch.
+- Before operations, all four routes and active-work files authorize the same `STG9MEDIA-001`, exact contract versions, and complete shared requirement set; canonical activation is read back exactly.
+- NAS publisher authentication and filesystem access are restricted to verified Stage9 library operations and cannot write/delete other shares or replace existing media. If the installed DSM cannot support this under documented means, stop without modifying NAS internals.
+- The non-root Stage9 service is isolated from the generic Runner, with exactly one active Stage9 Media scheduler, bounded per-run limits, existing locks/retry behavior, and generic Downloader behavior retained.
+- The first natural scheduled run is observed and separately reported from actual NFO/poster publication; no unapproved work or unsafe change occurs.
+- After success or safe stop, original Governance, DLDWS-001, Stage9, and Stage11 routes are restored and exact canonical readback is verified.
 
 ## EVIDENCE
+
+- User approved this integrated transition on 2026-10-26 KST. Activation base and freshly read remote `teddy-subtitle-stage11` SHA: `9c89efe29c5b9af7b5cc70aff305738a9723d2c2`.
+- Existing promotion `43fa8c034d4c6198507a2e7138829b6f3f6cfc15`, Stage9 offline verification, and prior operational observations are evidence only; no prior blocked step is treated as passed/current without revalidation.
+- Existing DLDWS-001 and S11-WX011 remain unchanged. Stage9 operations remain prohibited until this joint registration is posted and exactly read back.
+
+## NEXT_DECISION
+
+If any gate blocks this transition, record the exact safe-stop state, restore all four original routes, and request only the next decision needed to establish a proven least-privilege NAS publisher. Otherwise continue through one natural scheduled run and close the temporary joint task.
+
+## HISTORICAL CLOSED GOVERNANCE RECORDS
+
+All pre-existing closure and GOV-007 evidence below remains historical and unaltered; it does not override this current task while this joint registration is active.
 
 - ## CLOSED JOINT OPERATIONS AUTHORIZATION — STG9MEDIA-001 (2026-10-26)
 

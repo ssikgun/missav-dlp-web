@@ -1,10 +1,10 @@
 # Discovery Writer Safety workstream — active work
 
 WORKSTREAM: discovery-writer-safety
-TASK_ID: DLDWS-001
+TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
 
 **Historical metadata normalization (2026-10-23, DLDWS-001):** Only the five unquoted fields above define the live workstream task. Older approvals and execution evidence below remain in this document; their repeated metadata labels are quoted solely so the unchanged governance validator does not mistake historical declarations for live ones. The exact complete pre-normalization file is preserved byte-for-byte at `docs/governance/discovery-writer-safety/history/DLDWS-001_ACTIVE_WORK_before_field_normalization_ac476f4.md` (Git blob `348c0957a5feb0833dfd1467a07cf9f995e373b8`). Future historical entries must quote metadata lines or express them as prose. This changes no task authorization, safety boundary or execution result.
 
@@ -20,7 +20,41 @@ CLOSED on 2026-10-26 at the NAS least-privilege preflight. No Writer socket sour
 - Prohibited: any Writer socket source, service, socket, permission, database, or evidence change; no DLDWS-001 implementation or test change.
 - The joint scope is limited to the one-time Stage9 cutover recorded in Governance ACTIVE_WORK and the Stage9 reactivation record.
 
+## CURRENT SHARED PARTICIPATION — STG9MEDIA-001 (2026-10-26)
+
+The user approved temporary shared registration for the Stage9 transition. This does not complete, replace, or rewrite DLDWS-001; its objective, progress, candidates, and evidence below remain preserved. Discovery Writer Safety participation is limited to confirming the transition does not alter Writer socket lifecycle, service, permissions, or data.
+
 ## OBJECTIVE
+
+Preserve the DLDWS-001 Writer socket safety boundary during the shared Stage9 transition and confirm no Writer implementation or operation is included.
+
+## APPROVED_SCOPE
+
+- Read-only review of the shared Stage9 invocation/lock boundaries for Writer socket impact.
+- Verify the transition does not modify Writer socket code, service, socket pathname, permissions, lifecycle, or database.
+- Preserve the original DLDWS-001 objective, candidate, progress, and evidence byte-for-byte apart from the required live routing metadata and this participation record.
+
+## PROHIBITED_SCOPE
+
+- No Writer socket source/test changes, service/unit/socket changes, permission changes, cleanup, or database work.
+- No change to the DLDWS-001 candidate/evidence or Stage11 work.
+- No unrelated Downloader behavior or production service changes.
+
+## ACCEPTANCE_CRITERIA
+
+- Shared Stage9 changes preserve Writer socket ownership and lifecycle code and do not invoke Writer operations.
+- DLDWS-001 history, candidate references, and evidence remain intact; original routing is restored at joint-task closure.
+
+## EVIDENCE
+
+- User approval received 2026-10-26 KST. Activation base and current remote SHA: `9c89efe29c5b9af7b5cc70aff305738a9723d2c2`.
+- No Writer source or operation is authorized by this participation; evidence will be updated only with verification of that boundary.
+
+## NEXT_DECISION
+
+Continue this shared registration only while the Writer boundary remains unchanged; restore DLDWS-001 routing and its original required-workstream set at closure.
+
+## DLDWS-001 OBJECTIVE — PRESERVED
 
 Share DLDWS-001 with Downloader to safely investigate the Writer socket smoke failure blocking the DL-001 Docker build candidate, preserving the approved B-option candidate and the distinction between inode reuse and actual socket replacement safety.
 
