@@ -6,6 +6,12 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## APPROVED OFFLINE SMOKE FOLLOW-UP — 2026-10-27
+
+The user explicitly approved adding exactly `teddy_discovery_completion_runner_skip_media_smoke.py` to `STG9MEDIA-001` for a minimal repair of its obsolete dedicated `RunnerConfig` SSH fixture after the File Station implementation. This approval is limited to that one test file, its synthetic File Station credential/path settings, and the relevant offline smoke and minimal regression checks. Existing Stage9 production code and the generic Completion Runner remain unchanged. NAS, DB, Jellyfin, CT108 service/timer, DSM account/ACL, release deployment, and operational writes remain prohibited. Acceptance: the paired generic `--skip-media`/dedicated-runner smoke passes, preserves exactly one Stage9 owner, and no unrelated files or behavior change. Next decision: review operational cutover separately after offline verification; this entry does not reopen the closed operational authorizations.
+
+Offline evidence: `python3 -B teddy_discovery_completion_runner_skip_media_smoke.py` PASS (4 checks), `python3 -B teddy_discovery_media_only_runner_smoke.py` PASS, and `git diff --check` PASS. The prior `ssh_host` constructor error was reproduced before this change; no real NAS, DB, Jellyfin, service, or runner apply was used.
+
 
 ## CURRENT USER-APPROVED FILE STATION IMPLEMENTATION — 2026-10-27
 

@@ -220,11 +220,12 @@ with tempfile.TemporaryDirectory(prefix="stg9media-runner-pair-") as temp:
     )
     db.close()
 
-    ssh_key = root / "fake-key"
-    known_hosts = root / "fake-known-hosts"
+    filestation_password = root / "filestation-password"
+    filestation_ca = root / "filestation-ca.pem"
     jellyfin_key = root / "fake-jellyfin-key"
-    for path in (ssh_key, known_hosts, jellyfin_key):
+    for path in (filestation_password, filestation_ca, jellyfin_key):
         path.write_text("offline fixture\n", encoding="utf-8")
+    os.chmod(filestation_password, 0o600)
 
     generic_media_calls = []
     generic_result = runner.run_once(
@@ -265,11 +266,9 @@ with tempfile.TemporaryDirectory(prefix="stg9media-runner-pair-") as temp:
         visibility_seed_max_items=1,
         apply=True,
         confirm=MEDIA_CONFIRMATION,
-        ssh_host="127.0.0.1",
-        ssh_user="fixture",
-        ssh_key_path=ssh_key,
-        ssh_known_hosts_path=known_hosts,
-        library_root="/library",
+        filestation_password_path=filestation_password,
+        filestation_ca_path=filestation_ca,
+        library_root="/volume1/video/video2/JAV",
         poster_proxy_url="http://127.0.0.1:9",
         jellyfin_base_url="http://127.0.0.1:9",
         jellyfin_key_path=jellyfin_key,
