@@ -1,10 +1,14 @@
 # Downloader non-subtitle workstream — active work
 
 WORKSTREAM: downloader
-TASK_ID: DLDWS-001
+TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
+
+## CURRENT JOINT STAGE9 OPERATIONS PARTICIPATION — 2026-10-27
+
+User-approved `STG9MEDIA-001` temporary operational overlay. Preserve existing DLDWS-001 work and history. Deploy the canonical generic Completion Runner `--skip-media` in the CT108 wrapper without altering the 60-second schedule, downloads, MP4 processing, Organizer, metadata recovery, shared locks, or retries. Verify that generic execution excludes Stage9 Media and the dedicated Stage9 route alone owns it. No Downloader source rewrite, forced jobs, Writer socket modification, or unrelated service changes. Local CT108 root is specifically allowed for the dedicated Stage9 service; Synology publisher remains non-admin File Station. Restore `DLDWS-001` paired routing at closure. Exact approval and preflight are recorded in Governance/Stage9.
 
 **Historical metadata normalization (2026-10-23, DLDWS-001):** Only the five unquoted fields above define the live workstream task. Older approvals and execution evidence below remain in this document; their repeated metadata labels are quoted solely so the unchanged governance validator does not mistake historical declarations for live ones. The exact complete pre-normalization file is preserved byte-for-byte at `docs/governance/downloader/history/DLDWS-001_ACTIVE_WORK_before_field_normalization_ac476f4.md` (Git blob `5a4a886596fae7e56ed8a2940a24ce07e6892728`). Future historical entries must quote metadata lines or express them as prose. This changes no task authorization, safety boundary or execution result.
 

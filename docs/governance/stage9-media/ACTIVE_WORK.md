@@ -4,7 +4,26 @@ WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: stage9-media
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
+
+## CURRENT USER-APPROVED STAGE9 OPERATIONS CUTOVER — 2026-10-27
+
+Teddy chose **CT108 local root** for the dedicated Stage9 service to reuse the root-only media DB/WAL and shared `0600` title locks without broad permission changes; this replaces ONLY the prior local non-root execution rule. The NAS connection remains non-administrator **`stage9_media` File Station HTTPS**, not NAS root or administrators-group SSH. Existing source implementation, skip-media smoke fix and historical CLOSED authorizations are preserved.
+
+### APPROVED_SCOPE
+
+- After narrow read-only live preflight, deploy the current immutable Stage9 File Station release and root-private NAS password, CA and Jellyfin credential files. Retain TLS hostname and pinned CA checks, exact JAV path mapping, create-only sidecar handling, and no-overwrite/fail-closed protections.
+- Point the old generic CT108 wrapper at the already-promoted Completion Runner with `--skip-media`, preserving its existing 60-second service and all non-media behavior. Start a dedicated hourly Stage9 timer only after verifying no double scheduling. One media item maximum per invocation, bounded Jellyfin calls, up to five minutes randomized delay and Stage9-only failure-stop.
+- Check current DB/schema and verified backup without resetting retries or replaying completed jobs. Grant only verified minimum real JAV sidecar create permission to the existing Synology principal if needed; stop on unknown permission or File Station Download HTTP 502. Observe one normal scheduled item and check DB/NFO/poster/Jellyfin outcomes against existing content protection.
+
+### PROHIBITED_SCOPE
+
+- No root/admin SSH publisher on NAS, TLS disablement, broad NAS/CT108 ACL expansion, existing MP4/NFO/poster overwrite/delete, synthetic ACL re-test, bulk retry/processing, other workstreams' product changes, Writer socket change, or Stage11 activity. No full refactor until Stage9 complete; report a subsequent read-only full-code audit separately before seeking refactor approval.
+
+### EVIDENCE / NEXT_DECISION
+
+- Canonical remote source SHA before registration `3f159e175e4b2c915158b900e8e96a0ef9ddd792`; offline skip-media regression repaired. Actual CT108 old wrapper SHA `e49be466924287f328ea4d482b6a4806f0142cb4b8a71268c25bdb2365552b39`, old release `a671444bd293fc98a754f7f051acbcbdded4b83a`, no `--skip-media`, generic timer `inactive/enabled`, dedicated timer not installed. Root-only paths and DB verified; `acl` package installed but no ACL change. Live File Station/JAV permission, Download 502, and one scheduled Stage9 run remain UNVERIFIED/NOT_RUN.
+- Proceed only after current state and NAS permissions satisfy bounded preflight. Close with original workstream routes restored; preserve all completed jobs and DLDWS-001 evidence.
 
 ## APPROVED OFFLINE SMOKE FOLLOW-UP — 2026-10-27
 

@@ -1,10 +1,14 @@
 # Discovery Writer Safety workstream — active work
 
 WORKSTREAM: discovery-writer-safety
-TASK_ID: DLDWS-001
+TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
+
+## CURRENT JOINT STAGE9 OPERATIONS PARTICIPATION — 2026-10-27
+
+User-approved `STG9MEDIA-001` temporary participation only to preserve the existing Writer socket lifecycle and shared title locks during the Stage9 scheduled-owner transition. No Writer socket source, test, service, socket, permission, data, or evidence change. Preserve DLDWS-001 history and restore paired routing at closure; exact cutover boundaries are in Governance/Stage9.
 
 **Historical metadata normalization (2026-10-23, DLDWS-001):** Only the five unquoted fields above define the live workstream task. Older approvals and execution evidence below remain in this document; their repeated metadata labels are quoted solely so the unchanged governance validator does not mistake historical declarations for live ones. The exact complete pre-normalization file is preserved byte-for-byte at `docs/governance/discovery-writer-safety/history/DLDWS-001_ACTIVE_WORK_before_field_normalization_ac476f4.md` (Git blob `348c0957a5feb0833dfd1467a07cf9f995e373b8`). Future historical entries must quote metadata lines or express them as prose. This changes no task authorization, safety boundary or execution result.
 

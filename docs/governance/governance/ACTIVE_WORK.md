@@ -1,10 +1,31 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: NONE
-STATUS: INACTIVE
+TASK_ID: STG9MEDIA-001
+STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.1
-REQUIRES_WORKSTREAMS: governance
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
+
+## CURRENT JOINT STAGE9 OPERATIONS AUTHORIZATION — 2026-10-27
+
+Teddy explicitly approved local CT108 **root** execution for the dedicated Stage9 service on 2026-10-27, superseding only the previous *local non-root* service requirement. Stage9 NAS access MUST use existing non-admin `stage9_media` over verified HTTPS File Station, never administrator SSH. Prior joint operations records remain CLOSED historical evidence.
+
+### APPROVED_SCOPE
+
+- Temporarily route Governance, Downloader, Discovery Writer Safety, and Stage9 together as `STG9MEDIA-001`, preserving all DLDWS-001 and Stage11 work.
+- Deploy the already-promoted immutable File Station Stage9 runtime, update only the generic wrapper to use existing `--skip-media`, retain the generic 60-second schedule/downloads/Organizer/metadata recovery, and install a separate Stage9 hourly randomized timer/service with max one item per run and Stage9-only failure-stop.
+- Before production writes, confirm CT108 provenance and current service state, private credentials/CA, database integrity and backup, shared locks, NAS create-only sidecar rights, and a single-owner Stage9 scheduling path. Verify only one natural scheduled representative run and its DB/NFO/poster/Jellyfin effects; report no-work separately from actual publication.
+- Local root preserves current root-only DB/WAL, Discovery read access, and shared title-lock semantics, without broad local ACL or ownership changes. NAS publisher remains least-privileged, with pinned TLS and existing no-overwrite protections.
+
+### PROHIBITED_SCOPE
+
+- No broad ACL laboratory or recursive chmod/chown, NAS administrator SSH publisher, TLS bypass, existing MP4/NFO/poster overwrite/delete, retry resets, bulk processing, new Stage9 code implementation, Writer socket changes, Stage11 work, or unrelated Downloader behavior changes. Stop if File Station Download 502 or actual JAV create-only permission remains unresolved.
+- No full Downloader code refactoring until Stage9 is complete. After Stage9 and the separately planned four MP4 recovery items, review the full Downloader source read-only, report duplicates/structural issues, and obtain separate refactoring approval.
+
+### EVIDENCE AND NEXT_DECISION
+
+- Latest verified remote branch before registration: `3f159e175e4b2c915158b900e8e96a0ef9ddd792`; Stage9 skip-media smoke was previously repaired. CT108 generic timer `inactive/enabled` and old wrapper SHA `e49be466924287f328ea4d482b6a4806f0142cb4b8a71268c25bdb2365552b39` with no `--skip-media`; dedicated timer absent. Root-only directories and DB confirmed. Debian `acl` package installed, no permissions changed. All production Stage9 deployment and NAS/Jellyfin writes remain NOT_RUN.
+- Proceed with narrow read-only live preflight. On completion or blocker, restore original routes (Governance `INACTIVE/NONE`, Downloader and Writer `DLDWS-001` with paired requirements, Stage9 `STG9MEDIA-001` alone), preserving Stage11.
 
 ## OBJECTIVE
 
