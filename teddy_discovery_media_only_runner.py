@@ -15,7 +15,6 @@ import fcntl
 import json
 import os
 import re
-import shutil
 import sqlite3
 import stat
 import sys
@@ -27,10 +26,10 @@ MAX_ITEMS_LIMIT = 100
 MAX_VISIBILITY_LIMIT = 100
 MAX_JELLYFIN_GET_REQUESTS = 1000
 REQUIRED_RUNTIME_MODULES = (
-    "teddy_discovery_completion_ssh.py",
     "teddy_discovery_ids.py",
     "teddy_discovery_jellyfin.py",
     "teddy_discovery_jellyfin_visibility.py",
+    "teddy_discovery_media_filestation.py",
     "teddy_discovery_media_jobs.py",
     "teddy_discovery_media_metadata.py",
     "teddy_discovery_media_pipeline.py",
@@ -105,10 +104,8 @@ class RunnerConfig:
     target_dvd_id: str | None = None
     apply: bool = False
     confirm: str = ""
-    ssh_host: str = ""
-    ssh_user: str = ""
-    ssh_key_path: str | Path | None = None
-    ssh_known_hosts_path: str | Path | None = None
+    filestation_password_path: str | Path | None = None
+    filestation_ca_path: str | Path | None = None
     library_root: str = ""
     poster_proxy_url: str = ""
     jellyfin_base_url: str = ""
@@ -350,26 +347,26 @@ def _validate_runtime(expected_release_id: str | None) -> Path:
 
 
 def _validate_remote_config(config: RunnerConfig) -> None:
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,254}", config.ssh_host):
-        raise RunnerError("INVALID_SSH_HOST")
-    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]{0,63}", config.ssh_user):
-        raise RunnerError("INVALID_SSH_USER")
-    if shutil.which("ssh") is None:
-        raise RunnerError("SSH_CLIENT_UNAVAILABLE")
-    for path in (
-        config.ssh_key_path,
-        config.ssh_known_hosts_path,
-        config.jellyfin_key_path,
-    ):
+    for path in (config.filestation_password_path, config.filestation_ca_path, config.jellyfin_key_path):
         if path is None:
             raise RunnerError("REQUIRED_CREDENTIAL_PATH_MISSING")
         _normal_path(path, allow_missing=False, expected="file")
+    try:
+        from teddy_discovery_media_filestation import validate_password_file
+
+        validate_password_file(config.filestation_password_path)
+    except ImportError as exc:
+        raise RunnerError("FILESTATION_RUNTIME_MODULE_MISSING") from exc
+    except Exception as exc:
+        code = getattr(exc, "code", "FILESTATION_CREDENTIAL_PREFLIGHT_FAILED")
+        raise RunnerError(str(code)) from exc
     remote = PurePosixPath(config.library_root)
     if (
         not config.library_root
         or not remote.is_absolute()
         or ".." in remote.parts
         or remote.as_posix() != config.library_root
+        or config.library_root != "/volume1/video/video2/JAV"
     ):
         raise RunnerError("INVALID_LIBRARY_ROOT")
     try:
@@ -520,13 +517,13 @@ def _exclusive_run_lock(path: Path):
 
 
 class _LibraryStatOnly:
-    """Narrow the pipeline's SSH surface to a read-only video stat."""
+    """Narrow the pipeline's remote surface to a read-only video stat."""
 
-    def __init__(self, ssh):
-        self.__ssh = ssh
+    def __init__(self, media_remote):
+        self.__media_remote = media_remote
 
     def stat_library(self, relative_path):
-        return self.__ssh.stat_library(relative_path)
+        return self.__media_remote.stat_library(relative_path)
 
 
 class _RejectJellyfinRedirects(urllib.request.HTTPRedirectHandler):
@@ -567,44 +564,48 @@ class _JellyfinRequestBudget:
 
 
 def _build_services(config: RunnerConfig, normalized: dict) -> dict:
-    from teddy_discovery_completion_ssh import CompletionSSH
     from teddy_discovery_jellyfin import JellyfinClient
     from teddy_discovery_jellyfin_visibility import reconcile_jellyfin_visibility
     from teddy_discovery_media_jobs import reconcile_media_jobs, run_retryable_media_jobs
     from teddy_discovery_media_metadata import make_poster_fetcher
     from teddy_discovery_media_pipeline import run_media_pipeline
-    from teddy_discovery_media_publish import MediaMetadataSSHMutator
+    from teddy_discovery_media_filestation import (
+        SynologyFileStationMediaAdapter,
+        make_tls_context,
+    )
 
     get_budget = _JellyfinRequestBudget(
         normalized["jellyfin_get_max_requests"],
         normalized["max_items"],
     )
-    ssh = CompletionSSH(
-        host=config.ssh_host,
-        user=config.ssh_user,
-        key=os.fspath(config.ssh_key_path),
-        known_hosts=os.fspath(config.ssh_known_hosts_path),
-        downloads_root=config.library_root,
-        library_root=config.library_root,
-    )
+    # Build and verify the pinned TLS context before media-job registration
+    # can mutate the Stage9 DB. The adapter itself opens a session only while
+    # processing one bounded media job.
+    try:
+        tls_context = make_tls_context(config.filestation_ca_path)
+    except Exception as exc:
+        code = getattr(exc, "code", "FILESTATION_TLS_PREFLIGHT_FAILED")
+        raise RunnerError(str(code)) from exc
     jellyfin = JellyfinClient(
         base_url=config.jellyfin_base_url,
         api_key_path=config.jellyfin_key_path,
         opener=get_budget,
     )
     fetcher = make_poster_fetcher(config.poster_proxy_url)
-    mutator = MediaMetadataSSHMutator(ssh)
-    readonly_ssh = _LibraryStatOnly(ssh)
-
     def processor(dvd_id):
-        return run_media_pipeline(
-            db_path=normalized["discovery_db_path"],
-            dvd_id=dvd_id,
-            ssh=readonly_ssh,
-            metadata_mutator=mutator,
-            jellyfin=jellyfin,
-            fetcher=fetcher,
-        )
+        with SynologyFileStationMediaAdapter(
+            password_file=config.filestation_password_path,
+            ca_file=config.filestation_ca_path,
+            tls_context=tls_context,
+        ) as media_remote:
+            return run_media_pipeline(
+                db_path=normalized["discovery_db_path"],
+                dvd_id=dvd_id,
+                ssh=_LibraryStatOnly(media_remote),
+                metadata_mutator=media_remote,
+                jellyfin=jellyfin,
+                fetcher=fetcher,
+            )
 
     return {
         "reconcile": reconcile_media_jobs,
@@ -725,10 +726,8 @@ def _config_from_args(args) -> RunnerConfig:
         target_dvd_id=args.target_dvd_id,
         apply=args.apply,
         confirm=args.confirm,
-        ssh_host=args.ssh_host or "",
-        ssh_user=args.ssh_user or "",
-        ssh_key_path=args.ssh_key,
-        ssh_known_hosts_path=args.ssh_known_hosts,
+        filestation_password_path=args.filestation_password_file,
+        filestation_ca_path=args.filestation_ca_file,
         library_root=args.library_root or "",
         poster_proxy_url=args.poster_proxy_url or "",
         jellyfin_base_url=args.jellyfin_base_url or "",
@@ -752,10 +751,8 @@ def main(argv=None) -> int:
     parser.add_argument("--jellyfin-get-max-requests", type=int)
     parser.add_argument("--target-dvd-id")
     parser.add_argument("--expected-release-id")
-    parser.add_argument("--ssh-host")
-    parser.add_argument("--ssh-user")
-    parser.add_argument("--ssh-key", type=Path)
-    parser.add_argument("--ssh-known-hosts", type=Path)
+    parser.add_argument("--filestation-password-file", type=Path)
+    parser.add_argument("--filestation-ca-file", type=Path)
     parser.add_argument("--library-root")
     parser.add_argument("--poster-proxy-url")
     parser.add_argument("--jellyfin-base-url")

@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 import hashlib
 import importlib
+import os
 import sqlite3
 import subprocess
 import sys
@@ -148,19 +149,18 @@ def make_config(root: Path, *, apply=False, target=None, **overrides):
         target_dvd_id=target,
         apply=apply,
         confirm=runner.CONFIRMATION if apply else "",
-        ssh_host="localhost" if apply else "",
-        ssh_user="tester" if apply else "",
-        ssh_key_path=root / "ssh-key" if apply else None,
-        ssh_known_hosts_path=root / "known-hosts" if apply else None,
-        library_root="/volume/adult" if apply else "",
+        filestation_password_path=root / "filestation-password" if apply else None,
+        filestation_ca_path=root / "filestation-ca.pem" if apply else None,
+        library_root="/volume1/video/video2/JAV" if apply else "",
         poster_proxy_url="http://127.0.0.1:8123" if apply else "",
         jellyfin_base_url="http://127.0.0.1:8096" if apply else "",
         jellyfin_key_path=root / "jellyfin-key" if apply else None,
         **overrides,
     )
     if apply:
-        (root / "ssh-key").write_text("synthetic", encoding="utf-8")
-        (root / "known-hosts").write_text("synthetic", encoding="utf-8")
+        (root / "filestation-password").write_text("synthetic-password\n", encoding="utf-8")
+        os.chmod(root / "filestation-password", 0o600)
+        (root / "filestation-ca.pem").write_text("synthetic CA fixture", encoding="utf-8")
         (root / "jellyfin-key").write_text("synthetic", encoding="utf-8")
     return config
 
@@ -196,6 +196,8 @@ def import_is_side_effect_free():
     source = Path(module.__file__).read_text(encoding="utf-8")
     for forbidden_text in (
         "teddy_discovery_completion_runner",
+        "teddy_discovery_completion_ssh",
+        "MediaMetadataSSHMutator",
         "plan_remote_downloads",
         "recover_held_metadata",
         "process_one(",
