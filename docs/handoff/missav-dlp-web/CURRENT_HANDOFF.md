@@ -1,5 +1,28 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## CURRENT USER APPROVAL — DLDWS-001 EXISTING IMAGE FINAL VALIDATION (2026-10-28)
+
+### OBJECTIVE
+
+Reuse the existing verified Python 3.10 image and exact product candidate, correct only the isolated fixture storage capacity, complete remaining mandatory regression/boundary checks and conditionally promote the verified candidate. Writer systemd-socket-only design remains final; no direct-mode redesign. DLDWS-001 IN_PROGRESS, downloader,discovery-writer-safety, contract versions 1.0.0. Registration base 887ca3bf636b24327c799814d19e9e5fb70c2679; no routing/contract/task change.
+
+### APPROVED_SCOPE
+
+- Register this identical approval in both ACTIVE_WORK files and canonical handoff, run governance/diff checks, normal fast-forward and exact remote readback before validation. Verify protected image sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31, exact tag, candidate-products manifest SHA a8413545d96eda73eeeed346393e7d8179f4c3516f1e68ef6fcca1de33f3bf29, source and historical Writer/build/final-image evidence. Preserve previous failure and all existing evidence without mutation; use new isolated evidence and current-base product worktree only.
+- Check actual host memory/container limits and availability before providing a small synthetic fixture filesystem, preferably 2GiB tmpfs, without pressure or production mounts. Verify actual free bytes after fixture allocation exceed the unchanged 512MiB safety floor with margin. Use unique disposable network-none test container, resource/time limits, no operational mounts. No image rebuild/retag or product/test assertion/config/guard change.
+- Gate A: rerun ONLY test_late_postprocessor_failure_does_not_rewrite_job with unchanged assertion/source and sufficient storage; record free space, reach of injected postprocessor, held result and preserved job/source. On FAIL stop remaining validation and product promotion, retain evidence; do not repair/repeat without explicit approval.
+- Gate B after A PASS: reuse exactly the remaining 10 prior-unexecuted startup cases, existing 13 atomic-save and 14 mocked NAS no-clobber cases, 4 download/1 global MP4, journal/recovery, HLS/legacy TS/fragment and library500 API/UI fixtures. Cite prior 12 startup PASS without needlessly repeating. Synthetic only; no real download/remux/NAS operations.
+- Gate C after B PASS: minimally verify Writer client/activation protocol, Stage9 generic/dedicated runner separation, task/local-result/hash fields, Stage11 input/sidecar boundary, Stage12 provenance/no-overwrite and expected unchanged Stage9/11/12 source hashes. No real stage/model/subtitle/media operations or untested quality PASS.
+- ONLY IF existing image/candidate/provenance, historical Writer/build/source evidence, A/B/C, scope/governance and exact latest remote fast-forward ALL PASS, promote exact preserved Writer lifecycle/smokes, nine Downloader modules/template, unchanged candidate Dockerfile and hash manifest plus necessary source provenance/results from a new isolated current-base Git tree. Verify remote HEAD and every promoted file hash. On FAIL/UNKNOWN, publish only actual result documentation; no product promotion.
+
+### PROHIBITED_SCOPE
+
+No image build/retag/overwrite, Writer service/socket/systemd modification/restart, operating Downloader container/deploy/restart, product code/test assertion/Dockerfile/Writer implementation edits beyond exact candidate promotion, safety reserve changes/bypass, real download/retry/remux, operating tasks/queue/DB/NAS/Jellyfin/media/subtitle mutation, Stage9/11/12 code/model/service/timer modification, protected candidate/evidence/dirty tree alteration, secrets in Git, test repair/repetition after failure without approval, broad refactor/new workstream/router/contract change or operating deployment.
+
+### ACCEPTANCE_CRITERIA AND NEXT_DECISION
+
+Report authorization, image identity, candidate integrity, actual post-allocation fixture capacity, failed-case rerun, remaining Downloader/stage boundaries, historical Writer/build/final source evidence, conditional promotion and production invariance separately. Preserve historic failure rather than reclassifying it. SOURCE POLICY IS SYSTEMD-SOCKET ONLY; no renewed design decision needed. If any gate fails or is unknown, stop and record cause. Production deployment requires separate explicit approval and fresh maintenance/replay/rollback checks. PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
+
 ## DLDWS-001 ACTIVATION-ONLY RESULT — WRITER/BUILD PASS; FIXTURE CAPACITY FAIL (2026-10-28 KST)
 
 DESIGN_DECISION_REGISTERED=PASS; WRITER_ACTIVATION_DESIGN=PASS; WRITER_ACTIVE_SOCKET_PROTECTION=PASS; WRITER_RESTART_RECOVERY=PASS; WRITER_PROTOCOL_DB_COMPATIBILITY=PASS; WRITER_SMOKE=PASS; PYTHON310_BUILD=PASS; FINAL_IMAGE_SOURCE_MATCH=PASS; DOWNLOADER_REGRESSION=FAIL; STAGE9_11_12_BOUNDARY=INCOMPLETE; CANONICAL_PRODUCT_PROMOTION=BLOCKED; PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
