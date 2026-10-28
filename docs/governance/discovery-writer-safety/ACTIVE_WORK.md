@@ -6,6 +6,28 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
+## DLDWS-001 WRITER LIFECYCLE RESULT — DIRECT/ACTIVATION DECISION REQUIRED (2026-10-28 KST)
+
+WRITER_CANDIDATE_PROVENANCE=PASS; WRITER_DESIGN_COMPATIBILITY=REVIEW_REQUIRED; WRITER_SAFETY=INCOMPLETE; WRITER_STALE_RECOVERY=INCOMPLETE; WRITER_SMOKE=NOT_RUN; PYTHON310_BUILD=NOT_RUN; FINAL_IMAGE_SOURCE_MATCH=NOT_RUN; DOWNLOADER_REGRESSION=INCOMPLETE; STAGE9_11_12_BOUNDARY=INCOMPLETE; CANONICAL_PRODUCT_PROMOTION=BLOCKED; PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
+
+### Actual comparison and current operation
+
+- Approval commit 56ec7c1fba45f1b3a728d55b59a428535d6b63e2 was normally fast-forwarded/read back before comparison. Preflight canonical 38cfeacaabbbfd2981635de4404509be35aebe37 matched remote. Reverified all 2399 prior phase2 preserved files under manifest e683cba4b2e8a87ddd009901cb93773a563259596a7ef2bf925cc93798a772de and all previous Writer review entries under manifest 4a19a4f945966da15d232262b1db5d0fd8a0e62cac8bdc2ecc8cf5513fb99d26. Old candidates/releases/evidence untouched.
+- Canonical Writer SHA-256 8898087c4830a6e2729c5593377224a9cfa518147aa0ec40bdc554cba392410e: direct serve/automatic stale unlink, no inherited-listener support; exact previously demonstrated active-replacement unlink source. Historical collision summary/full log hashes and failed-race-fix evidence were rechecked, not rerun.
+- Exact B-option commit b0831048b3788b9a86a180f040b0152145a079c7 was read from the original Git object store without editing its worktree. Writer SHA-256 365283b48fc4bf0d9556d9896cd1f71f7cf3157e44fcfaffafbf2a5c6d00b66e: service serve requires --systemd-socket/FD3, but unsafe legacy direct-cleanup helper remains. Its prior legacy/activation PASS is not proof that its direct helper passes mandatory collision safety.
+- Actual immutable operating Writer SHA-256 709999d4c10701a284a9e96f7facdf3b41ac3179fd5bf944c6cb8bf400fbf83d: activation-only service startup, explicit descriptor-only close; _prepare_socket_parent refuses existing socket paths including stale rather than unlinking. This differs from both B-option and canonical. All six immutable release files match the preserved package manifest in this read-only recheck.
+- Failed direct race-fix SHA-256 b8f6f638231bb13bb8dabcb5a3bb28907d515985c3ab8d17109cb801311c5c55: refuses stale unlink; preserved active/collision PASS but stale recovery FAIL, not a completed solution. Historical summary SHA d7a7adee3ddc2570e5b770904304bb1947e05388a4286fb1334602cac0ce45d4 reverified.
+- All four variants' protocol validator, frame reader, request handler, DB/provenance engine and UnixSocketDiscoveryWriterClient ASTs match. Exact variant diffs/hashes and canonical/B-option/strengthened/activation smokes are separately captured. No smoke assertion changed; prior unsafe-unlink negative control remains mandatory, not skipped or relabeled.
+- Actual current service is active/running PID 53232 and ExecStart uses the immutable 709999... source with --systemd-socket. Actual socket UID0/GID988/mode0660; unit active with Accept=no, root:teddy-library-discovery-writer, SocketMode0660, DirectoryMode0750, RemoveOnStop=no. Final readback shows same PID/state. No health request/socket I/O/DB open was made, so previous READY remains historical. No operating service/socket/systemd/Docker/data/model change.
+
+### Explicit decision gate and next action
+
+No existing variant provides both the canonical direct-mode automatic stale recovery contract and verified adversarial active-path/identity-collision protection. Taking B-option alone leaves the unsafe helper; taking the operating release changes canonical direct support; taking the other race fix fails direct stale recovery. The user explicitly requires stopping if direct cleanup removal/support change or a new direct-vs-activation policy is needed. Therefore no Writer candidate was selected or modified, no new product tree/edit/test/build/promotion proceeded; tests/builds executed this attempt=0 and new image ID=NONE. This is a design-compatibility stop, not a new safety-test failure. Existing successful activation operation is not reclassified as failed.
+
+Required decision: whether to retire canonical application-managed direct-mode automatic stale cleanup and align supported service startup with the CURRENT operating --systemd-socket lifecycle. If approved, preserve inherited FD ownership/close semantics and protocol and validate restart/recovery via the systemd-owned socket lifecycle, retaining historical direct FAIL and collision negative controls. No operating service change is proposed or performed. If direct automatic recovery must remain supported, existing candidates do not supply a validated solution; do not invent a design here.
+
+New evidence: /opt/missav-dlp-web/source-evidence/dldws001-writer-lifecycle-20261028-ev8n9trv, root-owned0700, with sources/, pairwise diffs, runtime metadata and RESULT.json/RESULT.md. RESULT.md SHA-256 650e196e3dc44b836d25d4f063484e75bd35bcfdd7936b7e65b8109a94c912ed; evidence-sha256.json SHA-256 1aab4dca60ab6da14b27fd1073dbdfd4c0b116185a9c23ba5d5746ae9effa4d9. Only paired ACTIVE_WORK/handoff result documents changed. DLDWS-001 remains IN_PROGRESS with the same paired requirement and 1.0.0 contracts; all other routes, stage code/models/services, prior history and backup policy unchanged. Any later promotion still requires all Writer/Python3.10/final-overlay/Downloader/stage-boundary gates; operating deployment requires separate explicit approval and maintenance/replay/rollback checks.
+
 ## CURRENT USER APPROVAL — DLDWS-001 WRITER LIFECYCLE RESTORATION / PHASE 2 (2026-10-28)
 
 ### OBJECTIVE
