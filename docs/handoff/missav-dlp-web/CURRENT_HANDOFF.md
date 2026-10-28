@@ -14717,3 +14717,86 @@ PROHIBITED: No product source, Dockerfile, contract, router, task ID, other work
 BASE AND ACCEPTANCE: ssikgun/missav-dlp-web, teddy-subtitle-stage11, preflight remote 84df1da0aeb7bafc414e2aafb414f914131a14c5; DLDWS-001 IN_PROGRESS in downloader and discovery-writer-safety, contracts 1.0.0, common 1.0.1. Historical product promotion 53a156289b40b91e9d109f95f34fefc9958ec19c and image sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31 are evidence, not proof of reproducible future builds or production deployment. Record the same authorization and result in both ACTIVE_WORK files and canonical handoff; verify governance, diff and normal fast-forward/readback. Report conclusions and UNKNOWNs, with PRODUCT_SOURCE_CHANGED=NO, PRODUCTION_CHANGED=NO, DEPLOY=NOT_RUN.
 
 NEXT_DECISION: User reviews the concrete first small refactoring proposal; no implementation or operational deployment is authorized by this audit.
+
+## DLDWS-001 READ-ONLY STRUCTURE AUDIT — RESULT (2026-10-28 KST)
+
+CANONICAL_PREFLIGHT=PASS; SOURCE_OWNERSHIP_MAP=PASS; BUILD_CHAIN_AUDIT=INCOMPLETE; OVERLAY_DUPLICATION=CONFIRMED; CROSS_STAGE_BOUNDARY=PASS (scoped static interfaces and prior evidence only); REFACTOR_PLAN=READY; PRODUCT_SOURCE_CHANGED=NO; PRODUCTION_CHANGED=NO; BUILD=NOT_RUN; DEPLOY=NOT_RUN.
+
+The 21 pre-PWA patch scripts plus PWA script run before the final overlay. Seven Python paths and index.html exist both at root and overlay and have different bytes; all seven Python pairs also have different ASTs. Safety and MP4 queue modules exist only in the overlay. Dockerfile pre-overlay checks test intermediate files; SHA/compile checks follow the overlay. Mixed patches also alter surviving teddy_network.py, teddy_proxy_pool.py, templates/teddy-proxy.js and the generated PWA icon, so no whole patch is approved for deletion. Individual patch necessity and final behavior remain unproven without a future isolated build; historical verified image evidence was read, not rerun. Floating base, uv, SpoofDPI, apt and package inputs prevent a claim of byte-identical future image reproduction.
+
+The concrete first proposed change is Dockerfile only: move the existing post-UI-patching teddy_library_ui_smoke.py invocation from its current pre-overlay location to immediately after the final overlay SHA/compile command; retain the earlier root-stage smoke. In a separately approved isolated Python 3.10 build, the existing smoke must pass on final index.html, all ten overlay manifest hashes must match, existing build checks must pass, and relevant non-overlay Stage sources must remain unchanged. On failure stop; revert the one Dockerfile commit. This checks the actual final UI before source consolidation. It is a plan, not implementation authorization.
+
+A later admin source consolidation needs special care: the current build smoke calls root admin.manual_retry, but the final overlay admin omits it and uses core._teddy_safe_retry_task. Adapt the existing smoke to the actual safe retry interface under separate approval before considering consolidation. Detailed source roles, all patch targets, boundaries and four-step plan are recorded in CURRENT_HANDOFF under DLDWS-001 STRUCTURE AUDIT DETAIL. No Stage9/11/12 product-quality or current production-state claim is made.
+
+## DLDWS-001 STRUCTURE AUDIT DETAIL (2026-10-28 KST)
+
+### Source and execution map
+
+Canonical audit base 84df1da0aeb7bafc414e2aafb414f914131a14c5; approval registered/read back at 5063e681101a678d160be1be2d30bf66fa439570. Historical product commit 53a156289b40b91e9d109f95f34fefc9958ec19c, isolated image sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31 and candidate manifest a8413545d96eda73eeeed346393e7d8179f4c3516f1e68ef6fcca1de33f3bf29 were read as prior evidence. Final-image source manifest SHA-256 89e86f309639c782f5175ccab698386f74ccdd3b386409abd4bbeb3ab4f6e633. Past Downloader and Stage9/11/12 boundary PASS is not a new test run or evidence of present production state.
+
+Dockerfile:1-24 copies the repository after Python 3.10 dependency installation. Lines 26-70 compile/check ROOT files, then lines 73-94 run the first eleven patch scripts and the bootstrap sed. Lines 96-101 verify that intermediate runtime. Lines 104-114 run ten source/UI patch scripts, followed by asset injection and PWA patch at 131-150. Lines 152-170 check the intermediate UI/runtime. Lines 172-175 finally copy downloader_runtime_overlay over /app, check the ten-file hash manifest and compile nine overlay Python modules. CMD at 182 runs /app/teddy_bootstrap.py, which imports teddy_entrypoint as reliability (bootstrap:12); entrypoint imports app as core (entrypoint:10). Bootstrap installs routing, safety, Discovery and other services and starts the MP4 queue and download workers at 445-456. The remaining root modules, static assets and Writer source are not replaced by this overlay.
+
+The nine overlay Python modules and template are the verified image sources. Their ten full hashes are in downloader_runtime_overlay/dldws001-source-sha256.txt; exact verified values and roles are:
+
+| Runtime path | SHA-256 | Role / root relationship |
+| --- | --- | --- |
+| app.py | f2ffdc1542f1203e7c533bf0116d617bb9f7d2a9d9fb937455b75f17d640244e | Task state, workers and web core; different root AST. |
+| teddy_bootstrap.py | b96850dbfaa585f5cf2abb3fdbe328030706fc159aba8875656fe2c775e433f3 | Runtime composition, claims, routing and publish dispatch; different root AST. |
+| teddy_download_safety.py | 52e1801aa35745891ea8c6946efde20c9752598bdfeedf20c5f13a7581966d03 | Locks, space, HLS identity, guarded conversion and no-clobber; no root file. |
+| teddy_downloader_admin.py | 73984205a2340a05a930132bf248bb1a8c07125391167aa9d5e1c072f247cb31 | Bulk retry/admin boundary; different root AST and interface. |
+| teddy_entrypoint.py | c36799eace49e3f6df7fbdce69524c6f9f5d31a8b4588d1d65f14993b44c1357 | HLS, retry/resume and MP4 admission; different root AST. |
+| teddy_generic.py | f19362ebeecf6d517c7acbe97629c2c34f97017957c0a324d090fc45b6abf339 | Generic yt-dlp execution; different root AST. |
+| teddy_mp4_queue.py | bd2f29b1df32cef4e60d2eb2b93637157d0f3e0fd38a706f4ef0312a835a3d53 | Durable global MP4 queue and recovery; no root file. |
+| teddy_routing.py | 275607b2249029b689e701cdddf45b960c552d8099b23a554e20a54f3f212231 | URL admission, mode and route; different root AST. |
+| teddy_storage.py | d678abce28a0545d7e9d47633f79cff729c18d7e9436b82c2c31c2921fe914f9 | Local/final storage and NAS verified publication; different root AST. |
+| templates/index.html | 4d379e37c76e25781ea4eda8d169af5f24d70a4d53ef74808dc088c37b85766f | Final web shell; different root bytes. |
+
+### Ordered patch classification
+
+O = output path is overwritten by the final overlay, so a duplication candidate for runtime output only; it may still be a required intermediate anchor/check. S = at least one written output survives the final overlay or is an input to another patch; keep until separately proven. U = runtime necessity is not established merely by the static map. None is approved for removal in this audit.
+
+| Order | Script | Observed write targets and classification |
+| --- | --- | --- |
+| 1 | teddy_patch_vpn_health.py | entrypoint/bootstrap/routing O; teddy_network.py S. |
+| 2 | teddy_patch_proxy_pool.py | generic O; teddy_proxy_pool.py S. |
+| 3 | teddy_patch_proxy_speed.py | bootstrap O; proxy_pool, teddy_patch_routing.py and templates/teddy-proxy.js S. |
+| 4 | teddy_patch_task_claim_remux.py | entrypoint/bootstrap O; used by subsequent anchors and intermediate verification, U. |
+| 5 | teddy_patch_proxy_learning.py | entrypoint/bootstrap O; proxy_pool, routing patch and proxy JS S. |
+| 6 | teddy_patch_proxy_task_sync.py | proxy_pool S. |
+| 7 | teddy_patch_proxy_engine_recovery.py | bootstrap O; intermediate verification U. |
+| 8 | teddy_patch_extraction_pause.py | app/entrypoint O; runtime verifier checks intermediate markers U. |
+| 9 | teddy_patch_hls_transport.py | entrypoint O; later HLS patch and checks depend on it U. |
+| 10 | teddy_patch_hls_pool_clients.py | entrypoint O; Dockerfile:87-89 and teddy_verify_build.py:180-187 check intermediate markers U. |
+| 11 | teddy_patch_hls_transport_bridge.py | bootstrap O; Dockerfile:93-94 checks intermediate wrapper U. |
+| 12 | teddy_patch_index.py | index.html O; later UI patches and checks depend on its anchors U. |
+| 13 | teddy_patch_logs.py | index.html O; intermediate UI dependencies U. |
+| 14 | teddy_patch_storage.py | index.html O; intermediate UI dependencies U. |
+| 15 | teddy_patch_routing.py | index.html O; script itself was modified by earlier proxy patches and supplies later UI anchors U. |
+| 16 | teddy_patch_ytdlp_options.py | index.html O; intermediate checks U. |
+| 17 | teddy_patch_browser.py | index.html O; intermediate checks U. |
+| 18 | teddy_patch_split_storage.py | generic/entrypoint/bootstrap O; later bootstrap patches and split-storage checks depend on intermediate output U. |
+| 19 | teddy_patch_browser_runtime.py | bootstrap O; auth patch and intermediate check depend on it U. |
+| 20 | teddy_patch_auth.py | bootstrap O; admin patch and intermediate check depend on it U. |
+| 21 | teddy_patch_downloader_admin.py | bootstrap O; pre-overlay compile/admin smoke and intermediate markers U. |
+| PWA | teddy_patch_pwa.py | index.html O; generated templates/teddy-icon-180.png S, and manifest/vector are checked. |
+
+Dockerfile:76 bootstrap sed and :132-135 static HTML injection also precede overlay; final overlay already contains corresponding runtime/UI material but intermediate greps and smoke tests still depend on these stages. teddy_patch_mobile.py and teddy_patch_proxy_singleflight.py are compiled but not executed by this Dockerfile. Intermediate source transformations were statically inspected; no patch was executed or removed in this audit. S denotes retained output, not proof every individual replacement is indispensable.
+
+### Responsibilities and protected interfaces
+
+- Request admission: overlay routing.enqueue_download:295-350 resolves mode, creates task, saves before queue insertion. app.py:374 and :474 own atomic save/load; app.py:991 delegates worker count to safety:217-223, capped at four. Prior save-failure evidence records that the in-memory new task may remain even though persistence/queue admission failed; do not claim a full transaction.
+- HLS segments and manifest: overlay entrypoint:136-179, :243 and :374 plus safety:786-969; MP4 queue:435/526/616/1208 owns journal, HLS/legacy TS and replay selection. The flock-protected worker and FFmpeg safety lock preserve the global one-MP4 boundary.
+- Publication: bootstrap:165-183 calls storage.publish_pending_task before cleanup; storage:503-693 and :821-917 validate source/final sizes and SHA with no-clobber. safety:550 and :1583 preserve space reserve and local no-clobber. Do not delete source, fragments or job records before approved verified publication.
+- Proxy/VPN: overlay bootstrap:12-25, :41-46 and :208-214 composes routing, network, proxy_pool and vpn_health. Those root modules and proxy JS receive surviving patch effects.
+- UI/library: final overlay index plus root templates/teddy-library.js/css; bootstrap:61 installs teddy_discovery_runtime, which installs root teddy_library_api at :184-190. Library MAX_TITLES=500 and holding bound are at teddy_library_api.py:49, :281-284; its Writer client is created at :370.
+- Writer: root teddy_library_discovery_writer.py:472-517 adopts exactly one systemd listener and rejects direct serve; :382-390 closes its FD without unlink. Its private _UnixServer constructor retains a legacy fixture branch (:375-380), which is not the supported serve path. Preserve protocol, DB/provenance, identity and no-unlink boundaries; no Writer implementation change is proposed.
+- Stage9 owns the separate media-only runner and NFO/poster/Jellyfin paths. General Completion Runner skip_media is explicit at teddy_discovery_completion_runner.py:119-125, :191-197, :243; do not merge the runners. Stage11 owns its input and sidecar logic; Stage12 validates GeneratedKoreanSRT bytes/size/SHA at teddy_discovery_subtitle_publish.py:228-300 and rejects a different existing target at :540-563. The historical boundary suite passed, but Stage11 model quality and current production operation were not checked.
+
+### Evidence-backed priorities and separate future approvals
+
+1. FIRST, Dockerfile only: move its existing second teddy_library_ui_smoke.py RUN from line 153 to after overlay SHA/compile at 174-175; retain the first pre-patch invocation at line 64 and all other guards. Benefit: the same existing check reads final index.html and unchanged root JS/CSS; no runtime file changes or patch removal. Before implementation, explicitly authorize an isolated candidate/build under DLDWS-001 and verify selected workstreams. PASS: existing smoke passes after overlay in the isolated Python 3.10 build, prior build checks pass, all 10 manifest hashes and relevant non-overlay Stage source hashes remain unchanged, no production mount; git diff --check. Record actual base/dependency identifiers because image inputs float. Risk: the old post-patch intermediate UI smoke is replaced by the final check; other intermediate verifiers remain. Roll back by reverting the one Dockerfile commit.
+2. Adapt existing teddy_downloader_admin_smoke.py and its Dockerfile invocation to verify the ACTUAL safe retry interface in a separate approved candidate. Root smoke:145 calls admin.manual_retry; overlay admin omits that symbol and routes through core._teddy_safe_retry_task (overlay admin:151-180). The current pre-overlay smoke cannot establish final admin behavior. Preserve manual/bulk retry safety assertions and compare prior evidence; do not merely remove assertions. Minimum test: existing narrowly adapted synthetic admin smoke against final runtime and one saved-state/queue admission failure check; no Writer or other Stage product change. Rollback the test/build commit; exact viability remains to be demonstrated.
+3. Only after step 2 succeeds and separately approved, pilot one-source consolidation for teddy_downloader_admin.py: copy the exact verified overlay bytes to root and remove only its overlay duplicate. Keep its existing manifest entry so the final /app file must still hash to 73984205a2340a05a930132bf248bb1a8c07125391167aa9d5e1c072f247cb31. Target files: root and overlay admin paths; any test/build adjustment requires reviewed scope. Confirm unchanged runtime hash, adjusted admin smoke and existing build checks. Other overlay modules remain. Roll back the isolated commit to restore the verified overlay. Do not infer that the same migration works for bootstrap, entrypoint or UI.
+4. Only with later explicit approval and after mapping dependent checks, examine one O-only patch at a time, starting with teddy_patch_hls_pool_clients.py. Its final entrypoint bytes are overlay-owned, but Dockerfile:87-89 and teddy_verify_build.py:180-187 inspect its intermediate result; those checks/anchor dependencies must be preserved or deliberately moved to a proven final-runtime check before deleting the script or RUN. Candidate files are Dockerfile, teddy_verify_build.py and that patch; no actual deletion has been proven safe. Minimum isolated final-source HLS queue/journal and worker-limit checks plus manifest, stage-boundary and prior build checks. Mixed network/proxy/PWA patches are not deletion candidates without independent proof. Revert each separate commit on failure.
+
+All future product/test/build work, source removal and deployment require their own explicit user approval and workstream scope. The audit itself did not change product code, execute tests, build an image or touch production.
