@@ -1,5 +1,19 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-28 — DLDLIB-001 library title-bound repair; deployment pending
+
+The user explicitly approved a temporary Governance/Downloader/Discovery Writer Safety switch to DLDLIB-001, preserving DLDWS-001 and all backup/Writer policies. Exact original routing and document blob IDs are recorded in each selected ACTIVE_WORK at base a7f90446094f6a703d88e5ebb3d3517a8a4ba2f7. The current three routes remain IN_PROGRESS / DLDLIB-001 with requires governance,downloader,discovery-writer-safety until separately approved deployment/UI validation and closeout. Stage9 STG9MEDIA-001 and Stage11 S11-WX011 routes are unchanged.
+
+### DLDLIB-001 IMPLEMENTATION RESULT — 2026-10-28
+
+- GOVERNANCE_REGISTRATION=PASS: registration commit b7f129b029b1a54eb63338633fb500ee69f6e63b was published by normal fast-forward and fetched back with exact SHA/tree equality before product edits.
+- LIBRARY_FIX=PASS: the only product-code change is teddy_library_api.py MAX_TITLES 250 -> 500. All other NAS inventory budgets, path validation, listing/search/sort/subtitle/Jellyfin/deletion logic are unchanged.
+- TESTS=PASS: the existing teddy_library_api_smoke.py now adds isolated real-SQLite/Flask API fixtures: 252 holdings HTTP 200 with 252 returned items; 501 holdings HTTP 503/library_unavailable before any NAS inventory call; fixture DB bytes unchanged by each request. The 252 test reproduced HTTP 503 before the constant change. Existing library API smoke and teddy_library_ui_smoke.py pass; git diff --check passes.
+- Test runtime: system Python 3.13 with existing Flask dependencies from /tmp/dl001-py310-testenv-20261019/lib/python3.10/site-packages on PYTHONPATH; -B disables bytecode writes. Default Python lacked Flask and the old Python 3.10 environment lacked its standard library; no operational environment was installed or modified. All test DB/files/NAS/Jellyfin boundaries were isolated fixtures.
+- DEPLOY=NOT_RUN; actual production API/UI recovery remains unverified. Governance, Downloader and Writer Safety stay IN_PROGRESS / DLDLIB-001 with the three-workstream requirement. Stage9 and Stage11 are unchanged; DLDWS-001 and backup preservation history remain intact.
+- Next operational gate: obtain separate deployment authorization; freshly verify CT108 current image/source/Compose identity, the reviewed one-line product delta and rollback readiness, current task/queue state and Writer/dependency compatibility. Deploy only the authorized Downloader change, then verify authenticated GET /api/library and the web File Management library against current holdings. Do not force downloads/recovery, mutate NAS/DB/settings, or restore routing until the separately approved deployment/UI verification and closeout are complete.
+
+
 ## 2026-10-28 — Stage9 joint deployment closed; independent routes restored
 
 The user explicitly approved closing the temporary four-workstream STG9MEDIA-001 deployment after submitting the representative operational evidence below. Canonical base and freshly verified origin/teddy-subtitle-stage11 SHA: 9e196b6cc07c609b8c14c1cb2d6733d9e1dde91f.

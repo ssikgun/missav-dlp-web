@@ -46,7 +46,7 @@ from teddy_title_exclusion import (
 )
 
 LIBRARY_ROOT = "/volume1/video/video2/JAV"
-MAX_TITLES = 250
+MAX_TITLES = 500
 MAX_ENTRIES_PER_TITLE = 512
 MAX_ENTRIES_TOTAL = 30000
 MAX_DEPTH = 5

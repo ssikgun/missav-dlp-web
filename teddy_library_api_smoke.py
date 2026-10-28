@@ -206,6 +206,28 @@ def main():
                 else: os.environ[key]=value
         after=(hashlib.sha256(db_path.read_bytes()).digest(),hashlib.sha256(rollout_path.read_bytes()).digest())
         assert after==before # fixture databases remain byte-for-byte read-only
+        # Regression: a real holdings-backed list must handle the reported 252
+        # titles, while 501 still fails closed before any NAS inventory call.
+        for total in (252, 501):
+            db=sqlite3.connect(db_path)
+            existing=db.execute("SELECT COUNT(*) FROM holdings").fetchone()[0]
+            for index in range(existing, total):
+                add_holding(db, f"BOUND-{index:03d}", f"Boundary fixture {index}")
+            db.commit(); db.close()
+            db_hash=hashlib.sha256(db_path.read_bytes()).digest()
+            calls=nas.calls
+            response=client.get("/api/library")
+            if total==252:
+                assert response.status_code==200, response.get_json()
+                assert response.get_json()["summary"]["total_titles"]==252
+                assert len(response.get_json()["items"])==252
+                assert nas.calls==calls+1
+            else:
+                assert response.status_code==503
+                assert response.get_json()["error"]["code"]=="library_unavailable"
+                assert nas.calls==calls
+            assert hashlib.sha256(db_path.read_bytes()).digest()==db_hash
+        print("Library title-bound fixtures: 252 HTTP 200; 501 HTTP 503; PASS")
         print("Stage13-B fixture library API smoke: PASS")
 
 
