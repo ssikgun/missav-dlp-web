@@ -15186,3 +15186,6 @@ No CT108 resources were created or changed by Codex. Dedicated network/builder a
 
 
 The user then supplied additional read-only CT108 output: Docker context default, cgroup v2/systemd, the four named operational containers running on the production bridge, expected existing validation image ID present, and the listed IPv4/IPv6 route tables and routing rules. The cgroup values printed `memory.max=max`, `memory.current=8553738240`, and `memory.swap.max=max`; this does not by itself establish the parent LXC headroom. `nft --check` produced no diagnostic, but its exit status was not printed, so mutation/check permission is not recorded as PASS. These are user-submitted snapshot results. The effective BuildKit daemon/worker packet path, current firewall-check exit status and safe scoped rollback are still not proven. No builder/network/firewall operations or tests were executed by Codex.
+
+
+Additional operator read-only output reports `NFT_CHECK_EXIT=0` for a simple, non-mutating nft table syntax check; bridge-nf-call-iptables=1, bridge-nf-call-ip6tables=1, IPv4 forwarding=1, IPv6 forwarding=0. This confirms the reported basic check-mode result only; it does not validate a proposed complete ruleset, a BuildKit worker packet path, or actual runtime isolation. Resource creation and testing remain NOT_RUN.
