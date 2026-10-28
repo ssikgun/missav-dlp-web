@@ -15123,3 +15123,28 @@ CANONICAL_PREFLIGHT=PASS; CANDIDATE_INTEGRITY=PASS; EVIDENCE_PRESERVATION=PASS; 
 ### NEXT_DECISION
 
 Candidate remains blocked and unpromoted. On a host where the specified image exists and Docker access is already authorized, place the preserved evidence directory at the same path (or update source paths after hash verification) and run: sh /opt/missav-dlp-web/source-evidence/dldws001-routing-runtime-20261028/additional/run-on-admin-host.sh. If the Docker host is separate, transfer only the preserved candidate/test files and verify their recorded SHA-256 values first. Do not build or deploy an image.
+
+
+## DLDWS-001 ROUTING SINGLE-SOURCE PRODUCT PROMOTION — USER APPROVAL AND RUNTIME EVIDENCE (2026-10-28 KST)
+
+The user explicitly approves promoting the existing `teddy_routing.py` single-source candidate. This supersedes only the earlier promotion hold after the runtime recheck; earlier blocked results remain historical. DLDWS-001 remains `IN_PROGRESS` in `downloader,discovery-writer-safety`, each contract 1.0.0, common contract 1.0.1. No task, contract, router, or unrelated workstream changes are authorized.
+
+Exact approved product diff (three paths only):
+
+- `M teddy_routing.py`, SHA-256 `275607b2249029b689e701cdddf45b960c552d8099b23a554e20a54f3f212231`.
+- `D downloader_runtime_overlay/teddy_routing.py` (duplicate of the final routing source).
+- `M teddy_patch_vpn_health.py`, SHA-256 `43afabdfe8fd32d24abe644913a91ade7d395ae1f2d83791d461a4a075f5947e`; only its routing success-message insertion and now-unused `ROUTING` constant are removed. VPN health observer, bootstrap, reconnect, identity, and recovery behavior stay as in the approved candidate.
+
+Candidate: `/tmp/dldws001-routing-candidate-20261028`. Candidate patch SHA-256 is `e42509c9b33f8597ca7cc6ef49780ea598292faad56d7cd07419e193e348195a`. The overlay manifest remains unchanged at `396e4e7de18e04d1fa5ad0215fc2032c2cf3e6a6e341c34fb9055b4bbb416985`.
+
+### User/operator runtime evidence
+
+The user reports execution on the authorized `root@downloader` host with the existing image `sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31`: outer `EXIT_CODE=0`, test `TEST_EXIT=0`, and `OPERATING_RESOURCE_SNAPSHOT=PASS`. The preserved runtime log was read by Codex and reports Python `3.10.22`, actual Flask `/usr/local/lib/python3.10/site-packages/flask/__init__.py`, candidate module `/candidate/teddy_routing.py` at the expected routing SHA, and `ROUTING_RUNTIME_REAL_FLASK_SMOKE=PASS (5 groups)`. It also reports `TEDDY_DISCOVERY_DOWNLOAD_API_OFFLINE_SMOKE=PASS` and `DISCOVERY_DOWNLOAD_DB_BYTE_UNCHANGED_SMOKE=PASS`. Before/after container ID, state, and network snapshot files have identical respective SHA-256 values. Codex did not execute the tests; these results are attributed to the user/operator.
+
+Evidence path: `/opt/missav-dlp-web/source-evidence/dldws001-routing-runtime-20261028/runs/20261028T082156Z/`. Readback SHA-256: `runtime.log` `512d7d2e0480d012f386f8b142163e297e62ad8a5abf9770feea94d8341cb47c`, `result.txt` `4d0e91c3855626a8778e013bf7e164c41440a0201bfcda2f4978a0ade88d821d`, `environment.txt` `b1798233b18c18fbd6e4dc0158c85ec1af89fc2fab97725088c4c06383b2396c`.
+
+The prior Codex Docker-access block and runtime `INCOMPLETE` result remain preserved as history; this user-run evidence closes that runtime gate. Existing candidate static patch compatibility and manifest 10/10 results are historical evidence, not a new full image build. `BUILD_CHAIN_COMPATIBILITY=INCOMPLETE`; `NEW_IMAGE_BUILD=NOT_RUN`.
+
+### Boundaries and next action
+
+Only the exact three product paths, paired Downloader/Discovery Writer Safety ACTIVE_WORK, and this handoff may change. No image build, retag, deployment, container/service operation, routing-policy change, Dockerfile/verifier/manifest change, other product module, Stage9/11/12 code, Writer socket, queue, DB, NAS, Jellyfin, or media operation is authorized. The next action is to validate the exact candidate diff on a clean checkout at the latest remote HEAD, then fast-forward the approved three product paths and read them back. Product promotion does not authorize operational deployment.

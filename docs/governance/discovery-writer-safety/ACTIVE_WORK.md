@@ -3012,3 +3012,37 @@ CANONICAL_PREFLIGHT=PASS; CANDIDATE_INTEGRITY=PASS; EVIDENCE_PRESERVATION=PASS; 
 ### NEXT_DECISION
 
 Candidate remains blocked and unpromoted. On a host where the specified image exists and Docker access is already authorized, place the preserved evidence directory at the same path (or update source paths after hash verification) and run: sh /opt/missav-dlp-web/source-evidence/dldws001-routing-runtime-20261028/additional/run-on-admin-host.sh. If the Docker host is separate, transfer only the preserved candidate/test files and verify their recorded SHA-256 values first. Do not build or deploy an image.
+
+## CURRENT USER APPROVAL — DLDWS-001 ROUTING SINGLE-SOURCE PRODUCT PROMOTION (2026-10-28 KST)
+
+### OBJECTIVE AND APPROVED_SCOPE
+
+The user explicitly authorizes promotion of the already validated routing single-source candidate to the canonical product branch. This approval supersedes only the earlier hold on product promotion after the runtime recheck; prior results remain historical records. Preserve DLDWS-001 `IN_PROGRESS`, the downloader/discovery-writer-safety pair, contract versions 1.0.0, common contract 1.0.1, and all other workstream routes. Record this authorization and the actual runtime evidence in both paired ACTIVE_WORK files and CURRENT_HANDOFF before changing product files. Use a clean worktree at the latest canonical SHA and only a normal fast-forward with remote readback.
+
+The exact approved product diff is `M teddy_routing.py`, `D downloader_runtime_overlay/teddy_routing.py`, and `M teddy_patch_vpn_health.py`. Root routing must be byte-identical to the verified final implementation (SHA-256 `275607b2249029b689e701cdddf45b960c552d8099b23a554e20a54f3f212231`). The VPN patch must be the exact candidate (SHA-256 `43afabdfe8fd32d24abe644913a91ade7d395ae1f2d83791d461a4a075f5947e`), removing only the route success-message insertion and unused `ROUTING` constant. Preserve every other VPN health observer, bootstrap, reconnect, identity, and recovery behavior. Candidate patch SHA-256: `e42509c9b33f8597ca7cc6ef49780ea598292faad56d7cd07419e193e348195a`. Preserve the overlay manifest unchanged at SHA-256 `396e4e7de18e04d1fa5ad0215fc2032c2cf3e6a6e341c34fb9055b4bbb416985`.
+
+### USER-SUBMITTED RUNTIME EVIDENCE
+
+The user reports that the approved script was run on the authorized `root@downloader` server using the existing image `sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31`. The preserved run log was read back: `runtime.log` reports Python 3.10.22, Flask at `/usr/local/lib/python3.10/site-packages/flask/__init__.py`, module `/candidate/teddy_routing.py` with the exact approved routing SHA, and `ROUTING_RUNTIME_REAL_FLASK_SMOKE=PASS (5 groups)`. It also reports `TEDDY_DISCOVERY_DOWNLOAD_API_OFFLINE_SMOKE=PASS` and `DISCOVERY_DOWNLOAD_DB_BYTE_UNCHANGED_SMOKE=PASS`. The saved result reports `TEST_EXIT=0` and `OPERATING_RESOURCE_SNAPSHOT=PASS`; the user separately supplied outer `EXIT_CODE=0`. Before/after container-ID, container-state, and network snapshot files have identical respective SHA-256 values. These are user/operator execution results, not tests run by Codex.
+
+Evidence directory: `/opt/missav-dlp-web/source-evidence/dldws001-routing-runtime-20261028/runs/20261028T082156Z/`. Readback hashes: `runtime.log` `512d7d2e0480d012f386f8b142163e297e62ad8a5abf9770feea94d8341cb47c`; `result.txt` `4d0e91c3855626a8778e013bf7e164c41440a0201bfcda2f4978a0ade88d821d`; `environment.txt` `b1798233b18c18fbd6e4dc0158c85ec1af89fc2fab97725088c4c06383b2396c`. The preserved user-run log and exact source identity close the previously unrun runtime evidence gap without repeating the test.
+
+### PROHIBITED_SCOPE
+
+No new feature or routing/VPN/proxy policy change; no Docker image build, retag, or deployment; no operational container stop/start/recreate; no Docker daemon, socket, network, or firewall change; no task, queue, DB, NAS, Jellyfin, media, Writer socket, or service mutation; no changes to other downloader modules, Dockerfile, verifier, manifest, or Stage9/11/12 sources; no force push, automatic merge, or modification of prior candidates/evidence/protected worktrees. Any additional product path or design change blocks promotion.
+
+### ACCEPTANCE_CRITERIA AND NEXT_DECISION
+
+Recheck the candidate's exact 3-path diff and routing/VPN/manifest hashes. Confirm the current canonical base differs from the candidate base only by the already registered documentation commits, so the product patch applies without conflict. Confirm VPN patch deletion is limited to routing-message injection and the unused path constant; Dockerfile, verifier, manifest, and other workstream sources remain unchanged. Reuse the existing candidate-layout manifest 10/10 evidence; do not present it as a new image build. Pass paired/all-workstream governance validation and `git diff --check`; create a normal fast-forward commit from the current canonical HEAD and read back the branch and exact changed paths/hashes. Keep `BUILD_CHAIN_COMPATIBILITY=INCOMPLETE`, `NEW_IMAGE_BUILD=NOT_RUN`, `PRODUCTION_CHANGED=NO`, and `DEPLOY=NOT_RUN`.
+
+## DLDWS-001 ROUTING SINGLE-SOURCE PROMOTION — AUTHORIZATION AND RUNTIME EVIDENCE REGISTERED (2026-10-28 KST)
+
+PROMOTION_AUTHORIZATION=PASS; USER_RUNTIME_ATTESTATION=PASS (user/operator execution); ROUTING_RUNTIME_REAL_FLASK_SMOKE=PASS (5 groups); DISCOVERY_DOWNLOAD_API_OFFLINE_SMOKE=PASS; DISCOVERY_DOWNLOAD_DB_BYTE_UNCHANGED_SMOKE=PASS; TEST_EXIT=0; OPERATING_RESOURCE_SNAPSHOT=PASS; PRODUCT_GIT_PROMOTION=PENDING; NEW_IMAGE_BUILD=NOT_RUN; PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
+
+The existing user-run evidence is at `/opt/missav-dlp-web/source-evidence/dldws001-routing-runtime-20261028/runs/20261028T082156Z/`; image ID is `sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31`. Runtime output identifies Python 3.10.22, actual Flask, `/candidate/teddy_routing.py`, and routing SHA `275607b2249029b689e701cdddf45b960c552d8099b23a554e20a54f3f212231`. Codex read the preserved logs and confirmed matching before/after resource snapshot hashes; the user/operator, not Codex, executed these tests. The candidate's exact patch SHA is `e42509c9b33f8597ca7cc6ef49780ea598292faad56d7cd07419e193e348195a`; VPN patch SHA is `43afabdfe8fd32d24abe644913a91ade7d395ae1f2d83791d461a4a075f5947e`; unchanged manifest SHA is `396e4e7de18e04d1fa5ad0215fc2032c2cf3e6a6e341c34fb9055b4bbb416985`.
+
+The prior Docker/API access block and prior candidate-only result remain historical and are superseded only as to the runtime gate and promotion hold. No image build, service change, or deployment is included.
+
+### NEXT_DECISION
+
+Proceed with the already approved exact three-file product promotion after the paired documentation registration is read back. Product source promotion does not authorize an image build or operational deployment.
