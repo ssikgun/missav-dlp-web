@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import errno
 import io
 import logging
 import os
@@ -229,28 +228,39 @@ def main():
         assert sqlite3.connect(f["db_path"]).execute("SELECT * FROM unrelated").fetchall() == [("keep", "same")]
         # Simulate web process crash after writer commit, before provenance
         # discovery_reconciled=1. Restart replay is safe for this operation.
-        # The listening fd closes but the pathname survives as systemd's
-        # RuntimeDirectoryPreserve=restart leaves it between restarts.
+        # Closing a service fd must not unlink the socket-unit-owned pathname.
         restart_db_before = database_restart_snapshot(f["db_path"])
         parent_identity_before = (sock_path.parent.stat().st_dev, sock_path.parent.stat().st_ino)
         socket_identity_before = socket_identity(sock_path)
         server.shutdown(); server.server_close(); thread.join(timeout=2)
         assert sock_path.exists() and socket_identity(sock_path) == socket_identity_before
-        _prepare_socket_parent(str(sock_path))
+        try:
+            UnixSocketDiscoveryWriterClient(str(sock_path)).request("health")
+        except WriterError as exc:
+            assert exc.code == "WRITER_UNAVAILABLE"
+        else:
+            raise AssertionError("closed direct listener still accepted health requests")
         assert (sock_path.parent.stat().st_dev, sock_path.parent.stat().st_ino) == parent_identity_before
-        assert not sock_path.exists()
-        server2 = _UnixServer(str(sock_path), DiscoveryHoldingWriter(f["db_path"], str(f["provenance_path"])))
-        assert socket_identity(sock_path) != socket_identity_before
+
+        # Direct offline fixtures may bind only a fresh path. Production restart
+        # uses systemd's retained listener and is covered by the activation smoke.
+        restart_path = sock_path.parent / "writer-restart.sock"
+        _prepare_socket_parent(str(restart_path))
+        server2 = _UnixServer(str(restart_path), DiscoveryHoldingWriter(f["db_path"], str(f["provenance_path"])))
+        restarted_socket = restart_path.lstat()
+        assert stat.S_ISSOCK(restarted_socket.st_mode)
+        assert stat.S_IMODE(restarted_socket.st_mode) == 0o660
+        assert restarted_socket.st_uid == os.geteuid()
         thread2 = threading.Thread(target=server2.serve_forever, daemon=True); thread2.start()
-        assert UnixSocketDiscoveryWriterClient(str(sock_path)).request("health")["status"] == "READY"
+        assert UnixSocketDiscoveryWriterClient(str(restart_path)).request("health")["status"] == "READY"
         assert database_restart_snapshot(f["db_path"]) == restart_db_before
-        assert UnixSocketDiscoveryWriterClient(str(sock_path)).mark_absent(
+        assert UnixSocketDiscoveryWriterClient(str(restart_path)).mark_absent(
             operation_id="op-fixture-1", dvd_id=f["dvd"], holding_id=f["request"]["holding_id"],
             source_identity_fingerprint=f["fingerprint"])["status"] == "ALREADY_RECONCILED"
         store.finish("op-fixture-1", result_state="RECONCILE_PENDING",
             removed_entries=[f["media"].name], remaining_entries=[], nas_delete_complete=True,
             discovery_reconciled=True)
-        assert UnixSocketDiscoveryWriterClient(str(sock_path)).mark_absent(
+        assert UnixSocketDiscoveryWriterClient(str(restart_path)).mark_absent(
             operation_id="op-fixture-1", dvd_id=f["dvd"], holding_id=f["request"]["holding_id"],
             source_identity_fingerprint=f["fingerprint"])["status"] == "ALREADY_RECONCILED"
         second_record = store.begin(operation_id="op-fixture-2", dvd_id=f["dvd"],
@@ -281,8 +291,8 @@ def main():
         finally:
             lock.execute("ROLLBACK"); lock.close()
 
-        # Existing paths are handled by type and liveness, never by a broad
-        # cleanup. Symlinks and non-sockets remain byte-for-byte in place.
+        # Existing socket paths are never reclaimed by direct management.
+        # This preserves both active listeners and stale paths for operator review.
         unsafe = Path(tmp) / "unsafe"; unsafe.mkdir()
         target = Path(tmp) / "target"; target.write_text("keep-target")
         link = unsafe / "writer.sock"; link.symlink_to(target)
@@ -308,103 +318,89 @@ def main():
             "symlink parent accepted",
         )
 
-        # An unlinked listener pathname is stale only when connect reports
-        # ECONNREFUSED. Reclaim exactly that path, preserve its parent, and
-        # bind a fresh server on the same pathname.
         stale_path = unsafe / "stale.sock"
         stale = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         stale.bind(str(stale_path)); stale.close()
         stale_identity = socket_identity(stale_path)
-        parent_identity = (unsafe.stat().st_dev, unsafe.stat().st_ino)
-        _prepare_socket_parent(str(stale_path))
-        assert not stale_path.exists()
-        assert (unsafe.stat().st_dev, unsafe.stat().st_ino) == parent_identity
-        stale_server = _UnixServer(str(stale_path), f["writer"])
-        assert socket_identity(stale_path) != stale_identity
-        stale_thread = threading.Thread(target=stale_server.serve_forever, daemon=True); stale_thread.start()
-        assert UnixSocketDiscoveryWriterClient(str(stale_path)).request("health")["status"] == "READY"
-        stale_server.shutdown(); stale_server.server_close(); stale_thread.join(timeout=2)
-
-        # ENOENT is accepted only when a second lstat confirms the path is gone.
-        gone_path = unsafe / "gone.sock"
-        gone = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        gone.bind(str(gone_path)); gone.close()
-        def disappear_during_probe(path):
-            Path(path).unlink()
-            return errno.ENOENT
-        with mock.patch("teddy_library_discovery_writer._probe_socket", side_effect=disappear_during_probe):
-            _prepare_socket_parent(str(gone_path))
-        assert not gone_path.exists()
-
-        # Timeout, permission, would-block, and other errors are inconclusive;
-        # none may authorize unlinking a candidate socket.
-        for probe_errno in (errno.EACCES, errno.EAGAIN, errno.ETIMEDOUT, errno.EIO):
-            candidate = unsafe / f"error-{probe_errno}.sock"
-            raw = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            raw.bind(str(candidate)); raw.close()
-            before_identity = socket_identity(candidate)
-            with mock.patch("teddy_library_discovery_writer._probe_socket", return_value=probe_errno):
-                expect_writer_unavailable(
-                    lambda: _prepare_socket_parent(str(candidate)),
-                    f"probe errno {probe_errno} was treated as stale",
-                )
-            assert socket_identity(candidate) == before_identity
+        with mock.patch("teddy_library_discovery_writer._probe_socket",
+                        side_effect=AssertionError("existing socket must not be probed for unlink authority")):
+            expect_writer_unavailable(
+                lambda: _prepare_socket_parent(str(stale_path)),
+                "stale socket path was accepted for direct management",
+            )
+        assert socket_identity(stale_path) == stale_identity
+        assert stat.S_ISSOCK(stale_path.lstat().st_mode)
 
         wrong_owner = unsafe / "wrong-owner.sock"
         raw = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         raw.bind(str(wrong_owner)); raw.close()
         wrong_owner_identity = socket_identity(wrong_owner)
-        with mock.patch("teddy_library_discovery_writer.os.geteuid", return_value=os.geteuid() + 1), \
-                mock.patch("teddy_library_discovery_writer._probe_socket", return_value=errno.ECONNREFUSED):
+        with mock.patch("teddy_library_discovery_writer.os.geteuid", return_value=os.geteuid() + 1):
             expect_writer_unavailable(
                 lambda: _prepare_socket_parent(str(wrong_owner)),
-                "socket not owned by service euid was reclaimed",
+                "socket not owned by service euid was accepted",
             )
         assert socket_identity(wrong_owner) == wrong_owner_identity
 
-        # Deterministically replace the stale pathname after ECONNREFUSED but
-        # before the final lstat. The replacement must remain untouched.
+        # Replace the path after its first lstat snapshot. Even when an inode
+        # identity helper is forced to report a collision, no path is unlinked.
         race_path = unsafe / "race.sock"
         stale = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         stale.bind(str(race_path)); stale.close()
-        stale_race_identity = socket_identity(race_path)
         replacement = []
-        def replace_during_probe(path):
-            Path(path).unlink()
-            listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            listener.bind(str(path)); listener.listen(1)
-            replacement.append(listener)
-            return errno.ECONNREFUSED
-        with mock.patch("teddy_library_discovery_writer._probe_socket", side_effect=replace_during_probe):
-            expect_writer_unavailable(
-                lambda: _prepare_socket_parent(str(race_path)),
-                "replacement socket passed the identity recheck",
-            )
+        replaced = {"done": False}
+        real_lstat = Path.lstat
+        def replace_after_snapshot(path):
+            info = real_lstat(path)
+            if Path(path) == race_path and not replaced["done"]:
+                race_path.unlink()
+                listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                listener.bind(str(race_path)); listener.listen(1)
+                replacement.append(listener)
+                replaced["done"] = True
+            return info
+        with mock.patch.object(Path, "lstat", autospec=True, side_effect=replace_after_snapshot):
+            with mock.patch("teddy_library_discovery_writer._socket_identity",
+                            return_value=(1, 1, stat.S_IFSOCK, os.geteuid(), os.getegid())) as identity_collision:
+                expect_writer_unavailable(
+                    lambda: _prepare_socket_parent(str(race_path)),
+                    "active replacement socket path was accepted for direct management",
+                )
+                assert not identity_collision.called
+        assert replaced["done"] and len(replacement) == 1
         replacement_identity = socket_identity(race_path)
-        assert replacement_identity != stale_race_identity
+        assert stat.S_ISSOCK(race_path.lstat().st_mode)
         probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); probe.settimeout(1)
         probe.connect(str(race_path)); accepted, _ = replacement[0].accept(); accepted.close(); probe.close()
         assert socket_identity(race_path) == replacement_identity
         replacement[0].close()
+        print("IDENTITY_COLLISION_CANNOT_AUTHORIZE_UNLINK=PASS")
+        print("ACTIVE_REPLACEMENT_REMAINS_CONNECTABLE=PASS")
 
-        # Replacing the parent directory during the probe is also detected;
-        # the stale socket in the original directory is left untouched.
+        # Parent replacement during the path snapshot must also fail closed.
         parent_race = Path(tmp) / "parent-race"; parent_race.mkdir()
         parent_race_path = parent_race / "writer.sock"
         stale = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         stale.bind(str(parent_race_path)); stale.close()
         old_parent = Path(tmp) / "parent-race-old"
-        def replace_parent_during_probe(path):
-            Path(path).parent.rename(old_parent)
-            Path(path).parent.mkdir()
-            return errno.ECONNREFUSED
-        with mock.patch("teddy_library_discovery_writer._probe_socket", side_effect=replace_parent_during_probe):
+        swapped = {"done": False}
+        real_lstat = Path.lstat
+        def replace_parent_after_snapshot(path):
+            info = real_lstat(path)
+            if Path(path) == parent_race_path and not swapped["done"]:
+                Path(path).parent.rename(old_parent)
+                Path(path).parent.mkdir()
+                swapped["done"] = True
+            return info
+        with mock.patch.object(Path, "lstat", autospec=True, side_effect=replace_parent_after_snapshot):
             expect_writer_unavailable(
                 lambda: _prepare_socket_parent(str(parent_race_path)),
                 "replacement parent passed the identity recheck",
             )
+        assert swapped["done"]
         assert (old_parent / "writer.sock").exists()
         assert not parent_race_path.exists()
+        print("PARENT_DIRECTORY_REPLACEMENT_FAIL_CLOSED=PASS")
 
         try:
             UnixSocketDiscoveryWriterClient(str(Path(tmp)/"missing.sock")).request("health")

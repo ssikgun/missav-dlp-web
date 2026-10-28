@@ -1,0 +1,2070 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Downloader</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #ffffff;
+            color: #0f172a;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- Sidebar --- */
+        .sidebar {
+            width: 64px;
+            background: #f1f5f9;
+            border-right: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 0;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        .sidebar-logo {
+            color: #3b82f6;
+            font-weight: 800;
+            font-size: 20px;
+            margin-bottom: 12px;
+        }
+        .sidebar-btn {
+            width: 42px; height: 42px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: all 0.15s;
+            background: #e2e8f0;
+            color: #64748b;
+        }
+        .sidebar-btn.active {
+            background: #3b82f6;
+            color: #ffffff;
+        }
+        .sidebar-btn:hover:not(.active) {
+            background: #cbd5e1;
+        }
+
+        /* --- Main content --- */
+        .main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 32px;
+        }
+        .page { display: none; }
+        .page.active { display: block; }
+        [hidden] { display: none !important; }
+        .section-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 22px 0 18px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .section-tab {
+            min-height: 40px;
+            padding: 9px 14px;
+            border: 0;
+            border-bottom: 2px solid transparent;
+            background: transparent;
+            color: #64748b;
+            font: inherit;
+            font-size: 14px;
+            font-weight: 650;
+            cursor: pointer;
+        }
+        .section-tab.active { border-bottom-color: #3b82f6; color: #1e293b; }
+        .section-view-title { font-size: 16px; font-weight: 700; margin: 8px 0 4px; }
+        .subtitle-status-context { margin: 0 0 14px; color: #64748b; font-size: 13px; }
+        .file-management-view, .download-view { min-width: 0; }
+
+        .page-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+        .page-subtitle {
+            color: #94a3b8;
+            font-size: 13px;
+            margin-bottom: 24px;
+        }
+
+        /* --- URL Input --- */
+        .url-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .url-bar input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            background: #f8fafc;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .url-bar input:focus { border-color: #3b82f6; }
+        .url-bar button {
+            padding: 12px 28px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s;
+        }
+        .url-bar button:hover { background: #2563eb; }
+
+        /* --- Stats badges --- */
+        .download-summary-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 0 0 16px;
+        }
+        .download-summary-row > .teddy-network-panel { flex: 0 0 100%; }
+        .stats {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1 1 auto;
+            min-width: 0;
+            margin-bottom: 0;
+            flex-wrap: wrap;
+        }
+        .stat-badge {
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .stat-downloading { background: #eff6ff; color: #3b82f6; }
+        .stat-done { background: #f0fdf4; color: #16a34a; }
+        .stat-waiting { background: #fef3c7; color: #d97706; }
+        .stat-error { background: #fef2f2; color: #ef4444; }
+
+        /* --- Task card --- */
+        .task-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            transition: border-color 0.15s;
+        }
+        .task-card.done { background: #f0fdf4; border-color: #bbf7d0; }
+        .task-card.error { background: #fef2f2; border-color: #fecaca; }
+        .task-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+        .task-title {
+            font-size: 14px;
+            font-weight: 500;
+            word-break: break-all;
+            flex: 1;
+        }
+        .task-meta {
+            color: #94a3b8;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+        .task-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+        /* --- Teddy thumbnail --- */
+        .task-thumb {
+            width: 112px;
+            aspect-ratio: 16 / 9;
+            object-fit: cover;
+            border-radius: 7px;
+            flex-shrink: 0;
+            background: #e2e8f0;
+            border: 1px solid #e2e8f0;
+        }
+        @media (max-width: 720px) {
+            .task-thumb { width: 84px; }
+        }
+
+        /* --- Progress bar --- */
+        .progress-wrap { margin-top: 10px; }
+        .progress-bg {
+            background: #e2e8f0;
+            border-radius: 6px;
+            height: 5px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            background: linear-gradient(90deg, #3b82f6, #60a5fa);
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.4s ease;
+        }
+        .progress-text {
+            color: #94a3b8;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+
+        /* --- Buttons --- */
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: opacity 0.15s;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+        }
+        .btn:hover { opacity: 0.85; }
+        .btn-primary { background: #dbeafe; color: #2563eb; }
+        .btn-danger { background: #fef2f2; color: #ef4444; }
+        .btn-ghost { background: #f1f5f9; color: #94a3b8; }
+        .btn-preview { background: #f0f9ff; color: #3b82f6; }
+
+        /* --- File manager --- */
+        .files-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .files-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .search-input {
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 12px;
+            background: #f8fafc;
+            outline: none;
+            width: 180px;
+        }
+        .search-input:focus { border-color: #3b82f6; }
+        .sort-select {
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 12px;
+            background: #f8fafc;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .file-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+        }
+        .file-icon {
+            width: 40px; height: 40px;
+            background: #e2e8f0;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+        .file-name {
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .file-meta {
+            color: #94a3b8;
+            font-size: 11px;
+            margin-top: 2px;
+        }
+        .file-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+        /* --- Video modal --- */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: #0f172a;
+            border-radius: 12px;
+            overflow: hidden;
+            width: 90vw;
+            max-width: 960px;
+            position: relative;
+        }
+        .modal-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: none;
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            z-index: 10;
+        }
+        .modal-close:hover { background: rgba(255,255,255,0.25); }
+        .modal-content video {
+            width: 100%;
+            display: block;
+            max-height: 80vh;
+        }
+
+        /* --- Message toast --- */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 2000;
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: all 0.3s;
+            pointer-events: none;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+        .toast.error { background: #fef2f2; color: #ef4444; border: 1px solid #fecaca; }
+
+        /* --- Settings --- */
+        .settings-form {
+            max-width: 560px;
+        }
+        .setting-group {
+            margin-bottom: 24px;
+        }
+        .setting-label {
+            font-size: 14px;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 4px;
+        }
+        .setting-desc {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+        .setting-input {
+            padding: 10px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            background: #f8fafc;
+            outline: none;
+            width: 120px;
+            transition: border-color 0.15s;
+        }
+        .setting-input:focus { border-color: #3b82f6; }
+        .setting-input-wide {
+            padding: 10px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: monospace;
+            background: #f8fafc;
+            outline: none;
+            width: 100%;
+            transition: border-color 0.15s;
+        }
+        .setting-input-wide:focus { border-color: #3b82f6; }
+        .setting-select {
+            padding: 10px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            background: #f8fafc;
+            outline: none;
+            cursor: pointer;
+            min-width: 200px;
+        }
+        .setting-textarea {
+            padding: 10px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: monospace;
+            background: #f8fafc;
+            outline: none;
+            width: 100%;
+            resize: vertical;
+            transition: border-color 0.15s;
+        }
+        .setting-textarea:focus { border-color: #3b82f6; }
+
+        /* Toggle switch */
+        .toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+        .toggle input { display: none; }
+        .toggle-slider {
+            width: 44px; height: 24px;
+            background: #cbd5e1;
+            border-radius: 12px;
+            position: relative;
+            transition: background 0.2s;
+        }
+        .toggle-slider::after {
+            content: '';
+            width: 18px; height: 18px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 3px; left: 3px;
+            transition: transform 0.2s;
+        }
+        .toggle input:checked + .toggle-slider {
+            background: #3b82f6;
+        }
+        .toggle input:checked + .toggle-slider::after {
+            transform: translateX(20px);
+        }
+        .toggle-text {
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .setting-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 32px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+        }
+        .btn-save {
+            padding: 10px 28px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn-save:hover { background: #2563eb; }
+        .btn-reset {
+            padding: 10px 20px;
+            background: #f1f5f9;
+            color: #64748b;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn-reset:hover { background: #e2e8f0; }
+
+        .downloader-action-status {
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+        .download-bulk-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex: 0 1 auto;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 0;
+        }
+        .download-bulk-actions .downloader-action-status { flex: 1 1 100%; }
+        .download-bulk-actions .downloader-action-status:empty { display: none; }
+        @media (max-width: 720px) {
+            .download-summary-row {
+                align-items: stretch;
+                flex-direction: column;
+                gap: 10px;
+            }
+            .download-summary-row > .teddy-network-panel { flex: 0 0 auto; }
+            .download-bulk-actions {
+                justify-content: stretch;
+                width: 100%;
+            }
+            .download-bulk-actions button {
+                width: 100%;
+                min-height: 44px;
+                justify-content: center;
+            }
+        }
+
+        /* --- Selkies browser system control --- */
+        .selkies-system-control {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+        }
+        .selkies-system-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .selkies-system-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .selkies-system-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #f8fafc;
+            padding: 14px;
+        }
+        .selkies-system-card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .selkies-system-name {
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .selkies-system-status {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: #f1f5f9;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .selkies-system-status.ok {
+            background: #f0fdf4;
+            color: #16a34a;
+        }
+        .selkies-system-status.pending {
+            background: #fff7ed;
+            color: #ea580c;
+        }
+        .selkies-system-status.error {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+        .selkies-system-meta {
+            min-height: 18px;
+            margin-bottom: 12px;
+            color: #64748b;
+            font-size: 12px;
+        }
+        .selkies-restart-btn {
+            width: 100%;
+            min-height: 36px;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            background: #fff;
+            color: #dc2626;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition:
+                background 0.15s,
+                opacity 0.15s;
+        }
+        .selkies-restart-btn:hover:not(:disabled) {
+            background: #fef2f2;
+        }
+        .selkies-restart-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+
+        @media (max-width: 640px) {
+            .selkies-system-grid {
+                grid-template-columns: 1fr;
+            }
+            .section-tabs { gap: 2px; }
+            .section-tab { flex: 1 1 auto; padding: 9px 8px; font-size: 13px; }
+        }
+
+        /* --- Empty state --- */
+        .empty {
+            text-align: center;
+            padding: 48px 0;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+    </style>
+    <link rel="stylesheet" href="/static/teddy-discovery.css">
+    <link rel="stylesheet" href="/static/teddy-library.css">
+    <link rel="stylesheet" href="/static/teddy-subtitle-status.css">
+<link rel="stylesheet" href="/static/teddy-browser.css"><link rel="stylesheet" href="/static/teddy-theme.css"><link rel="stylesheet" href="/static/teddy-network.css"><link rel="stylesheet" href="/static/teddy-logs.css"><link rel="stylesheet" href="/static/teddy-routing.css"><link rel="stylesheet" href="/static/teddy-mobile.css">    <link rel="manifest" href="/static/teddy-manifest.webmanifest">
+    <link rel="icon" href="/static/teddy-icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/teddy-icon-180.png">
+    <meta name="application-name" content="Teddy Downloader">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Teddy">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#0b74f1" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-logo">D</div>
+        <button class="sidebar-btn active" data-page="download" title="다운로드">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+        <button class="sidebar-btn" data-page="discovery" title="Discovery">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.4-3.4"/><path d="M8 11h6"/><path d="M11 8v6"/></svg>
+        </button>
+        <button class="sidebar-btn" data-page="library" title="파일 관리" aria-label="파일 관리">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        </button>
+        <button class="sidebar-btn" data-page="browser" title="브라우저">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 010 18"/><path d="M12 3a15 15 0 000 18"/></svg>
+        </button>
+        <button class="sidebar-btn" data-page="logs" title="로그">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        </button>
+        <div style="flex:1"></div>
+        <button class="sidebar-btn" data-page="settings" title="설정">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </button>
+    </nav>
+
+    <!-- Main content -->
+    <div class="main">
+        <!-- Download Page -->
+        <div id="page-download" class="page active">
+            <div class="page-title">다운로드</div>
+            <div class="page-subtitle">URL을 입력하면 서버에서 다운로드합니다</div>
+            <div class="section-tabs download-tabs" role="tablist" aria-label="다운로드 보기">
+                <button class="section-tab active" type="button" data-download-view="tasks" aria-selected="true">다운로드 작업</button>
+                <button class="section-tab" type="button" data-download-view="preclean" aria-selected="false">정리 전 파일</button>
+            </div>
+            <section id="download-view-tasks" class="download-view active" data-download-panel="tasks">
+            <form id="downloadForm" class="url-bar">
+                <input type="text" id="url" placeholder="https://..." required>
+                <select id="downloadNetworkMode" class="teddy-route-select" title="이번 다운로드의 네트워크 경로">
+                    <option value="auto" selected>자동</option>
+                    <option value="direct">Direct</option>
+                    <option value="proxy">Proxy</option>
+                    <option value="vpn">VPN</option>
+                </select>
+                <button type="submit">추가</button>
+            </form>
+            <div class="teddy-route-hint" id="teddyRouteHint">자동 · 새 사이트는 Direct 우선 → 실패 시 무료 Proxy → 실패 시 VPN</div>
+
+            <div class="download-summary-row" id="teddy-task-summary-row">
+                <div class="stats" id="stats"></div>
+                <div class="download-bulk-actions">
+                    <button type="button" class="btn btn-ghost" id="retryFailedTasks" disabled>
+                        <span id="retryFailedLabel">↻ 실패 작업 모두 재시작</span>
+                        <span id="retryFailedCount">0</span>
+                    </button>
+                    <div class="downloader-action-status" id="bulkRetryStatus" role="status" aria-live="polite"></div>
+                </div>
+            </div>
+            <div id="taskList"></div>
+            </section>
+            <section id="download-view-preclean" class="download-view" data-download-panel="preclean" hidden>
+                <div class="files-header">
+                    <div>
+                        <div class="section-view-title">정리 전 파일</div>
+                        <div class="page-subtitle" id="filesSummary">JAV 라이브러리로 이동되면 이 목록에서 사라집니다</div>
+                    </div>
+                    <div class="files-controls">
+                        <input class="search-input" id="fileSearch" type="text" placeholder="검색...">
+                        <select class="sort-select" id="fileSort">
+                            <option value="date">날짜순</option>
+                            <option value="name">이름순</option>
+                            <option value="size">크기순</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="fileList"></div>
+            </section>
+        </div>
+
+        <!-- Current JAV holdings Library -->
+        <div id="page-library" class="page">
+            <div class="discovery-header library-header">
+                <div>
+                    <div class="page-title">파일 관리</div>
+                    <div class="page-subtitle">JAV 보유 작품 · 자막 · Jellyfin 상태</div>
+                </div>
+            </div>
+            <div class="section-tabs file-management-tabs" role="tablist" aria-label="파일 관리 보기">
+                <button class="section-tab active" type="button" data-file-management-view="library" aria-selected="true">보유 라이브러리</button>
+                <button class="section-tab" type="button" data-file-management-view="subtitle-status" aria-selected="false">자막 처리 현황</button>
+            </div>
+            <section id="file-management-view-library" class="file-management-view active" data-file-management-panel="library">
+            <div class="discovery-header library-header">
+                <div></div>
+                <div id="librarySummary" class="discovery-summary" aria-live="polite">라이브러리를 불러오지 않았습니다</div>
+            </div>
+            <div class="library-toolbar">
+                <label class="library-search-label" for="librarySearch">검색</label>
+                <input class="search-input library-search" id="librarySearch" type="search" placeholder="DVD-ID 또는 작품명" autocomplete="off">
+                <label class="library-control-label" for="libraryFilter">상태</label>
+                <select class="discovery-select library-select" id="libraryFilter">
+                    <option value="all">전체</option>
+                    <option value="ko-present">📝 한국어 자막 있음</option>
+                    <option value="ko-absent">📭 자막 없음</option>
+                    <option value="unresolved">🧩 자막 미해결</option>
+                    <option value="mismatch">⚠️ 상태 불일치/확인 필요</option>
+                </select>
+                <label class="library-control-label" for="librarySort">정렬</label>
+                <select class="discovery-select library-select" id="librarySort">
+                    <option value="nas_added:desc">NAS 추가일 최신순</option>
+                    <option value="nas_added:asc">NAS 추가일 오래된순</option>
+                    <option value="release_date:desc">출시일 최신순</option>
+                    <option value="dvd_id:asc">DVD-ID</option>
+                    <option value="title:asc">작품명</option>
+                    <option value="size:desc">작품 용량 큰순</option>
+                    <option value="subtitle_status:asc">자막 상태</option>
+                </select>
+            </div>
+            <div id="libraryStatus" class="discovery-status" aria-live="polite"></div>
+            <div id="libraryList" class="discovery-list" aria-live="polite">
+                <div class="discovery-loading">영상 라이브러리를 불러오려면 왼쪽 메뉴를 여세요.</div>
+            </div>
+            </section>
+            <section id="file-management-view-subtitle-status" class="file-management-view" data-file-management-panel="subtitle-status" hidden>
+                <p class="subtitle-status-context">자막 생성 파이프라인의 작업 상태 · 라이브러리 보유 현황과 별도</p>
+                <section class="subtitle-status-panel" id="subtitle-status-panel" aria-live="polite">
+                    <div class="subtitle-status-head">
+                        <div class="subtitle-status-title">자막 처리 현황</div>
+                        <span class="subtitle-status-badge" id="subtitle-status-badge">확인 중</span>
+                    </div>
+                    <div class="subtitle-status-current" id="subtitle-status-current">상태를 확인하고 있습니다.</div>
+                    <div class="subtitle-status-grid">
+                        <div class="subtitle-status-metric"><strong id="subtitle-count-published">-</strong><span>완료</span></div>
+                        <div class="subtitle-status-metric"><strong id="subtitle-count-pending">-</strong><span>남음</span></div>
+                        <div class="subtitle-status-metric"><strong id="subtitle-count-retryable">-</strong><span>재시도</span></div>
+                        <div class="subtitle-status-metric"><strong id="subtitle-count-terminal">-</strong><span>실패</span></div>
+                        <div class="subtitle-status-metric"><strong id="subtitle-count-unresolved">-</strong><span>보류</span></div>
+                    </div>
+                    <div class="subtitle-status-foot" id="subtitle-status-foot">마지막 활동: 확인 중</div>
+                </section>
+            </section>
+        </div>
+
+        <!-- Browser Page -->
+        <div id="page-browser" class="page">
+            <div class="teddy-browser-shell">
+                <iframe
+                    id="teddyBrowserFrame"
+                    class="teddy-browser-frame"
+                    title="VPN Browser"
+                    allow="clipboard-read; clipboard-write"
+                ></iframe>
+            </div>
+        </div>
+
+        <!-- Discovery Page -->
+        <div id="page-discovery" class="page">
+            <div class="discovery-header">
+                <div>
+                    <div class="page-title">Discovery</div>
+                    <div class="page-subtitle">최신 출시 · 주간 · 월간 · 장르 랭킹과 보유/가용 상태</div>
+                </div>
+                <div id="discoverySummary" class="discovery-summary">데이터를 불러오지 않았습니다</div>
+            </div>
+
+            <div class="discovery-toolbar">
+                <div class="discovery-tabs" role="tablist" aria-label="Discovery 보기">
+                    <button class="discovery-tab active" type="button" data-discovery-view="latest">Latest</button>
+                    <button class="discovery-tab" type="button" data-discovery-view="weekly">Weekly</button>
+                    <button class="discovery-tab" type="button" data-discovery-view="monthly">Monthly</button>
+                    <button class="discovery-tab" type="button" data-discovery-view="genre">Genre</button>
+                </div>
+
+                <div id="discoveryReleaseControls" class="discovery-release-controls">
+                    <label for="discoveryReleaseDateSelect">출시일</label>
+                    <select id="discoveryReleaseDateSelect" class="discovery-select discovery-date-select">
+                        <option value="">불러오는 중...</option>
+                    </select>
+                </div>
+
+                <div id="discoveryGenreControls" class="discovery-genre-controls" hidden>
+                    <label for="discoveryGenreSelect">장르</label>
+                    <select id="discoveryGenreSelect" class="discovery-select">
+                        <option value="">불러오는 중...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="discoveryStatus" class="discovery-status" aria-live="polite"></div>
+
+            <div id="discoveryList" class="discovery-list">
+                <div class="discovery-empty">
+                    왼쪽 Discovery 메뉴를 열면 랭킹 데이터를 불러옵니다.
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Page -->
+        <div id="page-logs" class="page">
+            <div class="teddy-log-header">
+                <div>
+                    <div class="page-title">로그</div>
+                    <div class="page-subtitle teddy-log-subtitle">앱의 최근 동작 로그를 표시합니다 · 컨테이너 재시작 시 웹 로그 버퍼는 초기화됩니다</div>
+                </div>
+                <div class="teddy-log-controls">
+                    <label class="teddy-log-autoscroll"><input type="checkbox" id="teddyLogAutoscroll" checked> 자동 스크롤</label>
+                    <button type="button" id="teddyLogRefresh">새로고침</button>
+                    <button type="button" id="teddyLogClear">화면 지우기</button>
+                </div>
+            </div>
+            <div class="teddy-log-status" id="teddyLogStatus">로그를 불러오는 중…</div>
+            <pre class="teddy-log-output" id="teddyLogOutput"></pre>
+        </div>
+
+        <!-- Settings Page -->
+        <div id="page-settings" class="page">
+            <div class="page-title">설정</div>
+            <div class="page-subtitle">다운로드 및 시스템 설정을 관리합니다</div>
+
+            <div class="settings-form">
+                <div class="setting-group">
+                    <label class="setting-label">동시 다운로드 수</label>
+                    <div class="setting-desc">서버에서 동시에 진행할 최대 다운로드 수 (변경 시 재시작 필요)</div>
+                    <input type="number" id="set-max-concurrent" class="setting-input" min="1" max="8" value="4">
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">자동 재시도 (이어받기)</label>
+                    <div class="setting-desc">끊기거나 실패한 다운로드를 서버가 자동으로 이어받아 재시도합니다. (브라우저를 켜둘 필요 없음)</div>
+                    <label class="toggle">
+                        <input type="checkbox" id="set-auto-retry" checked>
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-text" id="auto-retry-text">활성</span>
+                    </label>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">자동 재시도 최대 횟수</label>
+                    <div class="setting-desc">작업 하나당 자동 재시도 상한 (무한 반복 방지). 이어받기라 실패해도 매번 조금씩 진행됩니다.</div>
+                    <input type="number" id="set-auto-retry-max" class="setting-input" min="1" max="200" value="30">
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">파일명 템플릿</label>
+                    <div class="setting-desc">yt-dlp 파일명 형식. %(id)s=영상ID, %(title)s=제목, .60s=60자 제한</div>
+                    <input type="text" id="set-filename-template" class="setting-input-wide" value="[%(id)s] %(title).60s.%(ext)s">
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">SpoofDPI 프록시</label>
+                    <div class="setting-desc">SNI 차단 우회 프록시 사용 여부</div>
+                    <label class="toggle">
+                        <input type="checkbox" id="set-spoofdpi" checked>
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-text" id="spoofdpi-text">활성</span>
+                    </label>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">영상 화질</label>
+                    <div class="setting-desc">다운로드할 최대 해상도</div>
+                    <select id="set-quality" class="setting-select">
+                        <option value="best">최고 화질 (best)</option>
+                        <option value="1080">1080p</option>
+                        <option value="720">720p</option>
+                        <option value="480">480p</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Discovery 다운로드 소스</label>
+                    <div class="setting-desc">
+                        Discovery에서 MissAV와 123AV가 모두 확인된 경우 사용할 우선순위입니다.
+                        한 소스만 확인되면 해당 소스를 자동으로 사용합니다.
+                    </div>
+                    <select
+                        id="set-discovery-download-preference"
+                        class="setting-select"
+                    >
+                        <option value="auto">자동 · MissAV 우선</option>
+                        <option value="missav">MissAV 우선</option>
+                        <option value="123av">123AV 우선</option>
+                    </select>
+                </div>
+
+                <div class="setting-group" style="display:none">
+                    <label class="setting-label">사이트 미러 도메인 목록</label>
+                    <div class="setting-desc">사이트별 미러 도메인 (줄바꿈으로 구분)</div>
+                    <textarea id="set-mirrors" class="setting-textarea" rows="7">missav.ai
+missav.ws
+missav.live
+missav.fans
+missav.media
+missav123.com
+missav01.com</textarea>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">cf_clearance 쿠키 (surrit.com)</label>
+                    <div class="setting-desc">브라우저 개발자도구 → surrit.com 쿠키의 cf_clearance 값. 서버가 브라우저와 같은 출구 IP일 때 유효 (FlareSolverr보다 우선 사용). 만료되면 다시 붙여넣으세요.</div>
+                    <textarea id="set-cf-cookie" class="setting-textarea" rows="3" placeholder="cf_clearance=... (또는 값만)"></textarea>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">쿠키 발급 브라우저 User-Agent</label>
+                    <div class="setting-desc">위 cf_clearance를 받은 브라우저의 User-Agent (쿠키는 UA에 묶임). 비우면 firefox 위장 UA 사용.</div>
+                    <input type="text" id="set-cf-ua" class="setting-input-wide" placeholder="Mozilla/5.0 (...) Firefox/133.0">
+                </div>
+
+                <div
+                    class="selkies-system-control"
+                    id="selkies-system-control"
+                >
+                    <div class="selkies-system-title">
+                        브라우저 시스템
+                    </div>
+
+                    <div class="setting-desc">
+                        Selkies 브라우저 컨테이너만 재시작합니다.
+                        Downloader 백엔드, VPN(Gluetun), CT108은 재시작하지 않습니다.
+                    </div>
+
+                    <div class="selkies-system-grid">
+                        <div class="selkies-system-card">
+                            <div class="selkies-system-card-head">
+                                <div class="selkies-system-name">
+                                    데스크톱 브라우저
+                                </div>
+                                <span
+                                    class="selkies-system-status"
+                                    id="selkies-desktop-status"
+                                    aria-live="polite"
+                                >
+                                    확인 중
+                                </span>
+                            </div>
+
+                            <div
+                                class="selkies-system-meta"
+                                id="selkies-desktop-meta"
+                            >
+                                상태를 확인하고 있습니다.
+                            </div>
+
+                            <button
+                                type="button"
+                                class="selkies-restart-btn"
+                                id="restartSelkiesDesktop"
+                            >
+                                Selkies 재시작
+                            </button>
+                        </div>
+
+                        <div class="selkies-system-card">
+                            <div class="selkies-system-card-head">
+                                <div class="selkies-system-name">
+                                    모바일 브라우저
+                                </div>
+                                <span
+                                    class="selkies-system-status"
+                                    id="selkies-mobile-status"
+                                    aria-live="polite"
+                                >
+                                    확인 중
+                                </span>
+                            </div>
+
+                            <div
+                                class="selkies-system-meta"
+                                id="selkies-mobile-meta"
+                            >
+                                상태를 확인하고 있습니다.
+                            </div>
+
+                            <button
+                                type="button"
+                                class="selkies-restart-btn"
+                                id="restartSelkiesMobile"
+                            >
+                                Selkies 재시작
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-group teddy-ytdlp-settings">
+                    <label class="setting-label">일반 사이트 yt-dlp 옵션</label>
+                    <div class="setting-desc">YouTube 등 일반 사이트에 적용됩니다. 플레이리스트와 로그인/쿠키 기능은 포함하지 않습니다. 작업이 시작될 때 선택값을 작업에 고정해 재개 시에도 같은 옵션을 유지합니다.</div>
+
+                    <div class="setting-group">
+                        <label class="setting-label">다운로드 종류</label>
+                        <select id="set-ytdlp-media-mode" class="setting-select">
+                            <option value="video">영상 + 음성</option>
+                            <option value="audio">오디오만</option>
+                        </select>
+                    </div>
+
+                    <div id="teddy-ytdlp-video-options">
+                        <div class="setting-group">
+                            <label class="setting-label">최대 화질</label>
+                            <select id="set-ytdlp-video-quality" class="setting-select">
+                                <option value="best">최고 화질</option>
+                                <option value="2160">2160p 이하</option>
+                                <option value="1440">1440p 이하</option>
+                                <option value="1080">1080p 이하</option>
+                                <option value="720">720p 이하</option>
+                                <option value="480">480p 이하</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-group">
+                            <label class="setting-label">영상 컨테이너</label>
+                            <select id="set-ytdlp-video-container" class="setting-select">
+                                <option value="mp4">MP4 · 호환성 권장</option>
+                                <option value="mkv">MKV · 코덱 호환 범위 넓음</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-group">
+                            <label class="setting-label">자막 파일</label>
+                            <div class="setting-desc">선택 언어의 일반 자막과 자동 생성 자막을 허용하며 영상과 별도 자막 파일로 저장합니다.</div>
+                            <select id="set-ytdlp-subtitles" class="setting-select">
+                                <option value="off">받지 않음</option>
+                                <option value="ko">한국어</option>
+                                <option value="en">영어</option>
+                                <option value="ko_en">한국어 + 영어</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="teddy-ytdlp-audio-options" style="display:none">
+                        <div class="setting-group">
+                            <label class="setting-label">오디오 형식</label>
+                            <select id="set-ytdlp-audio-format" class="setting-select">
+                                <option value="m4a">M4A · 기본</option>
+                                <option value="mp3">MP3 · 192 kbps</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-group teddy-routing-settings">
+                    <label class="setting-label">네트워크 라우팅</label>
+                    <div class="setting-desc">자동 모드는 저장된 성공 경로를 사용하고, 처음 보는 사이트는 Direct → 무료 Proxy → VPN 순으로 네트워크성 실패에만 다음 경로를 시도합니다. 성공한 경로는 자동 학습됩니다.</div>
+
+                    <div class="teddy-routing-summary">
+                        <strong>기본 정책</strong>
+                        <span>Direct 우선 → 무료 Proxy → VPN → 성공 경로 학습</span>
+                    </div>
+
+                    <div id="teddyProxyPoolMount"></div>
+
+                    <div class="teddy-routing-section-title">수동 사이트 규칙</div>
+                    <div id="teddyManualRules" class="teddy-routing-list"></div>
+                    <div class="teddy-routing-add">
+                        <input type="text" id="teddyRoutingTarget" class="setting-input-wide" placeholder="https://example.com/video 또는 example.com">
+                        <select id="teddyRoutingMode" class="setting-select">
+                            <option value="direct">Direct</option>
+                            <option value="proxy">Proxy</option>
+                            <option value="vpn">VPN</option>
+                        </select>
+                        <button type="button" id="teddyRoutingAdd">추가</button>
+                    </div>
+
+                    <div class="teddy-routing-section-title">자동 학습된 사이트</div>
+                    <div id="teddyLearnedRules" class="teddy-routing-list"></div>
+                </div>
+
+                <div class="setting-actions">
+                    <button class="btn-save" id="saveSettings">저장</button>
+                    <button class="btn-reset" id="resetSettings">기본값 복원</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video preview modal -->
+    <div class="modal-overlay" id="videoModal">
+        <div class="modal-content">
+            <button class="modal-close" id="modalClose">&times;</button>
+            <video id="videoPlayer" controls playsinline preload="metadata"></video>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+    // --- Utility ---
+    function formatSize(bytes) {
+        if (bytes >= 1e9) return (bytes / 1e9).toFixed(1) + ' GB';
+        if (bytes >= 1e6) return (bytes / 1e6).toFixed(1) + ' MB';
+        if (bytes >= 1e3) return (bytes / 1e3).toFixed(1) + ' KB';
+        return bytes + ' B';
+    }
+    function formatDate(ts) {
+        const d = new Date(ts * 1000);
+        return d.toLocaleString('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+    }
+    function formatDuration(seconds) {
+        const s = Math.max(0, Math.round(Number(seconds) || 0));
+        if (!s) return '';
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const r = s % 60;
+        if (h) return h + '시간 ' + m + '분';
+        if (m) return m + '분 ' + r + '초';
+        return r + '초';
+    }
+    function showToast(msg, type) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast ' + type + ' show';
+        setTimeout(() => t.classList.remove('show'), 2500);
+    }
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // --- SPA Routing ---
+    document.querySelectorAll('.sidebar-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('page-' + btn.dataset.page).classList.add('active');
+            if (btn.dataset.page === 'settings') loadSettingsUI();
+        });
+    });
+
+    // Download page secondary views retain the original file controls and handlers.
+    document.querySelectorAll('[data-download-view]').forEach(button => {
+        button.addEventListener('click', () => {
+            const view = button.dataset.downloadView;
+            document.querySelectorAll('[data-download-view]').forEach(tab => {
+                const selected = tab === button;
+                tab.classList.toggle('active', selected);
+                tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+            });
+            document.querySelectorAll('[data-download-panel]').forEach(panel => {
+                panel.hidden = panel.dataset.downloadPanel !== view;
+                panel.classList.toggle('active', !panel.hidden);
+            });
+            if (view === 'preclean') fetchFiles();
+        });
+    });
+
+    document.querySelectorAll('[data-file-management-view]').forEach(button => {
+        button.addEventListener('click', () => {
+            const view = button.dataset.fileManagementView;
+            document.querySelectorAll('[data-file-management-view]').forEach(tab => {
+                const selected = tab === button;
+                tab.classList.toggle('active', selected);
+                tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+            });
+            document.querySelectorAll('[data-file-management-panel]').forEach(panel => {
+                panel.hidden = panel.dataset.fileManagementPanel !== view;
+                panel.classList.toggle('active', !panel.hidden);
+            });
+            if (view === 'subtitle-status') {
+                document.dispatchEvent(new CustomEvent('subtitle-status-activate'));
+            }
+        });
+    });
+
+    // --- Download Form ---
+    document.getElementById('downloadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const urlInput = document.getElementById('url');
+        const url = urlInput.value.trim();
+        if (!url) return;
+        fetch('/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ url, network_mode: document.getElementById('downloadNetworkMode').value })
+        })
+        .then(r => r.json())
+        .then(data => {
+            showToast(data.message, data.status === 'success' ? 'success' : 'error');
+            urlInput.value = '';
+            fetchTasks();
+        });
+    });
+
+    // --- Tasks ---
+    const teddyTaskSamples = new Map();
+    let teddyTaskOrderKey = '';
+
+    function teddyEffectiveSpeed(id, task) {
+        const now = performance.now() / 1000;
+        const bytes = Number(task.downloaded_bytes) || 0;
+        const apiSpeed = Number(task.speed_bps) || 0;
+        const previous = teddyTaskSamples.get(id) || { time: now, bytes: bytes, speed: 0 };
+        let deltaSpeed = 0;
+        const elapsed = now - previous.time;
+        if (elapsed > 0.25 && bytes > previous.bytes) {
+            deltaSpeed = (bytes - previous.bytes) / elapsed;
+        }
+
+        let measured = apiSpeed || deltaSpeed || previous.speed || 0;
+        if (measured > 0 && previous.speed > 0 && measured !== previous.speed) {
+            measured = previous.speed * 0.65 + measured * 0.35;
+        }
+        teddyTaskSamples.set(id, { time: now, bytes: bytes, speed: measured });
+        return measured;
+    }
+
+    function teddyActionState(task) {
+        if (task.status === '다운로드 중') return 'downloading';
+        if (task.status === '일시정지 요청 중') return 'pausing';
+        if (task.status === '일시정지') return 'paused';
+        if (task.status.includes('대기')) return 'waiting';
+        if (task.status.includes('완료') && task.filename) return 'done:' + task.filename;
+        if (task.status.includes('에러') || task.status.includes('취소')) return 'retry';
+        return 'other';
+    }
+
+    function teddyActionsHtml(id, task) {
+        if (task.status === '다운로드 중') {
+            return '<button class="btn btn-primary" onclick="teddyPauseTask(\'' + id + '\')">Ⅱ 일시정지</button>';
+        }
+        if (task.status === '일시정지 요청 중') {
+            return '<button class="btn btn-ghost" disabled>일시정지 중…</button>';
+        }
+        if (task.status === '일시정지') {
+            return '<button class="btn btn-primary" onclick="teddyResumeTask(\'' + id + '\')">▶ 재개</button>' +
+                   '<button class="btn btn-danger" onclick="teddyDeleteTask(\'' + id + '\')">삭제</button>';
+        }
+        if (task.status.includes('대기')) {
+            return '<span class="btn stat-waiting" role="status">대기 중</span>' +
+                   '<button class="btn btn-ghost" onclick="teddyDeleteTask(\'' + id + '\')">삭제</button>';
+        }
+        if (task.status.includes('완료') && task.filename) {
+            return '<a class="btn btn-primary" href="/api/files/' + teddyEncodeFilePath(task.filename) + '/download" style="text-decoration:none">↓ 받기</a>' +
+                   '<button class="btn btn-danger" onclick="deleteTask(\'' + id + '\')">목록에서 삭제</button>';
+        }
+        if (task.status.includes('에러') || task.status.includes('취소')) {
+            return '<button class="btn btn-primary" onclick="retryTask(\'' + id + '\')">↻ 재시작</button>' +
+                   '<button class="btn btn-ghost" onclick="teddyDeleteTask(\'' + id + '\')">✕</button>';
+        }
+        return '<button class="btn btn-ghost" onclick="teddyDeleteTask(\'' + id + '\')">✕</button>';
+    }
+
+    function teddyCreateTaskCard(id) {
+        const card = document.createElement('div');
+        card.className = 'task-card';
+        card.dataset.taskId = id;
+        card.innerHTML =
+            '<div class="task-top">' +
+                '<img class="task-thumb" alt="" loading="lazy" style="display:none">' +
+                '<div style="flex:1;min-width:0">' +
+                    '<div class="task-title"></div>' +
+                    '<div class="task-meta"></div>' +
+                '</div>' +
+                '<div class="task-actions"></div>' +
+            '</div>' +
+            '<div class="progress-wrap" style="display:none">' +
+                '<div class="progress-bg"><div class="progress-fill" style="width:0%"></div></div>' +
+                '<div class="progress-text"></div>' +
+            '</div>';
+        return card;
+    }
+
+    function teddyUpdateTaskCard(id, task, card) {
+        const isDone = task.status.includes('완료');
+        const isError = task.status.includes('에러');
+        const nextClass = 'task-card' + (isDone ? ' done' : (isError ? ' error' : ''));
+        if (card.className !== nextClass) card.className = nextClass;
+
+        const title = card.querySelector('.task-title');
+        const nextTitle = task.display_title || task.filename || task.url || '';
+        if (title.textContent !== nextTitle) title.textContent = nextTitle;
+
+        const meta = card.querySelector('.task-meta');
+        const routeLabel = task.network_mode === 'vpn' ? 'VPN' : (task.network_mode === 'proxy' ? 'Proxy' : (task.network_mode === 'direct' ? 'Direct' : ''));
+        const statusText = isDone && task.filesize
+            ? formatSize(task.filesize) + ' · 완료'
+            : (task.status || '');
+        const proxySpeed = Number(task.network_proxy_speed_bps) || 0;
+        const proxyLearned = Number(task.network_proxy_learned_speed_bps) || 0;
+        const proxyDetail = task.network_mode === 'proxy'
+            ? (proxyLearned ? ' · 실사용 ' + formatSize(proxyLearned) + '/s'
+                            : (proxySpeed ? ' · 검사 ' + formatSize(proxySpeed) + '/s' : '')) +
+              (task.network_proxy_latency_ms ? ' · ' + task.network_proxy_latency_ms + 'ms' : '')
+            : '';
+        const nextMeta = routeLabel ? statusText + ' · ' + routeLabel + proxyDetail : statusText;
+        if (meta.textContent !== nextMeta) meta.textContent = nextMeta;
+
+        const thumb = card.querySelector('.task-thumb');
+        if (task.thumbnail_url) {
+            if (thumb.dataset.source !== task.thumbnail_url) {
+                thumb.dataset.source = task.thumbnail_url;
+                thumb.style.display = 'none';
+                thumb.onload = function() { thumb.style.display = 'block'; };
+                thumb.onerror = function() { thumb.style.display = 'none'; };
+                thumb.src = '/api/tasks/' + encodeURIComponent(id) + '/thumbnail';
+            }
+        } else if (thumb.style.display !== 'none') {
+            thumb.style.display = 'none';
+        }
+
+        const actions = card.querySelector('.task-actions');
+        const actionState = teddyActionState(task);
+        if (actions.dataset.state !== actionState) {
+            actions.dataset.state = actionState;
+            actions.innerHTML = teddyActionsHtml(id, task);
+        }
+
+        const progress = card.querySelector('.progress-wrap');
+        const showProgress = task.status === '다운로드 중' || task.status === '일시정지 요청 중' || task.status === '일시정지';
+        if (!showProgress) {
+            if (progress.style.display !== 'none') progress.style.display = 'none';
+            return;
+        }
+
+        if (progress.style.display === 'none') progress.style.display = '';
+        const pct = task.progress || '0%';
+        const fill = progress.querySelector('.progress-fill');
+        if (fill.style.width !== pct) fill.style.width = pct;
+
+        const downloaded = Number(task.downloaded_bytes) || 0;
+        const totalEstimate = Number(task.total_bytes_estimate) || 0;
+        const progressParts = [pct];
+        if (downloaded && totalEstimate) {
+            progressParts.push(formatSize(downloaded) + ' / 약 ' + formatSize(totalEstimate));
+        } else if (downloaded) {
+            progressParts.push(formatSize(downloaded));
+        }
+
+        if (task.status === '다운로드 중') {
+            const speed = teddyEffectiveSpeed(id, task);
+            if (speed > 0) {
+                progressParts.push('↓ ' + formatSize(speed) + '/s');
+                if (totalEstimate > downloaded) {
+                    const eta = formatDuration((totalEstimate - downloaded) / speed);
+                    if (eta) progressParts.push('남은 시간 약 ' + eta);
+                }
+            }
+        }
+
+        const progressText = progress.querySelector('.progress-text');
+        const nextProgressText = progressParts.join(' · ');
+        if (progressText.textContent !== nextProgressText) {
+            progressText.textContent = nextProgressText;
+        }
+    }
+
+    function fetchTasks() {
+        fetch('/api/tasks').then(r => r.json()).then(tasks => {
+            const entries = Object.entries(tasks).reverse();
+            let downloading = 0, done = 0, waiting = 0, paused = 0, errors = 0;
+            entries.forEach(([, task]) => {
+                if (task.status === '다운로드 중' || task.status === '일시정지 요청 중') downloading++;
+                else if (task.status.includes('완료')) done++;
+                else if (task.status === '일시정지') paused++;
+                else if (task.status.includes('대기')) waiting++;
+                else if (task.status.includes('에러')) errors++;
+            });
+
+            const statsEl = document.getElementById('stats');
+            let statsHtml = '';
+            if (downloading) statsHtml += '<span class="stat-badge stat-downloading">↓ 진행 ' + downloading + '</span>';
+            if (paused) statsHtml += '<span class="stat-badge stat-waiting">Ⅱ 일시정지 ' + paused + '</span>';
+            if (done) statsHtml += '<span class="stat-badge stat-done">✓ 완료 ' + done + '</span>';
+            if (waiting) statsHtml += '<span class="stat-badge stat-waiting">⏳ 대기 ' + waiting + '</span>';
+            if (errors) statsHtml += '<span class="stat-badge stat-error">✕ 에러 ' + errors + '</span>';
+            if (statsEl.innerHTML !== statsHtml) statsEl.innerHTML = statsHtml;
+
+            const listEl = document.getElementById('taskList');
+            if (entries.length === 0) {
+                if (!listEl.querySelector('.empty')) {
+                    listEl.innerHTML = '<div class="empty">다운로드 목록이 비어있습니다</div>';
+                }
+                teddyTaskOrderKey = '';
+                return;
+            }
+
+            const empty = listEl.querySelector('.empty');
+            if (empty) empty.remove();
+            const wanted = new Set(entries.map(([id]) => id));
+            listEl.querySelectorAll('.task-card[data-task-id]').forEach(card => {
+                if (!wanted.has(card.dataset.taskId)) {
+                    teddyTaskSamples.delete(card.dataset.taskId);
+                    card.remove();
+                }
+            });
+
+            entries.forEach(([id, task]) => {
+                let card = listEl.querySelector('.task-card[data-task-id="' + id + '"]');
+                if (!card) {
+                    card = teddyCreateTaskCard(id);
+                    listEl.appendChild(card);
+                }
+                teddyUpdateTaskCard(id, task, card);
+            });
+
+            const nextOrderKey = entries.map(([id]) => id).join('|');
+            if (nextOrderKey !== teddyTaskOrderKey) {
+                entries.forEach(([id]) => {
+                    const card = listEl.querySelector('.task-card[data-task-id="' + id + '"]');
+                    if (card) listEl.appendChild(card);
+                });
+                teddyTaskOrderKey = nextOrderKey;
+            }
+        });
+    }
+
+    function deleteTask(id) {
+        fetch('/api/tasks/' + id, { method: 'DELETE' }).then(() => fetchTasks());
+    }
+
+    function retryTask(id) {
+        fetch('/api/tasks/' + id + '/retry', { method: 'POST' }).then(() => fetchTasks());
+    }
+
+    setInterval(fetchTasks, 1500);
+    fetchTasks();
+
+    function teddyEncodeFilePath(name) {
+        return String(name || '').split('/').map(encodeURIComponent).join('/');
+    }
+
+    // --- Files ---
+    let allFiles = [];
+
+    function fetchFiles() {
+        fetch('/api/files').then(r => r.json()).then(files => {
+            allFiles = files;
+            renderFiles();
+        });
+    }
+
+    function renderFiles() {
+        let files = allFiles.slice();
+        const query = document.getElementById('fileSearch').value.toLowerCase();
+        if (query) files = files.filter(f => f.name.toLowerCase().includes(query));
+
+        const sort = document.getElementById('fileSort').value;
+        if (sort === 'name') files.sort((a, b) => a.name.localeCompare(b.name));
+        else if (sort === 'size') files.sort((a, b) => b.size - a.size);
+        else files.sort((a, b) => b.modified - a.modified);
+
+        const totalSize = allFiles.reduce((s, f) => s + f.size, 0);
+        document.getElementById('filesSummary').textContent =
+            '서버에 저장된 파일 ' + allFiles.length + '개 \u00b7 ' + formatSize(totalSize);
+
+        const listEl = document.getElementById('fileList');
+        if (files.length === 0) {
+            listEl.innerHTML = '<div class="empty">파일이 없습니다</div>';
+            return;
+        }
+        listEl.innerHTML = files.map(f => {
+            const encodedName = teddyEncodeFilePath(f.name);
+            return '<div class="file-card">' +
+                '<div class="file-info">' +
+                    '<div class="file-icon">\uD83C\uDFAC</div>' +
+                    '<div style="min-width:0">' +
+                        '<div class="file-name" title="' + escapeHtml(f.name) + '">' + escapeHtml(f.name) + '</div>' +
+                        '<div class="file-meta">' + formatSize(f.size) + ' \u00b7 ' + formatDate(f.modified) + '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="file-actions">' +
+                    '<button class="btn btn-preview" onclick="previewFile(\'' + encodedName + '\')">\u25b6 재생</button>' +
+                    '<a class="btn btn-primary" href="/api/files/' + encodedName + '/download" style="text-decoration:none">\u2193 다운로드</a>' +
+                    '<button class="btn btn-danger" onclick="deleteFile(\'' + encodedName + '\')">삭제</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    document.getElementById('fileSearch').addEventListener('input', renderFiles);
+    document.getElementById('fileSort').addEventListener('change', renderFiles);
+
+    function deleteFile(name) {
+        if (!confirm('이 파일을 NAS에서 삭제할까요? 삭제 후 되돌릴 수 없습니다.')) return;
+        fetch('/api/files/' + name, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(data => {
+            showToast(data.message, data.status === 'success' ? 'success' : 'error');
+            fetchFiles();
+        });
+    }
+
+    // --- Video Modal ---
+    function previewFile(name) {
+        openVideoStream('/api/files/' + name + '/stream');
+    }
+
+    function openVideoStream(url) {
+        const player = document.getElementById('videoPlayer');
+        player.onerror = function() {
+            showToast('영상을 재생할 수 없습니다.', 'error');
+        };
+        player.src = url;
+        document.getElementById('videoModal').classList.add('active');
+        const attempt = player.play();
+        if (attempt && typeof attempt.catch === 'function') {
+            attempt.catch(() => showToast('재생을 시작하지 못했습니다.', 'error'));
+        }
+    }
+
+    window.playLibraryItem = function(dvdId) {
+        openVideoStream('/api/library/' + encodeURIComponent(dvdId) + '/stream');
+    };
+
+    document.getElementById('modalClose').addEventListener('click', closeModal);
+    document.getElementById('videoModal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeModal();
+    });
+
+    function closeModal() {
+        const player = document.getElementById('videoPlayer');
+        player.pause();
+        player.src = '';
+        document.getElementById('videoModal').classList.remove('active');
+    }
+
+    // --- Settings ---
+    const defaultSettings = {
+        max_concurrent: 4,
+        filename_template: '[%(id)s] %(title).60s.%(ext)s',
+        spoofdpi_enabled: true,
+        video_quality: 'best',
+        yt_dlp_media_mode: 'video',
+        yt_dlp_video_quality: 'best',
+        yt_dlp_video_container: 'mp4',
+        yt_dlp_audio_format: 'm4a',
+        yt_dlp_subtitles: 'off',
+        auto_retry: true,
+        auto_retry_max: 30,
+        discovery_download_preference: 'auto',
+        mirrors: ['missav.ai', 'missav.ws', 'missav.live', 'missav.fans', 'missav.media', 'missav123.com', 'missav01.com']
+    };
+
+    function loadSettingsUI() {
+        loadSelkiesStatuses();
+
+        fetch('/api/settings').then(r => r.json()).then(s => {
+            document.getElementById('set-max-concurrent').value = s.max_concurrent || 4;
+            document.getElementById('set-filename-template').value = s.filename_template || defaultSettings.filename_template;
+            document.getElementById('set-spoofdpi').checked = s.spoofdpi_enabled !== false;
+            document.getElementById('set-auto-retry').checked = s.auto_retry !== false;
+            document.getElementById('set-auto-retry-max').value = s.auto_retry_max || 30;
+            document.getElementById('set-quality').value = s.video_quality || 'best';
+            document.getElementById('set-ytdlp-media-mode').value = s.yt_dlp_media_mode || 'video';
+            document.getElementById('set-ytdlp-video-quality').value = s.yt_dlp_video_quality || 'best';
+            document.getElementById('set-ytdlp-video-container').value = s.yt_dlp_video_container || 'mp4';
+            document.getElementById('set-ytdlp-audio-format').value = s.yt_dlp_audio_format || 'm4a';
+            document.getElementById('set-ytdlp-subtitles').value = s.yt_dlp_subtitles || 'off';
+            document.getElementById('set-discovery-download-preference').value =
+                ['auto', 'missav', '123av'].includes(
+                    s.discovery_download_preference
+                )
+                    ? s.discovery_download_preference
+                    : 'auto';
+            document.getElementById('set-mirrors').value = (s.mirrors || defaultSettings.mirrors).join('\n');
+            document.getElementById('set-cf-cookie').value = s.cf_cookie || '';
+            document.getElementById('set-cf-ua').value = s.cf_user_agent || '';
+            updateToggleText();
+            teddyUpdateYtDlpVisibility();
+        });
+    }
+
+    function updateToggleText() {
+        document.getElementById('spoofdpi-text').textContent =
+            document.getElementById('set-spoofdpi').checked ? '활성' : '비활성';
+        document.getElementById('auto-retry-text').textContent =
+            document.getElementById('set-auto-retry').checked ? '활성' : '비활성';
+    }
+
+    document.getElementById('set-spoofdpi').addEventListener('change', updateToggleText);
+    document.getElementById('set-auto-retry').addEventListener('change', updateToggleText);
+
+    function teddyUpdateYtDlpVisibility() {
+        const audioOnly = document.getElementById('set-ytdlp-media-mode').value === 'audio';
+        document.getElementById('teddy-ytdlp-video-options').style.display = audioOnly ? 'none' : '';
+        document.getElementById('teddy-ytdlp-audio-options').style.display = audioOnly ? '' : 'none';
+    }
+    document.getElementById('set-ytdlp-media-mode').addEventListener('change', teddyUpdateYtDlpVisibility);
+
+    const selkiesControlLabels = {
+        desktop: '데스크톱',
+        mobile: '모바일'
+    };
+
+    const selkiesControlState = {
+        desktop: { busy: false },
+        mobile: { busy: false }
+    };
+
+    function formatSelkiesUptime(seconds) {
+        var value = Math.max(
+            0,
+            parseInt(seconds, 10) || 0
+        );
+
+        var days = Math.floor(
+            value / 86400
+        );
+
+        var hours = Math.floor(
+            (value % 86400) / 3600
+        );
+
+        var minutes = Math.floor(
+            (value % 3600) / 60
+        );
+
+        if (days > 0) {
+            return (
+                days + '일 '
+                + hours + '시간'
+            );
+        }
+
+        if (hours > 0) {
+            return (
+                hours + '시간 '
+                + minutes + '분'
+            );
+        }
+
+        if (minutes > 0) {
+            return (
+                minutes + '분'
+            );
+        }
+
+        return value + '초';
+    }
+
+    function setSelkiesBusy(target, busy) {
+        selkiesControlState[target].busy = busy;
+
+        var button = document.getElementById(
+            target === 'desktop'
+                ? 'restartSelkiesDesktop'
+                : 'restartSelkiesMobile'
+        );
+
+        button.disabled = busy;
+        button.textContent = busy
+            ? '재시작 중...'
+            : 'Selkies 재시작';
+    }
+
+    function renderSelkiesStatus(
+        target,
+        state,
+        text,
+        meta
+    ) {
+        var status = document.getElementById(
+            'selkies-' + target + '-status'
+        );
+
+        var metaEl = document.getElementById(
+            'selkies-' + target + '-meta'
+        );
+
+        status.className = (
+            'selkies-system-status '
+            + state
+        );
+
+        status.textContent = text;
+        metaEl.textContent = meta;
+    }
+
+    async function fetchSelkiesStatus(target) {
+        try {
+            var response = await fetch(
+                '/api/system/selkies/'
+                + target
+                + '/status',
+                {
+                    cache: 'no-store'
+                }
+            );
+
+            var payload = {};
+
+            try {
+                payload = await response.json();
+            } catch (error) {
+                payload = {};
+            }
+
+            if (!response.ok) {
+                throw new Error(
+                    payload.message
+                    || (
+                        'HTTP '
+                        + response.status
+                    )
+                );
+            }
+
+            if (
+                payload.status !== 'success'
+                || payload.role !== target
+            ) {
+                throw new Error(
+                    '잘못된 상태 응답'
+                );
+            }
+
+            if (payload.restart_pending) {
+                renderSelkiesStatus(
+                    target,
+                    'pending',
+                    '재시작 중',
+                    '컨테이너 재시작을 기다리고 있습니다.'
+                );
+            } else {
+                renderSelkiesStatus(
+                    target,
+                    'ok',
+                    '정상',
+                    '실행 시간 '
+                    + formatSelkiesUptime(
+                        payload.uptime_seconds
+                    )
+                );
+            }
+
+            return payload;
+
+        } catch (error) {
+            renderSelkiesStatus(
+                target,
+                'error',
+                '확인 실패',
+                '상태를 확인할 수 없습니다.'
+            );
+
+            return null;
+        }
+    }
+
+    async function loadSelkiesStatuses() {
+        await Promise.all([
+            fetchSelkiesStatus(
+                'desktop'
+            ),
+            fetchSelkiesStatus(
+                'mobile'
+            )
+        ]);
+    }
+
+    function sleepSelkies(ms) {
+        return new Promise(
+            function(resolve) {
+                setTimeout(
+                    resolve,
+                    ms
+                );
+            }
+        );
+    }
+
+    async function restartSelkies(target) {
+        var label = (
+            selkiesControlLabels[target]
+        );
+
+        if (
+            !confirm(
+                label
+                + ' Selkies 브라우저만 재시작하시겠습니까?\n\n'
+                + '해당 브라우저 연결은 잠시 끊기지만 '
+                + 'Downloader 백엔드와 VPN은 재시작하지 않습니다.'
+            )
+        ) {
+            return;
+        }
+
+        if (
+            selkiesControlState[target].busy
+        ) {
+            return;
+        }
+
+        setSelkiesBusy(
+            target,
+            true
+        );
+
+        renderSelkiesStatus(
+            target,
+            'pending',
+            '재시작 요청',
+            'Selkies 컨테이너에 재시작을 요청하고 있습니다.'
+        );
+
+        try {
+            var response = await fetch(
+                '/api/system/selkies/'
+                + target
+                + '/restart',
+                {
+                    method: 'POST'
+                }
+            );
+
+            var payload = {};
+
+            try {
+                payload = await response.json();
+            } catch (error) {
+                payload = {};
+            }
+
+            if (
+                response.status !== 202
+                || payload.status !== 'accepted'
+                || payload.role !== target
+            ) {
+                throw new Error(
+                    payload.message
+                    || (
+                        'HTTP '
+                        + response.status
+                    )
+                );
+            }
+
+            showToast(
+                label
+                + ' Selkies 재시작을 요청했습니다.',
+                'success'
+            );
+
+            renderSelkiesStatus(
+                target,
+                'pending',
+                '재시작 중',
+                '새 Selkies 세션이 올라오기를 기다리고 있습니다.'
+            );
+
+            await sleepSelkies(
+                1500
+            );
+
+            var recovered = false;
+
+            for (
+                var attempt = 0;
+                attempt < 40;
+                attempt += 1
+            ) {
+                var status = await fetchSelkiesStatus(
+                    target
+                );
+
+                if (
+                    status
+                    && status.status === 'success'
+                    && status.role === target
+                    && status.restart_pending === false
+                ) {
+                    recovered = true;
+                    break;
+                }
+
+                await sleepSelkies(
+                    1000
+                );
+            }
+
+            if (recovered) {
+                showToast(
+                    label
+                    + ' Selkies가 다시 연결되었습니다.',
+                    'success'
+                );
+            } else {
+                showToast(
+                    label
+                    + ' Selkies 상태 확인이 필요합니다.',
+                    'error'
+                );
+            }
+
+        } catch (error) {
+            showToast(
+                label
+                + ' Selkies 재시작 요청에 실패했습니다.',
+                'error'
+            );
+
+            renderSelkiesStatus(
+                target,
+                'error',
+                '재시작 실패',
+                '잠시 후 다시 시도하세요.'
+            );
+
+        } finally {
+            setSelkiesBusy(
+                target,
+                false
+            );
+
+            await loadSelkiesStatuses();
+        }
+    }
+
+    document.getElementById(
+        'restartSelkiesDesktop'
+    ).addEventListener(
+        'click',
+        function() {
+            restartSelkies(
+                'desktop'
+            );
+        }
+    );
+
+    document.getElementById(
+        'restartSelkiesMobile'
+    ).addEventListener(
+        'click',
+        function() {
+            restartSelkies(
+                'mobile'
+            );
+        }
+    );
+
+    setInterval(
+        function() {
+            var settingsPage = document.getElementById(
+                'page-settings'
+            );
+
+            if (
+                settingsPage
+                && settingsPage.classList.contains(
+                    'active'
+                )
+                && !selkiesControlState.desktop.busy
+                && !selkiesControlState.mobile.busy
+            ) {
+                loadSelkiesStatuses();
+            }
+        },
+        10000
+    );
+
+    document.getElementById('saveSettings').addEventListener('click', function() {
+        var mirrors = document.getElementById('set-mirrors').value
+            .split('\n')
+            .map(function(s) { return s.trim(); })
+            .filter(function(s) { return s.length > 0; });
+
+        var data = {
+            max_concurrent: parseInt(document.getElementById('set-max-concurrent').value) || 4,
+            filename_template: document.getElementById('set-filename-template').value.trim() || defaultSettings.filename_template,
+            spoofdpi_enabled: document.getElementById('set-spoofdpi').checked,
+            auto_retry: document.getElementById('set-auto-retry').checked,
+            auto_retry_max: parseInt(document.getElementById('set-auto-retry-max').value) || 30,
+            discovery_download_preference:
+                document.getElementById('set-discovery-download-preference').value,
+            video_quality: document.getElementById('set-quality').value,
+            yt_dlp_media_mode: document.getElementById('set-ytdlp-media-mode').value,
+            yt_dlp_video_quality: document.getElementById('set-ytdlp-video-quality').value,
+            yt_dlp_video_container: document.getElementById('set-ytdlp-video-container').value,
+            yt_dlp_audio_format: document.getElementById('set-ytdlp-audio-format').value,
+            yt_dlp_subtitles: document.getElementById('set-ytdlp-subtitles').value,
+            mirrors: mirrors,
+            cf_cookie: document.getElementById('set-cf-cookie').value.trim(),
+            cf_user_agent: document.getElementById('set-cf-ua').value.trim()
+        };
+
+        fetch('/api/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            showToast(res.message, res.status === 'success' ? 'success' : 'error');
+        });
+    });
+
+    document.getElementById('resetSettings').addEventListener('click', function() {
+        if (!confirm('모든 설정을 기본값으로 복원하시겠습니까?')) return;
+        fetch('/api/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(defaultSettings)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            showToast('기본값으로 복원되었습니다.', 'success');
+            loadSettingsUI();
+        });
+    });
+    </script>
+    <script src="/static/teddy-discovery.js"></script>
+    <script src="/static/teddy-library.js"></script>
+    <script src="/static/teddy-subtitle-status.js"></script>
+<script src="/static/teddy-browser.js"></script><script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script><script src="/static/teddy-network.js"></script><script src="/static/teddy-logs.js"></script><script src="/static/teddy-routing.js"></script><script src="/static/teddy-proxy.js"></script><script src="/static/teddy-hls-benchmark.js"></script></body>
+</html>

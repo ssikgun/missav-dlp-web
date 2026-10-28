@@ -57,6 +57,7 @@ RUN python teddy_library_delete_dryrun_smoke.py
 RUN python teddy_library_delete_commit_smoke.py
 RUN python teddy_library_delete_jellyfin_smoke.py
 RUN python teddy_library_discovery_writer_smoke.py
+RUN python teddy_library_discovery_writer_socket_activation_smoke.py
 RUN python deploy/stage13-f2m/reconcile_discovery_pending_smoke.py
 RUN python deploy/stage13-f2m/reconcile_discovery_apply_smoke.py
 RUN python deploy/stage13-f2m/reconcile_jellyfin_pending_smoke.py
@@ -167,6 +168,11 @@ RUN python -m py_compile \
     teddy_routing.py teddy_duplicates.py teddy_ownership.py teddy_ownership_smoke.py teddy_discovery_runtime.py teddy_discovery_download_api.py \
     teddy_generic.py teddy_123av.py teddy_entrypoint.py teddy_patch_pwa.py
 RUN python teddy_verify_build.py final
+
+# Verified Downloader runtime overlay; apply after all source-mutating patches.
+COPY downloader_runtime_overlay/ /app/
+RUN sha256sum -c dldws001-source-sha256.txt && \
+    python -m py_compile app.py teddy_bootstrap.py teddy_download_safety.py teddy_downloader_admin.py teddy_entrypoint.py teddy_generic.py teddy_mp4_queue.py teddy_routing.py teddy_storage.py
 
 # 6. 폴더 생성 및 포트 노출
 RUN mkdir -p /downloads /final

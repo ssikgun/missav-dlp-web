@@ -365,12 +365,29 @@ class _UnixServer(socketserver.ThreadingUnixStreamServer):
     daemon_threads = True
     allow_reuse_address = False
 
-    def __init__(self, address, writer):
+    def __init__(self, address, writer, *, inherited_socket=None):
         self.writer = writer
+        if inherited_socket is not None:
+            # Adopt systemd's Accept=no socket without bind/chmod/listen/unlink.
+            socketserver.BaseServer.__init__(self, address, _UnixHandler)
+            self.socket = inherited_socket
+            return
+        # Legacy constructor is kept for existing offline smoke fixtures.
+        # The production serve() entry point never uses this unsafe path.
         super().__init__(address, _UnixHandler, bind_and_activate=False)
         self.server_bind()
         os.chmod(address, 0o660)
         self.server_activate()
+
+    def server_close(self):
+        # The socket unit owns the pathname. UnixStreamServer.server_close()
+        # unlinks it, so close only this process's listener descriptor.
+        threads = getattr(self, "_threads", None)
+        if threads is not None:
+            threads.join()
+        listener = getattr(self, "socket", None)
+        if listener is not None:
+            listener.close()
 
 
 def _prepare_socket_parent(path: str) -> None:
@@ -388,65 +405,23 @@ def _prepare_socket_parent(path: str) -> None:
         raise WriterError("WRITER_UNAVAILABLE") from exc
     parent_identity = _directory_identity(parent)
     try:
-        original = target.lstat()
+        existing = target.lstat()
     except FileNotFoundError:
-        return
-    if stat.S_ISLNK(original.st_mode) or not stat.S_ISSOCK(original.st_mode):
-        raise WriterError("WRITER_UNAVAILABLE")
-
-    original_identity = _socket_identity(original)
-    probe_errno = _probe_socket(target)
-    if probe_errno not in {errno.ECONNREFUSED, errno.ENOENT}:
-        # A successful connection means a live listener. All errors other
-        # than ECONNREFUSED/ENOENT are inconclusive and must fail closed.
-        raise WriterError("WRITER_UNAVAILABLE")
-
-    current_parent = _directory_identity(parent)
-    if current_parent != parent_identity:
-        raise WriterError("WRITER_UNAVAILABLE")
-    if probe_errno == errno.ENOENT:
-        try:
-            target.lstat()
-        except FileNotFoundError:
-            return
-        raise WriterError("WRITER_UNAVAILABLE")
-    try:
-        current = target.lstat()
-    except FileNotFoundError:
-        # The socket disappeared during the probe. The unchanged parent and
-        # absent target are sufficient to continue without unlinking.
-        return
-    if (stat.S_ISLNK(current.st_mode) or not stat.S_ISSOCK(current.st_mode)
-            or _socket_identity(current) != original_identity
-            or current.st_uid != os.geteuid()):
-        raise WriterError("WRITER_UNAVAILABLE")
-
-    # Pin the checked parent directory and repeat the identity check relative
-    # to its fd immediately before unlinking only this socket pathname.
-    parent_fd = None
-    try:
-        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
-        parent_fd = os.open(parent, flags)
-        parent_stat = os.fstat(parent_fd)
-        if (not stat.S_ISDIR(parent_stat.st_mode)
-                or (parent_stat.st_dev, parent_stat.st_ino) != parent_identity):
+        if _directory_identity(parent) != parent_identity:
             raise WriterError("WRITER_UNAVAILABLE")
-        try:
-            final = os.stat(target.name, dir_fd=parent_fd, follow_symlinks=False)
-        except FileNotFoundError:
-            return
-        if (stat.S_ISLNK(final.st_mode) or not stat.S_ISSOCK(final.st_mode)
-                or _socket_identity(final) != original_identity
-                or final.st_uid != os.geteuid()):
-            raise WriterError("WRITER_UNAVAILABLE")
-        os.unlink(target.name, dir_fd=parent_fd)
-    except WriterError:
-        raise
-    except OSError as exc:
-        raise WriterError("WRITER_UNAVAILABLE") from exc
-    finally:
-        if parent_fd is not None:
-            os.close(parent_fd)
+        return
+
+    # A stale socket and an active replacement can have the same dev/inode
+    # tuple after inode reuse. The direct-managed path therefore never treats
+    # identity or a failed connect as authority to unlink an existing path.
+    # Production serve() accepts only systemd's inherited listener, whose unit
+    # owns the pathname. Existing paths require separate operator recovery.
+    if (stat.S_ISLNK(existing.st_mode) or not stat.S_ISSOCK(existing.st_mode)
+            or existing.st_uid != os.geteuid()):
+        raise WriterError("WRITER_UNAVAILABLE")
+    if _directory_identity(parent) != parent_identity:
+        raise WriterError("WRITER_UNAVAILABLE")
+    raise WriterError("WRITER_UNAVAILABLE")
 
 
 def _directory_identity(parent: Path) -> tuple[int, int]:
@@ -494,9 +469,58 @@ def _probe_socket(path: Path) -> int | None:
             probe.close()
 
 
-def serve(discovery_db: str, provenance_db: str, socket_path: str = DEFAULT_SOCKET_PATH):
-    _prepare_socket_parent(socket_path)
-    server = _UnixServer(socket_path, DiscoveryHoldingWriter(discovery_db, provenance_db))
+def _take_systemd_listener(expected_path: str) -> socket.socket:
+    """Adopt exactly one named inherited AF_UNIX listening socket from systemd.
+
+    The socket unit, not Writer, owns the pathname. Never probe, unlink,
+    bind, chmod, listen, or shut down this inherited socket.
+    """
+    if (os.environ.get("LISTEN_PID") != str(os.getpid())
+            or os.environ.get("LISTEN_FDS") != "1"
+            or os.environ.get("LISTEN_FDNAMES") != "writer"):
+        raise WriterError("WRITER_UNAVAILABLE")
+
+    listener = None
+    try:
+        # systemd starts inherited descriptors at fd 3. Ownership transfers
+        # to this socket object, which server_close() later closes.
+        listener = socket.socket(fileno=3)
+        if (listener.family != socket.AF_UNIX
+                or listener.getsockopt(socket.SOL_SOCKET, socket.SO_TYPE) != socket.SOCK_STREAM
+                or listener.getsockopt(socket.SOL_SOCKET, socket.SO_ACCEPTCONN) != 1):
+            raise WriterError("WRITER_UNAVAILABLE")
+        expected = Path(expected_path).absolute()
+        if listener.getsockname() != str(expected):
+            raise WriterError("WRITER_UNAVAILABLE")
+        parent_identity = _directory_identity(expected.parent)
+        path_stat = expected.lstat()
+        if (stat.S_ISLNK(path_stat.st_mode)
+                or not stat.S_ISSOCK(path_stat.st_mode)
+                or _directory_identity(expected.parent) != parent_identity):
+            raise WriterError("WRITER_UNAVAILABLE")
+        return listener
+    except (OSError, ValueError, TypeError, WriterError) as exc:
+        if listener is not None:
+            listener.close()
+        if isinstance(exc, WriterError):
+            raise
+        raise WriterError("WRITER_UNAVAILABLE") from exc
+
+
+def serve(discovery_db: str, provenance_db: str, socket_path: str = DEFAULT_SOCKET_PATH,
+          *, systemd_socket: bool = False):
+    # A mismatched/old ExecStart must fail closed instead of falling back to
+    # the vulnerable legacy stale-path cleanup. Deployment requires an
+    # explicitly coordinated, separately approved socket-unit migration.
+    if not systemd_socket:
+        raise WriterError("WRITER_UNAVAILABLE")
+    listener = _take_systemd_listener(socket_path)
+    try:
+        server = _UnixServer(socket_path, DiscoveryHoldingWriter(discovery_db, provenance_db),
+                             inherited_socket=listener)
+    except BaseException:
+        listener.close()
+        raise
     try:
         server.serve_forever(poll_interval=0.25)
     finally:
@@ -567,9 +591,12 @@ def main(argv=None):
     parser.add_argument("--discovery-db", required=True, help="administrator-configured canonical host DB path")
     parser.add_argument("--provenance-db", required=True, help="administrator-configured persistent provenance DB path")
     parser.add_argument("--socket", default=DEFAULT_SOCKET_PATH)
+    parser.add_argument("--systemd-socket", action="store_true",
+                        help="require the systemd-owned named inherited listener")
     args = parser.parse_args(argv)
     try:
-        serve(args.discovery_db, args.provenance_db, args.socket)
+        serve(args.discovery_db, args.provenance_db, args.socket,
+              systemd_socket=args.systemd_socket)
     except (OSError, WriterError):
         print("writer startup failed", file=sys.stderr)
         return 1

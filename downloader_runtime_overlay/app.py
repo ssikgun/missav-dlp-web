@@ -1,0 +1,1100 @@
+if __name__ == '__main__':
+    raise SystemExit('Use the supported teddy_bootstrap.py runtime; direct app.py execution skips safety installation.')
+
+import os
+import json
+import subprocess
+import shutil
+import time
+import threading
+import queue
+import uuid
+import re
+import stat
+import stat
+from urllib.parse import urlparse
+from flask import Flask, request, render_template, jsonify, send_file, Response
+import yt_dlp
+from yt_dlp.extractor.common import InfoExtractor
+from yt_dlp.utils import ExtractorError
+from curl_cffi import requests as cffi_requests
+import teddy_subtitle_status
+import teddy_download_safety
+import teddy_mp4_queue
+
+# surrit.com CDN의 Cloudflare 봇 차단 통과용 브라우저 TLS 지문 후보.
+# 실사용상 Firefox 지문이 가장 잘 통과되어 Firefox 전용으로 시도한다.
+IMPERSONATE_TARGETS = ["firefox135", "firefox133"]
+
+# surrit.com은 m3u8/세그먼트에 대한 "직접 접근"(Sec-Fetch-Site: none/navigate)은 WAF로 차단하고,
+# 미러 페이지의 영상 플레이어가 보내는 "크로스사이트 서브리소스 요청"은 허용한다.
+# 그래서 요청을 플레이어의 fetch처럼 보이게 하는 헤더를 함께 보낸다.
+CROSS_SITE_HEADERS = {
+    'Accept': '*/*',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'cross-site',
+}
+
+# --- 설정 관리 ---
+DOWNLOAD_DIR = '/downloads'
+SETTINGS_FILE = os.path.join(DOWNLOAD_DIR, '.settings.json')
+
+# 설정 스키마 버전. 미러 목록 등 기본값이 바뀔 때 올려서 기존 설정 파일을 자동 마이그레이션한다.
+SETTINGS_VERSION = 3
+
+# Opt-in, read-only startup for local health inspection. Normal startup is unchanged.
+STARTUP_HEALTH_ONLY = os.environ.get('TEDDY_STARTUP_MODE', '').strip().lower() == 'health-only'
+
+DEFAULT_SETTINGS = {
+    'max_concurrent': 4,
+    'filename_template': '[%(id)s] %(title).60s.%(ext)s',
+    'spoofdpi_enabled': True,
+    'video_quality': 'best',
+    'discovery_download_preference': 'auto',
+    # 유저스크립트 @match 기준 현재 활성 도메인 (2026.3 기준). 죽은 미러(missav.net/com) 제거.
+    'mirrors': ['missav.ai', 'missav.ws', 'missav.live', 'missav.fans', 'missav.media', 'missav123.com', 'missav01.com'],
+    # (선택·대개 불필요) surrit.com이 쿠키를 요구하는 경우에만: 브라우저에서 복사한 cf_clearance 쿠키/UA.
+    # 서버가 브라우저와 같은 출구 IP일 때만 유효하고 수시간 뒤 만료된다.
+    'cf_cookie': '',
+    'cf_user_agent': '',
+    # 자동 재시도: 끊긴/실패한 작업을 주기적으로 자동 재큐잉(이어받기). 동시 수는 max_concurrent가 제한.
+    'auto_retry': True,
+    'auto_retry_max': 30,   # 작업당 자동 재시도 상한 (무한루프 방지)
+    'settings_version': SETTINGS_VERSION,
+}
+
+# 버전 업그레이드 시 자동으로 제거할, 더 이상 동작하지 않는 옛 미러 도메인
+DEPRECATED_MIRRORS = {'missav.net', 'missav.com'}
+
+def migrate_settings(saved):
+    """저장된 설정에 새 기본 키를 채우고, 버전 업그레이드 시 미러 목록을 갱신한다.
+    사용자가 추가한 커스텀 미러는 보존하고, 죽은 기본 미러(DEPRECATED_MIRRORS)만 교체한다.
+    반환: (마이그레이션된 설정 dict, 변경 여부 bool)
+    """
+    merged = {**DEFAULT_SETTINGS, **saved}
+    changed = False
+
+    # 1. 새로 추가된 기본 키가 저장본에 없으면 채워 넣고 재저장 표시
+    if any(k not in saved for k in DEFAULT_SETTINGS):
+        changed = True
+
+    # 2. 버전 업그레이드 시 미러 목록 마이그레이션 (죽은 미러 제거 + 신규 공식 미러 추가)
+    if saved.get('settings_version', 1) < SETTINGS_VERSION:
+        mirrors = [m for m in merged.get('mirrors', []) if m not in DEPRECATED_MIRRORS]
+        for m in DEFAULT_SETTINGS['mirrors']:
+            if m not in mirrors:
+                mirrors.append(m)
+        merged['mirrors'] = mirrors
+        merged['settings_version'] = SETTINGS_VERSION
+        changed = True
+
+    return merged, changed
+
+
+def load_settings():
+    if STARTUP_HEALTH_ONLY:
+        return DEFAULT_SETTINGS.copy()
+    try:
+        if not os.path.exists(DOWNLOAD_DIR):
+            os.makedirs(DOWNLOAD_DIR)
+        if not os.path.exists(SETTINGS_FILE):
+            save_settings(DEFAULT_SETTINGS.copy())
+            return DEFAULT_SETTINGS.copy()
+        with open(SETTINGS_FILE, 'r') as f:
+            saved = json.load(f)
+        merged, changed = migrate_settings(saved)
+        if changed:
+            save_settings(merged)
+            print(f"[System] 설정을 v{SETTINGS_VERSION}로 마이그레이션했습니다. 미러: {merged.get('mirrors')}", flush=True)
+        return merged
+    except (FileNotFoundError, json.JSONDecodeError):
+        save_settings(DEFAULT_SETTINGS.copy())
+        return DEFAULT_SETTINGS.copy()
+
+def save_settings(settings):
+    if STARTUP_HEALTH_ONLY:
+        return False
+    with open(SETTINGS_FILE, 'w') as f:
+        json.dump(settings, f, ensure_ascii=False, indent=2)
+
+settings = load_settings()
+
+# --- SpoofDPI 프록시 자동 기동 ---
+SPOOFDPI_PORT = 8080
+SPOOFDPI_PROXY = f"http://127.0.0.1:{SPOOFDPI_PORT}"
+
+def start_spoofdpi():
+    if STARTUP_HEALTH_ONLY:
+        return None
+    from teddy_spoofdpi import start_spoofdpi as start_with_diagnostics
+    start_with_diagnostics(popen=subprocess.Popen, sleep=time.sleep,
+                           port=SPOOFDPI_PORT, log=lambda message: print(message, flush=True))
+
+if not STARTUP_HEALTH_ONLY:
+    start_spoofdpi()
+
+# static_folder 설정 추가
+app = Flask(__name__, static_folder='templates', static_url_path='/static')
+if STARTUP_HEALTH_ONLY:
+    @app.before_request
+    def _startup_health_only_guard():
+        if request.method == 'GET' and request.path == '/healthz':
+            return None
+        return jsonify({'status': 'health-only'}), 503
+
+    @app.route('/healthz', methods=['GET'])
+    def _startup_health_only_health():
+        return jsonify({'protocol_version': 1, 'status': 'READY', 'mode': 'health-only'})
+
+teddy_subtitle_status.install_routes(app, jsonify)
+
+download_queue = queue.Queue()
+tasks = {}
+
+# Share the existing reentrant task-state guard, including MP4 and resume.
+queue_admission_lock = getattr(teddy_download_safety, "_TASK_STATE_LOCK", None)
+if queue_admission_lock is None:
+    raise RuntimeError("Downloader task-state lock is unavailable")
+
+# --- 작업 목록 영속화 (재시작 시 중단된 다운로드를 재시도할 수 있도록) ---
+TASKS_FILE = os.path.join(DOWNLOAD_DIR, '.tasks.json')
+_tasks_lock = threading.Lock()
+
+def _retry_state_read(path):
+    """Read a regular retry-state file without following a replaced symlink."""
+    try:
+        before = os.lstat(path)
+    except FileNotFoundError:
+        return None, None
+    if not stat.S_ISREG(before.st_mode):
+        raise OSError('retry state path is not a regular file')
+    flags = os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0)
+    fd = os.open(path, flags)
+    try:
+        opened = os.fstat(fd)
+        if (not stat.S_ISREG(opened.st_mode)
+                or opened.st_dev != before.st_dev
+                or opened.st_ino != before.st_ino):
+            raise OSError('retry state file changed while being opened')
+        with os.fdopen(fd, 'rb') as stream:
+            fd = -1
+            return stream.read(), opened
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+def _retry_state_identity(metadata):
+    if metadata is None:
+        return None
+    return (metadata.st_dev, metadata.st_ino, metadata.st_mode,
+            metadata.st_uid, metadata.st_gid, metadata.st_size,
+            metadata.st_mtime_ns)
+
+def _retry_state_matches(path, expected_bytes, expected_metadata):
+    current_bytes, current_metadata = _retry_state_read(path)
+    return (current_bytes == expected_bytes
+            and _retry_state_identity(current_metadata) == _retry_state_identity(expected_metadata))
+
+def _retry_state_stage(path, payload, original_metadata):
+    directory = os.path.dirname(os.path.abspath(path))
+    temp_path = path + '.retry-' + uuid.uuid4().hex + '.tmp'
+    created = False
+    try:
+        stream = open(temp_path, 'xb')
+        created = True
+        with stream:
+            if original_metadata is not None:
+                os.fchown(stream.fileno(), original_metadata.st_uid, original_metadata.st_gid)
+                os.fchmod(stream.fileno(), stat.S_IMODE(original_metadata.st_mode))
+            written = stream.write(payload)
+            if written != len(payload):
+                raise OSError('short write while saving retry state')
+            stream.flush()
+            os.fsync(stream.fileno())
+        staged_bytes, staged_metadata = _retry_state_read(temp_path)
+        if staged_bytes != payload or staged_metadata is None:
+            raise OSError('retry state temporary file readback mismatch')
+        if original_metadata is not None and (
+                staged_metadata.st_uid != original_metadata.st_uid
+                or staged_metadata.st_gid != original_metadata.st_gid
+                or stat.S_IMODE(staged_metadata.st_mode) != stat.S_IMODE(original_metadata.st_mode)):
+            raise OSError('retry state temporary file metadata mismatch')
+        return temp_path
+    except Exception as stage_error:
+        if created:
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
+            except OSError as cleanup_error:
+                raise RuntimeError('owned retry-state temporary cleanup is uncertain') from cleanup_error
+        raise stage_error
+
+def _retry_state_fsync_directory(directory):
+    flags = os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0)
+    fd = os.open(directory, flags)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+def _retry_state_restore(path, original_bytes, original_metadata, installed_bytes,
+                         installed_metadata, backup_path):
+    directory = os.path.dirname(os.path.abspath(path))
+    if not _retry_state_matches(path, installed_bytes, installed_metadata):
+        raise OSError('retry state changed before rollback; refusing to overwrite it')
+    if original_bytes is None:
+        os.unlink(path)
+        _retry_state_fsync_directory(directory)
+        restored_bytes, restored_metadata = _retry_state_read(path)
+        if restored_bytes is not None or restored_metadata is not None:
+            raise OSError('retry state absence could not be restored')
+        return
+    if not backup_path or not _retry_state_matches(backup_path, original_bytes, original_metadata):
+        raise OSError('retry state recovery link is unavailable or changed')
+    os.replace(backup_path, path)
+    _retry_state_fsync_directory(directory)
+    restored_bytes, restored_metadata = _retry_state_read(path)
+    if (restored_bytes != original_bytes
+            or _retry_state_identity(restored_metadata) != _retry_state_identity(original_metadata)):
+        raise OSError('retry state rollback readback mismatch')
+
+def _retry_queue_put(queue_object, task_id):
+    """Queue.Queue admission with rollback if any internal step raises."""
+    if type(queue_object) is not queue.Queue:
+        raise RuntimeError('download queue implementation is not the verified standard queue')
+    with queue_object.not_full:
+        if queue_object.maxsize > 0 and queue_object._qsize() >= queue_object.maxsize:
+            raise queue.Full
+        previous_items = list(queue_object.queue)
+        previous_unfinished = queue_object.unfinished_tasks
+        try:
+            queue_object._put(task_id)
+            queue_object.unfinished_tasks += 1
+            queue_object.not_empty.notify()
+        except BaseException:
+            queue_object.queue.clear()
+            queue_object.queue.extend(previous_items)
+            queue_object.unfinished_tasks = previous_unfinished
+            raise
+
+def persist_retry_state_and_enqueue(task_id, previous_task, *, enqueue_download=True):
+    """Durably persist a retry transition and enqueue it as one checked operation.
+
+    This retry-only path deliberately leaves save_tasks()'s existing policy alone.
+    A hard-link recovery entry keeps the prior task file available until queue
+    admission succeeds, including rollback after a directory-fsync failure.
+    """
+    if STARTUP_HEALTH_ONLY:
+        raise RuntimeError('retry admission is disabled in health-only mode')
+    path = TASKS_FILE
+    directory = os.path.dirname(os.path.abspath(path))
+    temp_path = None
+    backup_path = None
+    backup_owned = False
+    replaced = False
+    replacement_attempted = False
+    committed = False
+    preserve_backup = False
+    original_bytes = None
+    original_metadata = None
+    installed_bytes = None
+    installed_metadata = None
+    task = tasks.get(task_id)
+    try:
+        with _tasks_lock:
+            try:
+                payload = json.dumps(dict(tasks), ensure_ascii=False).encode('utf-8')
+                original_bytes, original_metadata = _retry_state_read(path)
+                if original_metadata is not None:
+                    if not stat.S_ISREG(original_metadata.st_mode):
+                        raise OSError('retry state is not a regular file')
+                    backup_path = path + '.retry-backup-' + uuid.uuid4().hex
+                    os.link(path, backup_path, follow_symlinks=False)
+                    backup_owned = True
+                    if not _retry_state_matches(backup_path, original_bytes, original_metadata):
+                        raise OSError('retry state recovery link verification failed')
+                    _retry_state_fsync_directory(directory)
+                temp_path = _retry_state_stage(path, payload, original_metadata)
+                if not _retry_state_matches(path, original_bytes, original_metadata):
+                    raise OSError('retry state changed before replacement')
+                replacement_attempted = True
+                try:
+                    os.replace(temp_path, path)
+                    temp_path = None
+                    replaced = True
+                except Exception:
+                    # A wrapper or filesystem can report an error after the rename.
+                    try:
+                        installed_bytes, installed_metadata = _retry_state_read(path)
+                        replaced = (installed_bytes == payload
+                                    and installed_bytes != original_bytes)
+                    except Exception:
+                        preserve_backup = True
+                        replaced = True
+                    raise
+                installed_bytes, installed_metadata = _retry_state_read(path)
+                if installed_bytes != payload or installed_metadata is None:
+                    raise OSError('retry state replacement readback mismatch')
+                _retry_state_fsync_directory(directory)
+                if enqueue_download:
+                    _retry_queue_put(download_queue, task_id)
+                committed = True
+            except Exception as cause:
+                if task is not None and isinstance(task, dict):
+                    task.clear()
+                    task.update(previous_task)
+                if replaced and not committed:
+                    try:
+                        if replacement_attempted and installed_metadata is None:
+                            installed_bytes, installed_metadata = _retry_state_read(path)
+                        _retry_state_restore(path, original_bytes, original_metadata,
+                                             installed_bytes, installed_metadata, backup_path)
+                        backup_path = None
+                        backup_owned = False
+                    except Exception as rollback_error:
+                        preserve_backup = True
+                        raise RuntimeError(
+                            'retry state failure; prior task file rollback is uncertain; '
+                            'manual reconciliation required'
+                        ) from rollback_error
+                raise RuntimeError('retry state persistence or queue admission failed') from cause
+    finally:
+        for owned_path in (temp_path, backup_path if backup_owned and not preserve_backup else None):
+            if owned_path:
+                try:
+                    os.unlink(owned_path)
+                except FileNotFoundError:
+                    pass
+                except OSError as cleanup_error:
+                    print('[Retry] owned temporary state file cleanup failed: %s' % type(cleanup_error).__name__, flush=True)
+    return True
+
+def save_tasks():
+    if STARTUP_HEALTH_ONLY:
+        return False
+    path = TASKS_FILE
+    directory = os.path.dirname(os.path.abspath(path))
+    temp_path = None
+    backup_path = None
+    backup_owned = False
+    replaced = False
+    replacement_attempted = False
+    committed = False
+    preserve_backup = False
+    original_bytes = None
+    original_metadata = None
+    installed_bytes = None
+    installed_metadata = None
+    try:
+        with _tasks_lock:
+            try:
+                payload = json.dumps(dict(tasks), ensure_ascii=False).encode('utf-8')
+                original_bytes, original_metadata = _retry_state_read(path)
+                if original_metadata is not None:
+                    if not stat.S_ISREG(original_metadata.st_mode):
+                        raise OSError('task state is not a regular file')
+                    backup_path = path + '.save-backup-' + uuid.uuid4().hex
+                    os.link(path, backup_path, follow_symlinks=False)
+                    backup_owned = True
+                    if not _retry_state_matches(backup_path, original_bytes, original_metadata):
+                        raise OSError('task state recovery link verification failed')
+                    _retry_state_fsync_directory(directory)
+
+                temp_path = _retry_state_stage(path, payload, original_metadata)
+                if not _retry_state_matches(path, original_bytes, original_metadata):
+                    raise OSError('task state changed before replacement')
+
+                replacement_attempted = True
+                try:
+                    os.replace(temp_path, path)
+                    temp_path = None
+                    replaced = True
+                except Exception:
+                    # os.replace wrappers and filesystems can report failure
+                    # after the rename has already taken effect. The recovery
+                    # hard link keeps the original inode available for rollback.
+                    try:
+                        installed_bytes, installed_metadata = _retry_state_read(path)
+                        replaced = (
+                            installed_bytes == payload
+                            and installed_metadata is not None
+                            and _retry_state_identity(installed_metadata)
+                            != _retry_state_identity(original_metadata)
+                        )
+                    except Exception:
+                        preserve_backup = True
+                        replaced = True
+                    raise
+
+                installed_bytes, installed_metadata = _retry_state_read(path)
+                if installed_bytes != payload or installed_metadata is None:
+                    raise OSError('task state replacement readback mismatch')
+                _retry_state_fsync_directory(directory)
+                committed = True
+            except Exception as cause:
+                if replaced and not committed:
+                    try:
+                        if replacement_attempted and installed_metadata is None:
+                            installed_bytes, installed_metadata = _retry_state_read(path)
+                        _retry_state_restore(
+                            path, original_bytes, original_metadata,
+                            installed_bytes, installed_metadata, backup_path,
+                        )
+                        backup_path = None
+                        backup_owned = False
+                    except Exception as rollback_error:
+                        preserve_backup = True
+                        raise RuntimeError(
+                            'task state persistence failed; prior file rollback is uncertain; '
+                            'manual reconciliation required'
+                        ) from rollback_error
+                raise RuntimeError(
+                    'task state persistence failed; queue or API success must not proceed'
+                ) from cause
+    finally:
+        for owned_path in (
+            temp_path,
+            backup_path if backup_owned and not preserve_backup else None,
+        ):
+            if owned_path:
+                try:
+                    os.unlink(owned_path)
+                except FileNotFoundError:
+                    pass
+                except OSError as cleanup_error:
+                    print(
+                        '[System] owned task-state temporary cleanup failed: %s'
+                        % type(cleanup_error).__name__,
+                        flush=True,
+                    )
+    return True
+
+def load_tasks():
+    if STARTUP_HEALTH_ONLY:
+        return
+    try:
+        if not os.path.exists(TASKS_FILE):
+            return
+        with open(TASKS_FILE) as f:
+            loaded = json.load(f)
+        changed = False
+        for tid, t in loaded.items():
+            # The durable MP4 queue owns its recovery. Preserve the original
+            # status (including failures and ambiguous records) until admission.
+            if teddy_mp4_queue.owns_task_record(DOWNLOAD_DIR, tid, t):
+                tasks[tid] = t
+                continue
+            previous = dict(t)
+            # 재시작으로 끊긴(진행 중/대기) 작업은 재시도 가능한 '중단' 상태로 표시
+            if t.get('status') in ('다운로드 중', '대기 중'):
+                t['status'] = '에러: 다운로드 중단됨 (재시작하세요)'
+                t['progress'] = '0%'
+            elif t.get('status') == '일시정지 요청 중':
+                # A container restart while extraction/network I/O was still
+                # unwinding should complete the user's requested pause rather
+                # than leave the task permanently stuck in an intermediate state.
+                t['status'] = '일시정지'
+            t['speed_bps'] = 0
+            t.setdefault('downloaded_bytes', 0)
+            t.setdefault('total_bytes_estimate', 0)
+            tasks[tid] = t
+            changed = changed or t != previous
+        if changed:
+            save_tasks()
+    except Exception as e:
+        print(f'[System] tasks 로드 실패: {e}', flush=True)
+
+class DownloadCancelled(Exception):
+    pass
+
+# --- 커스텀 MissAV 추출기 ---
+class MyCustomMissAV(InfoExtractor):
+    IE_NAME = 'custom_missav'
+    # missav.ws / missav.live 외에 missav123.com 처럼 숫자가 붙은 도메인도 매칭 (\d*)
+    # 로케일 접두사(/en/, /ja/, /dm22/en/ 등)는 모두 건너뛰고 마지막 세그먼트를 영상 코드로 사용
+    _VALID_URL = r'https?://(?:[^/]+\.)?missav\d*\.[^/]+/(?:[^/?#]+/)*(?P<id>[^/?#]+)'
+
+    def _real_extract(self, url):
+        video_id = self._match_id(url)
+        print(f'🔥 [로직 시작] 파싱 대상: {url}', flush=True)
+
+        task_id = str((self._downloader.params or {}).get('teddy_task_id') or '')
+
+        def teddy_check_task_state():
+            if not task_id:
+                return
+            task = tasks.get(task_id)
+            if not task:
+                raise ExtractorError('Teddy task cancelled', expected=True)
+            if task.get('status') in ('일시정지 요청 중', '일시정지'):
+                raise ExtractorError('Teddy pause requested', expected=True)
+
+        teddy_check_task_state()
+
+        parsed_url = urlparse(url)
+        path = parsed_url.path
+        mirrors = [parsed_url.netloc] + settings.get('mirrors', DEFAULT_SETTINGS['mirrors'])
+        mirrors = list(dict.fromkeys(mirrors))
+
+        webpage = None
+        used_url = url
+
+        # 1. 페이지 HTML 소스 가져오기
+        for mirror in mirrors:
+            teddy_check_task_state()
+            test_url = f"https://{mirror}{path}"
+            proxy_list = [SPOOFDPI_PROXY, None] if settings.get('spoofdpi_enabled', True) else [None]
+            for proxy in proxy_list:
+                teddy_check_task_state()
+                try:
+                    proxies = {"https": proxy, "http": proxy} if proxy else None
+                    res = cffi_requests.get(test_url, impersonate="chrome110", timeout=20, proxies=proxies)
+                    teddy_check_task_state()
+                    if res.status_code == 200 and ('seek' in res.text or 'm3u8' in res.text):
+                        webpage = res.text
+                        used_url = test_url
+                        print(f'✅ 페이지 접속 성공: {mirror} (proxy={proxy})', flush=True)
+                        break
+                except ExtractorError:
+                    raise
+                except Exception as e:
+                    teddy_check_task_state()
+                    print(f'⚠️ {mirror} 접속 실패: {e}', flush=True)
+                    continue
+            teddy_check_task_state()
+            if webpage:
+                break
+
+        if not webpage:
+            raise ValueError("페이지 소스를 불러오는 데 실패했습니다. (Cloudflare 차단 의심)")
+
+        # 2. UUID 추출 - script 태그별로 검사 + UUID 형식 검증
+        video_uuid = None
+        script_contents = re.findall(r'<script[^>]*>(.*?)</script>', webpage, re.DOTALL)
+        print(f'[UUID] script 태그 수: {len(script_contents)}', flush=True)
+
+        for idx, script_content in enumerate(script_contents):
+            seek_index = script_content.find('seek')
+            if seek_index != -1 and seek_index >= 38:
+                candidate = script_content[seek_index - 38: seek_index - 2]
+                if re.match(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', candidate):
+                    video_uuid = candidate
+                    print(f'✅ UUID 발견 (script #{idx+1}): {video_uuid}', flush=True)
+                    break
+
+        # fallback1: 전체 HTML에서 seek 주변 검색
+        if not video_uuid:
+            seek_idx = webpage.find('seek')
+            while seek_idx != -1:
+                if seek_idx >= 38:
+                    candidate = webpage[seek_idx - 38: seek_idx - 2]
+                    if re.match(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', candidate):
+                        video_uuid = candidate
+                        print(f'✅ UUID fallback1: {video_uuid}', flush=True)
+                        break
+                seek_idx = webpage.find('seek', seek_idx + 1)
+
+        # fallback2: 정규식으로 UUID 패턴 검색
+        if not video_uuid:
+            uuid_match = re.search(r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', webpage)
+            if uuid_match:
+                video_uuid = uuid_match.group(1)
+                print(f'✅ UUID fallback2: {video_uuid}', flush=True)
+
+        if not video_uuid:
+            raise ValueError("영상 고유 ID(UUID)를 찾을 수 없습니다.")
+
+        # 3. 마스터 m3u8 주소 구성
+        master_url = f"https://surrit.com/{video_uuid}/playlist.m3u8"
+        print(f'🔗 마스터 m3u8: {master_url}', flush=True)
+
+        # 4. 화질별 m3u8 URL 생성
+        # 브라우저 referrer-policy(strict-origin-when-cross-origin)와 동일하게 Referer는 오리진만 전송
+        netloc = urlparse(used_url).netloc
+        referer = f"https://{netloc}/"
+        origin = f"https://{netloc}"
+        final_formats = []
+        cf_cookie, cf_ua = None, None  # (선택) 수동 cf_clearance 쿠키 / User-Agent
+
+        def fetch_m3u8(cookie=None, ua=None):
+            """여러 TLS 지문으로 마스터 m3u8을 받아 실제 m3u8(#EXTM3U)인지 검증. 본문 반환 or None."""
+            for tgt in IMPERSONATE_TARGETS:
+                teddy_check_task_state()
+                try:
+                    h = {'Referer': referer, 'Origin': origin, **CROSS_SITE_HEADERS}
+                    if cookie:
+                        h['Cookie'] = cookie
+                    if ua:
+                        h['User-Agent'] = ua
+                    r = cffi_requests.get(master_url, impersonate=tgt, timeout=15, headers=h)
+                    teddy_check_task_state()
+                    tag = 'm3u8+cf' if cookie else 'm3u8'
+                    print(f'[{tag}] {tgt} 응답코드: {r.status_code}', flush=True)
+                    if r.status_code == 200 and '#EXTM3U' in r.text:
+                        return r.text
+                except ExtractorError:
+                    raise
+                except Exception as e:
+                    teddy_check_task_state()
+                    print(f'⚠️ m3u8 fetch ({tgt}) 실패: {e}', flush=True)
+            teddy_check_task_state()
+            return None
+
+        # 1차: 쿠키 없이 마스터 m3u8 직접 시도
+        m_text = fetch_m3u8()
+
+        # 세그먼트는 쿠키 없이 헤더(Sec-Fetch cross-site)만으로 통과한다(브라우저 실측 확인).
+        # 설정에 수동 cf_clearance가 있으면 선택적으로 함께 보낸다.
+        manual_cookie = (settings.get('cf_cookie') or '').strip()
+        manual_ua = (settings.get('cf_user_agent') or '').strip()
+        if manual_cookie:
+            cf_cookie = manual_cookie if '=' in manual_cookie else f'cf_clearance={manual_cookie}'
+            cf_ua = manual_ua or None
+            print('[cf] 수동 cf_clearance 쿠키 사용', flush=True)
+
+        # 마스터도 막혔으면 확보한 쿠키로 재시도
+        if not m_text and cf_cookie:
+            print('⚠️ 직접 m3u8 차단 → cf_clearance 쿠키로 재시도', flush=True)
+            m_text = fetch_m3u8(cookie=cf_cookie, ua=cf_ua)
+
+        # 세그먼트 다운로드도 플레이어처럼(크로스사이트) 보이도록 헤더 구성 + 쿠키·UA 전달
+        fmt_headers = {'Referer': referer, 'Origin': origin, **CROSS_SITE_HEADERS}
+        if cf_cookie:
+            fmt_headers['Cookie'] = cf_cookie
+        if cf_ua:
+            fmt_headers['User-Agent'] = cf_ua
+
+        if m_text:
+            for line in m_text.split('\n'):
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    quality_url = f"https://surrit.com/{video_uuid}/{line}"
+                    quality_label = line.split('/')[0]
+                    height = None
+                    try:
+                        height = int(re.search(r'(\d+)', quality_label).group(1))
+                    except Exception:
+                        pass
+                    final_formats.append({
+                        'url': quality_url,
+                        'ext': 'mp4',
+                        'format_id': f'hls-{quality_label}',
+                        'height': height,
+                        'quality': height or 0,
+                        'protocol': 'm3u8_native',
+                        'http_headers': dict(fmt_headers),
+                    })
+                    print(f'[포맷] {quality_label} -> {quality_url}', flush=True)
+
+        # 그래도 결과가 없으면 yt-dlp 네트워킹(impersonate + 쿠키)으로 폴백
+        if not final_formats:
+            print('⚠️ 직접 m3u8 추출 실패 → yt-dlp 폴백', flush=True)
+            final_formats = self._extract_m3u8_formats(
+                master_url, video_id, 'mp4', m3u8_id='hls', headers=fmt_headers,
+            )
+
+        final_formats.sort(key=lambda x: x.get('quality', 0) or x.get('height', 0) or 0, reverse=True)
+
+        thumbnail_url = self._og_search_thumbnail(webpage, default=None)
+        return {
+            'id': video_id,
+            'title': self._og_search_title(webpage, default=video_id),
+            'thumbnail': thumbnail_url,
+            'formats': final_formats,
+            'age_limit': 18,
+        }
+
+
+# --- surrit.com 세그먼트 직접 다운로드 ---
+# yt-dlp는 세그먼트 요청에 Sec-Fetch 헤더를 싣지 않아 403이 난다. 마스터가 통과하는 방식
+# (curl_cffi + 크로스사이트 헤더) 그대로 변형 m3u8과 세그먼트를 직접 받아 합친다 (쿠키 불필요).
+from concurrent.futures import ThreadPoolExecutor
+
+
+def _fetch_segment(seg_url, headers):
+    last = None
+    for _ in range(2):
+        for tgt in IMPERSONATE_TARGETS:
+            try:
+                r = cffi_requests.get(seg_url, impersonate=tgt, headers=headers, timeout=30)
+                if r.status_code == 200:
+                    return r.content
+                last = f'HTTP {r.status_code}'
+            except Exception as e:
+                last = str(e)
+    raise ValueError(f'세그먼트 실패({last}): {seg_url}')
+
+
+def _download_hls_resumable(task_id, variant_url, headers, out_path):
+    """세그먼트를 개별 파일로 받아(이미 받은 건 스킵=이어받기) 완료 후 ffmpeg concat으로 out_path(mp4)를 만든다.
+    중단(취소/재시작)돼도 세그먼트 폴더가 남아, 재시도 시 남은 세그먼트만 받는다.
+    반환: 최종 파일 경로 (ffmpeg 실패 시 .ts 폴백)."""
+    parts_dir = os.path.join(DOWNLOAD_DIR, f'.{task_id}.parts')
+    os.makedirs(parts_dir, exist_ok=True)
+
+    r = None
+    for tgt in IMPERSONATE_TARGETS:
+        r = cffi_requests.get(variant_url, impersonate=tgt, headers=headers, timeout=20)
+        if r.status_code == 200 and '#EXT' in r.text:
+            break
+    if not r or r.status_code != 200 or '#EXT' not in r.text:
+        raise ValueError(f'변형 m3u8 응답 이상: {r.status_code if r else "?"}')
+    base = variant_url.rsplit('/', 1)[0] + '/'
+    seg_urls = [
+        (s if s.startswith('http') else base + s)
+        for s in (ln.strip() for ln in r.text.splitlines())
+        if s and not s.startswith('#')
+    ]
+    total = len(seg_urls)
+    if total == 0:
+        raise ValueError('세그먼트가 없습니다')
+
+    def seg_path(i):
+        return os.path.join(parts_dir, f'{i:05d}.ts')
+
+    # 이미 받아둔 세그먼트는 건너뛴다 (= 이어받기)
+    pending = [(i, u) for i, u in enumerate(seg_urls)
+               if not (os.path.exists(seg_path(i)) and os.path.getsize(seg_path(i)) > 0)]
+    done = total - len(pending)
+    downloaded_bytes = sum(
+        os.path.getsize(seg_path(i))
+        for i in range(total)
+        if os.path.exists(seg_path(i)) and os.path.getsize(seg_path(i)) > 0
+    )
+    total_bytes_estimate = int(downloaded_bytes * total / done) if done else 0
+
+    print(f'[다운로드] 세그먼트 {total}개 (완료 {done} / 남음 {len(pending)})', flush=True)
+    if task_id in tasks:
+        tasks[task_id]['progress'] = f'{int(done * 100 / total)}%'
+        tasks[task_id]['speed_bps'] = 0
+        tasks[task_id]['downloaded_bytes'] = downloaded_bytes
+        tasks[task_id]['total_bytes_estimate'] = total_bytes_estimate
+
+    def fetch_to_file(item):
+        i, u = item
+        data = _fetch_segment(u, headers)
+        tmp = seg_path(i) + '.tmp'
+        with open(tmp, 'wb') as f:
+            f.write(data)
+        os.replace(tmp, seg_path(i))  # 원자적 저장 — 중단돼도 반쪽 세그먼트가 안 남는다
+        return len(data)
+
+    speed_samples = []
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        BATCH = 16
+        for start in range(0, len(pending), BATCH):
+            if task_id not in tasks:
+                raise DownloadCancelled()
+            batch = pending[start:start + BATCH]
+            batch_started = time.monotonic()
+            byte_counts = list(ex.map(fetch_to_file, batch))
+            elapsed = max(time.monotonic() - batch_started, 0.001)
+            batch_bytes = sum(byte_counts)
+            batch_speed = batch_bytes / elapsed
+            speed_samples.append(batch_speed)
+            speed_samples = speed_samples[-4:]
+            smoothed_speed = sum(speed_samples) / len(speed_samples)
+
+            done += len(batch)
+            downloaded_bytes += batch_bytes
+            total_bytes_estimate = int(downloaded_bytes * total / done) if done else 0
+            if task_id in tasks:
+                tasks[task_id]['progress'] = f'{int(min(done, total) * 100 / total)}%'
+                tasks[task_id]['speed_bps'] = int(smoothed_speed)
+                tasks[task_id]['downloaded_bytes'] = downloaded_bytes
+                tasks[task_id]['total_bytes_estimate'] = total_bytes_estimate
+
+    # 모든 세그먼트 확보 → ffmpeg concat으로 mp4 리먹스
+    if task_id in tasks:
+        tasks[task_id]['progress'] = '99%'
+        tasks[task_id]['speed_bps'] = 0
+        tasks[task_id]['downloaded_bytes'] = downloaded_bytes
+        tasks[task_id]['total_bytes_estimate'] = downloaded_bytes
+    list_path = os.path.join(parts_dir, 'filelist.txt')
+    with open(list_path, 'w', encoding='utf-8') as lf:
+        for i in range(total):
+            lf.write(f"file '{seg_path(i)}'\n")
+    print('[ffmpeg] mp4 리먹스 중...', flush=True)
+    proc = subprocess.run(
+        ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0',
+         '-i', list_path, '-c', 'copy', out_path],
+        capture_output=True, text=True,
+    )
+    if proc.returncode == 0 and os.path.exists(out_path):
+        shutil.rmtree(parts_dir, ignore_errors=True)
+        return out_path
+    # ffmpeg 실패 → 세그먼트를 그대로 이어붙인 .ts로 폴백(재생 가능)
+    print(f'[ffmpeg] concat 실패(코드 {proc.returncode}) → ts로 저장: {(proc.stderr or "")[:300]}', flush=True)
+    ts_out = (out_path[:-4] if out_path.endswith('.mp4') else out_path) + '.ts'
+    with open(ts_out, 'wb') as of:
+        for i in range(total):
+            with open(seg_path(i), 'rb') as sf:
+                of.write(sf.read())
+    shutil.rmtree(parts_dir, ignore_errors=True)
+    return ts_out
+
+
+def _pick_format(formats, quality):
+    fmts = sorted([f for f in formats if f.get('url')], key=lambda f: f.get('height') or 0)
+    if not fmts:
+        return None
+    if not quality or quality == 'best':
+        return fmts[-1]
+    try:
+        target = int(quality)
+        under = [f for f in fmts if (f.get('height') or 0) <= target]
+        return under[-1] if under else fmts[0]
+    except Exception:
+        return fmts[-1]
+
+
+def _safe_filename(info, ext='mp4'):
+    vid = info.get('id') or 'video'
+    title = re.sub(r'[\\/:*?"<>|\n\r\t]', '', (info.get('title') or vid)).strip()[:60]
+    return f'[{vid}] {title}.{ext}'
+
+
+def _cleanup_temp_files():
+    """구버전 단일 임시파일(.*.part.ts) 제거 + 대응 작업이 없는 세그먼트 폴더(.*.parts) 제거.
+    진행 중이던 작업의 세그먼트 폴더는 이어받기를 위해 남긴다. (load_tasks 뒤에 호출됨)"""
+    if STARTUP_HEALTH_ONLY:
+        return
+    try:
+        for f in os.listdir(DOWNLOAD_DIR):
+            full = os.path.join(DOWNLOAD_DIR, f)
+            if f.startswith('.') and f.endswith('.part.ts') and os.path.isfile(full):
+                try:
+                    os.remove(full)
+                except OSError:
+                    pass
+            elif f.startswith('.') and f.endswith('.parts') and os.path.isdir(full):
+                if f[1:-6] not in tasks:  # 복구 판단 전까지 고아 조각 보존
+                    print(f'[System] 고아 세그먼트 폴더 보존: {f}', flush=True)
+    except OSError:
+        pass
+
+
+# --- 다운로드 함수 ---
+def download_video(task_id, url):
+    try:
+        # 1. 추출만 (다운로드는 직접 처리) — MyCustomMissAV가 변형 m3u8 URL + 헤더를 준다
+        with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True, 'proxy': None},
+                              auto_init=False) as ydl:
+            ydl.add_info_extractor(MyCustomMissAV())
+            print(f"[Download] 시작: {url}", flush=True)
+            info = ydl.extract_info(url, download=False)
+
+        fmt = _pick_format(info.get('formats', []), settings.get('video_quality', 'best'))
+        if not fmt:
+            raise ValueError('사용 가능한 화질이 없습니다')
+        variant_url = fmt['url']
+        headers = dict(fmt.get('http_headers') or {})
+        for k, v in CROSS_SITE_HEADERS.items():
+            headers.setdefault(k, v)
+        print(f"[선택] {fmt.get('height')}p -> {variant_url}", flush=True)
+
+        out_name = _safe_filename(info)
+        out_path = os.path.join(DOWNLOAD_DIR, out_name)
+
+        # 2. 세그먼트 다운로드(이어받기) + mp4 리먹스 → 최종 파일 경로 반환
+        final_path = _download_hls_resumable(task_id, variant_url, headers, out_path)
+        if task_id not in tasks:
+            return
+        out_name = os.path.basename(final_path)
+
+        if task_id in tasks:
+            tasks[task_id]['status'] = '완료'
+            tasks[task_id]['progress'] = '100%'
+            tasks[task_id]['speed_bps'] = 0
+            tasks[task_id]['filename'] = out_name
+            try:
+                final_size = os.path.getsize(final_path)
+                tasks[task_id]['filesize'] = final_size
+                tasks[task_id]['downloaded_bytes'] = final_size
+                tasks[task_id]['total_bytes_estimate'] = final_size
+            except OSError:
+                pass
+            save_tasks()
+        print(f"[완료] {out_name}", flush=True)
+    except DownloadCancelled:
+        if task_id in tasks:
+            tasks[task_id]['status'] = '취소됨'
+            tasks[task_id]['speed_bps'] = 0
+            save_tasks()
+    except Exception as e:
+        print(f"[Error] {url}: {e}", flush=True)
+        if task_id in tasks:
+            tasks[task_id]['status'] = f'에러: {str(e)[:100]}'
+            tasks[task_id]['speed_bps'] = 0
+            save_tasks()
+
+
+# --- 워커 ---
+def worker():
+    while True:
+        task_id = download_queue.get()
+        if task_id is None:
+            break
+        if task_id in tasks:
+            tasks[task_id]['status'] = '다운로드 중'
+            tasks[task_id]['speed_bps'] = 0
+            save_tasks()
+            download_video(task_id, tasks[task_id]['url'])
+        download_queue.task_done()
+
+AUTO_RETRY_INTERVAL = 15  # 초. 실패/중단 작업을 얼마나 자주 자동 재큐잉할지.
+
+def auto_retry_monitor():
+    """실패/중단된 작업을 주기적으로 자동 재큐잉한다(이어받기).
+    동시 다운로드 수는 워커 수(max_concurrent)가 제한하고,
+    작업당 재시도 횟수는 auto_retry_max로 상한을 둬 무한루프를 막는다.
+    (컨테이너 재시작으로 '중단' 표시된 작업도 자동으로 이어받게 된다.)"""
+    while True:
+        time.sleep(AUTO_RETRY_INTERVAL)
+        try:
+            if not settings.get('auto_retry', True):
+                continue
+            cap = int(settings.get('auto_retry_max', 30))
+            with queue_admission_lock:
+                for tid, t in list(tasks.items()):
+                    if not t.get('status', '').startswith('에러'):
+                        continue
+                    if t.get('error_kind') in ('storage', 'safety') or teddy_mp4_queue.owns_task_record(DOWNLOAD_DIR, tid, t):
+                        # Do not redownload an MP4-stage task through the network retry monitor.
+                        continue
+                    with download_queue.mutex:
+                        if tid in download_queue.queue:
+                            continue
+                    n = t.get('retries', 0)
+                    if n >= cap:
+                        continue
+                    previous = dict(t)
+                    t['retries'] = n + 1
+                    t['status'] = '대기 중'
+                    t['progress'] = '0%'
+                    t['speed_bps'] = 0
+                    try:
+                        persist_retry_state_and_enqueue(tid, previous)
+                    except Exception as e:
+                        print('[자동재시도] 상태 저장 또는 큐 등록 실패: %s' % type(e).__name__, flush=True)
+                        continue
+                    print(f"[자동재시도] ({t['retries']}/{cap}) {t.get('url')}", flush=True)
+        except Exception as e:
+            print(f'[자동재시도] 오류: {e}', flush=True)
+
+load_tasks()
+_cleanup_temp_files()
+_download_workers_started = False
+
+def start_download_workers():
+    global _download_workers_started
+    if STARTUP_HEALTH_ONLY:
+        return False
+    if _download_workers_started:
+        return False
+    count = teddy_download_safety.configured_download_worker_count(settings)
+    for _ in range(count):
+        threading.Thread(target=worker, daemon=True, name='teddy-download-worker').start()
+    threading.Thread(target=auto_retry_monitor, daemon=True, name='teddy-download-retry').start()
+    _download_workers_started = True
+    return True
+
+
+# --- 라우팅 ---
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/download', methods=['POST'])
+def handle_download():
+    with queue_admission_lock:
+        url = request.form.get('url', '').strip()
+        if not url:
+            return jsonify({"status": "error", "message": "URL 입력"}), 400
+        task_id = str(uuid.uuid4())
+        tasks[task_id] = {
+            'url': url,
+            'status': '대기 중',
+            'progress': '0%',
+            'speed_bps': 0,
+            'downloaded_bytes': 0,
+            'total_bytes_estimate': 0,
+        }
+        save_tasks()
+        download_queue.put(task_id)
+        return jsonify({"status": "success", "task_id": task_id})
+
+@app.route('/api/tasks', methods=['GET'])
+def get_tasks():
+    return jsonify(tasks)
+
+@app.route('/api/tasks/<task_id>', methods=['DELETE'])
+def delete_task(task_id):
+    if task_id in tasks:
+        del tasks[task_id]
+        save_tasks()
+        shutil.rmtree(os.path.join(DOWNLOAD_DIR, f'.{task_id}.parts'), ignore_errors=True)
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error"}), 404
+
+@app.route('/api/tasks/<task_id>/retry', methods=['POST'])
+def retry_task(task_id):
+    """실패/취소된 작업을 같은 URL로 다시 큐에 넣어 재시도한다."""
+    with queue_admission_lock:
+        if task_id not in tasks:
+            return jsonify({"status": "error", "message": "작업 없음"}), 404
+        cur = tasks[task_id].get('status', '')
+        if cur in ('다운로드 중', '대기 중'):
+            return jsonify({"status": "error", "message": "이미 진행 중인 작업"}), 400
+        tasks[task_id]['status'] = '대기 중'
+        tasks[task_id]['progress'] = '0%'
+        tasks[task_id]['speed_bps'] = 0
+        tasks[task_id]['retries'] = 0   # 수동 재시작은 자동 재시도 예산을 초기화
+        tasks[task_id].pop('error_kind', None)
+        tasks[task_id].pop('last_error_detail', None)
+        save_tasks()
+        download_queue.put(task_id)
+        print(f"[Retry] 재시도 큐 추가: {tasks[task_id].get('url')}", flush=True)
+        return jsonify({"status": "success"})
+
+@app.route('/api/files', methods=['GET'])
+def list_files():
+    files = []
+    if os.path.exists(DOWNLOAD_DIR):
+        for f in os.listdir(DOWNLOAD_DIR):
+            fp = os.path.join(DOWNLOAD_DIR, f)
+            if os.path.isfile(fp) and not f.startswith('.'):
+                s = os.stat(fp)
+                files.append({'name': f, 'size': s.st_size, 'modified': s.st_mtime})
+    files.sort(key=lambda x: x['modified'], reverse=True)
+    return jsonify(files)
+
+@app.route('/api/files/<path:filename>', methods=['DELETE'])
+def delete_file(filename):
+    fp = os.path.join(DOWNLOAD_DIR, filename)
+    if os.path.exists(fp):
+        os.remove(fp)
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error"}), 404
+
+@app.route('/api/settings', methods=['GET'])
+def get_settings():
+    return jsonify(settings)
+
+@app.route('/api/settings', methods=['PUT'])
+def update_settings():
+    global settings
+    new_settings = request.json
+    settings.update(new_settings)
+    save_settings(settings)
+    return jsonify({"status": "success", "message": "설정이 저장되었습니다. (동시 다운로드 수 변경은 재시작 후 적용)"})
+
+if __name__ == '__main__':
+    print(f"\n{'='*50}")
+    print(f"MissAV Downloader Started")
+    print(f"Download directory: {DOWNLOAD_DIR}")
+    print(f"Open: http://localhost:5000")
+    print(f"{'='*50}\n")
+    app.run(host='0.0.0.0', port=5000, debug=False)
