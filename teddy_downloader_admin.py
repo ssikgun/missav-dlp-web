@@ -5,6 +5,7 @@ import importlib
 import os
 import secrets
 import shutil
+import stat
 
 from flask import jsonify, request, session
 
@@ -40,27 +41,26 @@ def _storage_capacity(core, safety_module):
     return usage.free, filesystem.f_favail
 
 
-def manual_retry(core, task_id):
-    """Keep the existing individual manual-retry policy in one testable path."""
-    lock = getattr(core, "queue_admission_lock", None)
-    if lock is None:
-        return {"status": "error", "message": "다운로드 큐 보호 상태를 확인할 수 없습니다."}, 503
-    with lock:
-        task = core.tasks.get(task_id)
-        if not task:
-            return {"status": "error", "message": "작업 없음"}, 404
-        current = task.get("status", "")
-        if current in ("다운로드 중", "대기 중", "일시정지 요청 중"):
-            return {"status": "error", "message": "이미 진행 중인 작업"}, 400
-        if current == "일시정지":
-            return {"status": "error", "message": "일시정지 작업은 재개 버튼을 사용하세요."}, 400
-        task["status"] = "대기 중"
-        task["speed_bps"] = 0
-        task["retries"] = 0
-        core.save_tasks()
-        core.download_queue.put(task_id)
-        print(f"[Retry] 재시도 큐 추가: {task.get('url')}", flush=True)
-        return {"status": "success", "message": "재시도 대기 중"}, 200
+def _mp4_present(core, module, task_id):
+    """Unlike isfile(), distinguish absence from a failed metadata lookup."""
+    path = module._job_path(core.DOWNLOAD_DIR, task_id)
+    directory = os.path.dirname(path)
+    try:
+        parent = os.lstat(directory)
+    except FileNotFoundError:
+        return False
+    if not stat.S_ISDIR(parent.st_mode):
+        raise RuntimeError("MP4 queue directory is unsafe")
+    # Prove the queue can be inspected rather than accepting isfile=False on EACCES.
+    with os.scandir(directory):
+        pass
+    try:
+        metadata = os.lstat(path)
+    except FileNotFoundError:
+        return False
+    if not stat.S_ISREG(metadata.st_mode):
+        raise RuntimeError("MP4 job metadata is unsafe")
+    return True
 
 
 def _bulk_retry(core, retry_callback, mp4_queue_module, safety_module):
@@ -68,6 +68,10 @@ def _bulk_retry(core, retry_callback, mp4_queue_module, safety_module):
     if lock is None:
         return {"status": "error", "message": "작업 큐 잠금을 확인할 수 없습니다."}, 503
 
+    if (getattr(safety_module, "_TASK_STATE_LOCK", None) is not lock
+            or not callable(getattr(lock, "__enter__", None))
+            or not callable(getattr(lock, "__exit__", None))):
+        return {"status": "error", "message": "공유 작업 큐 잠금을 확인할 수 없습니다."}, 503
     with lock:
         if not isinstance(core.tasks, dict):
             return {"status": "error", "message": "작업 상태를 확인할 수 없어 재시도를 차단했습니다."}, 503
@@ -81,6 +85,20 @@ def _bulk_retry(core, retry_callback, mp4_queue_module, safety_module):
             return {"status": "success", "succeeded": 0, "skipped": 0, "failed": 0, "results": []}, 200
         if mp4_queue_module is None or not callable(getattr(mp4_queue_module, "has_task", None)):
             return {"status": "error", "message": "MP4 작업 상태를 확인할 수 없어 재시도를 차단했습니다."}, 503
+        protected_mp4 = {}
+        for task_id in candidates:
+            stage = core.tasks[task_id].get("mp4_stage")
+            if stage not in (None, "", "queued", "running", "failed", "output_ready", "publish_pending"):
+                return {"status": "error", "message": "MP4 작업 상태를 확인할 수 없습니다."}, 503
+            try:
+                occupied = _mp4_present(core, mp4_queue_module, task_id)
+                if mp4_queue_module.has_task(core, task_id) is not occupied:
+                    raise RuntimeError("MP4 queue state changed")
+            except Exception:
+                occupied = None
+            if type(occupied) is not bool:
+                return {"status": "error", "message": "MP4 작업 상태를 확인할 수 없습니다."}, 503
+            protected_mp4[task_id] = occupied or bool(stage)
         try:
             _storage_capacity(core, safety_module)
         except Exception as exc:
@@ -102,7 +120,7 @@ def _bulk_retry(core, retry_callback, mp4_queue_module, safety_module):
                 outcomes.append({"id": task_id, "result": "skipped"})
                 continue
             try:
-                if mp4_queue_module.has_task(core, task_id):
+                if protected_mp4[task_id] or mp4_queue_module.has_task(core, task_id):
                     skipped += 1
                     outcomes.append({"id": task_id, "result": "skipped"})
                     continue
@@ -166,7 +184,6 @@ def install(core, mp4_queue_module=None, safety_module=None):
 
 __all__ = [
     "_bulk_retry",
-    "manual_retry",
     "_storage_capacity",
     "install",
 ]

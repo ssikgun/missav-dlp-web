@@ -113,7 +113,6 @@ RUN python teddy_patch_browser_runtime.py
 RUN python teddy_patch_auth.py
 RUN python teddy_patch_downloader_admin.py
 RUN python -m py_compile teddy_bootstrap.py teddy_downloader_admin.py teddy_spoofdpi.py
-RUN python teddy_downloader_admin_smoke.py
 RUN grep -Fq 'data-page="browser"' templates/index.html && \
     grep -Fq 'id="page-browser"' templates/index.html && \
     grep -Fq '/static/teddy-browser.css' templates/index.html && \
@@ -173,6 +172,7 @@ COPY downloader_runtime_overlay/ /app/
 RUN sha256sum -c dldws001-source-sha256.txt && \
     python -m py_compile app.py teddy_bootstrap.py teddy_download_safety.py teddy_downloader_admin.py teddy_entrypoint.py teddy_generic.py teddy_mp4_queue.py teddy_routing.py teddy_storage.py
 RUN python teddy_library_ui_smoke.py
+RUN python teddy_downloader_admin_smoke.py
 
 # 6. 폴더 생성 및 포트 노출
 RUN mkdir -p /downloads /final
