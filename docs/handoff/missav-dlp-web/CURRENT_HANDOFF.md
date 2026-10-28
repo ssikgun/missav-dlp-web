@@ -14824,3 +14824,31 @@ The isolated Dockerfile diff is exactly one moved RUN: the initial UI smoke rema
 The single authorized build command stopped before any Dockerfile step: BuildKit returned the error: network mode bridge not supported by buildkit. The existing builder reports worker network=host; host networking could reach operating services, so no fallback build or builder reconfiguration was attempted. Candidate tag dldws001-ui-smoke-postoverlay:20261028-bfc9ebf was absent and no image ID was created. Production Downloader and other running containers retained their preflight IDs, images and running state. No container was started, stopped or attached to a network/volume. Full error and preflight outputs remain in the isolated candidate evidence path /tmp/dldws001-ui-overlay-20261028/evidence/build.log.
 
 No Dockerfile or product code is promoted. The one-line candidate remains only in isolated worktree /tmp/dldws001-ui-overlay-20261028. To resume requires a separate decision about using a dedicated BuildKit builder with a build-only bridge network; then a fresh preflight and one build attempt. Do not treat the image as built or the final UI smoke/overlay image checks as passed.
+
+## CURRENT USER APPROVAL — DLDWS-001 DEDICATED BUILDKIT UI SMOKE RETRY (2026-10-28 KST)
+
+### OBJECTIVE
+
+Reuse the exact preserved Dockerfile candidate and perform one isolated Python 3.10 image build using a dedicated `docker-container` BuildKit builder only after network isolation is demonstrated. If every requested build and final UI/source check passes, promote the approved one-line Dockerfile move and paired result documentation by normal fast-forward. This approval authorizes no new Dockerfile change, product behavior change, host firewall/routing change, production operation, or deployment. It keeps DLDWS-001 IN_PROGRESS in Downloader and Discovery Writer Safety (contracts 1.0.0; common contract 1.0.1); other workstream routes remain unchanged.
+
+### APPROVED_SCOPE
+
+- Register this same approval in both paired ACTIVE_WORK files and canonical CURRENT_HANDOFF; verify governance and `git diff --check`, fast-forward from the exact remote base, and remote readback before builder/network work. Approval base and last confirmed remote HEAD: `ca4008dd5016e331db3eb909eb6fea301b75ad20`.
+- Read-only verify the preserved candidate `/tmp/dldws001-ui-overlay-20261028/`, exact Dockerfile SHA-256 `4bc8ad8c51ef6bea92954c87910bbba8a98a8c052b5be4b3bab54879c53dc5f3`, and the previous BuildKit error log. The only candidate product change is the approved move of the second `teddy_library_ui_smoke.py` invocation to immediately after final runtime overlay SHA/compile; retain the first invocation and all other commands. Do not alter the original candidate, logs, source or existing images.
+- First record existing Docker/buildx versions, context, default builder/worker network, networks and attached running containers, image/tag state, and memory/storage. Do not change or select the default builder.
+- Prepare a uniquely named dedicated Docker `bridge` build network and `docker-container` builder. Use a supported `--driver-opt network=<dedicated-build-network>` for the BuildKit daemon and a supported `--oci-worker-net=bridge` worker setting; run only with this builder selected explicitly and use the worker's isolated `default` network for Dockerfile RUN. Never use host networking, `network.host`, `security.insecure`, or any production Docker network.
+- Before building, prove by existing read-only network policy and bounded harmless checks that the BuildKit daemon and RUN workers cannot reach host/operational services, private/internal routes, Docker host gateway, or IPv6 bypasses, while required public dependency access is available. Separate daemon and worker network evidence. If bridge isolation alone is the only evidence, or a host firewall/routing/shared network-policy change is required, stop with NETWORK_ISOLATION=BLOCKED; do not build.
+- Once all isolation gates pass, reuse the candidate in a fresh isolated build context and make exactly one build attempt with a unique temporary tag. Keep existing build checks and final UI smoke; capture full logs, resolved build inputs, image ID, overlay 10-file hashes, smoke execution after overlay, Writer/Stage9/11/12 boundaries, and unchanged production container state. Do not push an image or connect operational volumes, sockets, databases, NAS, Jellyfin, or networks.
+- Only if all mandatory gates pass, promote the Dockerfile-only product diff and these paired ACTIVE_WORK/CURRENT_HANDOFF result records by a normal fast-forward; then read back branch SHA, Dockerfile diff/hash and changed-file list. Otherwise promote result documentation only and retain the candidate.
+
+### PROHIBITED_SCOPE
+
+No default-builder modification; no host firewall, routing, or shared network-policy change; no host networking or BuildKit privilege entitlement; no operational service/container/network/volume/socket/data access; no Dockerfile or other product-source/test/overlay/patch change beyond the exact preserved candidate; no image retag/overwrite/push or repeated build; no contract/router/task-ID/other-workstream change; no Stage9/11/12 change; no production restart/deploy; no broad refactor.
+
+### ACCEPTANCE_CRITERIA
+
+The preserved candidate hash and exact one-line move match; governance/diff/readback passes; dedicated builder and worker network settings are supported and verified; internal operational reachability and host/IPv6 bypass are demonstrably blocked without changing shared policy; one isolated Python 3.10 build completes; existing build checks pass; the final overlay hashes and post-overlay UI smoke execute and pass; Writer/Stage boundaries, entrypoint, production containers and operational state remain unchanged. Any FAIL/UNKNOWN stops build or promotion at the relevant gate. `PRODUCTION_CHANGED=NO`; `DEPLOY=NOT_RUN`.
+
+### NEXT_DECISION
+
+If isolation cannot be proven under existing policy, report the exact missing evidence and stop without building. If the single build fails, preserve its log and request a separate decision before any further attempt. Promote the one-line Dockerfile change only if all acceptance gates pass; operational deployment and later source consolidation remain separate approvals.
