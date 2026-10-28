@@ -6,6 +6,32 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
+## CURRENT USER APPROVAL — DLDWS-001 LIVE-SOURCE CANONICALIZATION PHASE 1 (2026-10-28)
+
+### OBJECTIVE
+
+Prepare and validate a minimal isolated Downloader source candidate that preserves the currently working runtime and establishes how to reproduce it from canonical source. This is not product promotion or production deployment. DLDWS-001 remains IN_PROGRESS with downloader,discovery-writer-safety and contract versions 1.0.0; Writer participation is shared tracking and Writer-invariance only.
+
+### APPROVED_SCOPE
+
+- Register this identical approval in both selected ACTIVE_WORK documents and canonical handoff; validate and normal-fast-forward/read back before candidate source work.
+- Recheck the actual CT108 image and source hashes read-only. Copy only identified, verified Downloader source files into a fresh isolated analysis/candidate location; no environment, credentials, settings, DB or download data. Compare app.py, teddy_storage.py, teddy_mp4_queue.py, teddy_download_safety.py, teddy_routing.py, teddy_bootstrap.py, teddy_entrypoint.py, Dockerfile and relevant build patches. Confirm existing teddy_library_api.py MAX_TITLES=500 is retained.
+- Trace runtime/build-patch/overlay order, dependencies, ownership and verified features; include provenance-verified missing MP4 modules and only required Downloader deltas in a candidate. Produce exact diff, hashes and minimum reproducible integration/build plan. Reuse historical successful evidence where applicable; run syntax checks and small representative existing offline regression tests with isolated fixtures. Do not substitute old queue/safety candidates for the current live versions.
+- Record results in both DLDWS-001 ACTIVE_WORK documents and canonical handoff. Only documentation may be committed/pushed; candidate product promotion needs separate review/approval.
+
+### PROHIBITED_SCOPE
+
+No live Docker build/restart/replacement/deployment, operating Compose edit, actual download/retry/remux/NAS publication, task/queue/DB/settings/media change or deletion, secret capture or Git disclosure, Writer socket/systemd change, Stage9/Stage11/Stage12 source/model/service/timer change, protected dirty-worktree or old-candidate/evidence overwrite/reset, new broad refactor, contract/design change, or unapproved canonical product promotion. Preserve original DLDWS history and remaining backup policies.
+
+### ACCEPTANCE_CRITERIA
+
+Canonical preflight and authorization readback PASS before source work; fresh live image/source identity and provenance assessed explicitly; minimal candidate retains download max 4, global MP4 max 1, failed-job hold, atomic task persistence, recoverable media/fragment preservation, NAS no-clobber, verified completion-before-cleanup, task/lock/ownership boundaries and library 500. Exact changed-file hashes/diff and rebuild plan with evidence gaps; small existing offline checks reported accurately. Existing Stage9/Writer/Jellyfin and Stage11/Stage12 boundaries unchanged. BUILD=NOT_RUN, DEPLOY=NOT_RUN, PRODUCTION_CHANGED=NO. A live source hash match is not by itself all-safety or rebuild PASS.
+
+### EVIDENCE AND NEXT_DECISION
+
+User approval received 2026-10-28. Registration base and freshly checked remote SHA 5d1eadacc71b25a8066f1483757008f7dfdb8253. Expected user-provided image sha256:dd5d4e96f0292ff931edd8a239387d8de735243d13d942032ac8c8afacce2c77 and source hashes are to be rechecked; previous audit identified runtime overlays and absent canonical MP4 modules, not an authorization to recreate existing features. Stop if identity/access/scope cannot be verified without bypass. The phase ends with a validated isolated source candidate, provenance and integration plan. Separately approve any canonical product promotion and subsequent build/deployment; do not automatically proceed. Existing task IDs, routes, contracts and other workstreams are unchanged.
+
+
 ## DLDWS-001 BACKUP CLEANUP RESULT — USER-SUBMITTED (2026-10-28 KST)
 
 The user reports executing the previously approved limited preservation and cleanup operation. All operational observations and results in this entry are user-submitted; Codex did not rerun server commands, independently verify the results, copy files, or delete data during this documentation phase.
