@@ -14961,3 +14961,19 @@ CANONICAL_PREFLIGHT=PASS; SMOKE_CHANGE_SCOPE=PASS; ROOT_ADMIN_SMOKE=PASS; OVERLA
 ### NEXT_DECISION
 
 Keep DLDWS-001 and the existing duplicate administrator modules unchanged. Any later module consolidation or operational retry-path testing requires its own approved scope.
+
+## CURRENT USER APPROVAL — DLDWS-001 SINGLE ADMINISTRATOR SOURCE CANDIDATE (2026-10-28 KST)
+
+### OBJECTIVE AND APPROVED_SCOPE
+
+The user approves a minimal isolated candidate that makes root `teddy_downloader_admin.py` the single product source, using the exact verified final administrator bytes (SHA-256 `73984205a2340a05a930132bf248bb1a8c07125391167aa9d5e1c072f247cb31`). Inspect patch/call/build dependencies first; remove only its duplicate runtime-overlay product file if the root COPY supplies identical final bytes. Align the administrator smoke and its Dockerfile placement with the supported final callback/shared-lock/MP4 interface; preserve existing final UI smoke, all patch effects and the unchanged ten-entry overlay manifest. Allowed candidate changes are those two administrator paths, `teddy_downloader_admin_smoke.py`, and `Dockerfile`. Record a safety-coverage mapping for retired legacy tests, preserving authentication/CSRF, capacity/inode, selection/duplicates, result accounting, MP4 safety and fragment protections. Keep mocked callback coverage distinct from actual safe-retry implementation evidence.
+
+Register this identical approval in both DLDWS-001 ACTIVE_WORK files and canonical handoff; pass governance/diff and normal fast-forward/readback before creating a new isolated product-candidate worktree. Reuse the exact existing image `sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31` only as an offline read-only baseline. Use network-none/read-only disposable bounded containers with synthetic fixtures and read-only candidate mounts, no operational resources. Verify source-byte identity, single product copy, static build order, offline final placement and manifest 10/10, supported administrator smoke, safety mapping, protected source and production invariance. Preserve earlier root 4/4 and overlay 6/6 results as history.
+
+### PROHIBITED_SCOPE
+
+No retry/product-policy redesign, actual safe-retry/lock/concurrency change, manifest weakening, other patch/overlay/module consolidation, Stage9/11/12 or Writer source/service changes, operating Docker/network/BuildKit/firewall/data/NAS/DB/Jellyfin/media actions, deployment, protected worktree/evidence changes, or contract/router/task-ID changes. No new image build without an approved safe environment. The earlier one-line UI-change build waiver does not apply to this product integration.
+
+### ACCEPTANCE_CRITERIA AND NEXT_DECISION
+
+Prepare and preserve an isolated, verified candidate and evidence without product promotion. Keep DLDWS-001 IN_PROGRESS in downloader,discovery-writer-safety, both contracts 1.0.0 and common contract 1.0.1. Stop with DESIGN_BLOCKED if additional product paths or safety-behavior changes are needed. Report NEW_IMAGE_BUILD=NOT_RUN when no full build is verified, and PRODUCT_GIT_PROMOTION=NOT_RUN. After offline validation, present remaining build risk and obtain a separate promotion decision; only approval/result documentation is currently authorized for canonical fast-forward/readback. Production deployment remains separate.
