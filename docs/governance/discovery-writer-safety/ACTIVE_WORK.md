@@ -2836,3 +2836,17 @@ Preflight and paired approval readback pass; exact change scope is the smoke fil
 ### NEXT_DECISION
 
 Promote the test-only correction if all acceptance checks pass. Stop and preserve the exact cause on any product failure or unknown. Administrator module consolidation remains a separate approved task.
+
+## DLDWS-001 ADMIN SMOKE INTERFACE ALIGNMENT — RESULT (2026-10-28 KST)
+
+CANONICAL_PREFLIGHT=PASS; SMOKE_CHANGE_SCOPE=PASS; ROOT_ADMIN_SMOKE=PASS; OVERLAY_ADMIN_SMOKE=PASS; SAFETY_ASSERTIONS_PRESERVED=PASS; SHARED_LOCK_MP4_BOUNDARY=PASS; PRODUCT_SOURCE_CHANGED=NO; NEW_IMAGE_BUILD=NOT_RUN; GIT_PROMOTION=PASS; PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
+
+- The only product-test file changed is `teddy_downloader_admin_smoke.py`. Its root-mode tests retain their original function bodies and assertions. The smoke now explicitly selects an administrator module by mode, path, and SHA-256.
+- Existing image `sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31` was re-identified. Root administrator `/app/teddy_downloader_admin.py` SHA-256 `f764ca8368e178f69d0343c738e7662429b44498592a36b7505b33536b7ad74d`: 4 PASS / 0 FAIL. Final overlay administrator `/app/teddy_downloader_admin.py` SHA-256 `73984205a2340a05a930132bf248bb1a8c07125391167aa9d5e1c072f247cb31`: 6 PASS / 0 FAIL.
+- Overlay checks cover identity-shared lock acceptance and missing/mismatched-lock refusal; actual MP4 queue job consistency and refusal on path lookup error, inconsistent presence, symlink job, and unknown stage; callback-only retry dispatch; and failed callback accounting. The callback is mocked at the supported interface, so the safe-retry implementation itself is not claimed tested here.
+- The existing overlay manifest passed all 10 SHA-256 entries in the image. Both disposable runs used `--network none`, read-only root, no operational mounts/ports/secrets, dropped capabilities, no-new-privileges, bounded resources, and `--rm`. The image ID and running-container ID/image/name/network snapshot remained unchanged; no test container remained.
+- `git diff --check` and paired/all-workstream governance validation passed. Promotion contains the smoke and these three DLDWS-001 records only, on a normal fast-forward. The runtime overlay, administrator product modules, Dockerfile, Stage9/11/12 sources, and production services were not changed. No image was built or deployed.
+
+### NEXT_DECISION
+
+Keep DLDWS-001 and the existing duplicate administrator modules unchanged. Any later module consolidation or operational retry-path testing requires its own approved scope.
