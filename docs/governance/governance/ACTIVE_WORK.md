@@ -6,6 +6,29 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.1
 REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety
 
+## CURRENT USER-APPROVED DLDLIB-001 OPERATIONS — 2026-10-28 KST
+
+The user explicitly authorized the bounded Downloader-only production image deployment below. This supersedes the earlier DLDLIB-001 coding-phase prohibition on image build/container replacement/restart only for this exact operation, conditional on every safety gate. Prior coding evidence, DLDWS-001 and backup policies are preserved. Governance coordinates authorization/evidence, Downloader owns the change, and Writer Safety participates only to verify Writer invariance and compatibility.
+
+### APPROVED_SCOPE
+
+- After this approval is validated, committed, fast-forwarded and read back from canonical, read-only recheck actual CT108 host/container identity, image, complete Compose project/service/image/network/environment/mount/privilege/command configuration (never expose secrets), current file SHA and byte equality with the canonical pre-fix file, old-image/config rollback, live downloads/remux/tasks and MP4 journals, startup replay of old failures/GANA, Discovery DB read-only accessibility, Writer socket and shared-lock compatibility, and independent Stage9 scheduling.
+- Only when all gates including startup and rollback safety PASS: build a reproducible uniquely tagged single-file image layer based on the verified running image ID, replacing only /app/teddy_library_api.py with the canonical MAX_TITLES=500 version. No docker commit or full-source rebuild. Verify candidate import/constant and unchanged runtime configuration. Preserve the old image and Compose configuration; replace only the actual Downloader Compose service without dependency recreation and preserve command, networks, mounts, secrets, environment and permissions.
+- Verify running container, constant 500, authenticated /api/library HTTP 200 with actual count, list count and default ordering, web File Management library display, and unchanged jobs/queue/journal, Writer and Stage9 status. Any rollback requires a safe startup/replay path and preserved current state; stop if unproven. Record outcomes and precise evidence in ACTIVE_WORK and canonical handoff. User-supplied baseline image sha256:9ceedeba292ae50980e6fb143589b7c0e12d1abf8c34d82fa49de8a5a500402f and file SHA-256 7847786d04ac9af4c533f4163633db837954b5d15f9723b53fe68c50f72ed055 are historical until freshly verified.
+
+### PROHIBITED_SCOPE
+
+No product source change beyond already published constant, unrelated service/container recreation, direct patching of running container, Docker commit, forced job/download/Organizer/Stage9 work, Writer socket/service modification, Stage9 timer/service changes, NAS/Jellyfin/Discovery DB/settings writes, task or queue edits/deletion, backup movement/deletion, Stage11 changes or broad refactoring. No build/deploy if any mandatory safety gate is unknown or fails; no unsafe rollback or startup replay workaround. Do not publish secrets.
+
+### ACCEPTANCE_CRITERIA
+
+Approval readback, all governance checks and clean diff PASS before operations; fresh baseline, restart replay and rollback safety PASS before image creation/deployment. Candidate contains only the approved file difference and reads MAX_TITLES=500; real API and authenticated web UI verification are separate outcomes. If UI is unverified, do not claim full completion. Preserve unrelated services/data. Report each gate independently, image IDs and canonical SHA.
+
+### EVIDENCE AND NEXT_DECISION
+
+User approval 2026-10-28 KST; canonical pre-authorization base 30fd1fc7129c33c88beb421fc65ada3adbd6e425. The user's earlier running container, five completed tasks, empty MP4 queue, 252 holdings and HTTP 503 are historical observations, not current proof of restart safety. Proceed only after exact canonical authorization readback and fresh gates. Keep Governance, Downloader and Discovery Writer Safety IN_PROGRESS / DLDLIB-001 after this phase; restore original DLDWS-001 paired routes and Governance INACTIVE / NONE only during a later separate closeout following operational/UI verification.
+
+
 ## CURRENT TEMPORARY TASK — DLDLIB-001 (2026-10-28)
 
 ### OBJECTIVE
