@@ -14894,3 +14894,28 @@ Canonical preflight and approval readback pass; existing image ID and candidate 
 ### NEXT_DECISION
 
 Promote only the one-line Dockerfile move after all acceptance checks pass. If offline image validation fails or any identity differs, preserve candidate/evidence and stop; further changes or a new build require separate approval. Any operating deployment and broader source consolidation remain separate work.
+
+## DLDWS-001 EXISTING-IMAGE OFFLINE UI SMOKE — RESULT AND DOCKERFILE PROMOTION (2026-10-28 KST)
+
+CANONICAL_PREFLIGHT=PASS; DOCKERFILE_SCOPE=PASS; EXISTING_IMAGE_ID=PASS; OFFLINE_TEST_ISOLATION=PASS; FINAL_UI_SMOKE=PASS; OVERLAY_10_HASHES=PASS; WRITER_STAGE_BOUNDARY=PASS_HISTORICAL_EVIDENCE_REUSED; NEW_IMAGE_BUILD=NOT_RUN; GIT_PROMOTION=PASS; PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
+
+- The new validation-basis approval was registered/read back at `95d06596bdca27f21cd8434ba4d132759472c494`. Existing prior BuildKit network failure and isolation block remain in history and retain their original FAIL/BLOCKED states.
+- Existing image identity passed: `dldws001-activation-final:20261028-qkoxk08c`, `sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31`. No image was built. Prior Writer, source-hash, Downloader and Stage boundary evidence belongs to that unchanged image and is reused as historical evidence only; unrelated prior tests were not repeated.
+- Protected candidate `/tmp/dldws001-ui-overlay-20261028/Dockerfile` SHA-256 is `4bc8ad8c51ef6bea92954c87910bbba8a98a8c052b5be4b3bab54879c53dc5f3`. Static comparison against the canonical Dockerfile passed: exactly two UI smoke invocations remain; the first stays at line 64, and only the second moves from line 153 to line 175, immediately after final overlay SHA-256 and compile. All other Dockerfile lines/order and all product source, patch, overlay, test and Stage files are unchanged. `git diff --check` passed.
+- Existing-image test ran with `docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --pids-limit 32 --memory 256m --memory-swap 256m --cpus 0.5 --user 65534:65534 --env PYTHONDONTWRITEBYTECODE=1 --entrypoint /bin/sh <image-id> -ceu ...`; no mounts, injected service settings/secrets, ports or extra network were used. Container Python was 3.10.22. It verified the UI smoke and required HTML/JS/CSS files, then `sha256sum -c dldws001-source-sha256.txt` returned 10/10 OK:
+  - `app.py` `f2ffdc1542f1203e7c533bf0116d617bb9f7d2a9d9fb937455b75f17d640244e`
+  - `teddy_bootstrap.py` `b96850dbfaa585f5cf2abb3fdbe328030706fc159aba8875656fe2c775e433f3`
+  - `teddy_download_safety.py` `52e1801aa35745891ea8c6946efde20c9752598bdfeedf20c5f13a7581966d03`
+  - `teddy_downloader_admin.py` `73984205a2340a05a930132bf248bb1a8c07125391167aa9d5e1c072f247cb31`
+  - `teddy_entrypoint.py` `c36799eace49e3f6df7fbdce69524c6f9f5d31a8b4588d1d65f14993b44c1357`
+  - `teddy_generic.py` `f19362ebeecf6d517c7acbe97629c2c34f97017957c0a324d090fc45b6abf339`
+  - `teddy_mp4_queue.py` `bd2f29b1df32cef4e60d2eb2b93637157d0f3e0fd38a706f4ef0312a835a3d53`
+  - `teddy_routing.py` `275607b2249029b689e701cdddf45b960c552d8099b23a554e20a54f3f212231`
+  - `teddy_storage.py` `d678abce28a0545d7e9d47633f79cff729c18d7e9436b82c2c31c2921fe914f9`
+  - `templates/index.html` `4d379e37c76e25781ea4eda8d169af5f24d70a4d53ef74808dc088c37b85766f`
+- Actual command in the image: `python -B teddy_library_ui_smoke.py`; exit code 0, output `Stage13 UI-P1 Library UI shell smoke: OK`. The disposable container was auto-removed. The running-container ID/image/status/network snapshot was unchanged before and after.
+- The one-file Dockerfile promotion commit `854618a2239bffd9087349ddb55050d44d5fc95a` was a normal fast-forward from `95d06596bdca27f21cd8434ba4d132759472c494`. Remote readback confirmed the only product file is `Dockerfile`, with SHA-256 `4bc8ad8c51ef6bea92954c87910bbba8a98a8c052b5be4b3bab54879c53dc5f3` and the same one-line movement. Writer/Stage boundaries were not retested; previous PASS evidence remains applicable to unchanged code in the identical existing image.
+
+### VERIFICATION LIMIT
+
+This result establishes that the current existing image's final UI source passes the UI smoke, its ten overlay files match the manifest, and the Dockerfile command is now positioned after the final overlay checks. `NEW_IMAGE_BUILD=NOT_RUN`: a complete build from the changed Dockerfile, present-day dependency resolution, and byte-identical image reproduction were not verified. The previous BuildKit failure remains historical and unresolved as a build-environment issue. No operating deployment or broader source consolidation is authorized by this result.
