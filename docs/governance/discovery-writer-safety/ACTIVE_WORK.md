@@ -2741,3 +2741,18 @@ The preserved candidate hash and exact one-line move match; governance/diff/read
 ### NEXT_DECISION
 
 If isolation cannot be proven under existing policy, report the exact missing evidence and stop without building. If the single build fails, preserve its log and request a separate decision before any further attempt. Promote the one-line Dockerfile change only if all acceptance gates pass; operational deployment and later source consolidation remain separate approvals.
+
+## DLDWS-001 DEDICATED BUILDKIT RETRY — NETWORK ISOLATION BLOCKED (2026-10-28 KST)
+
+AUTHORIZATION=PASS; CANDIDATE_INTEGRITY=PASS; DEDICATED_BUILDER=BLOCKED; WORKER_BRIDGE_MODE=NOT_CONFIGURED; NETWORK_ISOLATION=BLOCKED; ISOLATED_PY310_BUILD=NOT_RUN; FINAL_UI_SMOKE=NOT_RUN; OVERLAY_10_HASHES=NOT_RUN; WRITER_STAGE_BOUNDARY=INCOMPLETE; GIT_PROMOTION=NOT_RUN; PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
+
+- The additional approval was registered identically in both DLDWS-001 ACTIVE_WORK files and this handoff, passed the paired and all-workstreams governance checks plus `git diff --check`, and was fast-forwarded/read back at canonical SHA `163d9a4227a4f898c8c7ac9c1f0c29d6c7f30c82` before Docker inspection.
+- The preserved candidate remains unchanged at `/tmp/dldws001-ui-overlay-20261028/`; its Dockerfile SHA-256 is `4bc8ad8c51ef6bea92954c87910bbba8a98a8c052b5be4b3bab54879c53dc5f3`. Its original failure log still records the earlier unsupported `--network=bridge` error. The reserved build tag `dldws001-ui-smoke-postoverlay:20261028-bfc9ebf` is absent.
+- Read-only Docker preflight: Engine 29.7.2, Buildx 0.36.1, default builder driver `docker`, BuildKit v0.32.2, worker network `host`. The default builder was not modified. The running Downloader and other containers remain attached to `missav-dlp-web_default`; no dedicated network or builder was created.
+- The existing Docker host has a private-LAN default route and IPv6 enabled on its uplink. Existing nftables input/output policy is ACCEPT; Docker bridge forwarding permits bridge egress, and `DOCKER-USER` contains only limited ingress rules for published UI ports, not a general private-destination or IPv6 egress deny. The standard bridge is non-internal with inter-container communication and masquerading enabled; the production bridge is also non-internal. Thus a new ordinary bridge cannot prove isolation from host, operational/private destinations, or IPv6 paths. An internal-only bridge would prevent the external apt/Python/SpoofDPI inputs required by this Dockerfile. Establishing public-only egress would require a new host/shared network policy, which this approval prohibits.
+- The network-isolation gate therefore stopped before creating Docker resources or starting a build. This retry performed zero image builds; final UI smoke, in-image overlay hashes, and current Writer/Stage boundary checks were not run. The earlier BuildKit failure remains historical evidence and was not reclassified.
+- No Dockerfile/product file was promoted and no production container, image, service, volume, network, or data was changed by this attempt.
+
+### NEXT_DECISION
+
+To resume, provide an already-existing, verifiable egress path that permits required public build inputs while denying host, private/operational destinations and IPv6 bypasses, or separately approve a scoped network-isolation policy change. Until then keep the approved Dockerfile candidate isolated and do not build or promote it. Production deployment and broader source consolidation remain separate approvals.
