@@ -1,5 +1,36 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-28 — DLDWS-001 limited backup preservation release registered
+
+## CURRENT USER-APPROVED LIMITED BACKUP PRESERVATION RELEASE — 2026-10-28 KST
+
+### OBJECTIVE AND APPROVAL
+
+Under existing shared DLDWS-001 / IN_PROGRESS, the user explicitly authorizes a narrowly conditional release of prior backup-preservation obligations for exactly these two Proxmox Data_5TB directories, after the ten specified configuration backup files have been safely copied and SHA-256 verified on CT108:
+
+1. /mnt/pve/Data_5TB/dldws001-backups/backup-20261020-110732-TbdQOd
+2. /mnt/pve/Data_5TB/dldws001-backups/root-ts-legacy-four-20261027-v1
+
+This scoped user decision supersedes prior preservation instructions only for these two directories and only after all gates below pass. It does not erase or rewrite historical backup, deployment, recovery, task or approval evidence; all other backup-preservation obligations remain in force. The existing DLDWS-001 task and its downloader,discovery-writer-safety routing remain unchanged. Writer Safety participation is coordination and preservation of Writer invariance only.
+
+### APPROVED_SCOPE AND ORDER
+
+- This Codex phase registers the approval in these two ACTIVE_WORK documents and the canonical handoff, validates governance and publishes/readbacks the documentation only. FILE_TRANSFER=NOT_RUN; DELETE=NOT_RUN in this phase.
+- In the separate subsequent operator phase, after exact canonical approval readback and all fresh gates, preserve the first directory's seven config-snapshot/ files and restore-check/.tasks.json, restore-check/.settings.json and restore-check/.proxy-pool.json: exactly ten files, under CT108 /var/backups/missav-dlp-web/20261020/. Preserve source relative paths and filenames, provenance, sizes and SHA-256 in root-private evidence without committing contents or credentials. Apply root-only access. Never restore these files over operating settings, task records or databases. Stop on existing destination collision or any uncertain identity; do not overwrite.
+- Only after all ten destination copies match source count, sizes and SHA-256 and required preserved evidence is confirmed, permit cleanup limited to the two exact directories above: redundant large recovery material and duplicate backup data in the first directory and the second legacy-four backup. No deletion outside these directories. Keep source backup unchanged until copy verification succeeds. User-estimated freed capacity is approximately 38.3 GiB; verify actual selected content and size before deletion rather than assuming that amount.
+
+### REQUIRED SAFETY GATES AND PROHIBITIONS
+
+- Verify actual PVE host identity and Data_5TB mount; the exact paths, directory types, identity and boundaries of both sources; and CT108 identity, target filesystem and whether the destination is covered by a backup. Confirm actual candidate deletion inventory/size, absence of other backup paths or live operational files in the deletion set, and preservation of historical approval/deployment/recovery evidence. Do not follow unexpected symlinks or cross boundaries; if any path, type, file count, source/target identity, conflict, hash or required preservation condition is uncertain or mismatched, STOP before deletion.
+- No NAS final MP4/NFO/poster mutation; no live Downloader job, queue, DB or settings overwrite; no Docker/Compose/Writer socket or service, Stage9 timer/runner, Stage11 or unrelated product changes; no backup deletion outside the two exact directories. Never commit credentials, secret keys or configuration contents.
+
+### ACCEPTANCE_CRITERIA, EVIDENCE AND NEXT_DECISION
+
+- Registration must be identical in both shared active-work files; all-workstream structure, DLDWS-001 paired preflight, unchanged independent task preflights and git diff --check pass; normal canonical fast-forward and exact remote readback. Structural registration is not proof of copy or cleanup.
+- The first exact directory and data.tar are recorded in existing DLDWS-001 history, including historical source-manifest SHA-256 252491423da01d4f1eeabad3e7caeaeac3e8cb23b2eb46818aba91b7be178d16; historical statements that the archive was preserved remain true as of their original observations, not a claim of current verification or permanent future existence. The second exact path is user-specified; its actual PVE identity and contents remain UNVERIFIED. No PVE path, file count or hash was verified in this registration phase.
+- The user separately conducts the PVE/CT108 operator step only after canonical registration readback and fresh verification of every gate. Preserve the original workstream state; this record does not complete DLDWS-001 or authorize any other cleanup. On any failed gate leave original backup data intact and report BLOCKED.
+
+
 ## 2026-10-28 — DLDLIB-001 closed and original routing restored
 
 ## DLDLIB-001 CLOSEOUT — 2026-10-28 KST
