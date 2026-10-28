@@ -2703,3 +2703,13 @@ BASE/ROUTING: ssikgun/missav-dlp-web, teddy-subtitle-stage11, approved base bfc9
 ACCEPTANCE: exact Dockerfile-only diff; both smoke calls preserved with only the second moved after final overlay SHA/compile; existing Python 3.10 build stages PASS; final UI smoke confirmed in build log after overlay; all 10 overlay hashes PASS; Writer and Stage source/entrypoint boundaries unchanged; governance/diff/latest-remote checks PASS. Otherwise stop without product promotion. PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
 
 NEXT_DECISION: If all gates pass, promote this Dockerfile-only change and result records. Operational rollout and broader source consolidation remain separate work.
+
+## DLDWS-001 FINAL UI SMOKE PLACEMENT — EXECUTION RESULT (2026-10-28 KST)
+
+CANONICAL_PREFLIGHT=PASS; DOCKERFILE_SCOPE=PASS; UI_SMOKE_PLACEMENT=PASS; ISOLATED_PY310_BUILD=FAIL_BEFORE_BUILD_STEPS; FINAL_UI_SMOKE=NOT_RUN; OVERLAY_10_HASHES=NOT_RUN_IN_IMAGE; WRITER_STAGE_BOUNDARY=INCOMPLETE; GIT_PROMOTION=NOT_RUN; PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
+
+The isolated Dockerfile diff is exactly one moved RUN: the initial UI smoke remains at line 64; the second is now at line 175 immediately after final overlay SHA/compile. Exact expected move comparison passed, overlay source manifest was unchanged, expected prior final-image sources matched 319/319 statically, git diff --check passed and no source/test/Stage file changed. New candidate Dockerfile SHA-256: 4bc8ad8c51ef6bea92954c87910bbba8a98a8c052b5be4b3bab54879c53dc5f3.
+
+The single authorized build command stopped before any Dockerfile step: BuildKit returned the error: network mode bridge not supported by buildkit. The existing builder reports worker network=host; host networking could reach operating services, so no fallback build or builder reconfiguration was attempted. Candidate tag dldws001-ui-smoke-postoverlay:20261028-bfc9ebf was absent and no image ID was created. Production Downloader and other running containers retained their preflight IDs, images and running state. No container was started, stopped or attached to a network/volume. Full error and preflight outputs remain in the isolated candidate evidence path /tmp/dldws001-ui-overlay-20261028/evidence/build.log.
+
+No Dockerfile or product code is promoted. The one-line candidate remains only in isolated worktree /tmp/dldws001-ui-overlay-20261028. To resume requires a separate decision about using a dedicated BuildKit builder with a build-only bridge network; then a fresh preflight and one build attempt. Do not treat the image as built or the final UI smoke/overlay image checks as passed.
