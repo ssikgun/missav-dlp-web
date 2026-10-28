@@ -14695,3 +14695,13 @@ AUTHORIZATION=PASS; RUNNER_PREFLIGHT=PASS; RUNNER_IMPORT_FIX=PASS; EXISTING_IMAG
 The exact previously verified 15-file candidate was copied into fresh worktree `/tmp/dldws001-promotion-20261028-5ic_hg6r`; every copied file matched its candidate manifest. The Dockerfile change is limited to the existing Writer activation smoke plus the final nine-module/template Downloader overlay copy/hash/compile step. No Stage9/11/12 product source is in the candidate. The canonical promotion is conditional on the following normal fast-forward and remote file-level readback; if either differs, stop without force or merge. Full `git diff --cached --check` reports one blank line at EOF in the exact candidate `downloader_runtime_overlay/teddy_mp4_queue.py`; its bytes are part of the verified image/candidate and were intentionally not normalized. The remaining 17 staged paths pass the path-excluded whitespace check.
 
 Next decision: finish the already authorized normal fast-forward promotion and verify every promoted file hash. Operational image deployment remains separate approval.
+
+## DLDWS-001 CANONICAL PRODUCT PROMOTION — REMOTE READBACK PASS (2026-10-28 KST)
+
+CANONICAL_PRODUCT_PROMOTION=PASS; NORMAL_FAST_FORWARD=PASS; REMOTE_READBACK=PASS; PRODUCT_FILE_HASHES=15/15 PASS; PRODUCTION_CHANGED=NO; BUILD=NOT_RUN; DEPLOY=NOT_RUN.
+
+- Promotion commit: `53a156289b40b91e9d109f95f34fefc9958ec19c`.
+- Readback remote branch: `teddy-subtitle-stage11`; fetched HEAD and `git ls-remote` both returned the promotion commit SHA above. All 15 promoted product files matched the immutable candidate manifest SHA-256 `a8413545d96eda73eeeed346393e7d8179f4c3516f1e68ef6fcca1de33f3bf29`.
+- The promotion commit contains exactly 18 files: the 15 candidate product files plus both paired DLDWS-001 ACTIVE_WORK files and `CURRENT_HANDOFF.md`. No Stage9/11/12 product source was changed.
+- DLDWS-001 remains `IN_PROGRESS` in `downloader,discovery-writer-safety`; contracts and router are unchanged. Production Downloader remains on its original image and running state. Operational deployment needs separate approval.
+- The exact verified candidate's `downloader_runtime_overlay/teddy_mp4_queue.py` retains one blank line at EOF, so the full promotion-commit `git diff --check` reports that single warning. The file was not normalized because that would violate the exact candidate/image hash; the other 17 changed paths pass the whitespace check.
