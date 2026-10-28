@@ -6,6 +6,39 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
+## CURRENT USER APPROVAL — DLDWS-001 REMAINING VALIDATION RESUMPTION (2026-10-28 KST)
+
+### OBJECTIVE AND SUPERSESSION
+
+Reuse the exact existing verified image and candidate, run only unexecuted Gate B checks and then Gate C, and conditionally promote the previously approved candidate if every mandatory gate passes. This approval explicitly supersedes the prior narrow restriction allowing only four standard-library imports. It does not authorize product-code, test-assertion, Writer-design, or image changes.
+
+### APPROVED_SCOPE
+
+- Register this same decision in both paired ACTIVE_WORK files and canonical CURRENT_HANDOFF. Run governance and diff checks, normal fast-forward, and exact remote readback before validation. Base SHA: 19a21f3e66cd5187ed0121f92bb0c65c7e880732. Keep task DLDWS-001, the two IN_PROGRESS workstreams, their 1.0.0 contracts, router and all other workstream states unchanged.
+- In a new isolated directory, preserve the original gate_b.py and failure logs unchanged. Build a runner that invokes only still-unexecuted checks, with required standard-library imports `ast`, `queue`, `uuid`, `threading`, `json`, and `hashlib`; any additional required standard-library import may be added only with a documented source reference. Do not run the original wrapper end-to-end.
+- Before tests, check runner syntax, imports and referenced names; print the exact execution list; prove previously passing startup (10), atomic-save (13), NAS no-clobber (14), concurrency, Gate A, and prior 38 unit cases are excluded. Verify existing image ID `sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31`, candidate manifest SHA-256 `a8413545d96eda73eeeed346393e7d8179f4c3516f1e68ef6fcca1de33f3bf29`, preserved evidence, and host/test resources read-only.
+- Reuse the exact existing image without rebuild/retag. Test only with network none, read-only container root, 2GiB synthetic `/tmp`, no operational mounts/sockets/DB/NAS, bounded CPU/memory/time, and remove the disposable container afterward. Keep the 512MiB product reserve unchanged and verify actual available fixture space remains above it.
+- Gate B: run only unexecuted normal download admission/state persistence; synthetic HLS/legacy-TS-to-queue/journal and source/fragment preservation; library-500 API/UI; and any other previously planned mandatory item proven not to have run. Do not repeat any previous PASS test. Stop on any real product assertion failure; do not modify product or tests.
+- Gate C only after Gate B PASS: minimal isolated Writer systemd-socket/client interface; Stage9 generic/dedicated runner separation; task/result-path/SHA contract; Stage11 input/sidecar; Stage12 provenance/no-overwrite; and expected Stage9/11/12 source hashes. Use existing synthetic/offline checks only; no real media, NAS, Jellyfin, model, or subtitle work.
+- If and only if image/candidate/evidence, previous PASS evidence, remaining Gate B, Gate C, governance/scope and latest-remote checks all PASS, promote only the exact already approved Writer activation-only source/smokes, nine Downloader overlay Python files/template, unchanged minimal Dockerfile integration/hash manifest, and required source/result documents in a fresh isolated Git worktree. Verify remote SHA and each changed file's SHA-256. On any FAIL/UNKNOWN, do not promote product files; record only actual results.
+
+### PROHIBITED_SCOPE
+
+No repetition of any previously passed check; no product-code, Writer implementation/design, test assertion/fixture-meaning, Dockerfile, image, or safety-reserve change; no image build/retag; no operational Docker/Writer/systemd change; no real download/remux/NAS/Jellyfin/media/model/subtitle operation; no production task/queue/DB/data write; no Stage9/11/12 source/service/timer change; no evidence/candidate overwrite; no contract/router/task-ID change; no deployment; no unapproved follow-up after a new failure.
+
+### ACCEPTANCE_CRITERIA
+
+- Runner preflight passes and the explicit execution list contains only unexecuted checks.
+- Existing image, candidate and prior evidence hashes match; historical results remain distinguished from new runs.
+- Remaining Gate B passes; Gate C runs only after B and passes without overstating subtitle quality.
+- Conditional product promotion and file-level remote readback occur only if every mandatory gate passes; otherwise product promotion remains BLOCKED/NOT_RUN.
+- `PRODUCTION_CHANGED=NO`; `DEPLOY=NOT_RUN`; all routes, contracts and task IDs remain unchanged.
+
+### NEXT_DECISION
+
+If all gates pass, promote the exact approved candidate from a new clean worktree and report remote SHA/file hashes. If any preflight or test fails or is unknown, stop, preserve artifacts, document the cause, and request a separate decision before continuing. Production deployment remains separate.
+
+
 ## CURRENT USER APPROVAL — DLDWS-001 RUNNER IMPORT FIX AND REMAINING VALIDATION (2026-10-28 KST)
 
 ### OBJECTIVE
