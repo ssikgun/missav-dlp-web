@@ -14867,3 +14867,30 @@ AUTHORIZATION=PASS; CANDIDATE_INTEGRITY=PASS; DEDICATED_BUILDER=BLOCKED; WORKER_
 ### NEXT_DECISION
 
 To resume, provide an already-existing, verifiable egress path that permits required public build inputs while denying host, private/operational destinations and IPv6 bypasses, or separately approve a scoped network-isolation policy change. Until then keep the approved Dockerfile candidate isolated and do not build or promote it. Production deployment and broader source consolidation remain separate approvals.
+
+## CURRENT USER APPROVAL — DLDWS-001 EXISTING-IMAGE OFFLINE UI SMOKE AND DOCKERFILE PROMOTION (2026-10-28 KST)
+
+### OBJECTIVE AND SUPERSESSION
+
+For this bounded run, the user-approved existing-image offline verification replaces the earlier requirement for a new Python 3.10 image-build PASS. It does not erase or reclassify the earlier BuildKit failure and does not claim a new full Dockerfile build. Keep DLDWS-001 `IN_PROGRESS` in `downloader,discovery-writer-safety`, both domain contracts at 1.0.0 and common contract at 1.0.1; do not change the router, task ID, or other workstream state.
+
+### APPROVED_SCOPE
+
+- Register this same approval in both paired ACTIVE_WORK files and canonical CURRENT_HANDOFF. Pass selected-workstream and all-workstreams governance checks plus `git diff --check`, normal fast-forward from the verified canonical head, and remote readback before image inspection/test execution.
+- Read-only verify existing image `sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31` (`dldws001-activation-final:20261028-qkoxk08c`), protected candidate `/tmp/dldws001-ui-overlay-20261028/`, candidate Dockerfile SHA-256 `4bc8ad8c51ef6bea92954c87910bbba8a98a8c052b5be4b3bab54879c53dc5f3`, prior promotion evidence and the previous network-isolation block. Any mismatch stops the run.
+- Compare the candidate to the latest canonical Dockerfile. Permit only the exact move of the second `RUN python teddy_library_ui_smoke.py` to immediately after final runtime overlay SHA-256 and compile verification. Keep the first invocation and all other Dockerfile commands and relative ordering unchanged. Do not edit the candidate, tests, manifest, overlays, patches, or product source.
+- After registration readback, run a disposable container from that exact existing image only: `--network none`, read-only root, no mounts/secrets/ports, drop all Linux capabilities, `no-new-privileges`, bounded CPU/memory/PIDs/time, Python bytecode disabled, and only a minimal temporary filesystem if required; remove it automatically. Verify Python 3.10, UI smoke/assets, all ten overlay hashes against the image manifest, and execute `python -B teddy_library_ui_smoke.py` from the image's actual `/app`. Capture actual PASS output and exit status. Do not rerun unrelated prior PASS tests.
+- Verify prior Writer and Stage9/11/12 boundary evidence and current source/operational-container invariance read-only; do not claim new boundary tests or a new full build. A successful offline smoke proves the existing image's UI source and candidate command placement only.
+- If and only if all requested conditions pass, promote the single Dockerfile change and these paired result documents via normal fast-forward and remote file/hash readback. On any FAIL/UNKNOWN, promote documentation only. `NEW_IMAGE_BUILD=NOT_RUN`; production deployment remains unauthorized and `DEPLOY=NOT_RUN`.
+
+### PROHIBITED_SCOPE
+
+No Docker image build or BuildKit/builder/network/firewall change; no operational container/service restart, deployment, network/volume/socket/database/NAS/Jellyfin access or write; no product change except the exact Dockerfile candidate if all gates pass; no UI/test/assertion/manifest/overlay/patch edit; no repeated unrelated tests; no Stage9/11/12 source/service/timer change; no dirty/protected worktree or evidence modification; no contract/router/task-ID/other-workstream change; no broader refactor.
+
+### ACCEPTANCE_CRITERIA
+
+Canonical preflight and approval readback pass; existing image ID and candidate Dockerfile SHA match; exact one-line move and two-call placement pass static comparison; the isolated offline container meets all restrictions; Python 3.10, manifest 10/10 hashes and actual UI smoke pass; previous Writer/Stage boundary evidence remains valid and current operational containers are unchanged. If any condition fails or is unknown, do not promote Dockerfile. Record that no new image was built and distinguish the existing-image verification from historical build evidence.
+
+### NEXT_DECISION
+
+Promote only the one-line Dockerfile move after all acceptance checks pass. If offline image validation fails or any identity differs, preserve candidate/evidence and stop; further changes or a new build require separate approval. Any operating deployment and broader source consolidation remain separate work.
