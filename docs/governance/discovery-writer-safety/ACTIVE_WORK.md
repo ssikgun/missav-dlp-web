@@ -6,7 +6,18 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
-## CURRENT USER-APPROVED LIMITED BACKUP PRESERVATION RELEASE — 2026-10-28 KST
+## DLDWS-001 BACKUP CLEANUP RESULT — USER-SUBMITTED (2026-10-28 KST)
+
+The user reports executing the previously approved limited preservation and cleanup operation. All operational observations and results in this entry are user-submitted; Codex did not rerun server commands, independently verify the results, copy files, or delete data during this documentation phase.
+
+- PVE host `pve`; Data_5TB reported as `/dev/sda1`, ext4; CT108 running. The user reports preserving 10 configuration/state files under `/var/backups/missav-dlp-web/20261020/`, with individual SHA-256, size, and permission checks PASS and `PRESERVED_MANIFEST=PASS`.
+- The user reports a new CT108 PBS snapshot `backup/ct/108/2026-10-28T01:44:23Z`. Restore verification of the contents inside the PBS snapshot was NOT_RUN; snapshot existence is not a restore test.
+- The user reports `ALL_DELETE_PRECHECKS=PASS` and personally entered `DELETE_TWO`, then deleted exactly `/mnt/pve/Data_5TB/dldws001-backups/backup-20261020-110732-TbdQOd` and `/mnt/pve/Data_5TB/dldws001-backups/root-ts-legacy-four-20261027-v1`; subsequent path-absence checks were reported as `DELETE_TWO_BACKUPS=PASS`. Those directories are reported absent after cleanup, not currently preserved. Historical archive/restore evidence below remains preserved as historical evidence, and other backup-preservation obligations remain unchanged.
+- User-reported pre-delete directory sizes: 32G and 6.7G; filesystem free space approximately 2.8T before and 2.9T after. Actual reclaimed byte count was NOT_MEASURED; do not infer it from rounded measurements.
+- The scoped two-directory operation is recorded as complete based on user-submitted evidence; no additional deletion, copy, operational command, source or service change is authorized by this result. DLDWS-001 remains IN_PROGRESS, shared by downloader and discovery-writer-safety; all routes are unchanged. Preserve existing approval, recovery and deployment records. Any future work follows the applicable existing task approvals.
+
+
+## HISTORICAL USER-APPROVED LIMITED BACKUP PRESERVATION RELEASE — 2026-10-28 KST
 
 ### OBJECTIVE AND APPROVAL
 
