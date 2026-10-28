@@ -1,5 +1,22 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-28 — DLDLIB-001 closed and original routing restored
+
+## DLDLIB-001 CLOSEOUT — 2026-10-28 KST
+
+DLDLIB_CLOSEOUT=PASS: user approved closure after the production evidence recorded below: SIGINT shutdown exit 0, existing candidate image deployment, MAX_TITLES=500, authenticated library HTTP 200 and user-confirmed 252 titles displayed in the web UI. The independent API summary/items counts were not read; no broader product-quality completion is implied. The exact deployment and previous blocked-attempt evidence remain below and in canonical history.
+
+ROUTING_RESTORED: Governance INACTIVE / NONE (requires governance); Downloader and Discovery Writer Safety IN_PROGRESS / DLDWS-001 (requires downloader,discovery-writer-safety). Stage9 remains IN_PROGRESS / STG9MEDIA-001 and Stage11 remains IN_PROGRESS / S11-WX011. The original DLDWS-001 purpose, status, approvals, candidates, evidence and backup preservation policy are retained. Earlier DLDLIB-001 scopes, approvals and next decisions below are historical and grant no continuing operation authority. This closeout only edits routing, active-work and handoff documents; it authorizes no code, Docker, NAS/DB/Jellyfin, Stage9, Writer, Stage11 or backup operation.
+
+### ACCEPTANCE_CRITERIA
+
+Restore and structurally validate all routes, pass DLDWS-001 paired and unchanged Stage9/Stage11 preflights and governance smoke, pass git diff --check, normal fast-forward and exact remote readback. Preserve all historical evidence. Original route details are independently anchored at pre-transition commit a7f90446094f6a703d88e5ebb3d3517a8a4ba2f7 and prior document blob IDs below.
+
+### NEXT_DECISION
+
+Governance is inactive; proceed with DLDWS-001 only within its original authorized scope. Any new scope or deployment requires its own authorization. No product/runtime activity is authorized by DLDLIB-001 closeout.
+
+
 ## 2026-10-28 — DLDLIB-001 SIGINT deployment and library verification
 
 ### DLDLIB-001 SIGINT DEPLOYMENT — 2026-10-28 KST

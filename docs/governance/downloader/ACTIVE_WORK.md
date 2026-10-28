@@ -1,12 +1,27 @@
 # Downloader non-subtitle workstream — active work
 
 WORKSTREAM: downloader
-TASK_ID: DLDLIB-001
+TASK_ID: DLDWS-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
-## CURRENT USER-APPROVED DLDLIB-001 OPERATIONS — 2026-10-28 KST
+## DLDLIB-001 CLOSEOUT — 2026-10-28 KST
+
+DLDLIB_CLOSEOUT=PASS: user approved closure after the production evidence recorded below: SIGINT shutdown exit 0, existing candidate image deployment, MAX_TITLES=500, authenticated library HTTP 200 and user-confirmed 252 titles displayed in the web UI. The independent API summary/items counts were not read; no broader product-quality completion is implied. The exact deployment and previous blocked-attempt evidence remain below and in canonical history.
+
+ROUTING_RESTORED: Governance INACTIVE / NONE (requires governance); Downloader and Discovery Writer Safety IN_PROGRESS / DLDWS-001 (requires downloader,discovery-writer-safety). Stage9 remains IN_PROGRESS / STG9MEDIA-001 and Stage11 remains IN_PROGRESS / S11-WX011. The original DLDWS-001 purpose, status, approvals, candidates, evidence and backup preservation policy are retained. Earlier DLDLIB-001 scopes, approvals and next decisions below are historical and grant no continuing operation authority. This closeout only edits routing, active-work and handoff documents; it authorizes no code, Docker, NAS/DB/Jellyfin, Stage9, Writer, Stage11 or backup operation.
+
+### ACCEPTANCE_CRITERIA
+
+Restore and structurally validate all routes, pass DLDWS-001 paired and unchanged Stage9/Stage11 preflights and governance smoke, pass git diff --check, normal fast-forward and exact remote readback. Preserve all historical evidence. Original route details are independently anchored at pre-transition commit a7f90446094f6a703d88e5ebb3d3517a8a4ba2f7 and prior document blob IDs below.
+
+### NEXT_DECISION
+
+Governance is inactive; proceed with DLDWS-001 only within its original authorized scope. Any new scope or deployment requires its own authorization. No product/runtime activity is authorized by DLDLIB-001 closeout.
+
+
+## HISTORICAL CLOSED DLDLIB-001 OPERATIONS — 2026-10-28 KST
 
 The user explicitly authorized the bounded Downloader-only production image deployment below. This supersedes the earlier DLDLIB-001 coding-phase prohibition on image build/container replacement/restart only for this exact operation, conditional on every safety gate. Prior coding evidence, DLDWS-001 and backup policies are preserved. Governance coordinates authorization/evidence, Downloader owns the change, and Writer Safety participates only to verify Writer invariance and compatibility.
 
@@ -60,7 +75,7 @@ Approval readback, all governance checks and clean diff PASS before operations; 
 User approval 2026-10-28 KST; canonical pre-authorization base 30fd1fc7129c33c88beb421fc65ada3adbd6e425. The user's earlier running container, five completed tasks, empty MP4 queue, 252 holdings and HTTP 503 are historical observations, not current proof of restart safety. Proceed only after exact canonical authorization readback and fresh gates. Keep Governance, Downloader and Discovery Writer Safety IN_PROGRESS / DLDLIB-001 after this phase; restore original DLDWS-001 paired routes and Governance INACTIVE / NONE only during a later separate closeout following operational/UI verification.
 
 
-## CURRENT TEMPORARY TASK — DLDLIB-001 (2026-10-28)
+## HISTORICAL CLOSED TEMPORARY TASK — DLDLIB-001 (2026-10-28)
 
 ### OBJECTIVE
 
