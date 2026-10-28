@@ -2881,3 +2881,25 @@ CANONICAL_PREFLIGHT=PASS; SINGLE_SOURCE_DESIGN=PASS; ADMIN_SOURCE_IDENTITY=PASS;
 ### NEXT_DECISION — PRODUCT PROMOTION HELD
 
 No new Dockerfile image build was attempted because an approved isolated build environment is unavailable. Static ordering, ten-file placement and existing-image smoke do not establish a full build or current dependency reproduction. Obtain a separate user choice before product promotion: accept this bounded byte-identity/offline evidence as the promotion criterion, or first complete a full build in a separately approved safe environment. Do not automatically reuse the prior UI-only build waiver. Keep DLDWS-001 IN_PROGRESS and all routing unchanged; operational deployment remains separate.
+
+## CURRENT USER APPROVAL — DLDWS-001 SINGLE ADMINISTRATOR CANDIDATE PROMOTION (2026-10-28 KST)
+
+### OBJECTIVE AND SCOPE
+
+The user explicitly accepts the preserved offline verification evidence as the promotion criterion for the existing administrator single-source candidate. Promote exactly the candidate's four product paths (`teddy_downloader_admin.py`; deletion of `downloader_runtime_overlay/teddy_downloader_admin.py`; `teddy_downloader_admin_smoke.py`; `Dockerfile`) and update the two paired DLDWS-001 ACTIVE_WORK records plus this canonical handoff. Use a new clean worktree from the current canonical head, recheck candidate/evidence hashes and exact diff, pass governance/diff checks, then use only normal fast-forward and remote readback. The user does not authorize a full Docker image build or production deployment.
+
+### REQUIRED PRESERVATION AND VERIFICATION
+
+Preserve administrator SHA-256 `73984205a2340a05a930132bf248bb1a8c07125391167aa9d5e1c072f247cb31`, the ten-entry runtime manifest unchanged, every other overlay file, all other Dockerfile patch/verification order, final UI smoke, Writer activation boundary, Stage9/11/12 files and final CMD. Reuse the exact candidate with recorded historical 8/8 admin smoke; do not rerun it. Verify the root administrator bytes, duplicate deletion, final source manifest values, smoke-after-overlay placement, original candidate diff scope, evidence manifest, and source/production invariance before promotion. Keep the known legacy `manual_retry()` references in root `teddy_entrypoint.py` and `teddy_downloader_admin_flask_smoke.py` unchanged and report their pre-overlay/legacy execution limitation.
+
+### FIXED VALIDATION LIMITS
+
+Keep `BUILD_CHAIN_COMPATIBILITY=INCOMPLETE` and `NEW_IMAGE_BUILD=NOT_RUN`; do not alter the earlier BuildKit network-isolation record. Do not imply that full Dockerfile rebuild, current dependency resolution, legacy pre-overlay runtime compatibility, or deployment passed. Result records must distinguish product source promotion from `DEPLOY=NOT_RUN`.
+
+### PROHIBITED_SCOPE
+
+No changes outside the four product paths and three result documents; no new or substituted product implementation; no manifest or other overlay change; no patch reordering; no Writer/Stage9/11/12, contract, router or task-ID change; no BuildKit/network/firewall change, image build, operational container/service/data/media/queue/DB/NAS/Jellyfin action, or deployment; no force push or merge on conflict; no protected dirty worktree or prior evidence modification.
+
+### ACCEPTANCE_CRITERIA
+
+Candidate and 38-entry evidence manifest match their approved hashes; product diff is exactly four paths; `ADMIN_RUNTIME_SHA=PASS`; `FINAL_MANIFEST_10=PASS`; historical smoke result is labeled `HISTORICAL_PASS`; governance and `git diff --check` pass; latest remote head is the parent of the promotion commit; remote readback confirms all seven approved files and exact hashes, including the overlay file deletion. Keep DLDWS-001 `IN_PROGRESS` for `downloader,discovery-writer-safety`, domain contracts 1.0.0 and common contract 1.0.1. `BUILD_CHAIN_COMPATIBILITY=INCOMPLETE`; `NEW_IMAGE_BUILD=NOT_RUN`; `PRODUCTION_CHANGED=NO`; `DEPLOY=NOT_RUN`.
