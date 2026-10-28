@@ -15072,3 +15072,18 @@ Record the exact three-path diff, hashes, smoke counts, isolated patch result, t
 ### PROHIBITED_SCOPE
 
 No change to route-selection policy, fallback order, learning, queue lock/state semantics, duplicate protections, download or MP4 concurrency, `teddy_verify_build.py`, Dockerfile, manifest, other overlay or patch files, Writer implementation/service, Stage9/11/12 code/service, contracts, router or task ID. No full image build, BuildKit/network/firewall changes, operational Docker/service/data/DB/NAS/Jellyfin/media actions, production deployment, existing protected worktree/evidence changes, extra product paths, or automatic product promotion.
+
+
+## DLDWS-001 ROUTING SINGLE-SOURCE CANDIDATE — RESULT (2026-10-28 KST)
+
+CANONICAL_PREFLIGHT=PASS; ROUTING_SINGLE_SOURCE=PASS (isolated candidate); ROUTING_SOURCE_IDENTITY=PASS; DUPLICATE_REMOVAL=PASS (candidate only); VPN_PATCH_COMPATIBILITY=PASS; ROUTING_SMOKE=INCOMPLETE; BUILD_CHAIN_STATIC=PASS; FINAL_MANIFEST_10=PASS; STAGE_WRITER_BOUNDARY=PASS (source/diff boundary only); NEW_IMAGE_BUILD=NOT_RUN; PRODUCT_CANDIDATE=BLOCKED; PRODUCT_GIT_PROMOTION=NOT_RUN; PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
+
+- Product candidate: `/tmp/dldws001-routing-candidate-20261028`. Its exact product diff is three paths: replace root `teddy_routing.py` with SHA-256 `275607b2249029b689e701cdddf45b960c552d8099b23a554e20a54f3f212231`; delete the byte-identical overlay copy; remove only the route success-message insertion and unused `ROUTING` constant from `teddy_patch_vpn_health.py` (candidate SHA-256 `43afabdfe8fd32d24abe644913a91ade7d395ae1f2d83791d461a4a075f5947e`). Existing VPN health observer, bootstrap integration, reconnect/IP confirmation and recovery changes remain.
+- Static dependency review and isolated build-chain reproduction passed: existing routing smoke and patch sequence completed; `teddy_verify_build.py runtime` accepted the success marker. The VPN health patch ran on a disposable source copy and left candidate routing bytes intact. The unchanged manifest SHA is `396e4e7de18e04d1fa5ad0215fc2032c2cf3e6a6e341c34fb9055b4bbb416985`; a fresh recursive root-copy plus overlay-copy simulation passed all 10 entries. No Docker image was built.
+- A local synthetic routing harness passed 5 groups / 0 failures under Python 3.13.5 with a minimal Flask response/context shim. It covered direct/proxy/VPN/auto selection, fallback order, canonicalization and learning, invalid-mode and missing-lock rejection, success response, and task-save/queue admission under the shared lock. It is not a Python 3.10 image test or real Flask/API integration test. The existing discovery download API/duplicate smoke was not run.
+- Exact image smoke could not be run: Docker API access was denied at `/var/run/docker.sock`. The local Python 3.10.22 executable also lacks standard-library modules (`hashlib`, `ntpath`), and Flask is unavailable in the host Python. Therefore the existing image ID and image-based runtime behavior were not re-identified in this execution; do not treat earlier image evidence as a new test.
+- Candidate patch, the actual Python 3.13 harness and shim, hashes, and test summary are preserved under `/tmp/dldws001-routing-evidence-20261028/`. The protected original worktree, Stage9/11/12 and Writer sources, Dockerfile, verifier, manifest, operations and services were unchanged. `git diff --check` passed.
+
+### NEXT_DECISION
+
+Keep the candidate unpromoted. Re-run the existing-image Python 3.10 routing and download-API smoke in an environment with Docker API access and a working Python 3.10 image. No product promotion, new image build, or deployment is authorized by this candidate result.
