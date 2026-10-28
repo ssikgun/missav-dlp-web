@@ -15087,3 +15087,23 @@ CANONICAL_PREFLIGHT=PASS; ROUTING_SINGLE_SOURCE=PASS (isolated candidate); ROUTI
 ### NEXT_DECISION
 
 Keep the candidate unpromoted. Re-run the existing-image Python 3.10 routing and download-API smoke in an environment with Docker API access and a working Python 3.10 image. No product promotion, new image build, or deployment is authorized by this candidate result.
+
+
+## CURRENT USER APPROVAL — DLDWS-001 ROUTING PYTHON 3.10 / REAL FLASK RUNTIME RECHECK (2026-10-28 KST)
+
+### OBJECTIVE AND APPROVED_SCOPE
+
+The user authorizes runtime-only verification of the existing teddy_routing.py single-source candidate. Do not recreate or modify the candidate, promote product files, build an image, or deploy.
+
+- Preserve and recheck the exact candidate at /tmp/dldws001-routing-candidate-20261028 and prior evidence at /tmp/dldws001-routing-evidence-20261028/; expected routing SHA-256 275607b2249029b689e701cdddf45b960c552d8099b23a554e20a54f3f212231, VPN patch SHA-256 43afabdfe8fd32d24abe644913a91ade7d395ae1f2d83791d461a4a075f5947e, and unchanged manifest SHA-256 396e4e7de18e04d1fa5ad0215fc2032c2cf3e6a6e341c34fb9055b4bbb416985. Preserve a separate immutable copy of the three-path candidate diff, changed source files/hashes, previous validation records, runtime environment facts, and new logs in /opt/missav-dlp-web/source-evidence/dldws001-routing-runtime-20261028/; never overwrite an existing path or change its permissions.
+- Reuse only the existing image sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31. Before execution verify Docker daemon/context/image and candidate visibility; use a disposable container with network disabled, read-only root and candidate mounts, no production resources, bounded resources, and automatic removal. Confirm Python 3.10.x, standard library, actual Flask import, candidate module path and exact SHA.
+- Run the real-Flask synthetic routing checks and the existing teddy_discovery_download_api_smoke.py only after proving it uses an isolated synthetic SQLite DB and does not touch production paths, queues, workers, or networks. Keep API mock coverage distinct from direct routing admission coverage.
+- Record outcomes and limits in both paired ACTIVE_WORK files and this canonical handoff. Keep task DLDWS-001, both IN_PROGRESS workstreams, contracts, router and all other workstream states unchanged.
+
+### PROHIBITED_SCOPE
+
+No host Python repair/package installation, Docker socket permission or group changes, privilege bypass, external Docker API, daemon/network/firewall change, image build/retag, operating container/service/data/DB/queue/NAS/Jellyfin/Writer/Stage9/11/12 action, candidate/product edit or GitHub product promotion. Do not claim any test PASS unless Codex actually ran it in the approved environment. If /opt is not writable or Docker is unavailable, preserve existing evidence untouched and report the blocker.
+
+### ACCEPTANCE_CRITERIA AND NEXT_DECISION
+
+Candidate hashes and exact three-path diff match; persistent evidence copy matches source hashes; actual Docker image ID and Python/Flask/module provenance are confirmed; direct routing smoke and guarded Discovery API smoke pass; operating containers are unchanged; paired/all-workstream governance, diff check, normal fast-forward and remote readback pass. Only then may PRODUCT_CANDIDATE=READY; always keep PRODUCT_GIT_PROMOTION=NOT_RUN, NEW_IMAGE_BUILD=NOT_RUN, PRODUCTION_CHANGED=NO, DEPLOY=NOT_RUN. If any prerequisite is unavailable, leave the candidate unpromoted and record the exact condition and next operator action.
