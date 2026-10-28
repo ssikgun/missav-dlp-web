@@ -6,6 +6,38 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
+## CURRENT USER APPROVAL — DLDWS-001 RUNNER IMPORT FIX AND REMAINING VALIDATION (2026-10-28 KST)
+
+### OBJECTIVE
+
+Reuse the exact existing verified isolated image and product candidate; repair only a new copy of the prior orchestration runner by adding the approved standard-library imports, then execute only the not-yet-run Gate B checks and, if they pass, Gate C. Conditionally promote only the exact previously approved candidate if every gate passes. No product edit, assertion change, image rebuild, design review, or production deployment is authorized.
+
+### APPROVED_SCOPE
+
+- Register this same approval in both DLDWS-001 ACTIVE_WORK files and canonical CURRENT_HANDOFF; run selected-workstream governance validation and git diff checks, then normal fast-forward and exact remote readback before validation.
+- Reconfirm image ID sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31, candidate manifest SHA-256 a8413545d96eda73eeeed346393e7d8179f4c3516f1e68ef6fcca1de33f3bf29, and referenced historical PASS evidence read-only. Preserve prior failure logs and all evidence unchanged.
+- In a new isolated copy of gate_b.py, add only the approved Python standard-library imports `ast`, `queue`, `uuid`, and `threading`. Before test execution, run a syntax check and verify those imports. Keep the original wrapper and failure log intact. Do not change test code, assertions, fixtures, product files, image, or safety reserve.
+- Reuse only the existing image and the previously verified network-none, production-unmounted test environment with 2GiB tmpfs, bounded resources, and synthetic fixtures. Verify actual available space remains safely above the unchanged 512MiB floor after fixture allocation.
+- Do not repeat any previously passed tests. Execute only the remaining normal-admission, HLS/legacy-TS queue/journal and source-preservation, library-500/API/UI, and other previously unrun mandatory Gate B checks. Run Gate C only if Gate B passes: minimal isolated Writer activation/client protocol, Stage9 runner separation, task/result/hash, Stage11 input/sidecar, Stage12 provenance/no-overwrite, and expected Stage9/11/12 source-hash checks.
+- If all mandatory checks and scope/governance/latest-remote checks pass, promote only the exact previously approved candidate in a fresh isolated Git worktree: Writer activation-only source/smokes, nine Downloader overlay Python files and template, unchanged minimal Dockerfile integration/hash manifest, and required result/source provenance documents. Read back remote HEAD and each promoted file hash. If any gate fails or is unknown, do not promote product code; record only actual outcomes.
+
+### PROHIBITED_SCOPE
+
+No repeat of prior PASS tests; no product/test assertion/fixture-semantic/Dockerfile/Writer changes; no image rebuild, retag, or replacement; no Writer service/socket/systemd or operating Downloader change; no actual download, conversion, NAS/Jellyfin/media/model/subtitle operation; no operational state, DB, queue, or data mutation; no Stage9/11/12 source/service/timer change; no safety-reserve reduction or check bypass; no protected candidate/evidence alteration; no contract/router/task-ID change; no deployment; no further correction or retry after a new failure without separate approval.
+
+### ACCEPTANCE_CRITERIA
+
+- Existing image identity and candidate manifest match; historical Writer/build/final-image evidence remains valid and distinct from current-run results.
+- Runner import-only syntax/import preflight passes before executing any remaining Gate B checks.
+- Remaining Gate B passes without repeating prior PASS checks; Gate C passes only after Gate B.
+- Conditional product promotion occurs only after every required gate passes and remote fast-forward/readback verifies all files; otherwise product promotion is NOT_RUN/BLOCKED with the exact reason.
+- PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN; DLDWS-001, both selected workstreams, contracts, router, and other workstream states remain unchanged.
+
+### NEXT_DECISION
+
+If all gates pass, complete the already approved exact-candidate canonical promotion and report its remote SHA. If any test or preflight fails, stop immediately, preserve all artifacts, document actual outcomes, and request a new decision before further execution. Production deployment remains a separate approval.
+
+
 ## DLDWS-001 EXISTING IMAGE REVALIDATION — RUNNER ERROR / PROMOTION BLOCKED (2026-10-28 KST)
 
 AUTHORIZATION=PASS; EXISTING_IMAGE_ID=PASS; CANDIDATE_INTEGRITY=PASS; FIXTURE_CAPACITY=PASS; FAILED_REGRESSION_RERUN=PASS; DOWNLOADER_REGRESSION=INCOMPLETE; WRITER_SAFETY=PASS (historical evidence reverified); PYTHON310_BUILD=PASS (historical evidence reverified); FINAL_IMAGE_SOURCE_MATCH=PASS (same image and historical hash evidence reverified); STAGE9_11_12_BOUNDARY=INCOMPLETE; CANONICAL_PRODUCT_PROMOTION=BLOCKED; PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
