@@ -5,7 +5,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import app as core
-import teddy_downloader_admin
 
 
 SEGMENT_TIMEOUT_SECONDS = 45
@@ -326,15 +325,6 @@ def _install_routes():
                 }), 409
             return original_delete(task_id)
         core.app.view_functions['delete_task'] = safe_delete_task
-
-    def safe_retry_task(task_id):
-        body, status_code = teddy_downloader_admin.manual_retry(core, task_id)
-        return core.jsonify(body), status_code
-
-    if 'retry_task' in core.app.view_functions:
-        core.app.view_functions['retry_task'] = safe_retry_task
-        core._teddy_safe_retry_task = safe_retry_task
-
 
 def install():
     core._fetch_segment = _fetch_segment

@@ -21,34 +21,16 @@ from werkzeug.security import generate_password_hash
 
 import teddy_auth
 import teddy_downloader_admin as admin
+import teddy_download_safety as safety
+import teddy_mp4_queue as mp4_queue
 
 
 assert hasattr(Flask("flask-smoke"), "test_client")
 assert "site-packages/flask/" in flask.__file__.replace("\\", "/")
 
 
-class FakeMp4Queue:
-    def __init__(self):
-        self.active = set()
-        self.jobs = []
-
-    def has_task(self, core, task_id):
-        return task_id in self.active
-
-    def _job_files(self, root):
-        return list(self.jobs)
-
-
-class FakeSafety:
-    def __init__(self, reserve=100):
-        self.reserve = reserve
-
-    def reserve_bytes(self, total):
-        return self.reserve
-
-
 class Fixture:
-    def __init__(self, tasks=None, failed_retries=()):
+    def __init__(self, tasks=None, failed_retries=(), provide_safe_retry=True):
         self.temp = tempfile.TemporaryDirectory(prefix="dldws001-flask-")
         self.root = self.temp.name
         self.auth_dir = os.path.join(self.root, "auth")
@@ -64,8 +46,8 @@ class Fixture:
 
         self.app = Flask("dldws001-real-flask-test")
         self.app.config.update(TESTING=True, SERVER_NAME="downloader.ssikgun.com")
-        self.mp4 = FakeMp4Queue()
-        self.safety = FakeSafety()
+        self.mp4 = mp4_queue
+        self.safety = safety
         self.save_count = 0
         self.tasks = tasks if tasks is not None else {
             "retained": {"status": "에러: ENOSPC", "retries": 30},
@@ -78,7 +60,7 @@ class Fixture:
             tasks=self.tasks,
             settings={"auto_retry": True, "auto_retry_max": 30, "max_concurrent": 4},
             download_queue=queue.Queue(),
-            queue_admission_lock=threading.RLock(),
+            queue_admission_lock=safety._TASK_STATE_LOCK,
         )
 
         def save_tasks():
@@ -89,31 +71,57 @@ class Fixture:
         self.core.save_tasks = save_tasks
 
         def safe_retry(task_id):
+            # Synthetic callback boundary only; it does not implement or
+            # validate the production safe-retry callback.
             if task_id in failed_retries:
                 response = jsonify({"status": "error", "message": "synthetic refusal"})
                 return response, 409
-            body, code = admin.manual_retry(self.core, task_id)
-            return jsonify(body), code
+            task = self.tasks.get(task_id)
+            if not isinstance(task, dict) or not str(task.get("status") or "").startswith("에러"):
+                return jsonify({"status": "error", "message": "synthetic refusal"}), 409
+            task["status"] = "대기 중"
+            task["retries"] = 0
+            task["speed_bps"] = 0
+            self.core.save_tasks()
+            self.core.download_queue.put(task_id)
+            return jsonify({"status": "success", "message": "synthetic accepted"}), 200
 
-        self.core._teddy_safe_retry_task = safe_retry
-        previous_env = {
+        if provide_safe_retry:
+            self.core._teddy_safe_retry_task = safe_retry
+        self.previous_env = {
             name: os.environ.get(name)
-            for name in ("TEDDY_AUTH_DIR", "TEDDY_AUTH_COOKIE_DOMAIN")
+            for name in ("TEDDY_AUTH_DIR", "TEDDY_AUTH_COOKIE_DOMAIN", "TEDDY_STORAGE_RESERVE_BYTES")
         }
         os.environ["TEDDY_AUTH_DIR"] = self.auth_dir
         os.environ["TEDDY_AUTH_COOKIE_DOMAIN"] = ".ssikgun.com"
+        os.environ["TEDDY_STORAGE_RESERVE_BYTES"] = "100"
         try:
             teddy_auth.install(self.core)
             admin.install(self.core, self.mp4, self.safety)
-        finally:
-            for name, value in previous_env.items():
-                if value is None:
-                    os.environ.pop(name, None)
-                else:
-                    os.environ[name] = value
+        except Exception:
+            self.restore_env()
+            raise
+        assert self.core.queue_admission_lock is self.safety._TASK_STATE_LOCK
 
         self.client = self.app.test_client()
         self.base = "https://downloader.ssikgun.com"
+
+    def add_mp4_job(self, task_id):
+        job_dir = mp4_queue.queue_dir(self.download_dir)
+        os.makedirs(job_dir, mode=0o700, exist_ok=True)
+        path = mp4_queue._job_path(self.download_dir, task_id)
+        record = mp4_queue._seal_job({
+            "schema": mp4_queue.SCHEMA,
+            "task_id": task_id,
+            "kind": "synthetic-smoke",
+            "stage": "queued",
+            "payload": {"fixture": "legacy-flask-smoke"},
+        })
+        with open(path, "x", encoding="utf-8") as f:
+            json.dump(record, f, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            f.write("\n")
+        assert mp4_queue.has_task(self.core, task_id)
+        assert mp4_queue._read_job(path)["task_id"] == task_id
 
     def open(self, method, path, **kwargs):
         return self.client.open(path, method=method, base_url=self.base, **kwargs)
@@ -135,6 +143,13 @@ class Fixture:
     def headers(self, token=None):
         return {"X-CSRF-Token": token if token is not None else self.token}
 
+    def restore_env(self):
+        for name, value in self.previous_env.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
 
 def test_real_bulk_retry_auth_and_csrf():
     with _fixture_context(tasks={}) as fixture:
@@ -150,6 +165,16 @@ def test_real_bulk_retry_auth_and_csrf():
         assert response.get_json() == {
             "status": "success", "succeeded": 0, "skipped": 0, "failed": 0, "results": [],
         }
+
+
+def test_bulk_retry_fails_closed_without_safe_callback():
+    with _fixture_context(tasks={"error": {"status": "에러: synthetic", "retries": 2}},
+                          provide_safe_retry=False) as fixture:
+        fixture.login()
+        response = fixture.open("POST", "/api/tasks/retry-failed", headers=fixture.headers())
+        assert response.status_code == 503, response.get_json()
+        assert fixture.core.tasks["error"] == {"status": "에러: synthetic", "retries": 2}
+        assert fixture.core.download_queue.empty()
 
 
 def test_real_bulk_retry_selection_capacity_parts_and_records():
@@ -174,7 +199,8 @@ def test_real_bulk_retry_selection_capacity_parts_and_records():
             with open(fragment, "rb") as f:
                 parts_hashes[task_id] = hashlib.sha256(f.read()).hexdigest()
         fixture.core.download_queue.put("queued")
-        fixture.mp4.active.add("mp4")
+        tasks["mp4"]["mp4_stage"] = "queued"
+        fixture.add_mp4_job("mp4")
         enough_disk = SimpleNamespace(total=10_000_000, free=9_000_000)
         enough_inodes = SimpleNamespace(f_favail=50_000)
         with mock.patch.object(admin.shutil, "disk_usage", return_value=enough_disk), \
@@ -276,23 +302,36 @@ def test_real_bulk_retry_partial_result_and_auto_retry_race():
 
 
 class _fixture_context:
-    def __init__(self, tasks=None, failed_retries=()):
-        self.fixture = Fixture(tasks=tasks, failed_retries=failed_retries)
+    def __init__(self, tasks=None, failed_retries=(), provide_safe_retry=True):
+        self.fixture = Fixture(
+            tasks=tasks,
+            failed_retries=failed_retries,
+            provide_safe_retry=provide_safe_retry,
+        )
 
     def __enter__(self):
         return self.fixture
 
     def __exit__(self, exc_type, exc, tb):
         self.fixture.temp.cleanup()
+        self.fixture.restore_env()
         return False
 
 
 def main():
+    assert hashlib.sha256(open(admin.__file__, "rb").read()).hexdigest() == (
+        "73984205a2340a05a930132bf248bb1a8c07125391167aa9d5e1c072f247cb31"
+    )
     test_real_bulk_retry_auth_and_csrf()
+    test_bulk_retry_fails_closed_without_safe_callback()
     test_real_bulk_retry_selection_capacity_parts_and_records()
     test_real_bulk_retry_fails_closed_on_bytes_and_inodes()
     test_real_bulk_retry_partial_result_and_auto_retry_race()
-    print("real Flask test_client admin route integration: PASS (actual Flask + teddy_auth + installed routes)")
+    print("legacy Flask integration: PASS (real Flask + teddy_auth + final admin; synthetic retry callback)")
+    print(f"admin_module={admin.__file__}")
+    print(f"admin_sha256={hashlib.sha256(open(admin.__file__, 'rb').read()).hexdigest()}")
+    print(f"safety_module={safety.__file__}")
+    print(f"mp4_queue_module={mp4_queue.__file__}")
 
 
 if __name__ == "__main__":
