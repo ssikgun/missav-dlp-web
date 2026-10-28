@@ -3121,3 +3121,18 @@ The prior Docker/API access block and prior candidate-only result remain histori
 ### NEXT_DECISION
 
 Proceed with the already approved exact three-file product promotion after the paired documentation registration is read back. Product source promotion does not authorize an image build or operational deployment.
+
+## DLDWS-001 ROUTING SINGLE-SOURCE PRODUCT PROMOTION — RESULT (2026-10-28 KST)
+
+CANONICAL_PREFLIGHT=PASS; USER_RUNTIME_ATTESTATION=PASS (user/operator execution); ROUTING_SOURCE_IDENTITY=PASS; VPN_PATCH_COMPATIBILITY=PASS (exact approved patch plus existing isolated patch-chain evidence); FINAL_MANIFEST_10=PASS (offline root-plus-overlay layout); PRODUCT_GIT_PROMOTION=PASS; NORMAL_FAST_FORWARD=PASS; REMOTE_READBACK=PASS; BUILD_CHAIN_COMPATIBILITY=INCOMPLETE; NEW_IMAGE_BUILD=NOT_RUN; PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
+
+- Authorization and user-run evidence were registered in the paired documents and handoff in commit `5478fe4e42624c83f340488b909639d3bfed19d0`, a normal fast-forward from `c78f5c369f6dc4c7cdae0ba436884daf8fd41139`. Product promotion commit is `fc599be67ae2c790ddfb4ec637616875efce3fb8`, a normal fast-forward whose parent is the registration commit. Remote compare/readback shows exactly the three approved product paths: root routing modified, duplicate overlay routing removed, and VPN health patch modified.
+- Remote root routing is identical to the verified final source: SHA-256 `275607b2249029b689e701cdddf45b960c552d8099b23a554e20a54f3f212231`, with Git blob `ccec8eee948ae249d7301166120126362faaf447` matching the previously verified overlay blob. VPN patch SHA-256 is `43afabdfe8fd32d24abe644913a91ade7d395ae1f2d83791d461a4a075f5947e`; its diff removes only the route success-message insertion and unused `ROUTING` constant. Existing VPN health observer, bootstrap, reconnect, identity, and recovery edits remain in the exact approved candidate.
+- The runtime overlay routing duplicate is absent. The ten-entry manifest remains SHA-256 `396e4e7de18e04d1fa5ad0215fc2032c2cf3e6a6e341c34fb9055b4bbb416985` and its Git blob remained `1aaa73b1e71f3afbc185cc471f0c738d234bee7f`. A disposable offline reconstruction of root source copy followed by the runtime-overlay copy passed `sha256sum -c` for all 10 entries. This is a static file-layout check, not a Docker image build.
+- Remote Dockerfile blob `8a7df775c61ed8abc1f773aecd466450b879a912` and `teddy_verify_build.py` blob `c3886f5b62156339ce2640d0b7c70103f1196e41` match their pre-promotion values. No Dockerfile, verifier, Stage9/11/12 source, Writer source, contract, or router changed. `git diff --check` and paired/all-workstream governance validation passed before promotion.
+- User/operator runtime log at `/opt/missav-dlp-web/source-evidence/dldws001-routing-runtime-20261028/runs/20261028T082156Z/` records existing image `sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31`, Python 3.10.22, actual Flask, exact candidate routing SHA, real-Flask routing smoke 5 groups PASS, offline Discovery API PASS, DB-byte unchanged PASS, and unchanged before/after operating resource snapshots. Codex read the logs but did not run those tests. Earlier Docker-access and incomplete runtime results remain preserved as historical entries.
+- No Docker image was built, retagged, or deployed; no operating service, queue, DB, NAS, Jellyfin, Writer socket, or media was changed. Keep `BUILD_CHAIN_COMPATIBILITY=INCOMPLETE`, `NEW_IMAGE_BUILD=NOT_RUN`, `PRODUCTION_CHANGED=NO`, and `DEPLOY=NOT_RUN`.
+
+### NEXT_DECISION
+
+The routing single-source product promotion is complete. Any Docker image build and operational deployment requires separate authorization; until then, the running service remains unchanged.
