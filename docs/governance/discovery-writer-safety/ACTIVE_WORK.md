@@ -6,6 +6,23 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
+## DLDWS-001 EXISTING IMAGE REVALIDATION — RUNNER ERROR / PROMOTION BLOCKED (2026-10-28 KST)
+
+AUTHORIZATION=PASS; EXISTING_IMAGE_ID=PASS; CANDIDATE_INTEGRITY=PASS; FIXTURE_CAPACITY=PASS; FAILED_REGRESSION_RERUN=PASS; DOWNLOADER_REGRESSION=INCOMPLETE; WRITER_SAFETY=PASS (historical evidence reverified); PYTHON310_BUILD=PASS (historical evidence reverified); FINAL_IMAGE_SOURCE_MATCH=PASS (same image and historical hash evidence reverified); STAGE9_11_12_BOUNDARY=INCOMPLETE; CANONICAL_PRODUCT_PROMOTION=BLOCKED; PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
+
+### Evidence and actual results
+
+- Approval 9374e5d09ec986370d2458fbee788ee996fbbea1 was normally fast-forwarded/read back before validation; preflight canonical 887ca3bf636b24327c799814d19e9e5fb70c2679 matched remote. Old evidence manifest c5748d1e933574754f85dc3c5fdd91c5bbe90374c4bdaa4e884df77e0482d36a and candidate manifest a8413545d96eda73eeeed346393e7d8179f4c3516f1e68ef6fcca1de33f3bf29 and all entries passed recheck. Existing image tag and ID both exactly sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31. Historical Writer safety 3/3, Python3.10.22 build and final-image source checks revalidated from unchanged evidence, not rerun. Historical failed regression retained.
+- Host memory available 4,350,000,128 bytes, total 10GiB; cgroup memory.max=max. Each disposable image container used network none, read-only root, no production mounts, 2GiB tmpfs, 768MiB memory+swap cap, CPU 1 and PID128. Following 64KiB fixture allocation/fsync, /tmp total 2,147,483,648 bytes and available 2,147,418,112 bytes; unchanged 512MiB reserve fully respected. Containers removed after execution.
+- Gate A: exact previously failed test_late_postprocessor_failure_does_not_rewrite_job PASS 1/1. Unchanged test assertions verify the injected postprocessor was reached, result held, and source/job evidence preserved. Previous 12 startup PASS cases cited separately, not repeated.
+- Gate B: remaining startup cases 10/10 PASS; existing atomic save/failure tests 13/13 PASS; NAS SHA/no-clobber synthetic tests 14/14 PASS; multiprocess global MP4 maximum 1 and download limit 4 PASS. Newly executed unittest cases: 38 PASS / 0 FAIL including Gate A, plus concurrency checks PASS.
+- Gate B execution did NOT complete: the assistant-written orchestration wrapper omitted standard library imports. At gate_b.py:26 the normal-admission setup raised NameError: name 'ast' is not defined; the subsequent copied fixture code also requires queue, uuid and threading. This is an execution-wrapper error, not a product assertion failure. Normal admission, legacy TS linkage, final library/API/UI fixtures and Stage9/11/12 dynamic boundaries remain NOT_RUN. No new test or product code changed, no repeat or fix after error, no product promotion.
+- New root-owned evidence /opt/missav-dlp-web/source-evidence/dldws001-final-revalidate-20261028-2dwvwi1a retains original execution logs, wrapper, results and baseline/postcheck. RESULT.md SHA-256 35d5d764fbab55016a1a8f516ba78556c757052e0ba2b01495d624eacf660efb; evidence-sha256.json SHA-256 b7202bed45a64ff45d60b10b2b0a1bc11c62c927ad36b47d78f2ca227d43d35e. Old candidate/image/evidence unchanged. Operating Downloader image/PID/started/running and Writer service/socket state/config match baseline; no production data or service modification.
+
+### Next decision
+
+Current user instructions require stopping after a failed test execution without further correction/repetition. Separately authorize correction ONLY of the orchestration wrapper imports ast, queue, uuid and threading in a new copy, then run the remaining unexecuted Gate B cases and Gate C using this same verified image and sufficient isolated /tmp; do not repeat passed cases, change product/assertions/reserve, rebuild/retag or revisit settled Writer design. Conditional promotion only after all gates pass and remote/contract checks; any subsequent failure stops. Production deployment remains separately authorized. DLDWS-001 IN_PROGRESS, required pair and all routes/contracts/history/backup obligations unchanged. Only these paired ACTIVE_WORK and canonical handoff documents are committed.
+
 ## CURRENT USER APPROVAL — DLDWS-001 EXISTING IMAGE FINAL VALIDATION (2026-10-28)
 
 ### OBJECTIVE
