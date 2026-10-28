@@ -1,10 +1,46 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: NONE
-STATUS: INACTIVE
+TASK_ID: DLDLIB-001
+STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.1
-REQUIRES_WORKSTREAMS: governance
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety
+
+## CURRENT TEMPORARY TASK — DLDLIB-001 (2026-10-28)
+
+### OBJECTIVE
+
+Restore the Downloader web file manager's held-library listing with the user-approved minimum title-bound correction. The user explicitly approved temporarily switching Governance, Downloader and Discovery Writer Safety together from their original routing. DLDWS-001 is preserved, not completed or replaced.
+
+### APPROVED_SCOPE
+
+- Governance participation: temporary routing, approval/evidence records and canonical handoff only. Writer Safety participation: shared-routing consistency and Writer invariance only. Downloader owns the library product change.
+- Complete and validate registration before product edits. Change only teddy_library_api.py MAX_TITLES from 250 to 500; if needed, update exactly one existing library smoke file. Prove 252 holdings list successfully and 501 remain blocked under the existing bound policy, using isolated fixtures and the existing related smoke.
+- Publish scoped governance and product commits to canonical teddy-subtitle-stage11 by normal fast-forward, with exact remote readback. No contract change or new workstream is authorized or needed.
+
+### PROHIBITED_SCOPE
+
+No Docker image build/container replacement/restart, service/timer or Writer socket change, NAS/Jellyfin/operational DB/settings write, download/recovery execution, backup movement/deletion or policy change, Stage9 implementation/operation change, Stage11 change, refactoring, pagination, caching, authentication change, per-title exceptions, filter bypass, or other product behavior changes. Preserve query sorting/search, NAS inventory/path protection and other budgets, subtitle status, Jellyfin and permanent deletion behavior.
+
+### ACCEPTANCE_CRITERIA
+
+Registration preflight and governance structure PASS before coding; 252-item success and 501-item existing-policy rejection plus existing related library smoke PASS; git diff --check PASS; normal canonical fast-forward and exact remote readback. Code/test PASS is not production recovery. DEPLOY=NOT_RUN in this phase.
+
+### EVIDENCE
+
+- User-submitted CT108 diagnosis: missav-dlp-web, Discovery DB /discovery/teddy-discovery.sqlite3 accessible; jav/present=1 holdings=252; runtime MAX_TITLES=250; GET /api/library HTTP 503. Canonical read-only review confirms _build_items raises above MAX_TITLES and listing maps the exception to 503. These runtime observations were supplied by the user, not measured by this coding phase.
+- Exact pre-transition canonical base: a7f90446094f6a703d88e5ebb3d3517a8a4ba2f7. Original router and three ACTIVE_WORK documents are recoverable byte-for-byte by that commit and these blob IDs:
+- docs/governance/ACTIVE_WORK.md: Git blob 7791163613b2c647ffc16481c6704319d69b98a1
+- docs/governance/governance/ACTIVE_WORK.md: Git blob cf424aeddf51775fb009499e125b8765e4f27f44
+- docs/governance/downloader/ACTIVE_WORK.md: Git blob c02d122bbff3ff323f13bcb404caac985c68a40c
+- docs/governance/discovery-writer-safety/ACTIVE_WORK.md: Git blob 4403afe868fc6847344d48aa95221880468a8f38
+- Original live metadata: Governance INACTIVE / NONE, contract 1.0.1, requires governance; Downloader and Discovery Writer Safety IN_PROGRESS / DLDWS-001, contract 1.0.0, requires downloader,discovery-writer-safety. Stage9 IN_PROGRESS / STG9MEDIA-001 and Stage11 IN_PROGRESS / S11-WX011 remain unchanged.
+- All original DLDWS-001 objectives, status/approvals, deployment/recovery evidence, candidates, Writer safeguards and backup preservation policy remain preserved below and at the exact pre-transition commit. Earlier live-task statements below are historical while this temporary task is active.
+
+### NEXT_DECISION
+
+After code/test PASS, KEEP all three routes IN_PROGRESS / DLDLIB-001 with governance,downloader,discovery-writer-safety until a separately approved operational deployment and web UI verification are complete. This phase grants no deployment permission. Only a later explicit closeout restores the exact original Governance INACTIVE / NONE and DLDWS-001 paired routing above; never restore prematurely or discard DLDWS-001 history.
+
 
 ## JOINT DEPLOYMENT CLOSED — STG9MEDIA-001 (2026-10-28)
 
