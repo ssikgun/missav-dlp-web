@@ -14705,3 +14705,15 @@ CANONICAL_PRODUCT_PROMOTION=PASS; NORMAL_FAST_FORWARD=PASS; REMOTE_READBACK=PASS
 - The promotion commit contains exactly 18 files: the 15 candidate product files plus both paired DLDWS-001 ACTIVE_WORK files and `CURRENT_HANDOFF.md`. No Stage9/11/12 product source was changed.
 - DLDWS-001 remains `IN_PROGRESS` in `downloader,discovery-writer-safety`; contracts and router are unchanged. Production Downloader remains on its original image and running state. Operational deployment needs separate approval.
 - The exact verified candidate's `downloader_runtime_overlay/teddy_mp4_queue.py` retains one blank line at EOF, so the full promotion-commit `git diff --check` reports that single warning. The file was not normalized because that would violate the exact candidate/image hash; the other 17 changed paths pass the whitespace check.
+
+## DLDWS-001 USER APPROVAL — READ-ONLY DOWNLOADER STRUCTURE AUDIT, PHASE 1 (2026-10-28 KST)
+
+OBJECTIVE: Map canonical root sources, ordered Docker build patches, UI/static steps, final Downloader runtime overlay, and actual container startup; assess evidence-backed duplication, protected boundaries, and a small ordered refactoring plan. The user approves this read-only analysis and its documentation only.
+
+SCOPE: Inspect current canonical sources and relevant previous image/promotion evidence without rerunning prior builds or tests. Use static hashes, AST and call/import tracing as needed. Classify patch and file dependencies including build-time validations and surviving non-overlay effects. Examine Stage9, Stage11 and Stage12 only at Downloader interfaces and ownership boundaries. Report exact first proposed implementation files and acceptance criteria; a future change requires separate approval and affected workstream authorization.
+
+PROHIBITED: No product source, Dockerfile, contract, router, task ID, other workstream, protected tree, prior evidence or candidate changes; no source merging or deletion, image build, repeated tests, production deployment, services, Writer/systemd, NAS/Jellyfin/DB/jobs/queue/media writes, actual downloads or conversions. Preserve all earlier approvals and history.
+
+BASE AND ACCEPTANCE: ssikgun/missav-dlp-web, teddy-subtitle-stage11, preflight remote 84df1da0aeb7bafc414e2aafb414f914131a14c5; DLDWS-001 IN_PROGRESS in downloader and discovery-writer-safety, contracts 1.0.0, common 1.0.1. Historical product promotion 53a156289b40b91e9d109f95f34fefc9958ec19c and image sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31 are evidence, not proof of reproducible future builds or production deployment. Record the same authorization and result in both ACTIVE_WORK files and canonical handoff; verify governance, diff and normal fast-forward/readback. Report conclusions and UNKNOWNs, with PRODUCT_SOURCE_CHANGED=NO, PRODUCTION_CHANGED=NO, DEPLOY=NOT_RUN.
+
+NEXT_DECISION: User reviews the concrete first small refactoring proposal; no implementation or operational deployment is authorized by this audit.

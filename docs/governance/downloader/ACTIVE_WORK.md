@@ -2742,3 +2742,15 @@ NEXT_CHECKPOINT: decide whether to separately authorize a test-only fixture-isol
 - Final test copy SHA-256 `e4bfde0d8e2ea45e85d102e55134df8fc5330a0bf7a3559bf43b7d7b9d20f605`; result JSON `/tmp/dldws001-nas-noclobber-20261023/evidence/result.json` SHA-256 `d77adcabe83625b5c1ea24c2661304ba2310d5fa7344bd445b62bc6167a7136f`.
 - A preserved historical smoke copy expects a same-hash pre-existing final to count as success and delete the local source. That assertion now conflicts with the explicit collision policy and was not modified or rerun; update a new test copy before using that historical suite. This does not change the 14 focused-test result.
 - Actual CT108 runtime bytes and NAS `ln -T` support are still unverified. No NAS write, image build, production deployment, retry, or production file change occurred. The next gate remains a CT108 read-only source/image check and SSH `ln --help` capability check before preparing a unique one-file overlay.
+
+## DLDWS-001 USER APPROVAL — READ-ONLY DOWNLOADER STRUCTURE AUDIT, PHASE 1 (2026-10-28 KST)
+
+OBJECTIVE: Map canonical root sources, ordered Docker build patches, UI/static steps, final Downloader runtime overlay, and actual container startup; assess evidence-backed duplication, protected boundaries, and a small ordered refactoring plan. The user approves this read-only analysis and its documentation only.
+
+SCOPE: Inspect current canonical sources and relevant previous image/promotion evidence without rerunning prior builds or tests. Use static hashes, AST and call/import tracing as needed. Classify patch and file dependencies including build-time validations and surviving non-overlay effects. Examine Stage9, Stage11 and Stage12 only at Downloader interfaces and ownership boundaries. Report exact first proposed implementation files and acceptance criteria; a future change requires separate approval and affected workstream authorization.
+
+PROHIBITED: No product source, Dockerfile, contract, router, task ID, other workstream, protected tree, prior evidence or candidate changes; no source merging or deletion, image build, repeated tests, production deployment, services, Writer/systemd, NAS/Jellyfin/DB/jobs/queue/media writes, actual downloads or conversions. Preserve all earlier approvals and history.
+
+BASE AND ACCEPTANCE: ssikgun/missav-dlp-web, teddy-subtitle-stage11, preflight remote 84df1da0aeb7bafc414e2aafb414f914131a14c5; DLDWS-001 IN_PROGRESS in downloader and discovery-writer-safety, contracts 1.0.0, common 1.0.1. Historical product promotion 53a156289b40b91e9d109f95f34fefc9958ec19c and image sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31 are evidence, not proof of reproducible future builds or production deployment. Record the same authorization and result in both ACTIVE_WORK files and canonical handoff; verify governance, diff and normal fast-forward/readback. Report conclusions and UNKNOWNs, with PRODUCT_SOURCE_CHANGED=NO, PRODUCTION_CHANGED=NO, DEPLOY=NOT_RUN.
+
+NEXT_DECISION: User reviews the concrete first small refactoring proposal; no implementation or operational deployment is authorized by this audit.
