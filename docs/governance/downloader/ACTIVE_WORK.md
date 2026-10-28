@@ -2990,3 +2990,21 @@ CANONICAL_PREFLIGHT=PASS; CANDIDATE_INTEGRITY=PASS; PRODUCT_DIFF_SCOPE=PASS; ADM
 - The known `manual_retry()` references in root `teddy_entrypoint.py` and standalone `teddy_downloader_admin_flask_smoke.py` remain unchanged. Pre-overlay entrypoint/legacy fixture execution compatibility remains unverified. No operational container, service, network, database, queue, NAS, Jellyfin, media, Writer or Stage9/11/12 state was changed; deployment remains NOT_RUN.
 
 DLDWS-001 remains `IN_PROGRESS` in Downloader and Discovery Writer Safety with both contracts at 1.0.0; common contract remains 1.0.1. Governance, Stage9/11/12 routing and task IDs are unchanged.
+
+## CURRENT USER APPROVAL — DLDWS-001 LEGACY `manual_retry()` REFERENCE CLEANUP (2026-10-28 KST)
+
+### OBJECTIVE AND APPROVED_SCOPE
+
+The user authorizes removing the two remaining source references to the retired `teddy_downloader_admin.manual_retry()` interface: the obsolete intermediate `safe_retry_task()` wrapper/registration and unused admin import in root `teddy_entrypoint.py`, and the old callback call in `teddy_downloader_admin_flask_smoke.py`. A repository-wide source search found exactly these two executable Python call sites; historical governance/handoff mentions are records, not executable references. Do not change retry policy or copy the final retry implementation into the intermediate entrypoint. Keep the existing individual retry route in `app.py` and all unrelated entrypoint behavior unchanged. In the legacy Flask smoke, use an explicitly synthetic `_teddy_safe_retry_task` callback, the exact shared lock object from `teddy_download_safety`, and the final MP4 queue file/state contract; do not claim the mock validates production retry implementation.
+
+Register this approval in both paired DLDWS-001 ACTIVE_WORK files and canonical handoff; pass governance validation, `git diff --check`, normal fast-forward and remote readback before product edits. Use a new isolated worktree from the latest canonical HEAD. Preserve the final runtime overlay entrypoint, administrator module, manifest, Writer, Stage9/11/12 sources, contracts, routing and task ID. If the intermediate bulk-retry callback is absent, it must fail closed (503); do not reconnect the legacy `app.py` retry route as a safe callback.
+
+### VALIDATION AND PROMOTION CONDITIONS
+
+Confirm no unexpected executable `manual_retry()` call sites exist. Run Python 3.10 syntax checks on the two changed files and the existing Flask integration smoke against the exact existing image `sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31` in a disposable `--network none`, read-only, bounded container with synthetic fixtures and no operational mounts, services, data, or secrets. Preserve authentication/CSRF, failed-only selection, completed/paused protection, duplicate download/MP4 guards, storage/inode refusal, partial-result accounting, lock conflict, fragment-hash invariance, and synthetic state/queue checks. Verify zero retired calls in both files, final administrator SHA `73984205a2340a05a930132bf248bb1a8c07125391167aa9d5e1c072f247cb31`, and unchanged final overlay entrypoint and manifest. If any test fails or a design conflict appears, do not promote product files; record only the result and exact limitation.
+
+If all checks pass, promote only `teddy_entrypoint.py`, `teddy_downloader_admin_flask_smoke.py`, and these three DLDWS-001 result documents by normal fast-forward, then read back remote SHA, changed paths and file hashes. Full Docker build is not part of this task: keep `BUILD_CHAIN_COMPATIBILITY=INCOMPLETE` and `NEW_IMAGE_BUILD=NOT_RUN`. `PRODUCTION_CHANGED=NO`; `DEPLOY=NOT_RUN`.
+
+### PROHIBITED_SCOPE
+
+No change to final runtime overlay, administrator product module, retry policy/callback implementation, lock/storage/MP4 protections, Dockerfile, build scripts, manifest, Writer implementation or service, Stage9/11/12 code or service, contracts, router or task ID. No test assertion weakening, production container/service/data/queue/DB/NAS/Jellyfin/media operation, Docker image build, deployment, protected worktree/evidence changes, or unrelated cleanup.
