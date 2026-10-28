@@ -1,5 +1,27 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## CURRENT USER APPROVAL — DLDWS-001 WRITER SMOKE / PHASE 2 RESUME (2026-10-28)
+
+### OBJECTIVE
+
+Minimally correct the existing Writer smoke's unsupported socket identity assumption, retain safety assertions, and resume the approved isolated Python 3.10 final-overlay validation and conditional source promotion. DLDWS-001 stays IN_PROGRESS, downloader,discovery-writer-safety, contracts 1.0.0; no contract/router/other-workstream changes. Registration base f2ebcb1f970989a6a5f998fea301bc811a16c64b.
+
+### APPROVED_SCOPE
+
+- Register this identical approval in both ACTIVE_WORK files and canonical handoff, validate governance/scope/diff and normal fast-forward/readback before product work. Read-only verify previous permanent phase2 evidence and manifest e683cba4b2e8a87ddd009901cb93773a563259596a7ef2bf925cc93798a772de, original failing smoke, source candidate hashes/provenance/plan and build failure log. Preserve all old evidence; use a fresh isolated product tree and separate new evidence location.
+- Inspect shutdown/listener lifetime, stale classification/removal, path absence, new bind/type/permission/ownership/health, and unchanged DB/provenance replay. If the identity inequality assumption is confirmed wrong, modify ONLY teddy_library_discovery_writer_smoke.py minimally: replace that unsupported assertion with observed listener termination, safe stale removal, new socket metadata and health/DB/replay guarantees, reusing existing tests. Retain all active/stale/path/parent identity, symlink/regular-file/ownership/race/protocol/fail-closed protections. Root cause of the original inode reuse remains unconfirmed unless actual evidence establishes it. A Writer implementation defect or inability to fix safely within one test file stops work without product changes.
+- Run the corrected smoke ONCE under Python 3.10 in isolation before the full build. Record exact diff, pre/post hashes, test count/outcomes and retained assertions. If smoke fails, no image build. After PASS, reverify and reuse unchanged approved Downloader overlay/Dockerfile, old patch order and final-overlay position. Record actual base/uv/SpoofDPI/package inputs; use unique tags, no production mounts/network. Perform ONE new full image build; any new failure stops without unrelated repair/rebuild. Do not claim cached safety checks as newly executed; ensure affected important checks execute.
+- If build PASS, run existing bounded synthetic final-image checks: all 9 module/template hashes and library 500, Python 3.10 parse/import, admission/atomic persistence and save failures, terminal-job replay hold and interrupted recovery, download 4/MP4 global 1, HLS/legacy-TS/MP4 journal linkage, input/fragment preservation, NAS mock SHA/no-clobber/completion and publish-failure source preservation. Check canonical Stage9/11/12 source invariance, runner separation, Writer interface, task/local-result/hash/sidecar fields, subtitle failure independence and publication provenance/no-overwrite. No real stage/model/subtitle operations or product-quality claim.
+- ONLY if all smoke/safety/build/final-source/regression/boundary/scope/governance/fast-forward gates PASS: promote the verified Downloader overlay/hash manifest, minimal Dockerfile integration, ONLY this Writer smoke fix and the three result documents from a fresh isolated product tree. No other stage or Writer implementation source. Read back remote HEAD and changed-file hashes. If any required gate FAIL/UNKNOWN, product promotion remains BLOCKED; commit only actual result documentation.
+
+### PROHIBITED_SCOPE
+
+No operating Docker stop/restart/deploy/Compose change, operating image/tag change, Writer product/socket/systemd change, real download/retry/remux/NAS transfer, operating state/queue/DB/settings/media/NFO/poster/subtitle mutation, Stage9/11/12 code/model/service/timer/contract change, old candidate/evidence/dirty-tree alteration, secrets in Git, test skip/bypass/false PASS or safety weakening, broad refactor/new task/contract/router change. Preserve concurrency policy 4/1, DLDWS history and remaining backup policies.
+
+### ACCEPTANCE_CRITERIA AND NEXT_DECISION
+
+Report original root cause as CONFIRMED or INCONCLUSIVE separately from fix/safety PASS. Record smoke diff/hashes and actual checks, one build outcome, final-image tests/identity and stage boundary limits, source lineage, preserved evidence and normal remote readback. All required gates must pass for conditional product promotion; otherwise stop and document exact cause and next decision only. Earlier failed attempt stays historical, not erased. Any later operating deployment requires separate approval with fresh maintenance/replay/rollback safety. PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN throughout this phase.
+
 ## DLDWS-001 PHASE 2 RESULT — BUILD FAILED / PROMOTION BLOCKED (2026-10-28 KST)
 
 PHASE2_AUTHORIZATION=PASS; CANDIDATE_SHA=PASS; CANDIDATE_PRESERVED=YES; PYTHON310_BUILD=FAIL; FINAL_IMAGE_SOURCE_MATCH=NOT_RUN; DOWNLOADER_REGRESSION=INCOMPLETE; STAGE9_11_12_BOUNDARY=INCOMPLETE; CANONICAL_PRODUCT_PROMOTION=BLOCKED; PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
