@@ -1,5 +1,46 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## DLDWS-001 LIVE-SOURCE PHASE 1 RESULT — 2026-10-28 KST
+
+CANONICAL_SOURCE_PREFLIGHT=PASS; LIVE_SOURCE_MATCH=PASS; OVERLAY_PROVENANCE=PASS; SOURCE_CANDIDATE=PASS (isolated scoped source/representative offline validation only); OFFLINE_VALIDATION=PASS; PRODUCTION_CHANGED=NO; BUILD=NOT_RUN; DEPLOY=NOT_RUN.
+
+### Evidence and candidate
+
+- Approval registration d1a16774745437eef1952d58c7982cb02d964906 was normally pushed and remotely read back before source work; previous canonical base 5d1eadacc71b25a8066f1483757008f7dfdb8253. Actual CT108 read-only image/source recheck matches sha256:dd5d4e96f0292ff931edd8a239387d8de735243d13d942032ac8c8afacce2c77 and all five user-provided source hashes. These are direct checks in this phase, unlike earlier user-submitted evidence.
+- New root-only isolated artifact: /tmp/dldws001-source-candidate-20261028-0e99u5sg. candidate/ contains canonical source plus Dockerfile final overlay/hash/compile layer and downloader_runtime_overlay/ (9 Python sources and 1 Downloader template); canonical-raw/, baseline/, live/, runtime-render/, evidence/ and INTEGRATION_PLAN.md distinguish raw canonical, offline patch-render, selected live source and test output. No credentials/environment/settings/DB/tasks/queue/media copied. Existing dirty worktree and all old candidates/evidence untouched. No candidate product code committed or pushed.
+- All 21 ordered source patch steps succeeded in isolated replay; static asset/PWA rendering was additionally reproduced. Even after these, canonical lacks queue/safety entirely and loses live task persistence/replay safeguards, download-vs-MP4 worker separation, HLS/legacy-TS recovery, source/fragment preservation and SHA/no-clobber publication. App/bootstrap/entrypoint/generic/storage/admin must be integrated together; routing has only a fail-closed error-message difference. The template's remaining difference is existing Downloader summary/retry CSS/placement, with no Stage9/11/12 markup delta. The library module, SpoofDPI and reliability JS already match; library 500 is retained without overlay. Twelve used dependency files hash-match canonical patch output.
+- Every overlay file matches live and a separately retained source, recorded in evidence/provenance.json. Crucially queue/safety/entrypoint match /opt/missav-dlp-web/backups/dldws001-legacy-ts-20261027-r09PUC/image-context, not the older 20261022 queue/safety. App/bootstrap/generic/routing/admin match retained startup-safety sources; storage matches the NAS no-clobber source; template matches ui-alignment. Image COPY history corroborates source overlay ordering. Selected source lineage is PASS; full original dependency/base-image reconstruction is not claimed.
+- evidence/canonical-to-candidate.diff and per-file post-patch diffs give exact changes; evidence/candidate-files.sha256 and hashes below identify the reviewed candidate. INTEGRATION_PLAN.md SHA-256: ba51464108857bef82cac65785371b7136ed98cc04de74f92fa7970091e41e9e. Temporary artifacts must be hash-reverified before later promotion; their local path is not a permanent Git source archive.
+
+### Validation and limits
+
+Python 3.10 grammar plus host compile PASS for 9 modules and unchanged library. Existing startup-recovery suite 23/23 PASS; SSH no-clobber synthetic suite 14/14 PASS; existing process-shared MP4 lock test PASS (maximum 1 across 3 children); download cap 4 assertion PASS; existing library API fixtures PASS (252 HTTP 200, 501 HTTP 503); library UI and file-management navigation smoke PASS. No normal app import, live workers, media conversion or remote publication. Execution used host Python 3.13 with existing fixture dependencies; production Python 3.10 image build/import validation was not performed. Historical target-version and operational evidence remain historical. The first startup attempt had 22 passes/one missing negative-control fixture; copying that old before-file into the separate test fixture fixed the test setup, with no product change. Original log and passing rerun retained. No all-safety, whole-image reproducibility, deployment or subtitle-quality PASS is inferred.
+
+### Integration plan and next decision
+
+Review/explicitly approve bounded product promotion separately. Keep canonical raw sources and their existing anchor-sensitive Dockerfile patch order; apply verified Downloader overlay only after final source/static/PWA patches and existing final verifier, then verify hashes/compile. Never place already-patched live app/entrypoint before those patch scripts. Existing pre-overlay build smokes are insufficient: a separately authorized isolated build must check FINAL overlay output on target Python 3.10 with synthetic startup/import, retry/persistence/MP4/NAS mock and UI/boundary validation. Record/pin resolved Python base, latest uv/main SpoofDPI and package inputs before claiming image reproducibility; no dependency redesign or build was performed here.
+
+Shared app/task lock/schema, local_result_paths/sha256, publish-pending/completion and subtitle sidecars are interfaces to preserve for Stage11. No Stage9/Writer/Stage11/Stage12 source, contract, routing or runtime changed. The full older running image's unexamined transitive stages must not be copied wholesale; newer canonical stage revisions require separate boundary validation before any full rebuild. SIGTERM behavior is not repaired by this candidate; preserve the approved SIGINT shutdown path and separately authorized maintenance/replay/rollback gates for any future deployment.
+
+Both DLDWS-001 routes remain IN_PROGRESS, requiring downloader,discovery-writer-safety under 1.0.0. Governance/Stage9/Stage11 routes, original purpose/approvals/operating and recovery history, completed library fix and remaining backup policies are unchanged. Next decision: user review of this isolated candidate and explicit product-promotion scope; no automatic promotion/build/deploy or further implementation in this phase.
+
+### Candidate hashes (relative to overlay unless noted)
+
+```text
+f2ffdc1542f1203e7c533bf0116d617bb9f7d2a9d9fb937455b75f17d640244e  app.py
+b96850dbfaa585f5cf2abb3fdbe328030706fc159aba8875656fe2c775e433f3  teddy_bootstrap.py
+52e1801aa35745891ea8c6946efde20c9752598bdfeedf20c5f13a7581966d03  teddy_download_safety.py
+73984205a2340a05a930132bf248bb1a8c07125391167aa9d5e1c072f247cb31  teddy_downloader_admin.py
+c36799eace49e3f6df7fbdce69524c6f9f5d31a8b4588d1d65f14993b44c1357  teddy_entrypoint.py
+f19362ebeecf6d517c7acbe97629c2c34f97017957c0a324d090fc45b6abf339  teddy_generic.py
+bd2f29b1df32cef4e60d2eb2b93637157d0f3e0fd38a706f4ef0312a835a3d53  teddy_mp4_queue.py
+275607b2249029b689e701cdddf45b960c552d8099b23a554e20a54f3f212231  teddy_routing.py
+d678abce28a0545d7e9d47633f79cff729c18d7e9436b82c2c31c2921fe914f9  teddy_storage.py
+4d379e37c76e25781ea4eda8d169af5f24d70a4d53ef74808dc088c37b85766f  templates/index.html
+006f008ec5b12d572d39755a505d0ca43b675012819ef7b4c68860a8b52cb2a9  Dockerfile
+fd615dafaa3ae91f39daa4653d7f8ebe55a154be032191bcb4390a75451708ee  teddy_library_api.py (unchanged canonical)
+```
+
 ## 2026-10-28 — DLDWS-001 source canonicalization phase 1 authorized
 
 ## CURRENT USER APPROVAL — DLDWS-001 LIVE-SOURCE CANONICALIZATION PHASE 1 (2026-10-28)
