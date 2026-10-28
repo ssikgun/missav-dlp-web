@@ -1,12 +1,19 @@
 # Downloader non-subtitle workstream — active work
 
 WORKSTREAM: downloader
-TASK_ID: STG9MEDIA-001
+TASK_ID: DLDWS-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
-## CURRENT JOINT STAGE9 OPERATIONS PARTICIPATION — 2026-10-27
+## JOINT DEPLOYMENT PARTICIPATION CLOSED — STG9MEDIA-001 (2026-10-28)
+
+The user approved closing the temporary Stage9 deployment overlay using the submitted CT108 measurements. Governance and Stage9 ACTIVE_WORK record the complete attributed evidence: PPPE-446 scheduled completion, actual NAS MP4 size/NFO (769 bytes)/poster.webp (11,010 bytes), and Jellyfin VISIBLE at 2026-10-28T00:02:20+00:00; SNOS-403 and FNS-258 also have completed sidecars and VISIBLE. The user-submitted timer/--skip-media/success logs support bounded deployment closeout; Codex performed only a read-only canonical create-only/no-overwrite source review, not these operational actions.
+
+Original DLDWS-001 IN_PROGRESS / downloader,discovery-writer-safety routing is restored. Its objective, approval state, candidates, deployment/recovery results, all historical evidence and backup preservation policy remain intact. No backup policy is changed and no cleanup task is registered. Stage9 continues independently as STG9MEDIA-001 / IN_PROGRESS; no full-product completion is claimed. Earlier joint instructions below are historical and grant no renewed joint deployment authority. This closeout makes governance/handoff edits only; no product, Writer socket, Stage11, runtime, NAS, DB, Jellyfin or backup mutation occurs. Next decision: proceed only within the original DLDWS-001 approvals and independently authorized tasks.
+
+
+## HISTORICAL CLOSED JOINT STAGE9 OPERATIONS PARTICIPATION — 2026-10-27
 
 User-approved `STG9MEDIA-001` temporary operational overlay. Preserve existing DLDWS-001 work and history. Deploy the canonical generic Completion Runner `--skip-media` in the CT108 wrapper without altering the 60-second schedule, downloads, MP4 processing, Organizer, metadata recovery, shared locks, or retries. Verify that generic execution excludes Stage9 Media and the dedicated Stage9 route alone owns it. No Downloader source rewrite, forced jobs, Writer socket modification, or unrelated service changes. Local CT108 root is specifically allowed for the dedicated Stage9 service; Synology publisher remains non-admin File Station. Restore `DLDWS-001` paired routing at closure. Exact approval and preflight are recorded in Governance/Stage9.
 

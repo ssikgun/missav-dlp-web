@@ -1,5 +1,22 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-10-28 — Stage9 joint deployment closed; independent routes restored
+
+The user explicitly approved closing the temporary four-workstream STG9MEDIA-001 deployment after submitting the representative operational evidence below. Canonical base and freshly verified origin/teddy-subtitle-stage11 SHA: 9e196b6cc07c609b8c14c1cb2d6733d9e1dde91f.
+
+### EVIDENCE — USER-SUBMITTED CT108 MEASUREMENTS (2026-10-28 KST)
+
+- The user submitted the operational measurements below; Codex did not execute the deployment, NAS checks, DB updates, or Jellyfin operations represented by them.
+- PPPE-446: scheduled Stage9 processing COMPLETED; nfo_status=COMPLETE and poster_status=COMPLETE; NAS MP4 size comparison PASS; actual NAS NFO exists (769 bytes); actual poster.webp exists (11,010 bytes). jellyfin_notification_status=VISIBLE, jellyfin_recovery_status=VISIBLE, and media_jellyfin_visibility.status=VISIBLE; visible_at=2026-10-28T00:02:20+00:00; last_error=NULL and no media error.
+- SNOS-403 and FNS-258: NFO/poster completion and Jellyfin VISIBLE confirmed by the user. Previously submitted operational logs confirm the dedicated timer is active, the generic Completion Runner uses --skip-media, and recent scheduled invocations completed with one media item and zero failures.
+- Read-only canonical code review: teddy_discovery_media_filestation.py:_publish_one validates exact paths and input hashes, accepts an identical existing sidecar without rewriting it, rejects conflicting content/type, rechecks before create-only upload, handles concurrent creation as an error, and verifies final owner, size and SHA-256. _upload_create_only does not request overwrite and sets create_parents=false; publish_bundle restricts canonical sidecar filenames and only reads the video. This is a source review, not a new production permission or no-overwrite test.
+- These measurements satisfy the bounded scheduled-run DB/NFO/poster/Jellyfin closeout evidence for the joint deployment. They do not establish whole-product completion, all-title quality, or resolution of every pending/retry/poster item.
+
+Governance is restored to INACTIVE / NONE (requires governance); Downloader and Discovery Writer Safety to IN_PROGRESS / DLDWS-001 (requires downloader,discovery-writer-safety); Stage9 to IN_PROGRESS / STG9MEDIA-001 (requires stage9-media). Stage11 S11-WX011 is unchanged. The joint deployment is closed; Stage9 automatic operation and remaining independent work continue within existing boundaries. DLDWS-001 purpose, approvals, candidates, deployment/recovery history and backup preservation policy are retained. No backup cleanup task or policy change is included. This Codex closeout changes governance/handoff documents only, with no product-source, service/timer, NAS/DB/Jellyfin, forced-job, Writer, Stage11 or backup mutation. Full operational evidence and the source-review limits are preserved in Governance/Stage9 ACTIVE_WORK. Earlier blocked deployment entries below remain historical, superseded for this bounded deployment closeout only.
+
+
+Validation: all-workstream structure; restored DLDWS-001 paired, independent STG9MEDIA-001 and unchanged S11-WX011 preflights PASS; governance smoke 21/21 PASS; git diff --check PASS. Canonical publication uses a normal fast-forward followed by exact remote SHA/tree readback.
+
 ## 2026-10-26 — Stage9 integrated automation transition (CT108 preflight blocked)
 
 - Temporary Governance/Downloader/Discovery Writer Safety/Stage9 activation was published and read back at `60acbe8b59db1536bc5644b36c8228829a680a54`. Product promotion `43fa8c034d4c6198507a2e7138829b6f3f6cfc15` adds a generic Completion Runner `--skip-media` opt-out while preserving general download/Organizer/metadata-recovery flow, the dedicated Stage9 Media runner candidate, and focused offline smoke coverage. The original local candidate `9c7df01b88a03f99f873d801447816a1045c8890` was not modified.

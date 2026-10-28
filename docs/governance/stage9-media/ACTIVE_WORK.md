@@ -4,9 +4,38 @@ WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
+REQUIRES_WORKSTREAMS: stage9-media
 
-## CURRENT USER-APPROVED STAGE9 OPERATIONS CUTOVER — 2026-10-27
+## JOINT DEPLOYMENT CLOSED — STG9MEDIA-001 (2026-10-28)
+
+The user explicitly approved this closeout after submitting the missing representative operational evidence. The temporary four-workstream deployment overlay is CLOSED. The original independent routes are restored: Governance INACTIVE / NONE; Downloader and Discovery Writer Safety IN_PROGRESS / DLDWS-001 with their paired requirement; Stage9 IN_PROGRESS / STG9MEDIA-001 with stage9-media only. Stage11 is unchanged.
+
+### APPROVED_SCOPE
+
+Record the supplied evidence, close the temporary joint deployment, restore routing/required-workstream metadata, and update the canonical handoff. Preserve the original DLDWS-001 objective, approvals, deployment/recovery evidence, candidates and backup preservation policy. No backup-policy amendment or backup-cleanup task is registered in this closeout.
+
+### PROHIBITED_SCOPE
+
+No product source, runtime/service/timer configuration or restart, NAS/DB/Jellyfin write, forced download/metadata execution, backup transfer/deletion, Stage11 or Writer implementation change is authorized by this closeout.
+
+### ACCEPTANCE_CRITERIA
+
+The representative scheduled processing and actual NAS NFO/poster plus Jellyfin visibility evidence are recorded with correct attribution; original route/task/requirement sets are consistent; governance checks and diff check pass; the canonical branch is updated by normal fast-forward and read back exactly. Stage9 automatic operation and remaining independent work are preserved without a whole-product completion claim.
+
+### EVIDENCE — USER-SUBMITTED CT108 MEASUREMENTS (2026-10-28 KST)
+
+- The user submitted the operational measurements below; Codex did not execute the deployment, NAS checks, DB updates, or Jellyfin operations represented by them.
+- PPPE-446: scheduled Stage9 processing COMPLETED; nfo_status=COMPLETE and poster_status=COMPLETE; NAS MP4 size comparison PASS; actual NAS NFO exists (769 bytes); actual poster.webp exists (11,010 bytes). jellyfin_notification_status=VISIBLE, jellyfin_recovery_status=VISIBLE, and media_jellyfin_visibility.status=VISIBLE; visible_at=2026-10-28T00:02:20+00:00; last_error=NULL and no media error.
+- SNOS-403 and FNS-258: NFO/poster completion and Jellyfin VISIBLE confirmed by the user. Previously submitted operational logs confirm the dedicated timer is active, the generic Completion Runner uses --skip-media, and recent scheduled invocations completed with one media item and zero failures.
+- Read-only canonical code review: teddy_discovery_media_filestation.py:_publish_one validates exact paths and input hashes, accepts an identical existing sidecar without rewriting it, rejects conflicting content/type, rechecks before create-only upload, handles concurrent creation as an error, and verifies final owner, size and SHA-256. _upload_create_only does not request overwrite and sets create_parents=false; publish_bundle restricts canonical sidecar filenames and only reads the video. This is a source review, not a new production permission or no-overwrite test.
+- These measurements satisfy the bounded scheduled-run DB/NFO/poster/Jellyfin closeout evidence for the joint deployment. They do not establish whole-product completion, all-title quality, or resolution of every pending/retry/poster item.
+
+### NEXT_DECISION
+
+Joint deployment coordination is closed. Continue the existing Stage9 automatic operation and independently registered Stage9 work within its existing approval boundaries; unresolved items are not declared complete. DLDWS-001 resumes its original paired routing and preserved approval/history; Governance is inactive. Any new feature, cleanup or operational mutation requires its own matching task authorization. All earlier joint deployment instructions below are retained as historical records and grant no renewed deployment authority.
+
+
+## HISTORICAL CLOSED USER-APPROVED STAGE9 OPERATIONS CUTOVER — 2026-10-27
 
 Teddy chose **CT108 local root** for the dedicated Stage9 service to reuse the root-only media DB/WAL and shared `0600` title locks without broad permission changes; this replaces ONLY the prior local non-root execution rule. The NAS connection remains non-administrator **`stage9_media` File Station HTTPS**, not NAS root or administrators-group SSH. Existing source implementation, skip-media smoke fix and historical CLOSED authorizations are preserved.
 
