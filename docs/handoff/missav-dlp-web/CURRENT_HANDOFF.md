@@ -1,5 +1,30 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## CURRENT USER APPROVAL — DLDWS-001 WRITER LIFECYCLE RESTORATION / PHASE 2 (2026-10-28)
+
+### OBJECTIVE
+
+Minimally restore canonical Writer socket-lifetime safety using existing verified candidates, preserving existing architecture/support modes, then resume Downloader canonicalization phase2 only if every gate passes. DLDWS-001 remains IN_PROGRESS with downloader,discovery-writer-safety, contracts 1.0.0. Registration base 38cfeacaabbbfd2981635de4404509be35aebe37. No task/router/contract/other-workstream changes.
+
+### APPROVED_SCOPE
+
+- Register this identical approval in both ACTIVE_WORK files and canonical handoff, validate governance/scope/diff and normal-fast-forward/readback BEFORE product work. Reverify protected phase2 and Writer review evidence, previous Downloader manifest e683cba4b2e8a87ddd009901cb93773a563259596a7ef2bf925cc93798a772de; preserve all originals. Use a fresh isolated product/evidence location.
+- Compare canonical Writer SHA 8898087c4830a6e2729c5593377224a9cfa518147aa0ec40bdc554cba392410e, B-option commit b0831048b3788b9a86a180f040b0152145a079c7, immutable operational release sha256-709999d4c10701a284a9e96f7facdf3b41ac3179fd5bf944c6cb8bf400fbf83d, failed direct race-fix candidate and current/stronger smokes. Trace hashes/provenance/direct cleanup/socket FD transfer separately; read-only recheck current Writer executable/config and service state without exposing secrets or touching sockets/DB.
+- Prefer reusing the existing approved and operationally verified socket-activation lifecycle. After comparison, choose only clearly compatible minimal Writer lifecycle/source/smoke files in a new isolated tree. Preserve operating activation path and systemd-owned socket, client protocol/path/type/UID/GID/mode, DB/provenance/replay, direct-mode active protection if retained and stale/restart recovery. Do not wholesale transplant a candidate or assume distinct variants equivalent.
+- Reuse bounded strengthened synthetic tests, retaining the reproduced active-path deletion/identity-collision case and trustworthy negative/positive controls: real listener/path survival, stale-only cleanup, old listener termination/new bind-health, metadata, parent/path replacement, symlink/regular-file safety, protocol, DB/provenance/replay and activation FD contract. Never treat a different inode as proof. No Downloader image build before Writer safety and stale/restart recovery PASS.
+- Only after source provenance, Writer safety/recovery, Downloader manifest/overlay, scope and operating/data invariance PASS: resume the previously approved Python 3.10 isolated image build ONCE, unchanged 21 ordered source patches and final overlay. Record actual build inputs and unique test image identity. Verify final module/template/library hashes/import, 4-download/1-global-MP4 policy, admission/storage/restart/journal/input preservation, mock NAS SHA/no-clobber and Stage9/11/12 interfaces. No actual downloads, conversion, NAS/stage/model work. Any build or required test failure stops without unapproved repair/repeated builds.
+- ONLY if ALL Writer/build/final-image/Downloader/stage-boundary/scope/governance/fast-forward gates PASS: normally commit/push minimal verified Writer lifecycle/smoke, approved Downloader overlay/hash manifest, minimal Dockerfile integration and three result documents from isolated tree; remote HEAD/file-hash readback required. Otherwise promote no product code and document actual results/decision only.
+
+### STOP CONDITIONS / PROHIBITED_SCOPE
+
+If integration requires a NEW activation-vs-direct policy choice, removal/change of direct support, changed operating Writer behavior, service/systemd change, or cannot satisfy both active protection and stale recovery, stop without candidate promotion and report the decision. A clearly compatible minimal correction within existing approved architecture may proceed; do not invent a new architecture or treat the stale-recovery-failing candidate as complete.
+
+No operating Docker stop/restart/deploy/tag overwrite/Compose change, Writer service/socket/systemd mutation, operating DB/NAS/Jellyfin/tasks/queue/settings/media/subtitle/NFO/poster write, real download/retry/remux/model/subtitle execution, Stage9/11/12 source/model/service/timer/contract change, old release/evidence/candidate/dirty-tree overwrite, secret disclosure, test skip/bypass/weakened assertions, failed-to-PASS relabeling, broad refactor/new task/contract/router change. Preserve DLDWS history, backup policies and concurrency 4/1.
+
+### ACCEPTANCE_CRITERIA AND NEXT_DECISION
+
+Report candidate lineage, design compatibility, actual Writer safety/stale/smoke, Python3.10 build, final source/regression/stage boundary and conditional promotion independently; old PASS is historical, not a current run. Evidence must include selected variants/files, actual active-listener and stale/restart proof, image identity and final hashes/tests, exact GitHub scope and readback. PRODUCTION_CHANGED=NO, DEPLOY=NOT_RUN. If any policy/design or mandatory gate remains unresolved, stop and document exact next user decision; operating deployment always needs separate approval and fresh maintenance/replay/rollback gates.
+
 ## DLDWS-001 WRITER SMOKE RESUME RESULT — IMPLEMENTATION DEFECT / STOPPED (2026-10-28 KST)
 
 WRITER_SMOKE_ROOT_CAUSE=INCONCLUSIVE; WRITER_SMOKE_FIX=BLOCKED; WRITER_SAFETY_ASSERTIONS=FAIL (retained failure of byte-identical canonical source, no new test execution); PYTHON310_BUILD=NOT_RUN; FINAL_IMAGE_SOURCE_MATCH=NOT_RUN; DOWNLOADER_REGRESSION=INCOMPLETE; STAGE9_11_12_BOUNDARY=INCOMPLETE; CANONICAL_PRODUCT_PROMOTION=BLOCKED; PRODUCTION_CHANGED=NO; DEPLOY=NOT_RUN.
