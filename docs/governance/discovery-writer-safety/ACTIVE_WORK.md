@@ -2808,3 +2808,31 @@ CANONICAL_PREFLIGHT=PASS; DOCKERFILE_SCOPE=PASS; EXISTING_IMAGE_ID=PASS; OFFLINE
 ### VERIFICATION LIMIT
 
 This result establishes that the current existing image's final UI source passes the UI smoke, its ten overlay files match the manifest, and the Dockerfile command is now positioned after the final overlay checks. `NEW_IMAGE_BUILD=NOT_RUN`: a complete build from the changed Dockerfile, present-day dependency resolution, and byte-identical image reproduction were not verified. The previous BuildKit failure remains historical and unresolved as a build-environment issue. No operating deployment or broader source consolidation is authorized by this result.
+
+## CURRENT USER APPROVAL — DLDWS-001 ADMIN SMOKE / FINAL OVERLAY INTERFACE ALIGNMENT (2026-10-28 KST)
+
+### OBJECTIVE
+
+Minimally correct the existing `teddy_downloader_admin_smoke.py` so it independently validates the root build-stage administrator and the final runtime-overlay administrator using each module's actual interface. Do not change either administrator implementation or consolidate/remove duplicate modules. Keep DLDWS-001 `IN_PROGRESS` in the paired `downloader,discovery-writer-safety` workstreams (contracts 1.0.0; common 1.0.1); leave router, task ID, other workstreams and Stage9/11/12 ownership unchanged.
+
+### APPROVED_SCOPE
+
+- Register this identical task approval in both paired ACTIVE_WORK files and canonical CURRENT_HANDOFF; run the shared governance and diff checks, normal fast-forward, and remote readback before editing the smoke.
+- Read-only inspect `teddy_downloader_admin_smoke.py`, root and overlay admin modules, overlay `teddy_entrypoint.py`, `teddy_download_safety.py`, `teddy_mp4_queue.py`, `teddy_bootstrap.py`, and Dockerfile order. Confirm the safe-retry callback registration and `install()` path before choosing test dispatch.
+- Modify only `teddy_downloader_admin_smoke.py`. Preserve root `manual_retry()` test behavior/assertions for the pre-overlay build stage. For final overlay tests, explicitly select/identify the overlay module by import path and SHA; do not call its absent `manual_retry()`. Model only the actual `core._teddy_safe_retry_task` callback boundary, and do not claim a mocked callback proves the implementation itself.
+- Adapt fixtures to the actual final contract, including shared-lock identity `safety_module._TASK_STATE_LOCK is core.queue_admission_lock` and MP4 `_job_path`/`has_task` file/state consistency. Preserve existing assertions and add only the minimum checks for safe lock/MP4 refusals, allowed callback use, truthful partial-result accounting and failed-save/admission behavior.
+- Preserve checks for failed-only retry selection; completed/paused/queued/MP4 duplicates; disk/inode exhaustion; partial success/failure accounting; retry state/count; fragment hashes; SpoofDPI secret redaction; and UI safety text. Do not bypass product guards or duplicate production retry code in the smoke.
+- Test root and overlay interfaces separately in the existing Python 3.10.22 image `sha256:00868de5586405e37f26685c5dc49133560cfe5bf6fc30a7cb848ae3e08b1c31`, using read-only test-source mounts only as needed. Use `--network none`, read-only container root, no operational volume/secret/port/socket/database/NAS, dropped capabilities, `no-new-privileges`, bounded CPU/memory/PIDs/time and automatic container removal. Report imported administrator path/hash and test counts for each run. No image build or unrelated regression suite repetition.
+- If every required root/overlay assertion passes, promote only `teddy_downloader_admin_smoke.py` plus these paired result documents by normal fast-forward; verify remote HEAD and file hashes. If a product defect or FAIL/UNKNOWN occurs, do not promote the smoke; record only evidence and the next decision.
+
+### PROHIBITED_SCOPE
+
+No administrator or other product-source edit; no overlay/manifest/Dockerfile/build-script change; no assertion weakening or safety bypass; no duplicate-module consolidation/removal; no Docker build/deploy/restart or builder/network/firewall change; no operational download/queue/DB/NAS/media/Writer/Stage9/11/12 action; no protected worktree/evidence overwrite; no contract/router/task-ID change; no unrelated or repeated test suite.
+
+### ACCEPTANCE_CRITERIA
+
+Preflight and paired approval readback pass; exact change scope is the smoke file; root implementation's existing `manual_retry()` behavior remains verified; final overlay administrator is imported by its actual path/hash and tests only its supported callback/locking/MP4 interface; existing and new safety assertions pass without weakening; root and overlay test counts/results are separately recorded; overlay product hashes and operating state remain unchanged; governance/diff/normal fast-forward/readback pass. `PRODUCT_SOURCE_CHANGED=NO`; `NEW_IMAGE_BUILD=NOT_RUN`; `PRODUCTION_CHANGED=NO`; `DEPLOY=NOT_RUN`.
+
+### NEXT_DECISION
+
+Promote the test-only correction if all acceptance checks pass. Stop and preserve the exact cause on any product failure or unknown. Administrator module consolidation remains a separate approved task.
