@@ -1,5 +1,28 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## CURRENT USER APPROVAL — DLDWS-001 PHASE 2 (2026-10-28)
+
+### OBJECTIVE
+
+Validate the preserved phase-1 source in an isolated Python 3.10 Docker image and conditionally promote only the verified Downloader overlay and minimal build integration. DLDWS-001 remains IN_PROGRESS with downloader,discovery-writer-safety under both 1.0.0 contracts. Writer participation remains shared tracking and invariant/boundary verification; other workstreams and routing are unchanged.
+
+### APPROVED_SCOPE
+
+- Register this identical phase-2 approval in both ACTIVE_WORK files and canonical handoff, validate governance, normal-fast-forward and exact remote readback BEFORE isolated product work. Registration base e046d86a8a8df9cc51f1d47ac264fed9f05e656e.
+- Reverify phase-1 candidate /tmp/dldws001-source-candidate-20261028-0e99u5sg/candidate, its manifest, exact diff, provenance and INTEGRATION_PLAN.md SHA-256 ba51464108857bef82cac65785371b7136ed98cc04de74f92fa7970091e41e9e. Preserve candidate/source evidence in a new collision-free root-owned permanent location; copy no secrets/operating data. Missing or changed candidate stops work; never substitute obsolete 20261022 queue/safety for the approved 20261027/live lineage.
+- In a new isolated product tree, retain existing 21 ordered source patches and static/PWA/final verification, then apply the verified final overlay exactly once. Read-only identify current image/source, actual Python 3.10 base digest/version, uv:latest, SpoofDPI main/install artifact and package inputs/versions, storage and unique test image/container names. Build only a unique isolated test image; record resolved inputs without silently upgrading/replacing them. Build failure stops product work.
+- Against FINAL overlay image, check 9 Python/template hashes and unchanged library 500, Stage9/11/12 source invariance, Python 3.10 syntax/import and overlay order. Reuse small existing offline synthetic tests for admission/persistence errors/state-file protection, terminal replay holds and interrupted recovery, download cap 4/global MP4 cap 1, journal/state linkage, HLS/legacy-TS/source/fragment preservation and NAS no-clobber/hash-size-completion/failure preservation. No actual downloads/remux/NAS calls.
+- Verify static/minimal side-effect-free Stage9 generic/dedicated runner separation, Writer socket interface, task/local-result/hash/publication and Stage11 sidecar/input/failure-isolation fields, Stage12 provenance/no-overwrite, without changing stage behavior. Stage11 release/models/timers remain unchanged; no ASR/speaker/translation-quality PASS is implied.
+- ONLY if EVERY required gate PASS, including no unexpected interface changes, exact scope, governance/diff checks and latest-remote fast-forward: commit/push verified Downloader overlay sources/hash manifest and minimal Dockerfile integration from an isolated product tree; normal remote readback must verify files/hashes. Preserve root pre-patch sources and existing patch order. If any gate FAIL/UNKNOWN, do not promote product code; document cause and next decision only. Record actual results in these same three documents.
+
+### PROHIBITED_SCOPE
+
+No operating container stop/restart/replacement/deployment or Compose up/edit, operating image/tag overwrite, production network/volume attachment, actual download/retry/MP4 conversion/NAS publication, task/journal/settings/DB/NAS/Jellyfin/media/subtitle/NFO/poster write or deletion, Stage9/11/12 product/service/timer/model/contract change, Writer socket/systemd change, old candidate/evidence or protected dirty-tree mutation, concurrency-policy change, weakened/masked checks, build-system/package refactor, routing/contract change or new task ID. Do not run the operational CMD in test containers; use isolated synthetic paths and no production mounts/network.
+
+### ACCEPTANCE_CRITERIA AND NEXT_DECISION
+
+Report authorization, candidate integrity/permanent preservation, target Python 3.10 build/final source match, representative Downloader regressions and stage boundaries independently. Preserve resolved build inputs, final file hashes, test counts and exact scope. Conditional product promotion is authorized in THIS phase only after all gates PASS; deployment remains NOT_RUN and PRODUCTION_CHANGED=NO. On build failure or unexpected interface/gate failure stop product work, retain evidence and document precise blockers without speculative repair. After successful promotion, any operating deployment requires separate explicit approval with fresh maintenance/replay/rollback gates. Historical phase-1 prohibition on promotion/build is superseded only by this bounded phase-2 approval; all historical evidence and original DLDWS/backup obligations remain.
+
 ## DLDWS-001 LIVE-SOURCE PHASE 1 RESULT — 2026-10-28 KST
 
 CANONICAL_SOURCE_PREFLIGHT=PASS; LIVE_SOURCE_MATCH=PASS; OVERLAY_PROVENANCE=PASS; SOURCE_CANDIDATE=PASS (isolated scoped source/representative offline validation only); OFFLINE_VALIDATION=PASS; PRODUCTION_CHANGED=NO; BUILD=NOT_RUN; DEPLOY=NOT_RUN.
