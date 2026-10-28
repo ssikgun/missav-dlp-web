@@ -326,10 +326,7 @@ def enqueue_download(
 
     lock = getattr(core, 'queue_admission_lock', None)
     if lock is None:
-        return core.jsonify({
-            'status': 'error',
-            'message': '다운로드 큐 보호 상태를 확인할 수 없습니다.',
-        }), 503
+        return core.jsonify({'status': 'error', 'message': '다운로드 큐 잠금을 확인할 수 없습니다.'}), 503
     with lock:
         core.tasks[task_id] = {
             'url': url,
@@ -352,6 +349,7 @@ def enqueue_download(
 
     return core.jsonify({
         'status': 'success',
+        'message': '다운로드 큐에 추가했습니다.',
         'task_id': task_id,
         'network_mode': decision['mode'],
         'network_source': decision['source'],
