@@ -150,7 +150,6 @@ RUN grep -Fq 'id="retryFailedTasks"' templates/index.html && \
     grep -Fq 'max-width: 720px' templates/index.html
 
 RUN python teddy_discovery_ui_shell_smoke.py templates/index.html templates/teddy-discovery.css templates/teddy-discovery.js
-RUN python teddy_library_ui_smoke.py
 RUN python teddy_subtitle_status_smoke.py
 RUN python teddy_subtitle_status_ui_smoke.py
 RUN python teddy_file_management_navigation_smoke.py
@@ -173,6 +172,7 @@ RUN python teddy_verify_build.py final
 COPY downloader_runtime_overlay/ /app/
 RUN sha256sum -c dldws001-source-sha256.txt && \
     python -m py_compile app.py teddy_bootstrap.py teddy_download_safety.py teddy_downloader_admin.py teddy_entrypoint.py teddy_generic.py teddy_mp4_queue.py teddy_routing.py teddy_storage.py
+RUN python teddy_library_ui_smoke.py
 
 # 6. 폴더 생성 및 포트 노출
 RUN mkdir -p /downloads /final
