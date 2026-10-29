@@ -22,6 +22,8 @@ RUN python -c "import typing_extensions; import curl_cffi; import yt_dlp; import
 
 # 5. 애플리케이션 복사
 COPY . .
+# The single-source generic imports this unchanged safety module before patches.
+COPY downloader_runtime_overlay/teddy_download_safety.py /app/teddy_download_safety.py
 
 # Source + patch scripts must all parse before any build-time mutation.
 RUN python -m py_compile \

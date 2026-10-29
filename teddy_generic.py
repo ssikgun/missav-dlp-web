@@ -7,6 +7,7 @@ import time
 import teddy_routing
 import teddy_storage
 import teddy_123av
+import teddy_download_safety
 
 
 _save_lock = threading.Lock()
@@ -36,6 +37,10 @@ def is_custom_site(core, url):
 
 def _task_temp_dir(core, task_id):
     return os.path.join(core.DOWNLOAD_DIR, f'.{task_id}.ytdlp')
+
+
+def _task_home_dir(core, task_id):
+    return os.path.join(core.DOWNLOAD_DIR, f'.{task_id}.ytdlp-home')
 
 
 def _pick(raw, short_key, setting_key, allowed, default):
@@ -232,8 +237,10 @@ def _youtube_dl_for_url(core, opts, url):
 
 def download_generic(core, reliability, task_id, url, network_mode='direct'):
     temp_dir = _task_temp_dir(core, task_id)
+    home_dir = _task_home_dir(core, task_id)
     os.makedirs(temp_dir, exist_ok=True)
-    site_key, site_dir = teddy_storage.ensure_site_dir(core, url, custom=False)
+    os.makedirs(home_dir, exist_ok=True)
+    site_key = teddy_storage.site_key_for_url(url, custom=False)
     last_filename = {'path': ''}
     proxy_url = teddy_routing.proxy_for_mode(network_mode)
     ytdlp_options = yt_dlp_options_for_task(core, task_id)
@@ -245,6 +252,9 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
         task['network_mode'] = network_mode
         task['yt_dlp_options'] = ytdlp_options
         _maybe_save(core, task_id, force=True)
+
+    space_reservation = {'manager': None}
+    unknown_downloaded_by_file = {}
 
     def progress_hook(data):
         task = core.tasks.get(task_id)
@@ -259,6 +269,18 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
 
         if status == 'downloading':
             downloaded, total, fraction = _progress_fraction(data)
+            reservation = space_reservation.get('manager')
+            estimated_total = teddy_download_safety.estimated_download_size_bytes(data)
+            if reservation is None:
+                raise teddy_download_safety.DownloadSafetyError('다운로드 공간 예약이 초기화되지 않았습니다.')
+            if estimated_total is not None and downloaded <= estimated_total:
+                reservation.reset_unknown()
+                reservation.update(max(0, estimated_total - downloaded))
+            else:
+                filename_key = str(data.get('filename') or 'stream')
+                unknown_downloaded_by_file[filename_key] = max(
+                    int(unknown_downloaded_by_file.get(filename_key, 0)), downloaded)
+                reservation.observe_unknown_size(sum(unknown_downloaded_by_file.values()))
             task['downloaded_bytes'] = downloaded
             task['total_bytes_estimate'] = total
             task['speed_bps'] = int(data.get('speed') or 0)
@@ -288,7 +310,10 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
         'socket_timeout': 30,
         'format': _format_selector(core, ytdlp_options),
         'paths': {
-            'home': site_dir,
+            # Keep every in-progress/finalized yt-dlp artifact on local NVMe.
+            # The bootstrap publishes completed outputs to TEDDY_FINAL_DIR only
+            # after yt-dlp postprocessing has fully finished.
+            'home': home_dir,
             'temp': temp_dir,
         },
         'outtmpl': {
@@ -300,6 +325,9 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
         'progress_hooks': [progress_hook],
     }
     _apply_media_options(opts, ytdlp_options)
+    if ytdlp_options['media_mode'] == 'video' and ytdlp_options['video_container'] == 'mp4':
+        # The MP4 stage runs after the network worker returns; retain source streams for restart recovery.
+        opts['keepvideo'] = True
     if proxy_url:
         opts['proxy'] = proxy_url
 
@@ -317,8 +345,21 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
         flush=True,
     )
     try:
+        teddy_download_safety.ensure_download_start_space(home_dir)
+        teddy_download_safety.ensure_download_start_space(temp_dir)
         with _youtube_dl_for_url(core, opts, url) as ydl:
-            info = ydl.extract_info(url, download=True)
+            with teddy_download_safety.StorageReservation(core.DOWNLOAD_DIR, task_id, home_dir) as reservation:
+                space_reservation['manager'] = reservation
+                try:
+                    with teddy_download_safety.task_context(task_id, reservation=reservation):
+                        info = ydl.extract_info(url, download=True)
+                finally:
+                    space_reservation['manager'] = None
+            current_task = core.tasks.get(task_id)
+            if not current_task:
+                raise core.DownloadCancelled()
+            if current_task.get('status') in ('일시정지 요청 중', '일시정지'):
+                raise reliability.DownloadPaused()
             if info is None:
                 raise ValueError('yt-dlp가 다운로드 정보를 반환하지 않았습니다.')
             if info.get('_type') == 'playlist':
@@ -326,7 +367,10 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
                 if len(entries) == 1:
                     info = entries[0]
             _store_metadata(core, task_id, info)
-            final_path = _find_final_path(core, ydl, info, site_dir)
+            queued_task = core.tasks.get(task_id) or {}
+            if queued_task.get('mp4_stage') == 'queued':
+                return {'status': 'mp4-queued'}
+            final_path = _find_final_path(core, ydl, info, home_dir)
 
         task = core.tasks.get(task_id)
         if not task:
@@ -338,23 +382,67 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
         if not final_path:
             raise ValueError('다운로드는 끝났지만 최종 파일 경로를 확인하지 못했습니다.')
 
-        final_size = os.path.getsize(final_path)
-        task['status'] = '완료'
-        task['progress'] = '100%'
-        task['speed_bps'] = 0
-        task['filename'] = teddy_storage.relative_public_path(core, final_path)
-        task['filesize'] = final_size
-        task['downloaded_bytes'] = final_size
-        task['total_bytes_estimate'] = final_size
-        task['engine'] = 'yt-dlp'
-        task['storage_folder'] = site_key
-        task['network_mode'] = network_mode
-        task['yt_dlp_options'] = ytdlp_options
-        task.pop('last_error_detail', None)
-        _maybe_save(core, task_id, force=True)
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        print(f"[완료][yt-dlp][{route_label}] {task['filename']}", flush=True)
-        return {'status': 'complete'}
+        storage_guard_path = teddy_download_safety.storage_lock_path(home_dir)
+        outputs = []
+        try:
+            for entry in os.scandir(home_dir):
+                if not entry.is_file():
+                    continue
+                name = entry.name
+                if (
+                    name == os.path.basename(storage_guard_path)
+                    and not entry.is_symlink()
+                    and os.path.realpath(entry.path) == storage_guard_path
+                ):
+                    continue
+                if name.endswith(('.part', '.ytdl', '.tmp')) or '.part-Frag' in name:
+                    continue
+                outputs.append(entry.path)
+        except OSError:
+            outputs = []
+        if final_path not in outputs:
+            outputs.append(final_path)
+
+        main_rel = teddy_storage.relative_work_path(core, final_path)
+        local_paths = []
+        for path in outputs:
+            try:
+                relative = teddy_storage.relative_work_path(core, path)
+            except teddy_storage.PublishError:
+                continue
+            if relative not in local_paths:
+                local_paths.append(relative)
+        local_paths = [path for path in local_paths if path != main_rel] + [main_rel]
+
+        with teddy_download_safety.task_state_guard():
+            task = core.tasks.get(task_id)
+            if not task or task.get('status') == '취소됨':
+                raise core.DownloadCancelled()
+            if task.get('status') in ('일시정지 요청 중', '일시정지'):
+                teddy_download_safety.complete_pause_request(core, task_id)
+                raise reliability.DownloadPaused()
+            if task.get('status') != '다운로드 중':
+                raise teddy_download_safety.DownloadSafetyError(
+                    '최종 로컬 결과를 확정하기 전 작업 상태가 변경되어 게시를 보류했습니다.'
+                )
+            final_size = os.path.getsize(final_path)
+            task['progress'] = '99%'
+            task['speed_bps'] = 0
+            task['filename'] = os.path.basename(final_path)
+            task['filesize'] = final_size
+            task['downloaded_bytes'] = final_size
+            task['total_bytes_estimate'] = final_size
+            task['engine'] = 'yt-dlp'
+            task['storage_folder'] = site_key
+            task['network_mode'] = network_mode
+            task['yt_dlp_options'] = ytdlp_options
+            task['local_result_path'] = main_rel
+            task['local_result_paths'] = local_paths
+            task.pop('last_error_detail', None)
+            _maybe_save(core, task_id, force=True)
+        # Keep yt-dlp temp fragments until final storage has been verified.
+        print(f"[로컬 완료][yt-dlp][{route_label}] {main_rel} -> publish pending", flush=True)
+        return {'status': 'local-complete'}
     except reliability.DownloadPaused:
         task = core.tasks.get(task_id)
         if task:
@@ -376,22 +464,30 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
         return {'status': 'cancelled'}
     except Exception as exc:
         task = core.tasks.get(task_id)
+        if task and task.get('status') == '취소됨':
+            return {'status': 'cancelled'}
         # yt-dlp may wrap an exception raised from a progress hook. Preserve the
         # user's pause request rather than converting it into an error task.
-        if task and task.get('status') in ('일시정지 요청 중', '일시정지'):
-            task['status'] = '일시정지'
-            task['speed_bps'] = 0
-            task['engine'] = 'yt-dlp'
-            task['storage_folder'] = site_key
-            task['network_mode'] = network_mode
-            task['yt_dlp_options'] = ytdlp_options
-            _maybe_save(core, task_id, force=True)
+        pause_interrupt = isinstance(exc, (reliability.DownloadPaused, teddy_download_safety.TaskPauseRequested))
+        if task and (pause_interrupt or task.get('status') in ('일시정지 요청 중', '일시정지')):
+            teddy_download_safety.complete_pause_request(core, task_id)
+            task = core.tasks.get(task_id)
+            if task:
+                task['speed_bps'] = 0
+                task['engine'] = 'yt-dlp'
+                task['storage_folder'] = site_key
+                task['network_mode'] = network_mode
+                task['yt_dlp_options'] = ytdlp_options
+                _maybe_save(core, task_id, force=True)
             print(f'[Pause][yt-dlp] 일시정지 완료: {url}', flush=True)
             return {'status': 'paused'}
         message = str(exc)
+        kind = teddy_download_safety.failure_kind(exc)
         print(f'[Error][yt-dlp][{route_label}] {url}: {message}', flush=True)
         if task:
-            task['status'] = f'에러: {message[:100]}'
+            prefix = '에러: 저장 공간/잠금 보호: ' if kind in ('storage', 'safety') else '에러: '
+            task['status'] = f'{prefix}{message[:100]}'
+            task['error_kind'] = kind
             task['last_error_detail'] = message[:1000]
             task['speed_bps'] = 0
             task['engine'] = 'yt-dlp'
@@ -399,7 +495,7 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
             task['network_mode'] = network_mode
             task['yt_dlp_options'] = ytdlp_options
             _maybe_save(core, task_id, force=True)
-        return {'status': 'error', 'error': message}
+        return {'status': 'error', 'error': message, 'error_kind': kind}
 
 
 def install_delete_cleanup(core):
@@ -412,6 +508,7 @@ def install_delete_cleanup(core):
         active = task and task.get('status') in ('다운로드 중', '일시정지 요청 중', '대기 중')
         if task and not active:
             shutil.rmtree(_task_temp_dir(core, task_id), ignore_errors=True)
+            shutil.rmtree(_task_home_dir(core, task_id), ignore_errors=True)
         return original_delete(task_id)
 
     core.app.view_functions['delete_task'] = delete_with_generic_cleanup

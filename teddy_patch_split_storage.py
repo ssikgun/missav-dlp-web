@@ -1,7 +1,6 @@
 from pathlib import Path
 
 
-GENERIC = Path('teddy_generic.py')
 ENTRYPOINT = Path('teddy_entrypoint.py')
 BOOTSTRAP = Path('teddy_bootstrap.py')
 
@@ -25,47 +24,6 @@ def replace_function(path, function_name, next_function_name, replacement):
     if end < 0:
         raise SystemExit(f'split storage patch failed: {next_function_name} boundary not found')
     path.write_text(text[:start] + replacement.rstrip() + '\n\n\n' + text[end:], encoding='utf-8')
-
-
-def patch_generic():
-    replace_once(
-        GENERIC,
-        """def _task_temp_dir(core, task_id):\n    return os.path.join(core.DOWNLOAD_DIR, f'.{task_id}.ytdlp')\n""",
-        """def _task_temp_dir(core, task_id):\n    return os.path.join(core.DOWNLOAD_DIR, f'.{task_id}.ytdlp')\n\n\ndef _task_home_dir(core, task_id):\n    return os.path.join(core.DOWNLOAD_DIR, f'.{task_id}.ytdlp-home')\n""",
-        'generic per-task home helper',
-    )
-
-    replace_once(
-        GENERIC,
-        """    temp_dir = _task_temp_dir(core, task_id)\n    os.makedirs(temp_dir, exist_ok=True)\n    site_key, site_dir = teddy_storage.ensure_site_dir(core, url, custom=False)\n    last_filename = {'path': ''}\n""",
-        """    temp_dir = _task_temp_dir(core, task_id)\n    home_dir = _task_home_dir(core, task_id)\n    os.makedirs(temp_dir, exist_ok=True)\n    os.makedirs(home_dir, exist_ok=True)\n    site_key = teddy_storage.site_key_for_url(url, custom=False)\n    last_filename = {'path': ''}\n""",
-        'generic local task directories',
-    )
-
-    replace_once(
-        GENERIC,
-        """        'paths': {\n            'home': site_dir,\n            'temp': temp_dir,\n        },\n""",
-        """        'paths': {\n            # Keep every in-progress/finalized yt-dlp artifact on local NVMe.\n            # The bootstrap publishes completed outputs to TEDDY_FINAL_DIR only\n            # after yt-dlp postprocessing has fully finished.\n            'home': home_dir,\n            'temp': temp_dir,\n        },\n""",
-        'generic local yt-dlp home',
-    )
-
-    replace_once(
-        GENERIC,
-        "final_path = _find_final_path(core, ydl, info, site_dir)",
-        "final_path = _find_final_path(core, ydl, info, home_dir)",
-        'generic final path local home',
-    )
-
-    old_final = """        final_size = os.path.getsize(final_path)\n        task['status'] = '완료'\n        task['progress'] = '100%'\n        task['speed_bps'] = 0\n        task['filename'] = teddy_storage.relative_public_path(core, final_path)\n        task['filesize'] = final_size\n        task['downloaded_bytes'] = final_size\n        task['total_bytes_estimate'] = final_size\n        task['engine'] = 'yt-dlp'\n        task['storage_folder'] = site_key\n        task['network_mode'] = network_mode\n        task['yt_dlp_options'] = ytdlp_options\n        task.pop('last_error_detail', None)\n        _maybe_save(core, task_id, force=True)\n        shutil.rmtree(temp_dir, ignore_errors=True)\n        print(f\"[완료][yt-dlp][{route_label}] {task['filename']}\", flush=True)\n        return {'status': 'complete'}\n"""
-    new_final = """        outputs = []\n        try:\n            for entry in os.scandir(home_dir):\n                if not entry.is_file():\n                    continue\n                name = entry.name\n                if name.endswith(('.part', '.ytdl', '.tmp')) or '.part-Frag' in name:\n                    continue\n                outputs.append(entry.path)\n        except OSError:\n            outputs = []\n        if final_path not in outputs:\n            outputs.append(final_path)\n\n        main_rel = teddy_storage.relative_work_path(core, final_path)\n        local_paths = []\n        for path in outputs:\n            try:\n                relative = teddy_storage.relative_work_path(core, path)\n            except teddy_storage.PublishError:\n                continue\n            if relative not in local_paths:\n                local_paths.append(relative)\n        local_paths = [path for path in local_paths if path != main_rel] + [main_rel]\n\n        final_size = os.path.getsize(final_path)\n        # 99% remains non-terminal until every completed output (including subtitle\n        # sidecars) is atomically published to final storage by the bootstrap.\n        task['status'] = '다운로드 중'\n        task['progress'] = '99%'\n        task['speed_bps'] = 0\n        task['filename'] = os.path.basename(final_path)\n        task['filesize'] = final_size\n        task['downloaded_bytes'] = final_size\n        task['total_bytes_estimate'] = final_size\n        task['engine'] = 'yt-dlp'\n        task['storage_folder'] = site_key\n        task['network_mode'] = network_mode\n        task['yt_dlp_options'] = ytdlp_options\n        task['local_result_path'] = main_rel\n        task['local_result_paths'] = local_paths\n        task.pop('last_error_detail', None)\n        _maybe_save(core, task_id, force=True)\n        shutil.rmtree(temp_dir, ignore_errors=True)\n        print(f\"[로컬 완료][yt-dlp][{route_label}] {main_rel} -> publish pending\", flush=True)\n        return {'status': 'local-complete'}\n"""
-    replace_once(GENERIC, old_final, new_final, 'generic defer completion until publish')
-
-    replace_once(
-        GENERIC,
-        """        if task and not active:\n            shutil.rmtree(_task_temp_dir(core, task_id), ignore_errors=True)\n        return original_delete(task_id)\n""",
-        """        if task and not active:\n            shutil.rmtree(_task_temp_dir(core, task_id), ignore_errors=True)\n            shutil.rmtree(_task_home_dir(core, task_id), ignore_errors=True)\n        return original_delete(task_id)\n""",
-        'generic delete local task directories',
-    )
 
 
 def patch_entrypoint():
@@ -127,7 +85,6 @@ def patch_bootstrap():
 
 
 def main():
-    patch_generic()
     patch_entrypoint()
     patch_bootstrap()
     print('split local-work / final-storage runtime patch: OK')
