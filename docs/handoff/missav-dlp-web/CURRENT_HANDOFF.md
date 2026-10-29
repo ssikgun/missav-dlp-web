@@ -15189,3 +15189,18 @@ The user then supplied additional read-only CT108 output: Docker context default
 
 
 Additional operator read-only output reports `NFT_CHECK_EXIT=0` for a simple, non-mutating nft table syntax check; bridge-nf-call-iptables=1, bridge-nf-call-ip6tables=1, IPv4 forwarding=1, IPv6 forwarding=0. This confirms the reported basic check-mode result only; it does not validate a proposed complete ruleset, a BuildKit worker packet path, or actual runtime isolation. Resource creation and testing remain NOT_RUN.
+
+
+## DLDWS-001 2026-10-29 DEPLOYMENT RESULT — USER-REPORTED
+
+USER_REPORTED_BUILD=PASS; DOCKERFILE_VALIDATION=PASS; USER_REPORTED_PRODUCTION_DEPLOYMENT=PASS; BROWSER_CONFIRMATION=USER_REPORTED; FEATURE_MATRIX=INCOMPLETE; OPERATIONAL_E2E=NOT_RUN; ROLLBACK_READY=PASS (prepared only); ROLLBACK_EXECUTED=NO; DLDWS-001=IN_PROGRESS.
+
+- The user reports this deployment used canonical source `d52ab3f9139dbd03c41e24739238713c0662d89e`, image `missav-dlp-web:dldws001-20261029-buildonly-v1` (`sha256:68767fbbf26ccf7b0a2a2ef540b1ee5f5c4ad4b16c8c0897afe03bd18a372fc3`), replacing the retained prior image `sha256:dd5d4e96f0292ff931edd8a239387d8de735243d13d942032ac8c8afacce2c77`. The deployed container ID begins `6dd9d58d4178`.
+- The user reports Dockerfile validation completed; mounts, principal environment configuration, group GID 988 and network settings were preserved; the authenticated protected endpoint returned HTTP 401; Gluetun and Selkies containers remained running. Immediately before deployment, saved tasks and media-processing processes were both 0.
+- The prior image and rollback information were retained at `/opt/missav-dlp-web/backups/dldws001-deploy-20261029-v1`. Temporary build-isolation network and firewall rules were reportedly removed before deployment. Rollback was prepared but not exercised.
+- The user confirmed the browser displayed the service. No per-feature browser test results were supplied, so this is not a full feature-matrix PASS. A real download through MP4 conversion and verified final storage remains NOT_RUN.
+- These are user-submitted operational results; Codex did not access CT108 or perform production operations for this documentation record. DLDWS-001 remains `IN_PROGRESS` in both required workstreams; no task closure is implied.
+
+### NEXT_DECISION
+
+Separately authorize a small operational check of one real download through MP4 conversion and final-storage verification. Keep the existing image and rollback path available until that check is complete; do not treat browser confirmation or HTTP 401 as end-to-end validation.
