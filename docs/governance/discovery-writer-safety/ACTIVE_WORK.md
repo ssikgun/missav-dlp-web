@@ -3258,3 +3258,17 @@ AUTHORIZATION=PASS; PRODUCT_PROMOTION=AUTHORIZED (exact four product paths); PYT
 ### NEXT_DECISION
 
 After product-source readback, separately decide whether to run a Python 3.10 isolated Docker build with real external dependencies and focused validation. Promotion alone is not an operational feature-pass or deployment.
+
+
+## DLDWS-001 GENERIC SINGLE-SOURCE PRODUCT PROMOTION — REMOTE READBACK PASS (2026-10-29 KST)
+
+GOVERNANCE=PASS; PRODUCT_PROMOTION=PASS; PRODUCT_DIFF_SCOPE=PASS (exactly four product paths); SINGLE_SOURCE=PASS; FINAL_GENERIC_SHA256=a5ea703022bcfaf50878e49e5eac47e75eb1dcaab979024e4b22119dfcac7c07; PATCH_CHAIN=PASS (recorded 33-step offline source-patch replay, not a full image build); FUNCTION_REGRESSION=PASS (recorded 14/14 synthetic groups on Python 3.13.5; evidence rechecked, not rerun); MANIFEST=PASS (candidate final layout 10/10; manifest unchanged); REMOTE_READBACK=PASS; PYTHON_310=INCOMPLETE; BUILD=NOT_RUN; DEPLOY=NOT_RUN; PRODUCTION_CHANGED=NO.
+
+- Authorization registration was committed/read back at `c8913731aa298d797f6ea7440f30d2802867d852`; product promotion commit `81b65bb59894749664663dbd63d318d8d56d90ac` is its direct child and contains only `Dockerfile`, `teddy_generic.py`, `teddy_patch_split_storage.py`, and deletion of `downloader_runtime_overlay/teddy_generic.py`. Ref update used `force=false` and expected the authorization HEAD.
+- Remote readback matched the approved candidate bytes: `teddy_generic.py` SHA-256 `a5ea703022bcfaf50878e49e5eac47e75eb1dcaab979024e4b22119dfcac7c07`; `teddy_patch_split_storage.py` `d4e48c68be92eb34639518eff0c71fa788bc436e9cff65e8ae01f29668e6d8b7`; `Dockerfile` `46111fbe2b3c2579eaefe445a543629d735a732fa221bf26a66399ba046460f5`. The duplicate overlay generic path is absent. The manifest remains byte-identical at SHA-256 `0a657355d7f02d5552bea339d09c60b6b09d3e67486c4c436493f5f57392185c`.
+- Existing evidence at `/tmp/dldws001-generic-resume-evidence-20261029-_5t5z3u2` was rechecked: all 16 entries match its manifest (SHA-256 `e5357c89fdf67c0d03292108af2a69aac6ca13185e5ab70d6e1a409af3e625a3`). Its recorded verification includes the 33-step patch replay, candidate final manifest 10/10, and 14/14 synthetic regression groups. Tests were not rerun for this promotion. The synthetic runner used dependency doubles; actual external dependency compatibility is unverified. Python 3.10 remains incomplete (`hashlib` import unavailable in the prior environment); it was not repaired.
+- Selected-workstream governance check passed for `downloader,discovery-writer-safety / DLDWS-001`; all-workstreams structural validation and governance smoke passed (21/21). No Stage9/11/12 or Writer source, operational service, Docker image, database, queue, NAS, Jellyfin, or media data was changed.
+
+### NEXT_DECISION
+
+Separately authorize a Python 3.10 isolated Docker build and real-dependency/core validation if desired. This source promotion does not establish a fresh full build or operational feature pass. `BUILD=NOT_RUN`; `DEPLOY=NOT_RUN`.
