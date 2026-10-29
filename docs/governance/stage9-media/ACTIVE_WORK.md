@@ -6,6 +6,39 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03 USER-APPROVED NFO TITLE OFFLINE IMPLEMENTATION — 2026-10-30 KST
+
+APPROVAL: User explicitly approved the P03 first implementation checkpoint in the current ChatGPT conversation. This is a narrow new Stage9 Media feature authorization under existing task `STG9MEDIA-001 / IN_PROGRESS`, not an authorization to deploy or rewrite existing NAS metadata.
+
+### CURRENT_OBJECTIVE
+
+For newly generated NFO files only, represent the verified DVD-ID in the displayed XML `<title>` once as `[DVD-ID] work title`, so Jellyfin may display the number and the user may search for it. Actual Jellyfin display/search success is UNVERIFIED until a separately approved operational check.
+
+### APPROVED_SCOPE
+
+- Inspect current canonical source and verify exact repository/branch/head, worktree cleanliness and safe isolation before implementing.
+- Change only `teddy_discovery_media_metadata.py` and the existing small offline test `teddy_discovery_media_metadata_smoke.py`, unless the user separately approves any expansion.
+- Generate a single canonical `[DVD-ID]` prefix in the NFO `<title>` using the already validated metadata DVD-ID; avoid duplicate prefixes when the input title already contains the matching work number. Preserve the actual work title, `<originaltitle>`, `<id>`, `<uniqueid>` and other metadata, with no invented values or title-specific hardcoding. Never change the Discovery catalog title stored in the database.
+- Use isolated synthetic metadata/XML tests including normal title, already-numbered title, and existing no-poster behavior; run the already available focused smoke and minimal relevant regression. No additional test framework/laboratory.
+- Report exact changed files, source/test result, and any remaining Jellyfin uncertainty. Maintain existing NO-OVERWRITE and create-only publication behavior.
+
+### PROHIBITED_SCOPE
+
+- No old NFO rewrite or backfill, existing MP4/poster/NFO replacement/deletion, NAS File Station publication, production DB or Jellyfin write/refresh, systemd timer/service/Compose/Docker image change, operational deployment or real downloads.
+- Do not alter File Station adapter, Stage9 dedicated runner/pipeline, retry/backoff/locks, Jellyfin visibility code, general Downloader, Discovery Writer Safety or Stage11 source or approval state.
+- No change to common governance contracts/router, no force push, no protected dirty worktree mutation.
+
+### OFFLINE_ACCEPTANCE_CRITERIA
+
+- For representative synthesized DVD IDs, newly generated XML `<title>` has exactly one correctly formatted DVD-ID prefix and preserves meaningful actual title content.
+- XML `<originaltitle>`, `<id>`, `<uniqueid>`, dates and other tags retain previous semantics; no-poster NFO creation still works.
+- Focused offline smoke and minimal applicable regression PASS; no operational resources read/written by tests; `git diff --check` PASS.
+- Implementation/test PASS does not imply Jellyfin UI/search PASS.
+
+### NEXT_DECISION
+
+After approved source+offline checks, review an explicit separate Docker/runtime deployment proposal and a single new-media Jellyfin display/search test. Existing NFO migration (`P03-H`) remains ON HOLD. Update the informational work roadmap and canonical handoff with actual execution evidence; do not mark product or operations complete without it.
+
 ## JOINT DEPLOYMENT CLOSED — STG9MEDIA-001 (2026-10-28)
 
 The user explicitly approved this closeout after submitting the missing representative operational evidence. The temporary four-workstream deployment overlay is CLOSED. The original independent routes are restored: Governance INACTIVE / NONE; Downloader and Discovery Writer Safety IN_PROGRESS / DLDWS-001 with their paired requirement; Stage9 IN_PROGRESS / STG9MEDIA-001 with stage9-media only. Stage11 is unchanged.
