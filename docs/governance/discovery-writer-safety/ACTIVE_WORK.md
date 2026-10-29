@@ -3189,3 +3189,17 @@ ROOT_CAUSE=CONFIRMED; FIX_SCOPE=PASS (candidate only); BASELINE_FAIL_REPRODUCED=
 ### NEXT_DECISION
 
 Review whether to promote the two-path lock-exclusion candidate. Generic single-source consolidation remains a separate stage; this result does not approve it. No image build or production deployment was performed.
+
+## CURRENT USER APPROVAL — DLDWS-001 PROMOTE VERIFIED STORAGE LOCK EXCLUSION CANDIDATE (2026-10-29 KST)
+
+### OBJECTIVE AND APPROVED_SCOPE
+
+The user explicitly authorizes promotion to the canonical branch of the previously verified two-path internal storage lock exclusion candidate. Product changes are limited to downloader_runtime_overlay/teddy_generic.py and downloader_runtime_overlay/dldws001-source-sha256.txt, with exact candidate SHA-256 values respectively a5ea703022bcfaf50878e49e5eac47e75eb1dcaab979024e4b22119dfcac7c07 and 0a657355d7f02d5552bea339d09c60b6b09d3e67486c4c436493f5f57392185c. Reconfirm candidate identity and the preserved 8/8 evidence; rerun only a minimal synthetic check if the evidence is uncertain. Register this approval in both paired ACTIVE_WORK files and canonical handoff, pass governance and diff checks, then perform normal fast-forward/readback before product promotion.
+
+### PROHIBITED_SCOPE
+
+No new behavior, generic single-source consolidation, root teddy_generic.py change, Dockerfile/patch change, image build, operational deployment, real download, NAS/DB/Jellyfin/queue/media write, Stage9/11/12 or Writer change, contract/router/task-ID change, protected dirty-worktree change, or deletion of candidate/evidence/backup. Only the two approved product paths and the paired Downloader/Discovery Writer Safety ACTIVE_WORK files plus canonical CURRENT_HANDOFF may change. DLDWS-001 remains IN_PROGRESS in both required workstreams (domain contracts 1.0.0; common contract 1.0.1). BUILD=NOT_RUN; DEPLOY=NOT_RUN; PRODUCTION_CHANGED=NO.
+
+### ACCEPTANCE_CRITERIA AND NEXT_DECISION
+
+Before promotion, confirm current remote HEAD, registered task/contract scope, exact candidate hashes, exact two-path product diff, unchanged root generic and protected stage boundaries, preserved 8/8 synthetic regression evidence, final manifest 10/10, Python 3.10 status, governance, and git diff --check. Push only by normal fast-forward from the latest canonical HEAD and read back the commit, changed paths, and both product SHA-256 values. If any hash, scope, or remote state differs, stop without substituting or rewriting a candidate. Product promotion does not mean image build or operational deployment. After promotion, separately decide whether to resume generic single-source consolidation.
