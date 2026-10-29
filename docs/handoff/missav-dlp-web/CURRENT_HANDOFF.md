@@ -15344,3 +15344,17 @@ GOVERNANCE=PASS; CANDIDATE_SCOPE=PASS (four approved product paths in isolated c
 ### NEXT_DECISION
 
 Review this preserved candidate and the Python 3.10/real-dependency/full-build gaps before separately authorizing product promotion. No candidate product source is promoted by this documentation result. DLDWS-001 remains IN_PROGRESS in the required pair; all contracts, router and independent tasks are unchanged.
+
+
+## DLDWS-001 TEDDY_GENERIC SINGLE-SOURCE PROMOTION AUTHORIZATION (2026-10-29 KST)
+
+AUTHORIZATION=PASS; PRODUCT_PROMOTION=AUTHORIZED (exact four product paths); PYTHON_310=INCOMPLETE; NEW_IMAGE_BUILD=NOT_AUTHORIZED; DEPLOY=NOT_AUTHORIZED; PRODUCTION_CHANGED=NO.
+
+- The user explicitly authorized promoting the preserved isolated candidate `/tmp/dldws001-generic-resume-20261029-acl_wc9x` after recording this scope and confirming the normal fast-forward/readback. Evidence is preserved at `/tmp/dldws001-generic-resume-evidence-20261029-_5t5z3u2`; its 16-entry SHA-256 manifest rechecked 16/16 (manifest SHA-256 `e5357c89fdf67c0d03292108af2a69aac6ca13185e5ab70d6e1a409af3e625a3`).
+- The only authorized product paths are `teddy_generic.py` (SHA-256 `a5ea703022bcfaf50878e49e5eac47e75eb1dcaab979024e4b22119dfcac7c07`), deletion of `downloader_runtime_overlay/teddy_generic.py`, `teddy_patch_split_storage.py` (SHA-256 `d4e48c68be92eb34639518eff0c71fa788bc436e9cff65e8ae01f29668e6d8b7`), and `Dockerfile` (SHA-256 `46111fbe2b3c2579eaefe445a543629d735a732fa221bf26a66399ba046460f5`). The existing overlay manifest is not to change (SHA-256 `0a657355d7f02d5552bea339d09c60b6b09d3e67486c4c436493f5f57392185c`).
+- Promotion relies on the already-recorded candidate verification: 14/14 synthetic regression groups on Python 3.13.5, 33-step offline source-patch replay, final overlay manifest 10/10, and exact generic source identity. This is existing candidate evidence, not a new test run. The runner used third-party import doubles; actual dependency compatibility and Python 3.10 remain unverified. Full Docker image build is not part of this authorization.
+- Preserve Downloader and Discovery Writer Safety as `DLDWS-001 / IN_PROGRESS`, contract versions 1.0.0, and `REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety`. Stage9/Stage11/Stage12, Writer implementation, runtime services, existing worktrees and evidence remain out of scope. No production data or service may be changed. After approval readback, promote only the exact four candidate product paths by normal fast-forward, then record actual hashes/results in these paired ACTIVE_WORK files and CURRENT_HANDOFF. `BUILD=NOT_RUN`; `DEPLOY=NOT_RUN`.
+
+### NEXT_DECISION
+
+After product-source readback, separately decide whether to run a Python 3.10 isolated Docker build with real external dependencies and focused validation. Promotion alone is not an operational feature-pass or deployment.
