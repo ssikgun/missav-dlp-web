@@ -1,5 +1,17 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## P02 FIVE-PAIR STATIC AUDIT COMPLETE — NO IMPLEMENTATION (2026-10-29 KST)
+
+P02_STATIC_SOURCE_AND_PATCH_REVIEW=PASS; P02_DYNAMIC_BUILD_PARITY=NOT_RUN; SOURCE_CHANGE=NO; PRODUCTION_CHANGE=NO; P04_REFACTOR_IMPLEMENTATION=NOT_AUTHORIZED.
+
+- Compared all five root/Overlay duplicate pairs on the canonical branch. HTML Overlay contains browser/log pages and more UI assets; root HTML patches run before the final Overlay COPY. `teddy_patch_mobile.py` is not directly RUN by the Dockerfile; inline sed arranges mobile CSS.
+- `teddy_storage.py`: Overlay adds crucial no-overwrite finalization, SHA-256 checks and stored ownership/provenance before NAS publication. Root's existing replace operations must not be used as the unified production logic.
+- `teddy_entrypoint.py`: Overlay owns HLS identity/resume protection, segmented write safety, transport/worker handling, MP4 queue and pause/retry semantics.
+- `teddy_bootstrap.py`: Overlay owns pending-publication recovery, task claim and storage safety checks, route failure isolation, MP4 guard and lifecycle behavior.
+- `app.py`: Overlay owns durable task-state/retry persistence, readback and rollback, queue admission, health-only startup and MP4-safe retry/recovery. Removing it would change operations and risk state.
+- This completes the user-requested **read-only static difference review**, not implementation. No intermediate patched-root byte-for-byte artifact was created, no unified build or runtime parity test ran. P04 must specify affected workstreams and secure explicit product/deployment authorization before changing files. P03 Jellyfin `[DVD-ID] title` is the next priority but its Stage9 feature implementation and any NFO/NAS/Jellyfin change remain unapproved.
+- Persistent roadmap: [WORK_ROADMAP.md](WORK_ROADMAP.md). Treat each item's scope-specific status as separate from workstream ACTIVE_WORK status.
+
 ## CURRENT WORK ROADMAP / STATUS INDEX (2026-10-29 KST)
 
 - **작업 우선순위·완료/진행 중/미착수/보류의 단일 목차:** [WORK_ROADMAP.md](WORK_ROADMAP.md). 새 대화에서 계약/라우팅을 확인한 뒤 이 파일을 읽고, 이후 완료할 때마다 같은 로드맵 상태와 주요 `CURRENT_HANDOFF.md` 이력을 갱신한다.
