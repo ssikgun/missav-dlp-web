@@ -6,6 +6,30 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03 CANONICAL PROMOTION APPROVED — 2026-10-30 KST
+
+USER_APPROVAL: After reviewing the final P03 candidate diff and offline test report, the user explicitly approved promoting the two existing candidate files to the canonical GitHub `teddy-subtitle-stage11` branch by commit/push. This approval extends the P03 scope **only for Git source promotion**; it is not operational deployment or user-data publication authorization.
+
+APPROVED_CANDIDATE: `/tmp/dldws001-p03-nfo-title-20261030-77103dyk` (candidate directory, not a Git worktree). Verify its existence and SHA-256 before promotion:
+- `teddy_discovery_media_metadata.py`: `a4e17a18bfbd25cfb4358d89c5478c7df9c0c8a4d2ed004a80de1209b4173089`
+- `teddy_discovery_media_metadata_smoke.py`: `c217ef6db1b73bf8e0934395f4d81f9ff0f85a42a9de31df21238d51693873c5`
+
+APPROVED_SCOPE:
+- Check actual Git root, remote, branch, current HEAD, source blob baseline and governance preflight. Start from latest verified `teddy-subtitle-stage11` HEAD, not `main`.
+- Preserve existing protected dirty worktree unchanged; use a separate clean isolated Git worktree or equivalent. Copy the exact two SHA-verified candidate files, compare full diff against canonical baseline and inspect for any extraneous changes.
+- Re-run existing focused offline tests and `git diff --check`; commit **only those two product source/test files** on the canonical branch; normal non-force push with race detection, followed by readback and SHA-256 verification at the pushed commit. If remote changes or candidate bytes mismatch, stop and report; do not force push/rebase over uncertain state.
+- Record actual commit SHA and result in canonical handoff/roadmap in a **separate documentation-only follow-up** if needed; do not silently add other files to the two-file source-promotion commit.
+
+PROHIBITED_SCOPE:
+- No Docker image build, production deployment/service restart, CT108/CT112 changes, real downloads or external writes to NAS, Jellyfin or production DB. No NFO backfill, rewrite, deletion, poster or MP4 change, Jellyfin scan/refresh.
+- No changes to other workstreams, contracts, common routing, File Station or source outside the two approved files.
+- No protected dirty worktree modifications, force push or destructive cleanup.
+
+ACCEPTANCE:
+- Exactly two approved product files in the source commit; verified candidate and remote readback hashes match; offline checks PASS; canonical branch advanced as an ordinary fast-forward. Deployment and Jellyfin display/search remain NOT_RUN/NOT_VERIFIED.
+
+NEXT_DECISION: Review successful Git source promotion before separately proposing actual Docker/runtime deployment and one-item Jellyfin title/search observation.
+
 ## P03 USER-APPROVED NFO TITLE OFFLINE IMPLEMENTATION — 2026-10-30 KST
 
 APPROVAL: User explicitly approved the P03 first implementation checkpoint in the current ChatGPT conversation. This is a narrow new Stage9 Media feature authorization under existing task `STG9MEDIA-001 / IN_PROGRESS`, not an authorization to deploy or rewrite existing NAS metadata.
