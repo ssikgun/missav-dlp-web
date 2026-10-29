@@ -6,6 +6,23 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
+## DLDWS-001 GENERIC IMAGE OPERATIONAL DEPLOYMENT AND FNS-267 VERIFICATION (2026-10-29 KST)
+
+DEPLOY_AUTHORIZATION=USER_APPROVED (2026-10-29 KST); DOCKER_BUILD=PASS (prior CT108 Python 3.10 build); CONFIG_PREFLIGHT=PASS; DEPLOY=PASS; HTTP=PASS; IMAGE_MANIFEST=PASS; SIDECARS_UNCHANGED=PASS; REAL_DOWNLOAD_TO_MP4_TO_NAS=PASS (user-observed FNS-267); JELLYFIN_LIBRARY_AND_PLAYBACK=NOT_VERIFIED; ROLLBACK_EXECUTION=NOT_TESTED; PRODUCTION_CHANGED=YES (approved Downloader image replacement only).
+
+### Confirmed operational evidence
+
+- Canonical source branch: `teddy-subtitle-stage11`. Product source/evidence commit used for build: `af7974b3db43be08b91c8c80b443458a936bfb65`. Generic single-source SHA-256: `a5ea703022bcfaf50878e49e5eac47e75eb1dcaab979024e4b22119dfcac7c07`. Previous isolated Docker build on actual CT108 completed, including Python 3.10 real dependencies/import checks and manifest verification; the earlier isolated Codex runner's Docker-socket failure remains a separate historical result.
+- Authorized production deployment executed from `root@pve` via Proxmox CT108. Before image replacement: no queued tasks, no MP4 queue JSON entries, no active media processes; 10 existing Compose inputs resolved successfully after using the live `TEDDY_PUBLIC_ORIGIN` and verified Writer socket/directory GID 988 for Compose interpolation. Existing mount layout, group_add, restart policy and declared environment matched the running container. The additional Compose override changed only `services.missav-dlp-web.image` in the rendered configuration.
+- Previous operating image: `sha256:68767fbbf26ccf7b0a2a2ef540b1ee5f5c4ad4b16c8c0897afe03bd18a372fc3` (`missav-dlp-web:dldws001-20261029-buildonly-v1`). Newly deployed operating image: `sha256:ba31ba9cfcc481dc1f658312a3155a3496856008ff4d52f5a652de0766fd0dbe` (`missav-dlp-web:dldws001-20261029-generic-buildonly-v1`). The command returned `DEPLOY=PASS`, `HTTP=PASS`, `MANIFEST=PASS`, `SIDECARS_UNCHANGED=PASS`, and `ROLLBACK_IMAGE=PRESERVED`. Gluetun and both Selkies containers were not recreated by this deployment.
+- Deployment recovery metadata and image-only override retained under `/opt/missav-dlp-web/backups/dldws001-generic-deploy-20261029-v1/`. The old image was preserved, but rollback was not invoked, so rollback success is not claimed.
+- Post-deployment real-use observation reported directly by the user: `FNS-267` downloaded successfully, MP4 conversion completed, and the final MP4 was stored on NAS. This is one observed representative end-to-end download/storage check; no independent NAS checksum, Jellyfin library discovery, or Jellyfin playback check was supplied.
+
+### Boundaries and next decision
+
+- `DLDWS-001` remains `IN_PROGRESS` jointly under `downloader,discovery-writer-safety`, with both contracts at v1.0.0. This is a record of the separately user-authorized operational deployment and result, not a new product-code/design approval. Historical entries saying `DEPLOY=NOT_RUN` remain valid for their earlier checkpoints only.
+- No further image rebuild, redeploy, source change, cleanup, NAS mutation or Stage9/11/12 work is authorized by this record. Optional next check: confirm Jellyfin discovers and plays FNS-267 without changing media; if not performed, retain `JELLYFIN=NOT_VERIFIED`.
+
 ## DLDWS-001 CANONICAL PRODUCT PROMOTION — REMOTE READBACK PASS (2026-10-28 KST)
 
 CANONICAL_PRODUCT_PROMOTION=PASS; NORMAL_FAST_FORWARD=PASS; REMOTE_READBACK=PASS; PRODUCT_FILE_HASHES=15/15 PASS; PRODUCTION_CHANGED=NO; BUILD=NOT_RUN; DEPLOY=NOT_RUN.
