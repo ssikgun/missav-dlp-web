@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## CURRENT WORK ROADMAP / STATUS INDEX (2026-10-29 KST)
+
+- **작업 우선순위·완료/진행 중/미착수/보류의 단일 목차:** [WORK_ROADMAP.md](WORK_ROADMAP.md). 새 대화에서 계약/라우팅을 확인한 뒤 이 파일을 읽고, 이후 완료할 때마다 같은 로드맵 상태와 주요 `CURRENT_HANDOFF.md` 이력을 갱신한다.
+- 해당 로드맵은 사용자에게 확인한 진행 계획의 **현황 인덱스**이며, 계약·ACTIVE_WORK의 승인·TASK_ID·상태를 변경하지 않는다. 별도 Stage9 NFO `[DVD-ID] title` 기능 요구는 기록됐지만 구현/운영 쓰기는 승인되지 않았다.
+- 현 시점 최우선: 일반 Downloader root/Overlay 중복 5쌍의 **읽기 전용** 정밀 검수. `templates/index.html`부터 시작. Stage11은 독립 `S11-WX011` 승인 범위만.
+
 ## FOLLOW-UP BACKLOG — JELLYFIN TITLE PREFIX / NFO SEARCHABILITY (2026-10-29 KST)
 
 REQUEST_RECORDED=YES; PRODUCT_IMPLEMENTATION=NOT_AUTHORIZED; NAS_NFO_MUTATION=NOT_AUTHORIZED; JELLYFIN_REFRESH=NOT_AUTHORIZED; WORKSTREAM=stage9-media (STG9MEDIA-001, current scope needs separate explicit feature approval).
