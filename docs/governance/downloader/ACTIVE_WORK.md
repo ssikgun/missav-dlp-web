@@ -3278,3 +3278,16 @@ No new behavior, generic single-source consolidation, root teddy_generic.py chan
 ### ACCEPTANCE_CRITERIA AND NEXT_DECISION
 
 Before promotion, confirm current remote HEAD, registered task/contract scope, exact candidate hashes, exact two-path product diff, unchanged root generic and protected stage boundaries, preserved 8/8 synthetic regression evidence, final manifest 10/10, Python 3.10 status, governance, and git diff --check. Push only by normal fast-forward from the latest canonical HEAD and read back the commit, changed paths, and both product SHA-256 values. If any hash, scope, or remote state differs, stop without substituting or rewriting a candidate. Product promotion does not mean image build or operational deployment. After promotion, separately decide whether to resume generic single-source consolidation.
+
+## DLDWS-001 VERIFIED INTERNAL STORAGE LOCK EXCLUSION — CANONICAL PROMOTION RESULT (2026-10-29 KST)
+
+GOVERNANCE=PASS; PROMOTION=PASS; PRODUCT_DIFF=PASS (2 approved paths); GENERIC_SHA256=a5ea703022bcfaf50878e49e5eac47e75eb1dcaab979024e4b22119dfcac7c07; MANIFEST_SHA256=0a657355d7f02d5552bea339d09c60b6b09d3e67486c4c436493f5f57392185c; REGRESSION=PASS (preserved 8/8 synthetic evidence revalidated by hashes, not rerun); REMOTE_PUSH=PASS; REMOTE_READBACK=PASS; PYTHON_310=INCOMPLETE; BUILD=NOT_RUN; DEPLOY=NOT_RUN; PRODUCTION_CHANGED=NO.
+
+- Product commit: `d18d2b65d1cc2e8910839b8dc94ff0eb78a8c2bb`, a normal fast-forward from approval registration `4cd873af8c09a96ca8d31af7e1b87a5a4637ea45`. Remote readback confirmed exactly the two approved product paths and candidate file contents. Root `teddy_generic.py` remains unchanged.
+- The overlay generic excludes only the canonical regular storage guard file identified by `teddy_download_safety.storage_lock_path(home_dir)`; it leaves the lock in place. The candidate diff has no other behavior change. The updated 10-entry final-layout manifest passes 10/10.
+- The preserved Python 3.13.5 synthetic runner and result JSON hashes were rechecked; the recorded 8 groups remain historical execution evidence and were not repeated. Preserved baseline failure log SHA-256 remains `38a192fed42313c9f8542f863f64895f9523ba8403f4c295232a6c4c98850a20`. Python 3.10 remains incomplete because the prior environment could not import standard-library `hashlib`; no repair was attempted.
+- No Docker image build, operating deployment, real download, NAS/DB/Jellyfin write, or operational service change occurred. DLDWS-001 remains `IN_PROGRESS` in both selected workstreams; contracts, router and other workstream states are unchanged.
+
+### NEXT_DECISION
+
+Consider resuming the separate `teddy_generic.py` single-source consolidation candidate. This promotion does not approve that work or an operating deployment.
