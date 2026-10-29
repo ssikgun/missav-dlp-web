@@ -3132,3 +3132,17 @@ Moving the navigation smoke means it no longer checks the post-patch, pre-overla
 ### NEXT_DECISION
 
 Before any `teddy_generic.py` duplicate removal, authorize a separate minimal integration scope. The current root and overlay files differ materially (root SHA-256 `b8dc7049787d68bee278ff35e691457ea5ad4219b849e3bd2020d2989766f3b7`; overlay SHA-256 `f19362ebeecf6d517c7acbe97629c2c34f97017957c0a324d090fc45b6abf339`). The overlay imports `teddy_download_safety.py` and adds storage reservation, local yt-dlp artifact paths, source retention and MP4-queue handoff. Docker build stages and `teddy_verify_build.py runtime` import the root module before overlay copy; `teddy_patch_split_storage.py` and `teddy_patch_proxy_pool.py` mutate the root file. A safe proposal must preserve those build-time consumers and the safety dependency, then verify mocked yt-dlp success/failure, storage/publication boundaries, MP4 handoff and the final overlay manifest. A one-file copy/delete is not safe.
+
+## CURRENT USER APPROVAL — DLDWS-001 GENERIC SINGLE-SOURCE ISOLATED CANDIDATE (2026-10-29 KST)
+
+### OBJECTIVE AND APPROVED_SCOPE
+
+The user approves an isolated implementation and regression-verified candidate consolidating `teddy_generic.py` around the exact existing final runtime-overlay bytes. Allowed product candidate paths are root `teddy_generic.py`, deletion of `downloader_runtime_overlay/teddy_generic.py`, `teddy_patch_split_storage.py`, and `Dockerfile`. Copy the unchanged safety module earlier in Dockerfile if required; reuse the existing proxy patch already-applied recognition. Adjust only the generic part of the split-storage patch, preserving its entrypoint/bootstrap effects. Record the final-runtime baseline before implementation and preserve download/options/routing/local paths/reservations/pause/cancel/error/MP4/source-retention/local-complete/NAS publication boundaries.
+
+### PROHIBITED_SCOPE
+
+Do not change `teddy_patch_proxy_pool.py`, `teddy_verify_build.py`, the ten-entry overlay manifest, other product/UI/Writer/Stage9/11/12 sources, policies, contracts, routing, or task ID. An additional required product change is DESIGN_BLOCKED. No product GitHub promotion, full image build, production Docker/network/service/data access or mutation, real downloads/remux/NAS/Jellyfin/model operations, or changes to protected worktrees/candidates/images/evidence/backups. DLDWS-001 remains IN_PROGRESS in downloader,discovery-writer-safety (contracts 1.0.0; common 1.0.1).
+
+### ACCEPTANCE_CRITERIA AND NEXT_DECISION
+
+Register this same approval in both paired ACTIVE_WORK files and canonical handoff, validate governance/diff and normal fast-forward/readback before implementation. Use a new isolated workspace. Preserve exact final generic bytes and manifest hashes; check pre-overlay/final syntax/imports, unchanged proxy patch and adjusted split-storage behavior, representative synthetic mocked-yt-dlp success/failure/storage/pause/cancel/MP4/local-publication/source-preservation cases, and protected Stage/Writer boundaries. Prefer existing checks; distinguish Python 3.10 execution from Python 3.13-only results and static checks from full builds. Preserve the candidate, diff, hashes, baseline and actual results; document only actual outcomes. PRODUCT_PROMOTION=NOT_RUN; BUILD=NOT_RUN; DEPLOY=NOT_RUN; PRODUCTION_CHANGED=NO. A later product promotion requires a separate user decision based on the verified candidate and any remaining gaps.
