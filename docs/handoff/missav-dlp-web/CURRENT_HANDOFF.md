@@ -15372,3 +15372,14 @@ GOVERNANCE=PASS; PRODUCT_PROMOTION=PASS; PRODUCT_DIFF_SCOPE=PASS (exactly four p
 ### NEXT_DECISION
 
 Separately authorize a Python 3.10 isolated Docker build and real-dependency/core validation if desired. This source promotion does not establish a fresh full build or operational feature pass. `BUILD=NOT_RUN`; `DEPLOY=NOT_RUN`.
+
+
+## DLDWS-001 PYTHON 3.10 ISOLATED DOCKER BUILD — AUTHORIZED SCOPE (2026-10-29 KST)
+
+AUTHORIZATION=PASS; SOURCE_SHA=af7974b3db43be08b91c8c80b443458a936bfb65; BUILD=AUTHORIZED_ONLY_AFTER_SAFETY_PREFLIGHT; PRODUCTION_DEPLOY=NOT_AUTHORIZED.
+
+- The user authorizes one isolated Docker build from a clean source snapshot of exactly `teddy-subtitle-stage11` commit `af7974b3db43be08b91c8c80b443458a936bfb65`, using the existing Dockerfile and requirements, Python 3.10 dependencies, existing build patches/smokes, and the existing overlay manifest. Use a unique `buildonly` image tag; preserve every operating image/container, tag, volume, network and builder configuration.
+- Before building, verify the execution host, Docker daemon/context and builder; operating container/image identity; available memory/storage; and a previously validated isolated build route. The source context must be an independently constructed clean snapshot of this exact commit and checked for excluded `.git`, environment secrets, tokens, logs, personal data, backups and media. Do not use a dirty worktree or operating directory as context.
+- The build is permitted only if builder/RUN network isolation from operating networks and host resources, bounded resource capacity, public dependency access, and exact cleanup targets are evidenced. Any uncertainty blocks the build. No Docker permission bypass, daemon restart, builder/network/firewall reconfiguration, proxy/VPN changes, or unapproved source change is authorized by this record.
+- If these gates pass, verify in the image real Python 3.10, `hashlib`, `yt_dlp`, `curl_cffi`, Flask, and the actual generic/safety/MP4 modules; all existing Dockerfile build smokes; root generic SHA-256 `a5ea703022bcfaf50878e49e5eac47e75eb1dcaab979024e4b22119dfcac7c07`; final overlay manifest 10/10; and bounded synthetic core regression without external downloads, operating mounts, secrets, NAS, Jellyfin, or real media operations. Preserve the new image and logs. A successful build is not production deployment or full operational E2E.
+- Keep DLDWS-001 `IN_PROGRESS` jointly routed through `downloader,discovery-writer-safety`, each contract v1.0.0; do not change contracts, router, task ID, other workstreams, Stage9/11/12, Writer, production code/data/services. `DEPLOY=NOT_RUN` is mandatory. This authorization only covers isolated build and image validation after safety checks.
