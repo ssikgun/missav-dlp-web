@@ -3291,3 +3291,17 @@ GOVERNANCE=PASS; PROMOTION=PASS; PRODUCT_DIFF=PASS (2 approved paths); GENERIC_S
 ### NEXT_DECISION
 
 Consider resuming the separate `teddy_generic.py` single-source consolidation candidate. This promotion does not approve that work or an operating deployment.
+
+## CURRENT USER APPROVAL — DLDWS-001 GENERIC SINGLE-SOURCE RESUMPTION (2026-10-29 KST)
+
+### OBJECTIVE AND APPROVED_SCOPE
+
+Implement and validate an isolated generic single-source candidate based on canonical 81f5072d1951404633e33af6e0ce2978b686083d. Preserve the exact latest final generic SHA-256 a5ea703022bcfaf50878e49e5eac47e75eb1dcaab979024e4b22119dfcac7c07, including storage-guard exclusion. Candidate product changes are limited to root teddy_generic.py, removal of downloader_runtime_overlay/teddy_generic.py, teddy_patch_split_storage.py and Dockerfile. Supply the unchanged overlay safety module before initial generic imports; retire only generic mutation in the split-storage patch while preserving entrypoint/bootstrap patch behavior. Reuse the unchanged proxy-pool patch's already-applied route-label handling. Keep the ten-entry manifest, other patch order and final UI checks unchanged.
+
+### PROHIBITED_SCOPE
+
+No product canonical promotion, full image build, deployment, production Docker/service/data access or mutation, real download/remux/NAS/DB/Jellyfin operation, generic behavior/policy change, other product/patch/UI change, Writer or Stage9/11/12 change, protected tree/evidence/backup alteration, Python repair/install, contract/router/task-ID change. Additional required product paths or unproved functional equivalence stop the candidate. DLDWS-001 remains IN_PROGRESS in downloader,discovery-writer-safety; domain contracts 1.0.0 and common contract 1.0.1 remain unchanged.
+
+### ACCEPTANCE_CRITERIA AND NEXT_DECISION
+
+Register this identical scope in both paired ACTIVE_WORK files and canonical handoff; pass governance/diff and normal fast-forward/readback before implementation. In a fresh clean canonical source snapshot, verify initial imports, existing proxy patch, adjusted split-storage and unchanged entrypoint/bootstrap effects, runtime/final verifier conditions, final generic identity and manifest 10/10. Reuse bounded synthetic regression for options, routing, download4, storage failures, pause/cancel/errors, MP4 handoff/global1 boundary, source/sidecar/lock preservation and no-clobber/publication retry. Mark only newly executed cases as current PASS; distinguish Python3.13 from working Python3.10 and static/patch checks from a full build. Preserve exact diff, hashes and evidence. PRODUCT_PROMOTION=NOT_RUN; BUILD=NOT_RUN; DEPLOY=NOT_RUN; PRODUCTION_CHANGED=NO. Separately review the validated candidate and remaining verification gaps before product promotion.
