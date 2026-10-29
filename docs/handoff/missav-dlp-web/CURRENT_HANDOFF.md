@@ -1,5 +1,23 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## FOLLOW-UP BACKLOG — JELLYFIN TITLE PREFIX / NFO SEARCHABILITY (2026-10-29 KST)
+
+REQUEST_RECORDED=YES; PRODUCT_IMPLEMENTATION=NOT_AUTHORIZED; NAS_NFO_MUTATION=NOT_AUTHORIZED; JELLYFIN_REFRESH=NOT_AUTHORIZED; WORKSTREAM=stage9-media (STG9MEDIA-001, current scope needs separate explicit feature approval).
+
+- User-reported problem: Jellyfin currently finds works by title but not reliably by DVD ID. Requested visible display/search title form: `[DVD-ID] existing work title`, e.g. `[FNS-267] existing title`. This is a newly requested media metadata/NFO feature, not an approval to rewrite previously published NFOs.
+- Read-only canonical code check: `teddy_discovery_media_metadata.py:build_nfo_bytes` currently writes `<title>` from `metadata.title`, optional `<originaltitle>` from `metadata.original_title`, and DVD ID in `<id>` and `<uniqueid type="dvd_id">`. Thus DVD ID is stored but not presently included in the display title. Jellyfin documents `<title>` as its NFO display-name field and reads NFO metadata ahead of remote metadata; whether a particular client/search index responds as desired must be verified by an actual canary.
+- Candidate future implementation: add a normalized, non-duplicated `[DVD-ID] ` prefix only to the new NFO display `<title>`, retain actual `<originaltitle>` and stable ID fields/real metadata, and validate with a tiny isolated NFO test and one explicitly approved new-title Jellyfin canary. An earlier proposal to change `<originaltitle>` is not treated as an approved implementation decision. No title-specific hardcoding.
+- Existing NAS `.nfo` files remain strictly no-overwrite. The File Station publisher accepts identical content and rejects conflicting existing artifacts. Any retrospective NFO update/metadata refresh must be separately scoped and approved; no bulk overwrite, rename, direct Jellyfin DB update, refresh, or automatic migration is implied.
+- Priority: retain the existing roadmap and continue the read-only inspection of five root/overlay duplicates before any unapproved refactor. Schedule this Stage9 NFO feature separately, preserving independent workstream routing and the user-approved general Downloader scope. Stage9's earlier automatic-processing residuals (3 historical failed records, 8 cover-URL-missing poster waits, FNS-267 internal visibility PENDING though user playback verified) remain observations, not authorization for forced replay or DB changes.
+
+### NEXT READ-ONLY REFACTOR AUDIT — `templates/index.html` (2026-10-29 KST)
+
+READ_ONLY_AUDIT=IN_PROGRESS; SOURCE_CHANGE=NO; DOCKER_BUILD=NOT_RUN; PRODUCTION_CHANGED=NO; REFACTOR_IMPLEMENTATION=NOT_AUTHORIZED.
+
+- Canonical branch `teddy-subtitle-stage11`: root `templates/index.html` and `downloader_runtime_overlay/templates/index.html` both exist with different bytes. The root currently has 4 distinct `data-page` values, 67 HTML IDs, 3 script sources and 3 stylesheet links; the overlay has 6 `data-page` values, 91 IDs, 11 script sources and 9 stylesheet links. The overlay-only page values include `browser` and `logs`; added IDs and assets support browser, network/routing, logging, proxy and media option controls. These are static file observations, not an exhaustive feature test or proof of safe merging.
+- Dockerfile patches the root HTML with `teddy_patch_index.py`, `teddy_patch_storage.py`, `teddy_patch_browser.py`, mobile/browser-runtime/PWA patches and inline CSS/JS insertion, then copies `downloader_runtime_overlay/` over `/app/` at the end. Removing the overlay without rebuilding and checking equivalence can remove features. No candidate source change or image build was attempted.
+- Per 2026-10-28 routing handoff, remaining 5 root/overlay pairs are `templates/index.html`, `teddy_storage.py`, `teddy_entrypoint.py`, `teddy_bootstrap.py`, and `app.py`; the provisional risk order is HTML, storage, entrypoint, bootstrap, app. This is a planning order, not a task authorization. Inspect actual affected workstreams before proposing changes to shared UI.
+
 ## DLDWS-001 FNS-267 POST-DEPLOY JELLYFIN AND MEDIA FILE CHECK — USER CONFIRMED (2026-10-29 KST)
 
 REAL_DOWNLOAD_TO_MP4_TO_NAS=PASS (previously user-observed); JELLYFIN_LIBRARY_AND_PLAYBACK=PASS (subsequently user-confirmed); NAS_POSTER_AND_TITLE_INFORMATION_FILES=OBSERVED_PRESENT (user-confirmed); END_TO_END_FNS_267=PASS (one representative user-observed case); ROLLBACK_EXECUTION=NOT_TESTED; PRODUCT_SOURCE_CHANGED=NO; PRODUCTION_CHANGED_BY_THIS_RECORD=NO.
