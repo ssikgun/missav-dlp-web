@@ -15204,3 +15204,17 @@ USER_REPORTED_BUILD=PASS; DOCKERFILE_VALIDATION=PASS; USER_REPORTED_PRODUCTION_D
 ### NEXT_DECISION
 
 Separately authorize a small operational check of one real download through MP4 conversion and final-storage verification. Keep the existing image and rollback path available until that check is complete; do not treat browser confirmation or HTTP 401 as end-to-end validation.
+
+## CURRENT USER APPROVAL — DLDWS-001 FINAL FILE-MANAGEMENT NAVIGATION SMOKE PLACEMENT (2026-10-29 KST)
+
+### OBJECTIVE AND APPROVED SCOPE
+
+The user approves only relocating the existing single `RUN python teddy_file_management_navigation_smoke.py` command in `Dockerfile` to immediately after the final `COPY downloader_runtime_overlay/ /app/` and its SHA-256/Python compile checks. Keep exactly one invocation; preserve every other Dockerfile instruction, patch order, product file, and test assertion. Check the effect of removing its earlier pre-overlay position and verify the actual final file layout using the existing navigation smoke plus the minimal existing library UI smoke.
+
+### PROHIBITED SCOPE
+
+No other product or Stage9/11/12 source change, test/assertion edit, duplicate-source integration, patch removal, full Docker image build, operational Docker/NAS/DB/Jellyfin/queue/Writer/subtitle access or mutation, container restart, deployment, contract/router/task-ID change, or protected dirty-worktree change. Preserve DLDWS-001 `IN_PROGRESS` in the required `downloader,discovery-writer-safety` pair and keep other workstream routes unchanged.
+
+### ACCEPTANCE AND NEXT DECISION
+
+In a clean snapshot of the latest canonical branch, prove the Dockerfile has exactly one navigation-smoke invocation immediately following the final overlay hash/compile checks; all other instruction order/content and the overlay manifest remain unchanged; run the navigation smoke and minimal UI regression against the reconstructed final root-plus-overlay file layout; pass `git diff --check` and paired/all-workstream governance validation. Only if all checks pass, promote the Dockerfile-only product change plus these paired records and canonical handoff by normal fast-forward, then read back the remote SHA and changed paths. If the actual final-layout tests cannot run or fail, do not promote the product Dockerfile; record the actual outcome only. `BUILD=NOT_RUN`; `DEPLOY=NOT_RUN`. Next decision: separately propose the smallest scope for removing the actual `teddy_generic.py` duplicate.
