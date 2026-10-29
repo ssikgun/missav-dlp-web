@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 import json
 import sqlite3
@@ -542,14 +543,75 @@ def main():
 
         assert (
             root.findtext("title")
-            == "한국어 제목"
+            == "[ABC-123] 한국어 제목"
         )
+
+        already_numbered = ET.fromstring(
+            media_metadata.build_nfo_bytes(
+                replace(
+                    metadata,
+                    title="[ABC-123] 한국어 제목",
+                )
+            )
+        )
+
+        assert (
+            already_numbered.findtext("title")
+            == "[ABC-123] 한국어 제목"
+        )
+
+        assert (
+            already_numbered.findtext("title").count(
+                "ABC-123"
+            )
+            == 1
+        )
+
+        regular_prefix = ET.fromstring(
+            media_metadata.build_nfo_bytes(
+                replace(
+                    metadata,
+                    title="ABC-123 한국어 제목",
+                )
+            )
+        )
+
+        assert (
+            regular_prefix.findtext("title")
+            == "[ABC-123] 한국어 제목"
+        )
+
+        for empty_title in (
+            "ABC-123",
+            "[ABC-123]",
+        ):
+            try:
+                media_metadata.build_nfo_bytes(
+                    replace(
+                        metadata,
+                        title=empty_title,
+                    )
+                )
+            except ValueError as exc:
+                assert (
+                    str(exc)
+                    == "metadata title is empty after removing dvd_id prefix"
+                )
+            else:
+                raise AssertionError(
+                    "an ID-only title was accepted"
+                )
 
         assert (
             root.findtext(
                 "originaltitle"
             )
             == "Original English Title"
+        )
+
+        assert (
+            root.findtext("id")
+            == "ABC-123"
         )
 
         assert (
@@ -616,6 +678,16 @@ def main():
         )
 
         db = sqlite3.connect(db_path)
+        assert (
+            db.execute(
+                "SELECT title FROM titles WHERE dvd_id = ?",
+                ("ABC-123",),
+            ).fetchone()[0]
+            == "한국어 제목"
+        )
+        db.close()
+
+        db = sqlite3.connect(db_path)
         db.execute(
             "UPDATE titles SET cover_url = NULL WHERE dvd_id = ?",
             ("ABC-123",),
@@ -629,6 +701,13 @@ def main():
             fetcher=lambda url: missing_cover_fetches.append(url),
         )
         assert missing_cover.nfo_data
+        missing_cover_root = ET.fromstring(
+            missing_cover.nfo_data
+        )
+        assert (
+            missing_cover_root.findtext("title")
+            == "[ABC-123] 한국어 제목"
+        )
         assert missing_cover.poster is None
         assert missing_cover.poster_status == "PENDING"
         assert missing_cover.poster_error == "COVER_URL_MISSING"

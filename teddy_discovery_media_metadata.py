@@ -301,10 +301,33 @@ def build_nfo_bytes(
         "movie"
     )
 
+    title = metadata.title.strip()
+    escaped_dvd_id = re.escape(metadata.dvd_id)
+    prefix_pattern = re.compile(
+        r"^\s*(?:\[\s*"
+        + escaped_dvd_id
+        + r"\s*\]\s*|"
+        + escaped_dvd_id
+        + r"(?=\s|$)\s*)",
+        re.IGNORECASE,
+    )
+
+    while prefix_pattern.match(title):
+        title = prefix_pattern.sub("", title, count=1).lstrip()
+
+    if not title:
+        raise ValueError(
+            "metadata title is empty after removing dvd_id prefix"
+        )
+
+    display_title = (
+        f"[{metadata.dvd_id}] {title}"
+    ).rstrip()
+
     ET.SubElement(
         root,
         "title",
-    ).text = metadata.title
+    ).text = display_title
 
     if metadata.original_title:
         ET.SubElement(
