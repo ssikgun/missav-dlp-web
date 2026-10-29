@@ -3236,3 +3236,17 @@ GOVERNANCE=PASS; CANDIDATE_SCOPE=PASS (no product changes); SINGLE_SOURCE_INTEGR
 ### NEXT_DECISION
 
 Separately approve investigation and a minimal fix for generic completed-output selection so internal safety lock files are not treated as publishable media/sidecars, while retaining lock lifetime and user-file protection. Then rerun the failed baseline case and resume the already bounded single-source candidate only after the baseline is valid. Do not weaken publication validation, delete lock files, alter the reserve, modify assertions to hide the failure, or silently change the required final generic bytes. A usable Python 3.10 environment is also needed to close runtime validation. No product promotion or deployment is authorized.
+
+## CURRENT USER APPROVAL — DLDWS-001 INTERNAL STORAGE LOCK EXCLUSION CANDIDATE (2026-10-29 KST)
+
+### OBJECTIVE AND APPROVED_SCOPE
+
+The user authorizes only an isolated candidate fix for the confirmed .teddy-storage-guard.lock being mistaken for a completed download output during local publication. Candidate product changes are limited to downloader_runtime_overlay/teddy_generic.py and the corresponding generic hash entry in downloader_runtime_overlay/dldws001-source-sha256.txt. Exclude only the exact lock path reported by the existing teddy_download_safety.storage_lock_path() helper, if its canonical path semantics are confirmed. Keep the lock file in place and unchanged; preserve ordinary video and valid sidecar discovery, storage reservation, MP4 handoff, publication verification, collision protection, and retry behavior. This is an isolated fix only; generic duplicate consolidation remains a separate phase.
+
+### PROHIBITED_SCOPE
+
+Do not change root teddy_generic.py, Dockerfile, patch scripts, Writer, Stage9/11/12, tests outside minimal synthetic validation material, task/queue policies, contracts, routing, or task IDs. No real downloads, Docker image build, production deployment, NAS/DB/Jellyfin/operational queue access or writes, media deletion, or changes to protected worktrees, candidates, images, evidence, or backups. Product GitHub promotion is not authorized. DLDWS-001 remains IN_PROGRESS in both downloader,discovery-writer-safety workstreams (domain contracts 1.0.0; common contract 1.0.1).
+
+### ACCEPTANCE_CRITERIA AND NEXT_DECISION
+
+Before implementation, register this same scope in both paired ACTIVE_WORK files and canonical handoff; pass governance and git diff --check, then normal fast-forward and remote readback. Use a fresh isolated workspace. Reuse the preserved baseline failure evidence (baseline overlay generic SHA-256 f19362ebeecf6d517c7acbe97629c2c34f97017957c0a324d090fc45b6abf339; baseline manifest SHA-256 396e4e7de18e04d1fa5ad0215fc2032c2cf3e6a6e341c34fb9055b4bbb416985). Verify the lock is excluded yet preserved; video and normal sidecars remain publishable; unrelated collisions still fail without clobbering; retry safety remains; representative prior download, pause/cancel, storage-reservation, and MP4 scenarios do not regress; and the final overlay manifest has 10/10 matches. Reuse Python 3.13 synthetic validation; Python 3.10 is INCOMPLETE if no working environment is available. Preserve the candidate and evidence. PRODUCT_PROMOTION=NOT_RUN; BUILD=NOT_RUN; DEPLOY=NOT_RUN; PRODUCTION_CHANGED=NO. After candidate validation, ask separately whether to promote it and later resume generic single-source consolidation.
