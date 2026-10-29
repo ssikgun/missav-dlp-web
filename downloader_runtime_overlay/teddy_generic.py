@@ -382,12 +382,19 @@ def download_generic(core, reliability, task_id, url, network_mode='direct'):
         if not final_path:
             raise ValueError('다운로드는 끝났지만 최종 파일 경로를 확인하지 못했습니다.')
 
+        storage_guard_path = teddy_download_safety.storage_lock_path(home_dir)
         outputs = []
         try:
             for entry in os.scandir(home_dir):
                 if not entry.is_file():
                     continue
                 name = entry.name
+                if (
+                    name == os.path.basename(storage_guard_path)
+                    and not entry.is_symlink()
+                    and os.path.realpath(entry.path) == storage_guard_path
+                ):
+                    continue
                 if name.endswith(('.part', '.ytdl', '.tmp')) or '.part-Frag' in name:
                     continue
                 outputs.append(entry.path)
