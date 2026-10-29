@@ -6,6 +6,14 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
 
+## DLDWS-001 FNS-267 POST-DEPLOY JELLYFIN AND MEDIA FILE CHECK — USER CONFIRMED (2026-10-29 KST)
+
+REAL_DOWNLOAD_TO_MP4_TO_NAS=PASS (previously user-observed); JELLYFIN_LIBRARY_AND_PLAYBACK=PASS (subsequently user-confirmed); NAS_POSTER_AND_TITLE_INFORMATION_FILES=OBSERVED_PRESENT (user-confirmed); END_TO_END_FNS_267=PASS (one representative user-observed case); ROLLBACK_EXECUTION=NOT_TESTED; PRODUCT_SOURCE_CHANGED=NO; PRODUCTION_CHANGED_BY_THIS_RECORD=NO.
+
+- The user subsequently confirmed that `FNS-267` played successfully in Jellyfin and that a poster and work/title information files were generated in the NAS folder. Together with the earlier confirmed download, MP4 conversion and NAS storage, the representative real-use sequence is complete for this title.
+- These are user-observed results. The exact poster/metadata contents, independent media-file hashes, broader-library correctness and other titles were not separately verified. The independent Stage9 media workstream is not marked complete by this DLDWS-001 observation.
+- This is a follow-up evidence update to the earlier deployment entry, where Jellyfin was correctly listed as `NOT_VERIFIED` at that earlier checkpoint. The prior result remains preserved as historical state. No new build, deployment, Stage9/11/12 code change or production data operation occurred while recording this check.
+
 ## DLDWS-001 GENERIC IMAGE OPERATIONAL DEPLOYMENT AND FNS-267 VERIFICATION (2026-10-29 KST)
 
 DEPLOY_AUTHORIZATION=USER_APPROVED (2026-10-29 KST); DOCKER_BUILD=PASS (prior CT108 Python 3.10 build); CONFIG_PREFLIGHT=PASS; DEPLOY=PASS; HTTP=PASS; IMAGE_MANIFEST=PASS; SIDECARS_UNCHANGED=PASS; REAL_DOWNLOAD_TO_MP4_TO_NAS=PASS (user-observed FNS-267); JELLYFIN_LIBRARY_AND_PLAYBACK=NOT_VERIFIED; ROLLBACK_EXECUTION=NOT_TESTED; PRODUCTION_CHANGED=YES (approved Downloader image replacement only).
