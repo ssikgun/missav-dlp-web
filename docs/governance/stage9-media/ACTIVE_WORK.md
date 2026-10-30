@@ -6,6 +6,18 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-M READ-ONLY ROOT-CAUSE AUDIT BLOCKED BY ENVIRONMENT — CODEX-REPORTED (2026-10-30 KST)
+
+SOURCE: User-supplied Codex report of P03-M attempt against canonical HEAD `95e26b0e5455c2b0fea02aa8ccaa5d056f67730a`. This is an execution-environment block, not proof of any of the 133 root-cause distributions. The previously approved P03-M read-only task remains IN_PROGRESS and its limits unchanged.
+
+- `PREFLIGHT=PASS` for GitHub governance authorization; local worktree reported dirty/protected and untouched. Audit-source files `targets.jsonl`, `inventory.jsonl`, `summary.json` were verified by Codex for permissions, full SHA-256 and 255 distinct IDs; exactly 133 distinct missing-NFO IDs and canonical paths verified. No NAS inventory repeated.
+- `CAUSE_CLASSIFICATION=INCOMPLETE`; `STATE_VS_NAS_MISMATCH=UNKNOWN`; `DB_READ_ONLY=NOT_RUN`; `DB_SNAPSHOT_STABILITY=UNVERIFIED`. The actual production Discovery/Stage9 DB rows were **not** queried, so **no actual per-cause counts** are established.
+- Codex reported `hostname=downloader`, but runtime PID 1 = `codex` and virtualized as LXC, plus Docker API permission denied. This environment does **not** independently establish it is actual Proxmox CT108; Codex correctly did not perform the live DB query or SSH into CT108. Do not infer root cause from source criteria alone.
+- Read-only source check: media job reconciliation requires `organizer_jobs.status='COMPLETED'` joined with `holdings.storage_root='jav'`, `present=1`, `discovered_by='completion-stage9'`; registration/processing budgets stay capped per run. Missing cover URL alone does not prove no NFO can be created. Source conditions are not observed counts.
+- `PRODUCTION_WRITE_BY_AUDIT=NO` per Codex report; `NFO_CREATION=NOT_RUN`, `LEGACY_TITLE_REWRITE=NOT_RUN`, `TIMER_CHANGE=NOT_RUN`, `JELLYFIN_SEARCH=NOT_VERIFIED`.
+
+NEXT_ACTION: From **positively verified Proxmox CT108** (not a hostname-matched Codex sandbox), read only minimal Discovery and Stage9 DB columns using `mode=ro` and `PRAGMA query_only=ON` under the existing P03-M authorization; classify exactly the verified 133 ID set using the independently validated existing audit file, transferred without secrets and without NAS crawling or production writes. First verify that CT108 is the correct guest and whether the prior local audit files are accessible there. If audit files are absent, plan a separate read-only trusted file transfer or user-provided aggregate, not an invented list. Do not attempt an unsafe shortcut or alter production paths.
+
 ## P03-M MISSING 133 NFO READ-ONLY ROOT-CAUSE AUDIT APPROVED — 2026-10-30 KST
 
 USER_APPROVAL: Following the completed read-only full NFO inventory on 2026-10-30 (255 verified holdings, 122 exact canonical NFO files present, 133 missing NFO), the user said to proceed with the previously recommended **next read-only task**: identify why 133 existing holdings lack an NFO. This is approved as read-only investigation only under existing `stage9-media / STG9MEDIA-001 / IN_PROGRESS`; it is **not** approval to create missing NFOs, modify existing NFO titles, reset failed job states, alter NAS/Jellyfin/DB, or change the Stage9 hourly timer. Shared Downloader and Writer resources are read-only references and must not be modified. Contract: Stage9 v1.0.0; common v1.0.1.
