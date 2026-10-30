@@ -6,6 +6,24 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-N V2 FOUR-FILE SOURCE-ONLY GITHUB PROMOTION — PASS (2026-10-30 KST)
+
+USER_APPROVAL: Exact Stage9 NFO-only four-file source promotion approved by user ("응 승인해") and registered under `stage9-media / STG9MEDIA-001 / IN_PROGRESS`; common contract v1.0.1, Stage9 contract v1.0.0. Promotion was **SOURCE-ONLY** to canonical GitHub `ssikgun/missav-dlp-web:teddy-subtitle-stage11`, NOT production.
+
+EVIDENCE: Exact user-uploaded reviewed `p03n-review-v2-twr9OL.patch` SHA-256 `85a292816c3c457d6b712d8b62d1961afc1d1d72d69f7be70e2732f914a44802`; patch was reconstructed against current two matching canonical baselines and two absent new files. All **four created GitHub blobs matched the target full SHA prefixes recorded in the patch** before any ref update. A single new Git tree and one commit were created, then canonical branch advanced through `update_ref` with `expected_sha=cecf974f12ec21f9428befd8ee5ba7a090e0764c`, `force=false` (no reset/force). Promotion commit: **`fc8671487a7a1adb033619b58878f6bddb0c5d48`**, parent `cecf974f12ec21f9428befd8ee5ba7a090e0764c`.
+
+`SOURCE_PROMOTION=PASS`, `CANONICAL_READBACK=PASS`, `DIFF_SCOPE=PASS`: remote ref readback verified promotion commit; GitHub compare reports **only four approved files changed**, and current GitHub fetched file blob SHAs match:
+- `teddy_discovery_media_filestation.py` `79416f33481df61544be3c4accc51581beb31342`.
+- `teddy_discovery_media_filestation_smoke.py` `65e81a2fd49d483316ed7c97364582b369f26818`.
+- `teddy_discovery_media_nfo_only.py` `341dcd63a1dc5d079751830cd08fcd53c06efe90`.
+- `teddy_discovery_media_nfo_only_smoke.py` `4b3f464f3a019a2a93532581bfb6653790d9cb2b`.
+
+TEST EVIDENCE: `STATIC_REVIEW=PASS_OFFLINE` for exact v2 uploaded patch; `OFFLINE_SMOKE=33 PASS/0 FAIL` and `FILESTATION_REGRESSION=6 PASS/0 FAIL` were **Codex-reported**, not independently rerun by GitHub promotion tool. GitHub action for exact promoted commit may be pending discovery; do not equate documentation-workflow success with product runtime test success. If CI run for promoted commit not observed or not yet finished, `SOURCE_COMMIT_CI=PENDING_OR_NOT_OBSERVED`.
+
+SAFETY: `OPERATING_DEPLOYMENT=NOT_RUN`, `LIVE_CANARY=NOT_RUN`, `NFO_CREATED_ON_NAS=0`, `PRODUCTION_DB_WRITE=0`, `POSTER_WRITE=0`, `JELLYFIN_NETWORK_CALL=0`, `TIMER_CHANGE=NOT_RUN`. `LIVE_CREATE_ONLY_GUARD=UNVERIFIED`. No actual 129-item database eligibility assessment, exact current NFO absence or independently authenticated NAS owner/group validation during promotion. The old dirty isolated clone `/tmp/p03n-clean-xOKlUfE7/repo` is **not modified or deleted** by GitHub connector promotion, but its persistence is host dependent.
+
+NEXT DECISION: Separately authorize **a read-only single exact DVD-ID current DB/NAS preflight**, including live File Station no-overwrite server behavior evidence and ownership/source/metadata, before any real one-title NFO creation. Then separately approve the *write* canary if eligible. Existing NFO 119 title rewrites, 3 prefix conflicts, 13 ownership anomalies, failed 3 jobs and 1 past temporal mismatch remain separate. P03-T hourly→10-min Stage9 timer remains final and NOT_RUN.
+
 ## P03-N V2 FOUR-FILE SOURCE-ONLY CANONICAL PROMOTION APPROVED — 2026-10-30 KST
 
 EXPLICIT USER APPROVAL: Following P03-N v2 `STATIC_REVIEW=PASS_OFFLINE`, user stated **"응 승인해"**, in direct response to the exact request to promote the reviewed four-file Stage9 NFO-only candidate to the **GitHub canonical source branch only**, with **no runtime deployment or NAS/Jellyfin/production DB writes**. Workstream `stage9-media / STG9MEDIA-001 / IN_PROGRESS`, Stage9 contract v1.0.0 and common contract v1.0.1.
