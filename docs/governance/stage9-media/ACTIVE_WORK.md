@@ -6,6 +6,21 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-N EXACT HISTORICAL MISSING ONE-TARGET SELECTION — USER CT108 PASS (2026-10-30 KST)
+
+EVIDENCE_SOURCE: User-reported direct CT108 `python3 -B` read-only command. An initial P03-N target selection version raised `ValueError: not enough values to unpack (expected 3, got 1)` due to an assistant-authored Python list-unpacking bug; a second command had the same bug, then a corrected direct-row iteration was run and **`SELECTION=PASS`**. No DB mutation or NAS access was reported. A prior shell-local `set -euo pipefail` may cause SSH shell exits when a command fails; subsequent user `set +e` returned `SHELL_ALIVE=YES`. Avoid `set -e` in future user shell commands and fail visibly.
+
+Historical inventory snapshot confirms `HISTORICAL_MISSING=133` titles, `CURRENT_ELIGIBLE_IDS=129`, `HISTORICAL_CURRENT_INTERSECTION=129` **by DVD-ID**. This historical cross-set match is not a current NAS NFO absence proof.
+
+**SELECTED EXACT ID:** `EBWH-350`.
+- DB exact video `EBWH/EBWH-350/EBWH-350.mp4`, `VIDEO_SIZE_DB=4445557425` bytes.
+- Expected new canonical NFO `EBWH/EBWH-350/EBWH-350.nfo`.
+- `DISCOVERED_BY=organizer-apply`; `METADATA_SOURCE=javdatabase-weekly`.
+- Joined historical missing snapshot `nfo_present=false` and current single present JAV holding/Organizer COMPLETED/current metadata ID/source/title concordance as tested by the user script.
+- `NAS_CHECK=NOT_RUN`, `NAS_UPLOAD=0`, `PRODUCTION_DB_WRITE=0`, `SOURCE_CHANGED=NO` per user script. Current exact NAS video size, owner/group, real path, NFO absence and server-side create-only are **NOT_YET_VERIFIED**.
+
+NEXT AUTHORIZED: **only this single EBWH-350**, use the existing bounded File Station API for read-only `stat_library` and exact NFO `getinfo/list` cross-check. Allow authentication login/logout required for reads, but **no Upload API or any other filesystem state change**. Derive existing root-private NAS password and CA file **paths only** from already installed Stage9 service configuration; never echo secret values, never alter permission/credentials, never deploy the new source into an operational release, and fail closed if those paths cannot be safely identified. Compare NAS video `size=4445557425`, exact `real_path=/volume1/video/video2/JAV/EBWH/EBWH-350/EBWH-350.mp4`, and nonempty read-only owner/group; confirm exact `/video/video2/JAV/EBWH/EBWH-350/EBWH-350.nfo` absent. Strongly ensure no upload request can be made by preflight script. `LIVE_CREATE_ONLY_GUARD=UNVERIFIED` from read-only evidence. The selected target is not permission for real NFO creation, broad scan or writing all 129. P03-T timer remains last.
+
 ## P03-N EXACT-ONE-TARGET PREFLIGHT PHASE 1 — USER CT108 READ-ONLY PASS (2026-10-30 KST)
 
 EVIDENCE_SOURCE: User-provided `root@downloader` CT108 command/output after explicit read-only preflight approval. Existing local historical P03-H inventory directory `/tmp/p03h-nfo-inventory-20261030-8edfut5v/` has `summary.json` (10,811 bytes), `targets.jsonl` (32,195 bytes) and `inventory.jsonl` (76,754 bytes), with valid JSON object shape. `targets.jsonl` row fields `dvd_id,nfo_relative_path,video_relative_path`; `inventory.jsonl` fields `dvd_id,nfo_owner_matches_video,nfo_present,nfo_relative_path,nfo_sha256,originaltitle_present,reason,status,video_relative_path`. First sample ID `ACHJ-097` was **NFO_PRESENT=True**, and must **not** be selected as a missing-NFO canary merely because it appears first.
