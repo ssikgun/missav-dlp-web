@@ -6,6 +6,22 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-N OFFLINE REMEDIATION CANDIDATE — CODEX-REPORTED PASS (2026-10-30 12:16:39 KST)
+
+EVIDENCE: User pasted Codex completion report from existing isolated CT108 clone `/tmp/p03n-clean-xOKlUfE7/repo`, still at baseline local HEAD `587ed8c9f79bea2584b4b91b52293527ee9d9e38`. Codex did not independently fetch the latest remote canonical HEAD during this session; ChatGPT checked current canonical branch externally before this governance log. Evidence below is **Codex-reported**, not yet a second independent read of the modified candidate patch or an independent test rerun.
+
+REMEDIATION: `PREFLIGHT=PASS`; `LOCAL_CANDIDATE_PRESERVED=PASS`. Only the **new two candidate files** `teddy_discovery_media_nfo_only.py` and `teddy_discovery_media_nfo_only_smoke.py` were modified during this follow-up. Earlier changes to `teddy_discovery_media_filestation.py` and its smoke remain uncommitted and retained. Combined candidate status remains four approved files only, with 2 tracked modified + 2 untracked newly created files; no Git commit/reset/rebase/clean/push.
+
+- `COHORT_VALIDATION=PASS` (reported): verify present JAV holding, status, exact path/size and source in `library-inventory` or `organizer-apply`. This is **not** an immutable allowlist proving membership in the exact 129 old NFO-missing IDs.
+- `ORGANIZER_VALIDATION=PASS` (reported): require completed organizer job for same DVD-ID before upload.
+- `METADATA_VALIDATION=PASS_WITH_LIMITS` (reported): verify metadata source and usable JSON identity/title evidence; missing or contradictory title/identity/structure fails closed. Existing metadata provenance may be complex and actual live source quality has not been independently verified; do not assert all 129 records are eligible. Missing poster or cover URL alone must not block NFO.
+- `UPLOAD_ATTEMPT_TEST=PASS` (reported): count actual multipart File Station upload POST requests rather than URL-only string; normal success, concurrent collisions, and uncertain upload each one POST; preexisting NFO collision zero POST.
+- `OFFLINE_SMOKE=33 PASS/0 FAIL` + `FILESTATION_REGRESSION=6 PASS/0 FAIL`, **total 39 PASS/0 FAIL reported**. `DIFF_SCOPE=PASS`, `git diff --check=PASS`, four approved paths unchanged in scope.
+
+LIMITS: Caller-supplied `expected_owner` and `expected_group` do not supply independently authoritative provenance; independent read-only current video/NFO ownership and exact target NFO nonexistence are still needed before any live canary. Injected fake transport is not a network-isolation proof. `LIVE_CREATE_ONLY_GUARD=UNVERIFIED`; `SOURCE_PROMOTION=NOT_RUN`, `LIVE_CANARY=NOT_RUN`, `NFO_CREATED_ON_NAS=0`, `PRODUCTION_DB_WRITE=0`, `JELLYFIN_NETWORK_CALL=0`, `TIMER_CHANGE=NOT_RUN`.
+
+NEXT_REVIEW: **Export the newly amended complete four-file patch from the same isolated clone and independently review actual code changes, tests, fail-closed gates and corrected multipart POST counter**, comparing against the earlier patch SHA-256 `1686e62d0a15d0efcced2be49aaee077ba131ecebf9a15c22ca0b32679000cb8`. Until independent static review passes, former `STATIC_REVIEW=CHANGES_REQUIRED` and `PROMOTION=BLOCKED` remain active. Do not expand workstream, run live NAS, alter 119 existing NFOs, change posters, or modify Stage9 timer; 10-minute timer remains P03 final step.
+
 ## P03-N INDEPENDENT UPLOADED PATCH REVIEW — CHANGES REQUIRED (2026-10-30 KST)
 
 SOURCE: User uploaded exact `/mnt/data/p03n-review-S5nLEV.patch` extracted from the isolated CT108 candidate; independently read all **205 lines / 11,407 bytes**, SHA-256 **`1686e62d0a15d0efcced2be49aaee077ba131ecebf9a15c22ca0b32679000cb8`** matching user shell output. Patch names exactly the four approved paths. New `teddy_discovery_media_nfo_only.py` and `teddy_discovery_media_nfo_only_smoke.py` pass AST parse/syntax checks. Reviewer compared the patch with matching GitHub canonical `teddy_discovery_media_publish.py`, `teddy_discovery_media_filestation.py`, metadata source handling and Stage9 reconcile predicates. No live candidate execution, sandbox local code mutation, NAS, operational DB, or Jellyfin access occurred during this independent review.
