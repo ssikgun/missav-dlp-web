@@ -131,3 +131,17 @@ LATEST_STATUS: `FIRST10_POSTCHECK=PASS_10; SECOND10_APPLY=PASS_10; SECOND10_INDE
 - User requested larger batches and approved rollout; existing reviewed batch program limit `MAX_BATCH=20`. **Next single checkpoint**: verify NAS script + manifest SHA and execute dry-run only `--dry-run --start 20 --count 20` (indices 20–39 in 104 ssikgun-owned cohort) under original NAS staging `/tmp/p03h-bulk104-sIzAT42z`; actual apply must wait until dry-run result is observed. No change to code, admin permissions, unrelated workstream, Stage9 timer or Jellyfin DB.
 
 LATEST_STATUS: `FIRST10_POSTCHECK=PASS_10; SECOND10_APPLY=PASS_10; SECOND10_INDEPENDENT_POSTCHECK=PASS_10; APPLIED_TOTAL=20_OF_187; REMAINING_104=84; LIVE_83=BLOCKED; NEXT20_DRYRUN=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Third batch, 20 targets (offsets 20–39) NAS dry-run — 2026-10-30 KST, user terminal
+
+- Executed from CT108 over SSH as ordinary NAS user `ssikgun`, staged files under `/tmp/p03h-bulk104-sIzAT42z`.
+- Script SHA-256 `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef` PASS; immutable 188-candidate manifest SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087` PASS.
+- Command: `python3 -B p03h_bulk104_ssikgun_controlled.py --dry-run --start 20 --count 20`.
+- Exact BATCH_IDS: `DVMM-015,EBWH-090,EBWH-296,EKDV-826,EROFV-313,EROFV-387,EROFV-390,FC2-PPV-4973050,FNS-244,FSDSS-901,FTHT-361,FTHTD-219,FTHTD-228,FTKD-045,GANA-3432,HMN-890,HMN-904,HNBR-014,HODV-22112,HODV-22113`.
+- User output confirmed `TARGETS_104=PASS; EXCLUDE_MARR014=YES; EXCLUDE_ADMIN83=YES`, `BATCH_START=20; BATCH_COUNT=20`, `PREFLIGHT=20_PASS`, `DRY_RUN=PASS; NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`.
+- Standing user approval for 187 exact title-only NFO changes includes this bounded group; exclude the already completed first 20, MARR-014, 59 protected and 83 admin-owned targets. Existing verified runner enforces 20 max. No code changes, no ACL policy change.
+- **Third batch LIVE APPLY NOT RUN** at checkpoint. Next one checkpoint is exact script+manifest SHA verification then `--apply --start 20 --count 20 --confirm P03H-104` under normal `ssikgun` user; record full result and backup directory before further actions. On failure stop and inspect, never blindly retry. Then independently verify backup and live NFO/ACL before moving to offset 40.
+- No Jellyfin rescan, Stage9 timer changes, other service, video or DB changes observed in this dry-run.
+
+LATEST_STATUS: `FIRST20_INDEPENDENT_POSTCHECK=PASS_20; THIRD20_DRYRUN=PASS_20; THIRD20_APPLY=NOT_RUN; APPLIED_TOTAL=20_OF_187; REMAINING_104=84; LIVE_83=BLOCKED; P03_T=NOT_RUN`.
