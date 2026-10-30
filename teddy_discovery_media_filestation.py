@@ -789,6 +789,7 @@ class SynologyFileStationMediaAdapter:
         return {
             "size": int(item["size"]),
             "owner": item["owner"].get("user"),
+            "group": item["owner"].get("group"),
             "real_path": item["real_path"],
             "file_type": expected_ext,
         }
@@ -863,7 +864,7 @@ class SynologyFileStationMediaAdapter:
         if response_value.get("success") is not True:
             error = response_value.get("error")
             code = _safe_code(error.get("code")) if isinstance(error, dict) else "UNKNOWN"
-            if code == "414":
+            if code in {"414", "1805"}:
                 raise FileStationMediaError("SIDECAR_CREATED_CONCURRENTLY")
             raise FileStationMediaError("UPLOAD_API_ERROR_" + code)
 

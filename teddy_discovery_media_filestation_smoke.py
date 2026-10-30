@@ -253,6 +253,7 @@ def test_nfo_only_create_and_verified_stat(root: Path):
         assert stat_result == {
             "size": len(VIDEO_BYTES),
             "owner": "admin",
+            "group": "users",
             "real_path": REAL_LIBRARY_ROOT + "/ABC/ABC-123/ABC-123.mp4",
             "file_type": ".mp4",
         }
