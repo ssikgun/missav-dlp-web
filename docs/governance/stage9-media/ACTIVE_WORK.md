@@ -6,6 +6,16 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-N EBWH-350 USER-UPLOADED movie.nfo CONTENT VERIFIED — 2026-10-30 KST
+
+EXACT INPUT: User provided `movie.nfo` file after the matching Windows Explorer screenshot showing an alternate NFO in the EBWH-350 folder. Inspected this **669-byte UTF-8/ASCII XML** file directly; SHA-256 `c60e9ad6f108a531193a56bc0563b446f1fdb9fd3e290ef5726fa3955d0652d4`. XML parsed successfully as `<movie>`. It contains one English `<title>` **without** the `[EBWH-350]` prefix, `<uniqueid type="teddy">EBWH-350</uniqueid>`, dates, studio/actor/genres, and **no `<originaltitle>` or `<id>`**. This is user-supplied file content, not a separate live NAS byte-hash readback; physical NAS file byte-for-byte equality is not independently established.
+
+SCHEMA CONTRAST: The approved current NFO builder `teddy_discovery_media_metadata.py::build_nfo_bytes` emits `<title>[DVD-ID] ...</title>`, `<id>DVD-ID</id>`, and `<uniqueid type="dvd_id" default="true">DVD-ID</uniqueid>`. That differs from the uploaded older-style `type="teddy"` NFO and shows a different serializer/schema, **not confirmed creator identity** (could be older pipeline, another tool or manual process). `teddy_discovery_media_publish.py` recognizes `movie.nfo` as a library sidecar, but `canonical_nfo_filename` defines `<DVD-ID>.nfo` for new publication. Jellyfin official docs support both movie.nfo and matching-video-basename NFO, https://jellyfin.org/docs/general/server/metadata/nfo/.
+
+VERDICT: `EXISTING_MOVIE_NFO_XML=PASS`, `EXISTING_MOVIE_NFO_DVD_ID=PASS`, `EXISTING_TITLE_PREFIX=ABSENT`, `NEW_EBWH350_CANONICAL_NFO_CREATION=BLOCKED`. This corrects the original assertion that EBWH-350 has no NFO. The historic `133` counts **missing DVD-ID-named NFO**, and `129` specifically the authorized source cohorts; **how many have movie.nfo is UNKNOWN**, not all missing or all present.
+
+NEXT USER DECISION: Propose a separately authorized **read-only, bounded 129-title alternate NFO audit** that reports each folder's `<DVD-ID>.nfo`, `movie.nfo` presence and valid XML/ID/title-prefix state, without writing or altering NAS, DB, Jellyfin, source or timer. Protect preexisting NFOs; never auto-create a second NFO beside movie.nfo or replace movie.nfo. Only after factual reclassification should user choose a safe title-update path and its explicit authorizations. P03-T timer remains last. The user's current observation and uploaded file **do not authorize** expansion to 129 live NAS lookups or source implementation.
+
 ## P03-N EBWH-350 EXISTING movie.nfo DISCOVERED — NEW NFO WRITE BLOCKED (2026-10-30 KST)
 
 EVIDENCE: User-provided CT108 isolated read-only File Station result for selected `EBWH-350`: `CREDENTIAL_PATHS=PASS`, `SOURCE_INTEGRITY=PASS`, video size `4,445,557,425` exact DB match, owner `admin` and group `users`, `NAS_VIDEO=PASS`, exact canonical filename `EBWH/EBWH-350/EBWH-350.nfo` **ABSENT** `NAS_NFO_CURRENT_ABSENCE=PASS`, `NAS_PREFLIGHT=PASS`, `NAS_UPLOAD=0`, `PRODUCTION_DB_WRITE=0`, `LIVE_CANARY=NOT_RUN`, and `SERVER_SIDE_CREATE_ONLY=UNVERIFIED`. Initial read-only script returned `DOWNLOAD_NOT_AUTHORIZED` due to assistant guard incorrectly blocking an API discovery query; retry corrected that filter, without any media write.
