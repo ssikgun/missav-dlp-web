@@ -6,6 +6,16 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-N V2 PATCH INDEPENDENT STATIC REVIEW PASS — 2026-10-30 KST
+
+SOURCE: User-uploaded `p03n-review-v2-twr9OL.patch`; independently read entire **261-line, 15,692-byte** patch, SHA-256 `85a292816c3c457d6b712d8b62d1961afc1d1d72d69f7be70e2732f914a44802`. Compared with v1 patch SHA-256 `1686e62d0a15d0efcced2be49aaee077ba131ecebf9a15c22ca0b32679000cb8`: previous File Station adapter/smoke changes unchanged; only NFO-only entrypoint and synthetic smoke were amended. Python AST parsed both complete new modules; 33 unique smoke cases independently counted. **39 total test PASS/0 FAIL remains Codex-reported, not independently rerun.**
+
+`STATIC_REVIEW=PASS_OFFLINE`: `create_nfo_only()` now gates eligible present JAV holdings by `discovered_by IN ('library-inventory','organizer-apply')` and same DVD-ID Organizer `COMPLETED`; validates ID/path/size, verified metadata-source/raw JSON source+DVD-ID+title concordance and NFO size, checks File Station video stat owner/group/path/size before create-only. Missing/mismatched metadata fails closed; no poster requirement. Updated smoke has real organizer_jobs columns and tests both eligible/excluded sources, missing/incomplete/wrong-ID Organizer, metadata errors. Actual multipart upload POST counter now inspects POST body, expects exactly one attempt for success/concurrency/uncertain responses and zero for preflight/existing-file stop. File Station sidecar collision 1805/414 remains fail-closed. No full media pipeline, poster fetch, job DB or Jellyfin side effect in NFO-only entrypoint.
+
+`SOURCE_PROMOTION=NOT_RUN`, `LIVE_CANARY=NOT_RUN`, `NFO_CREATED_ON_NAS=0`, `PRODUCTION_DB_WRITE=0`, `JELLYFIN_NETWORK_CALL=0`, `TIMER_CHANGE=NOT_RUN`. **Unverified live gates**: real 129 identity/metadata eligibility, exact current NFO absence, independently evidenced expected video owner/group, actual Synology server collision no-overwrite (`LIVE_CREATE_ONLY_GUARD=UNVERIFIED`). Injected transport is not an enforceable network-isolation boundary. These remain separate and cannot be inferred from synthetic PASS.
+
+NEXT: seek **separate explicit approval** for four-file source-only promotion from reviewed candidate to canonical `teddy-subtitle-stage11`; no operational deployment. Do not automatically promote or execute NAS canary. Keep CT108 dirty isolated candidate preserved. P03-T Stage9 10-minute timer remains last.
+
 ## P03-N OFFLINE REMEDIATION CANDIDATE — CODEX-REPORTED PASS (2026-10-30 12:16:39 KST)
 
 EVIDENCE: User pasted Codex completion report from existing isolated CT108 clone `/tmp/p03n-clean-xOKlUfE7/repo`, still at baseline local HEAD `587ed8c9f79bea2584b4b91b52293527ee9d9e38`. Codex did not independently fetch the latest remote canonical HEAD during this session; ChatGPT checked current canonical branch externally before this governance log. Evidence below is **Codex-reported**, not yet a second independent read of the modified candidate patch or an independent test rerun.
