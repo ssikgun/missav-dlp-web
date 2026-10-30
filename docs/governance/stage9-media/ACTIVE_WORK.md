@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 52170)
+Total output lines: 924
+
 # Stage9 Media workstream — active work
 
 WORKSTREAM: stage9-media
@@ -5,6 +8,14 @@ TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
+
+## P03-H EBWH-350 USER-REPORTED SUCCESS / READ-ONLY COHORT AUDIT — 2026-10-30 KST
+
+USER EVIDENCE: User reports a single existing EBWH-350 `movie.nfo` title-only replacement, with original SHA-256 `c60e9ad6f108a531193a56bc0563b446f1fdb9fd3e290ef5726fa3955d0652d4` and resulting SHA-256 `63f3d1e1cb32b0db1ca477a59aea6f39236dd5c0ad77a714f53a2f9e5e185432`. The user reports NAS single-file replacement, hash, owner and permissions checks PASS, and Jellyfin display of `[EBWH-350]` and search for `ebwh-350` PASS after refresh. This is user-supplied evidence, not independently repeated by Codex. It does not establish atomicity, concurrency protection, rollback or safety for other files.
+
+USER AUTHORIZATION: Record this result in these three canonical documents and perform a bounded read-only audit of the prior 129 `movie.nfo` and 119 `<DVD-ID>.nfo` cohorts using their exact historical evidence and current read-only DB, excluding EBWH-350 from further modification candidates. Check current paths, NFO count/name, XML/ID/title, SHA-256, owner/group/mode and available ACL; classify the 13 historical owner/group differences, three conflicting IDs and four historical exceptions separately. Stop for unavailable evidence or access; no expanding to the entire library. Preserve originals and existing backups. No NAS mutation, NFO creation, production DB write, Jellyfin write, account/ACL changes, service/timer changes, product code change or deployment. Bulk modification requires separate user authorization. Stage9 10-minute timer remains the final P03 step.
+
+STATUS: EBWH-350 user-reported result PASS; current audit and source promotion outcomes are not implied by this authorization. Historical 248 are planning candidates, not a currently verified or approved update count.
 
 ## P03-H EXISTING NFO TITLE-ONLY DESIGN REVIEW APPROVED / 129 movie.nfo XML PASS — 2026-10-30 KST
 
@@ -404,51 +415,7 @@ Workstream/task: `stage9-media`; `STG9MEDIA-001 / IN_PROGRESS`; contract v1.0.0,
 
 1. Finish and report the separately approved read-only inventory first. Establish actual candidate counts, identity/ownership/path/XML validity, permission boundaries, and whether the current Synology File Station `stage9_media` principal can safely and reversibly perform the explicitly scoped NFO update. Do not treat prior SSH/admin access as permission to use it. Do not change NAS account privileges, ACLs or TLS protections.
 2. Derive and review one minimal, concrete, bounded update strategy with safe backup/restore: for each candidate preserve original NFO complete bytes, SHA-256 and identity/metadata before write; ensure backup availability and restoration verification; exact expected-original-byte/hash guard, per-file collision/race checks, permitted atomicity, bounded workload and failure-stop. **If the only available method demands an unapproved privileged NAS identity, broad delete/move/replacement privilege, uncertain atomicity, or changes to the create-only Stage9 publisher, STOP and present the design/permission choice to the user**. Do not choose a bypass unilaterally.
-3. Start any later production mutation only in a **new, explicit P03-H execution step** based on the reported inventory and approved specific implementation route, with exact target-set bounds and readback/rollback gates registered in this Stage9 ACTIVE_WORK first. This user preapproval should not needlessly be re-requested for the same narrow title-only goal, but does not resolve unknown dangerous execution methods or authorize unrelated system changes. No unattended transition from the currently running read-only Codex task to mutation.
-4. Use a small initial verified update/readback checkpoint before completing the remainder, with fail-closed behavior on discrepancies. No forced download, completed-job replay, Stage9 timer/runner edits, Jellyfin POST/scan/refresh, generic Downloader/Writer/Stage11 changes or DB writes are included. Jellyfin existing-item refresh/import, if required, is a separate exact-scope decision; GET-only title/search observations are allowed within an approved read-only task.
-
-ACCEPTANCE_TARGET: All verified eligible legacy NFOs safely converted, unchanged unrelated fields/artifacts verified, backups and rollback path preserved, exact counts/failed exclusions reported, Jellyfin title/number-search verified separately before claiming user-facing PASS. No claimed result is pre-completed by this approval.
-
-## P03-T TEN-MINUTE STAGE9 TIMER — LAST P03 ROADMAP STEP (NOT YET AUTHORIZED TO APPLY)
-
-USER_DECISION: Add a proposed **60-minute → 10-minute** `teddy-stage9-media.timer` frequency change as the **final P03 step**, after inventory, approved safe legacy NFO handling, and representative Jellyfin title/search verification. This is roadmap scheduling intent, NOT immediate timer-change authorization. `TIMER_CHANGE=NOT_RUN`.
-
-BEFORE ANY TIMER CHANGE: Read the **actual** timer unit and `OnCalendar`/`RandomizedDelaySec`/`Persistent`/failure-stop settings, interval and active service runs, work locks, existing generic completion timer separation, 1-item/1-check/1-seed/9-GET budgets and retry/backoff state. Estimate higher daily run volume, confirm no overlap, preserve duplicate scheduling protection, no hidden increase in per-run concurrency and reasonable jitter. Require a separate explicit, bounded Stage9-only timer-change execution authorization and reversible unit backup/readback; no change to any other timer, service, Docker or data.
-
-## P03-H LEGACY NFO READ-ONLY INVENTORY AUTHORIZED — 2026-10-30 KST
-
-USER_APPROVAL: After P03 source promotion, isolated Stage9 deployment, and successful 10:01:16 KST first scheduled no-new-item run, the user requested proceeding with the **next recommended task**: first check whether there is any naturally generated post-P03 NFO/Jellyfin search example, and then assess pre-existing NFOs for a possible future `[DVD-ID] title` backfill. The user's consent **at this checkpoint authorizes investigation and read-only inventory only**, NOT existing NFO edits, Jellyfin refresh, or product/production mutation.
-
-WORKSTREAM/TASK: `stage9-media / STG9MEDIA-001 / IN_PROGRESS`, common contract v1.0.1 and Stage9 contract v1.0.0. `P03-H` remains **ON HOLD for implementation/writes**. Other workstreams and governance router remain unchanged. Canonical branch at approval preflight: `teddy-subtitle-stage11`, HEAD `2fa2d7162ef1430e4d1a910af884c2863a48cd1a`; recheck before execution.
-
-### SCOPE — READ ONLY
-
-1. Verify canonical governance and actual CT108 host/runtime, Stage9 one-shot service, timer, current dedicated release, and read-only source configuration. Do not rerun existing completed build/deployment.
-2. Discover the minimum existing Discovery/Stage9 read-only data sources needed to identify actual present JAV holdings and expected canonical NFO names. Use production SQLite only with `mode=ro` plus `PRAGMA query_only=ON` and bounded SELECT/PRAGMA; inspect no unrelated personal data. Avoid any operation that alters the live database, WAL, SHM, locks, task state, or counters.
-3. Check whether a naturally created post-P03 NFO is already evidenced by read-only state/logs. If found, validate its XML title/ID and, when specifically safely identifiable, read only the corresponding Jellyfin visible title and number-based search result via **GET only**. If no such item exists, mark `NEW_NFO=NOT_OBSERVED` / `JELLYFIN_SEARCH=NOT_VERIFIED` and do not force processing.
-4. For existing NFOs associated with validated holdings only, inspect bounded NAS metadata and NFO XML content via existing non-administrator Stage9 File Station HTTPS identity with TLS/CA checks intact. The File Station session's narrowly necessary authentication/logout may use the existing API; no Upload, CopyMove, rename, delete, file create, metadata update, or Jellyfin POST/refresh. Do not use NAS administrator/root SSH or broaden permissions. Do not recursively download videos/posters or enumerate unrelated shares. Preserve exact path ownership and sidecar name checks; cap each NFO response at the existing `MAX_NFO_BYTES` and respect existing API request-budget/timeout limits; report `INCOMPLETE` instead of weakening them. Do not execute the actual Stage9 apply runner.
-5. Summarize counts (including denominators, exclusions and inaccessible cases) for: valid already-ID-prefixed NFO, valid title without ID prefix, missing NFO, malformed/oversized/ambiguous/identity-mismatch NFO. Include only a few non-sensitive, safely validated DVD-ID examples if useful, and sample expected title transformations **in memory without writing**. Do not store full titles, raw NFOs, credentials, APIs/session tokens, or personal media data in Git/log artifacts.
-6. Present minimal safe options for a future user-approved one-time P03-H migration (backup, preserve all other XML fields, exact path ownership, atomic/no-clobber and collision policy, bounded scope, Jellyfin re-read policy and rollback) as **proposals only**, noting the existing create-only/NO-OVERWRITE rule. No implementation or operational write is authorized by this section.
-
-### PROHIBITED
-
-No existing MP4/NFO/poster replacement or deletion; no automatic or manual NFO backfill; no Stage9 media apply, forced download, retry reset, lock acquisition, timer/service/release changes, Docker rebuild, database write, NAS user/ACL change, Jellyfin scan/refresh/write, or changes to other workstreams. No bypass of read-only API/credential/tls limits or use of privileged NAS access. No scripts/artifacts that modify production directories. Stop on unknown mapping, access method or identity.
-
-ACCEPTANCE: Source/contract preflight PASS; all observations clearly attributed to either GitHub source, Codex read-only CT108/NAS/Jellyfin, or supplied logs; exact counts and incomplete coverage reported; production changes 0; original P03-H WRITE/HISTORICAL NFO BACKFILL remains ON HOLD until an explicit **new user approval**.
-
-NEXT_DECISION: Review the counted inventory and whether new Jellyfin ID-search actually works, then separately authorize (or reject) a restricted pre-existing NFO update with rollback and exact account/permission safeguards.
-
-## P03 FIRST NATURAL STAGE9 RUN OBSERVED — USER-SUBMITTED CT108 LOG (2026-10-30 10:01:16 KST)
-
-EVIDENCE_SOURCE: User-provided read-only `systemctl show` and `journalctl` output for the approved first natural Stage9 invocation. ChatGPT reviewed the supplied systemd output and GitHub implementation; this is not an independent direct CT108 query.
-
-RESULT: `NEXT_NATURAL_RUN=PASS; EXIT=0; RESULT=success; NEW_RELEASE_RUNTIME=PASS; STAGE9_TIMER=active/enabled; NFO_TITLE=NOT_OBSERVED; JELLYFIN_TITLE_SEARCH=NOT_VERIFIED; OTHER_SERVICES_UNCHANGED=INCOMPLETE`.
-
-- On 2026-10-30 10:01:16 KST, `teddy-stage9-media.service` started and exited successfully with `ExecMainStatus=0` and `Result=success`, using `WorkingDirectory=/opt/missav-dlp-web/stage9-runtime/releases/b31873824527bbcdf800d141b40eaf6e2af03abd`. `inactive` afterward is expected for oneshot.
-- `teddy-stage9-media.timer` remained `active/enabled`, last trigger 10:01:16 and next reported trigger 11:04:53 KST.
-- Runner JSON: `status=COMPLETE`, `stage=stage9-media-only`, `non_media_execution=0`, `registered=0`, `media.attempted=0`, `media.completed=0`, `media.failed=0`, `media.retryable=8`, `media.held_cover_url_missing=8`, `media.exhausted=3`, `media.manual_action_updates=1`, `media.manual_action_updates_deferred=2`, `jellyfin_get_requests=0`, `jellyfin_post_attempts=0`, `jellyfin_visibility.visible=122`, `jellyfin_visibility.jellyfin_mutations=0`.
-- Source review: `manual_action_updates` counts executions of `_mark_jellyfin_manual_action_if_exhausted`, which enters a media-DB transaction and issues a conditional UPDATE for an exhausted job. The counter increments even if zero rows matched; **do not infer either that exactly one DB row changed or that DB writes were zero**. `jellyfin_mutations=0` reports only that metric, not an exhaustive DB write audit.
-- There were no newly attempted media jobs and no new NFO was observed during this invocation. Existing count `visible=122` is a runner summary and does **not** prove the new P03 title was visible or searchable in Jellyfin. Do not infer product/search PASS.
+3. Start any later production mutation only in a **new, explicit P03-H execution step** based on the reported inventory and approved specific implementation route, with exact target-set bounds and readback/rollback gates registered in this Stage9 ACTIVE_WORK first. This use…2170 tokens truncated… no newly attempted media jobs and no new NFO was observed during this invocation. Existing count `visible=122` is a runner summary and does **not** prove the new P03 title was visible or searchable in Jellyfin. Do not infer product/search PASS.
 - No forced job, manual apply, old-NFO rewrite or broader scan was requested; continue approved existing scheduled operation only. `OTHER_SERVICES_UNCHANGED` remains `INCOMPLETE` because the prior deployment compared only a bounded set of services.
 
 NEXT_DECISION: Observe the new NFO title and Jellyfin number-based search only when a **naturally eligible new media item** is processed, or seek separate express approval for any bounded alternate verification. Do not force jobs or republish existing artifacts to make a test pass.

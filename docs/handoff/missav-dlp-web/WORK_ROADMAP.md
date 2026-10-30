@@ -6,6 +6,9 @@ CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
+
+**P03-H 최신 상태 (2026-10-30, 사용자 보고):** EBWH-350 기존 `movie.nfo` 제목 보정 후 NAS 해시·소유권·권한과 Jellyfin 제목 표시·`ebwh-350` 검색 PASS. 원본 SHA-256 `c60e9ad6f108a531193a56bc0563b446f1fdb9fd3e290ef5726fa3955d0652d4`, 결과 `63f3d1e1cb32b0db1ca477a59aea6f39236dd5c0ad77a714f53a2f9e5e185432`. Codex 독립 재검증은 없음. 기존 129+119 계획 후보에 대해 정확한 과거 자료와 현재 상태를 이용한 읽기 전용 사전 조사만 승인; EBWH-350 중복 수정 제외, 13 소유권 차이·3 품번 충돌·4 상태 예외 보호. 248은 현재 적용 가능 건수가 아니다. 전체 수정·운영 배포 미승인; P03-T 10분 타이머 변경은 마지막 단계.
+
 ## 1. 읽는 순서 및 업데이트 규칙
 
 - 새 대화에서는 `AGENTS.md`, 공통 `docs/governance/PROJECT_CONTRACT.md`, 라우터 `docs/governance/ACTIVE_WORK.md`, 해당 영역의 `PROJECT_CONTRACT.md`와 `ACTIVE_WORK.md`를 먼저 확인한다. 이어 이 파일의 **현황·우선순위·다음 한 단계**를 읽는다.
