@@ -54,3 +54,16 @@ STATUS_SUMMARY: `MARR014=PASS; PREFLIGHT_187=PASS; LIVE_104=NOT_RUN; LIVE_83=BLO
 - The remaining 94 within this 104 cohort have NOT RUN. Admin-owned 83 are still BLOCKED by account write-access and ACL read failures. Stage9 service account, timers, NAS ACL policy, videos, DB, and Jellyfin unchanged.
 
 LATEST_STATUS: `FIRST10_DRYRUN=PASS; FIRST10_APPLY=NOT_RUN; LIVE_104=NOT_RUN; LIVE_83=BLOCKED; P03_T=NOT_RUN`.
+
+
+## P03-H first 10 live apply — 2026-10-30 23:21 KST (user terminal log)
+
+- User ran NAS normal `ssikgun`, non-sudo `python3 -B p03h_bulk104_ssikgun_controlled.py --apply --start 0 --count 10 --confirm P03H-104`. Exact NAS staged script SHA256 `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef` and frozen 188 manifest SHA256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087` both verified PASS in user log.
+- `PREFLIGHT=10_PASS`, `BATCH_BACKUP=PASS`, `BATCH=PASS; APPLIED_COUNT=10`, `NAS_NFO_WRITE=10; VIDEO_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`, `JELLYFIN_REFRESH=NOT_RUN`.
+- Backup: `/volume1/video/video2/downloads/backups/stage9/p03h-bulk104-20261030-232101-jfneyo0r` (per-ID original.nfo, original_acl.txt, receipt.json).
+- Applied exact IDs: `ACHJ-097, ADN-785, ADN-799, AVSA-455, AVSA-456, BAGR-093, CAWB-039, DAL-012, DANDYA-049, DASS-534`.
+- Applied NFO SHA256 in above order: `ab68d15a40a2990be4536d8d77286d011b8c37a7375567f0b8659760755b0809`, `819d29338cda63aba564efee28e7ac277da9e41cd62bc0a7cc324efb5812e413`, `e264cc5a77a55b17720498cc31c8c702419149f12219368a6024bfa358d658dd`, `ba7862170073ee27604d1ea5eb50320c768f393691605ee7e804d3a1b3022161`, `afee042ad3e7281b92ab7afd41b464dd80c682bc74a23d2a1b4dd967a8a5b8fc`, `aba4512e326786a8af047207ea78ece0dbc2b4d9dac996e63fcd16fe5a86a49c`, `61f4ea6238ac73d7328c42c423a62bc59885c3a6335f81c701fb71eb540a94d8`, `e5a13f22da6f5f01fac8ec590d0bc286818c21fcd6d55edfebc9f3bcf5edbbca`, `d8c9caf825bf107c57716fbf824bfc66bc60af5709121182b3e367484cefd53f`, `82481c793a3ecddac49361c6b061d01e081012435ddf6f060ed8a2b8eaee50d4`.
+- This is user-supplied execution evidence, not independent second NAS readback. Next: read-only 10-target receipt/backup/NFO hash, ACL and owner/mode check; stop if mismatch. DO NOT rerun first batch.
+- Remaining: 94 `ssikgun` writable + 83 `admin` inaccessible. MARR-014 and protected 59 excluded. No timer, Stage9 account or unrelated service change. Stage9 timer 10-min change still NOT RUN.
+
+LATEST_STATUS: `FIRST10_APPLY=PASS_10; FIRST10_INDEPENDENT_POSTCHECK=NOT_RUN; REMAINING_104=94; LIVE_83=BLOCKED; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
