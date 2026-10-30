@@ -6,6 +6,24 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-N V2 FOUR-FILE SOURCE-ONLY CANONICAL PROMOTION APPROVED — 2026-10-30 KST
+
+EXPLICIT USER APPROVAL: Following P03-N v2 `STATIC_REVIEW=PASS_OFFLINE`, user stated **"응 승인해"**, in direct response to the exact request to promote the reviewed four-file Stage9 NFO-only candidate to the **GitHub canonical source branch only**, with **no runtime deployment or NAS/Jellyfin/production DB writes**. Workstream `stage9-media / STG9MEDIA-001 / IN_PROGRESS`, Stage9 contract v1.0.0 and common contract v1.0.1.
+
+SOURCE / INTEGRITY: Exact uploaded `p03n-review-v2-twr9OL.patch`, 15,692 bytes, SHA-256 `85a292816c3c457d6b712d8b62d1961afc1d1d72d69f7be70e2732f914a44802`, corresponding to the user-preserved CT108 isolated dirty candidate baseline HEAD `587ed8c9f79bea2584b4b91b52293527ee9d9e38`. Current canonical source before approval recording `6705204bf4aa49d61cc034539570b6a59a232645`, intervening commits change governance/handoff only, not the four candidate source files. Preserve dirty candidate under `/tmp/p03n-clean-xOKlUfE7/repo`; do not force-pull, reset, clean, or rewrite it.
+
+EXACT FOUR FILES ALLOWED FOR ONE SOURCE-ONLY PROMOTION:
+- `teddy_discovery_media_filestation.py` (group observation and safe 1805 collision classification).
+- `teddy_discovery_media_filestation_smoke.py` (group smoke expectation).
+- `teddy_discovery_media_nfo_only.py` (new NFO-only bounded historical cohort function).
+- `teddy_discovery_media_nfo_only_smoke.py` (new synthetic smoke).
+
+IMPLEMENTATION RULE: Verify latest canonical SHA before write and confirm baseline blob SHAs for existing files and nonexistence of the two new paths. Apply the **exact full reviewed v2 patch**, not a newly interpreted implementation, to only the above files. Prefer one atomic GitHub tree+commit+conditional ref update on `teddy-subtitle-stage11`; no `main` substitution, no force or permission bypass. Compare the four resulting blobs with patch header target Git blob hashes and verify GitHub file readback, commit file list and branch HEAD. Abort on any concurrent head move, unapproved file change or content/digest mismatch. Any remediation requires separate review.
+
+ACCEPTANCE: `PATCH_SHA256=PASS`, `DIFF_SCOPE=FOUR_APPROVED_FILES_ONLY`, `SOURCE_PROMOTION=PASS`, `CANONICAL_READBACK=PASS`, `CI=PASS` if workflow finishes (otherwise `PENDING` not PASS), `OPERATING_DEPLOYMENT=NOT_RUN`, `LIVE_CANARY=NOT_RUN`, `NFO_CREATED_ON_NAS=0`, `PRODUCTION_DB_WRITE=0`, `POSTER_WRITE=0`, `JELLYFIN_NETWORK_CALL=0`, `TIMER_CHANGE=NOT_RUN`. The offline 33+6 test PASS remains Codex-reported, not independent live safety proof. `LIVE_CREATE_ONLY_GUARD=UNVERIFIED` and exact 129 historical IDs/metadata/owner/group/NFO absence remain future gates.
+
+NEXT AFTER PROMOTION: separately request an exact-one-target, read-only production NAS/DB preflight and evidence for authoritative collision no-overwrite before authorizing any real File Station upload, then stage existing 119 NFO title repairs and actual Jellyfin search verification. Stage9 hourly→10-minute timer stays **P03 LAST** and requires separate approval.
+
 ## P03-N V2 PATCH INDEPENDENT STATIC REVIEW PASS — 2026-10-30 KST
 
 SOURCE: User-uploaded `p03n-review-v2-twr9OL.patch`; independently read entire **261-line, 15,692-byte** patch, SHA-256 `85a292816c3c457d6b712d8b62d1961afc1d1d72d69f7be70e2732f914a44802`. Compared with v1 patch SHA-256 `1686e62d0a15d0efcced2be49aaee077ba131ecebf9a15c22ca0b32679000cb8`: previous File Station adapter/smoke changes unchanged; only NFO-only entrypoint and synthetic smoke were amended. Python AST parsed both complete new modules; 33 unique smoke cases independently counted. **39 total test PASS/0 FAIL remains Codex-reported, not independently rerun.**
