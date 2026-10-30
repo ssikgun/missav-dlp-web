@@ -1,7 +1,7 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 1
-UPDATED_AT: 2026-10-30 KST (P03 STAGE9_DEPLOYMENT=PASS_CODEX_REPORTED, NATURAL_RUN=NOT_OBSERVED, JELLYFIN_SEARCH=NOT_VERIFIED)
+UPDATED_AT: 2026-10-30 KST (P03 STAGE9_DEPLOYMENT=PASS_CODEX_REPORTED, NATURAL_RUN=PASS_USER_LOG, NFO_TITLE=NOT_OBSERVED, JELLYFIN_SEARCH=NOT_VERIFIED)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
@@ -21,7 +21,7 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 | --- | --- | --- | --- | --- |
 | 1 | P01 | **미디어 자동화 잔여 항목 원인 확인** (과거 Stage9 Media) | **완료 — 조사 범위 한정** | CT108 읽기 전용 DB 확인: COMPLETED 122, FAILED 3, PENDING/RUNNING 0; 오래된 COMPLETED/UNKNOWN 조합 108, 포스터 PENDING 8건 모두 COVER_URL_MISSING, FNS-267 내부 Jellyfin CHECK_PENDING 1건, 타이머 active 및 마지막 서비스 Result=success. 강제 재시도·정리·DB 변경은 별도 항목 P01-H로 **보류**. |
 | 2 | P02 | **루트/Overlay 중복 파일 5쌍의 읽기 전용 정밀 검수** | **완료 — 정적 소스·패치 비교 범위만 (2026-10-29)** | 5쌍 모두 분석: HTML은 최종 Overlay 기준 UI/패치 순서, 저장 코드는 no-overwrite·SHA-256, 엔트리포인트는 HLS/MP4, 부트스트랩은 보호된 게시·복구, 앱은 영속 상태·재시도 안전성 차이가 핵심. 실제 빌드 중간 산출물과 새 단일 원본의 byte-identical 동등성은 미검증이며 P04 구현·검증 승인 시 별도 확인. 소스·이미지·운영 변경 0. |
-| 3 | P03 | **Jellyfin에서 `[작품번호] 작품 제목` 표시 및 작품번호 검색** (미디어 메타데이터) | **Stage9 전용 운영 릴리스 전환 PASS (Codex 보고, 2026-10-30); 다음 정기 실행·Jellyfin 검색 미검증** | 정본 코드 승격 `b31873824527bbcdf800d141b40eaf6e2af03abd` 완료. 사용자 승인 후 CT108에서 Stage9 전용 릴리스 `9e196b6c…` → `b3187382…` 전환, 새 NFO 모듈 SHA·27모듈 manifest·585개 기존 파일 비교·합성 smoke PASS (Codex 보고 09:36 KST). 기존 unit 백업과 릴리스 보존, 전용 타이머 active/enabled, 다음 예약 10:01:15 KST. **NEXT_NATURAL_RUN/NFO_TITLE=NOT_OBSERVED, JELLYFIN_TITLE_SEARCH=NOT_VERIFIED, OTHER_SERVICES_UNCHANGED=INCOMPLETE** (일부만 점검). 다음 단계는 정상 예약 실행 이후 읽기 전용 관찰. 기존 NAS NFO/영상/포스터 변경, 강제 작업·전체 Jellyfin 새로고침 금지. |
+| 3 | P03 | **Jellyfin에서 `[작품번호] 작품 제목` 표시 및 작품번호 검색** (미디어 메타데이터) | **Stage9 전용 운영 배포·첫 정기 실행 PASS (2026-10-30); 신규 NFO/Jellyfin 검색 미검증** | 소스 정본 승격 `b31873824527bbcdf800d141b40eaf6e2af03abd`; 전용 릴리스 `9e196b6c…` → `b3187382…` 배포 PASS (Codex 보고). 사용자 제출 CT108 systemd/journal: 10:01:16 KST 자연 실행 exit 0, 새 릴리스 사용, 타이머 active/enabled 및 다음 예약 11:04:53. `media.attempted=0`, `registered=0`, `jellyfin_get_requests=0`, `jellyfin_post_attempts=0`; **새 NFO 제목 NOT_OBSERVED / Jellyfin 품번 검색 NOT_VERIFIED**. `manual_action_updates=1`은 조건부 DB 상태 업데이트 경로 호출 횟수이며 실제 변경 행 수는 미확인. 다른 서비스 영향은 일부만 확인하여 INCOMPLETE. 기존 NAS NFO/MP4/포스터 변경·강제 재처리·Jellyfin 전체 새로고침 금지. |
 | 4 | P04 | **검수로 확정된 중복만 단계적 단일 원본화** | **미착수 — 범위/구현 승인 전** | P02 결과로 각 파일의 patch 의존성, 실행 동등성, 데이터 보호 경계를 문서화하고 승인된 파일에만 변경→격리 검증→별도 운영 배포 승인. 위험도가 낮은 HTML부터 제안하되 확정 우선순위는 검수 결과에 따른다. |
 | 5 | P05 | **일반 다운로드/Discovery Writer 작업 DLDWS-001 종료 조건 점검** | **미착수 — 대표 운영 검증 PASS** | 이미 완료한 Docker 이미지 교체·FNS-267 실사용 성공을 재검증 없이 활용한다. 남은 계약상 미완료 조건과 Writer 소켓 안전성 이력만 정리하고 사용자 결정 후 종료 여부 판단. 현재 두 영역 모두 `IN_PROGRESS / DLDWS-001`. |
 | 6 | P06 | **한국어 자막 음성 인식/화자 근거 확인** (이전 Stage11) | **진행 중 — 별도 독립 작업** | 현재 `S11-WX011 / IN_PROGRESS`. 기존 S04/S08/S13 일본어 후보와 오디오를 사용자에게 비교 제시할 다음 결정이 남아 있음. S03/S11/S15 누락 의심, 일본어 정답/정확한 경계/화자 DER는 UNKNOWN. 계약에 따른 읽기 전용 범위만. |
