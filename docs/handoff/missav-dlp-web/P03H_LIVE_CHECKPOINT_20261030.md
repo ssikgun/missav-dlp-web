@@ -67,3 +67,16 @@ LATEST_STATUS: `FIRST10_DRYRUN=PASS; FIRST10_APPLY=NOT_RUN; LIVE_104=NOT_RUN; LI
 - Remaining: 94 `ssikgun` writable + 83 `admin` inaccessible. MARR-014 and protected 59 excluded. No timer, Stage9 account or unrelated service change. Stage9 timer 10-min change still NOT RUN.
 
 LATEST_STATUS: `FIRST10_APPLY=PASS_10; FIRST10_INDEPENDENT_POSTCHECK=NOT_RUN; REMAINING_104=94; LIVE_83=BLOCKED; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## First 10 independent NAS postcheck — 2026-10-30 KST (user terminal evidence)
+
+- Following the exact first-10 live application, user executed a **read-only** Python verification under NAS non-sudo `ssikgun` over SSH from CT108. Exact manifest SHA-256 was checked against `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`.
+- Inspected the ten identity-matched `receipt.json`, `original.nfo`, `original_acl.txt`, and current canonical NFOs under the first-batch backup directory `/volume1/video/video2/downloads/backups/stage9/p03h-bulk104-20261030-232101-jfneyo0r`.
+- For every one of `ACHJ-097, ADN-785, ADN-799, AVSA-455, AVSA-456, BAGR-093, CAWB-039, DAL-012, DANDYA-049, DASS-534`, the program printed `PASS=<DVD-ID> BACKUP=OK NFO=OK ACL=OK`.
+- Checks included exact original backup SHA against immutable manifest and backup receipt; updated NFO bytes exactly equal to insertion of `[DVD-ID] ` into the original title only; expected updated SHA; inode, UID, GID, mode, regular-file/link count; Synology ACL hash and extended attribute names unchanged.
+- Terminal summary: `POSTCHECK=10_PASS`; `NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`. This PASS is based on user's NAS terminal output, not a separate GitHub-side NAS connection.
+- **First 10 are COMPLETE / verified; NEVER reapply start=0.** This did not include Jellyfin library rescan. Keep original backups intact.
+- Next checkpoint is next-batch `--dry-run --start 10 --count 10` from the **same verified NAS staging directory** `/tmp/p03h-bulk104-sIzAT42z`, with exact script+manifest SHA checks. If PASS, authorized separate apply for same bounded ten and independent postcheck; stop immediately on any mismatch. Do not include 83 inaccessible admin-owned files or protected 59, and do not change Stage9 timers yet.
+
+LATEST_STATUS: `FIRST10_APPLY=PASS_10; FIRST10_INDEPENDENT_POSTCHECK=PASS_10; REMAINING_104=94; LIVE_83=BLOCKED; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
