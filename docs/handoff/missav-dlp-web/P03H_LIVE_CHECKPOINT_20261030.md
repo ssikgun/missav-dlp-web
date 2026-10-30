@@ -181,3 +181,17 @@ LATEST_STATUS: `FIRST20_INDEPENDENT_POSTCHECK=PASS_20; THIRD20_DRYRUN=PASS_20; T
 - Workstream `STG9MEDIA-001`; Stage9 timer remains unchanged; unrelated sources and services not modified as per observed run.
 
 LATEST_STATUS: `THIRD20_APPLY=PASS_20; THIRD20_INDEPENDENT_POSTCHECK=NOT_RUN; CUMULATIVE_APPLIED=40_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=20_OF_187; REMAINING_104=64; LIVE_83=BLOCKED; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Third batch (offset 20–39) independent NAS postcheck — 2026-10-30 KST, user terminal evidence
+
+- Following the earlier exact 20-file apply backed up in `/volume1/video/video2/downloads/backups/stage9/p03h-bulk104-20261030-234831-wfbw63iw`, user executed NAS read-only Python over SSH as ordinary `ssikgun` from CT108.
+- Validated immutable 188-row manifest SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`, exact sorted 104-title cohort offset 20–39 against fixed expected 20 DVD IDs; matched per-title `receipt.json`, `original.nfo`, `original_acl.txt`, backup SHA, and original manifest SHA.
+- Compared each current NFO's bytes against exact title-only insertion `[DVD-ID] ` into original bytes and expected candidate SHA; verified original inode, owner UID/group GID/mode and link count; checked live Synology ACL SHA and xattr name list unchanged.
+- Every one of `DVMM-015, EBWH-090, EBWH-296, EKDV-826, EROFV-313, EROFV-387, EROFV-390, FC2-PPV-4973050, FNS-244, FSDSS-901, FTHT-361, FTHTD-219, FTHTD-228, FTKD-045, GANA-3432, HMN-890, HMN-904, HNBR-014, HODV-22112, HODV-22113` printed `PASS=<DVD-ID> BACKUP=OK NFO=OK ACL=OK`.
+- Terminal summary `POSTCHECK=20_PASS`; `NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`. This is user-supplied direct NAS terminal evidence, not a separate GitHub-side NAS connection.
+- **Offsets 0–39 are now 40/187 applied and independently verified. Do not rerun these offsets.** Remaining `ssikgun` cohort 64, `admin` owner cohort 83 still not writable with ordinary `ssikgun`. Protected 59 and finished MARR-014 remain excluded.
+- Next **single checkpoint**: verify script and manifest SHA and run only `--dry-run --start 40 --count 20` on NAS from the existing staging dir `/tmp/p03h-bulk104-sIzAT42z`. Do not auto-apply until log confirms 20 PASS. Continue GitHub checkpointing after each real apply/postcheck.
+- No Jellyfin refresh, DB operation, Stage9 timer change, video mutation, or other-workstream modification done in this verification.
+
+LATEST_STATUS: `THIRD20_APPLY=PASS_20; THIRD20_INDEPENDENT_POSTCHECK=PASS_20; CUMULATIVE_APPLIED=40_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=40_OF_187; REMAINING_104=64; LIVE_83=BLOCKED; NEXT20_DRYRUN=NOT_RUN; P03_T=NOT_RUN`.
