@@ -6,6 +6,16 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-N EXACT-ONE-TARGET PREFLIGHT PHASE 1 — USER CT108 READ-ONLY PASS (2026-10-30 KST)
+
+EVIDENCE_SOURCE: User-provided `root@downloader` CT108 command/output after explicit read-only preflight approval. Existing local historical P03-H inventory directory `/tmp/p03h-nfo-inventory-20261030-8edfut5v/` has `summary.json` (10,811 bytes), `targets.jsonl` (32,195 bytes) and `inventory.jsonl` (76,754 bytes), with valid JSON object shape. `targets.jsonl` row fields `dvd_id,nfo_relative_path,video_relative_path`; `inventory.jsonl` fields `dvd_id,nfo_owner_matches_video,nfo_present,nfo_relative_path,nfo_sha256,originaltitle_present,reason,status,video_relative_path`. First sample ID `ACHJ-097` was **NFO_PRESENT=True**, and must **not** be selected as a missing-NFO canary merely because it appears first.
+
+Current live Discovery DB at `/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3` was queried using `mode=ro` and `PRAGMA query_only=ON`. Query filtered present/JAV/MATCHED/positive-size holdings, historical source in the approved two cohorts and same-DVD-ID Organizer COMPLETED. Counts: `library-inventory=68`, `organizer-apply=61`, total **129**. User script reported `AUDIT_STRUCTURE=PASS`, `DB_READ_ONLY=PASS`, `NAS_UPLOAD=0`, `PRODUCTION_DB_WRITE=0`, `TARGET_SELECTED=NOT_YET`. No NAS File Station access took place in phase 1.
+
+INTERPRETATION: 129 current DB-eligible titles **numerically agree** with the earlier P03-M historical source partition (68+61), but overlap with the exact 129 **historically missing NFO ID set** is **not yet verified**. The JSON file listing all historical targets includes entries with `nfo_present=True`; treat only `inventory.jsonl` rows with `nfo_present is False` as historical missing candidates, then intersect by ID and canonical NFO/video paths with `targets.jsonl` and current matching DB holdings. A past missing NFO remains unproven absent on current NAS until exact current read-only check.
+
+NEXT AUTHORIZED READ: Bounded, read-only, exact historical-missing inventory/target join against current eligible DB IDs to **select one safe exact DVD-ID**, with no new NAS scan or publication. Then separate bounded read-only NAS video/getinfo and NFO existence/owner/group for that one exact ID. If metadata evidence is incomplete or selection ambiguous, fail closed and report. No actual NAS upload, production DB/NFO write, Jellyfin call, poster action or timer change; `LIVE_CREATE_ONLY_GUARD=UNVERIFIED`. A successful preflight does not authorize a write canary.
+
 ## P03-N EXACT-ONE-TARGET READ-ONLY DB/NAS PREFLIGHT APPROVED — 2026-10-30 KST
 
 USER APPROVAL: After source-only promotion PASS, the assistant proposed a **single exact DVD-ID read-only current DB/NAS preflight** as the next separately authorized work and explicitly excluded any NAS write. The user replied **"응 다음 작업"**. This authorizes only bounded, read-only **candidate selection and preflight of one exact historical NFO-missing DVD-ID**, inside `stage9-media / STG9MEDIA-001 / IN_PROGRESS` (common contract v1.0.1 / Stage9 v1.0.0). It does **not** authorize an NFO upload, File Station create-only collision test requiring a write, operational deployment, metadata/job DB modification, poster/Jellyfin activity or timer modification.
