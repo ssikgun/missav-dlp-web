@@ -6,6 +6,21 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-N ISOLATED OFFLINE CANDIDATE AND SYNTHETIC SMOKE — CODEX-REPORTED PASS (2026-10-30 11:55:57 KST)
+
+EVIDENCE_SOURCE: User pasted Codex's final report from user-managed CT108 isolated independent clone `/tmp/p03n-clean-xOKlUfE7/repo`. These are **Codex-reported** results; ChatGPT has not yet independently read uncommitted/untracked candidate source or rerun offline smoke. Codex preflight checked clean baseline branch `teddy-subtitle-stage11` at `587ed8c9f79bea2584b4b91b52293527ee9d9e38` and active approval, while the session did **not** independently recheck remote latest HEAD. ChatGPT separately verified that the remote branch currently still points to this SHA **before** recording the result.
+
+RESULT: `PREFLIGHT=PASS`; `ISOLATED_CANDIDATE=PASS`; `IMPLEMENTATION=PASS` (candidate only); `OFFLINE_SMOKE=PASS` with **21/21 new NFO-only synthetic tests** and **6/6 existing File Station regression tests**, total 27 PASS/0 FAIL; `CREATE_ONLY_COLLISION_OFFLINE=PASS`, including existing same/different content, simulated error 1805/414, uncertain upload, and postverify mismatch; `DIFF_SCOPE=PASS`; `CANONICAL_UNCHANGED=PASS`; `NO_REAL_NETWORK_DB_NAS_CALLS=PASS`; `git diff --check=PASS` — all based on user-supplied Codex report.
+
+EXACT CANDIDATE FILES, UNPROMOTED:
+- New untracked `teddy_discovery_media_nfo_only.py`, `teddy_discovery_media_nfo_only_smoke.py`: historical NFO-only one-title entrypoint and synthetic smoke.
+- Modified tracked `teddy_discovery_media_filestation.py`, `teddy_discovery_media_filestation_smoke.py`: owner group observation and Synology 1805 collision categorization, regression smoke.
+- Reported `git status --short`: ` M teddy_discovery_media_filestation.py`, ` M teddy_discovery_media_filestation_smoke.py`, `?? teddy_discovery_media_nfo_only.py`, `?? teddy_discovery_media_nfo_only_smoke.py`. No commit, PR or push; candidate exists **only in isolated `/tmp` clone**. Protect its files; clone is ephemeral and may be lost on cleanup/restart.
+
+SAFE LIMITS: `LIVE_CREATE_ONLY_GUARD=UNVERIFIED` (real Synology collision behavior not tested), `SOURCE_PROMOTION=NOT_RUN`, `LIVE_CANARY=NOT_RUN`, `NFO_CREATED_ON_NAS=0`, `PRODUCTION_DB_WRITE=0`, `POSTER_WRITE=0`, `JELLYFIN_NETWORK_CALL=0`, `TIMER_CHANGE=NOT_RUN`. Existing 119 NFO titles and 3 prefix conflicts/13 owner-group issues, 3 exhausted media jobs, and 1 historical DB/NAS mismatch remain separate. No change to prior approved production behavior.
+
+NEXT_REVIEW: **Read-only review of the exact candidate source/diff and its fail-closed paths** before deciding whether to approve promotion to canonical branch; then separate explicitly authorized one-title live NAS canary only after real server-side no-overwrite/collision protection and same-title current NFO absence are verified. Do not use this dirty candidate clone as the base for unrelated workstreams. For a different workstream, use a new clean clone/worktree of current canonical HEAD and route/authorize that workstream separately. Existing authorization only covers P03-N local candidate and synthetic tests, not promotion/live upload.
+
 ## P03-N CLEAN INDEPENDENT CT108 CLONE VERIFIED — USER TERMINAL (2026-10-30 KST)
 
 EVIDENCE_SOURCE: User supplied the normal trusted CT108 `root@downloader` shell output; **not** an independent shell execution by ChatGPT. `hostname=downloader`, `PID1=systemd`. The normal host `git ls-remote origin refs/heads/teddy-subtitle-stage11` returned exact canonical SHA `d3f74d53c56e395e3c9fd9b78fc69373810d7483`, so earlier DNS failure was confined to the Codex sandbox observation, not the host shell.
