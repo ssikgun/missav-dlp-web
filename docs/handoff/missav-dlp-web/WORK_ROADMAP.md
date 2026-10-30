@@ -1,7 +1,7 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 1
-UPDATED_AT: 2026-10-30 KST (P03 DEPLOYMENT/NATURAL_RUN=PASS, P03-H TITLE-ONLY USER_PREAPPROVAL, P03-T 10MIN_FINAL_STEP_PLANNED, JELLYFIN_SEARCH=NOT_VERIFIED)
+UPDATED_AT: 2026-10-30 KST (P03-H NFO_INVENTORY_255=PASS_CODEX_REPORTED, TITLE_BACKFILL=BLOCKED, P03-T 10MIN_PLANNED, JELLYFIN_SEARCH=NOT_VERIFIED)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
@@ -30,7 +30,7 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 ### 별도 보류 / 자동 수행하지 않는 항목
 
 - **P01-H — 미디어 자동화 잔여 운영 처리:** `DANDYA-033`, `NHDTB-778` = unsupported video extension (각 실패 5회), `MFCS-085` = cover_url missing (과거 누적 17,161회); 포스터 대기 8건은 URL 없음; `FNS-267`은 Jellyfin 실제 재생 PASS지만 DB의 recovery/visibility PENDING이 관찰됨. 이전 완료 108건의 신규 필드 UNKNOWN은 미처리 108건이라고 단정하지 않는다. 처리를 원하면 최신 상태 읽기 전용 재확인 후 안전한 별도 승인. **보류**.
-- **P03-H — 기존 NFO 제목 품번 추가:** **읽기 전용 조사 INCOMPLETE (Codex 보고 2026-10-30 10:30 KST)**. 현재 보유 작품 254개, 기존 File Station API 요청 한도 64/64 때문에 31개만 확인: 실제 NFO 29개(모두 `<id>`/`uniqueid` 일치·XML 유효·`[DVD-ID]` 접두사 없음), 미존재 2개, 미확인 223개. 29개 중 29개가 수정 후보이지만 **전체 254개 전수 확인은 아님**. 신규 NFO·Jellyfin 품번 검색은 미검증. 사용자는 안전하게 확인된 **기존 NFO `<title>`에 품번 1회 추가하는 목표를 사전 승인**, 실제 NAS 권한/백업/원자적 교체/복구/대상 SHA·경합 안전 설계 및 실행 단계 확정 전 **WRITE_EXECUTION=NOT_STARTED**. 기존 create-only File Station 경로는 덮어쓰기 불가, 다른 아티팩트 보호 유지. Codex는 읽기 전용 SQL·NAS GET만 사용했다고 보고했으나 DB 본 파일 SHA 변화 및 WAL/SHM 소멸이 별도 관찰되어 **DB 바이트 불변은 미검증**. **다음 승인(2026-10-30):** 전체 254개 읽기 전용 재조사 또는 기존 31개 대상 검증 후 남은 223개 분할 조사 허용. 각 File Station 세션 최대 64회 요청을 유지하고 순차 소규모 배치, 전체 계수 합산 및 불명확 사례 별도 표기. 진행 전 승인 기록 `docs/governance/stage9-media/ACTIVE_WORK.md`를 재확인. **조사 실행 NOT_RUN**, 기존 NFO 쓰기·10분 타이머 변경은 여전히 미실행.
+- **P03-H — 기존 NFO 제목 품번 추가:** **읽기 전용 전수 조사 PASS (Codex 보고 2026-10-30 10:52:53 KST)**. 현재 보유 작품 **255개 모두 확인**: NFO 존재 122개 중 **품번 추가 후보 119개**, 기존에 다른 품번 접두사가 있는 **모호한 3개는 제외**, 실제 NFO 없음 **133개**. 119개 중 영상/NFO 소유자 또는 그룹 불일치 13개는 추가 안전 검토 필요. 이전 254개와 이번 255개는 과거 ID 집합이 없어 1개 증가 원인/동일 집합 여부 미확인. File Station 한도 유지 22개 독립 순차 세션/842요청/세션 최대 48/64. DB/WAL/SHM 전후 SHA 같지만 SHM mtime 변동되어 audit 기인 write 여부 UNKNOWN. **기존 NFO 제목 수정 목표는 사용자 사전 승인, 실제 기존 파일 교체 방식은 create-only 충돌로 BLOCKED / 운영 쓰기 NOT_STARTED.** NFO가 없는 133개는 기존 NFO 제목 수정과 별도 현상: Stage9 자동 작업은 Organizer COMPLETED·discovered_by=completion-stage9 등 조건을 충족한 보유만 등록하므로 255개 전체가 대상이 아닐 수 있음. **133개 누락의 실제 원인별 개수는 미조사**, 신규 NFO 생성/일괄 재처리 승인은 없음. Jellyfin 실제 품번 검색 NOT_VERIFIED. 후속: 133개를 Organizer/Stage9 작업 상태와 읽기 전용 교차 대조, 119개 기존 NFO는 허용된 소유권·백업·원자적 교체·복구 수단 검증 후 별도 실행.
 - **P03-T — P03 최종 단계 (10분 Stage9 타이머):** 기존 1시간 주기 → **10분 주기**를 사용자 요청에 따라 P03-H 및 Jellyfin 대표 품번 검색 확인 **뒤에** 배치함. 설계/검토 계획으로만 등록; 실제 `teddy-stage9-media.timer` 변경 **NOT_RUN**, 현재 Codex 조사 완료 전 변경하지 않음. 단위 설정(무작위 지연 포함), 재진입·부하·실패 중지 정책·기존 다운로드 타이머 분리 검증 후 별도 변경 승인과 백업/복구 절차 필요.
 - 재생 정상 파일의 대체 코덱/Jellyfin 강제 트랜스코딩, 1회성 iPhone Safari 다운로드 실패 등 과거 선택적 기능은 재현/필요성 증거 없이는 후순위.
 - 과거 Stage10의 보유목록/중복방지 등 완료 이력은 새 작업으로 재등록하지 않는다. 2026-10-29 최신 라우터에 별도 Stage10 workstream은 없다.
