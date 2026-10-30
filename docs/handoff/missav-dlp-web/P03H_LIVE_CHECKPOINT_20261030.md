@@ -119,3 +119,15 @@ LATEST_STATUS: `FIRST10_POSTCHECK=PASS_10; SECOND10_DRYRUN=PASS_10; SECOND10_APP
 - No Stage9 service credentials, ACL policy, existing video, product DB, Jellyfin, protected 59, completed MARR-014 or timer changes.
 
 LATEST_STATUS: `FIRST10_POSTCHECK=PASS_10; SECOND10_APPLY=PASS_10; SECOND10_INDEPENDENT_POSTCHECK=NOT_RUN; APPLIED_TOTAL=20_OF_187; REMAINING_104=84; LIVE_83=BLOCKED; P03_T=NOT_RUN`.
+
+
+## Second 10 independent NAS postcheck — 2026-10-30 KST, user terminal
+
+- Exact follow-up to second batch live application (`--start 10 --count 10`), backup directory `/volume1/video/video2/downloads/backups/stage9/p03h-bulk104-20261030-233103-pbrtrzep`.
+- User ran CT108 SSH to NAS as normal `ssikgun` with read-only Python: checked frozen 188-manifest SHA `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`, selected sorted manifest offset 10–19 against exact expected DVD IDs, checked `receipt.json` and `original.nfo` bytes/SHA against manifest, saved ACL SHA, current NFO expected title-only prefix bytes and candidate SHA, inode/UID/GID/mode/link count, live Synology ACL hash and xattrs.
+- All ten printed `BACKUP=OK NFO=OK ACL=OK`: `DLDSS-536,DLDSS-555,DLDSS-557,DLDSS-559,DOKI-037,DOKS-689,DROP-141,DSOD-046,DVAJ-754,DVAJ-757`.
+- Summary: `POSTCHECK=10_PASS`; `NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`. All checks based on user-supplied CT108/NAS terminal evidence, not separately connected NAS by GitHub.
+- **First 20/187 are now applied and independently verified. Do not reapply offsets 0–19.** Remaining `ssikgun` subset 84, `admin`-owned inaccessible subset 83. Preserve all original backups.
+- User requested larger batches and approved rollout; existing reviewed batch program limit `MAX_BATCH=20`. **Next single checkpoint**: verify NAS script + manifest SHA and execute dry-run only `--dry-run --start 20 --count 20` (indices 20–39 in 104 ssikgun-owned cohort) under original NAS staging `/tmp/p03h-bulk104-sIzAT42z`; actual apply must wait until dry-run result is observed. No change to code, admin permissions, unrelated workstream, Stage9 timer or Jellyfin DB.
+
+LATEST_STATUS: `FIRST10_POSTCHECK=PASS_10; SECOND10_APPLY=PASS_10; SECOND10_INDEPENDENT_POSTCHECK=PASS_10; APPLIED_TOTAL=20_OF_187; REMAINING_104=84; LIVE_83=BLOCKED; NEXT20_DRYRUN=NOT_RUN; P03_T=NOT_RUN`.
