@@ -6,6 +6,21 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03 FIRST NATURAL STAGE9 RUN OBSERVED — USER-SUBMITTED CT108 LOG (2026-10-30 10:01:16 KST)
+
+EVIDENCE_SOURCE: User-provided read-only `systemctl show` and `journalctl` output for the approved first natural Stage9 invocation. ChatGPT reviewed the supplied systemd output and GitHub implementation; this is not an independent direct CT108 query.
+
+RESULT: `NEXT_NATURAL_RUN=PASS; EXIT=0; RESULT=success; NEW_RELEASE_RUNTIME=PASS; STAGE9_TIMER=active/enabled; NFO_TITLE=NOT_OBSERVED; JELLYFIN_TITLE_SEARCH=NOT_VERIFIED; OTHER_SERVICES_UNCHANGED=INCOMPLETE`.
+
+- On 2026-10-30 10:01:16 KST, `teddy-stage9-media.service` started and exited successfully with `ExecMainStatus=0` and `Result=success`, using `WorkingDirectory=/opt/missav-dlp-web/stage9-runtime/releases/b31873824527bbcdf800d141b40eaf6e2af03abd`. `inactive` afterward is expected for oneshot.
+- `teddy-stage9-media.timer` remained `active/enabled`, last trigger 10:01:16 and next reported trigger 11:04:53 KST.
+- Runner JSON: `status=COMPLETE`, `stage=stage9-media-only`, `non_media_execution=0`, `registered=0`, `media.attempted=0`, `media.completed=0`, `media.failed=0`, `media.retryable=8`, `media.held_cover_url_missing=8`, `media.exhausted=3`, `media.manual_action_updates=1`, `media.manual_action_updates_deferred=2`, `jellyfin_get_requests=0`, `jellyfin_post_attempts=0`, `jellyfin_visibility.visible=122`, `jellyfin_visibility.jellyfin_mutations=0`.
+- Source review: `manual_action_updates` counts executions of `_mark_jellyfin_manual_action_if_exhausted`, which enters a media-DB transaction and issues a conditional UPDATE for an exhausted job. The counter increments even if zero rows matched; **do not infer either that exactly one DB row changed or that DB writes were zero**. `jellyfin_mutations=0` reports only that metric, not an exhaustive DB write audit.
+- There were no newly attempted media jobs and no new NFO was observed during this invocation. Existing count `visible=122` is a runner summary and does **not** prove the new P03 title was visible or searchable in Jellyfin. Do not infer product/search PASS.
+- No forced job, manual apply, old-NFO rewrite or broader scan was requested; continue approved existing scheduled operation only. `OTHER_SERVICES_UNCHANGED` remains `INCOMPLETE` because the prior deployment compared only a bounded set of services.
+
+NEXT_DECISION: Observe the new NFO title and Jellyfin number-based search only when a **naturally eligible new media item** is processed, or seek separate express approval for any bounded alternate verification. Do not force jobs or republish existing artifacts to make a test pass.
+
 ## P03 STAGE9-ONLY RUNTIME DEPLOYMENT RESULT — CODEX-REPORTED (2026-10-30 09:36 KST)
 
 STATUS: `PREFLIGHT=PASS; OLD_RELEASE_PRESERVED=PASS; NEW_RELEASE_PREP=PASS; RELEASE_SOURCE_SHA256=PASS; SERVICE_SWITCH=PASS; STAGE9_TIMER=PASS; NEXT_NATURAL_RUN=NOT_OBSERVED; NFO_TITLE=NOT_OBSERVED; JELLYFIN_TITLE_SEARCH=NOT_VERIFIED; OTHER_SERVICES_UNCHANGED=INCOMPLETE; ROLLBACK_READY=PASS`.
