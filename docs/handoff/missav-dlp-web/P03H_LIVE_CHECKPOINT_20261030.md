@@ -39,3 +39,18 @@ BASE_REMOTE_SHA_AT_CHECK: `b6da0ff8423bef0b56be6c1772c6f1740f34eb5d`
 At each significant checkpoint (first bounded batch, next batch result, the 104-file cohort complete, separate 83-file decision, and final Jellyfin validation), append a new dated checkpoint in GitHub on the **same canonical branch** before advancing. Verify the remote branch SHA and new file readback. Do not overwrite or truncate the large historical ACTIVE_WORK/CURRENT_HANDOFF documents merely to prepend a small log. Historical `NEXT` text is not a new approval.
 
 STATUS_SUMMARY: `MARR014=PASS; PREFLIGHT_187=PASS; LIVE_104=NOT_RUN; LIVE_83=BLOCKED; BULK_187=IN_PROGRESS; P03_T=NOT_RUN`.
+
+
+## Verified first-10 NAS dry-run — 2026-10-30 KST, user CT108 evidence
+
+- Stage9 approved bulk candidate, user authorization from the earlier 187-target approval remains limited to 187 exact candidates; protected other 59 files and already finished MARR-014 are excluded.
+- On CT108, local script `/tmp/p03h_bulk104_ssikgun_controlled.py` passed SHA-256 `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef`; 188 JSONL manifest passed SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`.
+- Synology normal SSH user `ssikgun` staging directory `/tmp/p03h-bulk104-sIzAT42z` contains copied verified script and manifest; both hashes validated again on NAS.
+- `--offline-plan` and `--dry-run --start 0 --count 10` both PASS, with 104 exact ssikgun targets, MARR-014 excluded, 83 admin-owned targets excluded.
+- The exact first 10 identities, in ascending order: `ACHJ-097,ADN-785,ADN-799,AVSA-455,AVSA-456,BAGR-093,CAWB-039,DAL-012,DANDYA-049,DASS-534`.
+- User-visible results: `PREFLIGHT=10_PASS; DRY_RUN=PASS; NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`.
+- **First live apply NOT RUN at this checkpoint.** Following step within existing user-approved 187 scope: recheck NAS-staged script/manifest hashes, execute only `--apply --start 0 --count 10 --confirm P03H-104` as non-sudo `ssikgun`, preserve verified backup receipts, stop immediately if any error, and record actual applied count/IDs and NAS backup path in the next GitHub checkpoint.
+- The batch script uses in-place writes, not atomic rename. The preflight PASS does not prove power-loss atomicity or rule out uncooperative concurrent file writers. Backups are created/read back for all 10 before NFO mutations; errors trigger per-file recovery attempt and stop. Never blindly retry after partial failure.
+- The remaining 94 within this 104 cohort have NOT RUN. Admin-owned 83 are still BLOCKED by account write-access and ACL read failures. Stage9 service account, timers, NAS ACL policy, videos, DB, and Jellyfin unchanged.
+
+LATEST_STATUS: `FIRST10_DRYRUN=PASS; FIRST10_APPLY=NOT_RUN; LIVE_104=NOT_RUN; LIVE_83=BLOCKED; P03_T=NOT_RUN`.
