@@ -195,3 +195,16 @@ LATEST_STATUS: `THIRD20_APPLY=PASS_20; THIRD20_INDEPENDENT_POSTCHECK=NOT_RUN; CU
 - No Jellyfin refresh, DB operation, Stage9 timer change, video mutation, or other-workstream modification done in this verification.
 
 LATEST_STATUS: `THIRD20_APPLY=PASS_20; THIRD20_INDEPENDENT_POSTCHECK=PASS_20; CUMULATIVE_APPLIED=40_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=40_OF_187; REMAINING_104=64; LIVE_83=BLOCKED; NEXT20_DRYRUN=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Fourth batch (offsets 40–59) NAS dry-run — 2026-10-31 KST, user CT108 log
+
+- Workstream: `stage9-media`; approved task `STG9MEDIA-001 / IN_PROGRESS`; common contract `v1.0.1 APPROVED`, Stage9 contract `v1.0.0 APPROVED`. Scope remains exact previously approved NFO title-only updates among the 187, excluding admin-owned 83, completed canary MARR-014, and 59 otherwise protected candidates.
+- NAS execution: regular `ssikgun` account via CT108 SSH, unchanged staging `/tmp/p03h-bulk104-sIzAT42z`. Verified script SHA-256 `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef` and frozen manifest SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`, both `OK`.
+- Command: `python3 -B p03h_bulk104_ssikgun_controlled.py --dry-run --start 40 --count 20`.
+- Exact batch IDs: `HODV-22114,HODV-22116,HUNTC-623,IESP-765,IPX-996,IPZZ-034,IPZZ-789,IPZZ-935,IPZZ-972,JUQ-234,JUR-750,JUR-859,KIR-079,KNMB-133,MAAN-1193,MFYD-181,MIAD-866,MIDA-445,MIDA-705,MIDV-372`.
+- User terminal output confirmed `TARGETS_104=PASS; EXCLUDE_MARR014=YES; EXCLUDE_ADMIN83=YES`, `BATCH_START=40; BATCH_COUNT=20`, `PREFLIGHT=20_PASS`, `DRY_RUN=PASS; NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`.
+- **No live write in this batch yet.** Existing 40 NFOs (offsets 0–39) have independent postcheck PASS. Next authorized step within exact title-only scope: verify script/manifest SHA in NAS staging and run `--apply --start 40 --count 20 --confirm P03H-104` as `ssikgun`, ensuring all 20 original backups are verified before writes, saving output/backups for next checkpoint. On error do not rerun automatically; inspect actual partial completion. After apply independently read back originals, receipts, current NFO bytes, ownership/mode and ACL.
+- Remaining before apply: 64 writable `ssikgun` targets plus 83 blocked `admin` files. No Stage9 timer change, no Jellyfin rescan, no DB or video write.
+
+LATEST_STATUS: `FOURTH20_DRYRUN=PASS_20; FOURTH20_APPLY=NOT_RUN; VERIFIED_APPLIED=40_OF_187; REMAINING_SSIKGUN=64; BLOCKED_ADMIN=83; P03_T=NOT_RUN`.
