@@ -30,7 +30,7 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 ### 별도 보류 / 자동 수행하지 않는 항목
 
 - **P01-H — 미디어 자동화 잔여 운영 처리:** `DANDYA-033`, `NHDTB-778` = unsupported video extension (각 실패 5회), `MFCS-085` = cover_url missing (과거 누적 17,161회); 포스터 대기 8건은 URL 없음; `FNS-267`은 Jellyfin 실제 재생 PASS지만 DB의 recovery/visibility PENDING이 관찰됨. 이전 완료 108건의 신규 필드 UNKNOWN은 미처리 108건이라고 단정하지 않는다. 처리를 원하면 최신 상태 읽기 전용 재확인 후 안전한 별도 승인. **보류**.
-- **P03-H — 과거 NFO 전체 일괄 수정:** 기존 NFO는 File Station create-only/no-overwrite 규칙에 묶여 있으므로 새 규칙 도입과 분리한다. **보류 / 명시적 쓰기 승인 필요**.
+- **P03-H — 과거 NFO 조사와 일괄 수정 분리:** 기존 NFO는 File Station create-only/no-overwrite 규칙에 묶임. 2026-10-30 사용자 승인으로 **보유 작품에 대한 읽기 전용 NFO 조사만 진행 가능** (`STG9MEDIA-001`, 승인 기록 `docs/governance/stage9-media/ACTIVE_WORK.md`). 조사 실행·결과는 아직 미확인. **기존 NFO 수정/백필·Jellyfin 강제 갱신은 계속 보류 / 별도 명시적 쓰기 승인 필요**.
 - 재생 정상 파일의 대체 코덱/Jellyfin 강제 트랜스코딩, 1회성 iPhone Safari 다운로드 실패 등 과거 선택적 기능은 재현/필요성 증거 없이는 후순위.
 - 과거 Stage10의 보유목록/중복방지 등 완료 이력은 새 작업으로 재등록하지 않는다. 2026-10-29 최신 라우터에 별도 Stage10 workstream은 없다.
 
