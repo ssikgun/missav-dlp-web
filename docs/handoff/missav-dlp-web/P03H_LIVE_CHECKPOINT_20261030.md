@@ -93,3 +93,29 @@ LATEST_STATUS: `FIRST10_APPLY=PASS_10; FIRST10_INDEPENDENT_POSTCHECK=PASS_10; RE
 - Next checkpoint: verify hashes and exact second-batch IDs on NAS then `--apply --start 10 --count 10 --confirm P03H-104`; stop on any error and avoid blind retry. Record actual backup folder, applied hashes and completion count before further operations. Continue recording to GitHub canonical branch.
 
 LATEST_STATUS: `FIRST10_POSTCHECK=PASS_10; SECOND10_DRYRUN=PASS_10; SECOND10_APPLY=NOT_RUN; TOTAL_APPLIED=10_OF_187; ADMIN83=BLOCKED; STAGE9_TIMER=UNCHANGED`.
+
+
+## Second 10 live NFO apply — 2026-10-30, user CT108/NAS result
+
+- Live user evidence only (not an independent GitHub-side NAS readback): ran as NAS non-sudo `ssikgun`, exact staging script and immutable 188 manifest both SHA-256 verification PASS.
+- Command: `python3 -B p03h_bulk104_ssikgun_controlled.py --apply --start 10 --count 10 --confirm P03H-104`.
+- Source manifest SHA-256: `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`. Script SHA-256: `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef`.
+- `PREFLIGHT=10_PASS`, `BATCH_BACKUP=PASS`, `BATCH=PASS; APPLIED_COUNT=10`, `NAS_NFO_WRITE=10; VIDEO_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`, `JELLYFIN_REFRESH=NOT_RUN`.
+- NAS preserved backup root: `/volume1/video/video2/downloads/backups/stage9/p03h-bulk104-20261030-233103-pbrtrzep`.
+- Applied IDs and after SHA-256:
+  - DLDSS-536: `88b5d07f05616e3ecb2145a976ae5e3ff93d2afa5190c68438a8460fcc408401`
+  - DLDSS-555: `a229655d40e9244ad2dad474a41686f5338f19fc3637af5a3659969fa36169c6`
+  - DLDSS-557: `d6db1c957f35063b465bc9a8271dd2375aa23997daa6ab71574eef81fe98a1a9`
+  - DLDSS-559: `7e1fe4f495758c1186462baeb3efef4c5ad90d8c6401fab8e4736a6a5d3310a7`
+  - DOKI-037: `6ae8e46681aa8d41517436e401e5cdf688d1bd6079db5d88b0c972f0037a7872`
+  - DOKS-689: `b0c6ed6c8452c1f977870aba5b5937f54d02d68d57b3e62a5c0020e5bef91c56`
+  - DROP-141: `d30a35724e0cfbf57ddf257074c5327a6c9507604dd88342991074cde4bf88c0`
+  - DSOD-046: `bdc065a4c24013e37dac70f370f5cd51f73b9d55a29fb98bd851936e307b05f0`
+  - DVAJ-754: `51ecb09899b576fa82e4837f6fbe098e675a2b2f9ebaa046cf3d2f053e5441b4`
+  - DVAJ-757: `9110c6c036892979643351afe86ac602d8c9b6e1f4ed181b14d65868f8b259de`
+- **Next step:** independently verify exactly these ten immutable original backups, receipts, on-disk current NFOs, SHA-256 and Synology ACL/owner/group/mode. No reapply or arbitrary retry.
+- User asks to increase subsequent batch size. Current inspected batch script `MAX_BATCH=20`; recommend batches of **up to 20** from exact remaining 104 target set only after successful second-batch independent postcheck. No program change authorized/needed for 20. Next prospective batch offset `--start 20 --count 20`, subject to dry-run PASS. Other 83 admin-owned remain BLOCKED.
+- Earlier 10 independently confirmed PASS; now **20 total applied**, of exact 187 approved: 84 more `ssikgun` + 83 `admin`. Jellyfin refresh for recent changes NOT_RUN.
+- No Stage9 service credentials, ACL policy, existing video, product DB, Jellyfin, protected 59, completed MARR-014 or timer changes.
+
+LATEST_STATUS: `FIRST10_POSTCHECK=PASS_10; SECOND10_APPLY=PASS_10; SECOND10_INDEPENDENT_POSTCHECK=NOT_RUN; APPLIED_TOTAL=20_OF_187; REMAINING_104=84; LIVE_83=BLOCKED; P03_T=NOT_RUN`.
