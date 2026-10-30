@@ -1,5 +1,16 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## P03-N 129 EX-CANONICAL-MISSING HAVE movie.nfo — FULL FILENAME AUDIT PASS (2026-10-30 KST)
+
+- Canonical `ssikgun/missav-dlp-web:teddy-subtitle-stage11`; Stage9 `STG9MEDIA-001 / IN_PROGRESS`; common contract 1.0.1 and Stage9 contract 1.0.0.
+- User explicitly approved a bounded **read-only re-audit of the previous 129 historical missing-`<DVD-ID>.nfo` cohort**, refined to **all case-insensitive `.nfo` filenames** in exactly those 129 folders. No writes/deploy/Jellyfin/timer change.
+- CT108 live File Station List read-only result on 2026-10-30: `AUDIT_TOTAL=129`, `AUDIT_STATUS=PASS`, `ONE_MOVIE=129`, `NONE=0`, `ONE_CANONICAL=0`, `ONE_OTHER=0`, `MULTIPLE=0`, `UNKNOWN=0`. Nine bounded progress checkpoints through 129. Each matched current DB unique JAV holding and video size; test script reported `NAS_UPLOAD=0`, `PRODUCTION_DB_WRITE=0`, `NFO_WRITE=0`. **NFO XML content validation NOT_RUN**.
+- Previously 129/133 classified "missing NFO" were actually counted by `<DVD-ID>.nfo` filename only. For the 129 cohort, **every folder contains exactly one alternate `movie.nfo`**; these 129 do **not** need new NFO file publication. **BLOCK P03-N new-NFO creation or one-item canary in the 129 cohort** to prevent parallel/ambiguous NFOs. Prior 4 exceptions (three failed/exhausted and one past DB/NAS inconsistency) are not included in this 129 re-audit.
+- Single-title EBWH-350 owner `admin`, group `users`, NAS video size `4445557425`, canonical `EBWH-350.nfo` absent, **`movie.nfo` present**. Uploaded 669-byte `movie.nfo` XML was valid and `<title>` lacks `[EBWH-350]`, while `<uniqueid type="teddy">` contains EBWH-350. This does **not** establish XML validity/title state for all 129.
+- Source-only historical NFO-only code promotion `fc8671487a7a1adb033619b58878f6bddb0c5d48` remains on canonical; **no runtime deployment of that source** and it is not safe to use for duplicate NFO creation.
+- **NEXT (already authorized, read-only):** Exact existing `movie.nfo` for each of the same 129 folders, bounded 2 MiB File Station GET/Download and XML parse, check recognized DVD-ID and `<title>[DVD-ID]` presence; count valid/invalid/mismatched/unknown, no raw title disclosures. Original sidecars, production DB, Jellyfin and Stage9 timer untouched. Only after evidence review approve any source fix/existing-file title correction separately. P03-T 10-min timer remains final.
+- Canonical state detail: `docs/governance/stage9-media/ACTIVE_WORK.md` and `docs/handoff/missav-dlp-web/WORK_ROADMAP.md`. Handoff is not independent authorization.
+
 ## P03-N NFO-ONLY V2 GITHUB SOURCE-ONLY PROMOTION — PASS (2026-10-30 KST)
 
 - **Source canonical:** `ssikgun/missav-dlp-web` / `teddy-subtitle-stage11`; workstream `stage9-media / STG9MEDIA-001 / IN_PROGRESS`, common contract v1.0.1 and Stage9 v1.0.0.
