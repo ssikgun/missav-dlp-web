@@ -6,6 +6,24 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-M READ-ONLY CT108 DATABASE CATEGORIZATION — USER LOG (2026-10-30 KST)
+
+EVIDENCE_SOURCE: User pasted command and stdout from normal `root@downloader` CT108 shell outside the Codex sandbox. This is a **user-submitted read-only execution result**, not a separately independently repeated live query by ChatGPT. The earlier sandbox-blocked Codex audit remains historical, not retroactively changed to a successful DB access.
+
+PREFLIGHT: User's earlier normal CT108 shell verified `hostname=downloader`, `/proc/1/comm=systemd`, both Discovery and dedicated media DBs readable, and protected prior audit files `targets.jsonl`, `inventory.jsonl`, `summary.json` readable. The follow-up Python execution parsed complete `summary.json` with `json.load()`; previous first-line-only `JSONDecodeError` did not prove file corruption.
+
+EXECUTION: Existing audit data validated for 255 distinct matching target/inventory IDs with exact NFO/video paths and valid canonical forms; precisely **133 missing NFOs at the earlier audit snapshot**, 122 NFOs present. Short SQLite connections to `teddy-discovery.sqlite3` and `teddy-stage9-media.sqlite3` used URI `mode=ro` plus `PRAGMA query_only=ON` and SELECTs. Output `DB_READ_ONLY=PASS`; no NFO creation, NFO title rewrite, Stage9 replay or timer change.
+
+MUTUALLY EXCLUSIVE RESULTS across those 133 historical missing NFO IDs:
+
+- `NO_MEDIA_JOB_SOURCE_NOT_ELIGIBLE=129`: no current media job and the **source-side reconciliation eligibility** check did not pass. The exact failed predicate(s) — `holdings.storage_root`, `holdings.present`, `holdings.discovered_by` — were **not broken down in this output**. This is a classification of observed DB state, not evidence of each title's historical omission cause or confirmation that the user-approved NFO creation should bypass the reconciliation eligibility contract.
+- `MEDIA_FAILED_EXHAUSTED=3`: media job exists, `status=FAILED` and attempts >= default `MAX_ATTEMPTS=5` as checked by the submitted script. Do not reset/retry without further approved bounded recovery procedure.
+- `DB_NFO_COMPLETE_BUT_MISSING_AT_AUDIT=1`: media job currently `COMPLETED` and `nfo_status=COMPLETE`, while **earlier NAS snapshot** marked canonical NFO missing. Temporal mismatch must **not** be asserted as current physical NAS file loss until a bounded same-item read-only file recheck.
+- Sum = **133**, `CAUSE_CLASSIFICATION=PASS` for exact classification of the historic missing-target set, `MEDIA_JOB_EXISTS=4`, `SOURCE_AND_ORGANIZER_ELIGIBLE=4`, `RECONCILE_CONDITION_NOT_MET=129`, `NOT_CHECKED=0` for this scope. `DB_SNAPSHOT_STABILITY=NOT_CHECKED`; no DB before/after hash comparison, so do not infer global DB byte stability.
+- `NFO_CREATION=NOT_RUN`, `LEGACY_TITLE_REWRITE=NOT_RUN`, `TIMER_CHANGE=NOT_RUN`, `JELLYFIN_SEARCH=NOT_VERIFIED`.
+
+NEXT_DECISION: Within existing approved read-only P03-M scope, obtain **exclusive per-predicate counts among the 129 currently reconciliation-ineligible holdings**, using the exact 133 prior audit IDs, and only then propose the smallest missing-NFO creation/recovery route. Explicit product/design choice is still required if the desired historical holdings backfill would bypass `discovered_by='completion-stage9'`. The separate existing-NFO 119-title target and P03-T 10-minute timer remain gated and unexecuted.
+
 ## P03-M CT108 CODEX SANDBOX IDENTITY CLARIFICATION — USER-REPORTED (2026-10-30 KST)
 
 USER_CORRECTION: The user confirms **Codex was launched within actual Proxmox CT108**. The prior P03-M Codex process nevertheless reported `PID 1=codex`, LXC virtualization and Docker API permission denial from its **own execution sandbox/namespace**. These observations are fully compatible with a sandbox located inside CT108, and do **not** show the Codex host was elsewhere. The earlier phrase implying "not actual CT108" should **not** be used as a confirmed location finding. `SANDBOX_ISOLATION=LIKELY`, exact mapping/privileges `NOT_VERIFIED`.
