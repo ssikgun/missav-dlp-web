@@ -6,6 +6,40 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03 STAGE9-ONLY OPERATIONAL DEPLOYMENT APPROVED — 2026-10-30 KST
+
+USER_APPROVAL: The user explicitly approved a new isolated Stage9-only runtime release, the minimum corresponding `teddy-stage9-media.service` switch, and observation of the **next normal scheduled** execution, following completed P03 canonical source promotion and read-only CT108 preflight. This is a new narrowly authorized operational checkpoint under existing `STG9MEDIA-001 / IN_PROGRESS`. It supersedes earlier P03 deployment prohibitions **only** for the exact Stage9-only actions enumerated here. Stage9's approved create-only/no-overwrite, identity, locking, and retry limits remain mandatory. No broad Downloader/Writer/Stage11 deployment is authorized.
+
+### VERIFIED BASELINE AND TARGET
+
+- Canonical repository `ssikgun/missav-dlp-web`, branch `teddy-subtitle-stage11`; P03 two-file source commit `b31873824527bbcdf800d141b40eaf6e2af03abd`; documentation-only HEAD at approval preflight `16183c971c43e0f7fcb654054ee1401d10fd0cf9`. Re-verify actual HEAD before any local changes.
+- Target Stage9 runtime module `teddy_discovery_media_metadata.py`: SHA-256 `a4e17a18bfbd25cfb4358d89c5478c7df9c0c8a4d2ed004a80de1209b4173089`. Previously reported current runtime module: SHA-256 `94b9d0a1f2122eba5de66fd0cb1b66fed8a3e4a6dda017b84ebfd862a559685c`.
+- User-submitted current CT108 read-only snapshot: `teddy-stage9-media.service` is root, oneshot, last status=0, `WorkingDirectory=/opt/missav-dlp-web/stage9-runtime/releases/9e196b6cc07c609b8c14c1cb2d6733d9e1dde91f`; `ExecStart` points to the same release and has `--expected-release-id 9e196b6cc07c609b8c14c1cb2d6733d9e1dde91f`. The hourly dedicated timer is enabled/active; generic completion timer and Docker `sha256:ba31ba9cfcc481dc1f658312a3155a3496856008ff4d52f5a652de0766fd0dbe` stay unchanged. These are dated observations, not a substitute for immediate preflight.
+- The user found no top-level filename containing `manifest` or `provenance` in the active release. Inspect actual release marker/hash conventions before writing. Do not invent or skip an integrity mechanism.
+
+### APPROVED_SCOPE
+
+1. Read-only live preflight: verify CT108 identity, canonical GitHub source, exact service/timer unit and paths, existing immutable release contents/ownership/hash/provenance conventions, timer and runner activity, queued work boundaries, and current rollback prerequisites. Inspect configuration without printing credential contents. Verify only Stage9 workstream is affected; stop and report any shared/unapproved impact.
+2. From the **verified existing active Stage9 release**, prepare a **new separate immutable release** in `/opt/missav-dlp-web/stage9-runtime/releases/`, preserving all other runtime module bytes/behavior and substituting only the exact SHA-verified P03 metadata module. Do not alter the previous release. Respect existing release-ID and provenance/manifest rules; verify the runner's `--expected-release-id` guard and the complete required runtime set. If correct new-release ID/provenance method cannot be established, stop before service change.
+3. Perform minimum offline syntax/content check and focused synthetic NFO smoke outside production data. Verify target title formatting, existing metadata tags, candidate provenance, unchanged other module hashes, non-symlink regular files and secure ownership/modes. Do not import/execute real runners in apply mode or leave synthetic files in production media paths.
+4. If all gates PASS and the Stage9 oneshot is not running or acquiring locks, preserve an exact protected copy of the existing Stage9 systemd unit and current state, ensure no scheduled-run race, and change **only** the Stage9 service's runner path, WorkingDirectory and matching `--expected-release-id` to reference the new release. Temporary Stage9 timer pause/resume and `daemon-reload` are authorized only as needed for this safe Stage9-only switch. Preserve all other `ExecStart` arguments (DB, File Station, CA, Jellyfin key, locks, limits `--max-items 1 --visibility-max-items 1 --visibility-seed-max-items 1 --jellyfin-get-max-requests 9`, `--apply`, `--confirm`), credential path/permissions, user, unit guards and scheduling policy. Verify exact new unit readback.
+5. Leave the dedicated timer in its approved active/enabled state and **observe one next naturally scheduled** `teddy-stage9-media.service` execution only. Existing automatic Stage9 operation may execute its normal bounded DB, create-only NAS sidecar, and Jellyfin notification paths subject to existing safety gates. Only read bounded execution summary/state and exact identified item/sidecar evidence where safe. Do not force an item into the queue, manually run the Stage9 apply runner, induce a Jellyfin POST or scan, or assume an item is eligible. If no fresh NFO/Jellyfin item was processed, record `JELLYFIN_TITLE_SEARCH=NOT_VERIFIED`; do not expand the run.
+6. If a safe pre-switch/rollback gate fails, stop without changing the service/timer. If post-switch verification fails, restore **only** the preserved Stage9 unit/release pointer using a verified reversible procedure, without reversing any legitimate DB/NAS/Jellyfin side effects or touching unrelated services. Do not remove either release or backup; report timer state and unresolved failure.
+
+### PROHIBITED_SCOPE
+
+- No Docker image build or container restart, generic completion runner/timer changes, Discovery Writer socket, other Discovery services, Stage11 source/service work, other workstream routing/contract amendments, NAS account/ACL/credentials changes, Jellyfin library-wide scan/refresh, manual/forced media processing, retry resets, database schema migration or direct DB mutations.
+- No overwrite, delete, backfill or retroactive refresh of existing NFO/MP4/poster; no broad data scans, purge, cleaning old releases/backups, or force Git push.
+- No changes to existing Stage9 protected publication, lock, retry/backoff, Jellyfin idempotency logic, or operational limits. Do not silently bypass the release-ID/manifest/provenance check.
+- No secrets in logs, output, or Git. Existing immutable runtime/backup files must not be modified in place.
+
+### ACCEPTANCE CRITERIA AND NEXT DECISION
+
+- Verified original release and original systemd unit retained; new release differs only in intended P03 NFO title code and explicitly necessary identity/provenance metadata, with all other runtime modules unchanged. Exact hash/identity readback PASS.
+- Systemd Stage9-only switch PASS; generic Downloader container and other services/timers unaffected; next scheduled Stage9 cycle returns success or an accurately reported error with safe rollback handling.
+- Report distinctly: `RELEASE_PREP`, `UNIT_SWITCH`, `TIMER_RESTORED`, `NEXT_NATURAL_RUN`, `NFO_TITLE_OBSERVATION`, `JELLYFIN_TITLE_SEARCH`, `OTHER_SERVICES_UNCHANGED`, `ROLLBACK_READY`; distinguish actual product observation from source/test PASS. An absent eligible new item is not a failure and does not justify a forced run.
+- After reporting, record actual outcome in canonical Stage9 ACTIVE_WORK/WORK_ROADMAP/CURRENT_HANDOFF by a separate authorized documentation follow-up if applicable. Do not mark overall P03 product quality PASS until actual Jellyfin visible title and number-based search are observed, with no overwrite of previous sidecars.
+
 ## P03 CANONICAL PROMOTION APPROVED — 2026-10-30 KST
 
 USER_APPROVAL: After reviewing the final P03 candidate diff and offline test report, the user explicitly approved promoting the two existing candidate files to the canonical GitHub `teddy-subtitle-stage11` branch by commit/push. This approval extends the P03 scope **only for Git source promotion**; it is not operational deployment or user-data publication authorization.
