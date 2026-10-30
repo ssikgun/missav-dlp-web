@@ -1,7 +1,7 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 1
-UPDATED_AT: 2026-10-30 KST (P03 STAGE9_DEPLOYMENT=PASS_CODEX_REPORTED, NATURAL_RUN=PASS_USER_LOG, NFO_TITLE=NOT_OBSERVED, JELLYFIN_SEARCH=NOT_VERIFIED)
+UPDATED_AT: 2026-10-30 KST (P03 DEPLOYMENT/NATURAL_RUN=PASS, P03-H TITLE-ONLY USER_PREAPPROVAL, P03-T 10MIN_FINAL_STEP_PLANNED, JELLYFIN_SEARCH=NOT_VERIFIED)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
@@ -21,7 +21,7 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 | --- | --- | --- | --- | --- |
 | 1 | P01 | **미디어 자동화 잔여 항목 원인 확인** (과거 Stage9 Media) | **완료 — 조사 범위 한정** | CT108 읽기 전용 DB 확인: COMPLETED 122, FAILED 3, PENDING/RUNNING 0; 오래된 COMPLETED/UNKNOWN 조합 108, 포스터 PENDING 8건 모두 COVER_URL_MISSING, FNS-267 내부 Jellyfin CHECK_PENDING 1건, 타이머 active 및 마지막 서비스 Result=success. 강제 재시도·정리·DB 변경은 별도 항목 P01-H로 **보류**. |
 | 2 | P02 | **루트/Overlay 중복 파일 5쌍의 읽기 전용 정밀 검수** | **완료 — 정적 소스·패치 비교 범위만 (2026-10-29)** | 5쌍 모두 분석: HTML은 최종 Overlay 기준 UI/패치 순서, 저장 코드는 no-overwrite·SHA-256, 엔트리포인트는 HLS/MP4, 부트스트랩은 보호된 게시·복구, 앱은 영속 상태·재시도 안전성 차이가 핵심. 실제 빌드 중간 산출물과 새 단일 원본의 byte-identical 동등성은 미검증이며 P04 구현·검증 승인 시 별도 확인. 소스·이미지·운영 변경 0. |
-| 3 | P03 | **Jellyfin에서 `[작품번호] 작품 제목` 표시 및 작품번호 검색** (미디어 메타데이터) | **Stage9 전용 운영 배포·첫 정기 실행 PASS (2026-10-30); 신규 NFO/Jellyfin 검색 미검증** | 소스 정본 승격 `b31873824527bbcdf800d141b40eaf6e2af03abd`; 전용 릴리스 `9e196b6c…` → `b3187382…` 배포 PASS (Codex 보고). 사용자 제출 CT108 systemd/journal: 10:01:16 KST 자연 실행 exit 0, 새 릴리스 사용, 타이머 active/enabled 및 다음 예약 11:04:53. `media.attempted=0`, `registered=0`, `jellyfin_get_requests=0`, `jellyfin_post_attempts=0`; **새 NFO 제목 NOT_OBSERVED / Jellyfin 품번 검색 NOT_VERIFIED**. `manual_action_updates=1`은 조건부 DB 상태 업데이트 경로 호출 횟수이며 실제 변경 행 수는 미확인. 다른 서비스 영향은 일부만 확인하여 INCOMPLETE. 기존 NAS NFO/MP4/포스터 변경·강제 재처리·Jellyfin 전체 새로고침 금지. |
+| 3 | P03 | **Jellyfin에서 `[작품번호] 작품 제목` 표시 및 작품번호 검색** (미디어 메타데이터) | **Stage9 전용 운영 배포·첫 정기 실행 PASS (2026-10-30); 기존 NFO 조사 중·실제 검색 미검증** | 새 NFO 소스 승격 `b31873824527bbcdf800d141b40eaf6e2af03abd`, 전용 릴리스 운영 전환 PASS (Codex 보고); 10:01:16 KST 자연 실행 exit 0 (사용자 제공 systemd 로그), media attempted=0, Jellyfin 검색 미검증. **진행 순서:** (1) 현재 Codex의 P03-H 기존 NFO 읽기 전용 조사 결과 확인 → (2) 기존 NFO 중 검증된 대상에 한해 `<title>` 앞에 `[DVD-ID]` 1회 추가하는 사용자 목표 **사전 승인 기록**(실행은 안전한 방법·백업·정확한 범위 확정 후 별도 승인 게이트, 기존 조사 Codex의 쓰기 전환 금지) → (3) 신규/기존 대표 NFO의 Jellyfin 표시·품번 검색 확인 → (4) **P03 마지막 단계: Stage9 전용 타이머 주기 1시간 → 10분 변경**(실제 unit/무작위 지연·중복 실행·부하 확인과 별도 실행 승인 전 미적용). 기존 파일 보호, NAS 권한 확대 금지, 다른 타이머·Docker 변경 금지. |
 | 4 | P04 | **검수로 확정된 중복만 단계적 단일 원본화** | **미착수 — 범위/구현 승인 전** | P02 결과로 각 파일의 patch 의존성, 실행 동등성, 데이터 보호 경계를 문서화하고 승인된 파일에만 변경→격리 검증→별도 운영 배포 승인. 위험도가 낮은 HTML부터 제안하되 확정 우선순위는 검수 결과에 따른다. |
 | 5 | P05 | **일반 다운로드/Discovery Writer 작업 DLDWS-001 종료 조건 점검** | **미착수 — 대표 운영 검증 PASS** | 이미 완료한 Docker 이미지 교체·FNS-267 실사용 성공을 재검증 없이 활용한다. 남은 계약상 미완료 조건과 Writer 소켓 안전성 이력만 정리하고 사용자 결정 후 종료 여부 판단. 현재 두 영역 모두 `IN_PROGRESS / DLDWS-001`. |
 | 6 | P06 | **한국어 자막 음성 인식/화자 근거 확인** (이전 Stage11) | **진행 중 — 별도 독립 작업** | 현재 `S11-WX011 / IN_PROGRESS`. 기존 S04/S08/S13 일본어 후보와 오디오를 사용자에게 비교 제시할 다음 결정이 남아 있음. S03/S11/S15 누락 의심, 일본어 정답/정확한 경계/화자 DER는 UNKNOWN. 계약에 따른 읽기 전용 범위만. |
@@ -30,7 +30,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 ### 별도 보류 / 자동 수행하지 않는 항목
 
 - **P01-H — 미디어 자동화 잔여 운영 처리:** `DANDYA-033`, `NHDTB-778` = unsupported video extension (각 실패 5회), `MFCS-085` = cover_url missing (과거 누적 17,161회); 포스터 대기 8건은 URL 없음; `FNS-267`은 Jellyfin 실제 재생 PASS지만 DB의 recovery/visibility PENDING이 관찰됨. 이전 완료 108건의 신규 필드 UNKNOWN은 미처리 108건이라고 단정하지 않는다. 처리를 원하면 최신 상태 읽기 전용 재확인 후 안전한 별도 승인. **보류**.
-- **P03-H — 과거 NFO 조사와 일괄 수정 분리:** 기존 NFO는 File Station create-only/no-overwrite 규칙에 묶임. 2026-10-30 사용자 승인으로 **보유 작품에 대한 읽기 전용 NFO 조사만 진행 가능** (`STG9MEDIA-001`, 승인 기록 `docs/governance/stage9-media/ACTIVE_WORK.md`). 조사 실행·결과는 아직 미확인. **기존 NFO 수정/백필·Jellyfin 강제 갱신은 계속 보류 / 별도 명시적 쓰기 승인 필요**.
+- **P03-H — 기존 NFO 제목 품번 추가:** 읽기 전용 조사는 Codex 진행 중/결과 대기. 사용자는 2026-10-30 **모든 검증된 대상의 기존 NFO `<title>`만 `[DVD-ID] 제목`으로 고치겠다는 목표를 사전 승인**함. 다만 실제 수정 가능한 NAS 권한·원본 백업/복구·대상/원본 SHA·경합 방지·원자성 확인 전에는 **쓰기 실행 금지**. 현재 조사 세션 쓰기 전환 금지; 새 실행 단계는 결과 검토 및 안전한 구체 절차 승인이 선행되어야 함. File Station create-only 보호는 기존 다른 파일에 그대로 적용.
+- **P03-T — P03 최종 단계 (10분 Stage9 타이머):** 기존 1시간 주기 → **10분 주기**를 사용자 요청에 따라 P03-H 및 Jellyfin 대표 품번 검색 확인 **뒤에** 배치함. 설계/검토 계획으로만 등록; 실제 `teddy-stage9-media.timer` 변경 **NOT_RUN**, 현재 Codex 조사 완료 전 변경하지 않음. 단위 설정(무작위 지연 포함), 재진입·부하·실패 중지 정책·기존 다운로드 타이머 분리 검증 후 별도 변경 승인과 백업/복구 절차 필요.
 - 재생 정상 파일의 대체 코덱/Jellyfin 강제 트랜스코딩, 1회성 iPhone Safari 다운로드 실패 등 과거 선택적 기능은 재현/필요성 증거 없이는 후순위.
 - 과거 Stage10의 보유목록/중복방지 등 완료 이력은 새 작업으로 재등록하지 않는다. 2026-10-29 최신 라우터에 별도 Stage10 workstream은 없다.
 
