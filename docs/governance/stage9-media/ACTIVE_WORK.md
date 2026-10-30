@@ -6,6 +6,33 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H LEGACY NFO TITLE-ONLY USER PREAPPROVAL — 2026-10-30 KST
+
+USER_DECISION: The user expressly requests **all eligible, previously generated legacy NFO files** to show the work number in the same canonical `[DVD-ID] work title` format as the newly generated NFO and **pre-approves that bounded modification goal**. The user's phrase "품명" is understood in its established P03 context as **adding the validated 품번 / DVD-ID to the display title**, not replacing the actual title with some other metadata or renaming NFO/movie files.
+
+WORKSTREAM: `stage9-media`; TASK_ID: `STG9MEDIA-001 / IN_PROGRESS`; contract v1.0.0, shared contract v1.0.1. The previous P03-H **read-only inventory** instruction stays operative and unchanged for the currently running Codex session. This record does **not** upgrade that running task to write permissions and does not authorize a production mutation on sight. `WRITE_EXECUTION=NOT_STARTED / GATED_BY_INVENTORY_AND_SAFE_PLAN`.
+
+### Precisely pre-approved change objective
+
+- Only pre-existing canonical NFO sidecars associated with individually validated, present, owned JAV holdings and a verified matching DVD-ID are candidate targets. Coverage means all **verified eligible** files after an inventory; no guessing, title-specific hardcoding, arbitrary NAS traversal, or forcing a missing NFO into the rewrite set. Missing, malformed, identity-conflicting, access-unknown, or already-correct files are excluded from modification and separately reported.
+- For each verified target, change only the semantic XML `<title>` from its real current title to **one** `[DVD-ID] original work title` prefix, deduplicating any existing correct ID. Preserve the meaningful work title and all `<originaltitle>`, `<id>`, `<uniqueid>`, other tags, movie filenames, posters, subtitles, video bytes, dates and unrelated state. Never change Discovery catalog title. Do not overwrite a title whose identity/intent is ambiguous.
+- This is a user-approved **narrow exception request** to the default create-only/no-overwrite rule for the **exact verified existing NFO title field only**. The standing no-overwrite and ownership rules remain in force for every other artifact and for concurrent/unverified changes. Do not bypass race protection, exact expected-hash preconditions, or audit/rollback requirements.
+
+### Must be settled BEFORE any implementation/apply
+
+1. Finish and report the separately approved read-only inventory first. Establish actual candidate counts, identity/ownership/path/XML validity, permission boundaries, and whether the current Synology File Station `stage9_media` principal can safely and reversibly perform the explicitly scoped NFO update. Do not treat prior SSH/admin access as permission to use it. Do not change NAS account privileges, ACLs or TLS protections.
+2. Derive and review one minimal, concrete, bounded update strategy with safe backup/restore: for each candidate preserve original NFO complete bytes, SHA-256 and identity/metadata before write; ensure backup availability and restoration verification; exact expected-original-byte/hash guard, per-file collision/race checks, permitted atomicity, bounded workload and failure-stop. **If the only available method demands an unapproved privileged NAS identity, broad delete/move/replacement privilege, uncertain atomicity, or changes to the create-only Stage9 publisher, STOP and present the design/permission choice to the user**. Do not choose a bypass unilaterally.
+3. Start any later production mutation only in a **new, explicit P03-H execution step** based on the reported inventory and approved specific implementation route, with exact target-set bounds and readback/rollback gates registered in this Stage9 ACTIVE_WORK first. This user preapproval should not needlessly be re-requested for the same narrow title-only goal, but does not resolve unknown dangerous execution methods or authorize unrelated system changes. No unattended transition from the currently running read-only Codex task to mutation.
+4. Use a small initial verified update/readback checkpoint before completing the remainder, with fail-closed behavior on discrepancies. No forced download, completed-job replay, Stage9 timer/runner edits, Jellyfin POST/scan/refresh, generic Downloader/Writer/Stage11 changes or DB writes are included. Jellyfin existing-item refresh/import, if required, is a separate exact-scope decision; GET-only title/search observations are allowed within an approved read-only task.
+
+ACCEPTANCE_TARGET: All verified eligible legacy NFOs safely converted, unchanged unrelated fields/artifacts verified, backups and rollback path preserved, exact counts/failed exclusions reported, Jellyfin title/number-search verified separately before claiming user-facing PASS. No claimed result is pre-completed by this approval.
+
+## P03-T TEN-MINUTE STAGE9 TIMER — LAST P03 ROADMAP STEP (NOT YET AUTHORIZED TO APPLY)
+
+USER_DECISION: Add a proposed **60-minute → 10-minute** `teddy-stage9-media.timer` frequency change as the **final P03 step**, after inventory, approved safe legacy NFO handling, and representative Jellyfin title/search verification. This is roadmap scheduling intent, NOT immediate timer-change authorization. `TIMER_CHANGE=NOT_RUN`.
+
+BEFORE ANY TIMER CHANGE: Read the **actual** timer unit and `OnCalendar`/`RandomizedDelaySec`/`Persistent`/failure-stop settings, interval and active service runs, work locks, existing generic completion timer separation, 1-item/1-check/1-seed/9-GET budgets and retry/backoff state. Estimate higher daily run volume, confirm no overlap, preserve duplicate scheduling protection, no hidden increase in per-run concurrency and reasonable jitter. Require a separate explicit, bounded Stage9-only timer-change execution authorization and reversible unit backup/readback; no change to any other timer, service, Docker or data.
+
 ## P03-H LEGACY NFO READ-ONLY INVENTORY AUTHORIZED — 2026-10-30 KST
 
 USER_APPROVAL: After P03 source promotion, isolated Stage9 deployment, and successful 10:01:16 KST first scheduled no-new-item run, the user requested proceeding with the **next recommended task**: first check whether there is any naturally generated post-P03 NFO/Jellyfin search example, and then assess pre-existing NFOs for a possible future `[DVD-ID] title` backfill. The user's consent **at this checkpoint authorizes investigation and read-only inventory only**, NOT existing NFO edits, Jellyfin refresh, or product/production mutation.
