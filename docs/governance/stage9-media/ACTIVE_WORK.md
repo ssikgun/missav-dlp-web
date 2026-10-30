@@ -14,7 +14,7 @@ USER AUTHORIZATION: Record this result in these three canonical documents and pe
 
 AUDIT RESULT (Codex, 2026-10-30): Historical targets and inventory file SHA-256 matched their summary; read-only SQLite (`mode=ro`, `query_only=ON`) matched all 119 historical prefix candidates and exactly 129 of 133 historical canonical-filename-missing records against current present JAV holding, path, MATCHED, positive size and completed Organizer; EBWH-350 belongs to the 129. Historical 119 include 13 video/NFO owner/group mismatches; historical inventory also records 3 ambiguous cases, and the other 4 historical missing-filename cases are separate. File Station TCP connection failed `EPERM` in the sandbox: no current NAS content, title, hash, ownership, mode or ACL was verified. AUDIT_129=PARTIAL; AUDIT_119=PARTIAL; current safe update count UNKNOWN. No NAS write, DB SQL write, Jellyfin call, product change, deployment or timer change. Read-only SQLite can affect WAL/SHM bookkeeping; no file-byte stability claim is made.
 
-STATUS: EBWH-350 user-reported result PASS; current audit and source promotion outcomes are not implied by this authorization. Historical 248 are planning candidates, not a currently verified or approved update count.
+P03H_RESULT_NOTE: EBWH-350 user-reported result PASS; current audit and source promotion outcomes are not implied by this authorization. Historical 248 are planning candidates, not a currently verified or approved update count.
 
 ## P03-H EXISTING NFO TITLE-ONLY DESIGN REVIEW APPROVED / 129 movie.nfo XML PASS — 2026-10-30 KST
 
