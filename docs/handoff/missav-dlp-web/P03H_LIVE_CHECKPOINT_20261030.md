@@ -80,3 +80,16 @@ LATEST_STATUS: `FIRST10_APPLY=PASS_10; FIRST10_INDEPENDENT_POSTCHECK=NOT_RUN; RE
 - Next checkpoint is next-batch `--dry-run --start 10 --count 10` from the **same verified NAS staging directory** `/tmp/p03h-bulk104-sIzAT42z`, with exact script+manifest SHA checks. If PASS, authorized separate apply for same bounded ten and independent postcheck; stop immediately on any mismatch. Do not include 83 inaccessible admin-owned files or protected 59, and do not change Stage9 timers yet.
 
 LATEST_STATUS: `FIRST10_APPLY=PASS_10; FIRST10_INDEPENDENT_POSTCHECK=PASS_10; REMAINING_104=94; LIVE_83=BLOCKED; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Second 10 (offset 10–19) NAS dry-run — 2026-10-30 KST, CT108 user evidence
+
+- Executed on Synology via SSH using regular non-sudo `ssikgun`, staging `/tmp/p03h-bulk104-sIzAT42z`, with immutable source inputs.
+- Script SHA-256 `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef` PASS; 188-row manifest SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087` PASS.
+- Exact command `python3 -B p03h_bulk104_ssikgun_controlled.py --dry-run --start 10 --count 10`.
+- Exact IDs in sorted batch: `DLDSS-536,DLDSS-555,DLDSS-557,DLDSS-559,DOKI-037,DOKS-689,DROP-141,DSOD-046,DVAJ-754,DVAJ-757`.
+- Verified reported: `TARGETS_104=PASS; EXCLUDE_MARR014=YES; EXCLUDE_ADMIN83=YES`, `BATCH_START=10; BATCH_COUNT=10`, `PREFLIGHT=10_PASS`, `DRY_RUN=PASS; NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`.
+- **Second batch actual apply NOT RUN at this checkpoint**. User's standing approval covers exactly remaining 187 existing NFO title-only modifications, contingent on original backup and post-apply verification; no admin-owned, protected-59 or MARR-014 modifications. Previous first 10 independently checked PASS, do not reapply them.
+- Next checkpoint: verify hashes and exact second-batch IDs on NAS then `--apply --start 10 --count 10 --confirm P03H-104`; stop on any error and avoid blind retry. Record actual backup folder, applied hashes and completion count before further operations. Continue recording to GitHub canonical branch.
+
+LATEST_STATUS: `FIRST10_POSTCHECK=PASS_10; SECOND10_DRYRUN=PASS_10; SECOND10_APPLY=NOT_RUN; TOTAL_APPLIED=10_OF_187; ADMIN83=BLOCKED; STAGE9_TIMER=UNCHANGED`.
