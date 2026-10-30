@@ -145,3 +145,39 @@ LATEST_STATUS: `FIRST10_POSTCHECK=PASS_10; SECOND10_APPLY=PASS_10; SECOND10_INDE
 - No Jellyfin rescan, Stage9 timer changes, other service, video or DB changes observed in this dry-run.
 
 LATEST_STATUS: `FIRST20_INDEPENDENT_POSTCHECK=PASS_20; THIRD20_DRYRUN=PASS_20; THIRD20_APPLY=NOT_RUN; APPLIED_TOTAL=20_OF_187; REMAINING_104=84; LIVE_83=BLOCKED; P03_T=NOT_RUN`.
+
+
+## Third batch live NFO apply, offsets 20–39 — 2026-10-30 23:48 KST (user CT108/NAS log)
+
+- Exact execution: non-sudo `ssikgun` on NAS, from CT108 SSH, `python3 -B p03h_bulk104_ssikgun_controlled.py --apply --start 20 --count 20 --confirm P03H-104`, staging `/tmp/p03h-bulk104-sIzAT42z`.
+- Exact script SHA-256 `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef` and manifest SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`: checked `OK` on NAS.
+- Protected scope: `TARGETS_104=PASS`, `EXCLUDE_MARR014=YES`, `EXCLUDE_ADMIN83=YES`, `PREFLIGHT=20_PASS`.
+- `BATCH_BACKUP=PASS`, exact NAS backup directory `/volume1/video/video2/downloads/backups/stage9/p03h-bulk104-20261030-234831-wfbw63iw`. Preserve originals, ACL receipts and backups.
+- `BATCH=PASS; APPLIED_COUNT=20`, `NAS_NFO_WRITE=20; VIDEO_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`, `JELLYFIN_REFRESH=NOT_RUN`.
+- Exact applied NFO identities and reported postwrite SHA-256:
+  - `DVMM-015`: `e0cf015545aa1e235f8956905b1775d82b75d54f7bb59be241e3831e74100722`
+  - `EBWH-090`: `0bbb043602b3f8b8f9903b326b4f10f8da5a3327fa7bb34c389d52245df97484`
+  - `EBWH-296`: `3aed91a60a1427bf2c218edaca07b649c7e1fd93ee232891f508bcd97c8da7aa`
+  - `EKDV-826`: `e9d3df334a985071e022e6ce1585fd6ce30d84d476e2ff352259c3ce9ff0fd8a`
+  - `EROFV-313`: `c9c6ed7b1a4e5fd49e8d49ccf89251a2abf9bce49d421989964436d184527573`
+  - `EROFV-387`: `b2bab5fda8b3dab65adfe4fc7cffddc28347c155dcb540a790be9e15ac4e3c1e`
+  - `EROFV-390`: `f45ec84747349a0d3f053fffcd8ffa08613e49b8e1fb6a8057fbbafe022893f9`
+  - `FC2-PPV-4973050`: `9030ad5d3ca856ebc37b7a50905d219e18cc1f61ed758ded1fc252f18d9ad405`
+  - `FNS-244`: `24137cd500dc07f6103879fc1cbcc2e876c2c03fcd2e7386bc54b5b267ea2016`
+  - `FSDSS-901`: `1503a9496391a5eb076b4c81de342e3c3372bbdb53174a45c140b92899e307ca`
+  - `FTHT-361`: `49099a18e8050254381c2dcad7e421f273b38d3b2df2a96c393c1a1c042a8ce3`
+  - `FTHTD-219`: `5349f420e2c3747cc852e231395db2f2edb973205ec362e40b36a76131368d27`
+  - `FTHTD-228`: `ccbaeb09b8e3f410a950a06e461e95f2799197a98cb6b691515fea41917e7a58`
+  - `FTKD-045`: `b184bcca9424cb31f03bcb88725e497b1c163b31046e1d7932c168e4539919d6`
+  - `GANA-3432`: `a4093b20a3cd3d02a6bdde4b4f83f04146437b1b24d17c13e6d82bd924dab87f`
+  - `HMN-890`: `04d5ad8d783a978d28779dde5b0ab6f0b95ec19578092a2ce10dd4eeb3dad8cf`
+  - `HMN-904`: `9f0b441854bff5560a0ed3b124e20f8371fa0021832542c67cfc60d1bfe37930`
+  - `HNBR-014`: `5e4f701798466ca4ca043b360f7ee70177dda3be932d7b3c2cc3e167d73eb9dc`
+  - `HODV-22112`: `3c5d292a4c65a151deaa2d763b521d40c12ff4caec51fc5d07b0109098f986b6`
+  - `HODV-22113`: `cdf1465ae275432d5986748edb4e182a70b84557161995bc5cc1ebd5a67bfc1a`
+- These results are user-supplied live output of the bounded script and **are not yet independently reread** after completion.
+- First 20 earlier NFOs are independently verified. Current cumulative 40/187 NFOs were applied, **only 20/187 have independent postcheck PASS**. Remaining: 64 `ssikgun` titles, 83 `admin` titles blocked by permissions. MARR-014 and 59 protected excluded.
+- **Next checkpoint:** independent read-only verification of all 20 current NFOs against original backup `original.nfo`, `original_acl.txt`, `receipt.json`, immutable manifest, expected title-only prefix, current SHA256, owner/group/mode/inode and ACL/xattrs. No replay/rollback, no next batch, no Jellyfin library refresh until postcheck evidence. Do not interpret in-script postchecks as an independent postcheck.
+- Workstream `STG9MEDIA-001`; Stage9 timer remains unchanged; unrelated sources and services not modified as per observed run.
+
+LATEST_STATUS: `THIRD20_APPLY=PASS_20; THIRD20_INDEPENDENT_POSTCHECK=NOT_RUN; CUMULATIVE_APPLIED=40_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=20_OF_187; REMAINING_104=64; LIVE_83=BLOCKED; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
