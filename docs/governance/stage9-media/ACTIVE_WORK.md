@@ -6,6 +6,20 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-M 129 INELIGIBLE HOLDINGS SOURCE-PREDICATE BREAKDOWN — USER CT108 LOG (2026-10-30 KST)
+
+EVIDENCE: User pasted output of a further `python3 -B` read-only script run as `root@downloader` in the normal CT108 shell. Inputs: previously validated 255-row inventory containing 133 NFO-absent IDs at audit time, Discovery and Stage9 Media DBs opened with SQLite `mode=ro`, `PRAGMA query_only=ON` and SELECT only. All 133 IDs were mapped to current holdings; 4 had media job records, leaving **129 with no media job**. The user-pasted script asserted those counts, and classified the remaining 129 using actual predicates in canonical `reconcile_media_jobs` source.
+
+RESULT: `SOURCE_BREAKDOWN=PASS`; `TARGETS=129`, `CLASSIFIED=129/129`. Mutually exclusive primary reason **`DISCOVERED_BY_NOT_COMPLETION_STAGE9=129`**, and matching overlapping `SOURCE_MISMATCH=129`; no other failed predicate count was printed, indicating all 129 matched `storage_root='jav'`, `present=1`, and had at least one `organizer_jobs.status='COMPLETED'` in this read. Actual `holdings.discovered_by` cohort counts: **`library-inventory=68`, `organizer-apply=61`**. These 129 were outside the exact current registration SQL because provenance differs, not because their videos are absent or Organizer completion is missing.
+
+OTHER 4 HISTORICAL MISSING: Prior CT108 categorization found 3 media jobs `FAILED` at default 5-attempt ceiling and 1 media job `nfo_status=COMPLETE` but earlier NAS inventory said canonical NFO absent. These were **not reclassified** in the present 129-item cohort breakdown; the 1 mismatch is temporal and needs current same-path read-only NAS verification before any recovery action.
+
+CAUSAL LIMITS: This conclusively identifies the **current selection predicate** for 129 items, not each title's entire historical reason for lacking NFO. Do not rewrite `holdings.discovered_by` to `completion-stage9`, create fake Organizer events, silently relax global reconciliation filters, or enqueue completed historical jobs. The user's intent is to have accurate NFOs for eligible holdings, while preserving provenance and protecting old media. A separate user-approved minimal **historical-NFO-only creation route** should be evaluated with positive ID/metadata validation and create-only publication; no implementation, authorization to process 129 records, or production writes are inferred from this observation.
+
+SAFETY: `DB_READ_ONLY=PASS` (query guards/output), user reports `DB_WRITE=NOT_RUN`, `NFO_WRITE=NOT_RUN`; DB before/after file stability not checked. Existing 119 NFO title-only prefixed rewrite remains conditional and `NOT_STARTED`; 3 prefix conflicts, 13 owner/group mismatches require separate handling. `P03-T` 10-minute timer is still the planned final step and `TIMER_CHANGE=NOT_RUN`. Jellyfin real DVD-ID search remains `NOT_VERIFIED`.
+
+NEXT_DECISION: User review of bounded historical NFO-only backfill **design**, without changing original `discovered_by`, alongside separate existing-NFO title correction and 3 failed/1 mismatched files. Before any real creation, verify present canonical NFO absence and reliable metadata for every target, one-file create-only collision rules, backups/rollback where relevant, bounded rate, NAS ownership and Jellyfin behavior. Do not treat the 129 as automatically ready to write.
+
 ## P03-M READ-ONLY CT108 DATABASE CATEGORIZATION — USER LOG (2026-10-30 KST)
 
 EVIDENCE_SOURCE: User pasted command and stdout from normal `root@downloader` CT108 shell outside the Codex sandbox. This is a **user-submitted read-only execution result**, not a separately independently repeated live query by ChatGPT. The earlier sandbox-blocked Codex audit remains historical, not retroactively changed to a successful DB access.
