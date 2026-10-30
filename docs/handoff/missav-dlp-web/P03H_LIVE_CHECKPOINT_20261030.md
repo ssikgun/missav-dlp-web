@@ -208,3 +208,40 @@ LATEST_STATUS: `THIRD20_APPLY=PASS_20; THIRD20_INDEPENDENT_POSTCHECK=PASS_20; CU
 - Remaining before apply: 64 writable `ssikgun` targets plus 83 blocked `admin` files. No Stage9 timer change, no Jellyfin rescan, no DB or video write.
 
 LATEST_STATUS: `FOURTH20_DRYRUN=PASS_20; FOURTH20_APPLY=NOT_RUN; VERIFIED_APPLIED=40_OF_187; REMAINING_SSIKGUN=64; BLOCKED_ADMIN=83; P03_T=NOT_RUN`.
+
+
+## Fourth batch live NFO apply, offsets 40–59 — 2026-10-31 00:05 KST (user CT108/NAS output)
+
+- Workstream: `stage9-media STG9MEDIA-001 / IN_PROGRESS`, existing explicit user authorization for the exact 187 NFO title-only candidates; no expansion of scope.
+- Executed as NAS normal account `ssikgun` (not sudo) using staged script and frozen manifest in `/tmp/p03h-bulk104-sIzAT42z`.
+- Both staged input SHA checks reported OK: script `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef`, manifest `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`.
+- Exact command: `python3 -B p03h_bulk104_ssikgun_controlled.py --apply --start 40 --count 20 --confirm P03H-104`.
+- Preflight `PREFLIGHT=20_PASS`, `TARGETS_104=PASS; EXCLUDE_MARR014=YES; EXCLUDE_ADMIN83=YES`.
+- Backup reported PASS, path `/volume1/video/video2/downloads/backups/stage9/p03h-bulk104-20261031-000513-5n80nxmv`.
+- End of user output: `BATCH=PASS; APPLIED_COUNT=20`, `NAS_NFO_WRITE=20; VIDEO_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`, `JELLYFIN_REFRESH=NOT_RUN`.
+- Exact IDs and reported updated SHA-256:
+  - `HODV-22114` `3da66fe674d456603542b457c4476fed9ffb5e0544cb001afb083599ef85dd53`
+  - `HODV-22116` `e6cac26c36c59091782b1132c5a2b054c1dfefbad4bbf2ca35770fec677a1326`
+  - `HUNTC-623` `7c6f295a4923b936e73ebdee38f7f5a60368f391ce8618c1daefd743d99775d8`
+  - `IESP-765` `7c215e627ffb872ac41e8972dc23a35816be8b1aad15f611e6c68788b4292e93`
+  - `IPX-996` `13b4703db130c84632df6eaa241c8619cac9e6b1f371499cc4915faa0cd2606a`
+  - `IPZZ-034` `4f71155abfd02462338820f4c0fd2c3cf5e5c6e825b79719ec92ba68dd192ca6`
+  - `IPZZ-789` `e7a2a839faee529cb58d45e3af37b71241f86ac02709ddf49d4bb5b2ffe13d4e`
+  - `IPZZ-935` `fdb64d549c803d616e7a8e57042b9714e1f18b2a0714cf5f71d6ec9e7796cc95`
+  - `IPZZ-972` `18e3720b2547e2a7099f7eb17074598349f0d77aa4f66fe46cd64a215aa9d7a7`
+  - `JUQ-234` `eca51fa34687f563d23aae10b35179f93cabd28156a77068ad0f292049cf909d`
+  - `JUR-750` `f020263dde616058875d414ba149e8c83e09a78e5b467a46517d29730906c22d`
+  - `JUR-859` `c34adde93eb7afa0dfdb70b2e28984ecb7eee3ac2857449172a4aa80cbbcee7d`
+  - `KIR-079` `6ea4910af60f238f308a9116d76b24de99baec01715bb3d3e158b10ee2e3bf74`
+  - `KNMB-133` `b790866605019bf31625a086e3bbdf319cded36e57e192050a9cc983b35aafa2`
+  - `MAAN-1193` `b343bf69d09a75b83f24150a7b988b952b9839abd7d54bc81e99b30bd93c7c88`
+  - `MFYD-181` `2c03662ec0ceef73b38d54eab0d73df114cb1b11f60617c1fd360a5bcf3805e3`
+  - `MIAD-866` `b7d03c48a070f5d5505fc0b9123599af0f80651397c50f2d6ea7513f0fd6aa1f`
+  - `MIDA-445` `f1452030703f65ee7dc77ff42016c37431d989292deab37345628917d6dcb476`
+  - `MIDA-705` `faf2aeacb4d232cd82849b84d9cd862b0023389824796cfd611ac1cadda320fa`
+  - `MIDV-372` `4b08845bd88808a206c91878130f9ed7e5ba27e44baad9870b1dbda4990220ae`
+- Status distinction: **60/187 are applied** according to user terminal logs; **40/187 had independent postcheck PASS** in prior batches; **latest 20 require independent on-disk postcheck**. Do not reapply indices 40–59. When third-party files change unexpectedly, stop and inspect.
+- Remaining: 44 of original 104 `ssikgun` targets not yet applied; 83 `admin`-owned remain inaccessible and blocked; 59 separately protected and MARR-014 already completed/excluded. Do not alter ACLs, ownership, permissions, Stage9 timers, video, DB, or Jellyfin.
+- Next checkpoint: read-only verify all 20 current NFOs against exact immutable 188-manifest, per-ID `receipt.json`, `original.nfo`, `original_acl.txt`, exact title-only prefix, hash, inode/UID/GID/mode and live Synology ACL/xattrs. Hold next dry-run/apply until postcheck PASS.
+
+LATEST_STATUS: `FOURTH20_APPLY=PASS_20; FOURTH20_INDEPENDENT_POSTCHECK=NOT_RUN; TOTAL_APPLIED=60_OF_187; TOTAL_INDEPENDENT_POSTCHECK=40_OF_187; REMAINING_SSIKGUN=44; BLOCKED_ADMIN=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
