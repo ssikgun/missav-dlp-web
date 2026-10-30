@@ -6,11 +6,24 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H READ-ONLY NFO INVENTORY RESULT — CODEX-REPORTED (2026-10-30 10:30 KST)
+
+EVIDENCE: User-submitted Codex report; independent NAS/CT108 readback NOT_DONE. Stage9 workstream/contract readback and GitHub approval remain the authority.
+
+- `CANONICAL_PREFLIGHT=PASS` at the Codex inspected HEAD `4fc797b5336d5fce01f277a324d4d2ada1cedad6`; protected 57-path dirty worktree on another branch unchanged. The later documentation-only commits are not part of that historical execution baseline.
+- `INVENTORY=INCOMPLETE`: 254 uniquely identified present JAV holdings in SQLite `mode=ro` with `PRAGMA query_only=ON`; 31 exact canonical `<DVD-ID>.nfo` paths inspected using bounded, TLS-verified non-admin File Station GETs. `API_REQUESTS=64/64`; 223/254 holdings uninspected. The ceiling was not bypassed.
+- Among 31 inspected: NFO present 29, NFO absent 2; all 29 present XMLs valid and matching expected DVD-ID in `<id>` and `uniqueid type="dvd_id"`; all 29 have no canonical `[DVD-ID]` title prefix; 0 already prefixed; no malformed/ambiguous items in this inspected subset. `<originaltitle>` absent in the 29, an allowed optional field. **Do not extrapolate 29/29 to 254/254** or treat inaccessible/uninspected files as safe modification targets.
+- `NEW_NFO=NOT_OBSERVED`, `JELLYFIN_SEARCH=NOT_VERIFIED`; no new Stage9 media item was naturally processed in the observed 10:01:16 run. No forced Stage9 apply or Jellyfin operation.
+- Codex reports no DB write statements and only NAS GETs, so `DIRECT_CODEX_PRODUCTION_MUTATION=NOT_OBSERVED`. However between two observed file snapshots the main SQLite DB SHA changed and WAL/SHM files disappeared; `DB_BYTE_STABILITY=UNVERIFIED`, possible concurrent independent service activity unproved. Do not call overall production storage bytes unchanged.
+- Source audit: Stage9 File Station publisher is create-only and treats differing existing sidecar content as a collision; it **cannot** perform the user-requested legacy rewrite as written. The user's conditional title-only goal preapproval above remains valid, but **WRITE_EXECUTION=NOT_STARTED** pending a fully reviewed safe replacement/backup/restore method, exact target list, ownership and permissions, atomicity and concurrency protections. No old NFO update is allowed in the currently completed read-only task.
+
+NEXT_DECISION: Review an explicit **no-write design** for precise safe title-only replacement with all essential recovery checks and request any further permission or route choice from the user. P03-T final 10-minute timer remains planned/not applied.
+
 ## P03-H LEGACY NFO TITLE-ONLY USER PREAPPROVAL — 2026-10-30 KST
 
 USER_DECISION: The user expressly requests **all eligible, previously generated legacy NFO files** to show the work number in the same canonical `[DVD-ID] work title` format as the newly generated NFO and **pre-approves that bounded modification goal**. The user's phrase "품명" is understood in its established P03 context as **adding the validated 품번 / DVD-ID to the display title**, not replacing the actual title with some other metadata or renaming NFO/movie files.
 
-WORKSTREAM: `stage9-media`; TASK_ID: `STG9MEDIA-001 / IN_PROGRESS`; contract v1.0.0, shared contract v1.0.1. The previous P03-H **read-only inventory** instruction stays operative and unchanged for the currently running Codex session. This record does **not** upgrade that running task to write permissions and does not authorize a production mutation on sight. `WRITE_EXECUTION=NOT_STARTED / GATED_BY_INVENTORY_AND_SAFE_PLAN`.
+Workstream/task: `stage9-media`; `STG9MEDIA-001 / IN_PROGRESS`; contract v1.0.0, shared contract v1.0.1. The previous P03-H **read-only inventory** instruction stays operative and unchanged for the currently running Codex session. This record does **not** upgrade that running task to write permissions and does not authorize a production mutation on sight. `WRITE_EXECUTION=NOT_STARTED / GATED_BY_INVENTORY_AND_SAFE_PLAN`.
 
 ### Precisely pre-approved change objective
 
@@ -73,7 +86,7 @@ NEXT_DECISION: Observe the new NFO title and Jellyfin number-based search only w
 
 ## P03 STAGE9-ONLY RUNTIME DEPLOYMENT RESULT — CODEX-REPORTED (2026-10-30 09:36 KST)
 
-STATUS: `PREFLIGHT=PASS; OLD_RELEASE_PRESERVED=PASS; NEW_RELEASE_PREP=PASS; RELEASE_SOURCE_SHA256=PASS; SERVICE_SWITCH=PASS; STAGE9_TIMER=PASS; NEXT_NATURAL_RUN=NOT_OBSERVED; NFO_TITLE=NOT_OBSERVED; JELLYFIN_TITLE_SEARCH=NOT_VERIFIED; OTHER_SERVICES_UNCHANGED=INCOMPLETE; ROLLBACK_READY=PASS`.
+DEPLOYMENT_RESULTS: `PREFLIGHT=PASS; OLD_RELEASE_PRESERVED=PASS; NEW_RELEASE_PREP=PASS; RELEASE_SOURCE_SHA256=PASS; SERVICE_SWITCH=PASS; STAGE9_TIMER=PASS; NEXT_NATURAL_RUN=NOT_OBSERVED; NFO_TITLE=NOT_OBSERVED; JELLYFIN_TITLE_SEARCH=NOT_VERIFIED; OTHER_SERVICES_UNCHANGED=INCOMPLETE; ROLLBACK_READY=PASS`.
 
 EVIDENCE_SOURCE: User-provided Codex execution report at 2026-10-30 09:36:07 KST. These are Codex-observed CT108 operations, not independently accessed or verified by ChatGPT; no subsequent natural scheduled run has yet been observed at this checkpoint.
 
