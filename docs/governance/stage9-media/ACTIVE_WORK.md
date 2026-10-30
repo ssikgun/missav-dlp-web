@@ -6,6 +6,20 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03 STAGE9-ONLY RUNTIME DEPLOYMENT RESULT — CODEX-REPORTED (2026-10-30 09:36 KST)
+
+STATUS: `PREFLIGHT=PASS; OLD_RELEASE_PRESERVED=PASS; NEW_RELEASE_PREP=PASS; RELEASE_SOURCE_SHA256=PASS; SERVICE_SWITCH=PASS; STAGE9_TIMER=PASS; NEXT_NATURAL_RUN=NOT_OBSERVED; NFO_TITLE=NOT_OBSERVED; JELLYFIN_TITLE_SEARCH=NOT_VERIFIED; OTHER_SERVICES_UNCHANGED=INCOMPLETE; ROLLBACK_READY=PASS`.
+
+EVIDENCE_SOURCE: User-provided Codex execution report at 2026-10-30 09:36:07 KST. These are Codex-observed CT108 operations, not independently accessed or verified by ChatGPT; no subsequent natural scheduled run has yet been observed at this checkpoint.
+
+- Previous immutable Stage9 release preserved: `/opt/missav-dlp-web/stage9-runtime/releases/9e196b6cc07c609b8c14c1cb2d6733d9e1dde91f`.
+- New Stage9-only runtime release prepared and activated: `/opt/missav-dlp-web/stage9-runtime/releases/b31873824527bbcdf800d141b40eaf6e2af03abd`. P03 NFO metadata module SHA-256 `a4e17a18bfbd25cfb4358d89c5478c7df9c0c8a4d2ed004a80de1209b4173089`; 27-module manifest, synthetic metadata smoke PASS. Codex compared 585 preexisting files, finding all non-target file contents unchanged. GitHub product source SHA is b31873824527bbcdf800d141b40eaf6e2af03abd.
+- Codex changed only `teddy-stage9-media.service` runner path, WorkingDirectory, and `--expected-release-id` to the new release. The original unit was preserved at `/opt/missav-dlp-web/backups/p03-stage9-deploy-20261030-b3187382/teddy-stage9-media.service.before`. No forced Stage9 run was performed.
+- At report: Stage9 service `inactive` (oneshot between invocations), dedicated timer `active/enabled`, next natural trigger `2026-10-30 10:01:15 KST`. Container identities/start times and generic completion timer were checked, but **not all unrelated services**; do not promote `OTHER_SERVICES_UNCHANGED` beyond `INCOMPLETE`.
+- No new NFO/Jellyfin visible/search observation was supplied. Do not mark user-facing P03 product/search PASS, and do not force a replay, manual apply, Jellyfin refresh/scan, DB write, or existing NFO/poster/MP4 modification merely to obtain evidence.
+
+NEXT_CHECK: After the already scheduled natural Stage9 cycle, perform bounded **read-only** systemd/journal status and any safely identifiable newly created sidecar/Jellyfin observation; if no eligible item was naturally processed, keep `NFO_TITLE=NOT_OBSERVED` and `JELLYFIN_TITLE_SEARCH=NOT_VERIFIED`. Subsequent product/operational scope change requires fresh user approval.
+
 ## P03 STAGE9-ONLY OPERATIONAL DEPLOYMENT APPROVED — 2026-10-30 KST
 
 USER_APPROVAL: The user explicitly approved a new isolated Stage9-only runtime release, the minimum corresponding `teddy-stage9-media.service` switch, and observation of the **next normal scheduled** execution, following completed P03 canonical source promotion and read-only CT108 preflight. This is a new narrowly authorized operational checkpoint under existing `STG9MEDIA-001 / IN_PROGRESS`. It supersedes earlier P03 deployment prohibitions **only** for the exact Stage9-only actions enumerated here. Stage9's approved create-only/no-overwrite, identity, locking, and retry limits remain mandatory. No broad Downloader/Writer/Stage11 deployment is authorized.
