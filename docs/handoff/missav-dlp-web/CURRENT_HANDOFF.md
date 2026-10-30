@@ -1,5 +1,15 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## P03-N NFO-ONLY V2 GITHUB SOURCE-ONLY PROMOTION — PASS (2026-10-30 KST)
+
+- **Source canonical:** `ssikgun/missav-dlp-web` / `teddy-subtitle-stage11`; workstream `stage9-media / STG9MEDIA-001 / IN_PROGRESS`, common contract v1.0.1 and Stage9 v1.0.0.
+- **Explicit user approval:** Source-only promotion of the exact four reviewed P03-N candidate files; **no operating image rebuild, deployment, NAS NFO upload, DB/Jellyfin write or timer changes**.
+- **Promotion PASS:** Source commit `fc8671487a7a1adb033619b58878f6bddb0c5d48` (parent `cecf974f12ec21f9428befd8ee5ba7a090e0764c`). Verified uploaded v2 patch SHA-256 `85a292816c3c457d6b712d8b62d1961afc1d1d72d69f7be70e2732f914a44802`; Git object SHA matches for the exact four files: `teddy_discovery_media_filestation.py`, its smoke, `teddy_discovery_media_nfo_only.py`, its smoke. GitHub compare reports only these four source files, and all four full blob SHAs verified on remote readback.
+- **Testing:** v2 independent static review `PASS_OFFLINE`; new NFO-only smoke 33 PASS + existing File Station regression 6 PASS, **Codex-reported**, not independently rerun in promotion session. Source commit CI run was **not observed** when queried; CI status must not be reported PASS without a matching run.
+- **Operational safety:** `LIVE_CREATE_ONLY_GUARD=UNVERIFIED`, actual 129 historical item eligibility/current NFO absence/expected NAS owner+group **NOT_VERIFIED**, real NFO created 0, production DB writes 0, Jellyfin calls 0, deployment NOT_RUN, Stage9 hourly→10-minute timer NOT_RUN.
+- **Next:** Exact-one-DVD-ID **read-only DB/NAS preflight** requires separate user approval. Verify source/title/video ownership and existing NFO absence, and server-side no-overwrite evidence before separately approving any one-item live NAS upload. Keep the original dirty candidate at `/tmp/p03n-clean-xOKlUfE7/repo` until preservation decision; it was not touched by GitHub source promotion. Existing 119 title repairs and other Stage9 exceptions remain separate. **P03-T ten-minute timer remains P03 last.**
+- Progress and authoritative task state: `docs/handoff/missav-dlp-web/WORK_ROADMAP.md` and `docs/governance/stage9-media/ACTIVE_WORK.md`. This handoff does not grant further approval.
+
 ## P02 FIVE-PAIR STATIC AUDIT COMPLETE — NO IMPLEMENTATION (2026-10-29 KST)
 
 P02_STATIC_SOURCE_AND_PATCH_REVIEW=PASS; P02_DYNAMIC_BUILD_PARITY=NOT_RUN; SOURCE_CHANGE=NO; PRODUCTION_CHANGE=NO; P04_REFACTOR_IMPLEMENTATION=NOT_AUTHORIZED.
