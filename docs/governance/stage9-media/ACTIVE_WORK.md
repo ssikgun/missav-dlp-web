@@ -6,6 +6,29 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H LEGACY NFO READ-ONLY INVENTORY AUTHORIZED — 2026-10-30 KST
+
+USER_APPROVAL: After P03 source promotion, isolated Stage9 deployment, and successful 10:01:16 KST first scheduled no-new-item run, the user requested proceeding with the **next recommended task**: first check whether there is any naturally generated post-P03 NFO/Jellyfin search example, and then assess pre-existing NFOs for a possible future `[DVD-ID] title` backfill. The user's consent **at this checkpoint authorizes investigation and read-only inventory only**, NOT existing NFO edits, Jellyfin refresh, or product/production mutation.
+
+WORKSTREAM/TASK: `stage9-media / STG9MEDIA-001 / IN_PROGRESS`, common contract v1.0.1 and Stage9 contract v1.0.0. `P03-H` remains **ON HOLD for implementation/writes**. Other workstreams and governance router remain unchanged. Canonical branch at approval preflight: `teddy-subtitle-stage11`, HEAD `2fa2d7162ef1430e4d1a910af884c2863a48cd1a`; recheck before execution.
+
+### SCOPE — READ ONLY
+
+1. Verify canonical governance and actual CT108 host/runtime, Stage9 one-shot service, timer, current dedicated release, and read-only source configuration. Do not rerun existing completed build/deployment.
+2. Discover the minimum existing Discovery/Stage9 read-only data sources needed to identify actual present JAV holdings and expected canonical NFO names. Use production SQLite only with `mode=ro` plus `PRAGMA query_only=ON` and bounded SELECT/PRAGMA; inspect no unrelated personal data. Avoid any operation that alters the live database, WAL, SHM, locks, task state, or counters.
+3. Check whether a naturally created post-P03 NFO is already evidenced by read-only state/logs. If found, validate its XML title/ID and, when specifically safely identifiable, read only the corresponding Jellyfin visible title and number-based search result via **GET only**. If no such item exists, mark `NEW_NFO=NOT_OBSERVED` / `JELLYFIN_SEARCH=NOT_VERIFIED` and do not force processing.
+4. For existing NFOs associated with validated holdings only, inspect bounded NAS metadata and NFO XML content via existing non-administrator Stage9 File Station HTTPS identity with TLS/CA checks intact. The File Station session's narrowly necessary authentication/logout may use the existing API; no Upload, CopyMove, rename, delete, file create, metadata update, or Jellyfin POST/refresh. Do not use NAS administrator/root SSH or broaden permissions. Do not recursively download videos/posters or enumerate unrelated shares. Preserve exact path ownership and sidecar name checks; cap each NFO response at the existing `MAX_NFO_BYTES` and respect existing API request-budget/timeout limits; report `INCOMPLETE` instead of weakening them. Do not execute the actual Stage9 apply runner.
+5. Summarize counts (including denominators, exclusions and inaccessible cases) for: valid already-ID-prefixed NFO, valid title without ID prefix, missing NFO, malformed/oversized/ambiguous/identity-mismatch NFO. Include only a few non-sensitive, safely validated DVD-ID examples if useful, and sample expected title transformations **in memory without writing**. Do not store full titles, raw NFOs, credentials, APIs/session tokens, or personal media data in Git/log artifacts.
+6. Present minimal safe options for a future user-approved one-time P03-H migration (backup, preserve all other XML fields, exact path ownership, atomic/no-clobber and collision policy, bounded scope, Jellyfin re-read policy and rollback) as **proposals only**, noting the existing create-only/NO-OVERWRITE rule. No implementation or operational write is authorized by this section.
+
+### PROHIBITED
+
+No existing MP4/NFO/poster replacement or deletion; no automatic or manual NFO backfill; no Stage9 media apply, forced download, retry reset, lock acquisition, timer/service/release changes, Docker rebuild, database write, NAS user/ACL change, Jellyfin scan/refresh/write, or changes to other workstreams. No bypass of read-only API/credential/tls limits or use of privileged NAS access. No scripts/artifacts that modify production directories. Stop on unknown mapping, access method or identity.
+
+ACCEPTANCE: Source/contract preflight PASS; all observations clearly attributed to either GitHub source, Codex read-only CT108/NAS/Jellyfin, or supplied logs; exact counts and incomplete coverage reported; production changes 0; original P03-H WRITE/HISTORICAL NFO BACKFILL remains ON HOLD until an explicit **new user approval**.
+
+NEXT_DECISION: Review the counted inventory and whether new Jellyfin ID-search actually works, then separately authorize (or reject) a restricted pre-existing NFO update with rollback and exact account/permission safeguards.
+
 ## P03 FIRST NATURAL STAGE9 RUN OBSERVED — USER-SUBMITTED CT108 LOG (2026-10-30 10:01:16 KST)
 
 EVIDENCE_SOURCE: User-provided read-only `systemctl show` and `journalctl` output for the approved first natural Stage9 invocation. ChatGPT reviewed the supplied systemd output and GitHub implementation; this is not an independent direct CT108 query.
