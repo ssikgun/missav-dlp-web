@@ -6,6 +6,16 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-N CLEAN INDEPENDENT CT108 CLONE VERIFIED — USER TERMINAL (2026-10-30 KST)
+
+EVIDENCE_SOURCE: User supplied the normal trusted CT108 `root@downloader` shell output; **not** an independent shell execution by ChatGPT. `hostname=downloader`, `PID1=systemd`. The normal host `git ls-remote origin refs/heads/teddy-subtitle-stage11` returned exact canonical SHA `d3f74d53c56e395e3c9fd9b78fc69373810d7483`, so earlier DNS failure was confined to the Codex sandbox observation, not the host shell.
+
+A new independent clean clone was created at **`/tmp/p03n-clean-xOKlUfE7/repo`** using canonical branch `teddy-subtitle-stage11`; output: `CLEAN_CLONE=PASS`, `HEAD=d3f74d53c56e395e3c9fd9b78fc69373810d7483`, branch matched, `git status --porcelain` empty. Existing dirty `/opt/missav-pwa-src` Git tree and operational services were not modified by this action. Because this clone is under `/tmp` with user `umask 077`, confirm Codex can access/write **only this isolated clone** before implementation, rather than relaxing protection on any production directory. The path is temporary: keep the clone intact until evidence/report is captured; do not assume persistence across container restart/cleanup.
+
+OUTCOME: Prior `ISOLATED_CANDIDATE=BLOCKED` from the first Codex attempt is **resolved at host clone-preparation level**; `HOST_CLEAN_CLONE=PASS`. Actual new Codex sandbox access and implementation remain `NOT_RUN` until verified. Original P03-N isolated implementation/offline-smoke approval remains unchanged; do not approve live NAS/DB/Jellyfin writes, source promotion, upload canary or Stage9 timer changes by implication.
+
+NEXT_STEP: Launch Codex with working directory `/tmp/p03n-clean-xOKlUfE7/repo`, verify current Git root, canonical branch/HEAD and clean state, only then implement the already approved `teddy_discovery_media_nfo_only.py` plus offline smoke, with conditional narrowly scoped File Station changes. If sandbox cannot traverse or write this clone, stop and report exact path/error, do not chmod/ACL-change operational directories or bypass sandbox. Any evidence of GitHub remote advancement requires stopping to reconcile before coding.
+
 ## P03-N ISOLATED IMPLEMENTATION ATTEMPT BLOCKED BY CODEX GIT SANDBOX — REPORTED (2026-10-30 11:43:16 KST)
 
 EVIDENCE_SOURCE: User supplied Codex execution result. GitHub remote canonical `teddy-subtitle-stage11` was `5228b686f80335887623b745f1d1e504af51f948`, and root/common/Stage9 approval preflight was reported PASS. Local current dirty worktree used common git directory `/opt/missav-pwa-src/.git`, which was not writable inside Codex's sandbox. Its local objects did **not** contain the expected canonical commit; `git` remote fetch failed with sandbox DNS error. No accessible independent clean repository containing that commit was found. Codex stopped rather than rewriting dirty worktrees or bypassing permissions.
