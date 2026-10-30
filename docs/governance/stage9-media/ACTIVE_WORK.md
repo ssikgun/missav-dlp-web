@@ -6,6 +6,14 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-M CT108 CODEX SANDBOX IDENTITY CLARIFICATION — USER-REPORTED (2026-10-30 KST)
+
+USER_CORRECTION: The user confirms **Codex was launched within actual Proxmox CT108**. The prior P03-M Codex process nevertheless reported `PID 1=codex`, LXC virtualization and Docker API permission denial from its **own execution sandbox/namespace**. These observations are fully compatible with a sandbox located inside CT108, and do **not** show the Codex host was elsewhere. The earlier phrase implying "not actual CT108" should **not** be used as a confirmed location finding. `SANDBOX_ISOLATION=LIKELY`, exact mapping/privileges `NOT_VERIFIED`.
+
+OUTCOME_UNCHANGED: `DB_READ_ONLY=NOT_RUN`, `CAUSE_CLASSIFICATION=INCOMPLETE`, validated `MISSING_NFO_TARGETS=133`. User confirmation of the outer CT108 does not demonstrate that the Codex sandbox could see or safely read the live DB, nor does it authorize sandbox bypass, privilege escalation, changing permission/ACL, altering the runtime, or any production write.
+
+NEXT_CHECK: Use the user's **normal trusted CT108 console/shell outside the Codex sandbox** for a minimal, read-only check of actual PID1, the two known production DB paths, and the protected audit directory's visibility. Reuse existing P03-M read-only authorization. If required inputs are not available in one environment, stop and report rather than silently increasing privileges; a safe one-time read-only data handoff may be planned.
+
 ## P03-M READ-ONLY ROOT-CAUSE AUDIT BLOCKED BY ENVIRONMENT — CODEX-REPORTED (2026-10-30 KST)
 
 SOURCE: User-supplied Codex report of P03-M attempt against canonical HEAD `95e26b0e5455c2b0fea02aa8ccaa5d056f67730a`. This is an execution-environment block, not proof of any of the 133 root-cause distributions. The previously approved P03-M read-only task remains IN_PROGRESS and its limits unchanged.
