@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## P03-H EXISTING NFO XML VALIDATED / DESIGN-ONLY REVIEW APPROVED (2026-10-30 KST)
+
+- User CT108 read-only results for approved 129 historical alternative-NFO cohort: `AUDIT_TOTAL=129`, `AUDIT_STATUS=PASS`; all `movie.nfo` **XML valid 129/129, DVD-ID matching 129/129, `<title>[DVD-ID]` prefix missing 129/129**, read failures/invalid XML/ID mismatch/unknown **0**. FileStation GET-only, `NAS_UPLOAD=0`, `NFO_WRITE=0`, `PRODUCTION_DB_WRITE=0`, `JELLYFIN_CALL=0`. 129 new NFO creation is **BLOCKED** since existing valid NFOs would be duplicated.
+- Separately historical Codex P03-H inventory: 119 canonical-`<DVD-ID>.nfo` title prefix candidates (**13 video/NFO owner/group differences**) plus 3 conflicting prefix cases. Therefore **248 planning title-edit candidates = 129 directly revalidated alternative files + 119 historically reported**, not independently confirmed writable targets; 4 exceptional failed/status titles remain separate.
+- User explicitly approved **Codex P03-H no-write design-only examination** ("응 진행 하자") to select a minimal safe approach for exact `<title>` prefix only, with first EBWH-350 checkpoint and future scope plan. Approval excludes source implementation, NFO NAS edits, production deploy, new NFO creation, owner/ACL changes, Jellyfin refresh and Stage9 10-min timer.
+- Source code existing `teddy_discovery_media_filestation.py` and `teddy_discovery_media_publish.py` remain **create-only**; no proven atomic, reversible existing-file update route. Codex must verify remote canonical SHA / actual worktree, use existing contracts, inspect code read-only, design exact bytes/hash backup/restore, precondition/race protection, owner/group/mode preservation and conditional safe one-file canary. **STOP and present options** if only unapproved privileged NAS identity/broad replace/delete/uncertain atomicity works. No writes or automatic unsafe fallback.
+- Stage9 task `STG9MEDIA-001 / IN_PROGRESS`, governance truth `docs/governance/stage9-media/ACTIVE_WORK.md`, roadmap `docs/handoff/missav-dlp-web/WORK_ROADMAP.md`; contracts v1.0.1 common / v1.0.0 Stage9. Current canonical HEAD on handoff update will be advanced by this docs-only note. User's design approval does not equal later production execution authorization.
+
 ## P03-N 129 EX-CANONICAL-MISSING HAVE movie.nfo — FULL FILENAME AUDIT PASS (2026-10-30 KST)
 
 - Canonical `ssikgun/missav-dlp-web:teddy-subtitle-stage11`; Stage9 `STG9MEDIA-001 / IN_PROGRESS`; common contract 1.0.1 and Stage9 contract 1.0.0.
