@@ -6,6 +6,18 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-N EBWH-350 EXISTING movie.nfo DISCOVERED — NEW NFO WRITE BLOCKED (2026-10-30 KST)
+
+EVIDENCE: User-provided CT108 isolated read-only File Station result for selected `EBWH-350`: `CREDENTIAL_PATHS=PASS`, `SOURCE_INTEGRITY=PASS`, video size `4,445,557,425` exact DB match, owner `admin` and group `users`, `NAS_VIDEO=PASS`, exact canonical filename `EBWH/EBWH-350/EBWH-350.nfo` **ABSENT** `NAS_NFO_CURRENT_ABSENCE=PASS`, `NAS_PREFLIGHT=PASS`, `NAS_UPLOAD=0`, `PRODUCTION_DB_WRITE=0`, `LIVE_CANARY=NOT_RUN`, and `SERVER_SIDE_CREATE_ONLY=UNVERIFIED`. Initial read-only script returned `DOWNLOAD_NOT_AUTHORIZED` due to assistant guard incorrectly blocking an API discovery query; retry corrected that filter, without any media write.
+
+USER-OBSERVED ALTERNATIVE NFO: The user supplied a Windows Explorer screenshot of exactly `\\192.168.1.201\video\video2\JAV\EBWH\EBWH-350` showing a file named `movie` with Windows type `system information file` (~1 KiB); the user explicitly clarified **`movie.nfo`**. The same folder also contains `EBWH-350.mp4`, `EBWH-350.ko.srt`, and `poster.webp`. This is direct evidence that EBWH-350 is **NOT NFO-less in a general sense**, despite its absent filename-specific `EBWH-350.nfo`. It is not yet evidence of the contents, validity or title of `movie.nfo`.
+
+CRITICAL SCOPE CORRECTION: The historical NFO inventory, `HISTORICAL_MISSING=133` / cohort `129`, tested absence of **`<DVD-ID>.nfo` only** and did not establish absence of alternative `movie.nfo`. The repository itself lists `movie.nfo` in `LIBRARY_SIDECAR_FILENAMES` (`teddy_discovery_media_publish.py`). Jellyfin official local NFO docs explicitly support both `movie.nfo` and `<video-filename>.nfo` for movies: https://jellyfin.org/docs/general/server/metadata/nfo/ . Thus **do not call all 133 titles NFO-less** and do not advance the previously proposed one-title NFO-only NAS creation canary on EBWH-350. It could create duplicate metadata files in one folder with undefined runtime precedence. This does not establish how many other titles have existing `movie.nfo`.
+
+`EBWH350_NFO_CANARY=BLOCKED_EXISTING_ALTERNATE_NFO`, `WRITE_APPROVAL=NOT_GRANTED`, `PRODUCTION_DEPLOYMENT=NOT_RUN`, `NAS_UPLOAD=0`, `NFO_WRITE=0`, `JELLYFIN_SCAN=NOT_RUN`, `TIMER_CHANGE=NOT_RUN`. No change to design contract, source code, immutable v2 source promotion, or actual NAS files.
+
+NEXT: **Only read-only inspect the existing single EBWH-350 `movie.nfo`**, specifically real canonical path, size/hash, XML parse and `<title>` and `<originaltitle>` values where safely accessible, then obtain user choice on the best path to DVD-ID display without duplicating or overwriting any NFO. Any expanded 129-item alternate-NFO presence audit or remediation design/implementation requires separately scoped approval; do not silently expand the single-title preflight or reinterpret P03-N as existing-NFO mutation. Keep Stage9 P03-T ten-minute timer final.
+
 ## P03-N EXACT HISTORICAL MISSING ONE-TARGET SELECTION — USER CT108 PASS (2026-10-30 KST)
 
 EVIDENCE_SOURCE: User-reported direct CT108 `python3 -B` read-only command. An initial P03-N target selection version raised `ValueError: not enough values to unpack (expected 3, got 1)` due to an assistant-authored Python list-unpacking bug; a second command had the same bug, then a corrected direct-row iteration was run and **`SELECTION=PASS`**. No DB mutation or NAS access was reported. A prior shell-local `set -euo pipefail` may cause SSH shell exits when a command fails; subsequent user `set +e` returned `SHELL_ALIVE=YES`. Avoid `set -e` in future user shell commands and fail visibly.
