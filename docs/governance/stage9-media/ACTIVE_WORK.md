@@ -113,6 +113,20 @@ SECURITY LIMITATION: `ssikgun` is a member of administrators and can invoke sudo
 
 
 
+## P03-H ACL SINGLE DUMMY FILE TEST APPROVED — 2026-11-01 KST
+
+USER_APPROVAL: User explicitly replied `응 승인` to the immediately previous proposal for exactly **one harmless dummy-file creation inside the already-isolated Stage9 ACL test directory, followed by real ordinary-user read/write access checks**. Stage9-only task `STG9MEDIA-001 / IN_PROGRESS`, Stage9 contract `1.0.0` approved, common `1.0.1`; no shared workstream or production Apply authorized.
+
+EXACT NAS PATHS: Existing isolated empty parent `/volume1/video/video2/downloads/backups/stage9/.p03h-acl-probe-20261101-01` (UID1024/GID100, sole explicit admin ACL `user:admin:allow:rwxpdDaARWcCo:fd--`, archive `has_ACL,is_support_ACL`, `ssikgun` non-sudo directory open DENIED). **Only new file permitted**: `/volume1/video/video2/downloads/backups/stage9/.p03h-acl-probe-20261101-01/.p03h-acl-file-probe-20261101-01.txt`. Contents are a fixed harmless marker, no sensitive metadata/real backup bytes.
+
+AUTHORIZED WRITES: Under user-supplied interactive `sudo -v` then `sudo -n -u admin` create the above single file exactly once using `os.open(..., O_CREAT|O_EXCL|O_WRONLY|O_NOFOLLOW, mode=0600, dir_fd=<verified parent directory fd>)` with umask0077; write only the small marker and fsync it. Abort with no writes if parent not UID1024/GID100 real directory, nonempty, deviates from sole explicit admin ACL or no `is_inherit` absence, or file exists. If any step fails after creation, do not rerun/create/cleanup automatically; preserve observed partial state.
+
+READ-ONLY VERIFICATION: Inspect file mode/owner/content SHA and `synoacltool -get`, `-get-perm` as root via sudo. Test actual ordinary `ssikgun` file opens using `O_RDONLY|O_NOFOLLOW` and `O_WRONLY|O_NOFOLLOW` **without writing/truncating**, and real `admin` read/write descriptor opens. Note that ordinary-user open failure can derive from protected parent traversal; `-get-perm` distinguishes the child's own ACL, and neither test proves robust security against `ssikgun` invoking sudo. Report separately parent-folder and file effective results. New file shall remain in place; no deletion/chmod/chown or ACL edits are authorized in this step.
+
+PROHIBITED: further ACL edits to test directory, changes to any parent/sibling/real `p03h-admin83-9nhqs7od` backup, moving/deleting files, production NFO changes including `AKDL-312` and other 82 admin-owned NFOs, any runner code changes, account/group/service/Jellyfin/DB/timer operations. Actual backup destination/runner remediation requires separate review and approval.
+
+STATUS: `STAGE9_TEST_SINGLE_FILE=AUTHORIZED_NOT_RUN; STAGE9_TEST_FILE_ACCESS=NOT_TESTED; STAGE9_PRODUCTION_BACKUP_PRIVACY=FAIL; ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`.
+
 ## P03-H EBWH-350 USER-REPORTED SUCCESS / READ-ONLY COHORT AUDIT — 2026-10-30 KST
 
 USER EVIDENCE: User reports a single existing EBWH-350 `movie.nfo` title-only replacement, with original SHA-256 `c60e9ad6f108a531193a56bc0563b446f1fdb9fd3e290ef5726fa3955d0652d4` and resulting SHA-256 `63f3d1e1cb32b0db1ca477a59aea6f39236dd5c0ad77a714f53a2f9e5e185432`. The user reports NAS single-file replacement, hash, owner and permissions checks PASS, and Jellyfin display of `[EBWH-350]` and search for `ebwh-350` PASS after refresh. This is user-supplied evidence, not independently repeated by Codex. It does not establish atomicity, concurrency protection, rollback or safety for other files.
