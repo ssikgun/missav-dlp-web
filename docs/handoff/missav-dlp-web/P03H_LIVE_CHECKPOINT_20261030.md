@@ -437,3 +437,26 @@ LATEST_STATUS: `FINAL4_APPLY=PASS_4; FINAL4_INDEPENDENT_POSTCHECK=NOT_RUN; CUMUL
 - Workstream remains `stage9-media STG9MEDIA-001 / IN_PROGRESS`; Stage9 contract `v1.0.0 APPROVED`, common `v1.0.1 APPROVED`, canonical `teddy-subtitle-stage11` branch.
 
 LATEST_STATUS: `FINAL4_APPLY=PASS_4; FINAL4_INDEPENDENT_POSTCHECK=PASS_4; SSIKGUN104_COMPLETE=PASS_104_OF_104; CUMULATIVE_APPLIED=104_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=104_OF_187; REMAINING_SSIKGUN=0; BLOCKED_ADMIN=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Admin-owned 83 NFO read-only ownership and access audit — 2026-11-01 KST
+
+- User executed the previously checkpointed CT108 → Synology NAS SSH Python **read-only** audit as `ssikgun` UID 1026. Stage9 Media `STG9MEDIA-001 / IN_PROGRESS`; prior 104/104 writable cohort independently verified PASS remains unchanged.
+- Input frozen manifest `/tmp/p03h-bulk104-sIzAT42z/p03h_title_only_candidates_188.jsonl`; expected SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087` was checked by audit script against manifest read bytes. Parsed 188 rows and selected exact 83 `cohort == "129"` targets.
+- User NAS output:
+  ```
+  ===== ADMIN 83 READ-ONLY AUDIT =====
+  TARGETS=83
+  SCANNED=83
+  WRITE_ACCESS_COUNT=0
+  WRITE_ACCESS_IDS= NONE
+  OWNER_UID=1024 GID=100 MODE=0o644 COUNT=83
+  AUDIT=PASS
+  NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0
+  ```
+- Interpretation: 83/83 NFO paths exist and passed regular-file + single-link checks; all currently have owner UID 1024, group GID 100, POSIX mode 0644. `ssikgun` UID 1026 returned `os.access(path, os.W_OK) == False` for all 83. No reads/writes to content or modifications in this audit. Owner UID-to-account-name mapping (e.g. `admin`) was NOT checked directly by this audit; check separately.
+- **Do not use the existing `ssikgun` bulk104 program on these 83**: exact program allows only `cohort 119`, and write privilege has not been established. Do not silently elevate permissions, change ACL/chown/chmod, run as sudo, or create an extra service/account. Also do not claim an alternative existing account can write before read-only verification of that account and Synology ACL.
+- Next bounded **read-only** action: confirm UID 1024 and GID 100 local name mapping using `getent`/read-only `id`, inspect Synology ACL via `synoacltool -get` on exact manifest target(s) without writes, determine whether an **already authorized** account can access the files; seek user's explicit choice before any privileged workflow/credential or NAS write.
+- 104/187 NFO titles were applied and independently verified; 83/187 blocked, not failed writes. MARR-014 already completed separately, 59 protected excluded; all backups preserved. No Jellyfin refresh, video, DB, Stage9 timer or cross-workstream modifications.
+
+LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_READONLY_AUDIT=PASS_83_BLOCKED; ADMIN83_UID=1024; ADMIN83_GID=100; ADMIN83_MODE=0644; ADMIN83_SSIKGUN_WRITE=0_OF_83; CUMULATIVE_APPLIED_AND_VERIFIED=104_OF_187; REMAINING_BLOCKED=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
