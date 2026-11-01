@@ -779,3 +779,24 @@ LATEST_STATUS: `ADMIN83_STAGE_USER_REAPPROVAL_20261101=YES; ADMIN83_STAGE_GOVERN
 - **Next gates:** verify governance header layout/automated preflight, then seek user approval for exact one-file, no-`--apply` owner-side operational dry-run with staged script and same-session `sudo -v`. Before running, inspect script SHA/path and account access under both identities. Production NFO write needs separate approval after dry-run and backup/recovery review; leave DB/Jellyfin/timer unchanged.
 
 LATEST_STATUS: `ADMIN83_NAS_STAGE=PASS_3_FILES; ADMIN83_NAS_STAGE_PATH=/tmp/p03h-admin83-stage-20261101-9c4097dc; ADMIN83_NAS_SOURCE_SHA=PASS_3_OF_3; ADMIN83_STAGE_OWNER_MODE=PASS_1026_100_0555_0444; ADMIN83_RUNNER_EXECUTION=NOT_RUN; ADMIN83_NAS_DRYRUN=NOT_RUN; ADMIN83_APPLY=NOT_RUN; VERIFIED_NFO=104_OF_187; ADMIN_PENDING=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## P03-H admin83 first one-file owner-side NAS operational dry-run — 2026-11-01 KST
+
+- **User-performed live Synology NAS probe, read-only; no NFO modification.** Explicit user approval and exact one-target scope already registered in `docs/governance/stage9-media/ACTIVE_WORK.md` under `stage9-media / STG9MEDIA-001` on branch `teddy-subtitle-stage11` (registration HEAD `dd7aed6bd609ab86a236754b3a06d28760771924`).
+- CT108 launched one interactive `ssh -tt` to NAS as ordinary `ssikgun`; within that same session verified staged program file `/tmp/p03h-admin83-stage-20261101-9c4097dc/admin83_runner.py` as regular NFO-independent single-link file, UID1026/GID100, mode 0444, containing expected exact SHA-256 `b2bdb5df1080b2ac9951d7a59e68eb0c07271fefd6ee2685e56eee772130eb18`. Staging directory UID1026/GID100/mode 0555. Output `STAGED_RUNNER=PASS`.
+- Following interactive `sudo -v` within same TTY, user executed exactly `/usr/bin/python3 -B "$RUNNER" --start 0 --count 1` with **no** `--apply` or `--worker` supplied at top level. Program validated frozen 188-row manifest and fixed 83-row roster, invoked the actual `sudo -n -u admin` worker via subprocess/JSON stdin in NAS, and preflighted exact first ID `AKDL-312` as effective owner admin UID1024/GID100. Source code review shows preflight opens existing file and reads contents, XML, SHA/metadata/xattrs/ACL, but does not invoke backup() or apply_one() when `apply=False`.
+- User terminal output:
+  ```
+  STAGED_RUNNER=PASS
+  PREFLIGHT=1_PASS; IDS=AKDL-312
+  DRY_RUN=PASS; BACKUP_CREATED=NO
+  ADMIN83_ONE_DRYRUN=PASS
+  APPLY_REQUESTED=NO
+  ```
+- Interpretation: **actual owner-side sudo readiness + exact fixed-roster handoff + owner access and one-file candidate preflight succeeded on real DSM**. This proves the one-file path, not the remaining 82 file preflights or actual modification/backup durability/recovery; in-place write is not atomic and power-loss partial-write exposure remains. Report NFO content writes zero and backups zero; file-read atime may vary depending NAS filesystem.
+- Keep existing 104/104 ordinary NFOs previously applied and independently postchecked PASS, admin-owned 83/83 originals still not modified; no existing NFO, account/permissions, DB, Jellyfin, Stage9 timer or service modification was requested or reported.
+- Next suggested decision: obtain **separate explicit user approval** for remaining admin83 **read-only bounded preflight** in sequential batches `--start 1 --count 20`, `--start 21 --count 20`, `--start 41 --count 20`, `--start 61 --count 20`, `--start 81 --count 2` (total 82), **no `--apply`**, same-session `sudo -v`, strict SHA/source identity recheck and stop at any failure. An alternative full 83 read-only pass with max20 batches also requires fresh authorization. Do not move to Apply or backup creation without explicit separate authorization and review.
+- Acceptance for this authorized one-file step: `ADMIN83_LIVE_ONE_DRYRUN=PASS_AKDL312`, no backup, no Apply. NAS staging of exact three files PASS; `ADMIN83_APPLY=NOT_AUTHORIZED`; `P03_T=NOT_RUN`; `JELLYFIN_REFRESH=NOT_RUN`.
+
+LATEST_STATUS: `ADMIN83_LIVE_ONE_DRYRUN=PASS_AKDL312; ADMIN83_OWNER_SUBPROCESS_IPC_LIVE=PASS_1; ADMIN83_NAS_STAGE=PASS_3_FILES; ADMIN83_REMAINING_DRYRUN=NOT_RUN_82; ADMIN83_APPLY=NOT_RUN; VERIFIED_NFO=104_OF_187; ADMIN_PENDING=83; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`.
