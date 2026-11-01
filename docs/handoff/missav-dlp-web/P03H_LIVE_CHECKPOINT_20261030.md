@@ -503,3 +503,16 @@ LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_UID_MAPPING=admin; 
 - **Next:** Ask user which already-enabled DSM administrative identity is legitimately available, or perform bounded read-only local account/SSH-policy inspection via already authenticated `ssikgun` without editing configs or exposing secrets. Do not automatically try guessed credentials or assert access under `admin`. Any eventual 83-file write path needs a separate explicit user-approved plan, respecting existing backups and limited scope.
 
 LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_ACL_DIAGNOSTIC=LINUX_MODE_2_OF_2; ADMIN_SSH_AUTH=DENIED; ADMIN83_PRIVILEGED_ACCESS=UNVERIFIED; ADMIN83_WRITE=BLOCKED_83; NAS_WRITE_FROM_ATTEMPT=0; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Synology `ssikgun` administrators group verified, sudo authorization not yet checked — 2026-11-01 KST
+
+- User states that `ssikgun` may be their only enabled NAS admin account and that the built-in `admin` account was probably disabled. This is the user's recollection, **not verified account enabled/disabled state**.
+- User ran CT108 SSH to Synology as `ssikgun` and submitted `id`: `uid=1026(ssikgun) gid=100(users) groups=100(users),101(administrators)`. Group membership in `administrators` GID 101 is **confirmed by live login session**.
+- NAS shell returned `sh: line 5: getent: command not found` for `getent group administrators`; this does not negate the successful `id` output or indicate that the group is missing. No files changed.
+- Previously checked UID 1024-owned 83 exact NFOs are mode 0644, not writable as ordinary `ssikgun` (0/83). The group membership is **not equivalent to direct NFO write access**, and `sudo` authorization has not yet been tested. The earlier `admin@192.168.1.201` SSH attempt was denied; no remote admin script ran.
+- **Next only read-only action**: SSH as existing `ssikgun`, inspect `sudo -l` (authenticated local policy listing) with no elevated file operation. This may request the `ssikgun` password. Never paste passwords into ChatGPT. Do not enable `admin`, reset accounts, grant privileges, change POSIX/ACL ownership, or run the old 104-only script against the 83.
+- If `sudo -l` establishes an existing authorized privilege, any future exact 83 title-only changes still require a separately reviewed **admin83-compatible** backup-first safe workflow, manifest/target verification, ownership preservation, dry-run and explicit user approval before privileged writes. Current `p03h_bulk104_ssikgun_controlled.py` is constrained to cohort 119 and UID 1026 with MAX_BATCH=20; no scope extension is authorized.
+- Prior completion invariant remains `104/104` verified PASS, `83` admin-owned BLOCKED, Jellyfin refresh, DB writes, Stage9 timer untouched; workstream `STG9MEDIA-001 / IN_PROGRESS`, canonical branch `teddy-subtitle-stage11`.
+
+LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; SSIKGUN_ADMIN_GROUP=CONFIRMED; ADMIN_ACCOUNT_DISABLED=USER_RECOLLECTION_UNVERIFIED; ADMIN_SSH_AUTH=DENIED; SUDO_AUTHORIZATION=NOT_CHECKED; ADMIN83_WRITE=BLOCKED_83; P03_T=NOT_RUN`.
