@@ -6,6 +6,24 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H ADMIN83 OFFLINE BACKUP-ACL REMEDIATION APPROVED — 2026-11-02 KST
+
+USER_APPROVAL: In the new ChatGPT conversation, immediately after the confirmed 2026-11-02 read-only source review and proposed next step, user replied `응ㅇ 승인해.` to the explicitly proposed **offline-only backup security amendment**. This is an implementation approval for an isolated draft, NOT NAS test, staging replacement, installation, operational Apply, or permission modification. Workstream: `stage9-media`, task `STG9MEDIA-001 / IN_PROGRESS`, contract v1.0.0, common contract v1.0.1, `REQUIRES_WORKSTREAMS: stage9-media`.
+
+ALLOWED: Verify the frozen original NAS-staged `admin83_runner.py` / smoke / `RECOVERY.md` by exact SHA-256 and inspect/copy without mutating the source. Create a separate scratch offline-only candidate of precisely these three files. Revise only the **backup privacy and partial-backup audit path** of the existing runner, adjust corresponding bounded offline smoke and recovery instructions. Preserve existing title-only NFO editing, original-before-write backup order, hash/inode/UID/GID/ACL/xattr checks, strict manifest/roster/cohort handling, locks, no-follow, fail-closed, and no automatic retry or restoration.
+
+FROZEN INPUTS: Original NAS stage directory `/tmp/p03h-admin83-stage-20261101-9c4097dc`, script SHA256 `b2bdb5df1080b2ac9951d7a59e68eb0c07271fefd6ee2685e56eee772130eb18`, smoke SHA256 `fca6dd6e0b2be624b081996c4ecc09bbe76730c4c2f71c5798ab6a58a18bd306`, recovery SHA256 `b97a4fd429f977071c88b17ece55e27d2ad777dffcffd58ec3706173ada84488`. If exact source cannot be obtained/read, stop; never reconstruct the runner by memory or use a different worktree silently.
+
+DESIGN LIMIT: Require independently provisioned/private admin-only Synology ACL backup root, explicitly validate it before any sensitive backup writes; never continue using the broad inherited-ACL shared Stage9 root for sensitive backups. Require per-run/per-item directories and every newly written backup file to be verified for owner, expected admin-only effective ACL (not numeric mode alone), identity and byte/hash integrity. Refuse NFO mutation on any missing/unexpected owner, parent, path, symlink, archive/inheritance, ACE, ordinary-user access, or ACL command error. Record the exact created run directory even on partial failure, retain partial backups, fail closed with no blind retry, cleanup or restore. The tested isolated directory and child file are **only evidence for candidate design**; no production private root has yet been provisioned or accepted. Ordinary `ssikgun` access can be denied but this user has sudo/admin privileges; do not promise adversarial isolation from that privilege.
+
+OFFLINE ACCEPTANCE: Narrow synthetic isolated-temp regression for private-root allowed, inherited/open parent denied, untrusted child ACL denied, partial-backup failure after creation reports existing location, and unchanged NFO editing semantics. Include source hashes, minimal diff, test commands/results, remaining NAS-specific uncertainty, and safe manual recovery. Do not endlessly expand mocked ACL scenarios; honor single-user proportionate-validation policy. No real NAS read/write test, real ACL change or operational NFO modification in acceptance.
+
+PROHIBITED: Overwrite or edit the NAS staged originals; modify or relocate existing real `p03h-admin83-9nhqs7od` backup; change any Synology ACL, account, folder, ownership or permission; execute `--apply`; write to any NFO including `AKDL-312` or the remaining 82; deploy/commit candidate as operational source, alter production Docker/DB/Jellyfin/timers, touch other workstreams, delete or restore existing files. Approval for subsequent NAS-root provisioning, actual ACL tests, replacement of staged runner, NFO Apply and any remaining 82 must be separately obtained.
+
+CURRENT_STATUS: `APPROVAL_RECORDED=YES; OFFLINE_CODE_IMPLEMENTATION=NOT_RUN; OFFLINE_SMOKE=NOT_RUN; NAS_ROOT_PROVISION=NOT_AUTHORIZED; NAS_RUNNER_REPLACEMENT=NOT_AUTHORIZED; EXISTING_BACKUP_PRIVACY=FAIL; ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`.
+
+NEXT_DECISION: Codex may implement a bounded isolated offline candidate using verified frozen inputs, then report code and smoke for review. No further operations are authorized by a candidate PASS.
+
 ## P03-H ADMIN83 STAGING-ONLY AUTHORIZED — 2026-11-01 KST
 
 USER_APPROVAL: User explicitly approved staging exactly three verified CT108 candidate files on NAS, without program execution or production mutation.

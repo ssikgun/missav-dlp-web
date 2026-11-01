@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-02 — Stage9 ADMIN83 offline backup-ACL remediation approved; NOT YET IMPLEMENTED
+
+User explicitly approved **offline-only** repair of the verified 191-line NAS-staged `admin83_runner.py` backup privacy gate and partial-backup path reporting, plus corresponding isolated smoke/recovery notes. Same workstream `STG9MEDIA-001`; see `docs/governance/stage9-media/ACTIVE_WORK.md` for exact scope, original source SHA values, tests, and forbidden writes. Existing NFO title-only logic and no-retry/manual recovery remain frozen. No operating NAS ACL/root provisioning, candidate promotion, operational Apply, current backup repair, 82 remaining NFO edits, service/DB/Jellyfin changes are authorized. Prior source security review = PASS; existing operational backup privacy = FAIL. Candidate implementation/testing = NOT_RUN. Next: create isolated offline candidate from SHA-verified frozen source, report limited smoke and diff for review, then update canonical immediately with result.
+
 
 ## P03-H EBWH-350 USER-REPORTED SUCCESS / READ-ONLY AUDIT AUTHORIZED (2026-10-30 KST)
 
