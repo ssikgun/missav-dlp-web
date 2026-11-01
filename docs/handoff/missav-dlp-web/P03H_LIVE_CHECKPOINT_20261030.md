@@ -905,3 +905,13 @@ LATEST_STATUS: `STAGE9_ACL_EMPTY_DIR_CREATED=PASS_1; STAGE9_ACL_EMPTY_DIR_ACCESS
 - Next **read-only** action: inspect `synoacltool -get-perm PROBE ssikgun` vs `admin`, `-get-archive`, `-getace` to plan optional narrowly scoped test-directory ACL adjustment **only after separate user authorization**. Do not change group membership, parent ACL, existing real original backup, NFOs, DB/Jellyfin or timer.
 
 LATEST_STATUS: `STAGE9_ACL_USER_GROUP_REVIEW=PASS_BOTH_ADMINS; STAGE9_ACL_SSIKGUN_NAMED_AND_GROUP_ALLOW=YES; STAGE9_ACL_EMPTY_DIR_ACCESS=FAIL_SSIKGUN_OPEN_ALLOWED; STAGE9_ACL_TEST_FOLDER_CHANGE=NOT_AUTHORIZED; AKDL312_CONTENT_IDENTITY_POSTCHECK=PASS; AKDL312_BACKUP_PRIVACY=FAIL_ACCESS_SSIKGUN; VERIFIED_MODIFIED_NFO=105_OF_187; ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`.
+
+
+## ACL -get-perm lookup failure under ordinary account, no mutation — user NAS output 2026-11-01 KST
+
+- Exact existing empty probe directory `/volume1/video/video2/downloads/backups/stage9/.p03h-acl-probe-20261101-01`.
+- User ran read-only `/usr/syno/bin/synoacltool -get-perm "$P" ssikgun` as ordinary UID1026 `ssikgun` over SSH. Tool immediately printed `(900) failed to initgroup for user=ssikgun, gid: 100` and command exited nonzero, thus `set -eu` stopped **before** `-get-perm admin`, `-get-archive`, `-getace` and terminal `ACL_PRECHECK=COMPLETE`. No ACL modification or NFO/backup write.
+- The failed initgroup call is an account/group initialization failure of the *query tool*, **not proof of effective ACL deny or allow**, nor contradiction of the independently observed `SSIKGUN_DIRECTORY_OPEN=ALLOWED`. It may need elevated privileges but root success is not yet verified. Next check is separately bounded, read-only `sudo -v` in same SSH TTY followed by `sudo -n synoacltool -get-perm` for each named account, with nonzero failures reported but not misread as permissions results; `-get-archive` and `-getace` should run independently even if `-get-perm` fails.
+- Still no ACL change approval (including only empty test folder), no other 82 admin NFO writes, restore, Jellyfin, DB, or timer. Not appropriate to attempt a modified ACL command until effective-permission behavior and DSM semantics are evidenced.
+
+LATEST_STATUS: `STAGE9_ACL_GET_PERM=FAILED_INITGROUP_900; STAGE9_ACL_GET_PERM_ROOT_RETRY=NOT_RUN; STAGE9_ACL_EMPTY_DIR_ACCESS=FAIL_SSIKGUN_OPEN_ALLOWED; STAGE9_ACL_TEST_FOLDER_CHANGE=NOT_AUTHORIZED; AKDL312_CONTENT_IDENTITY_POSTCHECK=PASS; AKDL312_BACKUP_PRIVACY=FAIL_ACCESS_SSIKGUN; VERIFIED_MODIFIED_NFO=105_OF_187; ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
