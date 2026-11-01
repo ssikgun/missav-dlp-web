@@ -400,3 +400,22 @@ LATEST_STATUS: `SIXTH20_APPLY=PASS_20; SIXTH20_INDEPENDENT_POSTCHECK=PASS_20; CU
 - Repository canonical branch remains `teddy-subtitle-stage11`; this checkpoint records user terminal output, not independent connected NAS execution.
 
 LATEST_STATUS: `FINAL4_DRYRUN=PASS_4; FINAL4_APPLY=NOT_RUN; CUMULATIVE_APPLIED=100_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=100_OF_187; REMAINING_SSIKGUN=4; BLOCKED_ADMIN=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Final four normal-user NFO live apply, offsets 100–103 — user CT108 log, 2026-11-01 KST
+
+- Within previously approved Stage9 Media `STG9MEDIA-001 / IN_PROGRESS` and exact P03-H title-only NFO scope. No extension of authority, no admin-owned files touched.
+- Executed by NAS normal account `ssikgun` UID 1026 over SSH from CT108 in the original staging directory `/tmp/p03h-bulk104-sIzAT42z`. Script `p03h_bulk104_ssikgun_controlled.py` SHA-256 `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef`: `OK`; manifest `p03h_title_only_candidates_188.jsonl` SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`: `OK`.
+- Command: `python3 -B p03h_bulk104_ssikgun_controlled.py --apply --start 100 --count 4 --confirm P03H-104`. `TARGETS_104=PASS; EXCLUDE_MARR014=YES; EXCLUDE_ADMIN83=YES`; `BATCH_START=100; BATCH_COUNT=4`, `BATCH_IDS=SVVRT-086,VDD-209,WA-576,YSN-665`; `PREFLIGHT=4_PASS`.
+- All four original backups completed before write: `BATCH_BACKUP=PASS; PATH=/volume1/video/video2/downloads/backups/stage9/p03h-bulk104-20261101-111601-8yv3eh19`. Preserve backup snapshots and receipts.
+- Reported post-apply NFO SHA-256:
+  - `SVVRT-086`: `dde8bc43ca2f2dae10df3f55fcec09fcb634c368fd72edadd3b31ead40bf1629`
+  - `VDD-209`: `cd2592f201511eda1fb5c17aee09d5fb0ac30f0ac24ff700c3d44e364ec5efbc`
+  - `WA-576`: `34ac457db2135c4853711ebcc9e2609cef769809946f55885e5449e1d9b6d264`
+  - `YSN-665`: `99d9051a849d3fb131b88d2697a50760c153383e344dc1ac93c26bb211f1cd1c`
+- Final program output: `BATCH=PASS; APPLIED_COUNT=4`, `NAS_NFO_WRITE=4; VIDEO_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`, `JELLYFIN_REFRESH=NOT_RUN`.
+- **All 104 / 104 `ssikgun`-owned exact approved P03-H NFOs applied**; **only 100/104 independently postchecked** so far. Final four require read-only independent postcheck of original backup bytes/SHA, ACL receipt, live exact title-only NFO bytes/SHA, owner, inode, mode, current Synology ACL and xattr names. Do not repeat any apply on offsets 0–103.
+- 83 remaining approved `admin`-owned NFOs remain blocked (no permission change authorized). MARR-014 already completed separately and 59 unrelated protected items excluded. No Stage9 timer update, Jellyfin refresh, video/DB write, or permission escalation.
+- Next action is **independent read-only postcheck of exactly four**. On mismatch stop, investigate; preserve all backups. User-supplied shell stdout is evidence for this apply; GitHub cannot independently access the user's NAS.
+
+LATEST_STATUS: `FINAL4_APPLY=PASS_4; FINAL4_INDEPENDENT_POSTCHECK=NOT_RUN; CUMULATIVE_APPLIED=104_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=100_OF_187; REMAINING_SSIKGUN=0; BLOCKED_ADMIN=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
