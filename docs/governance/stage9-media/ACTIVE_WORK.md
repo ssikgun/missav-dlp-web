@@ -38,7 +38,7 @@ SCOPE: Run only staged `/tmp/p03h-admin83-stage-20261101-9c4097dc/admin83_runner
 
 LIMITS: No backup creation, original NFO write, Apply, recovery, copying files, permission/ACL changes, DB/Jellyfin/timer/service actions, changes to the other 82 admin NFOs, or rerun on error. Terminal PASS requires `PREFLIGHT=1_PASS`, `DRY_RUN=PASS; BACKUP_CREATED=NO`, and nonzero errors halt without promotion. A subsequent real NFO modification requires separate explicit authorization.
 
-STATUS: `ADMIN83_ONE_DRYRUN=AUTHORIZED_NOT_RUN`; `ADMIN83_APPLY=NOT_AUTHORIZED`.
+STATUS: `ADMIN83_ONE_DRYRUN=PASS_AKDL-312`; `ADMIN83_APPLY=NOT_AUTHORIZED`. User NAS output: `STAGED_RUNNER=PASS`, `PREFLIGHT=1_PASS; IDS=AKDL-312`, `DRY_RUN=PASS; BACKUP_CREATED=NO`, `ADMIN83_ONE_DRYRUN=PASS`, `APPLY_REQUESTED=NO` (2026-11-01 KST). No backup or NFO write; remaining 82 preflights NOT_RUN.
 
 
 
