@@ -714,3 +714,15 @@ LATEST_STATUS: `ADMIN83_UPDATED_SOURCE_REVIEW=PASS_WITH_NAS_PREFLIGHT_PENDING; A
 - Note: user terminal stdout provides evidence of read-only script completion; it is not independent access to NAS from GitHub connector.
 
 LATEST_STATUS: `ADMIN83_NAS_ACL_XATTR_AUDIT=PASS_83; ADMIN83_NAS_LINUX_MODE=83; ADMIN83_NAS_SYNO_ACL=0; ADMIN83_NAS_XATTR_TOTAL=0; ADMIN83_OWNER_EXECUTION=NOT_VERIFIED; ADMIN83_NAS_STAGE=NOT_RUN; ADMIN83_NAS_DRYRUN=NOT_RUN; ADMIN83_APPLY=NOT_RUN; VERIFIED_NFO=104_OF_187; ADMIN_PENDING=83; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`.
+
+
+## Admin83 same-session Synology sudo-v to admin identity read-only probe PASS — 2026-11-01 KST
+
+- User ran from CT108 `root@downloader` interactive `ssh -tt -o StrictHostKeyChecking=yes ssikgun@192.168.1.201`; within the **same NAS SSH TTY session**, normal identity `id` returned `uid=1026(ssikgun) gid=100(users) groups=100(users),101(administrators)`.
+- User interactively entered NAS sudo password in `sudo -v` (authenticated successfully), then invoked `sudo -n -u admin id`. It succeeded without a further password prompt, with `uid=1024(admin) gid=100(users) groups=100(users),101(administrators)`.
+- Session printed `SUDO_OWNER_HANDOFF=PASS` and `NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`. This confirms owner-identity command viability **in the tested same SSH TTY session**, not a lasting cache across independent SSH connections and not the application worker's JSON-over-stdin subprocess in DSM.
+- Program remains CT108-only: `admin83_runner.py` SHA `b2bdb5df1080b2ac9951d7a59e68eb0c07271fefd6ee2685e56eee772130eb18`, smoke SHA `fca6dd6e0b2be624b081996c4ecc09bbe76730c4c2f71c5798ab6a58a18bd306`, recovery guide SHA `b97a4fd429f977071c88b17ece55e27d2ad777dffcffd58ec3706173ada84488`. All 83 admin-owned NFOs had previous exact original/candidate SHA preflight PASS and strict NAS ACL/xattr audit PASS: 83 Linux mode, 0 Synology ACL, 0 visible xattrs.
+- Next least-risk step: ordinary `ssikgun` read-only NAS infrastructure preflight (Python interpreter version/path, staging directory permissions for both identities, backup parent space/attributes and source delivery approach). Do **not** copy/edit NAS candidate or execute/admin worker yet. For later owner-side live dry-run, require an authorized staged SHA-locked source readable by UID1024, same interactive TTY session `sudo -v`, then `sudo -n` worker using the validated 83-roster on dedicated stdin, and scoped read-only execution approval.
+- No NAS product NFO modifications, backup creation, owner/chmod/ACL changes, DB/Jellyfin/timer operations or product code promotion occurred. 104/104 `cohort 119` independently applied verified; remaining 83 `cohort 129` unmodified. Stage9 workstream `STG9MEDIA-001 / IN_PROGRESS`, selected inode-preserving in-place design remains approved *only as design*, not production write.
+
+LATEST_STATUS: `ADMIN83_SUDO_OWNER_HANDOFF=PASS_SAME_SESSION; ADMIN83_NAS_ACL_XATTR_AUDIT=PASS_83; ADMIN83_NAS_STAGE=NOT_RUN; ADMIN83_NAS_DRYRUN=NOT_RUN; ADMIN83_APPLY=NOT_RUN; VERIFIED_NFO=104_OF_187; ADMIN_PENDING=83; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`.
