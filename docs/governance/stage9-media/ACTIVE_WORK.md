@@ -74,6 +74,18 @@ INDEPENDENT POSTCHECK UPDATE (2026-11-01 KST): User's read-only admin-side postc
 
 User-reported NAS stdout 2026-11-01 KST: `PREFLIGHT=1_PASS; IDS=AKDL-312`, `BACKUP_COMPLETE=.../p03h-admin83-9nhqs7od`, `APPLIED=AKDL-312 SHA256=a7ce1cc489eab8250c3eaed4543f512ad84c488aaf7abd68d28c507132daf42c`, `BATCH=PASS`, exit zero. Require separate independent original-backup/receipt/current-file SHA, identity, ACL and xattr postcheck before product PASS; do not rerun Apply.
 
+## P03-H ACL ISOLATION EMPTY-DIRECTORY PROBE AUTHORIZED — 2026-11-01 KST
+
+USER_APPROVAL: After a completed read-only Synology backup-path survey, the user said "다음", accepting the next explicitly proposed **single test empty folder creation and ACL examination**. Stage9-only task `STG9MEDIA-001 / IN_PROGRESS`, contract v1.0.0, common v1.0.1. No application of `AKDL-312` or other 82 NFOs approved.
+
+KNOWN FACTS: Real `AKDL-312` title-only/identity/ACL/xattr postcheck PASS, while original-backup folders and files inherited Synology ACL and display 0777; `ssikgun` actually opened `original.nfo`. Read-only survey of `/volume1/video/video2/downloads/backups/stage9`, its ancestors, `admin` home, and existing JAV parent found Synology ACL inheritance with `ssikgun` access; did **not** identify an already-private safe location.
+
+AUTHORIZED EXACT ONE NAS MUTATION: With interactive `sudo -v` as NAS `ssikgun` and execution as `admin` UID1024, create **only one new empty directory**, by atomic, no-overwrite `mkdir(mode=0700, umask=0077)`, at `/volume1/video/video2/downloads/backups/stage9/.p03h-acl-probe-20261101-01`. Abort if destination already exists or parent not expected directory. After creation inspect only its `lstat`, owner/group/mode, `synoacltool -get`, and whether the ordinary `ssikgun` account can open/list or reports `os.access(W_OK)`. This is an **ACL inheritance observation only**; 0777/missing isolation must report BLOCKED. Keep empty test directory in place after test; no auto cleanup or retry.
+
+PROHIBITED: Changes to ACLs, chmod/chown, removing inheritance or setting Synology ACL, creating test files, deleting the test folder, modifying preexisting backup directories/files, data restore/reapply/NFO writes, other 82 admin NFO Apply, database/Jellyfin/timer/service changes or new NAS shares/accounts. Any ACL modification on even the test folder requires separate approval after exact DSM command semantics are verified. Probe `os.access(W_OK)` is a permissions hint, not a real unauthorized-write check.
+
+STATUS: `STAGE9_ACL_EMPTY_DIR_PROBE=AUTHORIZED_NOT_RUN; BACKUP_ISOLATION=NOT_PROVEN; ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`.
+
 ## P03-H EBWH-350 USER-REPORTED SUCCESS / READ-ONLY COHORT AUDIT — 2026-10-30 KST
 
 USER EVIDENCE: User reports a single existing EBWH-350 `movie.nfo` title-only replacement, with original SHA-256 `c60e9ad6f108a531193a56bc0563b446f1fdb9fd3e290ef5726fa3955d0652d4` and resulting SHA-256 `63f3d1e1cb32b0db1ca477a59aea6f39236dd5c0ad77a714f53a2f9e5e185432`. The user reports NAS single-file replacement, hash, owner and permissions checks PASS, and Jellyfin display of `[EBWH-350]` and search for `ebwh-350` PASS after refresh. This is user-supplied evidence, not independently repeated by Codex. It does not establish atomicity, concurrency protection, rollback or safety for other files.
