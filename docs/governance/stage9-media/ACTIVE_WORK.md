@@ -42,6 +42,18 @@ STATUS: `ADMIN83_ONE_DRYRUN=PASS_AKDL-312`; `ADMIN83_APPLY=NOT_AUTHORIZED`. User
 
 
 
+## P03-H ADMIN83 REMAINING 82 DRY-RUN APPROVED — 2026-11-01 KST
+
+USER_APPROVAL: Following actual NAS first one-file `AKDL-312` dry-run PASS, the user explicitly replied `응 승인해` to the proposal to preflight the **remaining 82 admin-owned NFOs** only. Same workstream `stage9-media / STG9MEDIA-001 / IN_PROGRESS`, approved common contract v1.0.1 and Stage9 contract v1.0.0.
+
+EXACT SCOPE: Existing NAS staged runner `/tmp/p03h-admin83-stage-20261101-9c4097dc/admin83_runner.py`, SHA-256 `b2bdb5df1080b2ac9951d7a59e68eb0c07271fefd6ee2685e56eee772130eb18`; run from normal `ssikgun` account on NAS, in **one interactive SSH TTY and `sudo -v` session**, after rechecking the staged program SHA, owner/group/type/mode and manifest SHA. Only five sequential **no-`--apply`** dry-run batches, exact ordered `--start --count` pairs: `1 20`, `21 20`, `41 20`, `61 20`, `81 2` (sums to 82; earlier `0 1` already PASS). Worker may internally use `sudo -n -u admin` solely to read and preflight. No repeat on any error; stop immediately at first failure or unexpected output.
+
+PROHIBITED: `--apply`, backup creation, in-place NFO write or restoration, changes to earlier 104 NFOs or media/MP4, any file copies/deployment or existing file chmod/chown/ACL/xattr changes, account/credential changes, DB, Jellyfin, service or timer operations. Preserve the approved inode-retaining design only as a future write method subject to separate explicit authorization.
+
+ACCEPTANCE: Each batch must return exit code 0 and matching `PREFLIGHT=<count>_PASS`, `DRY_RUN=PASS; BACKUP_CREATED=NO`; all five complete for `ADMIN83_REMAINING_DRYRUN=PASS_82`. Verify 83 total covered once with the earlier AKDL-312 check. All NFO originals unchanged; do not claim actual Apply, backup durability, atomicity or production outcome. Operational write still requires fresh explicit user approval.
+
+STATUS: `ADMIN83_REMAINING_DRYRUN=AUTHORIZED_NOT_RUN; ADMIN83_APPLY=NOT_AUTHORIZED; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`.
+
 ## P03-H EBWH-350 USER-REPORTED SUCCESS / READ-ONLY COHORT AUDIT — 2026-10-30 KST
 
 USER EVIDENCE: User reports a single existing EBWH-350 `movie.nfo` title-only replacement, with original SHA-256 `c60e9ad6f108a531193a56bc0563b446f1fdb9fd3e290ef5726fa3955d0652d4` and resulting SHA-256 `63f3d1e1cb32b0db1ca477a59aea6f39236dd5c0ad77a714f53a2f9e5e185432`. The user reports NAS single-file replacement, hash, owner and permissions checks PASS, and Jellyfin display of `[EBWH-350]` and search for `ebwh-350` PASS after refresh. This is user-supplied evidence, not independently repeated by Codex. It does not establish atomicity, concurrency protection, rollback or safety for other files.
