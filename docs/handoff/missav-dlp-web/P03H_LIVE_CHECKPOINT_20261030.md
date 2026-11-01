@@ -657,3 +657,18 @@ LATEST_STATUS: `ADMIN83_RUNNER_SOURCE_REVIEW=BLOCKED_ACL_SUDO; ADMIN83_SMOKE_SOU
 - Recommended next scope: minimal offline candidate correction and targeted smoke only (ACL Linux mode + sudo handoff + valid-roster path test), then record SHA and separate prospective read-only NAS verification. No GitHub product source promotion, NAS copies or privileged execution in this step.
 
 LATEST_STATUS: `ADMIN83_SMOKE_RECOVERY_REVIEW=BLOCKED_FIX_REQUIRED; ADMIN83_ACL_LINUX_MODE_FIX=NOT_IMPLEMENTED; ADMIN83_SUDO_IPC_FIX=NOT_IMPLEMENTED; ADMIN83_VALID_ROSTER_PATH_TEST=NOT_VALIDATED; ADMIN83_NAS_DRYRUN=NOT_RUN; ADMIN83_APPLY=NOT_RUN; VERIFIED_NFO=104_OF_187; ADMIN_REMAINING=83; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`.
+
+
+## Admin83 candidate three-blocker offline fix report — 2026-11-01 KST
+
+- This records a **user-supplied Codex report**, not independent verification of newly modified candidate code or live NAS behavior. Canonical repo/branch `ssikgun/missav-dlp-web:teddy-subtitle-stage11`; Stage9 Media `STG9MEDIA-001 / IN_PROGRESS`, common contract v1.0.1 and Stage9 contract v1.0.0 approved.
+- Reported offline candidate files in existing CT108 temporary directory `/tmp/p03h-admin83-offline-review-20261101`:
+  - `admin83_runner.py` SHA-256 `b2bdb5df1080b2ac9951d7a59e68eb0c07271fefd6ee2685e56eee772130eb18`.
+  - `admin83_runner_smoke.py` SHA-256 `fca6dd6e0b2be624b081996c4ecc09bbe76730c4c2f71c5798ab6a58a18bd306`.
+  - `RECOVERY.md` SHA-256 `b97a4fd429f977071c88b17ece55e27d2ad777dffcffd58ec3706173ada84488`.
+- Codex reports fixing three specific earlier review blockers: (1) recognizes only the observed Synology `synoacltool -get` Linux-mode output and retains separate Synology ACL handling plus rejection of unexpected output; (2) separates sudo authentication readiness from fixed 83-row roster input to the admin worker; (3) tests path guard correctly on a valid complete 83-row roster instead of failing solely on the row count. User reports offline smoke **PASS / 0 FAIL**.
+- **NOT independently established yet:** the new three SHA-256s and source contents on CT108, correct code logic in those fixes, ability to authenticate and deliver roster on DSM, all 83 ACL modes/privileges, Synology xattr value comparison, owner-identity readability/staging constraints and backup durability. Do not confuse reported offline smoke with operational PASS.
+- **No NAS copy, runner execution, dry-run, apply, backup/restore, admin file mutation, GitHub product code promotion, DB/Jellyfin change or Stage9 service/timer change** was reported by this Codex run. Existing 104/104 `cohort 119` applied + independently postchecked PASS; remaining 83 `cohort 129` unmodified, prior exact-content preflight PASS.
+- **Next only:** on CT108 read-only hash verification and focused source readback of changed `admin83_runner.py`, smoke, and recovery text, evaluate actual Linux-mode recognition and sudo worker stdin/TTY behavior. Preserve exact three pre-fix hashes separately in historical entries; do not run NAS program before code review. Then propose a separately approved scoped NAS read-only preflight and delivery; live production write requires another explicit approval.
+
+LATEST_STATUS: `ADMIN83_OFFLINE_FIX_REPORT=PASS_0_FAIL; ADMIN83_UPDATED_SOURCE_REVIEW=NOT_RUN; ADMIN83_NAS_CANDIDATE_DEPLOYMENT=NOT_RUN; ADMIN83_NAS_DRYRUN=NOT_RUN; ADMIN83_APPLY=NOT_RUN; SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_REMAINING=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
