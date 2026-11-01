@@ -52,7 +52,7 @@ PROHIBITED: `--apply`, backup creation, in-place NFO write or restoration, chang
 
 ACCEPTANCE: Each batch must return exit code 0 and matching `PREFLIGHT=<count>_PASS`, `DRY_RUN=PASS; BACKUP_CREATED=NO`; all five complete for `ADMIN83_REMAINING_DRYRUN=PASS_82`. Verify 83 total covered once with the earlier AKDL-312 check. All NFO originals unchanged; do not claim actual Apply, backup durability, atomicity or production outcome. Operational write still requires fresh explicit user approval.
 
-STATUS: `ADMIN83_REMAINING_DRYRUN=AUTHORIZED_NOT_RUN; ADMIN83_APPLY=NOT_AUTHORIZED; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`.
+STATUS: `ADMIN83_REMAINING_DRYRUN=PASS_82; ADMIN83_TOTAL_DRYRUN=PASS_83; ADMIN83_APPLY=NOT_AUTHORIZED; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`. User-run Synology NAS output (2026-11-01 KST): `RUNNER_MANIFEST=PASS`; five sequential owner-side batches `(1,20),(21,20),(41,20),(61,20),(81,2)` each printed exact `PREFLIGHT=<count>_PASS` and `DRY_RUN=PASS; BACKUP_CREATED=NO`; printed `ADMIN83_REMAINING_DRYRUN=PASS_82`, `APPLY_REQUESTED=NO`, `BACKUP_REQUESTED=NO`. Together with prior `(0,1) AKDL-312` PASS, 83/83 admin-owned NFOs were preflighted, not modified. No automatic recovery/backup or in-place Apply has been verified.
 
 ## P03-H EBWH-350 USER-REPORTED SUCCESS / READ-ONLY COHORT AUDIT — 2026-10-30 KST
 
