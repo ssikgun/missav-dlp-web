@@ -460,3 +460,16 @@ LATEST_STATUS: `FINAL4_APPLY=PASS_4; FINAL4_INDEPENDENT_POSTCHECK=PASS_4; SSIKGU
 - 104/187 NFO titles were applied and independently verified; 83/187 blocked, not failed writes. MARR-014 already completed separately, 59 protected excluded; all backups preserved. No Jellyfin refresh, video, DB, Stage9 timer or cross-workstream modifications.
 
 LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_READONLY_AUDIT=PASS_83_BLOCKED; ADMIN83_UID=1024; ADMIN83_GID=100; ADMIN83_MODE=0644; ADMIN83_SSIKGUN_WRITE=0_OF_83; CUMULATIVE_APPLIED_AND_VERIFIED=104_OF_187; REMAINING_BLOCKED=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Admin83 owner mapping confirmed; first ACL sample failed — 2026-11-01 KST, user CT108/NAS terminal output
+
+- Existing approved Stage9 workstream `STG9MEDIA-001 / IN_PROGRESS`, original 104/104 normal-user NFO batch independently verified PASS, unchanged. No authorized admin-owned NAS write or ACL change.
+- User ran NAS `ssikgun` read-only Python for two sample ACLs selected from frozen 188-row manifest `cohort == "129"`, manifest SHA `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`.
+- Account mapping returned `OWNER_NAME= admin`, `OWNER_SHELL= /bin/sh`, `GROUP_NAME= users`. Thus prior observed UID 1024 / GID 100 correspond to `admin` / `users` on this NAS. A shell mapping alone does NOT establish authorized SSH login or current credentials.
+- `subprocess.run(["/usr/syno/bin/synoacltool", "-get", "/volume1/video/video2/JAV/AKDL/AKDL-312/movie.nfo"], capture_output=True, text=True, check=True, timeout=15)` raised `CalledProcessError` with exit code `255`; the prior script exited at this first sample. No `stdout` or `stderr` was printed; **reason is not yet established** (do not infer that ACL is absent or permission denied solely from code 255); the second sample was not checked.
+- **AUDIT STATUS: OWNER_MAPPING=PASS; ACL_PROBE=INCOMPLETE_EXIT_255; ADMIN_83_WRITE=BLOCKED.** Prior 83/83 regular-file owner/mode scan remains PASS (UID 1024, GID 100, mode 0644; `ssikgun` writable 0/83). No NAS file writes were requested by this probe.
+- Next authorized action is **read-only error detail collection** on exactly the sampled file (or two bounded samples) using `subprocess.run(..., check=False)` to display return code, standard error, and stdout, plus basic file/directory access metadata; no `sudo`, no `chown`, `chmod`, ACL changes, account switch, or production data edits.
+- Stage9 `P03_T=NOT_RUN`, Jellyfin refresh `NOT_RUN`, videos/DB untouched.
+
+LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_READONLY_AUDIT=PASS_83_BLOCKED; ADMIN83_UID_MAPPING=admin; ADMIN83_GROUP_MAPPING=users; ADMIN83_ACL_PROBE=INCOMPLETE_EXIT_255; ADMIN83_WRITE=NOT_AUTHORIZED; P03_T=NOT_RUN`.
