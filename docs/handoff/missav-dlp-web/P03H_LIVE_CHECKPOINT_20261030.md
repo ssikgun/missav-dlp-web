@@ -593,3 +593,20 @@ LATEST_STATUS: `ADMIN83_OFFLINE_CODEX_PLAN=PASS_SELECTION_ONLY; ADMIN83_SAFE_RUN
 - Workstream: `stage9-media / STG9MEDIA-001 IN_PROGRESS`; canonical branch `teddy-subtitle-stage11`. No contract version or other workstream task changed.
 
 LATEST_STATUS: `ADMIN83_INPLACE_DESIGN=APPROVED_BY_USER; ADMIN83_CTIME_MTIME_CHANGE=ACCEPTED; ADMIN83_INODE_UID_GID_MODE_ACL_XATTR_VALUES=PRESERVE; ADMIN83_RUNNER=INCOMPLETE_OFFLINE_ONLY; ADMIN83_APPLY=NOT_RUN; INDEPENDENTLY_VERIFIED=104_OF_187; ADMIN_REMAINING=83; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`.
+
+
+## User-supplied Codex admin83 runner offline implementation outcome — 2026-11-01 KST
+
+- After user's choice of inode-preserving, in-place NFO title-prefix modifications, Codex reported preparing an **offline-only** admin-owned 83 runner and tests in a local temporary candidate directory:
+  - `/tmp/p03h-admin83-offline-review-20261101/admin83_runner.py`
+  - `/tmp/p03h-admin83-offline-review-20261101/admin83_runner_smoke.py`
+  - `/tmp/p03h-admin83-offline-review-20261101/RECOVERY.md`.
+- This entry reflects **Codex output submitted by the user**, not independently fetched or inspected code; candidate directory may not exist on CT108 or NAS. There was **no GitHub source commit** or approved deployment.
+- Codex reports SHA-256 rechecking of frozen 188-row manifest `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087` and previous 104 program; `ssikgun` verifies manifest, `admin` side checks a fixed 83-entry spec and hashes. Owner-side execution needs verification of secure handoff on actual DSM.
+- Reported offline smoke **PASS / 0 FAIL** for exactly 83 selection, MAX_BATCH<=20, original SHA mismatch refusal, backup failure refusal, partial-write failure handling, and repeat apply refusal. Synthetic files preserved inode/UID/GID/mode and xattr **values**; Synology ACL used mock values and remains **unverified in reality**.
+- Design is in-place, not atomic temp rename. Full bounded-batch original backup and read-back were implemented per Codex report; on failure the runner stops and reports recovery backup path. Automatic rollback and complete post-power-loss recovery guarantee are NOT claimed. `flock` is only cooperative and does not exclude writers ignoring lock.
+- **CURRENT VERDICT: OFFLINE PASS only; PRODUCTION READINESS=NOT_VERIFIED.** Required before any approval to mutate: independent source inspection, Synology sudo boundary + manifest handoff feasibility, effective admin access on all 83, read-only ACL/xattr value and original file attribute inspection, backup permission/space/durability checks, and an explicitly approved read-only operational Dry-run. Then separately approve a very small canary apply after safety evidence; perform exact independent postcheck.
+- No NAS write or backup, actual sudo apply, deployment, GitHub source promotion, account/ACL/chown/chmod modifications, Stage9 timer or Jellyfin operations were performed by this Codex session. 104/104 ordinary-user cohort NFOs remain independently verified PASS, 83 admin-owned NFOs unchanged.
+- Stage9 workstream `STG9MEDIA-001 / IN_PROGRESS`; canonical branch `teddy-subtitle-stage11`; approved design selection retained; production writes remain separately gated.
+
+LATEST_STATUS: `ADMIN83_OFFLINE_RUNNER_SMOKE=PASS_0_FAIL; ADMIN83_PRODUCTION_READINESS=NOT_VERIFIED; ADMIN83_NAS_DRYRUN=NOT_RUN; ADMIN83_APPLY=NOT_RUN; SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_REMAINING=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
