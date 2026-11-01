@@ -384,3 +384,19 @@ LATEST_STATUS: `SIXTH20_APPLY=PASS_20; SIXTH20_INDEPENDENT_POSTCHECK=NOT_RUN; CU
 - No video, DB or Jellyfin writes; Jellyfin refresh and Stage9 timer change NOT RUN; Stage9 active task `STG9MEDIA-001 / IN_PROGRESS`.
 
 LATEST_STATUS: `SIXTH20_APPLY=PASS_20; SIXTH20_INDEPENDENT_POSTCHECK=PASS_20; CUMULATIVE_APPLIED=100_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=100_OF_187; REMAINING_SSIKGUN=4; BLOCKED_ADMIN=83; FINAL4_DRYRUN=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Final four `ssikgun`-owned NFOs (offsets 100–103) dry-run PASS — 2026-11-01 KST
+
+- Scope: Stage9 Media active `STG9MEDIA-001 / IN_PROGRESS`, previously approved exact P03-H 187 title-only NFO corrections. The independent check for first 100/187 is PASS; no previous index is being re-applied.
+- User ran CT108 SSH to Synology under ordinary `ssikgun` account (UID 1026), staging `/tmp/p03h-bulk104-sIzAT42z`.
+- `p03h_bulk104_ssikgun_controlled.py` SHA-256 `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef`: `OK`.
+- `p03h_title_only_candidates_188.jsonl` SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`: `OK`.
+- Command: `python3 -B p03h_bulk104_ssikgun_controlled.py --dry-run --start 100 --count 4`.
+- User NAS terminal output: `TARGETS_104=PASS; EXCLUDE_MARR014=YES; EXCLUDE_ADMIN83=YES`, `BATCH_START=100; BATCH_COUNT=4`, exact `BATCH_IDS=SVVRT-086,VDD-209,WA-576,YSN-665`, `PREFLIGHT=4_PASS`; `DRY_RUN=PASS; NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`.
+- **Live apply NOT RUN** for this last group. Next operation: on the NAS as the same ordinary `ssikgun` user verify exact two SHA-256 checks, identity and staging, then only `python3 -B p03h_bulk104_ssikgun_controlled.py --apply --start 100 --count 4 --confirm P03H-104`. All 4 originals must be backed up before writes. Stop on error and do not blindly rerun.
+- After live apply, record exact backup path and postwrite SHA-256 for all four, then independently postcheck `receipt.json`, `original.nfo`, ACL snapshot, exact title-only change, candidate SHA, UID/GID/mode/inode and live Synology ACL/xattrs; no later batch within 104.
+- 83 admin-owned NFOs remain separately blocked. Do not change ownership/permissions/ACL, do not use sudo, do not touch 59 protected, completed canary MARR-014, videos/DB/Jellyfin, Stage9 timer or other workstreams.
+- Repository canonical branch remains `teddy-subtitle-stage11`; this checkpoint records user terminal output, not independent connected NAS execution.
+
+LATEST_STATUS: `FINAL4_DRYRUN=PASS_4; FINAL4_APPLY=NOT_RUN; CUMULATIVE_APPLIED=100_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=100_OF_187; REMAINING_SSIKGUN=4; BLOCKED_ADMIN=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
