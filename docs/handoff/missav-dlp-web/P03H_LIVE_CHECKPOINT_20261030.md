@@ -245,3 +245,17 @@ LATEST_STATUS: `FOURTH20_DRYRUN=PASS_20; FOURTH20_APPLY=NOT_RUN; VERIFIED_APPLIE
 - Next checkpoint: read-only verify all 20 current NFOs against exact immutable 188-manifest, per-ID `receipt.json`, `original.nfo`, `original_acl.txt`, exact title-only prefix, hash, inode/UID/GID/mode and live Synology ACL/xattrs. Hold next dry-run/apply until postcheck PASS.
 
 LATEST_STATUS: `FOURTH20_APPLY=PASS_20; FOURTH20_INDEPENDENT_POSTCHECK=NOT_RUN; TOTAL_APPLIED=60_OF_187; TOTAL_INDEPENDENT_POSTCHECK=40_OF_187; REMAINING_SSIKGUN=44; BLOCKED_ADMIN=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Fourth batch (offsets 40–59) independent NAS postcheck — evidence received 2026-11-01 KST
+
+- User supplied output from read-only `ssikgun` NAS Python postcheck over SSH from CT108, following the previously recorded 20-file live apply and backup at `/volume1/video/video2/downloads/backups/stage9/p03h-bulk104-20261031-000513-5n80nxmv`.
+- The submitted verification script checked NAS account UID 1026, immutable frozen manifest SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`, exact 188 rows and target cohort 104, and sorted offset 40–59 against the approved 20 identities.
+- For each exact title `HODV-22114,HODV-22116,HUNTC-623,IESP-765,IPX-996,IPZZ-034,IPZZ-789,IPZZ-935,IPZZ-972,JUQ-234,JUR-750,JUR-859,KIR-079,KNMB-133,MAAN-1193,MFYD-181,MIAD-866,MIDA-445,MIDA-705,MIDV-372`, live terminal printed `PASS=<DVD-ID> BACKUP=OK NFO=OK ACL=OK`.
+- Per-title checks: immutable backup `original.nfo` SHA matched manifest and `receipt.json`; `original_acl.txt` SHA matched receipt; exact original-to-updated bytes allowed only `[DVD-ID] ` prefix in existing `<title>`; resulting SHA matched manifest/receipt; original file inode, UID, GID, mode, regular-file/link count preserved; current Synology ACL hash and xattr name list matched saved state; symlink paths refused.
+- Final output: `POSTCHECK=20_PASS` and `NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`. Evidence is user-provided remote terminal output, not a separately connected server access by GitHub.
+- Fourth batch now **20/20 applied + independently postchecked PASS**. Cumulative approved bulk first 60 of 187 are applied and independently postchecked; avoid rerunning offsets 0–59. Remaining `ssikgun` subset 44, blocked `admin` subset 83. Completed canary MARR-014 and unrelated protected 59 excluded.
+- **Next action**: verify unchanged NAS script/manifest SHA under `/tmp/p03h-bulk104-sIzAT42z`; run read-only `--dry-run --start 60 --count 20` as `ssikgun`; inspect `PREFLIGHT=20_PASS`, `DRY_RUN=PASS`, and exact IDs before any apply. Continue staged GitHub checkpoint updates.
+- No evidence of Jellyfin refresh, Stage9 timer change, content DB/video writes, or admin ACL overrides. Existing Stage9 `STG9MEDIA-001` remains `IN_PROGRESS`.
+
+LATEST_STATUS: `FOURTH20_APPLY=PASS_20; FOURTH20_INDEPENDENT_POSTCHECK=PASS_20; VERIFIED_APPLIED=60_OF_187; REMAINING_SSIKGUN=44; BLOCKED_ADMIN=83; FIFTH20_DRYRUN=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
