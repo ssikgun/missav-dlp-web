@@ -487,3 +487,19 @@ LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_READONLY_AUDIT=PASS
 - Next bounded operation: read-only validation of an already authorized admin identity's access (login, `id`, file write-access checks only, no actual writes) if user chooses to use it; or maintain BLOCKED pending explicit plan. No unverified admin-wide write tooling or changing original `MAX_BATCH=20` subset.
 
 LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_UID_MAPPING=admin; ADMIN83_SSIKGUN_WRITE=0_OF_83; ADMIN83_ACL_DIAGNOSTIC=LINUX_MODE_2_OF_2; ADMIN83_REMAIN_BLOCKED=83; ADMIN_SSH_LOGIN=NOT_CHECKED; ADMIN_NAS_WRITE=NOT_AUTHORIZED; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## NAS admin SSH authentication attempt denied — user evidence, 2026-11-01 KST
+
+- Workstream: `stage9-media`, active approved task `STG9MEDIA-001 / IN_PROGRESS`, common contract v1.0.1 approved, Stage9 contract v1.0.0 approved.
+- User initiated CT108 SSH to NAS `admin@192.168.1.201` with `StrictHostKeyChecking=yes` and `NumberOfPasswordPrompts=1` to execute a **read-only** Python verification for admin-owned 83. User supplied result:
+  ```
+  admin@192.168.1.201's password:
+  admin@192.168.1.201: Permission denied (publickey,password).
+  ```
+- SSH authentication was denied **before** the remote Python ran. Consequently, `ADMIN_UID`, 83 read/write counts, `BACKUP_DIR_WRITABLE`, and other output from that script were **not observed**. Do not infer that the admin account is disabled or that the password is wrong based only on this failure; possible authentication-method, identity, enabled-state or policy conditions remain unverified. No further login attempts automated.
+- Earlier established facts preserved: 104/104 ordinary-user NFOs applied and independently verified PASS; 83/83 cohort-129 NFOs have UID 1024 mapped to `admin`, GID 100 mapped to `users`, mode 0644, and current `ssikgun` writable 0/83. Two sample `synoacltool` requests returned 255 with `It's Linux mode`, not proven ACL denial.
+- No production NAS file writes, ACL/chown/chmod, sudo, account activation, password resets, new accounts, video, DB, Jellyfin refresh or Stage9 timer modifications were performed by this denied-auth attempt.
+- **Next:** Ask user which already-enabled DSM administrative identity is legitimately available, or perform bounded read-only local account/SSH-policy inspection via already authenticated `ssikgun` without editing configs or exposing secrets. Do not automatically try guessed credentials or assert access under `admin`. Any eventual 83-file write path needs a separate explicit user-approved plan, respecting existing backups and limited scope.
+
+LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_ACL_DIAGNOSTIC=LINUX_MODE_2_OF_2; ADMIN_SSH_AUTH=DENIED; ADMIN83_PRIVILEGED_ACCESS=UNVERIFIED; ADMIN83_WRITE=BLOCKED_83; NAS_WRITE_FROM_ATTEMPT=0; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
