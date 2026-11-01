@@ -739,3 +739,17 @@ LATEST_STATUS: `ADMIN83_SUDO_OWNER_HANDOFF=PASS_SAME_SESSION; ADMIN83_NAS_ACL_XA
 - Do not silently use `sudo` to modify or re-permission media, or conflate a passing privilege probe with approval to mutate. Stage9 `STG9MEDIA-001 / IN_PROGRESS`; `teddy-subtitle-stage11` canonical remains source of truth. No Jellyfin refresh, DB write, Stage9 timer/service action or old 104 reapply.
 
 LATEST_STATUS: `ADMIN83_NAS_PYTHON_SUDO_IPC_BACKUP_ENV=PASS; ADMIN83_NAS_PYTHON=3.8.15; ADMIN83_SUDO_STDIN=PASS; ADMIN83_BACKUP_ACCESS=PASS; ADMIN83_NAS_STAGE=NOT_RUN; ADMIN83_NAS_DRYRUN=NOT_RUN; ADMIN83_APPLY=NOT_RUN; VERIFIED_NFO=104_OF_187; ADMIN_PENDING=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## User reapproved staging-only next step; governance write unavailable — 2026-11-01 KST
+
+- In direct reply to the earlier request to register staged-copy authorization in Stage9 ACTIVE_WORK, the user said `응 다음 작업 승인해`. Earlier in the same conversation, the user had already explicitly approved staging three exact SHA-pinned candidate files on NAS (no execution or dry-run). **This is explicit staging-only consent, not admin83 Apply or NFO mutation consent.**
+- Canonical `ssikgun/missav-dlp-web`, branch `teddy-subtitle-stage11`, Stage9 `STG9MEDIA-001 / IN_PROGRESS`. Latest branch head before this handoff update: `20c9e16d0cf881fd6e254dfd7ca237a347919af8`. Stage9 ACTIVE_WORK header read back in current session and task/contract were consistent.
+- Attempted to register the exact narrow scope in `docs/governance/stage9-media/ACTIVE_WORK.md` through connected GitHub `update_file`, but the host safety check rejected the write, twice. Do not claim that ACTIVE_WORK registration succeeded or that staging was executed. The prior approved staging scope remains exactly three candidate files:
+  - CT108 source `/tmp/p03h-admin83-offline-review-20261101/admin83_runner.py` SHA-256 `b2bdb5df1080b2ac9951d7a59e68eb0c07271fefd6ee2685e56eee772130eb18`
+  - `admin83_runner_smoke.py` SHA-256 `fca6dd6e0b2be624b081996c4ecc09bbe76730c4c2f71c5798ab6a58a18bd306`
+  - `RECOVERY.md` SHA-256 `b97a4fd429f977071c88b17ece55e27d2ad777dffcffd58ec3706173ada84488`.
+- Permitted once registration succeeds: create one new isolated NAS staging folder and these three new files only, verify hashes, owner/mode/readability and no symlinks. Prohibited: NFO edits, backups, original 104 operations, admin83 worker run, dry-run/Apply, user/password/ACL changes, DB/Jellyfin/timer changes. No production writes or code execution.
+- Since Stage9 contract requires explicit scoped task record and active-work registration did not succeed, **STAGING=BLOCKED_PENDING_ACTIVE_WORK_RECORD**. Continue by obtaining a verified canonical Stage9 ACTIVE_WORK staging authorization record via an authorized avenue (do not alter contract or task ID). Only after remote readback should the user run an exact no-overwrite staging command. Original 104 independently verified; 83 not yet modified.
+
+LATEST_STATUS: `ADMIN83_STAGE_USER_REAPPROVAL_20261101=YES; ADMIN83_STAGE_GOVERNANCE_RECORD=BLOCKED; ADMIN83_NAS_STAGE=NOT_RUN; ADMIN83_NAS_DRYRUN=NOT_RUN; ADMIN83_APPLY=NOT_RUN; VERIFIED_NFO=104_OF_187; ADMIN_PENDING=83`.
