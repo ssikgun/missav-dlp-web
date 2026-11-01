@@ -516,3 +516,22 @@ LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_ACL_DIAGNOSTIC=LINU
 - Prior completion invariant remains `104/104` verified PASS, `83` admin-owned BLOCKED, Jellyfin refresh, DB writes, Stage9 timer untouched; workstream `STG9MEDIA-001 / IN_PROGRESS`, canonical branch `teddy-subtitle-stage11`.
 
 LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; SSIKGUN_ADMIN_GROUP=CONFIRMED; ADMIN_ACCOUNT_DISABLED=USER_RECOLLECTION_UNVERIFIED; ADMIN_SSH_AUTH=DENIED; SUDO_AUTHORIZATION=NOT_CHECKED; ADMIN83_WRITE=BLOCKED_83; P03_T=NOT_RUN`.
+
+
+## NAS `ssikgun` sudo authorization verified — user read-only terminal output, 2026-11-01 KST
+
+- User confirms `ssikgun` is likely the only NAS administrator account they regularly use and recalls built-in `admin` disabled (user recollection; enabled-state not independently established). No change to account state.
+- From CT108 SSH TTY to NAS as `ssikgun`, user ran `id` and `sudo -l` with interactive password entry. User output:
+  ```
+  uid=1026(ssikgun) gid=100(users) groups=100(users),101(administrators)
+  Matching Defaults entries for ssikgun on ssikgun_home:
+      syslog=authpriv
+  User ssikgun may run the following commands on ssikgun_home:
+      (ALL) ALL
+  ```
+- Interpretation: current NAS authorization policy permits `ssikgun` to invoke commands via `sudo` under any user identity, subject to required authentication; this is **not** a claim that the admin83 file changes are complete, nor evidence that a dedicated safe cohort129 runner exists. The command `sudo -l` only listed privileges, executed **no privileged NAS file operation**.
+- Previous result unchanged: 104/104 `cohort 119` NFO titles successfully applied and independently verified PASS with backups preserved. The 83 `cohort 129` NFOs are UID 1024 `admin`, GID 100 `users`, mode 0644, `ssikgun` direct write 0/83. Sample Linux mode ACLs 2/2. Original `admin@192.168.1.201` SSH authentication denied; no reason to enable it.
+- Next safe scope: **read-only bounded preflight on the exact 83 cohort129 files**, comparing frozen manifest source SHA, live NFO bytes vs expected original and exact prefix candidate, owner/group/mode and regular-file checks, backing up feasibility; do not write files. After evidence PASS, design and review a distinct 83-safe privileged workflow with `sudo` access, all originals backed up before any mutation, strict exact scope and cross-file guards, owner/mode/inode/ACL preservation, batch cap, explicit approvals, then dry-run and staged apply. **Do not run existing cohort119-only UID1026 bulk104 script through sudo.**
+- Do not alter ownership, chmod/chown, ACL, admin account, video/DB, Jellyfin refresh, Stage9 timer, or other workstreams. Last 83 need separate explicit user approval before privileged production writes. Canonical branch `teddy-subtitle-stage11` and Stage9 `STG9MEDIA-001 / IN_PROGRESS` maintained.
+
+LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; SSIKGUN_ADMIN_GROUP=CONFIRMED; SSIKGUN_SUDO_AUTHORIZED=ALL_ALL; ADMIN83_COHORT=BLOCKED_PENDING_SAFE_WORKFLOW; ADMIN83_WRITE=NOT_RUN; CUMULATIVE_VERIFIED=104_OF_187; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`.
