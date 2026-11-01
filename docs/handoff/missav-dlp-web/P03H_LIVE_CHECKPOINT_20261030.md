@@ -473,3 +473,17 @@ LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_READONLY_AUDIT=PASS
 - Stage9 `P03_T=NOT_RUN`, Jellyfin refresh `NOT_RUN`, videos/DB untouched.
 
 LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_READONLY_AUDIT=PASS_83_BLOCKED; ADMIN83_UID_MAPPING=admin; ADMIN83_GROUP_MAPPING=users; ADMIN83_ACL_PROBE=INCOMPLETE_EXIT_255; ADMIN83_WRITE=NOT_AUTHORIZED; P03_T=NOT_RUN`.
+
+
+## Admin83 Linux-mode ACL diagnostic — two read-only samples, 2026-11-01 KST
+
+- This resolves the preceding inconclusive `synoacltool -get` exit code 255 for a **two-file sample**. Under unchanged normal NAS user `ssikgun` UID 1026, verified exact 188-row frozen manifest SHA `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087` and selected first two sorted `cohort 129` rows.
+- Sample 1: `AKDL-312`, path `/volume1/video/video2/JAV/AKDL/AKDL-312/movie.nfo`; `UID=1024 GID=100 MODE=0o644`, `FILE_READABLE=True FILE_WRITABLE=False PARENT_ACCESSIBLE=True`. `synoacltool -get` returned `ACL_EXIT_CODE=255`, `ACL_STDOUT="(synoacltool.c, 596)It's Linux mode\\n"`, `ACL_STDERR=''`.
+- Sample 2: `BLOR-289`, path `/volume1/video/video2/JAV/BLOR/BLOR-289/movie.nfo`; same UID 1024, GID 100, mode 0644, read yes, write no, parent traverse yes. `synoacltool -get` also returned 255 and `"(synoacltool.c, 596)It's Linux mode\\n"` on stdout with no stderr.
+- Diagnostic ended `DIAGNOSTIC=COMPLETE`, `NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`.
+- Interpretation: The exact `255` observed earlier is explained on **both tested files** by `synoacltool` reporting `It's Linux mode`; it is **not evidence that Synology ACL permission was denied**. For these two samples, the observed access is consistent with POSIX owner/group/other permissions. Do not extrapolate a verified ACL mode to all unexamined other 81; the prior full 83 audit separately established same POSIX UID/GID/mode and 0/83 `ssikgun` write access.
+- Account mapping previously verified UID 1024 `admin`, GID 100 `users`; existing `admin` account's ability to SSH, its current enablement and any approved alternative admin identity remain **unverified**. Do not log in or change accounts as an implementation step without user's deliberate choice.
+- **104/104 ordinary-user NFOs applied and independently verified PASS; 83/187 admin-owned NFOs still blocked.** No chmod, chown, sudo, ACL editing, privileged NAS write, Jellyfin refresh, video/DB write or Stage9 timer modifications.
+- Next bounded operation: read-only validation of an already authorized admin identity's access (login, `id`, file write-access checks only, no actual writes) if user chooses to use it; or maintain BLOCKED pending explicit plan. No unverified admin-wide write tooling or changing original `MAX_BATCH=20` subset.
+
+LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_UID_MAPPING=admin; ADMIN83_SSIKGUN_WRITE=0_OF_83; ADMIN83_ACL_DIAGNOSTIC=LINUX_MODE_2_OF_2; ADMIN83_REMAIN_BLOCKED=83; ADMIN_SSH_LOGIN=NOT_CHECKED; ADMIN_NAS_WRITE=NOT_AUTHORIZED; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
