@@ -610,3 +610,18 @@ LATEST_STATUS: `ADMIN83_INPLACE_DESIGN=APPROVED_BY_USER; ADMIN83_CTIME_MTIME_CHA
 - Stage9 workstream `STG9MEDIA-001 / IN_PROGRESS`; canonical branch `teddy-subtitle-stage11`; approved design selection retained; production writes remain separately gated.
 
 LATEST_STATUS: `ADMIN83_OFFLINE_RUNNER_SMOKE=PASS_0_FAIL; ADMIN83_PRODUCTION_READINESS=NOT_VERIFIED; ADMIN83_NAS_DRYRUN=NOT_RUN; ADMIN83_APPLY=NOT_RUN; SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_REMAINING=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Admin83 offline runner location and SHA audit — CT108 vs NAS, 2026-11-01 KST
+
+- User executed a read-only `sha256sum`/existence check on CT108 and NAS as `ssikgun` for exactly three existing Codex output artifacts under `/tmp/p03h-admin83-offline-review-20261101`.
+- **CT108 files present with observed SHA-256:**
+  - `admin83_runner.py`: `8d914588bc5c05d6f63de28a3030e4546b30a4cc5ddbf7206c939d96ac3ed9e6`
+  - `admin83_runner_smoke.py`: `70b8844bcf4487c1911f9832c519218af1661d56d3e0ca100f50684453e218b3`
+  - `RECOVERY.md`: `13165ef153abfb9b2212293c147028f4f794dccf79119079be7f1c3446b9b049`
+- **NAS files absent:** `NOT_PRESENT` for each of those three exact paths. Do not claim an actual NAS deployment or review of their source. Matching current SHA of files is a provenance observation only, not an external expected-hash attestation.
+- User's command displayed no NAS code execution, NFO writes, backups, owner/ACL changes, DB/Jellyfin writes or timer actions. **CURRENT GATE: candidate exists only on CT108, not on NAS.**
+- Next step within user's prior request: **read-only inspection of CT108 source + smoke + recovery documentation** (same three SHA-256 verified inputs) to verify the `ssikgun`-to-`admin` handoff, path/SHA guards, backup-first logic, in-place inode preservation, xattr values, error/rollback and effective CLI gating. No candidate copying, sudo execution, live dry-run, NAS backup, apply or deployment until the review identifies exactly what is safe.
+- Invariant: 104 ordinary-user NFOs independent PASS, 83 `admin`-owned NFOs exact preflight PASS but still untouched; workstream `stage9-media / STG9MEDIA-001 IN_PROGRESS` and approved in-place decision continue. Stage9 10-minute timer and Jellyfin refresh not run.
+
+LATEST_STATUS: `ADMIN83_CT108_CANDIDATE_FILES=EXIST_ALL_3; ADMIN83_NAS_CANDIDATE_FILES=ABSENT_ALL_3; ADMIN83_CANDIDATE_SHA=USER_VERIFIED_3; ADMIN83_SOURCE_REVIEW=NOT_RUN; ADMIN83_NAS_DRYRUN=NOT_RUN; ADMIN83_APPLY=NOT_RUN; VERIFIED_NFO=104_OF_187; ADMIN_PENDING=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
