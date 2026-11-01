@@ -25,15 +25,11 @@ ALLOWED: Create one new dedicated NAS staging directory, copy only these three f
 
 PROHIBITED: Program execution, NAS Dry-run, Apply, NFO modification, backup creation, permission changes to existing files, database/Jellyfin/service/timer changes.
 
-STAGING_STATUS: AUTHORIZED_NOT_EXECUTED  
+STAGING_STATUS: PASS_3_FILES  
 ADMIN83_APPLY: NOT_AUTHORIZED
 
 NEXT: Verify staging results before separately authorizing operational Dry-run.
-WORKSTREAM: stage9-media
-TASK_ID: STG9MEDIA-001
-STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: stage9-media
+
 
 ## P03-H EBWH-350 USER-REPORTED SUCCESS / READ-ONLY COHORT AUDIT — 2026-10-30 KST
 
