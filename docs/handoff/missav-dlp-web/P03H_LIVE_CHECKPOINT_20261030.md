@@ -273,3 +273,39 @@ LATEST_STATUS: `FOURTH20_APPLY=PASS_20; FOURTH20_INDEPENDENT_POSTCHECK=PASS_20; 
 - Subsequent safe step: non-sudo `ssikgun` preflight complete IDs then `--apply --start 60 --count 20 --confirm P03H-104`; all-original backup before any write per reviewed script; stop immediately if error; do not automatically rerun. Record actual NAS backup location, 20 postwrite SHA and identities, then independent postcheck before any next batch. No admin ACL modification, DB, Jellyfin, video or Stage9 timer changes.
 
 LATEST_STATUS: `FIFTH20_DRYRUN=PASS_20; FIFTH20_APPLY=NOT_RUN; VERIFIED_APPLIED=60_OF_187; REMAINING_SSIKGUN=44; BLOCKED_ADMIN=83; P03_T=NOT_RUN`.
+
+
+## Fifth batch live NFO apply, offsets 60–79 — 2026-11-01 11:03 KST (user CT108/NAS terminal log)
+
+- Workstream `stage9-media`, active `STG9MEDIA-001 / IN_PROGRESS`, exact previously user-approved P03-H title-only scope. Non-sudo `ssikgun` via CT108 SSH. Original Stage9 contracts unchanged.
+- NAS staging `/tmp/p03h-bulk104-sIzAT42z`. Script SHA-256 `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef` PASS; frozen 188-manifest SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087` PASS.
+- Corrected prior truncated `BATCH_IDS` evidence by independent pre-apply enumeration: 20 exactly, numbered 61–80, `EXACT20_IDS=PASS`, checked known prefix and frozen sorted manifest. IDs: `MIDV-822,MIDV-925,MILK-306,MIRD-258,MIUM-1327,MREC-010,MSFH-048,MURIKURI-018,NAMH-074,NHDTB-741,NHDTB-813,NHDTC-247,NHDTC-250,NLD-033,NOSKN-104,NPJS-264,NXGS-025,PRED-054,PRED-345,PRED-451`. The bounded script's own `BATCH_IDS` line remained truncated to `NHDT1` in terminal output; independently printed complete IDs make identity unambiguous.
+- Executed `python3 -B p03h_bulk104_ssikgun_controlled.py --apply --start 60 --count 20 --confirm P03H-104` from verified wrapper; `PREFLIGHT=20_PASS`, `TARGETS_104=PASS; EXCLUDE_MARR014=YES; EXCLUDE_ADMIN83=YES`.
+- Original backup successfully generated for all 20 before any modification, `BATCH_BACKUP=PASS`, exact directory `/volume1/video/video2/downloads/backups/stage9/p03h-bulk104-20261101-110339-5ufgfes1`.
+- Application: `BATCH=PASS; APPLIED_COUNT=20`, `NAS_NFO_WRITE=20; VIDEO_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`, `JELLYFIN_REFRESH=NOT_RUN`.
+- Applied exact ID and postwrite SHA-256:
+  - `MIDV-822`: `06ac88493eadf5758bd23f4486d14b287fb8072d25ebbd44d722e302a641a913`
+  - `MIDV-925`: `70db2cbfb59aaa06bc0e30188f6838fda0cf33e8e264379439f8bb45c61db25e`
+  - `MILK-306`: `548dd3ac986ce1fea3e7743f1f8a78635b5707094ff75dd9e06b37b4aa503837`
+  - `MIRD-258`: `1992be014d76ea173e2c141229021db53f2552421f91a66f3fbb30248b87c5ed`
+  - `MIUM-1327`: `e0a375c796e56287219d8c5f570c54e1fc2ac72e5b1ac61f759025fe2c1b50f2`
+  - `MREC-010`: `eed0b4ac7cff9c758bb716fac9d262e128b19f7ac852a66c37e3299790514e29`
+  - `MSFH-048`: `7935471f6f1e52c953fc4ad9cef6b6e75b0549370a67bb4f1e49b11b26a3b813`
+  - `MURIKURI-018`: `3d87d91963da84da4c2e448cf906ecc8e90b00c1375b9e653e8e09f726acdb30`
+  - `NAMH-074`: `3cd3847ebb1e8ad4abf46a1c3abb6f9a1a4575b52152a68ff972261705284560`
+  - `NHDTB-741`: `b7cac9db22ee4d221339ffc9b00ee9edec0284c13345630d1c7e6282b90fd402`
+  - `NHDTB-813`: `0affd86953fa871e9ba659d58a4739b780e968e0fdc5f8bfde76cbc4792edab0`
+  - `NHDTC-247`: `127d83cc8ba44719fb2816a82dd663abb439d1e602c9ad36c57c7decdaa8507e`
+  - `NHDTC-250`: `65efe544c0e43a8fc0b56ab92ad264aaa0816dccebb1f3948dc80b82bb4809a2`
+  - `NLD-033`: `a2578991b0c5a23374509fb7fe61907452a449c2f6eb8b2d3ba272a5c8ae908e`
+  - `NOSKN-104`: `ca1b37a11ea2c9be0e18470952c230a54130bcf5b080dfd444b9a30f04535f41`
+  - `NPJS-264`: `8253ef5ba95945758d683f59bb947de09a52ec17f58bdf001978cf46d10c5edf`
+  - `NXGS-025`: `0246a7ccdd5911591b2fe1ce59cd86af8cee6f1b66cc7836ae0386ba804c12c9`
+  - `PRED-054`: `d167fa9aee599ce2a69a7df0b83233210bf836e13c1ba2de859dfa8c4c5b8f01`
+  - `PRED-345`: `db9e04945fe8090efec0e71dcab4e62acf88cd135c8874afb17378b26cdabacb`
+  - `PRED-451`: `9cd5130ecfddc15b6a24119e9e3a48b654a1c12dea635325e9f5009281ecdee8`
+- Current status: total **80/187 applied**; **60/187 previously independently postchecked**. This fifth batch's 20 must still undergo independent read-only verification of backup bytes/receipts, exact NFO title-only change, owner/mode/inode, live Synology ACL and xattrs. DO NOT reapply indices 60–79.
+- Remaining `ssikgun` subset 24 (offset 80–103), `admin`-owned 83 still blocked. MARR-014 already completed and 59 protected excluded. No video, DB, Jellyfin, ACL policy, or Stage9 timer changes observed.
+- Next step is **read-only independent postcheck for exactly offsets 60–79**; no next apply until that is PASS. Preserve backup folder. Any failure: stop and inspect without blindly repeating apply.
+
+LATEST_STATUS: `FIFTH20_APPLY=PASS_20; FIFTH20_INDEPENDENT_POSTCHECK=NOT_RUN; CUMULATIVE_APPLIED=80_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=60_OF_187; REMAINING_SSIKGUN=24; BLOCKED_ADMIN=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
