@@ -1,4 +1,11 @@
 # Stage9 Media workstream — active work
+
+WORKSTREAM: stage9-media
+TASK_ID: STG9MEDIA-001
+STATUS: IN_PROGRESS
+CONTRACT_VERSION: 1.0.0
+REQUIRES_WORKSTREAMS: stage9-media
+
 ## P03-H ADMIN83 STAGING-ONLY AUTHORIZED — 2026-11-01 KST
 
 USER_APPROVAL: User explicitly approved staging exactly three verified CT108 candidate files on NAS, without program execution or production mutation.
