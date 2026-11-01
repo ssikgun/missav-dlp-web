@@ -309,3 +309,16 @@ LATEST_STATUS: `FIFTH20_DRYRUN=PASS_20; FIFTH20_APPLY=NOT_RUN; VERIFIED_APPLIED=
 - Next step is **read-only independent postcheck for exactly offsets 60–79**; no next apply until that is PASS. Preserve backup folder. Any failure: stop and inspect without blindly repeating apply.
 
 LATEST_STATUS: `FIFTH20_APPLY=PASS_20; FIFTH20_INDEPENDENT_POSTCHECK=NOT_RUN; CUMULATIVE_APPLIED=80_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=60_OF_187; REMAINING_SSIKGUN=24; BLOCKED_ADMIN=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Fifth batch independent postcheck (offsets 60–79) — user NAS output, 2026-11-01 KST
+
+- Direct user-supplied CT108 SSH-to-Synology `ssikgun` read-only postcheck run for exact fifth batch. This followed the previously logged fifth-batch backup at `/volume1/video/video2/downloads/backups/stage9/p03h-bulk104-20261101-110339-5ufgfes1`.
+- The supplied verification used immutable manifest SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`, exact fixed 188 manifest and sorted 104-candidate cohort index 60–79, verified these 20 IDs: `MIDV-822,MIDV-925,MILK-306,MIRD-258,MIUM-1327,MREC-010,MSFH-048,MURIKURI-018,NAMH-074,NHDTB-741,NHDTB-813,NHDTC-247,NHDTC-250,NLD-033,NOSKN-104,NPJS-264,NXGS-025,PRED-054,PRED-345,PRED-451`.
+- Each of the 20 printed `PASS=<DVD-ID> BACKUP=OK NFO=OK ACL=OK`, encompassing original `original.nfo` bytes/SHA vs manifest/receipt, `original_acl.txt` SHA, exact updated title prefix-only bytes and NFO candidate SHA, owner/group/mode/inode, Synology ACL snapshot and xattr name preservation.
+- Summary `POSTCHECK=20_PASS`; `NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`. These facts are supported by user terminal output, not independently observed via GitHub connector.
+- **Applied + independently postchecked total is now 80/187.** Indices 0–79 must not be rerun; preserve all batch backup directories.
+- User requested raising batch size to **40**. Existing exact-scope program `p03h_bulk104_ssikgun_controlled.py` has `MAX_BATCH=20`; any one-shot count=40 would refuse. Only 24 `ssikgun` writable items remain in current approved 104 cohort. Do **not** expand script cap or implicitly include `admin`-owned 83 (still blocked due to permission) simply to reach 40. Efficient safe plan: 20-item batch indices 80–99 and final 4-item batch indices 100–103 with dry-run, backup-first apply, and independent postcheck at each checkpoint. First next operation is read-only `--dry-run --start 80 --count 20` after SHA checks.
+- `admin` 83 cannot be written using current `ssikgun` identity; no sudo, chmod/chown/ACL edits, new permissions or new resource. Existing MARR-014 canary, protected 59 excluded. Jellyfin refresh and timer changes still NOT RUN; unrelated workstreams unaffected.
+
+LATEST_STATUS: `FIFTH20_APPLY=PASS_20; FIFTH20_INDEPENDENT_POSTCHECK=PASS_20; CUMULATIVE_APPLIED=80_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=80_OF_187; REMAINING_SSIKGUN=24; BLOCKED_ADMIN=83; NEXT20_DRYRUN=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
