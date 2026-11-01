@@ -322,3 +322,16 @@ LATEST_STATUS: `FIFTH20_APPLY=PASS_20; FIFTH20_INDEPENDENT_POSTCHECK=NOT_RUN; CU
 - `admin` 83 cannot be written using current `ssikgun` identity; no sudo, chmod/chown/ACL edits, new permissions or new resource. Existing MARR-014 canary, protected 59 excluded. Jellyfin refresh and timer changes still NOT RUN; unrelated workstreams unaffected.
 
 LATEST_STATUS: `FIFTH20_APPLY=PASS_20; FIFTH20_INDEPENDENT_POSTCHECK=PASS_20; CUMULATIVE_APPLIED=80_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=80_OF_187; REMAINING_SSIKGUN=24; BLOCKED_ADMIN=83; NEXT20_DRYRUN=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Sixth batch of 20 NFOs (offsets 80–99): dry-run PASS — user terminal evidence, 2026-11-01 KST
+
+- Canonical workstream `stage9-media`, approved task `STG9MEDIA-001 / IN_PROGRESS`; existing exact P03-H title-only user authorization, no permissions escalation or resource expansion.
+- From CT108 as ordinary NAS user `ssikgun` via SSH, staged `/tmp/p03h-bulk104-sIzAT42z`; input checks both `OK`: script SHA-256 `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef`; frozen 188-manifest SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`.
+- Command: `python3 -B p03h_bulk104_ssikgun_controlled.py --dry-run --start 80 --count 20`.
+- Terminal: `TARGETS_104=PASS; EXCLUDE_MARR014=YES; EXCLUDE_ADMIN83=YES`; `BATCH_START=80; BATCH_COUNT=20`; `PREFLIGHT=20_PASS`; `DRY_RUN=PASS; NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`.
+- Full exact batch ID list (not truncated): `ROYD-353,SDAM-181,SDDE-700,SGKI-106,SIRO-5722,SIRO-5731,SKMJ-426,SKMJ-774,SKMJ-790,SNOS-377,SNOS-399,SONE-123,SONE-345,SONE-682,SSIS-456,SSIS-950,STARS-678,START-636,STSK-242,STSK-243`.
+- Current verified applied total **80/187**, with 24 writable items remaining before this sixth live apply; 83 admin-owned candidates remain blocked under normal `ssikgun` account. The Stage9 controlled script enforces batch limit 20, so user request to increase to 40 was conservatively resolved as a final 20+4 rather than modifying the safety cap. Do not reapply earlier offsets 0–79.
+- **Next single step**: verify unchanged script SHA, manifest SHA and normal NAS account, then apply this exact group with `--apply --start 80 --count 20 --confirm P03H-104`; preserve backup directory and record full output. On failure stop, no blind retry. Independently postcheck original backups, receipts, NFO content, inode/ownership/mode, ACL/xattrs before final four. No Jellyfin refresh, Stage9 timer change, DB/video write or ACL elevation.
+
+LATEST_STATUS: `SIXTH20_DRYRUN=PASS_20; SIXTH20_APPLY=NOT_RUN; VERIFIED_APPLIED=80_OF_187; REMAINING_SSIKGUN=24; BLOCKED_ADMIN=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
