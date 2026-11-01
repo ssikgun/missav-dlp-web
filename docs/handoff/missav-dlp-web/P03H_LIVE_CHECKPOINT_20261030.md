@@ -753,3 +753,29 @@ LATEST_STATUS: `ADMIN83_NAS_PYTHON_SUDO_IPC_BACKUP_ENV=PASS; ADMIN83_NAS_PYTHON=
 - Since Stage9 contract requires explicit scoped task record and active-work registration did not succeed, **STAGING=BLOCKED_PENDING_ACTIVE_WORK_RECORD**. Continue by obtaining a verified canonical Stage9 ACTIVE_WORK staging authorization record via an authorized avenue (do not alter contract or task ID). Only after remote readback should the user run an exact no-overwrite staging command. Original 104 independently verified; 83 not yet modified.
 
 LATEST_STATUS: `ADMIN83_STAGE_USER_REAPPROVAL_20261101=YES; ADMIN83_STAGE_GOVERNANCE_RECORD=BLOCKED; ADMIN83_NAS_STAGE=NOT_RUN; ADMIN83_NAS_DRYRUN=NOT_RUN; ADMIN83_APPLY=NOT_RUN; VERIFIED_NFO=104_OF_187; ADMIN_PENDING=83`.
+
+
+## P03-H admin83 candidate staging NAS completed — user-submitted CT108/SSH results, 2026-11-01 KST
+
+- On canonical `ssikgun/missav-dlp-web:teddy-subtitle-stage11`, user had explicitly authorized **exactly three file staging only**, and Stage9 `ACTIVE_WORK.md` now contains an authorized staging block with the correct three file SHA values and `STAGING_STATUS: AUTHORIZED_NOT_EXECUTED` at remote HEAD `9c4097dc2da94f60e1c580eef14f1244173be285`. This entry records the actual subsequently submitted NAS copy results; ACTIVE_WORK's earlier snapshot is intentionally not overwritten here.
+- CT108 source: `/tmp/p03h-admin83-offline-review-20261101`. User command validated all three SHA-256 hashes via `sha256sum -c` and checked regular files, not symlinks.
+- One new Synology NAS staging directory was created via `ssikgun@192.168.1.201`, ordinary UID1026, under `/tmp/p03h-admin83-stage-20261101-9c4097dc`, initial mode 0700, no overwrite intended. User used `scp -O` to copy only these three named files:
+  - `admin83_runner.py`, SHA-256 `b2bdb5df1080b2ac9951d7a59e68eb0c07271fefd6ee2685e56eee772130eb18`.
+  - `admin83_runner_smoke.py`, SHA-256 `fca6dd6e0b2be624b081996c4ecc09bbe76730c4c2f71c5798ab6a58a18bd306`.
+  - `RECOVERY.md`, SHA-256 `b97a4fd429f977071c88b17ece55e27d2ad777dffcffd58ec3706173ada84488`.
+- NAS postcopy user-run Python verification: `os.geteuid()==1026`, directory `st_uid=1026, st_gid=100`, initial directory mode `0700`, file set exact 3, all are regular single-linked with UID1026/GID100 and SHA256 expected; then the **new staged files only** changed to mode `0444` and new staging directory to mode `0555`; final modes verified. Reports:
+  ```
+  admin83_runner.py=SHA_PASS
+  admin83_runner_smoke.py=SHA_PASS
+  RECOVERY.md=SHA_PASS
+  NAS_STAGE=PASS
+  STAGED_FILES=3
+  RUNNER_EXECUTED=NO
+  NAS_NFO_WRITE=0
+  BACKUP_CREATED=0
+  ```
+- **Meaning:** Stage9 P03-H approved candidate-staging step is PASS based on user-provided NAS stdout; no NAS runner execution, operational dry-run/apply, backup creation or NFO modification. Exactly 104 normal-owned original NFOs independently applied+postchecked PASS; 83 admin-owned originals remain unchanged. Source is staged at a `/tmp` path subject to cleanup; recheck existence and exact SHA before later execution.
+- **Governance document layout issue:** current Stage9 `ACTIVE_WORK.md` displays the added staging approval heading immediately after the `# Stage9 Media workstream — active work` title, while the canonical metadata header (`WORKSTREAM / TASK_ID / STATUS / CONTRACT_VERSION / REQUIRES_WORKSTREAMS`) appears after the approval block. This layout may violate governance preflight assumptions; no live preflight was run to certify structure. Restore the original top metadata order with the staging approval immediately **after** `REQUIRES_WORKSTREAMS: stage9-media` prior to any further authorized operational stage. Do not change authorization scope or other workstreams.
+- **Next gates:** verify governance header layout/automated preflight, then seek user approval for exact one-file, no-`--apply` owner-side operational dry-run with staged script and same-session `sudo -v`. Before running, inspect script SHA/path and account access under both identities. Production NFO write needs separate approval after dry-run and backup/recovery review; leave DB/Jellyfin/timer unchanged.
+
+LATEST_STATUS: `ADMIN83_NAS_STAGE=PASS_3_FILES; ADMIN83_NAS_STAGE_PATH=/tmp/p03h-admin83-stage-20261101-9c4097dc; ADMIN83_NAS_SOURCE_SHA=PASS_3_OF_3; ADMIN83_STAGE_OWNER_MODE=PASS_1026_100_0555_0444; ADMIN83_RUNNER_EXECUTION=NOT_RUN; ADMIN83_NAS_DRYRUN=NOT_RUN; ADMIN83_APPLY=NOT_RUN; VERIFIED_NFO=104_OF_187; ADMIN_PENDING=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
