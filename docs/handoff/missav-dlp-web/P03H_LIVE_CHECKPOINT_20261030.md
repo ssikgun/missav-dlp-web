@@ -820,3 +820,28 @@ LATEST_STATUS: `ADMIN83_LIVE_ONE_DRYRUN=PASS_AKDL312; ADMIN83_OWNER_SUBPROCESS_I
 - Stage9 governance `ACTIVE_WORK.md` was updated after this result with `ADMIN83_REMAINING_DRYRUN=PASS_82`, `ADMIN83_TOTAL_DRYRUN=PASS_83`, `ADMIN83_APPLY=NOT_AUTHORIZED` at commit `c13cdd5e40563133c739123483cbe94174a2558a`.
 
 LATEST_STATUS: `ADMIN83_LIVE_REMAINING_DRYRUN=PASS_82; ADMIN83_TOTAL_LIVE_DRYRUN=PASS_83; ADMIN83_APPLY=NOT_RUN_NOT_AUTHORIZED; VERIFIED_MODIFIED_NFO=104_OF_187; ADMIN83_PENDING_WRITES=83; ADMIN83_LIVE_BACKUP=NOT_RUN; ADMIN83_LIVE_RESTORE=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## P03-H AKDL-312 approved single-file live admin-owner apply — runner PASS, independent postcheck pending — user NAS stdout 2026-11-01 KST
+
+- User explicitly approved only `AKDL-312` existing `movie.nfo` backup-first in-place title-prefix modification after 83/83 admin owner-side dry-runs PASS. Scope registered in `docs/governance/stage9-media/ACTIVE_WORK.md` under `STG9MEDIA-001 / IN_PROGRESS` (commit `b0eddc1d7c36b5b19d8e8e8f5bb29522bf4c23c1`), before execution. No further 82 admin files or Jellyfin/DB/timer operation approved.
+- User ran exact one-target staged NAS program after checking staged Python source SHA, manifest SHA, original target identity, and same-SSH-session interactive `sudo -v`. Source: `/tmp/p03h-admin83-stage-20261101-9c4097dc/admin83_runner.py` SHA-256 `b2bdb5df1080b2ac9951d7a59e68eb0c07271fefd6ee2685e56eee772130eb18`. Invocation `/usr/bin/python3 -B "$RUNNER" --start 0 --count 1 --apply --confirm P03H-ADMIN83` as `ssikgun`, internally launches owner `admin` UID1024/GID100 worker via sudo. User stdout, in order:
+  ```
+  SOURCE_TARGET=PASS
+  TARGET=AKDL-312
+  ORIGINAL_SHA=5a7f2bc28dd1b5a50c32ee295c7293a16363456efc64de936ba5e5fd1b253feb
+  CANDIDATE_SHA=a7ce1cc489eab8250c3eaed4543f512ad84c488aaf7abd68d28c507132daf42c
+  BACKUP_PARENT_PREFLIGHT=PASS
+  PREFLIGHT=1_PASS; IDS=AKDL-312
+  BACKUP_COMPLETE=/volume1/video/video2/downloads/backups/stage9/p03h-admin83-9nhqs7od
+  APPLIED=AKDL-312 SHA256=a7ce1cc489eab8250c3eaed4543f512ad84c488aaf7abd68d28c507132daf42c
+  BATCH=PASS
+  AKDL312_COMMAND_RETURNED_ZERO=YES
+  INDEPENDENT_POSTCHECK=PENDING
+  ```
+- **Interpretation:** This is **user-submitted runner result PASS**, with backup path reported and zero exit status; it is **not yet independently verified** that backup receipt/original SHA, current NFO exact bytes, inode, UID/GID, permissions, ACL and xattr match expected. Avoid marking 105/187 independently verified or authorizing additional Apply. Other 82 admin originals remain unmodified under this run's requested scope; independent postcheck of them not done.
+- **Next read-only postcheck:** same-session interactive `sudo -v`, then `sudo -n -u admin /usr/bin/python3 -B -c ...` script (not the runner), read `/volume1/video/video2/JAV/AKDL/AKDL-312/movie.nfo` and exact backup directory `p03h-admin83-9nhqs7od/AKDL-312`: validate original backup SHA above; current NFO candidate SHA above; receipt original/candidate SHA, original file identity tuple, ACL backup SHA and actual `synoacltool` mode/output; absence/preservation of xattrs; verify only `[AKDL-312] ` title prefix insertion by bytes and valid XML. Stop and report any mismatch, do not rerun Apply or auto restore.
+- Confirmed from printed source: runner direct `O_RDWR`/in-place `write_fd`, `ftruncate`, `fsync`; intentional change to mtime/ctime; inode-preserving, power-loss non-atomic, no auto recovery. No backup restore, Jellyfin, DB or Stage9 timer action was reported.
+- Once independent check passes, user may decide next separately approved 82-admin remaining plan; first ensure manual recovery path is viable and backup preserved. Stage9 last P03-T timer remains NOT_RUN.
+
+LATEST_STATUS: `ADMIN83_AKDL312_USER_REPORTED_APPLY=PASS_POSTCHECK_PENDING; ADMIN83_AKDL312_BACKUP_PATH=/volume1/video/video2/downloads/backups/stage9/p03h-admin83-9nhqs7od; ADMIN83_AKDL312_INDEPENDENT_POSTCHECK=NOT_RUN; ADMIN83_AKDL312_RESTORE=NOT_RUN; ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED; INDEPENDENTLY_VERIFIED_MODIFIED_NFO=104_OF_187; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
