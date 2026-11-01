@@ -335,3 +335,39 @@ LATEST_STATUS: `FIFTH20_APPLY=PASS_20; FIFTH20_INDEPENDENT_POSTCHECK=PASS_20; CU
 - **Next single step**: verify unchanged script SHA, manifest SHA and normal NAS account, then apply this exact group with `--apply --start 80 --count 20 --confirm P03H-104`; preserve backup directory and record full output. On failure stop, no blind retry. Independently postcheck original backups, receipts, NFO content, inode/ownership/mode, ACL/xattrs before final four. No Jellyfin refresh, Stage9 timer change, DB/video write or ACL elevation.
 
 LATEST_STATUS: `SIXTH20_DRYRUN=PASS_20; SIXTH20_APPLY=NOT_RUN; VERIFIED_APPLIED=80_OF_187; REMAINING_SSIKGUN=24; BLOCKED_ADMIN=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Sixth batch live NFO apply (offsets 80–99) — 2026-11-01 KST, user CT108/NAS output
+
+- Workstream `stage9-media`, task `STG9MEDIA-001 / IN_PROGRESS`, exact user-approved title-only P03-H scope. No changes to Stage11, other workstreams, or Stage9 timer.
+- Executed as NAS normal `ssikgun` account (UID 1026), no sudo; staged source `/tmp/p03h-bulk104-sIzAT42z`. Confirmed script SHA-256 `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef` and manifest SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087` both `OK`.
+- Executed `python3 -B p03h_bulk104_ssikgun_controlled.py --apply --start 80 --count 20 --confirm P03H-104`.
+- Cohort/preservation checks: `TARGETS_104=PASS; EXCLUDE_MARR014=YES; EXCLUDE_ADMIN83=YES`, `PREFLIGHT=20_PASS`, `BATCH_START=80; BATCH_COUNT=20`.
+- Backup before writes: `BATCH_BACKUP=PASS; PATH=/volume1/video/video2/downloads/backups/stage9/p03h-bulk104-20261101-110921-wegnu36y`. Preserve originals, ACL snapshots, receipts.
+- Terminal completion: `BATCH=PASS; APPLIED_COUNT=20`; `NAS_NFO_WRITE=20; VIDEO_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`; `JELLYFIN_REFRESH=NOT_RUN`.
+- Exact applied identities and resulting NFO SHA-256 from user terminal:
+  - `ROYD-353`: `ca817acc332ebeb1ae25f1d0fcfc4e476237d3121e2ef15b51b3f140eb0a7045`
+  - `SDAM-181`: `06749992c469e4c72876c159ad04a230bea2d62f1a0583cbf5ec5483fd6e878a`
+  - `SDDE-700`: `2f72c918f9bcc4a3752b14ed0838a09f6b83a55daaff9b5ba5655164c1423dab`
+  - `SGKI-106`: `5c469dc4573067d61d0909b633c13511b795fbf87d5ee0343645fd3590fc56d8`
+  - `SIRO-5722`: `9153e93896d3de51af6b85438233e18063fa05dc20006907ff3982a830eefbe0`
+  - `SIRO-5731`: `1a4a0d355f94eb3d27833667a5dde2e684156468fe1fc67a156c2303e3ef4a1e`
+  - `SKMJ-426`: `92309e3b185aa17e1b77202abba623124ff63e443e83501386bd63d759613848`
+  - `SKMJ-774`: `d3f65fffa29a8b79bc9ee573bed09734ff7e626b5d35cbeb4477a220f0c003ec`
+  - `SKMJ-790`: `41258d8a456b383153b5993555776bbc8b84e47b786c3e7f266e6298c955e1f9`
+  - `SNOS-377`: `8fa126f68e2d0eaf0fdffb968af1a0180188efd0139e80539201b6340d42e76c`
+  - `SNOS-399`: `cc780d8b5165f855d5720e9f70d4e3fd37df2cb417d17945539c4076b13a3a3e`
+  - `SONE-123`: `86983dfd28503d44ae740624adb44d75d8bda12efc21e3140ef8bb49c3a0e233`
+  - `SONE-345`: `692b8697f3cea2e80e096cd9e43b569eb9727c1cb9ee7d55ece14b9d924ffe3f`
+  - `SONE-682`: `e49a27503c58c11065922127f39ed1d03abaad3d7485931fc71b8319c263212f`
+  - `SSIS-456`: `cf187950b5ccb3d66155d8d5d8c4e7b5671793a495b42308d8004203a61e22ce`
+  - `SSIS-950`: `f98ff95abe9de1a60f473a0089431d95d1fafbebad9fcfae4a20aedd8c577304`
+  - `STARS-678`: `2db16fccd894af5883a26165f6de208a34443e8e2d5e1af162a308b66f1f782f`
+  - `START-636`: `d5f7198d8e443df2096da252120d5bcba129ee90d6886966b5106a1ec6d461cc`
+  - `STSK-242`: `156efd9e6666f11b232bac59711516b3695f0a86a29ba9c3c0deb9f6d4e2b380`
+  - `STSK-243`: `0d99485ed72e16e062e0a577f90d7f55d613209ecabcfcae706e634acd1205fb`
+- Status: **100/187 have been applied**, of which **80/187 have independent postcheck PASS**. The sixth group still requires separate read-only postcheck, checking `receipt.json`, `original.nfo`, `original_acl.txt`, immutable manifest, exact title prefix bytes, NFO SHA-256, original inode/UID/GID/mode and current Synology ACL/xattrs. Do not reapply offsets 0–99.
+- Remaining within approved `ssikgun` writable cohort: **4** (offsets 100–103). Blocked separately: 83 `admin`-owned with no approved ACL/ownership escalation; exclude MARR-014 and unrelated protected 59. No Jellyfin refresh, DB mutation or video write.
+- Next single step: **independent read-only postcheck of sixth batch (offset 80–99)**. Before last 4, require postcheck PASS and GitHub checkpoint. Stop and investigate any unexpected mismatch, no blind retry.
+
+LATEST_STATUS: `SIXTH20_APPLY=PASS_20; SIXTH20_INDEPENDENT_POSTCHECK=NOT_RUN; CUMULATIVE_APPLIED=100_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=80_OF_187; REMAINING_SSIKGUN=4; BLOCKED_ADMIN=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
