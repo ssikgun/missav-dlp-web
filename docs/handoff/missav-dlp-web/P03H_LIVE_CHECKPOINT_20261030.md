@@ -419,3 +419,21 @@ LATEST_STATUS: `FINAL4_DRYRUN=PASS_4; FINAL4_APPLY=NOT_RUN; CUMULATIVE_APPLIED=1
 - Next action is **independent read-only postcheck of exactly four**. On mismatch stop, investigate; preserve all backups. User-supplied shell stdout is evidence for this apply; GitHub cannot independently access the user's NAS.
 
 LATEST_STATUS: `FINAL4_APPLY=PASS_4; FINAL4_INDEPENDENT_POSTCHECK=NOT_RUN; CUMULATIVE_APPLIED=104_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=100_OF_187; REMAINING_SSIKGUN=0; BLOCKED_ADMIN=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Final four (offsets 100–103) independent NAS postcheck PASS — 2026-11-01 KST, user CT108 evidence
+
+- Following the previously recorded live apply and backup in `/volume1/video/video2/downloads/backups/stage9/p03h-bulk104-20261101-111601-8yv3eh19`, user executed the independent read-only CT108 SSH-to-NAS Python verification as ordinary `ssikgun` UID 1026.
+- Immutable manifest SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`, exact frozen 188 rows, 104 sorted ordinary-owned candidates and final offset 100–103 identities were checked.
+- `PASS=SVVRT-086 BACKUP=OK NFO=OK ACL=OK`
+- `PASS=VDD-209 BACKUP=OK NFO=OK ACL=OK`
+- `PASS=WA-576 BACKUP=OK NFO=OK ACL=OK`
+- `PASS=YSN-665 BACKUP=OK NFO=OK ACL=OK`
+- Read-only verification checks `receipt.json` identity, `original.nfo` and `original_acl.txt` SHA, current NFO bytes equal original except exactly `[DVD-ID] ` prefix in `<title>`, expected current SHA from original manifest/receipt and user’s applied log, inode, UID/GID, mode, link count, Synology ACL SHA and xattr names unchanged.
+- Final console lines: `POSTCHECK=4_PASS`, `NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`. This checkpoint is grounded in submitted user terminal output; no standalone direct NAS inspection by this GitHub action.
+- **Final state of the 104-subset: `104/104 APPLIED AND INDEPENDENTLY VERIFIED — PASS`.** Do not rerun any indices 0–103. Keep all seven backup directories and the frozen manifest. Initial completed MARR-014 was excluded from this batch.
+- **187-target overall program is not fully complete:** remaining 83 `admin`-owned NFOs are blocked under non-sudo `ssikgun`; do not present all 187 as PASS. The 59 protected titles and completed MARR-014 remain outside the 187 active-bulk modifications.
+- Next stage is **read-only bounded review** of the 83 `admin`-owned NFOs to confirm actual ownership/mode/ACL and viable existing authorized access without changes; do NOT perform any sudo / chmod / chown / ACL changes or write to NAS before separate user approval. Production DB, Jellyfin write/refresh, Stage9 timer modification, video changes: not executed in this 104 batch rollout.
+- Workstream remains `stage9-media STG9MEDIA-001 / IN_PROGRESS`; Stage9 contract `v1.0.0 APPROVED`, common `v1.0.1 APPROVED`, canonical `teddy-subtitle-stage11` branch.
+
+LATEST_STATUS: `FINAL4_APPLY=PASS_4; FINAL4_INDEPENDENT_POSTCHECK=PASS_4; SSIKGUN104_COMPLETE=PASS_104_OF_104; CUMULATIVE_APPLIED=104_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=104_OF_187; REMAINING_SSIKGUN=0; BLOCKED_ADMIN=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
