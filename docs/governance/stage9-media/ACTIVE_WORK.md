@@ -1,5 +1,27 @@
 # Stage9 Media workstream — active work
+## P03-H ADMIN83 STAGING-ONLY AUTHORIZED — 2026-11-01 KST
 
+USER_APPROVAL: User explicitly approved staging exactly three verified CT108 candidate files on NAS, without program execution or production mutation.
+
+WORKSTREAM: stage9-media  
+TASK_ID: STG9MEDIA-001  
+STATUS: IN_PROGRESS
+
+APPROVED_SOURCE: `/tmp/p03h-admin83-offline-review-20261101`
+
+APPROVED_FILES:
+- `admin83_runner.py` — SHA256 `b2bdb5df1080b2ac9951d7a59e68eb0c07271fefd6ee2685e56eee772130eb18`
+- `admin83_runner_smoke.py` — SHA256 `fca6dd6e0b2be624b081996c4ecc09bbe76730c4c2f71c5798ab6a58a18bd306`
+- `RECOVERY.md` — SHA256 `b97a4fd429f977071c88b17ece55e27d2ad777dffcffd58ec3706173ada84488`
+
+ALLOWED: Create one new dedicated NAS staging directory, copy only these three files, and verify hashes, ownership, permissions, and file identity. Never overwrite an existing destination.
+
+PROHIBITED: Program execution, NAS Dry-run, Apply, NFO modification, backup creation, permission changes to existing files, database/Jellyfin/service/timer changes.
+
+STAGING_STATUS: AUTHORIZED_NOT_EXECUTED  
+ADMIN83_APPLY: NOT_AUTHORIZED
+
+NEXT: Verify staging results before separately authorizing operational Dry-run.
 WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
