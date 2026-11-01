@@ -800,3 +800,23 @@ LATEST_STATUS: `ADMIN83_NAS_STAGE=PASS_3_FILES; ADMIN83_NAS_STAGE_PATH=/tmp/p03h
 - Acceptance for this authorized one-file step: `ADMIN83_LIVE_ONE_DRYRUN=PASS_AKDL312`, no backup, no Apply. NAS staging of exact three files PASS; `ADMIN83_APPLY=NOT_AUTHORIZED`; `P03_T=NOT_RUN`; `JELLYFIN_REFRESH=NOT_RUN`.
 
 LATEST_STATUS: `ADMIN83_LIVE_ONE_DRYRUN=PASS_AKDL312; ADMIN83_OWNER_SUBPROCESS_IPC_LIVE=PASS_1; ADMIN83_NAS_STAGE=PASS_3_FILES; ADMIN83_REMAINING_DRYRUN=NOT_RUN_82; ADMIN83_APPLY=NOT_RUN; VERIFIED_NFO=104_OF_187; ADMIN_PENDING=83; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`.
+
+
+## P03-H admin83 remaining 82 actual Synology NAS read-only operational dry-runs — user-run, 2026-11-01 KST
+
+- The user explicitly approved the **remaining 82 admin-owned NFOs** in five read-only batches, separately from the first one-file dry-run, and scope was registered in `docs/governance/stage9-media/ACTIVE_WORK.md`, `stage9-media / STG9MEDIA-001 / IN_PROGRESS`, canonical `teddy-subtitle-stage11`, before execution.
+- CT108 initiated one interactive `ssh -tt` as NAS ordinary `ssikgun`. The NAS-side probe verified `/tmp/p03h-admin83-stage-20261101-9c4097dc/admin83_runner.py` SHA-256 `b2bdb5df1080b2ac9951d7a59e68eb0c07271fefd6ee2685e56eee772130eb18`, UID1026/GID100, regular single link, mode0444, and staging directory UID1026/GID100 mode0555. It also verified frozen 188-record manifest SHA `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`; printed `RUNNER_MANIFEST=PASS`. In the same interactive SSH session the user entered their sudo password to `sudo -v` and executed five successive NAS operational dry-run invocations of the fixed candidate, with no `--apply`.
+- User-provided NAS stdout showed **all five bounded batches completed**:
+  | --start | --count | First ID | Last ID | Reported |
+  | ---: | ---: | --- | --- | --- |
+  | 1 | 20 | BLOR-289 | HJMO-738 | `PREFLIGHT=20_PASS; DRY_RUN=PASS; BACKUP_CREATED=NO` |
+  | 21 | 20 | HMN-896 | NSFS-280 | `PREFLIGHT=20_PASS; DRY_RUN=PASS; BACKUP_CREATED=NO` |
+  | 41 | 20 | NSFS-456 | SNOS-120 | `PREFLIGHT=20_PASS; DRY_RUN=PASS; BACKUP_CREATED=NO` |
+  | 61 | 20 | SNOS-125 | SW-416 | `PREFLIGHT=20_PASS; DRY_RUN=PASS; BACKUP_CREATED=NO` |
+  | 81 | 2 | SW-893 | VEC-737 | `PREFLIGHT=2_PASS; DRY_RUN=PASS; BACKUP_CREATED=NO` |
+- Terminal summary exactly `ADMIN83_REMAINING_DRYRUN=PASS_82`, `APPLY_REQUESTED=NO`, `BACKUP_REQUESTED=NO`. Combined with the separately verified first `(0,1)` target `AKDL-312`, this completes **83/83 live NAS owner-side preflight-only dry-runs (0 failures)**. Operational preflight includes frozen roster identity, per-target SHA, XML candidate and metadata/xattr/ACL checks. First pass was recorded independently in previous checkpoint; no repeat, apply or backup in this run.
+- **Safety boundary:** This is user-supplied terminal evidence of NFO content dry-run, **not** a successful bulk Apply, live backup creation, restoration or crash safety. No candidate NFO changes, recovery attempts, DB/Jellyfin, or Stage9 timer were requested or observed. The runner accesses and reads the NFOs; do not assert atime never changed on the NAS. In-place writes remain crash-nonatomic with manual recovery and no auto retry.
+- **Current product progress:** original 104 ordinary-owned NFO title prefixes independently postchecked PASS, 83 admin-owned original NFOs unchanged but *all 83 live dry-run PASS*, total 187/187 planned scoped NFOs accounted for; actual updated count still **104/187**. The canary write to a single admin-owned NFO, if desired, requires a separately scoped user approval and a no-auto-retry/manual recovery plan. Keep all further 82 admin writes, DB/Jellyfin scans, and P03-T ten-minute timer unapproved/not-run.
+- Stage9 governance `ACTIVE_WORK.md` was updated after this result with `ADMIN83_REMAINING_DRYRUN=PASS_82`, `ADMIN83_TOTAL_DRYRUN=PASS_83`, `ADMIN83_APPLY=NOT_AUTHORIZED` at commit `c13cdd5e40563133c739123483cbe94174a2558a`.
+
+LATEST_STATUS: `ADMIN83_LIVE_REMAINING_DRYRUN=PASS_82; ADMIN83_TOTAL_LIVE_DRYRUN=PASS_83; ADMIN83_APPLY=NOT_RUN_NOT_AUTHORIZED; VERIFIED_MODIFIED_NFO=104_OF_187; ADMIN83_PENDING_WRITES=83; ADMIN83_LIVE_BACKUP=NOT_RUN; ADMIN83_LIVE_RESTORE=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
