@@ -371,3 +371,16 @@ LATEST_STATUS: `SIXTH20_DRYRUN=PASS_20; SIXTH20_APPLY=NOT_RUN; VERIFIED_APPLIED=
 - Next single step: **independent read-only postcheck of sixth batch (offset 80–99)**. Before last 4, require postcheck PASS and GitHub checkpoint. Stop and investigate any unexpected mismatch, no blind retry.
 
 LATEST_STATUS: `SIXTH20_APPLY=PASS_20; SIXTH20_INDEPENDENT_POSTCHECK=NOT_RUN; CUMULATIVE_APPLIED=100_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=80_OF_187; REMAINING_SSIKGUN=4; BLOCKED_ADMIN=83; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Sixth batch (offsets 80–99) independent NAS postcheck — 2026-11-01 KST (user CT108 output)
+
+- Executed independent read-only 20-file postcheck by ordinary NAS user `ssikgun` over SSH from CT108, after prior logged application and backup `/volume1/video/video2/downloads/backups/stage9/p03h-bulk104-20261101-110921-wegnu36y`.
+- Validated frozen manifest SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`, total 188 manifest rows and sorted 104 accessible targets, exact offset 80–99 identities: `ROYD-353,SDAM-181,SDDE-700,SGKI-106,SIRO-5722,SIRO-5731,SKMJ-426,SKMJ-774,SKMJ-790,SNOS-377,SNOS-399,SONE-123,SONE-345,SONE-682,SSIS-456,SSIS-950,STARS-678,START-636,STSK-242,STSK-243`.
+- All twenty independently printed `PASS=<dvd> BACKUP=OK NFO=OK ACL=OK`, checking exact receipt identity, original backup bytes and SHA, original ACL hash, only `[DVD-ID] ` title prefix inserted, updated NFO candidate SHA, inode/owner/group/mode/link count, Synology ACL and xattr names.
+- Final user terminal lines: `POSTCHECK=20_PASS`; `NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`. This is user-supplied NAS execution evidence, not direct GitHub-side NAS inspection.
+- **Cumulative applied and independently verified: 100/187.** Never reapply offsets 0–99. Preserve each backup and receipt directory. Last 4 `ssikgun`-owned entries remain, sorted frozen manifest indices 100–103. Other 83 `admin`-owned titles remain separately blocked; no permission/ACL changes authorized. MARR-014 already completed and excluded; separate protected 59 remain untouched.
+- **Next single step:** verify staged program SHA `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef` and manifest SHA on NAS, then `python3 -B p03h_bulk104_ssikgun_controlled.py --dry-run --start 100 --count 4`. Confirm `PREFLIGHT=4_PASS`, `DRY_RUN=PASS`, and exact target IDs before any apply. Existing runner `MAX_BATCH=20` retained, no new code. After last 4 apply, independent postcheck and GitHub checkpoint are required.
+- No video, DB or Jellyfin writes; Jellyfin refresh and Stage9 timer change NOT RUN; Stage9 active task `STG9MEDIA-001 / IN_PROGRESS`.
+
+LATEST_STATUS: `SIXTH20_APPLY=PASS_20; SIXTH20_INDEPENDENT_POSTCHECK=PASS_20; CUMULATIVE_APPLIED=100_OF_187; CUMULATIVE_INDEPENDENT_POSTCHECK=100_OF_187; REMAINING_SSIKGUN=4; BLOCKED_ADMIN=83; FINAL4_DRYRUN=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
