@@ -561,3 +561,20 @@ LATEST_STATUS: `ADMIN83_PREFLIGHT=PASS_83; ADMIN83_APPLY=NOT_RUN; ADMIN83_SAFE_R
 - No extrapolation of single sampled NFO write test to other 82. Current Stage9 dedicated service's independent least-privilege credential restrictions and timer/deployment status remain outside the manual P03-H repair scope.
 
 LATEST_STATUS: `SSIKGUN104_COMPLETE=PASS_104_OF_104; ADMIN83_PREFLIGHT=PASS_83; ADMIN_IDENTITY_SUDO=PASS_1024; ADMIN_SAMPLE_NFO_READ=YES; ADMIN_SAMPLE_NFO_WRITE=YES; ADMIN_MANIFEST_READ=NO; ADMIN_BACKUP_DIR_ACCESS=YES; ADMIN83_RUNNER=NOT_IMPLEMENTED; ADMIN83_APPLY=NOT_RUN; CUMULATIVE_INDEPENDENTLY_VERIFIED=104_OF_187; P03_T=NOT_RUN`.
+
+
+## Admin83 offline Codex candidate report; unresolved inode-vs-atomicity design — 2026-11-01 KST
+
+- This entry documents the **user-pasted Codex report**, not independent model execution or file-hash verification of candidate files. Canonical GitHub branch `ssikgun/missav-dlp-web:teddy-subtitle-stage11` latest remote at this checkpoint review was `8b073692f14b433e14abb973849528f741a6f4a5`, Stage9 `STG9MEDIA-001 / IN_PROGRESS`, common contract v1.0.1 and Stage9 contract v1.0.0 APPROVED.
+- Codex reported reading repo source and historical CT108 program/manifest **copies** matching recorded SHA-256, while the designated NAS directory was inaccessible in Codex environment. The canonical original CT108 NAS script was not accessed there.
+- Reported candidate files (temporary offline review only):
+  - `/tmp/p03h-admin83-offline-review-20261101/admin83_plan.py`: exact manifest hash/target/paths/owner checks and max 20 per batch, offline-only.
+  - `/tmp/p03h-admin83-offline-review-20261101/admin83_smoke.py`: cohort selection and title transformation offline smoke.
+- Codex reported 83 `cohort=="129"` selected and offline tests PASS for exact target selection, batch cap, SHA mismatch stop and byte-for-byte preservation outside XML title. Original source-hash verification and title prefix insertion were reused. **No functioning privileged apply mechanism, admin role handoff, entire-batch backups, rollback, NAS read/write integration, ACL/xattr value checks, or preservation verification implemented**. Actual NAS apply/deployment/commit not performed; four existing files unchanged.
+- **Unresolved technical design choice requiring explicit user selection before implementation:**
+  1. Preserve existing inode/UID/GID/mode/ACL/xattr values via a controlled in-place update while accepting inevitable ctime change and handling crash partial-write risks via prior backups, full readback and recovery. Verify mtime requirement separately; without restoration it changes, too.
+  2. Prefer atomic temp-file + rename publication, generally changing inode while preserving all practical required owner/mode/ACL/xattr values; more crash-resistant publication. Same strict backup, validation, rollback and original hash guards.
+- Do not represent either design as approved yet. User has not selected whether inode stability or atomic publication takes precedence. No assertion of xattr value preservation from the old 104-runner's name-only xattr checks. Any direct data changes or privilege use require separate exact task authorization and tested scoped runner.
+- Original 104/104 ordinary-user NFOs applied and independently verified PASS, still 83/187 untouched. Existing NAS admin identity via `sudo -u admin` demonstrated for one sample and backing directory, but manifest not readable as admin. No NAS ACL/chmod/chown/account alteration, DB or Jellyfin write, Stage9 timer change.
+
+LATEST_STATUS: `ADMIN83_OFFLINE_CODEX_PLAN=PASS_SELECTION_ONLY; ADMIN83_SAFE_RUNNER=INCOMPLETE; ADMIN83_APPLY=NOT_RUN; INODE_CTIME_DESIGN=USER_DECISION_PENDING; CUMULATIVE_INDEPENDENTLY_VERIFIED=104_OF_187; REMAINING_ADMIN=83; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`.
