@@ -259,3 +259,17 @@ LATEST_STATUS: `FOURTH20_APPLY=PASS_20; FOURTH20_INDEPENDENT_POSTCHECK=NOT_RUN; 
 - No evidence of Jellyfin refresh, Stage9 timer change, content DB/video writes, or admin ACL overrides. Existing Stage9 `STG9MEDIA-001` remains `IN_PROGRESS`.
 
 LATEST_STATUS: `FOURTH20_APPLY=PASS_20; FOURTH20_INDEPENDENT_POSTCHECK=PASS_20; VERIFIED_APPLIED=60_OF_187; REMAINING_SSIKGUN=44; BLOCKED_ADMIN=83; FIFTH20_DRYRUN=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN; P03_T=NOT_RUN`.
+
+
+## Fifth batch (offsets 60–79) NAS dry-run — 2026-11-01 KST (user CT108 output)
+
+- Workstream: `stage9-media`, approved active task `STG9MEDIA-001 / IN_PROGRESS`; purpose: exact previously user-approved P03-H title-only rollout, no broader Stage9 or Stage11 work.
+- NAS non-sudo `ssikgun` execution via CT108 SSH, staged script/manifest at `/tmp/p03h-bulk104-sIzAT42z`.
+- Both source SHA-256 checks on NAS were `OK`: script `14a9b65fe87768d8c27598d7a88bb7352aa26fdb6cadcf81f1fcbee570e81cef`, immutable manifest `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`.
+- Command: `python3 -B p03h_bulk104_ssikgun_controlled.py --dry-run --start 60 --count 20`.
+- Output: `TARGETS_104=PASS; EXCLUDE_MARR014=YES; EXCLUDE_ADMIN83=YES`, `BATCH_START=60; BATCH_COUNT=20`, `PREFLIGHT=20_PASS`, `DRY_RUN=PASS; NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0`.
+- **Important evidence limitation:** The user-pasted `BATCH_IDS` line terminates at `NHDT1` and does NOT contain all 20 target identities. Visible prefix only: `MIDV-822,MIDV-925,MILK-306,MIRD-258,MIUM-1327,MREC-010,MSFH-048,MURIKURI-018,NAMH-074,NHDTB-741,NHDT1`. Do **not** treat that as a complete list nor invent the remainder. The exact 20 are deterministically selected by sorted frozen manifest and offset 60–79. Before live apply, read that fixed manifest to output/check all 20 exact IDs, verify 20 count and prefix consistency, plus script/manifest SHA.
+- **Fifth batch live apply NOT RUN at this checkpoint.** Previously applied and independently verified: offsets 0–59, 60 of the 187 approved NFOs. Remaining accessible cohort: 44 (20 next batch + 24 afterward); separate 83 `admin`-owned inaccessible, excluded canary MARR-014, protected 59.
+- Subsequent safe step: non-sudo `ssikgun` preflight complete IDs then `--apply --start 60 --count 20 --confirm P03H-104`; all-original backup before any write per reviewed script; stop immediately if error; do not automatically rerun. Record actual NAS backup location, 20 postwrite SHA and identities, then independent postcheck before any next batch. No admin ACL modification, DB, Jellyfin, video or Stage9 timer changes.
+
+LATEST_STATUS: `FIFTH20_DRYRUN=PASS_20; FIFTH20_APPLY=NOT_RUN; VERIFIED_APPLIED=60_OF_187; REMAINING_SSIKGUN=44; BLOCKED_ADMIN=83; P03_T=NOT_RUN`.
