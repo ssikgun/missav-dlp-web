@@ -105,7 +105,13 @@ EVIDENCE/FAIL-CLOSED: A successful `-del-archive` return alone is **not privacy 
 
 PROHIBITED: `synoacltool -del PATH` (ACL delete), `-enforce-inherit`, any ACL or chmod/chown modifications to any other path including original parent and `p03h-admin83-9nhqs7od` backup; creating/deleting files or folders, changing account/group configuration, permission escalation beyond existing sudo, reapplying original `AKDL-312`, other 82 admin NFO writes, DB/Jellyfin/timer/service operations. New production permission/backup strategy requires separate decision and approval.
 
-STATUS: `STAGE9_ACL_INHERITANCE_PROBE=AUTHORIZED_NOT_RUN`; `AKDL312_BACKUP_PRIVACY=BLOCKED`; `ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`.
+STATUS: `STAGE9_ACL_INHERITANCE_PROBE=PASS_ADMIN_ONLY`; `STAGE9_TEST_FOLDER_READ_ISOLATION=PASS_ORDINARY_CONTEXT`; `STAGE9_TEST_FILE_INHERITANCE=NOT_TESTED`; `AKDL312_BACKUP_PRIVACY=BLOCKED`; `ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`.
+
+USER EXECUTION EVIDENCE 2026-11-01 KST (only exact approved test directory; do not rerun ACL mutation): Prior `EXACT_EMPTY_FOLDER=PASS` and `ACL_PRECONDITION=PASS`. `synoacltool -add` explicit `user:admin:allow:rwxpdDaARWcCo:fd--` created ACE [0] level0; `EXPLICIT_ADMIN_ACL=PASS`. Then `-del-archive "$P" is_inherit` returned `Archive: has_ACL,is_support_ACL`; `-get` returned exactly the sole explicit `user:admin` ACE (all six inherited ACEs removed); `-get-archive` matched. Root `-get-perm "$P" ssikgun` returned `Final permission: [----d--------]` with `GET_PERM_ssikgun=PASS` (query PASS, not access granted); admin returned `[rwxpdDaARWcCo]` and `GET_PERM_admin=PASS`. Direct independent ordinary `ssikgun` open returned `SSIKGUN_OPEN=DENIED_PERMISSION`, `SSIKGUN_WRITE_HINT=False`; `sudo -u admin` open returned `ADMIN_OPEN=ALLOWED`. `ACL_TEST_EXECUTION=COMPLETE`, `PRODUCTION_NFO_WRITE=0`, `EXISTING_BACKUP_CHANGE=0`. **PASS restricted to the previously empty test directory ordinary-account access**. Do not misread the remaining `d` bit as a general read/write grant; do not claim end-to-end confidential new backup files tested.
+
+SECURITY LIMITATION: `ssikgun` is a member of administrators and can invoke sudo; this ACL prevents its ordinary process from opening the tested folder but does **not** protect secrets against malicious admin-equivalent sudo identity. Real existing backup `p03h-admin83-9nhqs7od` remains accessible; no modifications were authorized. New child-file creation, inheritance, persistence, restore, runner integration and security boundary remain UNTESTED. Next proposed controlled one-file creation inside isolated test directory needs fresh explicit scope approval; until then no further NAS writes or ACL commands.
+
+
 
 ## P03-H EBWH-350 USER-REPORTED SUCCESS / READ-ONLY COHORT AUDIT — 2026-10-30 KST
 
