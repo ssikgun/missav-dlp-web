@@ -30,6 +30,17 @@ ADMIN83_APPLY: NOT_AUTHORIZED
 
 NEXT: Verify staging results before separately authorizing operational Dry-run.
 
+## P03-H ADMIN83 ONE-FILE OPERATIONAL DRY-RUN APPROVED — 2026-11-01 KST
+
+USER_APPROVAL: The user explicitly approved the next proposed one-file NAS operational dry-run after Stage9 candidate staging passed. Workstream `stage9-media`, task `STG9MEDIA-001 / IN_PROGRESS`, contract version 1.0.0.
+
+SCOPE: Run only staged `/tmp/p03h-admin83-stage-20261101-9c4097dc/admin83_runner.py` (SHA-256 `b2bdb5df1080b2ac9951d7a59e68eb0c07271fefd6ee2685e56eee772130eb18`) as `ssikgun` on the NAS, with `--start 0 --count 1` and **without `--worker` or `--apply`**, following same-session interactive `sudo -v` authentication. The runner may internally use `sudo -n -u admin` for owner-side **preflight only**. Check staged file hash/owner/mode before use.
+
+LIMITS: No backup creation, original NFO write, Apply, recovery, copying files, permission/ACL changes, DB/Jellyfin/timer/service actions, changes to the other 82 admin NFOs, or rerun on error. Terminal PASS requires `PREFLIGHT=1_PASS`, `DRY_RUN=PASS; BACKUP_CREATED=NO`, and nonzero errors halt without promotion. A subsequent real NFO modification requires separate explicit authorization.
+
+STATUS: `ADMIN83_ONE_DRYRUN=AUTHORIZED_NOT_RUN`; `ADMIN83_APPLY=NOT_AUTHORIZED`.
+
+
 
 ## P03-H EBWH-350 USER-REPORTED SUCCESS / READ-ONLY COHORT AUDIT — 2026-10-30 KST
 
