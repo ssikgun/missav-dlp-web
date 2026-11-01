@@ -68,7 +68,7 @@ EXECUTION SAFETY: One run, no automatic retry or auto restore on any error, inte
 
 PROHIBITED: Additional 82 admin NFO writes, rerunning AKDL-312 apply, edits to completed ordinary 104, bulk Apply, renames, moves, chmod/chown/ACL changes to existing media, permission changes, DB/Jellyfin service/scan operations, Stage9 ten-minute timer or other service changes. Real backup/restore and crash protection remain unverified until observed; this canary does not authorize recovery automation.
 
-STATUS: `ADMIN83_AKDL312_APPLY=AUTHORIZED_NOT_RUN`; `ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`; `JELLYFIN_REFRESH=NOT_RUN`; `P03_T=NOT_RUN`.
+STATUS: `ADMIN83_AKDL312_RUNNER=PASS_POSTCHECK_PENDING`; `ADMIN83_AKDL312_BACKUP=/volume1/video/video2/downloads/backups/stage9/p03h-admin83-9nhqs7od`; `ADMIN83_AKDL312_INDEPENDENT_POSTCHECK=NOT_RUN`; `ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`; `JELLYFIN_REFRESH=NOT_RUN`; `P03_T=NOT_RUN`. User-reported NAS stdout 2026-11-01 KST: `PREFLIGHT=1_PASS; IDS=AKDL-312`, `BACKUP_COMPLETE=.../p03h-admin83-9nhqs7od`, `APPLIED=AKDL-312 SHA256=a7ce1cc489eab8250c3eaed4543f512ad84c488aaf7abd68d28c507132daf42c`, `BATCH=PASS`, exit zero. Require separate independent original-backup/receipt/current-file SHA, identity, ACL and xattr postcheck before product PASS; do not rerun Apply.
 
 ## P03-H EBWH-350 USER-REPORTED SUCCESS / READ-ONLY COHORT AUDIT — 2026-10-30 KST
 
