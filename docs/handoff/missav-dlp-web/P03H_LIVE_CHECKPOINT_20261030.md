@@ -689,3 +689,28 @@ LATEST_STATUS: `ADMIN83_OFFLINE_FIX_REPORT=PASS_0_FAIL; ADMIN83_UPDATED_SOURCE_R
 - 104/104 ordinary cohort NFOs independently verified PASS; 83 admin-owned remain untouched; no Jellyfin refresh, DB writes, Stage9 timer, account or permission changes.
 
 LATEST_STATUS: `ADMIN83_UPDATED_SOURCE_REVIEW=PASS_WITH_NAS_PREFLIGHT_PENDING; ADMIN83_CANDIDATE_SHA=USER_VERIFIED_3; ADMIN83_NAS_ACL_XATTR_AUDIT=NOT_RUN; ADMIN83_NAS_STAGE=NOT_RUN; ADMIN83_NAS_DRYRUN=NOT_RUN; ADMIN83_APPLY=NOT_RUN; INDEPENDENTLY_VERIFIED=104_OF_187; ADMIN_REMAINING=83; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`.
+
+
+## Admin83 exact 83 NAS ACL and xattr read-only audit — user CT108/NAS stdout, 2026-11-01 KST
+
+- User ran the previously scoped CT108 SSH to NAS under normal `ssikgun` UID 1026 and executed a read-only Python audit. It verified SHA-256 of the frozen manifest `/tmp/p03h-bulk104-sIzAT42z/p03h_title_only_candidates_188.jsonl` as `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`; parsed 188 unique relevant rows, exact 83 unique `cohort=="129"` entries.
+- Each NFO checked regular-file mode, one hard link, owner UID1024 admin, group GID100 users, permissions 0644. Checked `synoacltool -get` with strict Linux-mode (exit 255, exact `(synoacltool.c, 596)It's Linux mode\n`, stderr empty) or Synology ACL (0, required markers, stderr empty) classifications; enumerated `os.listxattr` and attempted to read every listed value. This was a normal-user **read-only** audit; it is not owner-side sudo or actual-runner execution proof.
+- User terminal summary:
+  ```
+  ===== ADMIN 83 ACL/XATTR AUDIT =====
+  TARGETS=83
+  PASS= 83
+  FAIL= 0
+  LINUX_MODE= 83
+  SYNO_ACL= 0
+  XATTR_READABLE= 83
+  XATTR_TOTAL= 0
+  ACL_XATTR_AUDIT=83_PASS
+  NAS_WRITE=0 DB_WRITE=0 JELLYFIN_WRITE=0
+  ```
+- **Conclusion:** all 83 tested target NFOs currently return recognized Linux mode; no NFO has visible xattr names to read (`XATTR_TOTAL=0`). No unexpected `synoacltool` response on these 83. This resolves the previously unresolved 81-file ACL classification for the present audit, but does **not** prove the candidate is deployable, owner-side runtime permissions, sudo TTY/cache behavior, backup durability or in-place write success.
+- Keep `admin83_runner.py` source SHA `b2bdb5df1080b2ac9951d7a59e68eb0c07271fefd6ee2685e56eee772130eb18`, smoke `fca6dd6e0b2be624b081996c4ecc09bbe76730c4c2f71c5798ab6a58a18bd306`, recovery guide `b97a4fd429f977071c88b17ece55e27d2ad777dffcffd58ec3706173ada84488` as **CT108-only offline candidates**; not yet delivered to NAS. The approved in-place/inode-preserving design remains unchanged.
+- Next operation, if user proceeds: use **same interactive NAS SSH TTY session** to check `sudo -v` with password input only to sudo/TTY followed immediately by `sudo -n -u admin id`, and report success/failure, without running any runner or writing files. Then separately consider controlled source delivery, exact SHA readback, and explicitly approved NAS operational dry-run; NO admin83 apply without explicit scoped approval. Existing normal-user cohort 104/104 remains independently PASS, admin 83 still unmodified, Jellyfin refresh/timer not run.
+- Note: user terminal stdout provides evidence of read-only script completion; it is not independent access to NAS from GitHub connector.
+
+LATEST_STATUS: `ADMIN83_NAS_ACL_XATTR_AUDIT=PASS_83; ADMIN83_NAS_LINUX_MODE=83; ADMIN83_NAS_SYNO_ACL=0; ADMIN83_NAS_XATTR_TOTAL=0; ADMIN83_OWNER_EXECUTION=NOT_VERIFIED; ADMIN83_NAS_STAGE=NOT_RUN; ADMIN83_NAS_DRYRUN=NOT_RUN; ADMIN83_APPLY=NOT_RUN; VERIFIED_NFO=104_OF_187; ADMIN_PENDING=83; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`.
