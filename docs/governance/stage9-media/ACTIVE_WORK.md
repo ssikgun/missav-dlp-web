@@ -6,6 +6,18 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H CT108 BACKUP-ACL CANDIDATE SOURCE SHA3 READ-ONLY PASS — 2026-11-02 KST
+
+USER-EXECUTED READ-ONLY EVIDENCE: On `root@downloader` (CT108), `python3 -B` inspected exact isolated source directory `/tmp/p03h-admin83-backup-acl-offline-20261102`. `SOURCE_DIR=PASS`: real directory (not symlink). Three files each real regular, single hardlink (`st_nlink=1`), UID=0 GID=0 MODE=0644; SHA256 exact frozen matches:
+- `admin83_runner.py` `4f3a6867d4a86ece3ab32cc8c2b134d2113ef21fd384110cf9c6a81feeb2a7ef` PASS.
+- `admin83_runner_smoke.py` `4b18d4e4e2a4894309c654a8cf36bed2e4cef4e103b3df0f422a03105c936142` PASS.
+- `RECOVERY.md` `663fa7954adf7323aa4efe3758a1dbd3f8a78b288726115182f76cbbb2423f6b` PASS.
+`CT108_SOURCE_SHA3=PASS; SOURCE_WRITE=0; NAS_WRITE=0; NFO_WRITE=0`. This confirms the files available at the stated CT108 location in the user's session, not fresh NAS source identity, staging, Dry-run, backup write or deployment.
+
+APPROVED NEXT STAGING IDENTITY: Reserve one new separate NAS temporary staging target `/tmp/p03h-admin83-backup-acl-stage-20261102-v1` (must be absent, no overwrite); not yet created. Do not use or replace older `/tmp/p03h-admin83-stage-20261101-9c4097dc`. Next is NAS read-only preflight for destination absence, current user/parent identity, working verified CT108→NAS SSH transfer method and still-present frozen manifest, plus no mutation of private backup root; if transport or destination is uncertain, stop and inspect rather than guessing. A successful preflight does not authorize applying NFO changes. After actual staging, independently compare all three SHA256/owners/modes before any no-Apply index1 dry-run.
+
+CHECKPOINT_RESULT: `CT108_SOURCE_SHA3=PASS; NAS_STAGE_IDENTITY=NOT_CHECKED; NAS_STAGE_WRITE=NOT_RUN; NAS_SINGLE_DRYRUN=NOT_RUN; REAL_BACKUP_WRITE=0; EXISTING_BACKUP_PRIVACY=FAIL_UNCHANGED; OTHER_82_NFO_APPLY=NOT_AUTHORIZED`.
+
 ## P03-H ADMIN83 OFFLINE ACL-CANDIDATE NAS STAGING AND SINGLE READ-ONLY DRY-RUN APPROVED — 2026-11-02 KST
 
 USER_APPROVAL: After the verified NAS admin-private root child ACL inheritance PASS and canonical checkpoint, the user replied `응 진행해` to the explicit next proposal: **stage the offline-corrected candidate on the NAS as a separate candidate and perform only a read-only Dry-run**. Stage9-only `STG9MEDIA-001 / IN_PROGRESS`, contract v1.0.0 and common v1.0.1; source of truth `ssikgun/missav-dlp-web` branch `teddy-subtitle-stage11`. No cross-workstream work is approved.
