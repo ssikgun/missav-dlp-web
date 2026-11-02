@@ -6,6 +6,20 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H STAGE9 ADMIN PRIVATE BACKUP ROOT CREATION AND ACL READ-ONLY CHECK APPROVED — 2026-11-02 KST
+
+USER_APPROVAL: After the verified offline backup-ACL candidate result, user replied `응 승인해` to the proposal to create **one** new administrator-only NAS backup-root directory and inspect its Synology ACL/access. This is a narrowly scoped Stage9 Media authorization, `STG9MEDIA-001 / IN_PROGRESS`, contract v1.0.0 and common contract v1.0.1, `REQUIRES_WORKSTREAMS: stage9-media`.
+
+SINGLE TARGET: `/volume1/video/video2/downloads/backups/stage9-admin-private`, parent `/volume1/video/video2/downloads/backups`. Note this is a sibling of the existing `backups/stage9` directory, NOT its child. Before any creation, read-only verify actual NAS identity, intended parent and every relevant path component (no symlinks or unexpected owners), destination nonexistence, current ACL/inheritance and approved identities `admin` UID1024/GID100, ordinary `ssikgun` UID1026/GID100. No unbounded NAS traversal.
+
+ALLOWED: One bounded, no-overwrite empty directory creation only at the exact target as admin with restrictive requested mode/umask, after verified preconditions. Inspect the resulting empty directory's actual Synology ACL, inherited ACEs, effective owner/ordinary-user permissions, and real non-sudo directory opens; preserve directory after test. A result displaying 0777 is not by itself sufficient to determine effective access. Failed/incomplete access check must remain INCOMPLETE/BLOCKED, never privacy PASS. If new directory inherits broad ACL, stop and report it; **do not change inheritance or ACL under this approval**. Prior test-folder ACL changes do not authorize production-path ACL mutation. If the exact target already exists, do NOT recreate or modify it; read-only inspect and stop for review.
+
+PROHIBITED: `synoacltool -add`, `-del-archive`, `-replace`, `-del` or other ACL/permission/owner modifications to the new directory or other paths under this approval; creating any child file/directory or sensitive original-backup bytes; moving/changing/deleting existing real backup `p03h-admin83-9nhqs7od`; executing or installing offline candidate runner, `--apply`, modifying `AKDL-312` or other 82 NFOs; DB/Jellyfin/containers/timers/services/workstreams changes. No blind retry or cleanup. Existing users have sudo/admin privilege, so ordinary-user exclusion cannot protect against a sudo-capable adversarial identity.
+
+ACCEPTANCE FOR THIS CHECKPOINT: `PARENT_AND_TARGET_PREFLIGHT` verified before creation; actual `TARGET_CREATED` and path identity recorded; requested 0700 versus actual ACL analyzed; actual admin allowed and ordinary `ssikgun` denied or clearly report failure/unknown. Newly created child ACL inheritance, runner integration and operational backup confidentiality are NOT tested/approved. If ACL isolation fails, next ask for separately scoped **new-empty-folder-only ACL initialization**, not automatic remediation.
+
+STATUS: `USER_APPROVAL=YES; NAS_PREFLIGHT=NOT_RUN; TARGET_CREATED=NOT_RUN; TARGET_ACL_CHECK=NOT_RUN; NAS_CHILD_FILE_TEST=NOT_AUTHORIZED; OFFLINE_CANDIDATE_DEPLOYMENT=NOT_AUTHORIZED; REAL_BACKUP_PRIVACY=FAIL; OTHER_82_NFO_APPLY=NOT_AUTHORIZED`.
+
 ## P03-H ADMIN83 BACKUP-ACL OFFLINE CANDIDATE RESULT — 2026-11-02 KST
 
 SOURCE_IDENTITY: CT108 copies of the three previously NAS-staged files match their exact frozen SHA-256 values; the NAS originals were not independently read in this session. Isolated candidate directory: `/tmp/p03h-admin83-backup-acl-offline-20261102`. Candidate SHA-256: runner `4f3a6867d4a86ece3ab32cc8c2b134d2113ef21fd384110cf9c6a81feeb2a7ef`; smoke `4b18d4e4e2a4894309c654a8cf36bed2e4cef4e103b3df0f422a03105c936142`; recovery `663fa7954adf7323aa4efe3758a1dbd3f8a78b288726115182f76cbbb2423f6b`.

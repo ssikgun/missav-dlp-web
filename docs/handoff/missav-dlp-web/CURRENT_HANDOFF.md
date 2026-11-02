@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-02 — P03-H admin private backup-root create/inspect approved (not executed)
+
+After offline candidate PASS and GitHub checkpoint `56efd943ed1acb64dbdf794d7e4c03c8fc7560c1`, user approved narrowly bounded creation and **read-only ACL/access inspection** of one new empty NAS directory: `/volume1/video/video2/downloads/backups/stage9-admin-private`. Stage9 task `STG9MEDIA-001`; see current Stage9 ACTIVE_WORK for precise preflight and exclusions. This is sibling to existing `backups/stage9`; never touch old backup. This approval does **not** cover Synology ACL mutations or child-file creation, candidate runner installation or execution, real NFO/other 82 Apply, or DB/Jellyfin/service modifications. NAS preflight and actual creation are `NOT_RUN`. First next checkpoint is bounded read-only NAS identity/path/parent ACL preflight; after confirmed state, create once and inspect. If initial ACL remains open due to inherited permissions, stop and seek separate targeted initialization approval. Real backup privacy remains FAIL until proven otherwise.
+
 ## P03-H ADMIN83 BACKUP-ACL OFFLINE CANDIDATE RESULT — 2026-11-02 KST
 
 SOURCE_IDENTITY: CT108 copies of the three previously NAS-staged files match their exact frozen SHA-256 values; the NAS originals were not independently read in this session. Isolated candidate directory: `/tmp/p03h-admin83-backup-acl-offline-20261102`. Candidate SHA-256: runner `4f3a6867d4a86ece3ab32cc8c2b134d2113ef21fd384110cf9c6a81feeb2a7ef`; smoke `4b18d4e4e2a4894309c654a8cf36bed2e4cef4e103b3df0f422a03105c936142`; recovery `663fa7954adf7323aa4efe3758a1dbd3f8a78b288726115182f76cbbb2423f6b`.
