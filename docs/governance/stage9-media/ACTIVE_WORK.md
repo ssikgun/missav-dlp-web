@@ -1,5 +1,18 @@
 # Stage9 Media workstream — active work
 
+## P03-H LIVE SYNOLOGY ACL PREFLIGHT 3/3 PASS, CANARY PENDING (2026-11-02 KST)
+
+USER-EXECUTED NAS `ssikgun@ssikgun_home` `sudo -n /usr/bin/python3 -B -` actual read-only `synoacltool -get` classification and `lstat` of exactly approved three folders/video files. Output `ACL_PREFLIGHT=PASS; CHECKED=3; NAS_WRITE=0; NFO_CREATION=NOT_RUN; VIDEO_MODIFICATION=0`:
+- `MFCS-085`: video `.mp4` 1467881427 bytes, ordinary one-link regular file, folder/video owner 1026:100 and POSIX 0700, `DIR_ACL_KIND=SYNOLOGY`, `VIDEO_ACL_KIND=SYNOLOGY`, `DIR_ACL_SHA12=fdda6a482a86`, `VIDEO_ACL_SHA12=16add87b17e9`, video `st_ino=59051`, `st_mtime_ns=1788865655288182673`, no NFO.
+- `DANDYA-033`: `.ts` 6571739656, same owner/group/mode and ACL kinds/hash, `st_ino=59591`, `st_mtime_ns=1791539419025119040`, no NFO.
+- `NHDTB-778`: `.ts` 6637939156, same owner/group/mode and ACL kinds/hash, `st_ino=59589`, `st_mtime_ns=1791539317625169980`, no NFO.
+All three folders have the same ACL fingerprint, all three videos have a separate but identical video ACL fingerprint. `synoacltool` correctly classified these as Synology ACL (not Linux POSIX-only). ACL digest equality of separate folders/videos does NOT yet prove new create-only NFO will inherit safe ACL or that target uploader will retain expected owner; verify after create. User's initial `sudo -v` password retry does not affect successful later read-only result.
+
+SOURCE REVIEW: Existing `teddy_discovery_media_filestation.py::SynologyFileStationMediaAdapter.publish_bundle` supports direct NFO-only publication for a supported MP4 video, `poster=None` and returns `NFO_READY`; its private `_publish_one` has list/check/upload create-only intent and upload readback, but uploader owner is the dedicated `stage9_media` NAS account, unlike source video UID 1026. Whether FileStation upload create-only is truly server-atomic in the actual NAS environment and resulting ACL matching private media requirements remain unverified; avoid blindly invoking an uploader with unproven ACL. TS files are explicitly blocked by `_video_paths` and current allowed extensions; no broad policy changes permitted. Need pick safe exact canary route and secure NFO payload transfer (no titles/logged secrets) before first write.
+
+AUTHORIZATION STATE: prior explicit `승인해` applies to exact three NFO sidecars only, canary `MFCS-085` first, other two gated on success. `CANARY_NFO_CREATION=NOT_RUN`; `TS_NFO_CREATION=NOT_RUN`; `VIDEO_CONVERSION=NOT_RUN`; `MEDIA_JOB_WRITE=0`; `JELLYFIN_WRITE=0`. Preserve original 225 corrected NFOs and backups.
+
+
 ## P03-H EXPLICIT USER APPROVAL — EXACT THREE MISSING NFO CREATE-ONLY RECOVERY (2026-11-02 KST)
 
 USER APPROVAL: After seeing the actual 3/3 Synology NAS read-only file/ownership/no-existing-NFO preflight, the user answered **`승인해`** to the immediately preceding explicit question: authorize exactly 3 missing NFO creations in two phases, canary first for `MFCS-085`, then only if the canary passes independent file/metadata readback, `DANDYA-033` and `NHDTB-778`. Selected workstream `stage9-media`, task `STG9MEDIA-001 / IN_PROGRESS`, approved Stage9 media contract v1.0.0 and common contract v1.0.1. This authorization is **for the bounded, create-only missing-NFO sidecars only** and necessary non-mutating verification/preparation, NOT for generalized code design changes, production daemon deployment, broad retry or media format-policy changes.
