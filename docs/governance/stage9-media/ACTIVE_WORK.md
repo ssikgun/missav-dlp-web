@@ -1,5 +1,25 @@
 # Stage9 Media workstream — active work
 
+## P03-H NAS PRIVATE DUAL-UID ONE-TIME STAGING SUCCESS — 2026-11-02 KST
+
+USER-EXECUTED CT108→NAS STAGING: User ran the one-time Python3 -B staging wrapper at root@downloader, verifying the frozen /tmp/p03h-admin83-dualuid-offline-20261102-v1/stage_dualuid.py SHA256 9e39bdc790c7453fdf5167bfeae066f648106cacc884b7f3e535463a88614de2, secure existing CT108 SSH key and pinned known_hosts, and one strict-host-checked ssh -tt session as ssikgun@192.168.1.201 after the earlier read-only target-absence/source preflight PASS. The terminal echo of pasted source was visibly garbled, but execution produced unambiguous stdout:
+```text
+CT108_STAGE_TOOL=PASS
+OWNER_STAGE_CREATED=/tmp/p03h-admin83-dualuid-owner-20261102-v1
+ADMIN_STAGE_CREATED
+STAGING_COMPLETE; RUNNERS_NOT_EXECUTED
+SSH_EXIT=0
+STAGING_COMMAND=SUCCESS
+NO_AUTOMATIC_RETRY=YES
+```
+
+INTERPRETATION: The tool reported creation of the two approved fresh private NAS /tmp stages (one intended for owner ssikgun UID1026, one for worker admin UID1024), each with one code file; this is a successfully completed STAGING command, not evidence yet of independently read-back UID/GID/mode, exact file set, code SHA or reciprocal account-denial/open behavior. No dry-run runner or worker was invoked by this staging utility. No NFO Apply, real backup generation, Jellyfin/DB/deployment change was authorized or executed in this step. The original frozen staging/source and any partial artifacts must be preserved; NEVER blindly retry the one-time create command.
+
+CHECKPOINT: `P03H_DUALUID_STAGE_COMMAND=PASS; SSH_EXIT=0; OWNER_STAGE=CREATED_REPORTED; ADMIN_STAGE=CREATED_REPORTED; RUNNERS_EXECUTED=NO; NAS_STAGE_INDEPENDENT_READBACK=NOT_RUN; RECIPROCAL_ACCOUNT_ACCESS=NOT_VERIFIED; NAS_INDEX1_DRYRUN=NOT_RUN; NFO_APPLY=NOT_AUTHORIZED`. Previous separate owner direct Python script-launch EACCES remains CONFIRM_NEEDED; staging success does not resolve it.
+
+NEXT SINGLE CHECKPOINT: Separate bounded NAS read-only verification of the exact two stage dirs and exactly one code file per dir: actual UID/GID/modes, no symlink, nlink=1, frozen owner SHA256 d6dedc701d33bb8a02347fb88227c287af7ad50f517d6cb6a4c6a674c0c07379, frozen admin SHA256 4f3a6867d4a86ece3ab32cc8c2b134d2113ef21fd384110cf9c6a81feeb2a7ef; check owner can open owner file and cannot open admin file, and admin can open admin file and cannot open owner file. No runner execution or one-item dry-run until independent verification and separate review. No file/permission/ACL, backup, NFO, DB, Jellyfin, service, or other-workstream changes.
+
+
 WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
