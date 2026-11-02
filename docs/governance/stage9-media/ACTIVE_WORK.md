@@ -1,5 +1,29 @@
 # Stage9 Media workstream — active work
 
+## P03-H EXTRA37 INDEPENDENT NAS READBACK PASS / TITLE-ONLY CLOSED — 2026-11-02 KST
+
+ACTUAL USER-EXECUTED SYNOLOGY NAS read-only independent postcheck **PASS** after the approved extra 37 title-only NFO writes (2026-11-02 KST). The verifier checked **exactly** the previously created run `/volume1/video/video2/downloads/backups/stage9-admin-private/p03h-extra37-6e43458a98550ff6` and the fixed 37 target list split 23 UID1024, 4 UID1026, 10 UID1030. Independent actual terminal output:
+```
+===== EXTRA37 INDEPENDENT POSTCHECK =====
+BACKUP_VERIFIED=37
+SOURCE_VERIFIED=37
+TITLE_ONLY_DIFF=PASS
+OWNER_ACL_XATTR=PASS
+INDEPENDENT_POSTCHECK=PASS
+BACKUP_VERIFIED_COUNT=37
+SOURCE_VERIFIED_COUNT=37
+NAS_WRITE=0
+BACKUP_DELETED=NO
+```
+Each original backup NFO and Synology ACL/POSIX mode snapshot matched the backup receipt's original SHA; each current source NFO was independently verified equal to the original NFO bytes **plus only the single exact `[DVD-ID] ` text inserted after the one `<title>` opening tag**. Each current SHA equaled the receipt candidate SHA; each validated XML movie title begins with the exact matching DVD-ID and matching `<id>`/recognized `<uniqueid>`. Original inode, UID, GID, file mode, nlink, xattr hashes and identical ACL snapshot (23 Linux mode / 14 Synology ACL) remained unchanged by the title-only insertion. Admin-private root/run/per-title directory privacy and normal `ssikgun` open denial were also independently checked. No file writes, restore, retry or backup deletions in postcheck.
+
+CONCLUSION — `P03-H EXTRA37 TARGETED EXISTING NFO TITLE PREFIX CORRECTION = CLOSED / PASS` for the exact 37 user-approved titles. Combined separate historical changes: **188 frozen-roster prior titles + 37 extra = 225 existing NFO title-only edits**. The earlier live inventory found 189 properly prefixed NFOs in 229 recognized standard-family JAV folders, plus one independently verified FC2-PPV-4973050 in a hyphenated family skipped by the folder enumerator, plus the 37 extra unprefixed titles now corrected. Thus **227 preexisting NFOs are expected to have correct work-number prefix within the surveyed 230-folder combined scope** (188+37+2 previously correctly prefixed), grounded in earlier inventory and individual readback; do NOT misrepresent this as a new simultaneous independent 227-file scan or all arbitrary NAS paths.
+
+OUTSTANDING / NOT INCLUDED IN THIS COMPLETION: The 3 actual folders without any NFO (`DANDYA-033, MFCS-085, NHDTB-778`) remain; new NFO creation is separate, NOT authorized by the 37-title-only operation. Five `@eaDir` system folders were non-content exclusions, NOT missing NFO. Actual Jellyfin displayed-title acceptance after source changes and future naturally generated NFO after the 2026-10-30 Stage9 code deployment remain `NOT_VERIFIED`; no metadata refresh/scan/POST was done by this approved operation. Stage9 P03-T ten-minute timer has NOT been changed/approved. All other workstreams protected unchanged.
+
+RETENTION: New exact 37-original private backup run `p03h-extra37-6e43458a98550ff6` remains in place. No automatic cleanup or deletion without separate user consent. There is **NO need to re-Apply** 37 or 188 corrected NFOs. NEXT useful choice: manually verify Jellyfin title for FNS-267 after local-item metadata refresh (only user-selected), or separately plan 3 missing NFOs; preserve older 188 and current 37 source bytes. Do not auto-run refresh, full library scan, timer/deploy changes or third-party metadata requests absent authorization.
+
+
 ## P03-H EXTRA37 ACTUAL NAS APPLY PASS 37/37 — independent readback pending (2026-11-02 KST)
 
 ACTUAL USER SYNOLOGY NAS TERMINAL UPLOAD, 2026-11-02 KST (source user terminal, not ChatGPT direct execution): After separately approved exact 37-target correction and repeated read-only original SHA/fingerprint/ACL-mode survey PASS, user ran corrected `sudo -n /usr/bin/python3 -B -` with both POSIX Linux-mode (UID1024, 23) and Synology ACL (UID1026, four; UID1030, ten) handling. Verbatim key stdout:
