@@ -1,5 +1,10 @@
 # Stage9 Media workstream — active work
 
+## P03-H Jellyfin FNS-267 displayed title PASS — 2026-11-02 KST
+
+User confirmed that after manually scanning Jellyfin, FNS-267 now displays the corrected DVD-ID title. Product acceptance for this one item: PASS. Exact 37-title NAS NFO corrections and independent backup/source checks were already PASS in preceding checkpoint. Other 36 Jellyfin UI titles were not individually verified. Existing 188 corrected NFOs remain unchanged; do not reapply. Three folders without NFO (DANDYA-033, MFCS-085, NHDTB-778) remain separate/unapproved creation scope. The new private 37-title original backup run is preserved; no cleanup authorized. This note is documentation only, no NAS or Jellyfin mutation.
+
+
 ## P03-H EXTRA37 INDEPENDENT NAS READBACK PASS / TITLE-ONLY CLOSED — 2026-11-02 KST
 
 ACTUAL USER-EXECUTED SYNOLOGY NAS read-only independent postcheck **PASS** after the approved extra 37 title-only NFO writes (2026-11-02 KST). The verifier checked **exactly** the previously created run `/volume1/video/video2/downloads/backups/stage9-admin-private/p03h-extra37-6e43458a98550ff6` and the fixed 37 target list split 23 UID1024, 4 UID1026, 10 UID1030. Independent actual terminal output:
