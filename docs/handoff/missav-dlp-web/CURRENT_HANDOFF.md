@@ -1,5 +1,35 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## P03-H BLOR-289 NAS READ-ONLY PRE-APPLY TARGET/BACKUP GATE PASS — 2026-11-02 KST
+
+USER NAS CHECKPOINT: User ran a read-only pre-Apply check from ordinary `ssikgun@ssikgun_home` after `sudo -v`. The script validated owner UID1026, frozen dual-UID owner launcher path `/tmp/p03h-admin83-dualuid-owner-20261102-v1/admin83_runner.py` (real regular one-link file UID1026/mode0600 under real owner UID1026/mode0700 directory), owner SHA256 `d6dedc701d33bb8a02347fb88227c287af7ad50f517d6cb6a4c6a674c0c07379`, and frozen 188-entry manifest SHA256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`. The earlier actual index1 Dry-run independently identified the exact target ID as BLOR-289.
+
+LIVE NAS NFO STATE: Existing `/volume1/video/video2/JAV/BLOR/BLOR-289/movie.nfo` is one-link regular file, owner UID1024, mode0644, size `796` bytes, SHA256 `420688b64fa7579295eb28bbf6fa49fd11a6501887ff6813ed69142700b92522`. The XML `title` element was present/nonempty and did not start with `[BLOR-289] `. This is the frozen **before-Apply** byte identity to require unchanged at the eventual write boundary; the user did not print title text or independently verify manifest/roster row-to-current-target hash in this command.
+
+PRIVATE BACKUP ROOT STATE: Exact `/volume1/video/video2/downloads/backups/stage9-admin-private` is a real directory owned UID1024. Ordinary nonsudo UID1026 directory open failed with `PermissionError` (`ORDINARY_BACKUP_ACCESS=DENIED_PASS`). `sudo -n synoacltool -get` returned zero and showed exactly one admin-only explicit allow ACE `user:admin:allow:rwxpdDaARWcCo:fd--` (level0) and archive lacking `is_inherit`. This proves root ACL gate as tested; **actual new per-run private backup folder/file ACL, receipt and preservation after Apply remain UNVERIFIED**.
+
+Exact user stdout:
+```text
+OWNER_AND_MANIFEST=PASS
+TARGET_EXISTS=PASS
+TARGET_UID=1024
+TARGET_MODE=0o644
+TARGET_SIZE=796
+TARGET_SHA256=420688b64fa7579295eb28bbf6fa49fd11a6501887ff6813ed69142700b92522
+TITLE_ALREADY_PREFIXED=NO
+ORDINARY_BACKUP_ACCESS=DENIED_PASS
+PRIVATE_BACKUP_ROOT=PASS
+READONLY_APPLY_PREFLIGHT=PASS
+NFO_APPLY=NOT_RUN
+BACKUP_CREATED=NO
+NO_AUTOMATIC_RETRY=YES
+```
+
+STATUS: `BLOR289_READONLY_PRE_APPLY=PASS; USER_APPROVAL=YES; ORIGINAL_NFO_SHA256=420688b64fa7579295eb28bbf6fa49fd11a6501887ff6813ed69142700b92522; TARGET_UID=1024; PRIVATE_ROOT_ACL=PASS; PRIVATE_ROOT_ORDINARY_ACCESS_DENIED=PASS; FROZEN_OWNER_MANIFEST=PASS; NFO_APPLY=NOT_RUN; BACKUP_CREATED=NO; OTHER_81_APPLIES=NOT_AUTHORIZED`.
+
+NEXT SINGLE CHECKPOINT: Before invoking the now-approved one-title Apply, inspect the **already staged, SHA-pinned original admin runner and patched owner launcher** read-only to confirm real CLI `--apply`/`--confirm`, index bounds, backup root path, backup-before-mutate and privacy/partial-failure safety behavior. Do not infer exact invocation syntax from older AKDL-312 runner. If the staged verified code has an Apply safety gap, stop and report rather than apply; no unapproved script edits or permission changes. Once source and source/roster/target preconditions are consistent, one bounded BLOR-289-only Apply may be executed with no retry, with separate original/backup readback before declaring product PASS. Preserve legacy backup and all other files.
+
+
 ## P03-H BLOR-289 INDEX1 ONE-TITLE NFO APPLY AND PRIVATE BACKUP USER APPROVED — 2026-11-02 KST
 
 USER APPROVAL: Immediately after the exact one-item index1 `BLOR-289` real NAS no-Apply Dry-run PASS (`PREFLIGHT=1_PASS; IDS=BLOR-289; DRY_RUN=PASS; BACKUP_CREATED=NO; RUNNER_EXIT=0`) and GitHub recording, assistant explicitly asked whether the user approved **BLOR-289 only** actual NFO title change and creation of a private original backup. User replied `응 승인해` on 2026-11-02 KST. This is a new narrowly scoped authorization under the existing `stage9-media / STG9MEDIA-001 / IN_PROGRESS`, Stage9 contract v1.0.0 and common v1.0.1. User approval is now YES; real Apply has NOT occurred in this conversation.
