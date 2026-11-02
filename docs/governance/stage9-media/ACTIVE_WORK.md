@@ -6,6 +6,14 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H NAS PRIVATE BACKUP ROOT ACL-ONLY ISOLATION RESULT — 2026-11-02 KST
+
+USER NAS STDOUT: Explicitly authorized ACL-only action on the preexisting empty `/volume1/video/video2/downloads/backups/stage9-admin-private` ran once as ordinary `ssikgun` with noninteractive `sudo` ACL calls. `PREFLIGHT=PASS`, `ADMIN_ACE_ADD_ATTEMPTED=YES`, `ADMIN_ACE_READBACK=PASS`, `INHERITANCE_REMOVE_ATTEMPTED=YES`; final `synoacltool -get`: `Archive: has_ACL,is_support_ACL; Owner: admin(user)`, sole `[0] user:admin:allow:rwxpdDaARWcCo:fd-- (level:0)`, no six inherited allows. `ROOT_ACL_STRUCTURE=PASS`. `-get-perm ssikgun` exit0 showed `[----d--------]`; `-get-perm admin` exit0 showed `[rwxpdDaARWcCo]`. Actual non-sudo `SSIKGUN_OPEN=DENIED`; `ADMIN_OPEN=ALLOWED`, `ROOT_ACL_ISOLATION=PASS_ORDINARY_CONTEXT`. User log states `CHILD_WRITE=0; BACKUP_WRITE=0; NFO_WRITE=0; EXISTING_BACKUP_CHANGE=0`. The new root is retained. `ssikgun` still has administrator/sudo privileges: this is ordinary-session ACL separation only, not a hard sudo-proof boundary.
+
+VERDICT: `P03H_NAS_BACKUP_ROOT_ACL_ISOLATION=PASS_ORDINARY_CONTEXT`; `NEW_CHILD_ACL_INHERITANCE=NOT_TESTED`; `OPERATIONAL_BACKUP_ROOT_READY=NOT_YET_VERIFIED`; `OFFLINE_CANDIDATE_NAS_INSTALL=NOT_AUTHORIZED`; `AKDL312_EXISTING_EXPOSED_BACKUP=UNCHANGED`; `OTHER_82_NFO_APPLY=NOT_AUTHORIZED`. Only the already-authorized two target-folder ACL changes were executed; no implied permission for another ACL mutation, dummy child creation or production-runner execution.
+
+NEXT: separately authorize a single harmless test-file/child-ACL inheritance check inside this exact isolated private root, with expected parent owner/sole explicit ACE/archive, no existing entries overwritten, and read-only admin vs ordinary account access checks. The previously completed separate synthetic/test-folder child test is supporting evidence only, not a proof for this new root. Do not re-run the ACL mutation.
+
 ## P03-H ADMIN PRIVATE BACKUP ROOT ACL-ONLY ISOLATION APPROVED — 2026-11-02 KST
 
 USER_APPROVAL: Following creation of the new root with inherited ACL failure, user explicitly replied "응 승인해" to the proposed **ACL-only fix on that existing empty root**. Stage9 Media active `STG9MEDIA-001`, contract v1.0.0, common v1.0.1, canonical branch `teddy-subtitle-stage11`.
