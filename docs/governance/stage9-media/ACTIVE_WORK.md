@@ -1,5 +1,14 @@
 # Stage9 Media workstream — active work
 
+## P03-H 229-folder read-only inventory: 37 extra missing prefixes — 2026-11-02 KST
+
+User-executed Synology read-only inventory result (root shell, 2026-11-02): `DVD_FOLDERS=229; PREFIX_OK=189; PREFIX_MISSING=37; NO_NFO=3; MULTIPLE_NFO=0; UNKNOWN_OR_INVALID=0; NONCANONICAL_FOLDER=5; HISTORICAL_188_FOLDERS_FOUND=187; MISSING_LIST_TRUNCATED=NO; NAS_WRITE=0; JELLYFIN_WRITE=0`. All 37 NFOs with missing `[DVD-ID] ` title prefixes are outside the frozen 188-candidate manifest (`IN_188=NO`). One of 188 manifest DVD IDs was not encountered in the canonical-folder walk, despite a separate direct path-based read-only NFO audit reporting 188/188 prefix PASS. These are different coverage methods; exact cause is not established. Original 188 corrections must not be retried.
+
+Among 37 missing-prefix files: 23 `movie.nfo` UID1024 mode0644 (mtime 2026-08-31); 4 per-ID NFO UID1026 mode0700 (2026-09 through 2026-10-25); 10 per-ID NFO UID1030 mode0700 (2026-10-27 through 2026-10-29). The known FNS-267 attached/current NFO, outside frozen 188, lacks prefix and predates 2026-10-30 Stage9 P03 title-builder deployment. Mixed ownership and age require grouped checks, not owner-blind bulk changes. All 37 passed the script's single valid XML title and ID-consistency checks. Three NFO-less folders and five noncanonical folder entries were only counted, not identified.
+
+This checkpoint is READ-ONLY evidence, not approval for NAS writes or Jellyfin metadata refresh. NEXT: one short bounded read-only count/list of the 3 NFO-less IDs, 5 excluded folder names and 1 historical-188 unseen folder; then scoped safe plan for 37 old NFO title-only corrections with explicit user authorization for new NAS writes. Current new-Stage9 automatic prefix behavior is source/deployment evidenced but no post-deployment naturally created NFO was verified by these results. `ADDITIONAL_NFO_CORRECTION=NOT_RUN`.
+
+
 ## P03-H FNS-267 LIVE NAS DIAGNOSIS PASS AND ADDITIONAL UNPREFIXED JELLYFIN TITLES — 2026-11-02 KST
 
 USER ACTUAL SYNOLOGY NAS READ-ONLY EVIDENCE: At `ssikgun@ssikgun_home`, script verified frozen 188-row manifest SHA, found `FNS267_IN_188=NO`, exact `/volume1/video/video2/JAV/FNS/FNS-267` exists, `NFO_COUNT=1; NFO_FILENAMES=FNS-267.nfo`. Its live NFO SHA256 `7617a952668a8f7c4002943802f8d8c020476a19d61e892777644f584358cc82` exactly equals earlier uploaded bytes `MATCH_UPLOADED=True`. XML `title='BBQ Skewers ● NTR Tsubasa Mai'`, `id=FNS-267`, `PREFIX_PRESENT=False`. NAS file mtime `2026-10-29T17:02:48.943667+09:00`; terminal `DIAGNOSIS=PASS; NAS_WRITE=0`. P03 title-prefix build was deployed 2026-10-30 (per approved prior real deployment record), so FNS-267's mtime predates it by ~1 day, consistent with old-version generation but not definitive producer attribution.
