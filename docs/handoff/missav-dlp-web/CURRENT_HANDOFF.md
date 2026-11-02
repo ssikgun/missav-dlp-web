@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## P03-H NAS IPC PRIVACY FUNCTIONS SOURCE REVIEW PASS — 2026-11-02 KST
+
+USER-EXECUTED NAS readonly source inspection of pinned Owner SHA `156f2913c8e06d0aedc8eac21a7932bc94a6878cb94b87d22673b47e0ab8e745` printed Channel (lines33-58), WorkerProbe (74-80), OwnerProbe (82-131), verify_private (189-213). Transcript `FOUND=Channel,OwnerProbe,WorkerProbe,verify_private; SOURCE_INSPECTION=PASS; PROGRAM_EXECUTION=NOT_RUN; NAS_WRITE=0`. Channel has bounded typed messages, timeouts and EOF failure. WorkerProbe.check sends sequenced path identity and requires exact denied=True response; OwnerProbe.test requires actual euid1026/egid100, permits only approved BACKUPS root/run/item/file path pattern and tests O_RDONLY|O_DIRECTORY for directories or both O_RDONLY and O_WRONLY for files, requires EACCES/EPERM. verify_private() checks NAS admin ownership and expected ACL and invokes PROBE.check before rechecking ACL/inode. This is SOURCE STRUCTURE PASS, NOT execution proof.
+
+Existing NAS no-Apply index1 BLOR-289 PREPARE/IPC PASS does NOT call verify_private/WorkerProbe under apply=False. User's approved NAS read-only investigation can proceed with a single simple actual ordinary UID1026 denial + admin root ACL read-only check on EXISTING private backup root, but this will NOT by itself certify all per-file OwnerProbe ↔ WorkerProbe frames. No production Apply or backups authorized. Preserve frozen staged candidate and NFO untouched; report exact remaining risk instead of extending synthetic labs.
+
 ## 2026-11-02 STAGE9 ACTUAL NAS DRYRUN PASS
 
 Actual Synology `ssikgun@ssikgun_home` one-time BLOR-289 index1 no-Apply owner-worker run with pinned SHA completed: `OWNER_VERIFICATION=PASS; APPLY_ARGUMENT=ABSENT; PREFLIGHT=1_PASS; IDS=BLOR-289; DRY_RUN=PASS; BACKUP_CREATED=NO; RUNNER_EXIT_CODE=0; REAL_NAS_DRYRUN=PASS; PRIVACY_PROBE=NOT_TESTED; NFO_APPLY=NOT_RUN; AUTO_RETRY=NO`. This validates real process/IPC and NFO read-only preflight, not privacy probe or Apply. No new backup was reported by runner; separate filesystem audit was not done. The user-approved read-only investigation remains open; next minimum checkpoint is actual ordinary UID1026 backup-denial IPC observation if safe without Apply. Actual BLOR-289 Apply/retry is NOT approved. See Stage9 ACTIVE_WORK for scope and source identities.
