@@ -1,5 +1,14 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## P03-H BLOR-289 NESTED-PROBE AUTH FAILURE CONFIRMED — 2026-11-02 KST
+
+Synology user-provided read-only result: `FROZEN_PROBE_SOURCE=PASS`; `BLOR289_NFO_UNCHANGED=PASS` with SHA256 `420688b64fa7579295eb28bbf6fa49fd11a6501887ff6813ed69142700b92522`; `EXISTING_BACKUP_RUN_COUNT=0`; `NESTED_PROBE_EXIT=1`; `NESTED_PROBE_STDOUT_BYTES=0`; `NESTED_PROBE_STDERR_BYTES=29`; `NESTED_PROBE_ERROR='sudo: a password is required'`; `NESTED_PROBE=BLOCKED`; `NFO_APPLY=NOT_RUN`; `BACKUP_WRITE=0`; `NO_AUTOMATIC_RETRY=YES`.
+
+Confirmed narrow explanation: the frozen admin-runner's non-mutating cross-account access probe was unable to start under the current credential policy; the runner conservatively stopped the previously approved BLOR-289 Apply. This is an execution-permission failure, **not** a verified backup privacy leak. Independent readback after the stop confirms exact original NFO bytes unchanged and no new private backup run folders. `BLOR289_APPLY=BLOCKED`, not PASS. No retry, manual restoration, permission change or code rewrite is approved by this check.
+
+Next one checkpoint: prepare a read-only, isolated design review for the minimal correction, preserving real owner-access checks and fail-closed privacy checks for each backup path, without changing NAS permissions or reducing validation. Any implementation or renewed Apply requires separately reviewed scope. Preserve all files and diagnostic evidence.
+
+
 ## P03-H BLOR-289 APPROVED ONE-ITEM APPLY STOPPED BY BACKUP ORDINARY-DENIAL CHECK — 2026-11-02 KST
 
 USER EXECUTION: From actual Synology `ssikgun@ssikgun_home`, user invoked one user-approved guarded operation for index1 `BLOR-289` after `sudo -v`. The outer Python gate verified approved owner UID1026 mode0700/0600 code SHA256 `d6dedc701d33bb8a02347fb88227c287af7ad50f517d6cb6a4c6a674c0c07379`, admin code SHA256 `4f3a6867d4a86ece3ab32cc8c2b134d2113ef21fd384110cf9c6a81feeb2a7ef` via `sudo -n -u admin`, frozen 188-row manifest SHA256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`, selected sorted cohort index1 ID BLOR-289, original single-link UID1024/mode0644 `/volume1/video/video2/JAV/BLOR/BLOR-289/movie.nfo` SHA256 `420688b64fa7579295eb28bbf6fa49fd11a6501887ff6813ed69142700b92522` and non-prefixed title. Existing `/volume1/video/video2/downloads/backups/stage9-admin-private` was UID1024 private, ordinary ssikgun open denied, with one exact admin-only ACL and no inherited archive. Outer gate printed `BLOR289_APPLY_PREFLIGHT=PASS` then invoked one-time `/bin/python3 -B <new owner runner> --start 1 --count 1 --apply --confirm P03H-ADMIN83`.
