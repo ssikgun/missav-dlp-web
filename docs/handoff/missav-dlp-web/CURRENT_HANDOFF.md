@@ -1,5 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-02 — P03-H NAS admin user access to new temporary stage denied (confirmed)
+
+Actual NAS `sudo -n -u admin` read-only check confirmed `UID=1024/GID=100`, `ADMIN_STAGE_OPEN=FAIL/ERRNO=13` and `ADMIN_RUNNER_READ=FAIL/ERRNO=13` for fixed new stage `/tmp/p03h-admin83-backup-acl-stage-20261102-v1`. Directory is Linux-mode UID1026 `0700`, file UID1026 `0600`: expected inability of distinct admin user to traverse/read. `ACCESS_CHECK_COMPLETE=YES; FILE_WRITE=0; NFO_WRITE=0; RUNNER_EXECUTION=0`. This does not prove the cause of the prior `ssikgun` child-Python script-open EACCES; the two contexts are different. New stage SHA3 PASS remains, index1 dry-run NOT_RUN. No permission/ACL/runner/copy/NFO/backup mutation. Next only one read-only static inspection of actual SHA-pinned staged runner's subprocess admin delegation, script path and worker code before any new execution or minimal change proposal. Avoid changing mode to expose code to Synology GID100 `users`. `STG9MEDIA-001 / IN_PROGRESS`; Stage9 contract v1.0.0 and common contract v1.0.1.
+
+
 ## 2026-11-02 — NAS temporary admin83 candidate file-open diagnostic PASS; dry-run NOT_RUN
 
 Actual NAS `ssikgun` UID1026/GID100 read-only check: staged dir UID1026/mode0700, `admin83_runner.py` UID1026/mode0600; direct read, `io.open_code`, and separate child Python `io.open_code` all PASS. `synoacltool -get` returned `It's Linux mode` (not a Synology ACL deny). `DIAGNOSTIC_COMPLETE=YES; FILE_WRITE=0; NFO_WRITE=0`. Previous direct `python3 -B SCRIPT` EACCES not reproduced by this nonexecuting test; exact origin remains unconfirmed. Potential *separate* future runner preflight boundary: UID1024 `admin` likely cannot traverse/read UID1026-only stage dir mode0700/file0600, whereas existing runner is expected to call `sudo -n -u admin`. Do not confuse previous EACCES with this untested admin permission issue. Next: one read-only actual admin-identity open probe with same-session `sudo -v` (no run, mode change, copy, Dry-run, backup or Apply). `STG9MEDIA-001` remains IN_PROGRESS. See latest Stage9 ACTIVE_WORK checkpoint.
