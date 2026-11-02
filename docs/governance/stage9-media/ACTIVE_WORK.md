@@ -1,5 +1,22 @@
 # Stage9 Media workstream — active work
 
+## P03-H NFO TITLE-ONLY 83-COHORT FINAL CONTENT AND BACKUP PASS — 2026-11-02 KST
+
+FINAL RESULT — USER-EXECUTED ACTUAL SYNOLOGY NAS INDEPENDENT READ-ONLY CHECK AFTER 81-TITLE APPLY: The frozen 188-row manifest SHA256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087` was checked on NAS, with cohort `129` having 83 rows. Five precise private backup runs were scanned without modifying NAS content:
+- `p03h-admin83-wbxiuzy0`: 20 originals/receipts/ACL backup files verified.
+- `p03h-admin83-8qi3cltb`: 20 verified.
+- `p03h-admin83-kkqbhin5`: 20 verified.
+- `p03h-admin83-0fn1qjof`: 20 verified.
+- `p03h-admin83-t0c5v3ta`: 1 verified.
+All five `BACKUP_RUN_VERIFIED=<name> COUNT=<count>` markers were printed. For each of the 81 rows, verifier opened `original.nfo`, `original_acl.txt`, `receipt.json` and current `movie.nfo` read-only, required original SHA equal the frozen manifest, current bytes equal original bytes with exactly `[DVD-ID] ` prepended inside the XML `<title>`, verified receipt dvd_id/path/original/candidate/ACL hashes, and verified the receipt's device/inode/UID/GID/mode/link identity against the current NFO. Additionally, read-only SHA-256 recheck of the previously completed two titles AKDL-312 and BLOR-289 passed. Terminal output: `FINAL_INDEPENDENT_CHECK=PASS; VERIFIED_BACKUPS=81; NAS_WRITE=0; APPLY_RETRY=NO; PRESERVE_ALL_BACKUPS=YES`.
+
+VERDICT: `P03H_83_TARGETED_NFO_TITLE_FIX=PASS / COMPLETE`. Of the 83 targeted titles, AKDL-312 was independently confirmed previously to have the exact prefix already, BLOR-289 had one successful bounded Apply and independent backup/title comparison, and the remaining 81 completed five guarded batches with independent NFO/backup/receipt readback. **No further NFO Apply is required or authorized for this completed 83-title cohort**. Preserve all six original backup run folders (five bulk and one prior BLOR). Do not interpret this as a claim that all 188 manifest candidates are corrected, nor that Stage9 whole product, Jellyfin or posters are complete. Remaining 105 manifest records are outside this completed NFO scope and were not modified. No video, poster, Discovery DB, service, NAS account/ACL changes, or new download were requested.
+
+INDEPENDENT-VALIDATION LIMIT: This proves title-only bytes, original hashes, receipt hash fields and baseline file identity. The original ACL backup bytes are hash-matched to their receipts, but live Synology extended ACL equality/per-item ordinary-user access-denial was not separately measured for every file; do not overstate those untested properties. Earlier real NAS ordinary-user denial of the private backup ROOT was independently `PASS`. Given the complete functional and essential data-integrity checks, do not expand exhaustive ACL test infrastructure without concrete need.
+
+NEXT DECISION: User may select a *different* workstream/Stage9 task, but this P03-H 83-target NFO correction is finished. Do not automatically process the other 105 candidate records or run any Apply retry. Preserve canonical checkpoints in this Stage9 `ACTIVE_WORK.md` and the shared handoff when safely editable; avoid overriding older task authorization/history.
+
+
 ## P03-H BULK81 FIVE-BATCH ACTUAL APPLY PASS — 2026-11-02 KST
 
 ACTUAL USER-EXECUTED SYNOLOGY NAS LOG (attached terminal capture dated 2026-11-02): `ssikgun@ssikgun_home` launched one ordinary-user `/usr/bin/python3 -B -` coordinator using the frozen 188-row manifest SHA256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087` and pinned owner `admin83_owner.py` SHA256 `156f2913c8e06d0aedc8eac21a7932bc94a6878cb94b87d22673b47e0ab8e745`. Coordinator printed `FRESH_PREFLIGHT=PASS; READY=81` and independently verified already-prefixed AKDL-312 index0 and BLOR-289 index1 had not changed. Then ran exactly the approved five disjoint slices `(2,20),(22,20),(42,20),(62,20),(82,1)`, with per-slice owner/worker original preflight, private backup creation/complete and title-only NFO apply.
