@@ -1,5 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-02 — P03-H CT108→NAS existing SSH route verified PASS
+
+User's CT108 stdout confirmed previously saved NAS SSH identity/known_hosts (`SSH_FILES=PASS; KNOWN_HOST=PASS`) and successful explicit strict-host-verified `ssikgun@192.168.1.201` connection, remote host `ssikgun_home`, UID1026, `TMP=PASS; OLD_STAGE=PASS; NEW_STAGE=ABSENT_PASS; TRANSFER_PREFLIGHT=PASS; NAS_WRITE=0; NFO_WRITE=0; SSH_EXIT=0`. This supersedes the previous `teddy_storage` alias transport failure without changing SSH settings. No files were copied or NAS work performed. Active stage9-media `STG9MEDIA-001` user-approved next checkpoint: fresh frozen CT108 source SHA3 + destination absence, then exclusively stage three files under new NAS temp directory without overwrite, independent NAS SHA/owner/mode readback, and immediate canonical checkpoint. Existing old stage and admin-private backup ACL preserved. No Dry-run yet, Apply, real backup, or NFO mutation authorized at this step.
+
+
 ## 2026-11-02 — P03-H CT108 SSH ALIAS RESOLUTION FAILURE — 2026-11-02
 
 CT108 SSH preflight failed before NAS command execution: unresolved `teddy_storage` alias (`ssh -G` showed hostname unchanged, user root, port22; SSH_EXIT=255). P03H_SSH_TRANSPORT=BLOCKED_ALIAS_UNRESOLVED; NAS_TRANSFER=NOT_RUN; NAS_DRYRUN=NOT_RUN; STAGING_TARGET_CURRENT_STATE=NOT_RECHECKED_FROM_CT108. Prior NAS-only staging/ACL preflight remains PASS as observed then. Next: verify pre-existing CT108 NAS SSH key/known_hosts and test exact IP with strict known-host verification; no file copy/production write yet. Stage9 active task: STG9MEDIA-001; this does not authorize Apply or other workstreams.

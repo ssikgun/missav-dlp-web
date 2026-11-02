@@ -6,6 +6,15 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H CT108→NAS EXISTING SSH TRANSPORT PREFLIGHT PASS — 2026-11-02 KST
+
+USER-EXECUTED CT108 READ-ONLY SSH PREFLIGHT: On `root@downloader`, the existing key `/opt/missav-dlp-web/teddy-nas-transfer/id_ed25519` and known_hosts `/opt/missav-dlp-web/teddy-nas-transfer/known_hosts` were present, real/readable files (`SSH_FILES=PASS`), and the exact existing NAS IP `192.168.1.201` had an entry (`KNOWN_HOST=PASS`). Using explicit `ssikgun@192.168.1.201` (not unresolved `teddy_storage`) with `ssh -F /dev/null`, `IdentitiesOnly=yes`, pinned identity and known_hosts, `StrictHostKeyChecking=yes`, `BatchMode=yes` and one bounded connection succeeded. Remote Python output: `NAS_HOST=ssikgun_home; NAS_UID=1026; NAS_USER=ssikgun; TMP=PASS; OLD_STAGE=PASS; NEW_STAGE=ABSENT_PASS; TRANSFER_PREFLIGHT=PASS; NAS_WRITE=0; NFO_WRITE=0; SSH_EXIT=0`.
+
+CHECKPOINT RESULT: `P03H_CT108_NAS_SSH_TRANSPORT=PASS; VERIFIED_ACCOUNT_UID=1026; NEW_TARGET_ABSENT_AT_CHECK=YES; CT108_TO_NAS_CANDIDATE_COPY=NOT_RUN; NAS_STAGE_SHA3=NOT_RUN; NAS_DRYRUN=NOT_RUN; NAS_WRITE=0; NFO_WRITE=0`. The old stage `/tmp/p03h-admin83-stage-20261101-9c4097dc` remains present; the separate reserved new stage is `/tmp/p03h-admin83-backup-acl-stage-20261102-v1`. No SSH configuration, key, account or Synology ACL changes. The earlier CT108 three-file source SHA PASS is historical and must be rechecked on the copy checkpoint. This success resolves the prior alias failure by explicit IP; it does not prove File Station, NFO, backup privacy or candidate application.
+
+NEXT AUTHORIZED CHECKPOINT: On CT108 verify the exact frozen three source files again (type, one link, SHA256), verify NAS target absence anew via this pinned existing SSH transport, then create exactly one new NAS `/tmp/p03h-admin83-backup-acl-stage-20261102-v1` directory without overwrite and transfer only `admin83_runner.py`, `admin83_runner_smoke.py`, `RECOVERY.md` without file overwrite. Independently read back staged hashes/ownership/modes; stop and preserve partial state on any error. No old-stage changes, private-backup-root mutation, Apply, backup write, NFO edit or Dry-run in this checkpoint. Once staging SHA3 passes, record outcome immediately before separately running the already-approved no-Apply index1 dry-run.
+
+
 ## P03-H CT108 SSH ALIAS RESOLUTION FAILURE — 2026-11-02
 
 USER-EXECUTED CT108 READ-ONLY RESULT: On `root@downloader`, `ssh -G teddy_storage` reported `user root`, `hostname teddy_storage`, `port 22`; the `ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=8 -o ConnectionAttempts=1 -T teddy_storage "python3 -B -"` invocation failed before NAS Python could run with `ssh: Could not resolve hostname teddy_storage: Name or service not known` and `SSH_EXIT=255`. There is no evidence that NAS hostname, account or TCP SSH service itself failed; the SSH alias is unresolved on CT108 in this invocation. Neither `TRANSFER_PREFLIGHT=PASS` nor NAS UID/target readback was produced.
