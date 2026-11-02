@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## P03-H ADMIN83 PARENT/WORKER IPC OFFLINE CANDIDATE — 2026-11-02 KST
+
+SOURCE: Verified CT108 frozen runner SHA-256 `4f3a6867d4a86ece3ab32cc8c2b134d2113ef21fd384110cf9c6a81feeb2a7ef`; unchanged. Isolated candidate `/tmp/p03h-admin83-ipc-offline-20261102-APzCgpb6`: worker SHA-256 `6c479f4100c654a4b2577b5c19f38d8bf499e10b2b5f258403ab99adb2e937e8`; owner SHA-256 `d8a55d09aaedf0366262de228121b59902705ec5f88b85f53d951f78fb3e3ea5`; worker diff `f1a6a2951e15def5405b8a658085aa4e0c1ac72d2a1b104bb5fd6575f0b6495c`.
+
+OFFLINE RESULT: 19 synthetic IPC tests PASS/0 FAIL and one backup regression script PASS/0 FAIL. The ordinary UID1026 parent performs denial probes and responds over bounded sequenced standard-stream frames; no assumption of extra sudo-passed descriptors. Worker rechecks backup object identity and ACL following each probe; existing NFO title-only, fixed roster, backup/hash and manual recovery remain. Synthetic ACL and credential mocks do not establish actual NAS behavior. Files remain scratch only.
+
+CONFIRM_NEEDED: Real DSM sudo standard-stream transport, separate account identity, permissions/ACL checks for every backup component, and failure behavior. Cooperative locks cannot exclude unrelated writers, and in-place edits remain non-atomic under power loss. An owner/worker IPC outage during an already-started in-place write cannot provide atomic cancellation; do not claim otherwise. NAS staging, actual dry-run and any BLOR-289 Apply retry require separately scoped authorization. No NAS/NFO/DB/Jellyfin or Git product writes in this offline step.
+
 ## P03-H BLOR-289 OFFLINE IPC CANDIDATE IMPLEMENTATION & SYNTHETIC TESTS APPROVED — 2026-11-02 KST
 
 USER APPROVAL (2026-11-02 KST): After the Codex *read-only* design review, assistant explicitly proposed a **CT108-only isolated offline implementation and synthetic testing** of the minimally changed ssikgun-parent/admin-worker access-denial protocol. User directly replied `승인해`. This approval is scoped to existing `stage9-media / STG9MEDIA-001 / IN_PROGRESS`, common contract v1.0.1, Stage9 contract v1.0.0, canonical GitHub branch `teddy-subtitle-stage11`. This approval is NOT deployment, NFO Apply, or GitHub product-code commit approval.
