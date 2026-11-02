@@ -6,6 +6,20 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H ADMIN PRIVATE BACKUP ROOT SINGLE HARMLESS CHILD ACL CHECK APPROVED — 2026-11-02 KST
+
+USER_APPROVAL: After verified real NAS ACL isolation PASS and GitHub Project Governance CI recovery PASS, user replied `응 다음 작업` to the immediately described single harmless child test inside the same Stage9 private backup root. Active workstream is `stage9-media` / `STG9MEDIA-001` under approved Stage9 contract 1.0.0, common contract 1.0.1; `teddy-subtitle-stage11` remains canonical. This is approval for one child only, not operational backup or code deployment.
+
+EXACT PARENT: Already-created `/volume1/video/video2/downloads/backups/stage9-admin-private`; last user NAS evidence: real directory owner admin UID1024/GID100; sole explicit Synology ACE `user:admin:allow:rwxpdDaARWcCo:fd--` (level0), archive `has_ACL,is_support_ACL`; non-sudo `ssikgun` directory open DENIED, admin open ALLOWED. This ordinary-context ACL isolation does not defend against `ssikgun` invoking sudo. Fresh checks of identity, ACL, expected owner, emptiness and symlink-free ancestors are mandatory.
+
+EXACT SINGLE FILE: `/volume1/video/video2/downloads/backups/stage9-admin-private/.p03h-admin-private-file-probe-20261102.txt` with only harmless fixed ASCII marker `STAGE9_ACL_PROBE_20261102\\n` (one trailing newline). Owner is `admin` EUID1024. Only authorized write: `open(O_CREAT|O_EXCL|O_WRONLY|O_NOFOLLOW, mode=0600)` and write/fsync this fixed marker once, under a verified parent fd; do not overwrite, truncate or retry if file already exists, and do not modify parent ACL or any other NAS object. Retain this test file after inspection; do not clean up or automatically restore any partial work.
+
+READ-ONLY VERIFICATION: `lstat` regular file UID1024/GID100, size/content SHA256, `synoacltool -get/-get-archive` showing only admin ACE inherited from private parent; `-get-perm` ordinary ssikgun and admin may be reported but a query error is **not** a permission-denial PASS. Independently test ordinary `ssikgun` O_RDONLY and O_WRONLY descriptor opens (no writes) are denied, and admin read and write-descriptor opens succeed (no extra bytes written). The parent's deny blocks traversal, so a child path denial alone is not proof of independently denying access with parent traversal bypassed. If any preflight/validation differs, stop and report; once created, never rerun creation. Existing full parent ACL modification is already complete and must not be reapplied.
+
+PROHIBITED: Any real backup bytes, changes to existing `/backups/stage9/p03h-admin83-9nhqs7od`, `AKDL-312` or other 82 NFOs, `--apply`, Stage9 candidate runner installation/execution, any ancestor or private-root ACL mutation, recursive operations, DB/Jellyfin/Docker/timers/services, other workstreams or unrelated file creation. ACL file test success is **only** bounded child inheritance PASS, not operational backup privacy PASS.
+
+NEXT: Run the narrowly scoped NAS one-file test with real console log; report file self ACL/read/write-open evidence and no production changes; immediately checkpoint results to this Stage9 ACTIVE_WORK and `CURRENT_HANDOFF.md` and check GitHub Actions governance CI remains PASS.
+
 ## P03-H Stage9 governance CI metadata duplicate-field repair — 2026-11-02 KST
 
 User asked to investigate/fix repeated GitHub Project Governance failure emails. Gmail notifications and real Actions job 125047337556 (run 41373025661, commit 78d80ca) showed three errors: Stage9 ACTIVE_WORK must contain exactly one nonempty WORKSTREAM, TASK_ID, STATUS field. Read-only inspection of `scripts/check_project_governance.py` confirmed anchored, document-wide exact field extraction. Prior to fix, Stage9 document had 4 WORKSTREAM, 2 TASK_ID and 11 STATUS lines, mixing one canonical header per key with historical per-checkpoint labels.
