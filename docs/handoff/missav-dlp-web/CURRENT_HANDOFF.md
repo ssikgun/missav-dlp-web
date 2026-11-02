@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-02 — Stage9 new backup root created; effective ACL isolation FAIL
+
+User NAS execution: new empty /volume1/video/video2/downloads/backups/stage9-admin-private was created once as admin UID1024 GID100; CREATE_RESULT=COMPLETE; Synology reports mode 0777 and inherited ACL with six allow entries. Effective ssikgun rwx rights confirmed by synoacltool; ordinary ssikgun directory open ALLOWED, admin open ALLOWED. Backup root is NOT PRIVATE and must not be used. ACL_CHANGE=0, BACKUP_WRITE=0, NFO_WRITE=0. Preserve directory, do not re-run mkdir or touch real existing backup. Further explicit approval needed for empty-directory ACL-only change. No child files, code deployment or remaining 82 NFO Apply authorized. Stage9 ACTIVE_WORK has result checkpoint.
+
 ## 2026-11-02 — Stage9 admin private root NAS read-only preflight PASS (creation still NOT_RUN)
 
 User-supplied Synology `ssikgun` SSH log verified exact bounded `/volume1/video/video2/downloads/backups` directory ancestry with `lstat`, `admin` UID1024/GID100 and `ssikgun` UID1026/GID100, destination `stage9-admin-private` absent, parent owner 1026:100, parent ACL `is_inherit,is_support_ACL` with broad inherited allows for `ssikgun`, administrators, stage9_media and read-only principals. `NAS_PREFLIGHT=PASS; NAS_WRITE=0; ACL_CHANGE=0`. This is a parent-identity/ACL readback, not proof of private child; `TARGET_CREATED=NOT_RUN`. Already-approved next step is one no-overwrite empty admin-owned folder creation after fresh preconditions, read-only ACL/effective-access inspection and STOP if inheritance permits ordinary users. Do not change ACLs, create child files/backups, install candidate, run any NFO Apply, or touch existing real backup. Stage9-only task `STG9MEDIA-001`; detailed evidence and scope in Stage9 ACTIVE_WORK.
