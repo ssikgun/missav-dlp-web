@@ -1,5 +1,11 @@
 # Stage9 Media workstream — active work
 
+## P03-H MFCS-085 NON-ROOT SYNOLOGY ACL READ SUCCESS, SUDO -n UNAVAILABLE — CANARY HELD (2026-11-02 KST)
+
+USER-EXECUTED CT108-to-NAS `ssh ssikgun@192.168.1.201 /usr/bin/python3 -B -` read-only comparison: `USER_EUID=1026`. Directory `FOLDER_USER_MODE=0o777 FOLDER_USER_UID_GID=1026:100 FOLDER_USER_INO=59050`; source `VIDEO_USER_MODE=0o777 VIDEO_USER_UID_GID=1026:100 VIDEO_USER_INO=59051`. The absolute binary `/usr/syno/bin/synoacltool` exists; nonroot `-get` succeeded for folder (`FOLDER_USER_ACL_RC=0; FOLDER_USER_ACL_SHA12=beae725da9a3`) and video (`VIDEO_USER_ACL_RC=0; VIDEO_USER_ACL_SHA12=964f973829eb`). Noninteractive root read `sudo -n /usr/bin/python3 -B -c` returned `SUDO_READONLY_RC=1;SUDO_READONLY=UNAVAILABLE`. User result `NAS_WRITE=0;NFO_CREATION=NOT_RUN`.
+
+Do not infer sudo privileges absent or ACL changed from difference with prior privileged read-only snapshot (`0700`, ACL hashes `fdda6a482a86` / `16add87b17e9`). The origin of mode/hash difference remains unverified; need inspect actual bounded folder/video ACL rule content under normal user to assess safety before publication; do not chmod, loosen ACL or write NFO. `MFCS_NAS_CANARY=NOT_RUN`; `TS_TWO_NFO=NOT_RUN`. Approved scope remains exactly three missing create-only NFOs gated by MFCS canary.
+
 ## P03-H MFCS-085 NON-ROOT NAS STAT INSPECTION PASS — MODE DIFFERENCE INVESTIGATION (2026-11-02 KST)
 
 USER-EXECUTED CT108-to-NAS SSH `ssikgun@192.168.1.201` non-root `/usr/bin/python3 -B -`, exact MFCS-085 folder/video read-only inspection: `HOST=ssikgun_home;EUID=1026;EGID=100`. Folder `UID=1026 GID=100 MODE=0o777 INO=59050 SIZE=54 MTIME_NS=1789916782086043045 SYMLINK=False`. Video `UID=1026 GID=100 MODE=0o777 INO=59051 SIZE=1467881427 MTIME_NS=1788865655288182673 SYMLINK=False`. `FOLDER_WRITE_ACCESS=True;EXPECTED_NFO_EXISTS=False;NFO_COUNT=0;SYNOACL_TOOL_FOUND=False;READONLY_INSPECTION=PASS;NAS_WRITE=0`. `SYNOACL_TOOL_FOUND=False` comes from unprivileged user PATH lookup and does not prove the tool does not exist.
