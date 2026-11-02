@@ -6,6 +6,16 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H ADMIN PRIVATE ROOT NAS PREFLIGHT READBACK — 2026-11-02 KST
+
+USER-EXECUTED NAS READ-ONLY EVIDENCE: In a Synology `ssikgun@ssikgun_home` SSH shell, initial `sudo -v` password prompts included two failures; a subsequent `sudo -v` completed normally. The provided Python 3 `-B` preflight output then returned `NAS_PREFLIGHT=PASS; NAS_WRITE=0; ACL_CHANGE=0`. Identity: `admin` UID1024/GID100 and `ssikgun` UID1026/GID100. All bounded components are real directories per `lstat` (not symlinks); `/volume1` owner 0:0 mode0755, `/volume1/video` owner 0:0 mode0777, `/volume1/video/video2` owner 1024:100 mode0777, `/volume1/video/video2/downloads` owner 1026:100 mode0777, `/volume1/video/video2/downloads/backups` owner 1026:100 mode0777.
+
+TARGET: Exact `/volume1/video/video2/downloads/backups/stage9-admin-private` returned `TARGET_EXISTS=NO`. Parent `/volume1/video/video2/downloads/backups` Synology `sudo -n synoacltool -get` returned exit 0, `ACL version: 1`, archive `is_inherit,is_support_ACL`, owner `ssikgun`, six inherited allow ACEs (level3): `user::rwx...`, `user:stage9_media:rwx...`, `user:media-readonly:r-x...`, `group:administrators:rwx...`, `user:ssikgun:rwx...`, `user:ai_agent:r-x...`. Parent ACL is demonstrably broadly inherited. Parent readback PASS does NOT establish child privacy.
+
+STATUS: `NAS_PREFLIGHT=PASS_READ_ONLY; TARGET_EXISTS=NO_AT_CHECK; NAS_WRITE=0; ACL_CHANGE=0; TARGET_CREATED=NOT_RUN; TARGET_EFFECTIVE_ACL=NOT_TESTED; NAS_CHILD_FILE_TEST=NOT_AUTHORIZED; EXISTING_BACKUP_PRIVACY=FAIL; OTHER_82_NFO_APPLY=NOT_AUTHORIZED`.
+
+NEXT (already authorized under the immediately preceding scope): one exact no-overwrite admin-owned *empty directory* creation only after fresh target absence/parent identity check, followed by inspection of actual ACL/owner/archive and independent non-sudo ordinary-user vs admin directory access. Do not modify ACL even if inherited access is broad. No child creation, backup writes, candidate execution or NFO Apply; on any uncertainty stop/preserve the created directory. Record result immediately in both canonical documents.
+
 ## P03-H STAGE9 ADMIN PRIVATE BACKUP ROOT CREATION AND ACL READ-ONLY CHECK APPROVED — 2026-11-02 KST
 
 USER_APPROVAL: After the verified offline backup-ACL candidate result, user replied `응 승인해` to the proposal to create **one** new administrator-only NAS backup-root directory and inspect its Synology ACL/access. This is a narrowly scoped Stage9 Media authorization, `STG9MEDIA-001 / IN_PROGRESS`, contract v1.0.0 and common contract v1.0.1, `REQUIRES_WORKSTREAMS: stage9-media`.
