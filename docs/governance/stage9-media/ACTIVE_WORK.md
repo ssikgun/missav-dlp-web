@@ -6,6 +6,18 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H ADMIN PRIVATE BACKUP ROOT ACL-ONLY ISOLATION APPROVED — 2026-11-02 KST
+
+USER_APPROVAL: Following creation of the new root with inherited ACL failure, user explicitly replied "응 승인해" to the proposed **ACL-only fix on that existing empty root**. Stage9 Media active `STG9MEDIA-001`, contract v1.0.0, common v1.0.1, canonical branch `teddy-subtitle-stage11`.
+
+EXACT MUTATION TARGET: Existing `/volume1/video/video2/downloads/backups/stage9-admin-private` only. Previously observed owner `admin` UID1024/GID100, empty upon creation (emptiness must be rechecked), mode displayed 0777, Synology archive `is_inherit,is_support_ACL`, six inherited allow entries including named `ssikgun`, `stage9_media`, `media-readonly`, `ai_agent`, `group:administrators`, and `user::`. Ordinary `ssikgun` could open it, hence `ACL_ISOLATION=FAIL` until fixed. Earlier NAS isolated probe proved the precise two-step DSM ACL sequence works on this NAS (2026-11-01), but has not been applied to this new root.
+
+AUTHORIZED ACTIONS: Read-only revalidate every target/parent component as a real directory (not symlink), stable parent identity and owner, target UID1024/GID100, exact target ACL/inheritance and empty directory, with independently available `sudo -n` permission. Then only two nonrecursive `synoacltool` changes at the exact root: (1) `-add TARGET "user:admin:allow:rwxpdDaARWcCo:fd--"`; check explicit level-0 admin entry is present before step 2; (2) `-del-archive TARGET is_inherit` only after step-1 readback. Immediately inspect `-get`, `-get-archive`, `-get-perm` and real ordinary non-sudo `ssikgun` directory open denial versus `admin` allowed. Expected resulting target: sole explicit admin ACE, archive `has_ACL,is_support_ACL`, no inherited six ACEs. Preserve on partial failure, stop without rerun/rollback. A DSM ACL tool success code without effective access denial is not PASS.
+
+NOT AUTHORIZED: Any mkdir, child file/backup creation, recursive ACL, chmod/chown, changes to ancestors/other stage9 test folder, any existing `p03h-admin83-9nhqs7od` backup or NFO, candidate runner deployment/execution, `--apply` or remaining 82 files, DB/Jellyfin/Docker/services/timers. Even successful ordinary `ssikgun` denial is not protection from its administrator/sudo privileges, and does not verify new-child ACL inheritance or backup privacy. Record the result immediately after user provides real NAS log; prior to that, `NAS_ACL_CHANGE=NOT_RUN`.
+
+NEXT_CHECKPOINT: User to run one guarded on-NAS two-operation ACL-only initialization and show complete readback. Determine `ROOT_ACL_ISOLATION=PASS/FAIL/INCOMPLETE` and update both Stage9 ACTIVE_WORK and CURRENT_HANDOFF with observed details.
+
 ## P03-H NAS BACKUP ROOT ACL RESULT — 2026-11-02 KST
 
 User NAS log: created exactly one empty /volume1/video/video2/downloads/backups/stage9-admin-private as admin UID1024 GID100. Actual Synology inherited ACL includes ssikgun access and 6 allow entries; mode 0777. Ordinary ssikgun open ALLOWED; admin open ALLOWED. CREATE=PASS, PRIVATE_ACL=FAIL. ACL_CHANGE=0, BACKUP_WRITE=0, NFO_WRITE=0. Do not re-create target or use for backup. Next ACL-only initialization on the empty folder needs explicit new approval. Existing backup and 82 NFOs preserved.
