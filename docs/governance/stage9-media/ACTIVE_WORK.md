@@ -1,5 +1,21 @@
 # Stage9 Media workstream — active work
 
+## P03-H BULK81 FIVE-BATCH ACTUAL APPLY PASS — 2026-11-02 KST
+
+ACTUAL USER-EXECUTED SYNOLOGY NAS LOG (attached terminal capture dated 2026-11-02): `ssikgun@ssikgun_home` launched one ordinary-user `/usr/bin/python3 -B -` coordinator using the frozen 188-row manifest SHA256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087` and pinned owner `admin83_owner.py` SHA256 `156f2913c8e06d0aedc8eac21a7932bc94a6878cb94b87d22673b47e0ab8e745`. Coordinator printed `FRESH_PREFLIGHT=PASS; READY=81` and independently verified already-prefixed AKDL-312 index0 and BLOR-289 index1 had not changed. Then ran exactly the approved five disjoint slices `(2,20),(22,20),(42,20),(62,20),(82,1)`, with per-slice owner/worker original preflight, private backup creation/complete and title-only NFO apply.
+
+BATCHES AND BACKUP RUNS (each printed `PREFLIGHT=<count>_PASS; BACKUP_CREATED=...; BACKUP_COMPLETE=...; <count> APPLIED=... SHA256=...; BATCH=PASS`, then the coordinator independently compared each current NFO bytes to exact expected original-plus-title-prefix and printed `BATCH_VERIFIED=PASS`):
+- Batch1 start2 count20 -> `/volume1/video/video2/downloads/backups/stage9-admin-private/p03h-admin83-wbxiuzy0`; cumulative 20.
+- Batch2 start22 count20 -> `/volume1/video/video2/downloads/backups/stage9-admin-private/p03h-admin83-8qi3cltb`; cumulative 40.
+- Batch3 start42 count20 -> `/volume1/video/video2/downloads/backups/stage9-admin-private/p03h-admin83-kkqbhin5`; cumulative 60.
+- Batch4 start62 count20 -> `/volume1/video/video2/downloads/backups/stage9-admin-private/p03h-admin83-0fn1qjof`; cumulative 80.
+- Batch5 start82 count1, `VEC-737` -> `/volume1/video/video2/downloads/backups/stage9-admin-private/p03h-admin83-t0c5v3ta`; cumulative 81.
+
+COMPLETION MARKERS: `BATCH_VERIFIED=PASS; COMPLETED=81`, `BULK81_FINAL=PASS`, `VERIFIED_COMPLETED=81`, `BATCHES_ATTEMPTED=5`, `AUTO_RETRY=NO`, `PRESERVE_ALL_BACKUPS=YES`. Attached output has 81 distinct `APPLIED=` title IDs, exactly five `BATCH=PASS`, five `BACKUP_COMPLETE=`, and no STOP. Thus **81/81 title-only in-place modifications and immediate byte-for-byte after-check PASS**, with no visible runtime failure. Original 83-target cohort: previously prefixed AKDL-312 + previously applied BLOR-289 + 81 newly applied = **83/83 desired title-prefix state**, as supported by this run's preflight and immediate checks. This is not a claim that Stage9 entire product/service is complete.
+
+STILL TO VERIFY INDEPENDENTLY: The backup runs' `original.nfo`, `original_acl.txt`, `receipt.json` for all 81 titles need read-only hash, receipt content and private access/ACL audit after execution, independent of the owner/worker success markers. Do NOT delete/recreate any run, re-Apply any of the 83, or change remaining 105 frozen-manifest entries, video, poster, DB, Jellyfin or services. Next checkpoint is one bounded read-only 81-file current-vs-original-backup/receipt verification; on PASS, record final closure in this active-work and canonical handoff. The user requires frequent canonical progress checkpoints because a chat may hit its length limit unexpectedly.
+
+
 ## P03-H BULK81 MAX20 SOURCE GUARD AND NO-WRITE POSTCHECK — 2026-11-02 KST
 
 USER-EXECUTED SYNOLOGY NAS READ-ONLY RESULT: `sudo -n /usr/bin/python3 -B -` verified the two pinned owner/worker source SHA256 values `156f2913c8e06d0aedc8eac21a7932bc94a6878cb94b87d22673b47e0ab8e745` and `5937b6d7882a07177946c99a0ffd69633fa006007a7e458c3e23feb79b5156cf`. The exact `BATCH_INVALID` guard is in BOTH worker() line327 and owner main line391: `0<=start<83 and 1<=count<=20 and start+count<=83`. Thus the previous `--start 2 --count 81` error was the designed batch-size rejection and occurred at the owner-side guard before `run_owner`. The same read-only postcheck of frozen cohort `129` rows indices 2..82 found `ORIGINAL_UNCHANGED=81; CHANGED_COUNT=0`; bounded private-backup-root listing found only the previously verified `p03h-admin83-z9uf3lig` run; `READ_ONLY_DIAGNOSIS=COMPLETE; NAS_WRITE=0; APPLY_RETRY=NO`. This confirms no NFO changes across the 81 and no additional matching backup-run directory observed after rejected attempt. Do not classify failed batch as an Apply or perform a blind retry.
