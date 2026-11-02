@@ -1,5 +1,27 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## P03-H BLOR-289 APPROVED ONE-ITEM APPLY STOPPED BY BACKUP ORDINARY-DENIAL CHECK — 2026-11-02 KST
+
+USER EXECUTION: From actual Synology `ssikgun@ssikgun_home`, user invoked one user-approved guarded operation for index1 `BLOR-289` after `sudo -v`. The outer Python gate verified approved owner UID1026 mode0700/0600 code SHA256 `d6dedc701d33bb8a02347fb88227c287af7ad50f517d6cb6a4c6a674c0c07379`, admin code SHA256 `4f3a6867d4a86ece3ab32cc8c2b134d2113ef21fd384110cf9c6a81feeb2a7ef` via `sudo -n -u admin`, frozen 188-row manifest SHA256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`, selected sorted cohort index1 ID BLOR-289, original single-link UID1024/mode0644 `/volume1/video/video2/JAV/BLOR/BLOR-289/movie.nfo` SHA256 `420688b64fa7579295eb28bbf6fa49fd11a6501887ff6813ed69142700b92522` and non-prefixed title. Existing `/volume1/video/video2/downloads/backups/stage9-admin-private` was UID1024 private, ordinary ssikgun open denied, with one exact admin-only ACL and no inherited archive. Outer gate printed `BLOR289_APPLY_PREFLIGHT=PASS` then invoked one-time `/bin/python3 -B <new owner runner> --start 1 --count 1 --apply --confirm P03H-ADMIN83`.
+
+EXACT USER STDOUT:
+```text
+BLOR289_APPLY_PREFLIGHT=PASS
+===== ONE-TIME BLOR-289 APPLY =====
+PREFLIGHT=1_PASS; IDS=BLOR-289
+STOP=ValueError:BACKUP_ORDINARY_USER_DENIAL_UNVERIFIED; BACKUP=NONE
+APPLY_EXIT=1
+APPLY_COMMAND=STOPPED
+NO_AUTOMATIC_RETRY=YES
+NO_AUTOMATIC_RECOVERY=YES
+```
+
+INTERPRETATION: `APPLY=STOPPED` / `PASS=NO`. The staged source readback had established `worker` calls `backup(items)` after preflight and `backup()` begins `verify_private(BACKUPS,root=True)` **before** `tempfile.mkdtemp` and any NFO mutation. `verify_private()` runs a `sudo -n -u ssikgun` subordinate access-denial probe from effective `admin` and requires return code42 and exactly empty stdout/stderr; `BACKUP_ORDINARY_USER_DENIAL_UNVERIFIED` means the nested probe failed that exact check. Likely explanations include the admin→ssikgun sudo authorization boundary or unexpected probe output; **cause CONFIRM_NEEDED**, not proof the root is exposed. No `BACKUP_CREATED`, `BACKUP_COMPLETE`, `APPLIED=` or `BATCH=PASS` messages were printed, and `BACKUP=NONE`: based on known static call sequence this is consistent with stopping before creating a backup run directory or writing the NFO, but independent post-error NFO/backup readback has NOT yet occurred. Do not report product Apply PASS or assert post-Apply bytewise identity without readback.
+
+CHECKPOINT: `BLOR289_APPLY_ATTEMPTED_ONCE=YES; BLOR289_APPLY_PREFLIGHT=PASS; WORKER_PREFLIGHT=1_PASS; RESULT=BLOCKED_BACKUP_ORDINARY_USER_DENIAL_UNVERIFIED; APPLY_EXIT=1; BACKUP_REPORTED=NONE; BACKUP_CREATED_MARKER=ABSENT; APPLIED_MARKER=ABSENT; NFO_POSTCHECK=NOT_RUN; BACKUP_POSTCHECK=NOT_RUN; OTHER_81_APPLY=NOT_AUTHORIZED; NO_RETRY=YES; NO_AUTOMATIC_RECOVERY=YES`.
+
+NEXT SINGLE CHECKPOINT: Read-only bounded NAS diagnosis. First verify current BLOR-289 NFO remains exact before-SHA, and inspect existing private backup root for possible new p03h-admin83 run directory without touching contents. Then, from the `admin` identity, reproduce ONLY the nonmutating `sudo -n -u ssikgun` ordinary-user root-open probe, capturing returncode/empty stdout/stderr and sanitized failure reason. Direct ordinary `ssikgun` opening the root already returned PermissionError but the code's *nested sudo probe* may not have been authorized. No runner execution, no `--apply`, no restart, no manual backup creation, no sudoers/ACL/chmod/chown changes and no automatic retry. If nested probe cannot execute, review minimal safe alternative separately with explicit user approval and frozen source. **Approval for exactly BLOR-289 remains recorded, but this failed attempt is not permission to try Apply again without a separate bounded go/no-go decision.** Preserve all old/new stages and original backups.
+
 ## P03-H BLOR-289 DUAL-UID NAS RUNNER SOURCE REVIEW PASS (PRE-APPLY) — 2026-11-02 KST
 
 USER-EXECUTED NAS SOURCE REVIEW: The user provided complete NAS shell stdout from a read-only root-privileged `/usr/bin/python3 -B -` verification under `sudo -v`, on the actual NAS. The verifier used lstat UID/mode/regular/nlink checks, SHA256 on both frozen files (owner `/tmp/p03h-admin83-dualuid-owner-20261102-v1/admin83_runner.py` owner UID1026 SHA256 `d6dedc701d33bb8a02347fb88227c287af7ad50f517d6cb6a4c6a674c0c07379`; admin `/tmp/p03h-admin83-dualuid-admin-20261102-v1/admin83_runner.py` UID1024 SHA256 `4f3a6867d4a86ece3ab32cc8c2b134d2113ef21fd384110cf9c6a81feeb2a7ef`), AST parse, and exact byte-equivalence of the owner source to admin source after ONLY the single intended `str(Path(__file__).resolve())` worker script-path replacement. Stdout: `DUALUID_SOURCE_IDENTITY=PASS; OWNER_PATCH_EXACT=PASS; TOTAL_LINES=258; SELECTED_LINES=131; SOURCE_REVIEW=COMPLETE; RUNNER_EXECUTED=NO; NFO_APPLY=NOT_RUN; BACKUP_CREATED=NO`.
