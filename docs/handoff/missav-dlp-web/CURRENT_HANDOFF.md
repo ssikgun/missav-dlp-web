@@ -1,5 +1,26 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## P03-H NAS OWNER CODE-OPEN / CHILD TOKENIZE CHECK PASS — 2026-11-02 KST
+
+USER-EXECUTED NAS READ-ONLY PREFLIGHT: On the actual Synology ordinary shell `ssikgun@ssikgun_home`, user checked only `/tmp/p03h-admin83-dualuid-owner-20261102-v1/admin83_runner.py`, with expected frozen owner SHA256 `d6dedc701d33bb8a02347fb88227c287af7ad50f517d6cb6a4c6a674c0c07379`. Python `-B -` asserted current UID 1026, real owner UID1026 directory mode0700, real single-link owner UID1026 code file mode0600; `io.open_code` succeeded and SHA256 matched; separate child `/bin/python3 -B -m tokenize` on this exact code file returned 0. Actual stdout:
+
+```text
+OWNER_CODE_OPEN=PASS
+OWNER_CODE_SHA=PASS
+CHILD_TOKENIZE_EXIT=0
+CHILD_CODE_READ=PASS
+RUNNER_EXECUTED=NO
+NFO_WRITE=0
+NO_AUTOMATIC_RETRY=YES
+```
+
+INTERPRETATION: Exact NEW owner code is readable to Python, and a separate child interpreter can open/tokenize that path. This is a nonexecuting preflight; it did not import/execute `admin83_runner.py`, run the NFO dry-run, generate a real backup, modify NFO/ACL/permissions, or trigger Apply. It does NOT prove the historical direct `/bin/python3 -B SCRIPT` EACCES has been resolved, nor establish the cause of that historical error. The previous reciprocal real NAS account-isolation check remains PASS. Preserve original/dual-UID stage files and private backup boundary.
+
+CHECKPOINT: `OWNER_PREFLIGHT=PASS; OWNER_CODE_OPEN=PASS; OWNER_CODE_SHA=PASS; CHILD_TOKENIZE_EXIT=0; CHILD_CODE_READ=PASS; RUNNER_EXECUTED=NO; NAS_INDEX1_DRYRUN=NOT_RUN; EARLIER_DIRECT_OWNER_SCRIPT_EACCES_CAUSE=CONFIRM_NEEDED; NFO_WRITE=0; REAL_BACKUP_CREATED=NO_BY_THIS_CHECK; APPLY=NOT_AUTHORIZED`.
+
+NEXT SINGLE APPROVED STEP: Having passed the separate nonexecuting owner-code check and earlier dual-identity stage/access verification, a **one-time, bounded, existing-authorized index1 no-Apply Dry-run** (`--start 1 --count 1`) may be attempted using exactly the pinned new owner runner and existing NAS credentials, with a fresh SHA, UID/mode/manifest guard, and no automatic retry if the earlier interpreter-launch EACCES recurs. Confirm `PREFLIGHT=1_PASS` and `DRY_RUN=PASS; BACKUP_CREATED=NO` only from actual runner stdout; otherwise report BLOCKED and preserve all evidence. Do NOT invoke `--apply`/other indices, change code/modes/ACL, or modify NAS NFO, actual backup, DB, Jellyfin or service state. Technical checkpoint PASS is not an NFO product Apply authorization.
+
+
 ## P03-H NAS PRIVATE DUAL-UID RECIPROCAL ACCESS VERIFIED — 2026-11-02 KST
 
 USER-EXECUTED CT108→NAS READ-ONLY VERIFICATION: At `root@downloader`, user SHA-checked existing `/tmp/p03h-admin83-dualuid-offline-20261102-v1/verify_dualuid.py` against pinned SHA256 `fb76aa0ce9f828ca721320db2c74fd6591463e9bca2d86f8132096235ba8d7ef`, requiring a regular one-link file and the existing SSH key/known_hosts with pinned host match. User invoked its code exactly once through the pinned `ssh -F /dev/null -i ... -o StrictHostKeyChecking=yes -o BatchMode=yes -tt ssikgun@192.168.1.201` route after `sudo -v`. The terminal's pasted-code echo showed corruption, but process stdout unambiguously reported:
