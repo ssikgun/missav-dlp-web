@@ -1,5 +1,25 @@
 # Stage9 Media workstream — active work
 
+## P03-H NAS PRIVATE DUAL-UID RECIPROCAL ACCESS VERIFIED — 2026-11-02 KST
+
+USER-EXECUTED CT108→NAS READ-ONLY VERIFICATION: At `root@downloader`, user SHA-checked existing `/tmp/p03h-admin83-dualuid-offline-20261102-v1/verify_dualuid.py` against pinned SHA256 `fb76aa0ce9f828ca721320db2c74fd6591463e9bca2d86f8132096235ba8d7ef`, requiring a regular one-link file and the existing SSH key/known_hosts with pinned host match. User invoked its code exactly once through the pinned `ssh -F /dev/null -i ... -o StrictHostKeyChecking=yes -o BatchMode=yes -tt ssikgun@192.168.1.201` route after `sudo -v`. The terminal's pasted-code echo showed corruption, but process stdout unambiguously reported:
+
+```text
+CT108_VERIFIER=PASS
+ADMIN_OWN_READ=PASS; OWNER_READ_DENIED=PASS
+OWNER_OWN_READ=PASS; ADMIN_READ_DENIED=PASS; READ_ONLY=YES; RUNNERS_EXECUTED=NO
+VERIFY_SSH_EXIT=0
+VERIFY_COMMAND=COMPLETED
+NO_AUTOMATIC_RETRY=YES
+```
+
+RESULT: Reciprocal actual account read-isolation on the newly created private NAS owner/admin staging files is PASS. The pinned verifier finished successfully, not an NFO dry-run or publication; no runner was executed, and this verification step did not write NAS metadata, original NFOs, backups, or operational data. The verifier's stdout does not separately print full inode/mode/hash listing, so retain its verified tool identity and raw output as the evidence; do not claim a separate independent filesystem listing was supplied. The newly staged source and older frozen stages must remain intact. The earlier unrelated *direct owner Python script-launch* EACCES remains `ROOT_CAUSE=CONFIRM_NEEDED`; successful read access alone does NOT demonstrate a runnable owner script or authorize a blind dry-run retry.
+
+CHECKPOINT: `P03H_DUALUID_STAGING=PASS_REPORTED; VERIFY_DUALUID_TOOL_SHA=PASS; NAS_RECIPROCAL_ACCESS=PASS; OWNER_OWN_READ=PASS; ADMIN_OWN_READ=PASS; CROSS_ACCOUNT_DENIAL=PASS; READ_ONLY=YES; RUNNERS_EXECUTED=NO; VERIFY_SSH_EXIT=0; NAS_INDEX1_DRYRUN=NOT_RUN; ORIGINAL_OWNER_DIRECT_LAUNCH_EACCES=UNRESOLVED; NFO_APPLY=NOT_AUTHORIZED`.
+
+NEXT ONE CHECKPOINT: Before invoking any stage9 runner, perform a minimal bounded read-only investigation of the earlier direct owner `python3 -B /tmp/.../admin83_runner.py` EACCES using exact current new owner path, effective identity, interpreter/path access diagnostics **without executing runner code** or changing modes, ownership, NAS ACL, files, NFO, backups, or services. Distinguish a diagnostic PASS from proving direct script launch works. If the reason remains uncertain, stop and report CONFIRM_NEEDED; do not improvise stdin/exec bypass or re-run the prior failed dry-run. Once this separate execution-preflight is resolved and recorded, the existing authorization allows only an individually reviewed index1 one-item no-Apply Dry-run. Do not apply other 82 titles.
+
+
 ## P03-H NAS PRIVATE DUAL-UID ONE-TIME STAGING SUCCESS — 2026-11-02 KST
 
 USER-EXECUTED CT108→NAS STAGING: User ran the one-time Python3 -B staging wrapper at root@downloader, verifying the frozen /tmp/p03h-admin83-dualuid-offline-20261102-v1/stage_dualuid.py SHA256 9e39bdc790c7453fdf5167bfeae066f648106cacc884b7f3e535463a88614de2, secure existing CT108 SSH key and pinned known_hosts, and one strict-host-checked ssh -tt session as ssikgun@192.168.1.201 after the earlier read-only target-absence/source preflight PASS. The terminal echo of pasted source was visibly garbled, but execution produced unambiguous stdout:
