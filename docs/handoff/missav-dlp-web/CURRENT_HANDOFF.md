@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-02 STAGE9 ACTUAL NAS DRYRUN PASS
+
+Actual Synology `ssikgun@ssikgun_home` one-time BLOR-289 index1 no-Apply owner-worker run with pinned SHA completed: `OWNER_VERIFICATION=PASS; APPLY_ARGUMENT=ABSENT; PREFLIGHT=1_PASS; IDS=BLOR-289; DRY_RUN=PASS; BACKUP_CREATED=NO; RUNNER_EXIT_CODE=0; REAL_NAS_DRYRUN=PASS; PRIVACY_PROBE=NOT_TESTED; NFO_APPLY=NOT_RUN; AUTO_RETRY=NO`. This validates real process/IPC and NFO read-only preflight, not privacy probe or Apply. No new backup was reported by runner; separate filesystem audit was not done. The user-approved read-only investigation remains open; next minimum checkpoint is actual ordinary UID1026 backup-denial IPC observation if safe without Apply. Actual BLOR-289 Apply/retry is NOT approved. See Stage9 ACTIVE_WORK for scope and source identities.
+
 ## 2026-11-02 P03-H NAS NO-APPLY PREPARE REVIEW
 
 Actual NAS source SHA review PASS. Worker `apply=False` returns after prepare() before any backup() or apply_one(). prepare() opens the NFO O_RDWR without content write, temporarily locks it, reads and validates identity, source bytes, metadata and ACL. The no-Apply branch does NOT trigger the ordinary-user backup access-denial probe; therefore future dry-run PASS cannot prove backup privacy behavior. User already approved one NAS no-Apply run, no Apply. Next: execute one index1 no-Apply run with pinned Owner source, stop on failure. Stage9 ACTIVE_WORK holds detailed checkpoint.
