@@ -6,6 +6,10 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H NAS BACKUP ROOT ACL RESULT — 2026-11-02 KST
+
+User NAS log: created exactly one empty /volume1/video/video2/downloads/backups/stage9-admin-private as admin UID1024 GID100. Actual Synology inherited ACL includes ssikgun access and 6 allow entries; mode 0777. Ordinary ssikgun open ALLOWED; admin open ALLOWED. CREATE=PASS, PRIVATE_ACL=FAIL. ACL_CHANGE=0, BACKUP_WRITE=0, NFO_WRITE=0. Do not re-create target or use for backup. Next ACL-only initialization on the empty folder needs explicit new approval. Existing backup and 82 NFOs preserved.
+
 ## P03-H ADMIN PRIVATE ROOT NAS PREFLIGHT READBACK — 2026-11-02 KST
 
 USER-EXECUTED NAS READ-ONLY EVIDENCE: In a Synology `ssikgun@ssikgun_home` SSH shell, initial `sudo -v` password prompts included two failures; a subsequent `sudo -v` completed normally. The provided Python 3 `-B` preflight output then returned `NAS_PREFLIGHT=PASS; NAS_WRITE=0; ACL_CHANGE=0`. Identity: `admin` UID1024/GID100 and `ssikgun` UID1026/GID100. All bounded components are real directories per `lstat` (not symlinks); `/volume1` owner 0:0 mode0755, `/volume1/video` owner 0:0 mode0777, `/volume1/video/video2` owner 1024:100 mode0777, `/volume1/video/video2/downloads` owner 1026:100 mode0777, `/volume1/video/video2/downloads/backups` owner 1026:100 mode0777.
