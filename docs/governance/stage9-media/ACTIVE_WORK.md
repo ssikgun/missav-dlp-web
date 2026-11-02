@@ -6,6 +6,12 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H Stage9 governance CI metadata duplicate-field repair — 2026-11-02 KST
+
+User asked to investigate/fix repeated GitHub Project Governance failure emails. Gmail notifications and real Actions job 125047337556 (run 41373025661, commit 78d80ca) showed three errors: Stage9 ACTIVE_WORK must contain exactly one nonempty WORKSTREAM, TASK_ID, STATUS field. Read-only inspection of `scripts/check_project_governance.py` confirmed anchored, document-wide exact field extraction. Prior to fix, Stage9 document had 4 WORKSTREAM, 2 TASK_ID and 11 STATUS lines, mixing one canonical header per key with historical per-checkpoint labels.
+
+ONLY this Stage9-owned ACTIVE_WORK narrative was updated: all non-header exact-key lines were relabeled `WORKSTREAM_CONTEXT`, `HISTORICAL_TASK_ID`, or `CHECKPOINT_STATUS` while preserving their right-hand values verbatim. One canonical header set remains `WORKSTREAM: stage9-media`, `TASK_ID: STG9MEDIA-001`, `STATUS: IN_PROGRESS`, `CONTRACT_VERSION: 1.0.0`, `REQUIRES_WORKSTREAMS: stage9-media`. No governance validator, routing registry, contract, product code, NAS or Gmail settings changed. This is structural Stage9 record repair, not a policy relaxation. The before/after counts were verified locally against the exact regex; real GitHub Actions PASS must be checked separately after this commit.
+
 ## P03-H NAS PRIVATE BACKUP ROOT ACL-ONLY ISOLATION RESULT — 2026-11-02 KST
 
 USER NAS STDOUT: Explicitly authorized ACL-only action on the preexisting empty `/volume1/video/video2/downloads/backups/stage9-admin-private` ran once as ordinary `ssikgun` with noninteractive `sudo` ACL calls. `PREFLIGHT=PASS`, `ADMIN_ACE_ADD_ATTEMPTED=YES`, `ADMIN_ACE_READBACK=PASS`, `INHERITANCE_REMOVE_ATTEMPTED=YES`; final `synoacltool -get`: `Archive: has_ACL,is_support_ACL; Owner: admin(user)`, sole `[0] user:admin:allow:rwxpdDaARWcCo:fd-- (level:0)`, no six inherited allows. `ROOT_ACL_STRUCTURE=PASS`. `-get-perm ssikgun` exit0 showed `[----d--------]`; `-get-perm admin` exit0 showed `[rwxpdDaARWcCo]`. Actual non-sudo `SSIKGUN_OPEN=DENIED`; `ADMIN_OPEN=ALLOWED`, `ROOT_ACL_ISOLATION=PASS_ORDINARY_CONTEXT`. User log states `CHILD_WRITE=0; BACKUP_WRITE=0; NFO_WRITE=0; EXISTING_BACKUP_CHANGE=0`. The new root is retained. `ssikgun` still has administrator/sudo privileges: this is ordinary-session ACL separation only, not a hard sudo-proof boundary.
@@ -36,7 +42,7 @@ USER-EXECUTED NAS READ-ONLY EVIDENCE: In a Synology `ssikgun@ssikgun_home` SSH s
 
 TARGET: Exact `/volume1/video/video2/downloads/backups/stage9-admin-private` returned `TARGET_EXISTS=NO`. Parent `/volume1/video/video2/downloads/backups` Synology `sudo -n synoacltool -get` returned exit 0, `ACL version: 1`, archive `is_inherit,is_support_ACL`, owner `ssikgun`, six inherited allow ACEs (level3): `user::rwx...`, `user:stage9_media:rwx...`, `user:media-readonly:r-x...`, `group:administrators:rwx...`, `user:ssikgun:rwx...`, `user:ai_agent:r-x...`. Parent ACL is demonstrably broadly inherited. Parent readback PASS does NOT establish child privacy.
 
-STATUS: `NAS_PREFLIGHT=PASS_READ_ONLY; TARGET_EXISTS=NO_AT_CHECK; NAS_WRITE=0; ACL_CHANGE=0; TARGET_CREATED=NOT_RUN; TARGET_EFFECTIVE_ACL=NOT_TESTED; NAS_CHILD_FILE_TEST=NOT_AUTHORIZED; EXISTING_BACKUP_PRIVACY=FAIL; OTHER_82_NFO_APPLY=NOT_AUTHORIZED`.
+CHECKPOINT_STATUS: `NAS_PREFLIGHT=PASS_READ_ONLY; TARGET_EXISTS=NO_AT_CHECK; NAS_WRITE=0; ACL_CHANGE=0; TARGET_CREATED=NOT_RUN; TARGET_EFFECTIVE_ACL=NOT_TESTED; NAS_CHILD_FILE_TEST=NOT_AUTHORIZED; EXISTING_BACKUP_PRIVACY=FAIL; OTHER_82_NFO_APPLY=NOT_AUTHORIZED`.
 
 NEXT (already authorized under the immediately preceding scope): one exact no-overwrite admin-owned *empty directory* creation only after fresh target absence/parent identity check, followed by inspection of actual ACL/owner/archive and independent non-sudo ordinary-user vs admin directory access. Do not modify ACL even if inherited access is broad. No child creation, backup writes, candidate execution or NFO Apply; on any uncertainty stop/preserve the created directory. Record result immediately in both canonical documents.
 
@@ -52,7 +58,7 @@ PROHIBITED: `synoacltool -add`, `-del-archive`, `-replace`, `-del` or other ACL/
 
 ACCEPTANCE FOR THIS CHECKPOINT: `PARENT_AND_TARGET_PREFLIGHT` verified before creation; actual `TARGET_CREATED` and path identity recorded; requested 0700 versus actual ACL analyzed; actual admin allowed and ordinary `ssikgun` denied or clearly report failure/unknown. Newly created child ACL inheritance, runner integration and operational backup confidentiality are NOT tested/approved. If ACL isolation fails, next ask for separately scoped **new-empty-folder-only ACL initialization**, not automatic remediation.
 
-STATUS: `USER_APPROVAL=YES; NAS_PREFLIGHT=NOT_RUN; TARGET_CREATED=NOT_RUN; TARGET_ACL_CHECK=NOT_RUN; NAS_CHILD_FILE_TEST=NOT_AUTHORIZED; OFFLINE_CANDIDATE_DEPLOYMENT=NOT_AUTHORIZED; REAL_BACKUP_PRIVACY=FAIL; OTHER_82_NFO_APPLY=NOT_AUTHORIZED`.
+CHECKPOINT_STATUS: `USER_APPROVAL=YES; NAS_PREFLIGHT=NOT_RUN; TARGET_CREATED=NOT_RUN; TARGET_ACL_CHECK=NOT_RUN; NAS_CHILD_FILE_TEST=NOT_AUTHORIZED; OFFLINE_CANDIDATE_DEPLOYMENT=NOT_AUTHORIZED; REAL_BACKUP_PRIVACY=FAIL; OTHER_82_NFO_APPLY=NOT_AUTHORIZED`.
 
 ## P03-H ADMIN83 BACKUP-ACL OFFLINE CANDIDATE RESULT — 2026-11-02 KST
 
@@ -86,9 +92,9 @@ NEXT_DECISION: Codex may implement a bounded isolated offline candidate using ve
 
 USER_APPROVAL: User explicitly approved staging exactly three verified CT108 candidate files on NAS, without program execution or production mutation.
 
-WORKSTREAM: stage9-media  
-TASK_ID: STG9MEDIA-001  
-STATUS: IN_PROGRESS
+WORKSTREAM_CONTEXT: stage9-media  
+HISTORICAL_TASK_ID: STG9MEDIA-001  
+CHECKPOINT_STATUS: IN_PROGRESS
 
 APPROVED_SOURCE: `/tmp/p03h-admin83-offline-review-20261101`
 
@@ -114,7 +120,7 @@ SCOPE: Run only staged `/tmp/p03h-admin83-stage-20261101-9c4097dc/admin83_runner
 
 LIMITS: No backup creation, original NFO write, Apply, recovery, copying files, permission/ACL changes, DB/Jellyfin/timer/service actions, changes to the other 82 admin NFOs, or rerun on error. Terminal PASS requires `PREFLIGHT=1_PASS`, `DRY_RUN=PASS; BACKUP_CREATED=NO`, and nonzero errors halt without promotion. A subsequent real NFO modification requires separate explicit authorization.
 
-STATUS: `ADMIN83_ONE_DRYRUN=PASS_AKDL-312`; `ADMIN83_APPLY=NOT_AUTHORIZED`. User NAS output: `STAGED_RUNNER=PASS`, `PREFLIGHT=1_PASS; IDS=AKDL-312`, `DRY_RUN=PASS; BACKUP_CREATED=NO`, `ADMIN83_ONE_DRYRUN=PASS`, `APPLY_REQUESTED=NO` (2026-11-01 KST). No backup or NFO write; remaining 82 preflights NOT_RUN.
+CHECKPOINT_STATUS: `ADMIN83_ONE_DRYRUN=PASS_AKDL-312`; `ADMIN83_APPLY=NOT_AUTHORIZED`. User NAS output: `STAGED_RUNNER=PASS`, `PREFLIGHT=1_PASS; IDS=AKDL-312`, `DRY_RUN=PASS; BACKUP_CREATED=NO`, `ADMIN83_ONE_DRYRUN=PASS`, `APPLY_REQUESTED=NO` (2026-11-01 KST). No backup or NFO write; remaining 82 preflights NOT_RUN.
 
 
 
@@ -128,13 +134,13 @@ PROHIBITED: `--apply`, backup creation, in-place NFO write or restoration, chang
 
 ACCEPTANCE: Each batch must return exit code 0 and matching `PREFLIGHT=<count>_PASS`, `DRY_RUN=PASS; BACKUP_CREATED=NO`; all five complete for `ADMIN83_REMAINING_DRYRUN=PASS_82`. Verify 83 total covered once with the earlier AKDL-312 check. All NFO originals unchanged; do not claim actual Apply, backup durability, atomicity or production outcome. Operational write still requires fresh explicit user approval.
 
-STATUS: `ADMIN83_REMAINING_DRYRUN=PASS_82; ADMIN83_TOTAL_DRYRUN=PASS_83; ADMIN83_APPLY=NOT_AUTHORIZED; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`. User-run Synology NAS output (2026-11-01 KST): `RUNNER_MANIFEST=PASS`; five sequential owner-side batches `(1,20),(21,20),(41,20),(61,20),(81,2)` each printed exact `PREFLIGHT=<count>_PASS` and `DRY_RUN=PASS; BACKUP_CREATED=NO`; printed `ADMIN83_REMAINING_DRYRUN=PASS_82`, `APPLY_REQUESTED=NO`, `BACKUP_REQUESTED=NO`. Together with prior `(0,1) AKDL-312` PASS, 83/83 admin-owned NFOs were preflighted, not modified. No automatic recovery/backup or in-place Apply has been verified.
+CHECKPOINT_STATUS: `ADMIN83_REMAINING_DRYRUN=PASS_82; ADMIN83_TOTAL_DRYRUN=PASS_83; ADMIN83_APPLY=NOT_AUTHORIZED; P03_T=NOT_RUN; JELLYFIN_REFRESH=NOT_RUN`. User-run Synology NAS output (2026-11-01 KST): `RUNNER_MANIFEST=PASS`; five sequential owner-side batches `(1,20),(21,20),(41,20),(61,20),(81,2)` each printed exact `PREFLIGHT=<count>_PASS` and `DRY_RUN=PASS; BACKUP_CREATED=NO`; printed `ADMIN83_REMAINING_DRYRUN=PASS_82`, `APPLY_REQUESTED=NO`, `BACKUP_REQUESTED=NO`. Together with prior `(0,1) AKDL-312` PASS, 83/83 admin-owned NFOs were preflighted, not modified. No automatic recovery/backup or in-place Apply has been verified.
 
 ## P03-H ADMIN83 AKDL-312 SINGLE-FILE APPLY APPROVED — 2026-11-01 KST
 
 USER_APPROVAL: After real DSM preflight-only dry-runs passed for all 83 admin-owned target NFOs, the user explicitly replied `응 승인해` to the request to perform exactly **one** live canary write: create a verified original backup for `AKDL-312` and add its frozen `[AKDL-312] ` prefix to the existing `movie.nfo` title, preserving non-title bytes. Approval does **not** extend to any other admin-owned file.
 
-WORKSTREAM: `stage9-media / STG9MEDIA-001 / IN_PROGRESS`, approved common contract v1.0.1 and Stage9 contract v1.0.0. Canonical repository `ssikgun/missav-dlp-web` branch `teddy-subtitle-stage11`.
+WORKSTREAM_CONTEXT: `stage9-media / STG9MEDIA-001 / IN_PROGRESS`, approved common contract v1.0.1 and Stage9 contract v1.0.0. Canonical repository `ssikgun/missav-dlp-web` branch `teddy-subtitle-stage11`.
 
 EXACT TARGET AND SOURCE: Frozen 188-row manifest `/tmp/p03h-bulk104-sIzAT42z/p03h_title_only_candidates_188.jsonl` SHA-256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`; admin83 roster SHA `a9cc95bda6c10f95cc10b31f4678be38ccf478452bb7e41d34ef352641a9a2be`. First sorted cohort129 item index `0` was independently preflighted as `AKDL-312`; use exactly `--start 0 --count 1 --apply --confirm P03H-ADMIN83`. Runner staged on NAS at `/tmp/p03h-admin83-stage-20261101-9c4097dc/admin83_runner.py`, SHA-256 `b2bdb5df1080b2ac9951d7a59e68eb0c07271fefd6ee2685e56eee772130eb18`, staged owner UID1026/GID100, mode0444, folder mode0555. The program is invoked by ordinary `ssikgun` UID1026, uses same-session TTY `sudo -v` to call `sudo -n -u admin` effective UID1024/GID100 for exactly one file.
 
@@ -144,7 +150,7 @@ EXECUTION SAFETY: One run, no automatic retry or auto restore on any error, inte
 
 PROHIBITED: Additional 82 admin NFO writes, rerunning AKDL-312 apply, edits to completed ordinary 104, bulk Apply, renames, moves, chmod/chown/ACL changes to existing media, permission changes, DB/Jellyfin service/scan operations, Stage9 ten-minute timer or other service changes. Real backup/restore and crash protection remain unverified until observed; this canary does not authorize recovery automation.
 
-STATUS: `ADMIN83_AKDL312_RUNNER=PASS_POSTCHECK_PENDING`; `ADMIN83_AKDL312_BACKUP=/volume1/video/video2/downloads/backups/stage9/p03h-admin83-9nhqs7od`; `ADMIN83_AKDL312_INDEPENDENT_POSTCHECK=NOT_RUN`; `ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`; `JELLYFIN_REFRESH=NOT_RUN`; `P03_T=NOT_RUN`. INDEPENDENT READ-ONLY DIAGNOSIS (2026-11-01 KST): run backup directory, per-title backup directory, and all three original/ACL/receipt backup files have Synology-reported `lstat mode=0o777`, UID1024/GID100, despite code requesting private 0700/0600. Exact `original.nfo` SHA `5a7f2bc28dd1b5a50c32ee295c7293a16363456efc64de936ba5e5fd1b253feb` PASS; modified NFO SHA `a7ce1cc489eab8250c3eaed4543f512ad84c488aaf7abd68d28c507132daf42c` PASS, current mode 0644, UID1024/GID100. Receipt DVD and old/new SHA fields match. Backup privacy/effective access, current inode, ACL, xattr and exact title-only diff still unverified. **STATUS: `AKDL312_BACKUP_PRIVACY=BLOCKED_MODE_0777`; prohibit further 82 Apply and rerun of AKDL-312 until scoped permission-safety decision.** No chmod/chown/remediation or backup deletion authorized.
+CHECKPOINT_STATUS: `ADMIN83_AKDL312_RUNNER=PASS_POSTCHECK_PENDING`; `ADMIN83_AKDL312_BACKUP=/volume1/video/video2/downloads/backups/stage9/p03h-admin83-9nhqs7od`; `ADMIN83_AKDL312_INDEPENDENT_POSTCHECK=NOT_RUN`; `ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`; `JELLYFIN_REFRESH=NOT_RUN`; `P03_T=NOT_RUN`. INDEPENDENT READ-ONLY DIAGNOSIS (2026-11-01 KST): run backup directory, per-title backup directory, and all three original/ACL/receipt backup files have Synology-reported `lstat mode=0o777`, UID1024/GID100, despite code requesting private 0700/0600. Exact `original.nfo` SHA `5a7f2bc28dd1b5a50c32ee295c7293a16363456efc64de936ba5e5fd1b253feb` PASS; modified NFO SHA `a7ce1cc489eab8250c3eaed4543f512ad84c488aaf7abd68d28c507132daf42c` PASS, current mode 0644, UID1024/GID100. Receipt DVD and old/new SHA fields match. Backup privacy/effective access, current inode, ACL, xattr and exact title-only diff still unverified. **STATUS: `AKDL312_BACKUP_PRIVACY=BLOCKED_MODE_0777`; prohibit further 82 Apply and rerun of AKDL-312 until scoped permission-safety decision.** No chmod/chown/remediation or backup deletion authorized.
 
 INDEPENDENT POSTCHECK UPDATE (2026-11-01 KST): User's read-only admin-side postcheck halted with `RuntimeError: BACKUP_DIRECTORY_UNSAFE` while asserting exact UID1024/GID100/mode0700 on backup RUN/FOLDER, without identifying the specific directory or attribute. This is a **postcheck diagnostic block only**, not evidence of damaged NFO/backup or completed independent verification. Preserve backup, do not rerun Apply or restore. Next: read-only `lstat` of both directories and safe SHA readback if possible. Status `ADMIN83_AKDL312_POSTCHECK=BLOCKED_BACKUP_DIRECTORY_UNSAFE`; other 82 still not authorized.
 
@@ -160,7 +166,7 @@ AUTHORIZED EXACT ONE NAS MUTATION: With interactive `sudo -v` as NAS `ssikgun` a
 
 PROHIBITED: Changes to ACLs, chmod/chown, removing inheritance or setting Synology ACL, creating test files, deleting the test folder, modifying preexisting backup directories/files, data restore/reapply/NFO writes, other 82 admin NFO Apply, database/Jellyfin/timer/service changes or new NAS shares/accounts. Any ACL modification on even the test folder requires separate approval after exact DSM command semantics are verified. Probe `os.access(W_OK)` is a permissions hint, not a real unauthorized-write check.
 
-STATUS: `STAGE9_ACL_EMPTY_DIR_PROBE=PASS_CREATED_FAIL_ISOLATION; STAGE9_ACL_PROBE_ACCESS=FAIL_SSIKGUN_OPEN_ALLOWED; BACKUP_ISOLATION=FAILED_ON_TEST_FOLDER; ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`.
+CHECKPOINT_STATUS: `STAGE9_ACL_EMPTY_DIR_PROBE=PASS_CREATED_FAIL_ISOLATION; STAGE9_ACL_PROBE_ACCESS=FAIL_SSIKGUN_OPEN_ALLOWED; BACKUP_ISOLATION=FAILED_ON_TEST_FOLDER; ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`.
 
 FOLLOW-UP ROOT-PRIVILEGED READ-ONLY ACL TOOL CHECK (user NAS stdout, 2026-11-01 KST): `sudo -v` over independent interactive SSH TTY, `sudo -n /usr/syno/bin/synoacltool -get-perm <single-existing-empty-probe> ssikgun` PASS: `User/Group: [ssikgun/users,administrators]`, `Final permission: [rwxpdDaARWc--]`. `-get-perm ... admin` PASS: `User/Group: [admin/users,administrators]`, `Final permission: [rwxpdDaARWcCo]`. `-get-archive` PASS: `is_inherit,is_support_ACL`. `-getace` PASS with six inherited ACL entries including group UID101 administrators full allow and user UID1026 ssikgun full allow. `ACL_DIAGNOSIS=COMPLETE; NAS_WRITE=0; ACL_CHANGE=0`. Earlier non-sudo `initgroup(900)` was a privilege/tool invocation issue, not an ACL denial. `STAGE9_ACL_EFFECTIVE_PERMS=PASS_READ_ONLY_BOTH_ADMIN_AND_SSIKGUN`. **Isolation still FAIL**. No ACL edits allowed by this read-only result; existing backup and NFO must remain unchanged. Future ACL change to only empty probe folder requires separate user authorization and testing, followed by distinct rollout approval.
 
@@ -171,7 +177,7 @@ READ-ONLY ACL ACCOUNT/GROUP REVIEW (user NAS stdout 2026-11-01 KST): `id ssikgun
 
 USER_APPROVAL: The user replied `응 다음 작업 진행해` to the specific next proposal to **test disabling Synology ACL inheritance on the existing single empty Stage9 test folder only**, following root-privileged read-only `synoacltool -get-perm` success for `admin` and `ssikgun`. This approval does not authorize production permission repair, other file/backup moves, batch backup logic changes, NFO Apply or other Stage9 operations.
 
-WORKSTREAM: `stage9-media`, `STG9MEDIA-001 / IN_PROGRESS`, Stage9 contract `1.0.0`, common contract `1.0.1`, canonical `ssikgun/missav-dlp-web:teddy-subtitle-stage11`.
+WORKSTREAM_CONTEXT: `stage9-media`, `STG9MEDIA-001 / IN_PROGRESS`, Stage9 contract `1.0.0`, common contract `1.0.1`, canonical `ssikgun/missav-dlp-web:teddy-subtitle-stage11`.
 
 EXACT TARGET: Existing previously created empty directory ONLY `/volume1/video/video2/downloads/backups/stage9/.p03h-acl-probe-20261101-01`. Before writing: check real directory/no symlink, owner UID1024/GID100, initially mode0777, empty, Synology ACL `Archive: is_inherit,is_support_ACL`, existing expected inherited group `administrators` and named `ssikgun` allows; stop otherwise. Ordinary user `ssikgun` UID1026 and `admin` UID1024 are both administrators-group members.
 
@@ -181,7 +187,7 @@ EVIDENCE/FAIL-CLOSED: A successful `-del-archive` return alone is **not privacy 
 
 PROHIBITED: `synoacltool -del PATH` (ACL delete), `-enforce-inherit`, any ACL or chmod/chown modifications to any other path including original parent and `p03h-admin83-9nhqs7od` backup; creating/deleting files or folders, changing account/group configuration, permission escalation beyond existing sudo, reapplying original `AKDL-312`, other 82 admin NFO writes, DB/Jellyfin/timer/service operations. New production permission/backup strategy requires separate decision and approval.
 
-STATUS: `STAGE9_ACL_INHERITANCE_PROBE=PASS_ADMIN_ONLY`; `STAGE9_TEST_FOLDER_READ_ISOLATION=PASS_ORDINARY_CONTEXT`; `STAGE9_TEST_FILE_INHERITANCE=NOT_TESTED`; `AKDL312_BACKUP_PRIVACY=BLOCKED`; `ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`.
+CHECKPOINT_STATUS: `STAGE9_ACL_INHERITANCE_PROBE=PASS_ADMIN_ONLY`; `STAGE9_TEST_FOLDER_READ_ISOLATION=PASS_ORDINARY_CONTEXT`; `STAGE9_TEST_FILE_INHERITANCE=NOT_TESTED`; `AKDL312_BACKUP_PRIVACY=BLOCKED`; `ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`.
 
 USER EXECUTION EVIDENCE 2026-11-01 KST (only exact approved test directory; do not rerun ACL mutation): Prior `EXACT_EMPTY_FOLDER=PASS` and `ACL_PRECONDITION=PASS`. `synoacltool -add` explicit `user:admin:allow:rwxpdDaARWcCo:fd--` created ACE [0] level0; `EXPLICIT_ADMIN_ACL=PASS`. Then `-del-archive "$P" is_inherit` returned `Archive: has_ACL,is_support_ACL`; `-get` returned exactly the sole explicit `user:admin` ACE (all six inherited ACEs removed); `-get-archive` matched. Root `-get-perm "$P" ssikgun` returned `Final permission: [----d--------]` with `GET_PERM_ssikgun=PASS` (query PASS, not access granted); admin returned `[rwxpdDaARWcCo]` and `GET_PERM_admin=PASS`. Direct independent ordinary `ssikgun` open returned `SSIKGUN_OPEN=DENIED_PERMISSION`, `SSIKGUN_WRITE_HINT=False`; `sudo -u admin` open returned `ADMIN_OPEN=ALLOWED`. `ACL_TEST_EXECUTION=COMPLETE`, `PRODUCTION_NFO_WRITE=0`, `EXISTING_BACKUP_CHANGE=0`. **PASS restricted to the previously empty test directory ordinary-account access**. Do not misread the remaining `d` bit as a general read/write grant; do not claim end-to-end confidential new backup files tested.
 
@@ -201,7 +207,7 @@ READ-ONLY VERIFICATION: Inspect file mode/owner/content SHA and `synoacltool -ge
 
 PROHIBITED: further ACL edits to test directory, changes to any parent/sibling/real `p03h-admin83-9nhqs7od` backup, moving/deleting files, production NFO changes including `AKDL-312` and other 82 admin-owned NFOs, any runner code changes, account/group/service/Jellyfin/DB/timer operations. Actual backup destination/runner remediation requires separate review and approval.
 
-STATUS: `STAGE9_TEST_SINGLE_FILE=PASS_NEW_FILE_OWNER_ADMIN; STAGE9_TEST_FILE_PATH_ACCESS=PASS_ORDINARY_SSIKGUN_DENIED; STAGE9_TEST_FILE_ACL=PASS_INHERITED_ADMIN_ONLY; STAGE9_TEST_FILE_INDEPENDENT_ACCESS=NOT_PROVEN; STAGE9_PRODUCTION_BACKUP_PRIVACY=FAIL; ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`.
+CHECKPOINT_STATUS: `STAGE9_TEST_SINGLE_FILE=PASS_NEW_FILE_OWNER_ADMIN; STAGE9_TEST_FILE_PATH_ACCESS=PASS_ORDINARY_SSIKGUN_DENIED; STAGE9_TEST_FILE_ACL=PASS_INHERITED_ADMIN_ONLY; STAGE9_TEST_FILE_INDEPENDENT_ACCESS=NOT_PROVEN; STAGE9_PRODUCTION_BACKUP_PRIVACY=FAIL; ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`.
 
 USER NAS EXECUTION RESULT (2026-11-01 KST; exact user-approved one-file probe, no rerun): `PARENT_ACL=PASS`, `TEST_FILE_CREATED=YES`, new `.p03h-acl-file-probe-20261101-01.txt` within previously isolated `.p03h-acl-probe-20261101-01`, `FILE_UID=1024`, `FILE_GID=100`, `FILE_MODE=0o777` (Synology ACL display, **not** proof of public access), SHA256 `a8bbf8510c16e147e2ebb6ebec7556547a4c65cfe0f3c407414878a61edd734a`, `ADMIN_READ_OPEN=ALLOWED`, `ADMIN_WRITE_OPEN=ALLOWED_NO_BYTES_WRITTEN`. Child `synoacltool -get`: `Archive: is_inherit,is_support_ACL`; sole `[0] user:admin:allow:rwxpdDaARWcCo:---- (level:1)` inherited from isolated parent; `FILE_ACL_QUERY=PASS`. Root `-get-perm <child> ssikgun` emitted `Access deny`, so `FILE_PERM_ssikgun=QUERY_FAILED` — **not a successful effective-permission calculation**. Root `-get-perm ... admin` returned `[rwxpdDaARWcCo]` and `FILE_PERM_admin=QUERY_PASS`. Actual unprivileged `ssikgun` path opens `O_RDONLY` and `O_WRONLY` (no write) both `DENIED_PERMISSION`; `SSIKGUN_ACCESS_CHECK=COMPLETE`, `TEST_EXECUTION=COMPLETE`, `TEST_FILE_CREATE=1`, `PRODUCTION_NFO_WRITE=0`, `EXISTING_BACKUP_CHANGE=0`, `ACL_CHANGE=0`. Parent directory itself denies `ssikgun` traversal; therefore cannot prove child ACL-only independent deny by this result, although sole admin-only inherited ACE is observed. Test file intentionally retained.
 
@@ -225,7 +231,7 @@ FAILURE TRACKING: `worker()` lines153–162 assigns `run=backup(items)` only aft
 
 PROPOSED MINIMAL DESIGN — NOT AUTHORIZED FOR IMPLEMENTATION: Use a **separately provisioned and independently verified admin-only private backup-root** under existing NAS storage (no new share/user/server), with exactly one explicit admin allow ACE and inheritance broken, denying ordinary `ssikgun`. The next runner revision must refuse Apply unless that root and every new run/target directory and file inherit correct admin-only ACL, bytes+hash are verified, and all backups complete before any NFO write. Treat numeric 0777 alone as inconclusive under Synology ACL, but fail on any unexpected ACE, owner, path, symlink, effective read/write, or private root exposure. Avoid creating sensitive bytes in newly created shared/inherited run roots; save and report exact run-path on any partial backup failure; never automatic retry/restore. An admin/sudo-capable `ssikgun` remains outside the ACL confidentiality boundary. Potential ACL tests to determine file-self deny, crash/failure behavior, and private-root rollout need **separate scope approval** before NAS mutations or offline code implementation.
 
-STATUS: `STAGE9_ADMIN83_LIVE_SOURCE_SHA3=PASS`; `STAGE9_ADMIN83_SOURCE_REVIEW=PASS_READ_ONLY`; `STAGE9_ADMIN83_BACKUP_PRIVACY_LOGIC=BLOCKED_MISSING_ACL_GATE`; `STAGE9_ADMIN83_PARTIAL_BACKUP_PATH_TRACKING=GAP`; `STAGE9_ADMIN83_OFFLINE_REMEDIATION=NOT_AUTHORIZED`; `AKDL312_BACKUP_PRIVACY=FAIL_ACCESS_SSIKGUN`; `VERIFIED_MODIFIED_NFO=105_OF_187`; `ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`.
+CHECKPOINT_STATUS: `STAGE9_ADMIN83_LIVE_SOURCE_SHA3=PASS`; `STAGE9_ADMIN83_SOURCE_REVIEW=PASS_READ_ONLY`; `STAGE9_ADMIN83_BACKUP_PRIVACY_LOGIC=BLOCKED_MISSING_ACL_GATE`; `STAGE9_ADMIN83_PARTIAL_BACKUP_PATH_TRACKING=GAP`; `STAGE9_ADMIN83_OFFLINE_REMEDIATION=NOT_AUTHORIZED`; `AKDL312_BACKUP_PRIVACY=FAIL_ACCESS_SSIKGUN`; `VERIFIED_MODIFIED_NFO=105_OF_187`; `ADMIN83_OTHER_82_APPLY=NOT_AUTHORIZED`.
 
 ## P03-H EBWH-350 USER-REPORTED SUCCESS / READ-ONLY COHORT AUDIT — 2026-10-30 KST
 
