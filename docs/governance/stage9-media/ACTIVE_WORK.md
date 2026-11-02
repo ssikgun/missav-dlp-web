@@ -1,5 +1,24 @@
 # Stage9 Media workstream — active work
 
+## P03-H VERIFIED SIX-BACKUP-RUN CLEANUP — EXPLICIT USER APPROVAL 2026-11-02 KST
+
+EXPLICIT USER APPROVAL: After reporting final `FINAL_INDEPENDENT_CHECK=PASS; VERIFIED_BACKUPS=81` for the five newly created batches, and the previous separate BLOR-289 one-title backup/content PASS, assistant asked: `이번에 생성하고 검증까지 마친 백업 6개 폴더만 영구 삭제하는 걸 승인할까?` User directly replied `응 승인해`. This is a **new narrowly scoped destructive production NAS deletion approval** for exactly the following six **backup-run directories**, NOT the parent backup root or any other material. Previous handoff instruction to preserve these six after verification is superseded ONLY for their authorized disposal.
+
+EXACT SIX RUN DIRECTORY BASENAMES under `/volume1/video/video2/downloads/backups/stage9-admin-private`:
+- `p03h-admin83-z9uf3lig` (BLOR-289 one item)
+- `p03h-admin83-wbxiuzy0` (cohort sorted 2..21, 20 items)
+- `p03h-admin83-8qi3cltb` (22..41, 20)
+- `p03h-admin83-kkqbhin5` (42..61, 20)
+- `p03h-admin83-0fn1qjof` (62..81, 20)
+- `p03h-admin83-t0c5v3ta` (82, one)
+
+AUTHORIZED EXECUTION ONLY: A single fresh, guarded Synology NAS deletion after read-only preflight verifies the SHA-pinned 188-row manifest (SHA256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`), exact six run-directory identities and allowlisted per-item files `original.nfo`, `original_acl.txt`, `receipt.json`, no unexpected contents/symlinks, all 82 saved originals/receipt identities/hashes, and current 83 NFO title bytes remain as intended. Require backup-root and run owner UID1024/GID100, no deletion via wildcard or recursive parent removal; prefer anchored dirfd file unlink/rmdir of only verified entries. Abort before ANY deletion on preflight mismatch. Once deletion starts, any failure is potentially PARTIAL; stop without automatic retry, report deleted runs and preserve remaining files. DO NOT claim deletion complete until actual NAS terminal result and independent absence check. Neither the user approval nor this entry imply deletion has been executed.
+
+STRICT PROHIBITIONS: Never delete or replace any NFO, MP4, poster, subtitle, artwork, database, Jellyfin item, account/ACL or service; never remove backup ROOT, other historical backups, user home files, manifests or stage scripts. Do not process remaining 105 unapproved manifest candidates. Exact post-delete reversibility using these original NFO backup copies will be lost.
+
+AT DOCUMENTATION TIME: `USER_APPROVAL=YES; SIX_BACKUP_RUN_DELETE=NOT_RUN; NAS_WRITE=0_IN_THIS_GITHUB_STEP`. Next checkpoint is one guarded NAS cleanup command, then independent read-only evidence of six-absent/remaining-NFO-unchanged, and update this Stage9 ACTIVE_WORK with observed result. This remains solely `stage9-media / STG9MEDIA-001` under approved contracts.
+
+
 ## P03-H NFO TITLE-ONLY 83-COHORT FINAL CONTENT AND BACKUP PASS — 2026-11-02 KST
 
 FINAL RESULT — USER-EXECUTED ACTUAL SYNOLOGY NAS INDEPENDENT READ-ONLY CHECK AFTER 81-TITLE APPLY: The frozen 188-row manifest SHA256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087` was checked on NAS, with cohort `129` having 83 rows. Five precise private backup runs were scanned without modifying NAS content:
