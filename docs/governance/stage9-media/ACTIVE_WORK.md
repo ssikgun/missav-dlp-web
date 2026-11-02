@@ -1,5 +1,26 @@
 # Stage9 Media workstream — active work
 
+## P03-H NAS INDEX1 BLOR-289 ONE-ITEM NO-APPLY DRY-RUN PASS — 2026-11-02 KST
+
+USER-EXECUTED ONE-TIME NAS DRY-RUN: In the actual `ssikgun@ssikgun_home` shell, after interactive `sudo -v`, the user verified the frozen new owner runner `/tmp/p03h-admin83-dualuid-owner-20261102-v1/admin83_runner.py` has UID1026, directory mode0700, regular one-linked code file mode0600 and exact SHA256 `d6dedc701d33bb8a02347fb88227c287af7ad50f517d6cb6a4c6a674c0c07379`; froze the 188-row manifest `/tmp/p03h-bulk104-sIzAT42z/p03h_title_only_candidates_188.jsonl` against SHA256 `87ff398ba60f7b062fd07152c82aa3696fe7c8746cbbf530d206f8d51540e087`; and checked `sudo -n -v`. Then ran **exactly one** bounded `/bin/python3 -B <new owner runner> --start 1 --count 1` without `--apply`, `--worker`, or retry. Real user console stdout:
+
+```text
+P03H_INDEX1_PREFLIGHT=PASS
+===== ONE-ITEM NO-APPLY DRY-RUN =====
+PREFLIGHT=1_PASS; IDS=BLOR-289
+DRY_RUN=PASS; BACKUP_CREATED=NO
+RUNNER_EXIT=0
+DRY_RUN_COMMAND=COMPLETED
+NO_AUTOMATIC_RETRY=YES
+```
+
+VERDICT: The previously approved **index1 BLOR-289** one-item live NAS *no-Apply* Dry-run is PASS on the new verified dual-identity staging path. Unlike prior read-only code/tokenize checks, the actual owner runner was executed; it reached the admin worker preflight and completed its intended dry-run path with `RUNNER_EXIT=0`. The console expressly confirms no backup was created. Since this execution did not pass `--apply`, it is not an NFO modification or production rollout; **no independent before/after NFO byte-hash readback was supplied**, so do not claim an independent proof of bytewise unchanged NFO. The historical first-stage direct-launch `Permission denied` cause remains CONFIRM_NEEDED; the new stage demonstrably executes successfully, but that does not explain the previous failure. Previous index0 AKDL-312 Apply history and the remaining 82 titles are untouched by this bounded command, to the extent of the no-Apply boundary; no generalized batch approval is inferred.
+
+CHECKPOINT: `P03H_INDEX1_DRYRUN=PASS; INDEX1_ID=BLOR-289; PREFLIGHT=1_PASS; DRY_RUN=PASS; BACKUP_CREATED=NO; RUNNER_EXIT=0; NO_AUTOMATIC_RETRY=YES; OWNER_NEW_STAGE_EXECUTION=PASS; NFO_APPLY=NOT_RUN; OTHER_82_APPLY=NOT_AUTHORIZED; PRIOR_OWNER_EACCES_CAUSE=CONFIRM_NEEDED`.
+
+NEXT DECISION — NOT YET AUTHORIZED: The previously approved dual-private-stage and no-Apply test scope is complete. Before any real Apply or backup creation, obtain separate explicit user approval for one bounded title/index1 `BLOR-289` NFO action with current eligibility/source/backup/ownership/no-overwrite gates and a precise post-run readback/recovery plan. Until then, do NOT run `--apply`, repeat this Dry-run, alter ACLs or permissions, modify another title, or touch operating services, DB, or Jellyfin. Preserve existing files, code stages, and backups.
+
+
 ## P03-H NAS OWNER CODE-OPEN / CHILD TOKENIZE CHECK PASS — 2026-11-02 KST
 
 USER-EXECUTED NAS READ-ONLY PREFLIGHT: On the actual Synology ordinary shell `ssikgun@ssikgun_home`, user checked only `/tmp/p03h-admin83-dualuid-owner-20261102-v1/admin83_runner.py`, with expected frozen owner SHA256 `d6dedc701d33bb8a02347fb88227c287af7ad50f517d6cb6a4c6a674c0c07379`. Python `-B -` asserted current UID 1026, real owner UID1026 directory mode0700, real single-link owner UID1026 code file mode0600; `io.open_code` succeeded and SHA256 matched; separate child `/bin/python3 -B -m tokenize` on this exact code file returned 0. Actual stdout:
