@@ -1,5 +1,13 @@
 # Stage9 Media workstream — active work
 
+## P03-H NAS NO-APPLY prepare() REVIEW — 2026-11-02 KST
+
+ACTUAL NAS USER OUTPUT: frozen Owner SHA verified, `PREPARE_SOURCE_REVIEW=PASS`, `CANDIDATE_EXECUTION=NOT_RUN`, `NAS_WRITE=0`. Source worker lines 324–342 calls prepare() then, when apply=False, prints `DRY_RUN=PASS; BACKUP_CREATED=NO` and returns before backup() and apply_one(). Source prepare lines 262–273 checks path identity, opens NFO O_RDWR with O_NOFOLLOW, holds temporary exclusive flock, only reads file bytes/xattrs/ACL, computes candidate in memory, then fd is closed. It does not write NFO content or create backup, though it does briefly lock the NFO.
+
+CRITICAL: No-Apply does not call the backup privacy-probe pathway, so a successful dry-run validates process/IPC and selected NFO preflight only, not the original ordinary-user access-denial issue.
+
+AUTHORIZED NEXT: user-approved one NAS no-Apply invocation of SHA-pinned Owner with `--start 1 --count 1` and no `--apply`, no retry. Real Apply, backup, NFO writes, ACL edits remain NOT authorized. Result still pending.
+
 ## P03-H NAS IPC FROZEN WORKER NO-APPLY BRANCH READ-ONLY REVIEW — 2026-11-02 KST
 
 USER EXECUTED ACTUAL NAS `ssikgun@ssikgun_home` SHA-verified read-only inspection on staged `/tmp/p03h-admin83-ipc-owner-stage-20261102-v1/admin83_owner.py` (SHA256 `156f2913c8e06d0aedc8eac21a7932bc94a6878cb94b87d22673b47e0ab8e745`). EUID1026, regular one-link UID1026 source and AST-validated `worker()` function lines 324–342. Transcript: `WORKER_SOURCE_REVIEW=PASS; CANDIDATE_EXECUTION=NOT_RUN; NFO_APPLY=NOT_RUN`. Owner and admin-worker exact one-expression equivalence plus admin-worker SHA were established at preceding checkpoint.
