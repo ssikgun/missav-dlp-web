@@ -1,5 +1,13 @@
 # Stage9 Media workstream — active work
 
+## P03-H MFCS-085 DEPLOYED NFO LOCAL PREPARATION PASS — NAS CANARY PENDING (2026-11-02 KST)
+
+USER-EXECUTED CT108 `root@downloader` exact-one `MFCS-085` preparation, using `teddy-stage9-media.service` WorkingDirectory under `/opt/missav-dlp-web/stage9-runtime/releases`, actual deployed `teddy_discovery_media_metadata.load_media_metadata` and `build_nfo_bytes` with read-only Discovery DB. User output `MFCS_NFO_PREPARE=PASS; NFO_BYTES=1252; NFO_SHA256=4acfaba166b6aca61d0417a63dde56dc08f87721675fe6872951c435b2f7c84a; NAS_WRITE=0; VIDEO_MODIFICATION=0; JELLYFIN_WRITE=0`. The script checked XML root/movie, exact DVD-ID, title prefix, created only the root-owned local `/tmp/p03h-mfcs085-nfo-prep-20261102-v1/MFCS-085.nfo` using exclusive creation (0600 under 0700 directory) and compared file bytes with in-memory NFO. This is user terminal evidence; not a NAS publication and not an independent second readback.
+
+PREVIOUS SSH IDENTITY: User tested `ssh ssikgun@192.168.1.201` from CT108 and saw NAS host `ssikgun_home`, UID `1026`, GID `100`, `SSH_CREATE_IDENTITY=PASS`. This confirms account identity only; not NFO create privilege or Synology ACL inheritance.
+
+NEXT: single approved `MFCS-085` NAS create-only canary only after fresh destination/video/ACL/identity and local payload SHA checks. Transfer bytes privately over verified SSH; output exact sidecar `/volume1/video/video2/JAV/MFCS/MFCS-085/MFCS-085.nfo` only; preserve original `MFCS-085.mp4`, poster, DB and jobs. Enforce no-overwrite; after create independently confirm NFO SHA, XML ID, ownership, private Synology ACL and unchanged video identity/size. If ACL/owner/readback differs, STOP, preserve artifact and do not attempt `DANDYA-033`/`NHDTB-778`. No unrelated code/service/TS-policy, backup, Stage11 or Jellyfin changes authorized. `MFCS_NAS_CANARY=NOT_RUN`; `TS_TWO_NFO=NOT_RUN`.
+
 ## P03-H LIVE SYNOLOGY ACL PREFLIGHT 3/3 PASS, CANARY PENDING (2026-11-02 KST)
 
 USER-EXECUTED NAS `ssikgun@ssikgun_home` `sudo -n /usr/bin/python3 -B -` actual read-only `synoacltool -get` classification and `lstat` of exactly approved three folders/video files. Output `ACL_PREFLIGHT=PASS; CHECKED=3; NAS_WRITE=0; NFO_CREATION=NOT_RUN; VIDEO_MODIFICATION=0`:
