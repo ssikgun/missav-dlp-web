@@ -1,5 +1,17 @@
 # Stage9 Media workstream — active work
 
+## P03-H THREE NAS NFO CREATE-ONLY READ-ONLY PRECHECK PASS — 2026-11-02 KST
+
+ACTUAL USER-EXECUTED SYNLOGY `ssikgun@ssikgun_home`, with `sudo -v` and `sudo -n /usr/bin/python3 -B -`. This was a **read-only**, exactly three-folder lstat/scandir precheck of the parent directory and expected real video file (no video content read) under `/volume1/video/video2/JAV`. Final user stdout `CREATE_ONLY_PREFLIGHT=PASS; CHECKED=3; NAS_WRITE=0; NFO_CREATION=NOT_RUN`. Each item's expected actual NAS video byte size equals Discovery holding size, actual video is regular and single-link, there is no filename ending `.nfo` in exact folder, and owner/permissions snapshot matched across folder and video:
+- `DANDYA-033`: `DANDYA-033.ts`, size `6571739656`, video and DVD folder `UID=1026/GID=100/MODE=0o700`, `EXISTING_NFO_COUNT=0`.
+- `MFCS-085`: `MFCS-085.mp4`, size `1467881427`, same video and folder `UID=1026/GID=100/MODE=0o700`, `EXISTING_NFO_COUNT=0`.
+- `NHDTB-778`: `NHDTB-778.ts`, size `6637939156`, same video and folder `UID=1026/GID=100/MODE=0o700`, `EXISTING_NFO_COUNT=0`.
+
+Readiness assessment: `NAS_VIDEO_AND_NO_NFO_PRECHECK=PASS` at time of user's run. However, POSIX mode 0700 does **not** establish Synology ACL type or effective write authorization of dedicated non-admin `stage9_media` principal; actual video codec/TS completeness, metadata provenance and whole-filename race at creation are not proven. Prior production `teddy_discovery_media_nfo_only.py` candidate is **offline injected transport only**, excludes `completion-stage9` holdings and `.ts` input; cannot use it unmodified as a production solution. In-memory `load_media_metadata` + `build_nfo_bytes` on actual deployed release previously yielded valid XML 705/1252/873 bytes; those bytes were **not saved**.
+
+No implied authority to create NFO, change metadata, convert/rename video, change Synology ACL, reset `media_jobs` attempts (5 / 17161 / 5), alter status or timer or notify Jellyfin. Pending explicit user decision: approve a scoped **NFO-only, create-if-absent canary for MFCS-085 followed (only if PASS) by two .ts sidecars**, with safe payload provenance, owner/mode/ACL verification and independent readback, or continue limited read-only access/ACL design first. Existing 225 NFO repairs and original backup retention remain protected.
+
+
 ## P03-H ACTUAL DEPLOYED STAGE9 IN-MEMORY NFO 3/3 PASS — 2026-11-02 KST
 
 ACTUAL USER-EXECUTED CT108 ROOT READ-ONLY TEST, `root@downloader`. `teddy-stage9-media.service` `WorkingDirectory` points to a direct child of `/opt/missav-dlp-web/stage9-runtime/releases`; the script checked non-symlink release directory and file before importing **deployed** `teddy_discovery_media_metadata.py`. `/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3` was opened using SQLite `mode=ro` and `PRAGMA query_only=ON`. The test used deployed `load_media_metadata(DB, dvd)` and `build_nfo_bytes(metadata)` in memory, parsed resulting XML and checked root=`movie`, exact matching `<id>` and title starting with `[DVD-ID] `. No network requests, poster fetch, NFO file output, NAS/DB mutations, media job retry, or source/video modification.
