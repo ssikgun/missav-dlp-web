@@ -1,5 +1,12 @@
 # Stage9 Media workstream — active work
 
+## P03-H 37-target preflight blocked by malformed SHA — 2026-11-02 KST
+
+USER-EXECUTED ACTUAL SYNOLOGY NAS READ-ONLY PREFLIGHT: The previously supplied 37-line preflight code inadvertently included an incomplete hardcoded original SHA-256 for `SIRO-5536`. Assistant had given a corrected line separately, but user's pasted run still contained `SIRO-5536 1024 0332c5182a178d3d998f270f408bc72739fec9e89486fc3686ca07` (malformed/short). Terminal: `PREFLIGHT_37=BLOCKED; REASON=RuntimeError:EXPECTED_SHA_INVALID; READY_UID1024=20; READY_UID1026=4; READY_UID1030=8; BACKUP_CREATED=NO; NAS_WRITE=0; APPLY=NOT_RUN`. **32/37 targets verified before guard, no data modifications.** Stop happened at `SIRO-5536`, not due to observed SHA mismatch in the actual NAS file. The final five targets not checked in this attempted run are `SIRO-5536, SIRO-5537, SNOS-403, START-649, SW-216` (3 UID1024 and 2 UID1030).
+
+CORRECT ORIGINAL SHA SOURCE from earlier complete user NAS inventory for SIRO-5536: `0332c5182a547ef5602a178d3d998f270f408bc72739fec9e89486fc3686ca07`. Next step: bounded read-only fresh preflight for exactly these five with pinned full 64-digit hashes, original owner/GID/mode, NFO basename and id/title checks; do not try Apply. After that result, construct scoped 37-item Apply with a fresh entire-37 pre-write gate and owner-preserving protected backup/readback, with no blind retries or deviations from user-approved scope. No change to earlier 188 and no more approvals needed for exact 37 title-only goal.
+
+
 ## P03-H 37 additional title-only corrections — user-approved, preflight pending (2026-11-02 KST)
 
 USER APPROVAL: The user said `응 승인해. 37건만 수정 하면 더이상 수정할 nfo는 없는거야?` after being explicitly offered a new exact-scope title-only correction for the 37 verified additional NFOs under `stage9-media / STG9MEDIA-001 / IN_PROGRESS`. This authorizes 37 **existing NFO title-only** production corrections, CONDITIONAL on fresh safe per-file read-only preflight, an inspectable executable strategy with backups, preserving file identity/owner/group/mode/xattrs and no title duplication, exact old SHA guards, no other XML byte mutation, postreadback and no auto-retry. It does NOT authorize resetting jobs, creating 3 missing NFOs, changing Stage9 code/deployment/timer, Jellyfin scans/refreshes, touching 188 already-correct NFOs or any media/artwork/subtitles.
