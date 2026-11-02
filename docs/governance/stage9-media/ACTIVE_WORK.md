@@ -6,6 +6,14 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H NAS ACL-CANDIDATE STAGING PREFLIGHT USER READBACK — 2026-11-02 KST
+
+USER-EXECUTED NAS READ-ONLY RESULT: On `ssikgun@ssikgun_home`, user ran the exact preflight for temporary staging destination `/tmp/p03h-admin83-backup-acl-stage-20261102-v1` and read back `NAS_STAGE_PREFLIGHT=PASS; TRANSFER_CONNECTION=NOT_CHECKED; NAS_STAGE_WRITE=0; BACKUP_WRITE=0; NFO_WRITE=0`. Account UID1026 confirmed; `/tmp` real directory owned root:root, mode `01777` and writable hint True; exact new staging destination `NEW_TARGET=ABSENT_PASS`; old staged source folder `/tmp/p03h-admin83-stage-20261101-9c4097dc` `OLD_STAGE=PRESENT_UNCHANGED`. Isolated Synology private backup root `/volume1/video/video2/downloads/backups/stage9-admin-private` retained admin UID1024/GID100, exact sole explicit admin ACL `user:admin:allow:rwxpdDaARWcCo:fd--` at level0 and no inheritance archive (`has_ACL,is_support_ACL`). Ordinary nonsudo `ssikgun` directory open `DENIED_PASS`; `PRIVATE_ROOT_ACL=PASS`. No NAS writes occurred, and retained harmless child was not touched.
+
+STAGING_GATE: `CT108_SOURCE_SHA3=PASS` from the immediately prior checkpoint; `NAS_STAGE_PREFLIGHT=PASS_READ_ONLY`; `CT108_TO_NAS_SSH_TRANSPORT=NOT_CHECKED`; `NAS_CANDIDATE_STAGE=NOT_RUN`; `NAS_SINGLE_DRYRUN=NOT_RUN`. Do not assert stage complete or copy without separately verifying existing transport and destination absence anew. Fixed new stage target only: `/tmp/p03h-admin83-backup-acl-stage-20261102-v1`. Never re-create old stage or touch current private backup-root ACL/test file. Candidate source frozen SHA3 and Stage9 `STG9MEDIA-001` authorization remain in earlier entries.
+
+NEXT: Establish verified CT108-to-NAS SSH connection/identity and pre-copy destination absence in read-only commands; then one no-overwrite creation/copy of only three candidate files and independent NAS readback. Dry-run index1 without Apply only after stage success. Record every completed checkpoint immediately; preserve contract header fields exactly once.
+
 ## P03-H CT108 BACKUP-ACL CANDIDATE SOURCE SHA3 READ-ONLY PASS — 2026-11-02 KST
 
 USER-EXECUTED READ-ONLY EVIDENCE: On `root@downloader` (CT108), `python3 -B` inspected exact isolated source directory `/tmp/p03h-admin83-backup-acl-offline-20261102`. `SOURCE_DIR=PASS`: real directory (not symlink). Three files each real regular, single hardlink (`st_nlink=1`), UID=0 GID=0 MODE=0644; SHA256 exact frozen matches:
