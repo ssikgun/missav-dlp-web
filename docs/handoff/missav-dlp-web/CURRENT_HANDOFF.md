@@ -1,5 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-02 — P03-H CT108 SSH ALIAS RESOLUTION FAILURE — 2026-11-02
+
+CT108 SSH preflight failed before NAS command execution: unresolved `teddy_storage` alias (`ssh -G` showed hostname unchanged, user root, port22; SSH_EXIT=255). P03H_SSH_TRANSPORT=BLOCKED_ALIAS_UNRESOLVED; NAS_TRANSFER=NOT_RUN; NAS_DRYRUN=NOT_RUN; STAGING_TARGET_CURRENT_STATE=NOT_RECHECKED_FROM_CT108. Prior NAS-only staging/ACL preflight remains PASS as observed then. Next: verify pre-existing CT108 NAS SSH key/known_hosts and test exact IP with strict known-host verification; no file copy/production write yet. Stage9 active task: STG9MEDIA-001; this does not authorize Apply or other workstreams.
+
+
 ## 2026-11-02 — NAS admin83 ACL-candidate staging preflight PASS; SSH transport pending
 
 User's real Synology `ssikgun@ssikgun_home` read-only output: `NAS_STAGE_PREFLIGHT=PASS; ACCOUNT=SSIKGUN_UID1026; TMP_DIRECTORY=PASS`, /tmp owner 0:0 mode01777, `TMP_WRITABLE_HINT=True`, exact reserved destination `/tmp/p03h-admin83-backup-acl-stage-20261102-v1` `NEW_TARGET=ABSENT_PASS`. Previous old NAS stage `/tmp/p03h-admin83-stage-20261101-9c4097dc` remained present and unmodified. Actual private root owner/admin-only ACL unchanged, `SSIKGUN_PRIVATE_OPEN=DENIED_PASS; PRIVATE_ROOT_ACL=PASS`. `TRANSFER_CONNECTION=NOT_CHECKED; NAS_STAGE_WRITE=0; BACKUP_WRITE=0; NFO_WRITE=0`. CT108 candidate files were already separately SHA3 verified in previous checkpoint. **Next:** read-only verify existing CT108-to-NAS authenticated connection and exact receiving identity/path; then stage only three frozen SHA candidate files to the reserved absent directory without overwriting. No NAS staging or no-Apply Dry-run yet. Never touch old backup, NFO, private root/test file, service/timer, or old staging.

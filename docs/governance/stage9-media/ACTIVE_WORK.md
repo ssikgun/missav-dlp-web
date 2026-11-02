@@ -6,6 +6,15 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage9-media
 
+## P03-H CT108 SSH ALIAS RESOLUTION FAILURE — 2026-11-02
+
+USER-EXECUTED CT108 READ-ONLY RESULT: On `root@downloader`, `ssh -G teddy_storage` reported `user root`, `hostname teddy_storage`, `port 22`; the `ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=8 -o ConnectionAttempts=1 -T teddy_storage "python3 -B -"` invocation failed before NAS Python could run with `ssh: Could not resolve hostname teddy_storage: Name or service not known` and `SSH_EXIT=255`. There is no evidence that NAS hostname, account or TCP SSH service itself failed; the SSH alias is unresolved on CT108 in this invocation. Neither `TRANSFER_PREFLIGHT=PASS` nor NAS UID/target readback was produced.
+
+CHECKPOINT: `P03H_SSH_TRANSPORT=BLOCKED_ALIAS_UNRESOLVED; NAS_PYTHON=NOT_RUN; NEW_NAS_STAGE=NOT_CREATED_BY_THIS_CHECK; NAS_TRANSFER=NOT_RUN; NAS_DRYRUN=NOT_RUN; NFO_WRITE=0_BY_THIS_CHECK; SSH_CONFIG_OR_KEY_CHANGE=0`. Prior on-NAS `NAS_STAGE_PREFLIGHT=PASS_READ_ONLY` remains historical and is not a current CT108-to-NAS transport PASS. The earlier CT108 frozen source SHA3 was PASS; it has not been rerun here.
+
+NEXT: Inspect the preexisting CT108 NAS SSH identity/key/known_hosts without disclosing private-key bytes, verify the existing trusted-host entry and use an explicit verified `ssikgun@192.168.1.201` route with `BatchMode=yes`, `StrictHostKeyChecking=yes`, the verified identity file and pinned existing known_hosts. No new key/account, disabled host checking, retry loop, transfer, NAS mutation, NFO Apply or ACL change. If exact existing credentials/host verification are absent, stop and report. After a successful real SSH readback, recheck target absence before the separately approved staging-only step. Record the next outcome immediately in Stage9 ACTIVE_WORK and CURRENT_HANDOFF.
+
+
 ## P03-H NAS ACL-CANDIDATE STAGING PREFLIGHT USER READBACK — 2026-11-02 KST
 
 USER-EXECUTED NAS READ-ONLY RESULT: On `ssikgun@ssikgun_home`, user ran the exact preflight for temporary staging destination `/tmp/p03h-admin83-backup-acl-stage-20261102-v1` and read back `NAS_STAGE_PREFLIGHT=PASS; TRANSFER_CONNECTION=NOT_CHECKED; NAS_STAGE_WRITE=0; BACKUP_WRITE=0; NFO_WRITE=0`. Account UID1026 confirmed; `/tmp` real directory owned root:root, mode `01777` and writable hint True; exact new staging destination `NEW_TARGET=ABSENT_PASS`; old staged source folder `/tmp/p03h-admin83-stage-20261101-9c4097dc` `OLD_STAGE=PRESENT_UNCHANGED`. Isolated Synology private backup root `/volume1/video/video2/downloads/backups/stage9-admin-private` retained admin UID1024/GID100, exact sole explicit admin ACL `user:admin:allow:rwxpdDaARWcCo:fd--` at level0 and no inheritance archive (`has_ACL,is_support_ACL`). Ordinary nonsudo `ssikgun` directory open `DENIED_PASS`; `PRIVATE_ROOT_ACL=PASS`. No NAS writes occurred, and retained harmless child was not touched.
