@@ -1,5 +1,20 @@
 # Stage9 Media workstream — active work
 
+## P03-H EXTRA37 ACTUAL NAS APPLY PASS 37/37 — independent readback pending (2026-11-02 KST)
+
+ACTUAL USER SYNOLOGY NAS TERMINAL UPLOAD, 2026-11-02 KST (source user terminal, not ChatGPT direct execution): After separately approved exact 37-target correction and repeated read-only original SHA/fingerprint/ACL-mode survey PASS, user ran corrected `sudo -n /usr/bin/python3 -B -` with both POSIX Linux-mode (UID1024, 23) and Synology ACL (UID1026, four; UID1030, ten) handling. Verbatim key stdout:
+- `FRESH_PREFLIGHT=PASS; READY=37`.
+- `BACKUP_RUN_CREATED=/volume1/video/video2/downloads/backups/stage9-admin-private/p03h-extra37-6e43458a98550ff6`.
+- `BACKUP_COMPLETE=37; VERIFIED=PASS`.
+- `WRITE_BEGIN=FNS-267` then `APPLIED=FNS-267 SHA256=6c4a1abe36dc60347e254937c2ab6011cd147a14eb9383fc20b5eb5adfb24b07`. Afterwards 36 further `APPLIED=<DVD-ID> SHA256=...` items, all distinct and from exact approved 37 roster. Final `APPLIED=SW-216 SHA256=e505b26e5eb406bb3783375f1fa34d71a08331c818d247691f70bfc8c896bceb`.
+- Final `EXTRA37_APPLY=PASS; MODIFIED=37; APPLIED_COUNT=37; WRITE_IN_PROGRESS=NONE; BACKUP_RUN=/volume1/video/video2/downloads/backups/stage9-admin-private/p03h-extra37-6e43458a98550ff6; AUTO_RETRY=NO`.
+- The program's per-file source postcondition required exact candidate NFO bytes, unchanged dev/inode/owner/group/mode/nlink, xattrs and unchanged source ACL classification/snapshot, and backed up all 37 originals/ACL/receipts readback before starting the first source write. These are **script-evidenced immediate PASS**; not yet an independent postprocess verification.
+
+PROGRESS: `ADDITIONAL_NFO_37_APPLY=PASS_IMMEDIATE`, `INDEPENDENT_37_BACKUP_AND_SOURCE_RECHECK=NOT_RUN`. Prior frozen 188 current NAS prefix independent PASS; **188+37=225 separate title-only changes historically** (104 ordinary bulk + MARR canary + 83 admin cohort + 37 extras), but not to be conflated with the complete current existing-NFO count. Before latest update, 189 correctly prefixed NFO among 229 standard-family folders and 37 missing and 3 NFO-less; one additional correctly prefixed FC2-PPV-4973050 excluded by folder regex => expected 227 correctly prefixed existing NFOs across the observed 230 canonical/special-family folders, pending independent postcheck. Three existing folders with no NFO remain outside approved repair scope: `DANDYA-033, MFCS-085, NHDTB-778`. Five Synology `@eaDir` entries are system folders and excluded. Jellyfin title refresh/search and naturally generated post-deploy NFO remain NOT_VERIFIED; no Jellyfin/DB/video/poster/timer actions authorized.
+
+IMMEDIATE NEXT: **READ ONLY** exact-run independent 37 source-vs-original-and-receipt comparison with fixed run path and 37 unique IDs; check each current NFO equals original backup with only first `<title>` insertion `[DVD-ID] `, XML verified matching ID, SHA equals receipt candidate, original SHA matches receipt, preserved original inode/UID/GID/mode/nlink and POSIX Linux-vs-Synology ACL snapshots and xattrs. Check backup root/run/item ACL privacy and backup hash without ever printing full titles or raw ACL. Optionally same prior 188-manifest direct prefix check; do NOT run any Apply or script retry. Preserve all 37 new backups pending verified close and any explicit future user cleanup consent. Update canonical immediately after readback.
+
+
 ## P03-H entire 37 Linux/Synology ACL survey PASS — 2026-11-02 KST
 
 USER-EXECUTED ACTUAL SYNOLOGY NAS READ-ONLY ACL SURVEY: The corrected all-37 preflight successfully re-read all 37 NFO bytes and xattrs, verified their exact original owner UID/GID, modes, single-file paths and no symlinks, and recomputed the frozen all-37 sorted `DVD-ID|UID|SHA256(original)` digest `6d4e8d9f12dda4277e74f4d6a725a3153fe8d1506b4737fee1fe9f48063db0ca`. Exact stdout: `FROZEN_37_HASH=PASS; ACL_SURVEY=PASS; UID1024_LINUX=23; UID1024_SYNOLOGY=0; UID1026_LINUX=0; UID1026_SYNOLOGY=4; UID1030_LINUX=0; UID1030_SYNOLOGY=10; CHECKED=37; NAS_WRITE=0; APPLY=NOT_RUN`.
