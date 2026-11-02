@@ -1,5 +1,17 @@
 # Stage9 Media workstream — active work
 
+## P03-H THREE EXHAUSTED MEDIA ERRORS DECODED — 2026-11-02 KST
+
+ACTUAL USER CT108 exact-ID `media_jobs.error` short-text guarded read-only result. Live SQLite URI opened `mode=ro` plus `PRAGMA query_only=ON`. Output `ERROR_IDENTIFICATION=PASS; CHECKED=3; DB_WRITE=0; JOB_RETRY=0; NAS_WRITE=0` with the previously pinned error SHA12 and attempt_count unchanged:
+- `DANDYA-033` / 5 attempts / SHA12 `8daefccf6dbc` / exact stored last error **`unsupported video extension`**.
+- `NHDTB-778` / 5 attempts / same SHA12 `8daefccf6dbc` / exact stored last error **`unsupported video extension`**.
+- `MFCS-085` / 17,161 historical attempts / SHA12 `fa0a74aa9486` / original error remains **REDACTED** by the guarding code, not an established exact phrase. A previous bounded classifier only detected COVER_POSTER (regex `cover|poster|image`); cannot assert missing cover as exclusive cause. All have no NFO in the earlier live NAS snapshot, state FAILED and legacy nfo_status UNKNOWN; no writes or retries.
+
+CANONICAL SOURCE READ-ONLY CODE EVIDENCE: `teddy_discovery_media_publish.py::_safe_video_relative()` raises the exact `unsupported video extension` error when its `PurePosixPath(relative_path).suffix.lower()` is not in `{.mp4,.mkv,.avi,.mov,.webm,.m4v}`. This is likely the legacy failure boundary for the two jobs, but actual `holdings.relative_path` for each is NOT YET EXAMINED here and the currently deployed stage9 runtime release/version has NOT been compared with GitHub HEAD. Do not assume present video extension or advise renaming physical media without evidence. The Stage9 `build_media_bundle` creates an NFO with `poster=None, poster_status=PENDING` if the cover URL is absent; therefore MFCS absent cover alone cannot explain blocking of NFO with the *current source*.
+
+NEXT: SHORT strictly read-only CT108 query of the exact three `holdings.relative_path` values, only printing file basename/suffix, checks for unsafe path/extra rows and cross-compare with allowed suffixes. For MFCS-085 allow a bounded diagnostic that classifies literal stored 27-char error into safe shape without leaking URLs/credentials; if it remains redacted, use exact known source identifiers and avoid guess. Optionally inspect deployed runner identity read-only after knowing suffixes. No NAS NFO create, rename, retry, attempt reset, timer or Jellyfin mutations without new explicit scope approval. The 188+37 already corrected NFOs remain complete and protected. `LIVE_NFO_CREATE=NOT_AUTHORIZED/NOT_RUN`.
+
+
 ## P03-H THREE EXHAUSTED JOBS' ERROR FINGERPRINTS — EXACT 3 READ-ONLY PASS (2026-11-02 KST)
 
 USER-EXECUTED ACTUAL CT108 read-only error classifier, `/opt/missav-dlp-web/discovery/teddy-stage9-media.sqlite3` opened as SQLite URI `mode=ro`, `PRAGMA query_only=ON`; only `media_jobs.status, attempt_count, error` for the exact three known NFO-less titles. Terminal `ERROR_REVIEW=PASS; DB_WRITE=0; JOB_RETRY=0; NAS_WRITE=0`, values:
