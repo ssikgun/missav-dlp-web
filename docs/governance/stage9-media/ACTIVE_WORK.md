@@ -1,5 +1,17 @@
 # Stage9 Media workstream — active work
 
+## P03-H THREE EXHAUSTED JOBS' ERROR FINGERPRINTS — EXACT 3 READ-ONLY PASS (2026-11-02 KST)
+
+USER-EXECUTED ACTUAL CT108 read-only error classifier, `/opt/missav-dlp-web/discovery/teddy-stage9-media.sqlite3` opened as SQLite URI `mode=ro`, `PRAGMA query_only=ON`; only `media_jobs.status, attempt_count, error` for the exact three known NFO-less titles. Terminal `ERROR_REVIEW=PASS; DB_WRITE=0; JOB_RETRY=0; NAS_WRITE=0`, values:
+- `DANDYA-033: FAILED, attempts=5, error length=27, error SHA256 prefix=8daefccf6dbc, ERROR_CATEGORIES=UNCLASSIFIED`.
+- `NHDTB-778: FAILED, attempts=5, error length=27, error SHA256 prefix=8daefccf6dbc, ERROR_CATEGORIES=UNCLASSIFIED`.
+- `MFCS-085: FAILED, attempts=17161, error length=27, error SHA256 prefix=fa0a74aa9486, ERROR_CATEGORIES=COVER_POSTER` (matched `cover|poster|image` within the error).
+- Because the first two error SHA and length match, they record the same final error bytes with very high confidence; MFCS-085 differs. **A broad pattern classification is not exact root cause**; missing cover does not inherently prevent NFO generation in approved design. Stored 17,161 attempts is historical state, not evidence of fresh attempts/active retry.
+- Error plaintext was intentionally **not displayed** in the prior request. Source-specific exact classification now needs a narrow, privacy-conservative read-only follow-up or developer source verification; do not assume errors are HTTP, credentials, metadata, etc.
+
+No change to active Stage9 authorization: this is read-only investigation only, no manual retries, attempt_count changes, NFO creation, NAS, Jellyfin, DB, timer or service mutations. Next: inspect exactly these three short error strings only when proven safe to print (reject address, slash, URL, `@`, `=`, colon, control chars, secret-like words; otherwise output only safe normalized categories), and compare with current source to identify likely outdated runtime cause. Before proposing a fix, distinguish historical error from current live pipeline capabilities. The earlier 188+37 title fixes and private backup run remain CLOSED/PASS.
+
+
 ## P03-H THREE EXACT MEDIA JOBS FAILED/EXHAUSTED — LIVE CT108 READ-ONLY PASS (2026-11-02 KST)
 
 ACTUAL USER-EXECUTED CT108 `root@downloader` READ-ONLY DB QUERY (not a live ChatGPT server call), SQLite `mode=ro` / `PRAGMA query_only=ON`, using only `/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3` and `.../teddy-stage9-media.sqlite3`, with 3 exact IDs. Output `THREE_TARGET_READONLY=PASS; CHECKED=3; DB_WRITE=0; NAS_WRITE=0; MEDIA_JOB_EXECUTION=NOT_RUN`. Recorded state:
