@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## P03-H NAS PRIVATE STAGING PATH PREFLIGHT PASS — USER CT NAS READ-ONLY 2026-11-02 KST
+
+USER-PROVIDED ACTUAL NAS `ssikgun@ssikgun_home` transcript: `HOST=ssikgun_home; SSIKGUN_UID=1026; ADMIN_UID=1024; CALLER_IDENTITY=PASS; TMP_PARENT=PASS; WORKER_TARGET=AVAILABLE; OWNER_TARGET=AVAILABLE; NAS_STAGING_PREFLIGHT=PASS; NAS_WRITE=0; NFO_APPLY=NOT_RUN`. The read-only Python script verified the user/group-account identity by `pwd.getpwnam()`, current euid1026, a real sticky `/tmp` directory, and lstat nonexistence of both exact staging directories: `/tmp/p03h-admin83-ipc-worker-stage-20261102-v1` and `/tmp/p03h-admin83-ipc-owner-stage-20261102-v1`. It did not verify NAS transfer login/key, ability to create admin-owned private folder, or NAS-specific owner/admin execution and IPC. PASS is limited to this preflight and is subject to race/change before creation.
+
+USER APPROVED scope remains candidate-only NAS staging in fresh isolated private directories, owner UID1026, admin UID1024, exact pinned code hashes and source/readback, no overwrite of existing files; real NAS Dry-run or Apply, NFO, backups, root ACL/sudoers, services, DB/Jellyfin, and other titles are NOT authorized. Next single checkpoint is guarded transfer of the SHA-pinned worker and owner candidate files from CT108 to a newly created private owner-only NAS staging directory and post-transfer SHA verification; admin-owned worker installation follows only after that checkpoint passes. Stop on any collision or SSH auth failure; preserve partial state and do not blind retry.
+
 ## P03-H ADMIN83 IPC NAS PRIVATE CANDIDATE STAGING — USER APPROVED 2026-11-02 KST
 
 USER APPROVAL: In the next chat after exact owner/worker expression check, the assistant proposed a bounded read-only NAS destination/account/permission preflight and, only if safe, copying the exact SHA-verified IPC candidate scripts into NEW private staging directories on NAS. The user directly replied "승인해" and asked why the work was taking so long. The scope is strictly Stage9 Media workstream `STG9MEDIA-001 / IN_PROGRESS`, using existing common contract v1.0.1 and Stage9 contract v1.0.0. This new approval supersedes older offline-only/NAS-staging-NOT-AUTHORIZED markers FOR THIS LIMITED NAS STAGING ONLY; older history remains accurate for its time.
