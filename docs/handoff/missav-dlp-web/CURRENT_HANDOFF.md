@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-02 P03-H NAS NO-APPLY PREPARE REVIEW
+
+Actual NAS source SHA review PASS. Worker `apply=False` returns after prepare() before any backup() or apply_one(). prepare() opens the NFO O_RDWR without content write, temporarily locks it, reads and validates identity, source bytes, metadata and ACL. The no-Apply branch does NOT trigger the ordinary-user backup access-denial probe; therefore future dry-run PASS cannot prove backup privacy behavior. User already approved one NAS no-Apply run, no Apply. Next: execute one index1 no-Apply run with pinned Owner source, stop on failure. Stage9 ACTIVE_WORK holds detailed checkpoint.
+
 ## P03-H NAS IPC FROZEN WORKER NO-APPLY BRANCH READ-ONLY REVIEW — 2026-11-02 KST
 
 USER EXECUTED ACTUAL NAS `ssikgun@ssikgun_home` SHA-verified read-only inspection on staged `/tmp/p03h-admin83-ipc-owner-stage-20261102-v1/admin83_owner.py` (SHA256 `156f2913c8e06d0aedc8eac21a7932bc94a6878cb94b87d22673b47e0ab8e745`). EUID1026, regular one-link UID1026 source and AST-validated `worker()` function lines 324–342. Transcript: `WORKER_SOURCE_REVIEW=PASS; CANDIDATE_EXECUTION=NOT_RUN; NFO_APPLY=NOT_RUN`. Owner and admin-worker exact one-expression equivalence plus admin-worker SHA were established at preceding checkpoint.
