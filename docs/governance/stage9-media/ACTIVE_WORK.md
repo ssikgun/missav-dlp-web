@@ -1,5 +1,12 @@
 # Stage9 Media workstream — active work
 
+## P03-H 82-TITLE NAS READ-ONLY PREFLIGHT — AKDL-312 HOLD 2026-11-02 KST
+
+USER-PROVIDED ACTUAL NAS STDOUT: Under `ssikgun@ssikgun_home`, `sudo -v` then root `/usr/bin/python3 -B -` ran the pinned SHA/UID/mode manifest-and-NFO preflight, reading only files. Exact terminal markers: `PINNED_SCRIPTS=PASS; FROZEN_ROSTER=PASS; BLOR289_EXCLUDED=PASS; BACKUP_ROOT=PASS; TARGET_TOTAL=82; READY=81; MISMATCHES=1; BLOCKED_ID=AKDL-312 REASON=ORIGINAL_SHA_MISMATCH; BULK82_PREFLIGHT=BLOCKED; NAS_WRITE=0; BULK_APPLY=NOT_RUN; AUTO_RETRY=NO`. This verifies 81 original NFOs matched their frozen manifest hashes and one did not. The 82-title change was **not executed**; already-completed BLOR-289 remained excluded and verified unchanged. Do not record 82/82 PASS or assume AKDL-312 is already modified.
+
+NEXT CHECKPOINT ONLY: exact read-only inspection of `AKDL-312` at its pinned manifest path and SHA: report expected/current SHA, file identity and whether removing the exact `[AKDL-312] ` prefix from the existing title restores the expected original SHA. If that exact inverse SHA matches, it proves the title-only bytes were already modified; still do not re-Apply AKDL-312. If not, HOLD it for separate diagnosis. Do not lower SHA guards, edit the manifest, alter protected NAS originals, or start bulk Apply before resolving scope. Keep ordinary user and admin-private original backup boundary. User asked to finish remaining 82 efficiently, with proportionate verification and no unnecessary duplicate testing.
+
+
 ## P03-H REMAINING 82 TITLE-ONLY BULK — USER REQUEST 2026-11-02 KST
 
 EXPLICIT USER REQUEST: After BLOR-289 completed a one-title real Apply and independent read-only content/backup verification, the user said `좋아 이제 다른 82개 작품 수정하자. 한방에 잘~`. This explicitly requests/authorizes the remaining **82** existing NFO title-prefix modifications as the next Stage9 Media operation, subject to the approved Stage9 contract and safety prerequisites; it does **not** authorize touching BLOR-289 again, updating any other cohort, NAS artwork/video, Discovery DB/Jellyfin, services, account permissions, or replacing backups.
