@@ -1,5 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-02 — NAS temporary admin83 candidate file-open diagnostic PASS; dry-run NOT_RUN
+
+Actual NAS `ssikgun` UID1026/GID100 read-only check: staged dir UID1026/mode0700, `admin83_runner.py` UID1026/mode0600; direct read, `io.open_code`, and separate child Python `io.open_code` all PASS. `synoacltool -get` returned `It's Linux mode` (not a Synology ACL deny). `DIAGNOSTIC_COMPLETE=YES; FILE_WRITE=0; NFO_WRITE=0`. Previous direct `python3 -B SCRIPT` EACCES not reproduced by this nonexecuting test; exact origin remains unconfirmed. Potential *separate* future runner preflight boundary: UID1024 `admin` likely cannot traverse/read UID1026-only stage dir mode0700/file0600, whereas existing runner is expected to call `sudo -n -u admin`. Do not confuse previous EACCES with this untested admin permission issue. Next: one read-only actual admin-identity open probe with same-session `sudo -v` (no run, mode change, copy, Dry-run, backup or Apply). `STG9MEDIA-001` remains IN_PROGRESS. See latest Stage9 ACTIVE_WORK checkpoint.
+
+
 ## 2026-11-02 — P03-H NAS one-item Dry-run launch blocked (EACCES; no runner execution)
 
 User's `ssikgun@ssikgun_home` output: after successful `sudo -v`, staged files `admin83_runner.py`, `admin83_runner_smoke.py`, `RECOVERY.md` all passed SHA/type/UID/GID/mode checks; exact original 188-row manifest SHA passed. `STAGED_PREFLIGHT=PASS; FROZEN_MANIFEST=PASS`. But separate child `/bin/python3 -B .../admin83_runner.py --start 1 --count 1` reported `[Errno 13] Permission denied`, `RUNNER_EXIT=2`, `P03H_SINGLE_DRYRUN=BLOCKED; REASON=RUNNER_FAILED`. No runner preflight or Dry-run result, no index1 eligibility evidence, no NFO/backup write invoked. Same script had been readable via wrapper `Path.read_bytes` just before child start, so root cause is unverified; do not assume file mode alone. No retry, chmod, ACL alteration, Apply, alternate target, or cleanup. Stage9 `STG9MEDIA-001 / IN_PROGRESS`; single next checkpoint is bounded read-only diagnostic of NAS script-open/ACL and Python interpreter behavior. See Stage9 ACTIVE_WORK for full terminal evidence.
