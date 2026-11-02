@@ -1,5 +1,16 @@
 # Stage9 Media workstream — active work
 
+## P03-H extra37 actual NAS apply attempted but preflight ACL read blocked — 2026-11-02 KST
+
+ACTUAL USER SYNOLOGY NAS TERMINAL RESULT: Executed previously user-approved `sudo -n /usr/bin/python3 -B -` for exact 37 extra title-only NFO updates. Printed `===== P03-H EXTRA37 APPROVED APPLY =====`, then `EXTRA37_APPLY=STOPPED_OR_PARTIAL; REASON=RuntimeError:ACL_READ_FAILED:movie.nfo; APPLIED_COUNT=0; BACKUP_RUN=NONE; AUTO_RETRY=NO`. Code-level point of failure: inside first phase (read-only snapshot of 37), `acl(path)` invokes `synoacltool -get` and requires exit 0 and <=8192 stdout bytes; first sorted DVD ID is `AT-099`, canonical `/volume1/video/video2/JAV/AT/AT-099/movie.nfo`. It stopped before `FRESH_PREFLIGHT=PASS`, before any backup run mkdir, and before any NFO O_RDWR, so **no NFO modified, no backup created by this attempted execution** (`APPLIED_COUNT=0; BACKUP_RUN=NONE`); preserve all 37 exactly and do not rerun that same script.
+
+CAUSE NOT YET ESTABLISHED: `ACL_READ_FAILED` conflates nonzero `synoacltool -get` exit with oversized stdout. Output did not report return code, stdout/stderr or whether the file has no Synology ACL while using POSIX permissions. Do not assert ACL damage or bypass privacy guards. Need a **small, strictly read-only** diagnostic of `synoacltool` return code and bounded stdout/stderr for AT-099, plus one sample file in each other ownership cohort and original admin-private backup root. No ACL/permission modification or backups/NFO writes. Stop before production updates until handling verified for all relevant ownership classes; if no ACL is present, preserve ACL-absence semantics rather than fabricating an ACL or skipping necessary backup checks.
+
+AUDITED FINGERPRINT CROSS-CHECK: In this chat the assistant independently recomputed SHA256 over 37 original `DVD-ID|UID|SHA256(original NFO)` lines, sorted by DVD ID and joined with newline, using earlier actual NAS 37-item read-only inventory and corrected full `SIRO-5536` SHA. Result exactly matches frozen fingerprint `6d4e8d9f12dda4277e74f4d6a725a3153fe8d1506b4737fee1fe9f48063db0ca`. Thus fingerprint itself is not the cause of this failed run.
+
+CURRENT: `FRESH_ALL_37_APPLY_PREFLIGHT=BLOCKED_ON_FIRST_ACL; NAS_NFO_WRITE=0; NEW_BACKUP_RUN=NONE; EXTRA37_APPLY=NOT_STARTED; USER_APPROVAL=YES (same exact 37 scope)`. No forced retry. Preserve original 188 finished NFOs, excluded three no-NFO folders, other backup runs, Stage9 service and Jellyfin.
+
+
 ## P03-H 37-item operator apply plan frozen — 2026-11-02 KST
 
 Operator progression within existing user approval (no fresh consent required): The 37 ID/UID/original-SHA triples from 2026-11-02 user's actual NAS inventory were sorted by DVD-ID and compacted to a single UTF-8 newline-joined digest. Every line format: `DVD-ID|UID|SHA256(original NFO bytes)`. Frozen SHA-256 for **all 37** = `6d4e8d9f12dda4277e74f4d6a725a3153fe8d1506b4737fee1fe9f48063db0ca`; UID counts = 1024:23, 1026:4, 1030:10. This digest serves as a 37-file global pre-write freeze, NOT permission to auto-discover or change future or other files. It avoids transcribing 37 individual hashes again after the corrected SIRO-5536 SHA trouble. Previously independently verified old 188 manifest unchanged; do not touch it.
