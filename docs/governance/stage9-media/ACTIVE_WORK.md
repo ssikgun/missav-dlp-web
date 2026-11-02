@@ -1,5 +1,19 @@
 # Stage9 Media workstream — active work
 
+## P03-H THREE MISSING NFO SOURCE PATHS CLASSIFIED — 2026-11-02 KST
+
+ACTUAL USER CT108 ROOT READ-ONLY exact-three Discovery holdings path audit, SQLite `/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3` `mode=ro; PRAGMA query_only=ON`, output `VIDEO_PATH_READONLY=PASS; CHECKED=3; DB_WRITE=0; NAS_WRITE=0; RETRY=0`:
+- `DANDYA-033`: JAV holding `present=1`, relative path suffix **`.ts`**, `EXTENSION_ALLOWED=False`, `PARENT_MATCH=True`, `STEM_MATCH=True`, `PATH_SAFE=True`.
+- `NHDTB-778`: identically present/true path shape with suffix **`.ts`** not in supported list.
+- `MFCS-085`: JAV holding present, relative path suffix **`.mp4`**, `EXTENSION_ALLOWED=True`, `PARENT_MATCH=True`, `STEM_MATCH=True`, `PATH_SAFE=True`.
+
+READ-ONLY CANONICAL SOURCE CROSS-CHECK: `teddy_discovery_media_publish.py` `VIDEO_EXTENSIONS = {'.mp4','.mkv','.avi','.mov','.webm','.m4v'}` and `_safe_video_relative()` raises exact `MediaMetadataPublishError('unsupported video extension')` when the DB path suffix is not supported. This **explains the exact stored error for both DANDYA-033 and NHDTB-778** at current canonical source level; no title/metadata failure inferred. The source video sidecar builder receives the entire bundle but rejects unsupported path. `MFCS-085` is `.mp4` and had a different 27-char error (hash `fa0a74aa9486`, only broad `COVER_POSTER` category from regex); current root cause still unknown. Former attempts 5/17161/5 are exhausted legacy values and do not prove runtime currently looping.
+
+CAUSAL BOUNDARY: This check reads only DB `relative_path`, NOT present-tense NAS actual video presence, actual video format, size or presence of a simultaneously completed MP4 counterpart. Do not rename `.ts` to `.mp4`, alter global allowed extensions, force an FFmpeg remux, attempt source cleanup, or queue media jobs absent fresh evidence and explicit multi-area approval; TS can be an intermediate segment or a legitimate transport stream. For MFCS, avoid generic conclusion 'poster missing necessarily blocks NFO' because current `build_media_bundle` permits NFO-only when cover absent.
+
+NEXT READ-ONLY EVIDENCE: NAS direct exact-folder nonrecursive stat for three known DVDs, checking `.ts`, `.mp4` and any existing NFO (including movie.nfo) without reading video payload, no backups or writes, and/or CT108 safe text-only classified MFCS error message. Then propose minimal recovery per title with user selection and exact approved operation; preserve Stage9/Downloader/workstream boundaries and prior 188+37 fixed files. `NFO_CREATION=NOT_RUN; MP4_CONVERSION=NOT_RUN; RETRY=NOT_RUN; TIMER_CHANGE=NOT_RUN`.
+
+
 ## P03-H THREE EXHAUSTED MEDIA ERRORS DECODED — 2026-11-02 KST
 
 ACTUAL USER CT108 exact-ID `media_jobs.error` short-text guarded read-only result. Live SQLite URI opened `mode=ro` plus `PRAGMA query_only=ON`. Output `ERROR_IDENTIFICATION=PASS; CHECKED=3; DB_WRITE=0; JOB_RETRY=0; NAS_WRITE=0` with the previously pinned error SHA12 and attempt_count unchanged:
