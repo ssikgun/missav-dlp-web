@@ -1,5 +1,12 @@
 # Stage9 Media workstream — active work
 
+## P03-H BULK81 APPLY REJECTED BY BATCH_INVALID — 2026-11-02 KST
+
+ACTUAL NAS USER TERMINAL: after `sudo -v`, ordinary `ssikgun` invoked pinned `admin83_owner.py --start 2 --count 81 --apply --confirm P03H-ADMIN83`; stdout was exactly `STOP=ValueError:BATCH_INVALID`, and next shell `RUNNER_EXIT_CODE=1`. There was no `BATCH=PASS`, `PREFLIGHT`, or `BACKUP_COMPLETE` marker in this attempted run. **BULK81_APPLY=FAIL/BLOCKED**, not successful. Actual NAS file/backup side effects **NOT INDEPENDENTLY CHECKED**; do not infer zero writes solely from STOP. This attempted invocation must NOT be automatically retried. The previous note stating the pinned runner permits `--start 2 --count 81` is disproved by this runtime result (it accepted a contiguous slice shape but rejects this batch size or other batch condition). Exact source guard and permitted batch upper bound remain CONFIRM_NEEDED.
+
+NEXT ONLY: one read-only inspection of SHA-pinned owner/worker script around literal `BATCH_INVALID` and bounded private backup run directory contents, to identify exact validation/side-effect ordering. Preserve all backups, BLOR-289 and AKDL-312 completed titles, original media, other 81 candidates; no source modification, Apply, retry or script limit bypass. Once read-only result is known, plan the shortest safe bounded chunks within the existing approved 81-title intent and record the verified execution plan before a fresh invocation.
+
+
 ## P03-H AKDL-312 EXACT ALREADY-PREFIXED CONFIRMED — 81 REMAINING 2026-11-02 KST
 
 USER-EXECUTED ACTUAL NAS READ-ONLY FORENSIC: On `ssikgun@ssikgun_home`, SHA-pinned frozen manifest (188 rows, cohort 129) found the single `AKDL-312` record. Current `/volume1/video/video2/JAV/AKDL/AKDL-312/movie.nfo` is SHA256 `a7ce1cc489eab8250c3eaed4543f512ad84c488aaf7abd68d28c507132daf42c`, UID1024/GID100/mode0644, size745, with title `[AKDL-312] Health Checkup Center Women's Examination`. Its raw bytes contain `<title>[AKDL-312] ` exactly once; replacing this precise prefix with `<title>` results in frozen original SHA256 `5a7f2bc28dd1b5a50c32ee295c7293a16363456efc64de936ba5e5fd1b253feb`. Terminal `EXACT_ALREADY_PREFIXED=PASS; AKDL_DIAGNOSIS=PASS; NAS_WRITE=0; BULK_APPLY=NOT_RUN`. This proves AKDL-312 already has exactly the intended title-only prefix relative to the manifest, with no need for a second write. When/how it was originally modified and whether it has a matching private original backup were **not verified**; do not claim new Apply success for it.
