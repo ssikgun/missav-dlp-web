@@ -1,5 +1,12 @@
 # Stage9 Media workstream — active work
 
+## P03-H THREE-TARGET NAS FILE CHECK RUN ON WRONG HOST — NO NAS READ (2026-11-02 KST)
+
+USER SHELL OUTPUT: The proposed exact three-folder NAS read-only stat was mistakenly executed at **`root@downloader` (CT108)**, not the designated Synology NAS shell `ssikgun@ssikgun_home`. Script immediately returned `FILE_CHECK=BLOCKED`, `REASON=FileNotFoundError:[Errno 2] No such file or directory: '/volume1/video/video2/JAV/DANDYA/DANDYA-033'`, `CHECKED=0`, `NAS_WRITE=0`, `VIDEO_CONVERSION=NOT_RUN`, `NFO_CREATION=NOT_RUN`. Thus the missing path is **in CT108's own filesystem namespace**; it is **NOT evidence that the user NAS lacks DANDYA-033 or that an MP4/TS file disappeared**. Script did not stat any of the three real NAS folders and no media mutation was performed.
+
+NEXT: Run only a small read-only exact-3 nonrecursive source/sidecar stat on the actual Synology NAS user session. Check that the expected NAS JAV root is a real directory before inspecting; if absent on that host stop without modifying anything. Determine TS/MP4 files and matching sizes and confirm no existing NFO; avoid content reads, ffmpeg/remux, renames, video or sidecar writes. Preserve existing three FAILED/exhausted media job rows and previous 188+37 completed NFOs. `NAS_THREE_PHYSICAL_FILE_EVIDENCE=NOT_RUN` as of this checkpoint; `NAS_APPLY=NOT_AUTHORIZED`.
+
+
 ## P03-H THREE MISSING NFO SOURCE PATHS CLASSIFIED — 2026-11-02 KST
 
 ACTUAL USER CT108 ROOT READ-ONLY exact-three Discovery holdings path audit, SQLite `/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3` `mode=ro; PRAGMA query_only=ON`, output `VIDEO_PATH_READONLY=PASS; CHECKED=3; DB_WRITE=0; NAS_WRITE=0; RETRY=0`:
