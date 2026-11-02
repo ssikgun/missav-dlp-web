@@ -1,5 +1,17 @@
 # Stage9 Media workstream — active work
 
+## P03-H THREE EXACT NAS VIDEO FILES EXIST / ALL NFO MISSING — 2026-11-02 KST
+
+ACTUAL USER-EXECUTED SYNLOGY NAS CLI, `ssikgun@ssikgun_home`, `sudo -n /usr/bin/python3 -B -`, read-only nonrecursive exact-folder file stat under `/volume1/video/video2/JAV` with 3 explicit IDs, not CT108. Actual result `HOST=ssikgun_home; NAS_FILE_CHECK=PASS; CHECKED=3; NAS_WRITE=0; NFO_CREATION=NOT_RUN; VIDEO_CONVERSION=NOT_RUN`:
+- `DANDYA-033`: exactly observed `DANDYA-033.ts` regular file with size `6571739656` bytes and `DB_MATCH=True`, matching the existing Discovery holding suffix `.ts` and size. `NFO_COUNT=0`. No `.mp4` file with the expected DVD stem observed in this nonrecursive exact-folder survey.
+- `NHDTB-778`: `NHDTB-778.ts` regular file, size `6637939156` bytes, `DB_MATCH=True`, `NFO_COUNT=0`. No corresponding `.mp4` observed.
+- `MFCS-085`: `MFCS-085.mp4` regular file, size `1467881427` bytes, `DB_MATCH=True`, `NFO_COUNT=0`.
+- The code read file metadata (lstat), **not media payload, stream validity, or current live remux/queue state**; DB_MATCH means file *size* equal to holding size, not content hash. Do not assert media content playable or `.ts` is a completed video or an incomplete segment without independent proof.
+- Prior root CT108 jobs and source evidence: all 3 present JAV holdings with matching Organizer COMPLETE, 3 FAILED exhausted media jobs (5/17161/5). The two TS titles have exact old `unsupported video extension` errors which match `teddy_discovery_media_publish.py::_safe_video_relative` current exclusion of `.ts`. MFCS uses supported `.mp4`, old error 27 chars still redacted, only cover/poster regex matched; its Discovery title has no cover URL, but existing current media bundle may generate NFO with poster PENDING.
+
+NEXT: **READ ONLY** prioritize safe detailed source review of exact validator and current deployed state, and narrowly classify MFCS exact error without exposing secrets, then propose safe *separately authorized* NFO-only creation for these three once metadata/ownership/file identity validated. Do not add `.ts` globally or rename/reencode video merely to get NFO; do not reset/retry media jobs with historic 17161 count, and do not touch existing 188+37 repaired NFOs or delete backups. Creation/convert/deploy/systemd/Jellyfin/DB writes are NOT authorized by this read-only task. P03-T timer remains future separate step.
+
+
 ## P03-H THREE-TARGET NAS FILE CHECK RUN ON WRONG HOST — NO NAS READ (2026-11-02 KST)
 
 USER SHELL OUTPUT: The proposed exact three-folder NAS read-only stat was mistakenly executed at **`root@downloader` (CT108)**, not the designated Synology NAS shell `ssikgun@ssikgun_home`. Script immediately returned `FILE_CHECK=BLOCKED`, `REASON=FileNotFoundError:[Errno 2] No such file or directory: '/volume1/video/video2/JAV/DANDYA/DANDYA-033'`, `CHECKED=0`, `NAS_WRITE=0`, `VIDEO_CONVERSION=NOT_RUN`, `NFO_CREATION=NOT_RUN`. Thus the missing path is **in CT108's own filesystem namespace**; it is **NOT evidence that the user NAS lacks DANDYA-033 or that an MP4/TS file disappeared**. Script did not stat any of the three real NAS folders and no media mutation was performed.
