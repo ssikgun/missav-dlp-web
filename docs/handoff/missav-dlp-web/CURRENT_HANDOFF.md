@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-02 — Stage9 empty admin backup root ACL-only isolation APPROVED; NOT RUN
+
+User approved narrowly scoped ACL repair of the **already created, empty** `/volume1/video/video2/downloads/backups/stage9-admin-private`. Scope `STG9MEDIA-001`, current Stage9 ACTIVE_WORK entry "P03-H ADMIN PRIVATE BACKUP ROOT ACL-ONLY ISOLATION APPROVED" is authoritative. First recheck exact root owner 1024:100, emptiness, no symlinks, six inherited allow entries, current `ssikgun` access. Previously demonstrated DSM procedure on separate test folder: add explicit admin ACE `user:admin:allow:rwxpdDaARWcCo:fd--`, independently verify new explicit ACE; remove inheritance flag `is_inherit`; verify sole admin ACL and ordinary non-sudo ssikgun open denied, admin allowed. These are the only two allowed ACL mutations, on this exact directory only; no retry/rollback/child creation, real backup writes, runner execution, existing backup or 82 NFO changes, deploy/DB/Jellyfin/timers. Any failed precondition or incomplete verification must stop; full NAS result still `NOT_RUN`. This is not an admin/sudo-resistant boundary.
+
 ## 2026-11-02 — Stage9 new backup root created; effective ACL isolation FAIL
 
 User NAS execution: new empty /volume1/video/video2/downloads/backups/stage9-admin-private was created once as admin UID1024 GID100; CREATE_RESULT=COMPLETE; Synology reports mode 0777 and inherited ACL with six allow entries. Effective ssikgun rwx rights confirmed by synoacltool; ordinary ssikgun directory open ALLOWED, admin open ALLOWED. Backup root is NOT PRIVATE and must not be used. ACL_CHANGE=0, BACKUP_WRITE=0, NFO_WRITE=0. Preserve directory, do not re-run mkdir or touch real existing backup. Further explicit approval needed for empty-directory ACL-only change. No child files, code deployment or remaining 82 NFO Apply authorized. Stage9 ACTIVE_WORK has result checkpoint.
