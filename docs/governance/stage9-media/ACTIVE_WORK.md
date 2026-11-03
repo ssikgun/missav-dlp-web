@@ -1,8 +1,8 @@
 # Stage9 Media workstream — active work
 
-## STG9MEDIA-001 TEMPORARY SHARED GOVERNANCE PREFLIGHT — 2026-11-03 KST
+## STG9MEDIA-001 THUMB CLEANUP DESIGN AMENDMENT APPROVED / GOVERNANCE CLOSED — 2026-11-03 KST
 
-USER authorized a narrowly scoped design/contract update permitting cleanup of only program-owned temporary thumbnails after exact official-poster Jellyfin Primary readback. The same task ID STG9MEDIA-001 is temporarily active in governance and stage9-media. Stage9 source-only implementation approval and all previous NAS/Jellyfin production prohibitions remain unchanged. No runtime writes or file deletion are authorized. Next: apply Stage9 contract v1.0.2, validate, restore governance INACTIVE/NONE and Stage9-only routing.
+USER expressly approved changing the prior unconditional thumb retention: after a verified authentic poster is created without clobber, successfully becomes the exact movie's Jellyfin Primary, and is read back, only the exact program-owned temporary thumb (verified path, identity, file type, owner and hash) may be deleted under separately scoped future operational authorization. If the Jellyfin Primary is manual/non-owned/unconfirmed, image identity is uncertain, or any verification fails, retain the thumb; never delete user files, NFO, video or poster. Stage9 contract v1.0.2 APPROVED, STG9MEDIA-001 IN_PROGRESS; one-time paired governance routing used and reverted to INACTIVE/NONE. No code, NAS/DB/Jellyfin operation or deletion executed. Crucially, Jellyfin 10.11.11 no-atomic-CAS blocker still applies; this deletion-policy approval does NOT waive the user's manual-image protection requirement or approve a best-effort Primary replacement race. Future implementation scope and explicit canary/production authorization remain required.
 
 ## STG9MEDIA-001 JELLYFIN 10.11.11 IMAGE UPDATE NO ATOMIC CAS — DESIGN CHOICE REQUIRED (2026-11-03 KST)
 
@@ -1049,8 +1049,8 @@ NEXT SINGLE CHECKPOINT: Separate bounded NAS read-only verification of the exact
 WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.1
-REQUIRES_WORKSTREAMS: governance,stage9-media
+CONTRACT_VERSION: 1.0.2
+REQUIRES_WORKSTREAMS: stage9-media
 
 ## P03-H NAS DUAL-UID TWO TARGETS ABSENT / SOURCE VERIFIED PREFLIGHT PASS — 2026-11-02 KST
 

@@ -1,14 +1,14 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: STG9MEDIA-001
-STATUS: IN_PROGRESS
+TASK_ID: NONE
+STATUS: INACTIVE
 CONTRACT_VERSION: 1.0.1
-REQUIRES_WORKSTREAMS: governance,stage9-media
+REQUIRES_WORKSTREAMS: governance
 
-## STG9MEDIA-001 TEMPORARY GOVERNANCE AUTHORIZATION — 2026-11-03 KST
+## STG9MEDIA-001 TEMPORARY GOVERNANCE CLOSEOUT — 2026-11-03 KST
 
-USER APPROVAL: one-time temporary governance participation under the existing STG9MEDIA-001 task, paired with stage9-media, solely to amend the Stage9 Media domain contract for verified program-owned temporary-thumbnail cleanup and record/verify the result. No unrelated governance, common-contract, downloader, Stage11, NAS, database, Jellyfin, implementation, deployment, or production deletion scope. After the contract/documentation update and readback, restore governance to INACTIVE/NONE and Stage9-only routing; report the result.
+User-approved one-time shared governance change completed for Stage9 Media contract v1.0.2: auto-created temporary thumbnail may be removed only after verified official poster is confirmed as Jellyfin Primary, with exact ownership/path/hash checks and fail-closed/manual-art protections. Governance route and task restored to INACTIVE/NONE; Stage9-only STG9MEDIA-001 remains IN_PROGRESS. This document closeout grants no implementation, deployment, NAS deletion, database write or Jellyfin image change. Actual automatic Jellyfin image replacement remains blocked by lack of atomic conditional API support or a separately approved explicit risk-policy change.
 
 ## DLDLIB-001 CLOSEOUT — 2026-10-28 KST
 
