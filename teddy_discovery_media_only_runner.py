@@ -745,6 +745,12 @@ def _summarize_visibility(result: dict | None) -> dict | None:
 
 
 def _summarize_thumbnail(thumb_results: list[dict]) -> dict:
+    from teddy_discovery_media_thumbnail import safe_thumbnail_error
+    error_codes = {}
+    for item in thumb_results:
+        code = safe_thumbnail_error(item.get("error"))
+        if code is not None:
+            error_codes[code] = error_codes.get(code, 0) + 1
     attention_states = {"ATTENTION", "HELD_CONFLICT", "HELD_INVALID_STATE", "HELD_INVALID_TIMESTAMP", "EXHAUSTED"}
     held_reasons = {}
     for item in thumb_results:
@@ -759,6 +765,7 @@ def _summarize_thumbnail(thumb_results: list[dict]) -> dict:
         "held_reasons": held_reasons}
     summary["state"] = ("ATTENTION" if summary["attention"] else
         "PENDING" if summary["pending"] or held_reasons else "COMPLETE")
+    summary["error_codes"] = error_codes
     return summary
 
 

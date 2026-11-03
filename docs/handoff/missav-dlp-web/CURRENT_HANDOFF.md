@@ -1,6 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## Stage9 sanitized fetch diagnostics — source/offline complete (2026-11-03)
+
+Fixed error-category allowlist is propagated from candidate validation through new thumbnail DB errors to runner code counts. Thumbnail tests 13 PASS with 12 diagnostic subcases; jobs/runner/processor/FileStation regressions PASS. No raw exception/URL/body output, no production access or deployment, no historical state reset and no live canary retry. Prior CANDIDATE_FETCH_FAILED cause remains UNKNOWN. See Stage9 ACTIVE_WORK for evidence.
+
 ## STG9MEDIA-001 USER SQLITE LOCK EVIDENCE / MAINTENANCE CANDIDATE — 2026-11-03
 
 User reports CT108 service/timer inactive, dedicated media DB WAL empty, BEGIN IMMEDIATE PASS, integrity_check ok, ROLLBACK and lock release PASS; no DB schema/data change. fuser unavailable, no installation. This is a timestamped observation, not future writer exclusion. Timer was user-stopped: PRODUCTION_CHANGED=YES.

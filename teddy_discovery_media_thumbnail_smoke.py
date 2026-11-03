@@ -165,7 +165,7 @@ class CanaryGateSmoke(unittest.TestCase):
     def test_single_get_and_hash(self):
         import hashlib
         from teddy_discovery_media_thumbnail import one_shot_verified_fetch
-        url='https://fourhoi.com/abc-123/cover-n.jpg'; data=b'fixture'; calls=[]
+        url='https://fourhoi.com/abc-123/cover-n.jpg'; data=b'\xff\xd8\xfffixture\xff\xd9'; calls=[]
         def fetch(u,m): calls.append(u); return 200,u,'image/jpeg',data
         gate=one_shot_verified_fetch(fetch,exact_url=url,expected_size=len(data),expected_sha256=hashlib.sha256(data).hexdigest())
         self.assertEqual(gate(url,100)[3],data)
@@ -173,5 +173,59 @@ class CanaryGateSmoke(unittest.TestCase):
         self.assertEqual(len(calls),1)
         bad=one_shot_verified_fetch(fetch,exact_url=url,expected_size=len(data),expected_sha256='0'*64)
         with self.assertRaises(ValueError): bad(url,100)
+
+class DiagnosticCodesSmoke(unittest.TestCase):
+    def test_errors_reach_db_and_runner_without_upload(self):
+        import hashlib, tempfile, sqlite3
+        from pathlib import Path
+        from urllib.error import HTTPError, URLError
+        from teddy_discovery_media_thumbnail import candidate_thumbnail_url, store_candidate_thumbnail, one_shot_verified_fetch
+        from teddy_discovery_media_jobs import _media_transaction, run_thumbnail_jobs
+        from teddy_discovery_media_only_runner import _summarize_thumbnail
+        from unittest.mock import Mock
+        url=candidate_thumbnail_url('ABC-123'); data=b'\xff\xd8\xfffixture\xff\xd9'
+        secret='https://user:SECRET@invalid/?token=SECRET'
+        cases=[
+            (URLError(secret),'CANDIDATE_NETWORK_ERROR'),
+            (ConnectionRefusedError(secret),'CANDIDATE_NETWORK_ERROR'),
+            (HTTPError(secret,403,secret,{},None),'CANDIDATE_HTTP_ERROR'),
+            (HTTPError(secret,302,secret,{},None),'CANDIDATE_REDIRECT_REJECTED'),
+            ((302,url,'image/jpeg',data),'CANDIDATE_REDIRECT_REJECTED'),
+            ((200,url+'?secret','image/jpeg',data),'CANDIDATE_REDIRECT_REJECTED'),
+            ((200,url,'text/html',data),'CANDIDATE_MIME_MISMATCH'),
+            ((200,url,'image/jpeg',data+b'x'),'CANDIDATE_SIZE_MISMATCH'),
+            ((200,url,'image/jpeg',b'\xff\xd8\xffotherxx\xff\xd9'),'CANDIDATE_SHA256_MISMATCH'),
+            ((200,url,'image/jpeg',b'x'*len(data)),'CANDIDATE_RESPONSE_INVALID'),
+            ((200,url),'CANDIDATE_RESPONSE_INVALID'),
+            (RuntimeError(secret),'CANDIDATE_UNKNOWN_ERROR'),
+        ]
+        for index,(response,expected) in enumerate(cases):
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as tmp:
+                p=Path(tmp); locks=p/'titles';locks.mkdir();db=p/'media.sqlite'
+                with _media_transaction(db,p/'writer.lock') as c:
+                    c.execute("INSERT INTO media_jobs(dvd_id,status,nfo_status,created_at,updated_at) VALUES('ABC-123','COMPLETED','COMPLETE','2026-11-03','2026-11-03')")
+                calls=[]; storage=Mock()
+                def fetch(u,m):
+                    calls.append(u)
+                    if isinstance(response,Exception): raise response
+                    return response
+                gate=one_shot_verified_fetch(fetch,exact_url=url,expected_size=len(data),expected_sha256=hashlib.sha256(data).hexdigest())
+                def process(dvd):return store_candidate_thumbnail(dvd_id=dvd,video_relative='ABC/ABC-123/ABC-123.mp4',fetcher=gate,file_station=storage,official_poster_verified=False)
+                result=run_thumbnail_jobs(db_path=db,writer_lock_path=p/'writer.lock',title_lock_dir=locks,processor=process)
+                self.assertEqual(result[0]['error'],expected)
+                summary=_summarize_thumbnail(result)
+                self.assertEqual(summary['error_codes'],{expected:1});self.assertNotIn('SECRET',str(summary))
+                c=sqlite3.connect(db);self.assertEqual(c.execute('select thumbnail_error from media_jobs').fetchone()[0],expected);c.close()
+                self.assertEqual(len(calls),1);storage.create_thumbnail.assert_not_called()
+                second=process('ABC-123');self.assertEqual(second['error'],'CANDIDATE_REQUEST_LIMIT');self.assertEqual(len(calls),1)
+        self.assertEqual(_summarize_thumbnail([{'status':'PENDING','error':secret}])['error_codes'],{'CANDIDATE_UNKNOWN_ERROR':1})
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp); (p/'titles').mkdir()
+            with _media_transaction(p/'media.sqlite',p/'writer.lock') as c:
+                c.execute("INSERT INTO media_jobs(dvd_id,status,nfo_status,created_at,updated_at) VALUES('ABC-123','COMPLETED','COMPLETE','2026-11-03','2026-11-03')")
+            result=run_thumbnail_jobs(db_path=p/'media.sqlite',writer_lock_path=p/'writer.lock',title_lock_dir=p/'titles',processor=lambda dvd: {'status':'PENDING','error':secret})
+            c=sqlite3.connect(p/'media.sqlite')
+            self.assertEqual(c.execute('select thumbnail_error from media_jobs').fetchone()[0],'CANDIDATE_UNKNOWN_ERROR');c.close()
+
 
 if __name__ == '__main__': unittest.main(verbosity=2)

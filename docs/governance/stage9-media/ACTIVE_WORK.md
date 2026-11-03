@@ -1,5 +1,11 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 SANITIZED FETCH DIAGNOSTICS — SOURCE/OFFLINE PASS (2026-11-03)
+
+Implemented fixed allowlisted codes for transport, HTTP (HTTPError before URLError), redirect rejection, response/MIME, byte-size, SHA mismatch, request-limit/target guards and unknown failures. No proxy-vs-origin attribution without evidence and no raw exception/URL/body logging. One-shot guard now raises typed sanitized errors; storage still validates before create-only upload. Jobs sanitize newly returned processor errors before DB persistence and runner exposes only per-code counts. No historical rows or retry state changed.
+
+Offline thumbnail smoke 13 tests PASS, including 12 diagnostic subcases through fake transport/SQLite/runner with zero uploads on failures and no second underlying fetch; unknown secret-bearing processor text is reduced to UNKNOWN before DB and summary. Existing jobs, runner (25 thumbnail-only checks), processor (20) and FileStation (7) smokes PASS; governance and diff checks PASS. No live site, operational DB/NAS/Jellyfin access, deployment or service/timer actions. Existing MBRBI-015 canary remains consumed/no retry; actual old failure remains UNKNOWN and full image decoding remains unverified. Operational application requires separate approval.
+
 ## STG9MEDIA-001 SANITIZED FETCH DIAGNOSTICS — OFFLINE IMPLEMENTATION CHECKPOINT (2026-11-03)
 
 User approves source and offline tests only. Implementation in isolated `/tmp/stg9-error-codes-20261103` distinguishes HTTPError before URLError, redirect, MIME/format, byte-size, SHA, one-shot limit and unknown failures with fixed codes; jobs and runner filter codes through an allowlist. Initial synthetic end-to-end scenarios pass through SQLite and runner summary with no upload or second network call. Existing MBRBI-015 failure cause remains UNKNOWN, prior PENDING/error rows must not be edited, and consumed canary has no retry authorization. No operational access, deployment or service change. Final regression pending.

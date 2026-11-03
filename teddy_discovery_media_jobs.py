@@ -830,7 +830,8 @@ def run_thumbnail_jobs(*, db_path, writer_lock_path, processor, title_lock_dir=N
                 result_status = result.get('status') if isinstance(result, dict) else None
                 if result_status not in {'COMPLETE', 'FAILED', 'PENDING', 'ATTENTION', 'SKIPPED'}:
                     raise ValueError('invalid thumbnail processor outcome')
-                error = str(result.get('error') or '')[:500] or None
+                from teddy_discovery_media_thumbnail import safe_thumbnail_error
+                error = safe_thumbnail_error(result.get('error'))
             except Exception:
                 result_status, error = 'FAILED', 'THUMBNAIL_PROCESSOR_FAILED'
             with _media_transaction(db_path, writer_lock_path) as db:
@@ -842,7 +843,7 @@ def run_thumbnail_jobs(*, db_path, writer_lock_path, processor, title_lock_dir=N
                 if cursor.rowcount != 1:
                     outcomes.append({'dvd_id': candidate['dvd_id'], 'status': 'HELD_CONFLICT', 'attempted': True})
                     continue
-            outcomes.append({'dvd_id': candidate['dvd_id'], 'status': result_status, 'attempted': True})
+            outcomes.append({'dvd_id': candidate['dvd_id'], 'status': result_status, 'attempted': True, 'error': error})
     return outcomes
 
 

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit
 import re
+from urllib.error import HTTPError, URLError
 import hashlib
 import hmac
 
@@ -164,6 +165,51 @@ def make_candidate_proxy_fetcher(proxy_url):
     return fetch
 
 
+THUMBNAIL_ERROR_CODES = frozenset({
+    'CANDIDATE_NETWORK_ERROR', 'CANDIDATE_HTTP_ERROR', 'CANDIDATE_REDIRECT_REJECTED',
+    'CANDIDATE_RESPONSE_INVALID', 'CANDIDATE_MIME_MISMATCH', 'CANDIDATE_SIZE_MISMATCH',
+    'CANDIDATE_SHA256_MISMATCH', 'CANDIDATE_UNKNOWN_ERROR', 'CANDIDATE_REQUEST_LIMIT',
+    'CANDIDATE_TARGET_MISMATCH', 'CANDIDATE_FETCH_FAILED', 'THUMBNAIL_PROCESSOR_FAILED',
+    'HOLDING_SIZE_UNKNOWN', 'VIDEO_SIZE_OR_IDENTITY_UNCERTAIN', 'POSTER_STATUS_UNKNOWN',
+    'THUMBNAIL_OUTCOME_UNKNOWN', 'THUMBNAIL_TARGET_OR_STORAGE_UNCERTAIN',
+})
+
+
+def safe_thumbnail_error(value):
+    if value is None:
+        return None
+    return value if type(value) is str and value in THUMBNAIL_ERROR_CODES else 'CANDIDATE_UNKNOWN_ERROR'
+
+
+class CandidateFetchError(ValueError):
+    def __init__(self, code):
+        self.code = safe_thumbnail_error(code) or 'CANDIDATE_UNKNOWN_ERROR'
+        super().__init__(self.code)
+
+
+def _validated_candidate_response(response, exact_url, expected_size=None, expected_sha256=None):
+    if not isinstance(response, (tuple, list)) or len(response) != 4:
+        raise CandidateFetchError('CANDIDATE_RESPONSE_INVALID')
+    status, final, mime, data = response
+    if type(status) is not int or not 100 <= status <= 599 or not isinstance(final, str) or not isinstance(mime, str):
+        raise CandidateFetchError('CANDIDATE_RESPONSE_INVALID')
+    if 300 <= status < 400 or final != exact_url:
+        raise CandidateFetchError('CANDIDATE_REDIRECT_REJECTED')
+    if status != 200:
+        raise CandidateFetchError('CANDIDATE_HTTP_ERROR')
+    if mime.split(';', 1)[0].strip().lower() != 'image/jpeg':
+        raise CandidateFetchError('CANDIDATE_MIME_MISMATCH')
+    if not isinstance(data, bytes):
+        raise CandidateFetchError('CANDIDATE_RESPONSE_INVALID')
+    if not 4 <= len(data) <= MAX_POSTER_BYTES or (expected_size is not None and len(data) != expected_size):
+        raise CandidateFetchError('CANDIDATE_SIZE_MISMATCH')
+    if not data.startswith(b'\xff\xd8\xff') or not data.endswith(b'\xff\xd9'):
+        raise CandidateFetchError('CANDIDATE_RESPONSE_INVALID')
+    if expected_sha256 is not None and not hmac.compare_digest(hashlib.sha256(data).hexdigest(), expected_sha256):
+        raise CandidateFetchError('CANDIDATE_SHA256_MISMATCH')
+    return status, final, mime, data
+
+
 def store_candidate_thumbnail(*, dvd_id, video_relative, fetcher, file_station, official_poster_verified):
     """Store explicit template candidate; neither page identity nor decoding is claimed."""
     url = candidate_thumbnail_url(dvd_id)
@@ -174,13 +220,16 @@ def store_candidate_thumbnail(*, dvd_id, video_relative, fetcher, file_station, 
     if not callable(fetcher):
         raise ValueError('PROXY_FETCHER_REQUIRED')
     try:
-        status, final, content_type, data = fetcher(url, MAX_POSTER_BYTES)
+        _, _, _, data = _validated_candidate_response(fetcher(url, MAX_POSTER_BYTES), url)
+    except CandidateFetchError as exc:
+        return {'status': 'PENDING', 'error': safe_thumbnail_error(exc.code)}
+    except HTTPError as exc:
+        code = 'CANDIDATE_REDIRECT_REJECTED' if type(exc.code) is int and 300 <= exc.code < 400 else 'CANDIDATE_HTTP_ERROR'
+        return {'status': 'PENDING', 'error': code}
+    except (URLError, OSError):
+        return {'status': 'PENDING', 'error': 'CANDIDATE_NETWORK_ERROR'}
     except Exception:
-        return {'status': 'PENDING', 'error': 'CANDIDATE_FETCH_FAILED'}
-    if (status != 200 or final != url or str(content_type).split(';', 1)[0].strip().lower() != 'image/jpeg'
-            or not isinstance(data, bytes) or not 4 <= len(data) <= MAX_POSTER_BYTES
-            or not data.startswith(b'\xff\xd8\xff') or not data.endswith(b'\xff\xd9')):
-        return {'status': 'PENDING', 'error': 'CANDIDATE_RESPONSE_INVALID'}
+        return {'status': 'PENDING', 'error': 'CANDIDATE_UNKNOWN_ERROR'}
     return file_station.create_thumbnail(dvd_id=_normalize_dvd_id(dvd_id), video_relative=video_relative,
         content_type='image/jpeg', data=data)
 
@@ -193,13 +242,12 @@ def one_shot_verified_fetch(fetch, *, exact_url, expected_size, expected_sha256)
     used = False
     def guarded(url, maximum):
         nonlocal used
-        if used or url != exact_url or maximum < expected_size:
-            raise ValueError('ONE_SHOT_OR_TARGET_MISMATCH')
+        if used:
+            raise CandidateFetchError('CANDIDATE_REQUEST_LIMIT')
+        if url != exact_url:
+            raise CandidateFetchError('CANDIDATE_TARGET_MISMATCH')
+        if maximum < expected_size:
+            raise CandidateFetchError('CANDIDATE_SIZE_MISMATCH')
         used = True
-        status, final, content_type, data = fetch(url, maximum)
-        if (status != 200 or final != exact_url or str(content_type).split(';', 1)[0].strip().lower() != 'image/jpeg'
-                or not isinstance(data, bytes) or len(data) != expected_size
-                or not hmac.compare_digest(hashlib.sha256(data).hexdigest(), expected_sha256)):
-            raise ValueError('CANDIDATE_IDENTITY_MISMATCH')
-        return status, final, content_type, data
+        return _validated_candidate_response(fetch(url, maximum), exact_url, expected_size, expected_sha256)
     return guarded
