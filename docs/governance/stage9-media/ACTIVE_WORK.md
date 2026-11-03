@@ -1,5 +1,9 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 USER DB BACKUP + FOUR-COLUMN MIGRATION — 2026-11-03
+
+User reports direct CT108 root execution of the previously reviewed one-shot maintenance script `/tmp/stg9-db-maintenance-20261103/maintenance.py`; SHA256 verification PASS (`798cf4115003a3c3bdd0565b00322bbd2e8d1beb4cec96d950c3c6128405d38d`). Command output: `BACKUP_DIRECTORY=/opt/missav-dlp-web/backups/stage9-media-backup-_1d8u18x`, `BACKUP_SHA256=cb76c692cd5e1f23edab8542fcb5039ada6d23fcc45e7e6fefd1b4a842f1a8cb`, `MIGRATION=PASS`. Script implementation creates a SQLite backup, verifies backup contents/integrity and source snapshot, adds exactly four thumbnail columns transactionally, compares old column data and integrity before commit; errors roll back. This is USER_REPORTED successful execution, not independent post-execution readback yet. Production Media DB changed (additive schema) and private backup created; no release deployment, image GET, NAS/Jellyfin write or Stage9 timer resumption reported. Stage9 service/timer were previously USER_REPORTED inactive; current state must be freshly checked. NEXT: CT108 root read-only verification of backup hash/integrity, four new Media DB columns, MBRBI-015 old job/NFO states, and systemd stop state; then controlled immutable release deployment and bounded one-title canary under existing approval. Record verification before the next operational mutation. Do not execute the one-shot migration script again; abort on discrepancy.
+
 ## STG9MEDIA-001 USER SQLITE LOCK EVIDENCE / MAINTENANCE CANDIDATE — 2026-11-03
 
 User reports CT108 service/timer inactive, dedicated media DB WAL empty, BEGIN IMMEDIATE PASS, integrity_check ok, ROLLBACK and lock release PASS; no DB schema/data change. fuser unavailable, no installation. This is a timestamped observation, not future writer exclusion. Timer was user-stopped: PRODUCTION_CHANGED=YES.
