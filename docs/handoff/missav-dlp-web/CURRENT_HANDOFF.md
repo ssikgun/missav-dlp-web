@@ -1,6 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## Stage9 automatic thumbnail source input — blocked (2026-11-03)
+
+Automatic thumbnail wiring remains INCOMPLETE: Stage9 MediaMetadata/pipeline receives cover_url and metadata_source, but no verified exact MissAV page/image URL or reliable official-poster role. Shared MissAV collectors may record source_url in latest_items or raw metadata, but the movie writer validates missav.ws/en, not the observed missav123.com/ko source; no generic equivalence is established. The prior bounded DB review found no verified source for its no-cover candidates. Do not infer URLs or classify cover_url as an official poster. Existing proxy-only poster fetcher has a different response contract and default redirect handling than the thumbnail extractor requires. Jobs track NFO and poster states but no independent thumbnail state; missing-cover completed jobs are held.
+
+NEXT: separately design a Stage9-only, verified provenance input carrying exact work page, image association and poster-role evidence with a bounded retry/thumbnail state; decide whether existing recorded shared inputs suffice before requesting any shared-workstream change. No product source, operational service, DB, NAS or Jellyfin changes; no live requests.
+
 ## Stage9 exact-ID thumbnail source — offline checkpoint (2026-11-03)
 
 User-observed MissAV page-linked fourhoi.com image is accepted only over HTTPS with exact DVD-ID path `/ID/cover-n.jpg`; conflicting twitter:image is rejected. Existing canonical/og:url checks remain. Synthetic thumbnail smoke 9 PASS and FileStation regression 7 PASS. No live page or image request, image decoding, deployment, NAS or Jellyfin write. Production wiring, real image validation and safe Jellyfin Primary replacement remain unverified.
