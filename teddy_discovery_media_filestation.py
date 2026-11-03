@@ -930,6 +930,20 @@ class SynologyFileStationMediaAdapter:
         result = self._json_body(response, "UPLOAD_OUTCOME_UNKNOWN_RESPONSE")
         return result
 
+    def thumbnail_poster_exists(self, *, dvd_id: str, video_relative: str) -> bool:
+        """Read a complete verified folder listing; ambiguous poster entries fail."""
+        canonical, video_api_path, _ = _video_paths(video_relative)
+        if not isinstance(dvd_id, str) or dvd_id != PurePosixPath(canonical).parent.name.upper():
+            raise FileStationMediaError('BUNDLE_DVD_ID_MISMATCH')
+        video = self._resolve(video_api_path)
+        if video is None or video['isdir'] is not False:
+            raise FileStationMediaError('VIDEO_UNAVAILABLE_FOR_PUBLICATION')
+        folder = PurePosixPath(video_api_path).parent.as_posix()
+        matches = [item for item in self._parent_listing(folder) if item['name'].lower().startswith('poster.')]
+        if any(item['isdir'] is not False for item in matches):
+            raise FileStationMediaError('POSTER_TYPE_UNCERTAIN')
+        return bool(matches)
+
     def create_thumbnail(self, *, dvd_id: str, video_relative: str, content_type: str, data: bytes) -> dict:
         """Create a caller-verified thumbnail without touching other sidecars."""
         canonical, video_api_path, _ = _video_paths(video_relative)

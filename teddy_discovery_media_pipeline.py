@@ -86,6 +86,36 @@ def _present_holding(
     return row
 
 
+def run_thumbnail_processor(*, db_path, dvd_id, file_station, fetcher):
+    """Thumbnail-only operation for injection into the existing job manager."""
+    from teddy_discovery_media_metadata import _normalize_dvd_id
+    from teddy_discovery_media_thumbnail import store_candidate_thumbnail
+    try:
+        dvd_id = _normalize_dvd_id(dvd_id)
+        holding = _present_holding(db_path, dvd_id)
+        relative = str(holding['relative_path'])
+        expected_size = holding.get('size_bytes')
+        if type(expected_size) is not int or expected_size <= 0:
+            return {'status': 'ATTENTION', 'error': 'HOLDING_SIZE_UNKNOWN'}
+        video = file_station.stat_library(relative)
+        if not isinstance(video, dict) or video.get('size') != expected_size:
+            return {'status': 'ATTENTION', 'error': 'VIDEO_SIZE_OR_IDENTITY_UNCERTAIN'}
+        poster_exists = file_station.thumbnail_poster_exists(dvd_id=dvd_id, video_relative=relative)
+        if poster_exists is True:
+            return {'status': 'SKIPPED'}
+        if poster_exists is not False:
+            return {'status': 'ATTENTION', 'error': 'POSTER_STATUS_UNKNOWN'}
+        result = store_candidate_thumbnail(dvd_id=dvd_id, video_relative=relative,
+            fetcher=fetcher, file_station=file_station, official_poster_verified=False)
+        if result.get('status') == 'CREATED':
+            return {'status': 'COMPLETE'}
+        if result.get('status') == 'PENDING':
+            return {'status': 'PENDING', 'error': result.get('error')}
+        return {'status': 'ATTENTION', 'error': 'THUMBNAIL_OUTCOME_UNKNOWN'}
+    except Exception:
+        return {'status': 'ATTENTION', 'error': 'THUMBNAIL_TARGET_OR_STORAGE_UNCERTAIN'}
+
+
 def run_media_pipeline(
     *,
     db_path,

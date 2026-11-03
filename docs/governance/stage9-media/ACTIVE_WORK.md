@@ -1,5 +1,9 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 THUMBNAIL PROCESSOR — OFFLINE ONLY — 2026-11-03
+
+Added an explicitly injected thumbnail-only processor: verify one holding, actual video path/size and a complete FileStation poster listing; skip existing poster, fail closed on uncertainty, then pass original JPEG candidate bytes to create-only storage. Job status maps created to COMPLETE, poster to SKIPPED, fetch/validation failure to PENDING, ambiguous target/storage/collision to ATTENTION. No NFO or Jellyfin call. Synthetic processor checks 18 PASS; jobs, thumbnail 11, FileStation 7 and pipeline smoke PASS. No actual site, NAS, Jellyfin, operational DB or deployment. Runner remains unconnected. JPEG full decode is unverified; URL does not prove image content identity. Folder absence check and subsequent upload are separate API operations, so concurrent creation of a different poster cannot be ruled out atomically; address before a live rollout.
+
 ## STG9MEDIA-001 THUMBNAIL JOB STATE — OFFLINE — 2026-11-03
 
 Independent thumbnail status, attempts, timestamp and error plus additive media-job migration and an explicitly invoked injected-processor job-management path are implemented. Existing title and DB locks protect claim/recheck; thumbnail state transitions do not rewrite NFO, poster or Jellyfin states. Synthetic DB checks cover two IDs, completion, backoff, exhaustion, title lock and changed-state claim conflict; existing jobs smoke, thumbnail smoke 11 PASS and FileStation smoke 7 PASS. No actual site/NAS/Jellyfin operation or production database migration occurred. Runner and pipeline are not wired: existing poster checks, real fetch/storage and deployment require separately scoped work. Existing creator collision and uncertain outcomes require careful fail-closed handling before connecting a real processor.
