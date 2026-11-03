@@ -965,6 +965,8 @@ class SynologyFileStationMediaAdapter:
         if any(item["name"].lower() in {"thumb.jpg", "thumb.jpeg", "thumb.png", "thumb.webp"}
                for item in self._parent_listing(api_folder)):
             raise FileStationMediaError("THUMBNAIL_ALREADY_EXISTS")
+        if self.thumbnail_poster_exists(dvd_id=dvd_id, video_relative=video_relative):
+            return {"status": "POSTER_PRESENT"}
         folder = PurePosixPath(api_folder).relative_to(API_LIBRARY_ROOT).as_posix()
         result = self._publish_one(folder, filename, data, hashlib.sha256(data).hexdigest(), expected_max=MAX_POSTER_BYTES)
         if result["status"] != "CREATED":

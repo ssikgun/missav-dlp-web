@@ -111,6 +111,7 @@ class RunnerConfig:
     jellyfin_base_url: str = ""
     jellyfin_key_path: str | Path | None = None
     expected_release_id: str | None = None
+    thumbnail_enabled: bool = False
 
 
 def _normal_path(raw: str | Path, *, allow_missing: bool, expected: str) -> Path:
@@ -398,6 +399,8 @@ def _validate_config(
     *,
     require_release_id: bool = False,
 ) -> dict:
+    if type(config.thumbnail_enabled) is not bool:
+        raise RunnerError("INVALID_THUMBNAIL_FLAG")
     try:
         max_items = int(config.max_items)
         visibility_max = int(config.visibility_max_items)
@@ -607,7 +610,25 @@ def _build_services(config: RunnerConfig, normalized: dict) -> dict:
                 fetcher=fetcher,
             )
 
+    thumbnail_services = {}
+    if config.thumbnail_enabled:
+        from teddy_discovery_media_jobs import run_thumbnail_jobs
+        from teddy_discovery_media_pipeline import run_thumbnail_processor
+        from teddy_discovery_media_thumbnail import make_candidate_proxy_fetcher
+        thumbnail_fetcher = make_candidate_proxy_fetcher(config.poster_proxy_url)
+        def thumbnail_processor(dvd_id):
+            with SynologyFileStationMediaAdapter(
+                password_file=config.filestation_password_path,
+                ca_file=config.filestation_ca_path,
+                tls_context=tls_context,
+            ) as media_remote:
+                return run_thumbnail_processor(db_path=normalized["discovery_db_path"],
+                    dvd_id=dvd_id, file_station=media_remote, fetcher=thumbnail_fetcher)
+        thumbnail_services = {"run_thumbnail_jobs": run_thumbnail_jobs,
+                              "thumbnail_processor": thumbnail_processor}
+
     return {
+        **thumbnail_services,
         "reconcile": reconcile_media_jobs,
         "run_jobs": run_retryable_media_jobs,
         "visibility": reconcile_jellyfin_visibility,
@@ -694,6 +715,18 @@ def run_stage9_media_once(
                 max_seed_items=normalized["visibility_seed_max_items"],
                 target_dvd_id=target,
             )
+        thumbnail_summary = None
+        remaining = max(0, normalized["max_items"] - jobs["attempted"])
+        if config.thumbnail_enabled and not jobs["failed"] and remaining:
+            thumb_results = active["run_thumbnail_jobs"](
+                db_path=normalized["media_db_path"], writer_lock_path=normalized["media_writer_lock_path"],
+                title_lock_dir=normalized["title_lock_dir"], processor=active["thumbnail_processor"],
+                max_items=remaining, target_dvd_id=target)
+            thumbnail_summary = {"attempted": sum(bool(item.get("attempted")) for item in thumb_results),
+                "complete": sum(item.get("status") == "COMPLETE" for item in thumb_results),
+                "pending": sum(item.get("status") in {"PENDING", "FAILED"} for item in thumb_results),
+                "attention": sum(item.get("status") in {"ATTENTION", "HELD_CONFLICT"} for item in thumb_results),
+                "skipped": sum(item.get("status") == "SKIPPED" for item in thumb_results)}
         status = "PARTIAL_FAILURE" if jobs["failed"] else "COMPLETE"
         budget = active.get("get_budget")
         return {
@@ -702,6 +735,7 @@ def run_stage9_media_once(
             "non_media_execution": 0,
             "registered": int(registration),
             "media": jobs,
+            "thumbnail": thumbnail_summary,
             "jellyfin_visibility": _summarize_visibility(visibility_result),
             "jellyfin_get_requests": int(getattr(budget, "get_requests", 0)),
             "jellyfin_post_attempts": int(getattr(budget, "post_attempts", 0)),

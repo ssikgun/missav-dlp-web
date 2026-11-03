@@ -48,9 +48,17 @@ def main():
                 def bad(url, maximum): return 200, url, 'image/jpeg', b'broken'
                 assert run_thumbnail_processor(db_path=db_path, dvd_id=dvd, file_station=adapter, fetcher=denied)['status'] == 'PENDING'
                 assert run_thumbnail_processor(db_path=db_path, dvd_id=dvd, file_station=adapter, fetcher=bad)['status'] == 'PENDING'; checks += 2
+                # Poster appears after the first folder check, during image fetch.
+                def poster_appears(url, maximum):
+                    fake.files[poster] = b'concurrent poster'
+                    return 200, url, 'image/jpeg', image
+                with _adapter(root, fake) as race_adapter:
+                    assert run_thumbnail_processor(db_path=db_path, dvd_id=dvd, file_station=race_adapter, fetcher=poster_appears)['status'] == 'SKIPPED'
+                assert folder + '/thumb.jpg' not in fake.files and not fake.uploads; checks += 1
+                del fake.files[poster]  # Synthetic fixture only.
                 before = dict(fake.files)
                 result = run_thumbnail_jobs(db_path=job_db, writer_lock_path=lock, title_lock_dir=lock_dir, now=now, processor=lambda _: process())
-                assert result[0]['status'] == 'COMPLETE'; assert fake.files[folder + '/thumb.jpg'] == image
+                assert result[0]['status'] == 'COMPLETE', result; assert fake.files[folder + '/thumb.jpg'] == image
                 assert all(fake.files[k] == v for k,v in before.items()); checks += 2
                 assert run_thumbnail_jobs(db_path=job_db, writer_lock_path=lock, title_lock_dir=lock_dir, now=now, processor=lambda _: process()) == []
                 assert len(fake.uploads) == 1; checks += 1

@@ -390,7 +390,6 @@ def test_thumb_create_only(root: Path):
         fake.files[video] = VIDEO_BYTES
         fake.owners[video] = "admin"
         fake.files[folder + "/" + dvd + ".nfo"] = NFO_BYTES
-        fake.files[folder + "/poster.jpg"] = POSTER_BYTES
         before = dict(fake.files)
         rel = prefix + "/" + dvd + "/" + dvd + ".mp4"
         with _adapter(root, fake) as adapter:

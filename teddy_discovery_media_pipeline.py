@@ -109,6 +109,8 @@ def run_thumbnail_processor(*, db_path, dvd_id, file_station, fetcher):
             fetcher=fetcher, file_station=file_station, official_poster_verified=False)
         if result.get('status') == 'CREATED':
             return {'status': 'COMPLETE'}
+        if result.get('status') == 'POSTER_PRESENT':
+            return {'status': 'SKIPPED'}
         if result.get('status') == 'PENDING':
             return {'status': 'PENDING', 'error': result.get('error')}
         return {'status': 'ATTENTION', 'error': 'THUMBNAIL_OUTCOME_UNKNOWN'}

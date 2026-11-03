@@ -771,12 +771,13 @@ def thumbnail_retry_eligibility(job, *, now, max_attempts, retry_backoff_seconds
 
 
 def run_thumbnail_jobs(*, db_path, writer_lock_path, processor, title_lock_dir=None,
-                       now=None, max_items=1, max_attempts=DEFAULT_MEDIA_MAX_ATTEMPTS,
+                       now=None, max_items=1, target_dvd_id=None, max_attempts=DEFAULT_MEDIA_MAX_ATTEMPTS,
                        retry_backoff_seconds=DEFAULT_MEDIA_RETRY_BACKOFF_SECONDS,
                        running_stale_seconds=DEFAULT_MEDIA_RUNNING_STALE_SECONDS):
     """Explicit job-management entrypoint; processor is injected, no runtime wiring."""
     if not callable(processor) or int(max_items) < 1:
         raise ValueError('invalid thumbnail processor or item limit')
+    target = normalize_media_target_dvd_id(target_dvd_id) if target_dvd_id is not None else None
     current_time = _now_utc(now)
     stamp = current_time.isoformat(timespec='seconds')
     options = dict(now=current_time, max_attempts=max_attempts,
@@ -791,6 +792,8 @@ def run_thumbnail_jobs(*, db_path, writer_lock_path, processor, title_lock_dir=N
     lock_dir = title_lock_dir if title_lock_dir is not None else configured_lock_dir()
     outcomes = []
     for candidate in candidates:
+        if target is not None and candidate['dvd_id'] != target:
+            continue
         if len([item for item in outcomes if item.get('attempted')]) >= int(max_items):
             break
         if thumbnail_retry_eligibility(candidate, **options) != 'ELIGIBLE':

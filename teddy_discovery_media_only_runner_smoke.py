@@ -520,11 +520,67 @@ def jellyfin_request_budget_is_bounded():
     ) is None
 
 
+def thumbnail_runner_integration(root: Path):
+    from teddy_discovery_media_jobs import run_thumbnail_jobs
+    from teddy_discovery_media_pipeline import run_thumbnail_processor
+    from teddy_discovery_media_filestation_smoke import FakeFileStation, _adapter, API_LIBRARY_ROOT, VIDEO_BYTES
+    root.mkdir()
+    ids = ['ABC-123', 'XYZ-456']
+    init_discovery(root / 'discovery.sqlite3', ids)
+    init_media(root / 'media.sqlite3', jobs=[dict(dvd_id=d, status='COMPLETED', nfo_status='COMPLETE', poster_status='PENDING', jellyfin_notification_status='VISIBLE', jellyfin_recovery_status='VISIBLE') for d in ids])
+    with sqlite3.connect(root / 'discovery.sqlite3') as db:
+        for dvd in ids:
+            db.execute('UPDATE holdings SET size_bytes=?, relative_path=? WHERE dvd_id=?', (len(VIDEO_BYTES), dvd.split('-')[0] + '/' + dvd + '/' + dvd + '.mkv', dvd))
+    fake = FakeFileStation()
+    for dvd in ids:
+        family = dvd.split('-')[0]
+        fake.directories.add(API_LIBRARY_ROOT + '/' + family)
+        folder = API_LIBRARY_ROOT + '/' + family + '/' + dvd
+        fake.directories.add(folder); fake.files[folder + '/' + dvd + '.mkv'] = VIDEO_BYTES
+        fake.files[folder + '/' + dvd + '.nfo'] = b'original nfo'
+    image = b'\xff\xd8\xfffixture\xff\xd9'; calls = []
+    def fetch(url, maximum):
+        calls.append(url); return 200, url, 'image/jpeg', image
+    def process(dvd):
+        with _adapter(root, fake) as adapter:
+            return run_thumbnail_processor(db_path=root / 'discovery.sqlite3', dvd_id=dvd, file_station=adapter, fetcher=fetch)
+    svc = {'reconcile': lambda *a, **k: 0, 'run_jobs': lambda **k: {'attempted':0,'failed':0},
+           'visibility': lambda *a, **k: None, 'processor': lambda d: None,
+           'jellyfin': FakeJellyfin(), 'run_thumbnail_jobs':run_thumbnail_jobs, 'thumbnail_processor':process}
+    default = make_config(root, apply=True, max_items=2)
+    result = runner.run_stage9_media_once(default, services=svc)
+    assert result['thumbnail'] is None and not calls and not fake.uploads
+    enabled = replace(default, thumbnail_enabled=True)
+    result = runner.run_stage9_media_once(enabled, services=svc)
+    assert result['thumbnail']['complete'] == 2 and len(calls) == 2 and len(fake.uploads) == 2, (result['thumbnail'], calls, fake.uploads)
+    for dvd in ids: assert fake.files[API_LIBRARY_ROOT + '/' + dvd.split('-')[0] + '/' + dvd + '/thumb.jpg'] == image
+    again = runner.run_stage9_media_once(enabled, services=svc)
+    assert again['thumbnail']['attempted'] == 0 and len(calls) == 2
+    rows = read_rows(root / 'media.sqlite3', 'SELECT nfo_status,poster_status,jellyfin_notification_status FROM media_jobs')
+    assert rows == [('COMPLETE','PENDING','VISIBLE')] * 2
+    # An HTTP failure is persisted and not immediately retried by the runner.
+    with sqlite3.connect(root / 'media.sqlite3') as db:
+        db.execute("UPDATE media_jobs SET thumbnail_status='PENDING', thumbnail_attempt_count=0, thumbnail_updated_at=NULL WHERE dvd_id=?", (ids[0],))
+    failed_calls = []
+    def denied(url, maximum):
+        failed_calls.append(url); return 403, url, 'text/html', b'no'
+    def failed_processor(dvd):
+        with _adapter(root, fake) as adapter:
+            return run_thumbnail_processor(db_path=root / 'discovery.sqlite3', dvd_id=dvd, file_station=adapter, fetcher=denied)
+    svc['thumbnail_processor'] = failed_processor
+    pending = runner.run_stage9_media_once(enabled, services=svc)
+    assert pending['thumbnail']['pending'] == 1 and len(failed_calls) == 1
+    delayed = runner.run_stage9_media_once(enabled, services=svc)
+    assert delayed['thumbnail']['attempted'] == 0 and len(failed_calls) == 1
+    print('THUMBNAIL_RUNNER_INTEGRATION=PASS')
+
+
 def main():
     import_is_side_effect_free()
     with tempfile.TemporaryDirectory(prefix="stage9-media-runner-") as raw:
         root = Path(raw)
         dry_run_is_read_only(root / "dry")
+        thumbnail_runner_integration(root / "thumb-integration")
         bounded_root = root / "bounded"
         bounded_root.mkdir()
         registration_processing_and_visibility_are_bounded(bounded_root)

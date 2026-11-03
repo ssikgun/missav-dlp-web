@@ -1,5 +1,9 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 DEFAULT-DISABLED THUMB RUNNER — OFFLINE — 2026-11-03
+
+Stage9 runner supports an explicit programmatic `thumbnail_enabled` flag, default false; no operational CLI/activation policy or deployment added. Enabled offline path reuses the configured proxy, title/DB/runner locks, shared media attempt limit and target filter, existing thumbnail jobs and processor. FileStation rechecks poster existence before create-only thumb; skips when found and fails closed on uncertainty. Offline runner integration two IDs and retry/backoff PASS; thumbnail processor 20 checks, thumbnail 11, FileStation 7, jobs and media pipeline smoke PASS. JPEG full decoding is NOT_VERIFIED; recheck and upload are separate operations, not atomic against concurrent poster creation. No live site, NAS, DB migration, Jellyfin or service activity. Jellyfin Primary change and deletion remain unimplemented.
+
 ## STG9MEDIA-001 THUMBNAIL PROCESSOR — OFFLINE ONLY — 2026-11-03
 
 Added an explicitly injected thumbnail-only processor: verify one holding, actual video path/size and a complete FileStation poster listing; skip existing poster, fail closed on uncertainty, then pass original JPEG candidate bytes to create-only storage. Job status maps created to COMPLETE, poster to SKIPPED, fetch/validation failure to PENDING, ambiguous target/storage/collision to ATTENTION. No NFO or Jellyfin call. Synthetic processor checks 18 PASS; jobs, thumbnail 11, FileStation 7 and pipeline smoke PASS. No actual site, NAS, Jellyfin, operational DB or deployment. Runner remains unconnected. JPEG full decode is unverified; URL does not prove image content identity. Folder absence check and subsequent upload are separate API operations, so concurrent creation of a different poster cannot be ruled out atomically; address before a live rollout.
