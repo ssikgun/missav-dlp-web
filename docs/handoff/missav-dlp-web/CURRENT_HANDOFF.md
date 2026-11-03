@@ -1,6 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## Stage9 FileStation user evidence and staged release — 2026-11-03
+
+User reports read-only FileStation PASS for MBRBI-015 at observation time; exact video/NFO size/owner and @eaDir evidence are in Stage9 ACTIVE_WORK. Latest source archive staged separately under /tmp and local imports/smokes passed. Stage9 other-writer visibility and live invocation remain unverified; no timer pause, DB backup/migration, release switch or canary occurred.
+
 ## Stage9 canary hash gate integrated — 2026-11-03
 
 Verified prior guard SHA and reused it in thumbnail module. Explicit --canary-image-size / --canary-image-sha256 inputs are allowed only together in thumbnail-only mode; existing strict proxy fetcher is wrapped with exact target URL and single-use HTTP/MIME/size/SHA validation before storage. No work-specific values in product code. Runner smoke including success/hash-mismatch-before-upload passes; thumbnail smoke 12 PASS including second-GET blocking. FileStation credential/CA paths exist and are readable; no repeated blocked network or systemd request. FILESTATION_READ_ONLY remains INCOMPLETE. User command: python3 -B /tmp/stg9-filestation-readonly-20261103.py (existing API authentication, video stat and complete target listing only, no image GET/upload). Prior staging is preserved and stale relative to the changed source; a new release must use the new verified source SHA. READY_FOR_TIMER_PAUSE=NO; all production changes NOT_RUN.
