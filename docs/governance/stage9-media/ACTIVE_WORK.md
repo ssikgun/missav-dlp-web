@@ -1,5 +1,14 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 USER SELKIES DOM EXACT-IMAGE PROVENANCE CHECKPOINT — 2026-11-03 KST
+
+USER-EXECUTED F12 READ-ONLY DOM of the already-open real browser work page `https://missav123.com/ko/mbrbi-015`: `dvd_id_found=true`; the page's `og:image` AND `twitter:image` both equal `https://fourhoi.com/mbrbi-015/cover-n.jpg`. This is **user-browser page-to-image URL provenance for exact DVD-ID MBRBI-015**, not proof of successful image GET, decoded bytes/dimensions, authentic official-poster role, NAS availability, or production pipeline functioning. `video_posters=[]`. Eight visible large `cover-t.jpg` images refer to OTHER work IDs (OAE-210, MBR-099, MBRBI-005, OAE-212, MMND-106, MMRAA-323, MMRAA-295, VNTG-023); do not use those unrelated images for the target. The earlier DB-only 203 no-cover candidates being source-unlinked is not contradicted: user DOM now supplies one independently observed, exact page-linked candidate.
+
+**Source-only code gap:** `teddy_discovery_media_thumbnail.py` at current product checkpoint still calls `_url(image_url, frozenset({page.hostname}))`, so the page's cross-origin `fourhoi.com` `og:image` fails even if otherwise valid. Its separate canonical/`og:url` and HTTP response checks also remain **NOT VERIFIED** against this live page; the F12 script did not inspect them. Do not weaken the host restriction globally or infer official-poster status from a `cover-n.jpg` filename. The already-approved Stage9 source-only candidate may add a general exact-ID-bound trusted page-to-image rule and small offline regression using this observed endpoint family, preserving redirect, HTTPS, bytes, MIME, file identity and no-overwrite checks; do not make an MBRBI-015 special case. Real exact image fetch, image decoding, NAS writes, Jellyfin Primary POST, cleanup and deployment remain outside this browser-evidence checkpoint and require their separately scoped approvals. Jellyfin 10.11.11 atomic-CAS/manual-image-safety design blocker is unchanged.
+
+CHECKPOINT: `PAGE_IDENTITY=PASS_USER_BROWSER_DOM; OG_IMAGE_URL=VERIFIED_PAGE_LINKED; IMAGE_FETCH=NOT_RUN; IMAGE_DECODE=NOT_RUN; AUTHENTIC_POSTER=NOT_VERIFIED; PRODUCTION_CHANGED=NO`. No repeated page GET/403 probe. Preserve `STG9MEDIA-001 / IN_PROGRESS`, Stage9 contract 1.0.2, common contract 1.0.1.
+
+
 
 ## STG9MEDIA-001 SOURCE TO THUMB STORAGE — OFFLINE ONLY (2026-11-03)
 
