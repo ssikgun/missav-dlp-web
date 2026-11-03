@@ -1,6 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## Stage9 MBRBI-015 deployment preparation — 2026-11-03
+
+Read-only release diff and user NAS inventory recorded in Stage9 ACTIVE_WORK. Minimum source delta: four changed Stage9 modules plus new thumbnail module. Canary remains blocked until a default-off thumbnail-only targeted execution mode is implemented and separately approved release/DB/maintenance/canary scope is granted. Current runner also runs normal media/Jellyfin stages, so its flag alone is unsuitable for this narrow canary. Operational owners/current listing/service state remain NOT_VERIFIED; no operational change performed.
+
 ## MBRBI-015 thumbnail canary read-only preflight — 2026-11-03
 
 Read-only host reports `downloader`; CT ID and active service/timer state could not be independently verified because system bus access was denied in the execution environment. Installed unit WorkingDirectory is `/opt/missav-dlp-web/stage9-runtime/releases/b31873824527bbcdf800d141b40eaf6e2af03abd`; its runner differs from canonical and has no thumbnail_enabled support. Unit contains a loopback poster-proxy argument; actual proxy reachability was not tested. Timer unit specifies ten-minute schedule; active state unknown.
