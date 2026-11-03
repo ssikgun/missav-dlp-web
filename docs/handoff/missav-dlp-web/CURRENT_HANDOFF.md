@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## STG9MEDIA-001 CT108 HTTP RELEASE CUTOVER — USER-REPORTED PASS (2026-11-04)
+
+CT108 root user invoked the once-only SHA256-checked cutover script `/tmp/stg9-http-cutover-20261104/cutover.py` (script SHA256 `f9fdac820390f6ecc21bece01fe923e2c86d426267417ce338f352952f8e502a`) after Stage9 service/timer inactive/MainPID=0, DB process FD checks zero, and both previously restricted Codex PIDs verified zombie. User-pasted script output: `cutover.py: OK`, `RELEASE_INSTALLED=/opt/missav-dlp-web/stage9-runtime/releases/22e02204e7b5413f5c0bb444ccf13473a7a085f3`, `UNIT_BACKUP=/opt/missav-dlp-web/backups/stage9-unit-before-http22e-20261104.service SHA256=c5d0e1e8ef02a1f874e8203eba21e29497d2f4725d2380341644ccda37fe3fdb`, `UNIT_SWITCH=PASS SERVICE=inactive TIMER=inactive`. Stage9 ACTIVE_WORK checkpoint saved in GitHub commit `3b1e7b343d06d59de1376d93485d8f09dfb21b02`. Baseline remains `MBRBI-015 COMPLETED / NFO COMPLETE / thumbnail PENDING / attempt_count=2`; no new retry permission or service/timer activation. Release install and unit switch **PASS per script output** only. Next: independent CT108 read-only postcheck of effective systemd unit references and new thumbnail file SHA `7c88f0b90770e5e115464252e2714d13466b4d1d5f28ebbd44721129b35b48ba` (source/prep expected); SQLite/NAS/Jellyfin state post-cutover not yet independently read back. No real HTTP test, start, DB/NAS/Jellyfin writes or Gluetun change authorized. Preserve old release, backup, and diagnostics, do not rerun cutover blindly.
+
 
 ## STG9MEDIA-001 HTTP RELEASE CUTOVER — USER ATTEMPT-2 BASELINE / CT108 PROCEDURE PREPARED (2026-11-04)
 
