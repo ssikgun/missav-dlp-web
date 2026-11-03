@@ -1,5 +1,11 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 CANARY HASH GATE — OFFLINE PARTIAL — 2026-11-03
+
+Reused the existing timestamped user systemd readback; no bus retry or bypass. Offline-only gate candidate `/tmp/stg9-canary-gate-20261103/guard.py` SHA256 `7f34d5330509ed3f0f8b43b5dc648798bf1a11390a4951fc67869388b8c98cb2` wraps an injected fetcher with exact URL, single-use, HTTP/final URL/MIME/length/SHA checks. Three synthetic checks pass. It is NOT wired to the existing thumbnail-only CLI, not tested end-to-end against FileStation, not an operational activation command, and no live request occurred. The read-only staged release remains at `/tmp/stg9-release-staging-20261103/cbbe424cb6aad0b7cbf316749a7a56629447d3af` and is not deployed.
+
+Before asking the user to stop the active Stage9 timer, integrate and verify the one-GET gate with the actual runtime entry path and resolve read-only FileStation reachability; identify other DB writers. DB backup/migration, release switch, image GET, NAS write and timer modification remain NOT_RUN. Existing bounded approval is retained; no new authorization inferred.
+
 ## STG9MEDIA-001 USER SYSTEMD READBACK / RELEASE STAGING — 2026-11-03
 
 USER reports CT108 hostname downloader, Stage9 service inactive/dead MainPID 0 root, WorkingDirectory b31873824527bbcdf800d141b40eaf6e2af03abd; timer active/waiting as observed 16:20–16:30 KST. This is a timestamped user observation, not a current-state guarantee. Codex did not repeat systemd or bypass denied bus access. Existing bounded deployment approval remains in force.
