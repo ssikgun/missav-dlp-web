@@ -1,8 +1,8 @@
 """Fail-closed, offline-testable MissAV page thumbnail candidate.
 
 The caller must supply an already verified work URL and a proxy-only fetcher.
-No default transport, URL guessing, Jellyfin action or production wiring is
-provided here. Unknown image hosts remain unavailable pending evidence.
+No default transport, Jellyfin action or production wiring is provided here.
+The separate approved template candidate does not establish page provenance.
 """
 from __future__ import annotations
 
@@ -129,3 +129,55 @@ def store_injected_thumbnail(*, dvd_id, video_relative, page_url, fetcher, file_
     thumbnail = extract_thumbnail(dvd_id=dvd_id, page_url=page_url, fetcher=fetcher)
     return file_station.create_thumbnail(dvd_id=dvd_id, video_relative=video_relative,
         content_type=thumbnail.content_type, data=thumbnail.data)
+
+
+def candidate_thumbnail_url(dvd_id):
+    """A permitted candidate only; does not prove image or page identity."""
+    return 'https://fourhoi.com/' + _normalize_dvd_id(dvd_id).lower() + '/cover-n.jpg'
+
+
+def make_candidate_proxy_fetcher(proxy_url):
+    """Strictly bounded transport through the configured loopback proxy."""
+    import urllib.request
+    from teddy_discovery_media_metadata import _PosterOnlyProxyHandler, _validate_poster_proxy_url
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    proxy = _validate_poster_proxy_url(proxy_url)
+    opener = urllib.request.build_opener(
+        _PosterOnlyProxyHandler({'http': proxy, 'https': proxy}), NoRedirect())
+
+    def fetch(url, maximum):
+        parsed = _url(url, frozenset({'fourhoi.com'}))
+        parts = parsed.path.split('/')
+        if (len(parts) != 3 or parsed.query or parsed.netloc != 'fourhoi.com'
+                or url != candidate_thumbnail_url(parts[1]) or maximum != MAX_POSTER_BYTES):
+            raise ValueError('CANDIDATE_URL_INVALID')
+        request = urllib.request.Request(url, headers={'Accept': 'image/jpeg'})
+        with opener.open(request, timeout=20) as response:
+            return (response.status, response.geturl(), response.headers.get('Content-Type', ''),
+                    response.read(MAX_POSTER_BYTES + 1))
+    return fetch
+
+
+def store_candidate_thumbnail(*, dvd_id, video_relative, fetcher, file_station, official_poster_verified):
+    """Store explicit template candidate; neither page identity nor decoding is claimed."""
+    url = candidate_thumbnail_url(dvd_id)
+    if official_poster_verified is True:
+        return {'status': 'POSTER_PRESENT'}
+    if official_poster_verified is not False:
+        raise ValueError('POSTER_STATUS_UNKNOWN')
+    if not callable(fetcher):
+        raise ValueError('PROXY_FETCHER_REQUIRED')
+    try:
+        status, final, content_type, data = fetcher(url, MAX_POSTER_BYTES)
+    except Exception:
+        return {'status': 'PENDING', 'error': 'CANDIDATE_FETCH_FAILED'}
+    if (status != 200 or final != url or str(content_type).split(';', 1)[0].strip().lower() != 'image/jpeg'
+            or not isinstance(data, bytes) or not 4 <= len(data) <= MAX_POSTER_BYTES
+            or not data.startswith(b'\xff\xd8\xff') or not data.endswith(b'\xff\xd9')):
+        return {'status': 'PENDING', 'error': 'CANDIDATE_RESPONSE_INVALID'}
+    return file_station.create_thumbnail(dvd_id=_normalize_dvd_id(dvd_id), video_relative=video_relative,
+        content_type='image/jpeg', data=data)

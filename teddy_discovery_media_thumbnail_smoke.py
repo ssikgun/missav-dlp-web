@@ -103,4 +103,62 @@ class StorageConnectionSmoke(unittest.TestCase):
                     self.assertEqual(len(fake.uploads), 1)
 
 
+class CandidateSmoke(unittest.TestCase):
+    def test_candidate_storage(self):
+        from pathlib import Path
+        import tempfile
+        from teddy_discovery_media_thumbnail import candidate_thumbnail_url, store_candidate_thumbnail
+        from teddy_discovery_media_filestation_smoke import FakeFileStation, _adapter, API_LIBRARY_ROOT, VIDEO_BYTES
+        from teddy_discovery_media_filestation import FileStationMediaError
+        with tempfile.TemporaryDirectory() as tmp:
+            for dvd, prefix in (("ABC-123", "ABC"), ("XYZ-456", "XYZ")):
+                url = candidate_thumbnail_url(dvd)
+                self.assertEqual(url, 'https://fourhoi.com/' + dvd.lower() + '/cover-n.jpg')
+                fake = FakeFileStation(); folder = API_LIBRARY_ROOT + '/' + prefix + '/' + dvd
+                fake.directories.update({API_LIBRARY_ROOT + '/' + prefix, folder})
+                fake.files[folder + '/' + dvd + '.mp4'] = VIDEO_BYTES
+                rel = prefix + '/' + dvd + '/' + dvd + '.mp4'
+                data = b'\xff\xd8\xffsynthetic\xff\xd9'
+                with _adapter(Path(tmp), fake) as adapter:
+                    def run(fetch, poster=False):
+                        return store_candidate_thumbnail(dvd_id=dvd, video_relative=rel, fetcher=fetch, file_station=adapter, official_poster_verified=poster)
+                    def good(u, m): return (200, u, 'image/jpeg', data)
+                    self.assertEqual(run(good, True)['status'], 'POSTER_PRESENT')
+                    with self.assertRaises(ValueError): run(good, None)
+                    for response in ((403,url,'image/jpeg',data),(404,url,'image/jpeg',data),(200,url+'?redirect','image/jpeg',data),(200,url,'image/png',data),(200,url,'image/jpeg',b'bad')):
+                        self.assertEqual(run(lambda u,m: response)['status'], 'PENDING')
+                    before = dict(fake.files)
+                    self.assertEqual(run(good)['status'], 'CREATED')
+                    self.assertEqual(fake.files[folder + '/thumb.jpg'], data)
+                    with self.assertRaises(FileStationMediaError): run(good)
+                    self.assertTrue(all(fake.files[k] == v for k,v in before.items()))
+                    self.assertEqual(len(fake.uploads), 1)
+
+    def test_proxy_transport(self):
+        from unittest.mock import patch
+        from teddy_discovery_media_thumbnail import make_candidate_proxy_fetcher, candidate_thumbnail_url, MAX_POSTER_BYTES
+        from teddy_discovery_media_metadata import _PosterOnlyProxyHandler
+        class Response:
+            status = 200
+            headers = {'Content-Type': 'image/jpeg'}
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def geturl(self): return candidate_thumbnail_url('ABC-123')
+            def read(self, count):
+                assert count == MAX_POSTER_BYTES + 1
+                return b'bytes'
+        class Opener:
+            def open(self, request, timeout):
+                assert request.full_url == candidate_thumbnail_url('ABC-123') and timeout == 20
+                return Response()
+        with patch('urllib.request.build_opener', return_value=Opener()) as build:
+            fetch = make_candidate_proxy_fetcher('http://127.0.0.1:58888')
+            self.assertIsInstance(build.call_args.args[0], _PosterOnlyProxyHandler)
+            self.assertIsNone(build.call_args.args[1].redirect_request(None, None, 302, '', {}, 'https://evil.invalid'))
+            self.assertEqual(fetch(candidate_thumbnail_url('ABC-123'), MAX_POSTER_BYTES)[0], 200)
+            for bad in ('https://fourhoi.com/xyz-1/cover-n.jpg?x=1', 'https://fourhoi.com:443/abc-123/cover-n.jpg', 'https://evil.invalid/abc-123/cover-n.jpg', 'https://fourhoi.com/abc-123/cover-t.jpg'):
+                with self.assertRaises(ValueError): fetch(bad, MAX_POSTER_BYTES)
+        with self.assertRaises(ValueError): make_candidate_proxy_fetcher('http://example.com:8888')
+
+
 if __name__ == '__main__': unittest.main(verbosity=2)

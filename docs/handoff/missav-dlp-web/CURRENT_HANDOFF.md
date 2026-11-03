@@ -1,6 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## Stage9 template thumbnail offline checkpoint — 2026-11-03
+
+Stage9-only explicit candidate path derives the approved exact fourhoi URL, uses a strict loopback-proxy/no-redirect bounded fetcher and passes unchanged JPEG candidate bytes to existing create-only thumbnail storage. Poster verified present skips; unknown status stops; HTTP/validation failure stays PENDING. This does not establish work identity or page provenance. MIME, JPEG start/end markers and byte limit are checked; full decode is NOT_VERIFIED. Offline thumbnail smoke 11 PASS, FileStation regression 7 PASS. Not wired to Stage9 runtime, retry DB, NAS or Jellyfin; no live request or production change.
+
 ## Stage9 bounded thumbnail URL amendment and implementation gap — 2026-11-03
 
 User approved the narrow fourhoi.com exact normalized DVD-ID candidate rule; Stage9 contract v1.0.3 is approved, temporary shared governance routing was validated and restored, and remote readback verified. URL matching does not establish image identity or page provenance.
