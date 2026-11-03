@@ -1,5 +1,11 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 THUMB RUNNER STATUS / CANARY PREPARATION — 2026-11-03
+
+Runner reports thumbnail attention/exhaustion as PARTIAL_FAILURE, retry/lock/item-limit holds as PENDING with reason counts, and preserves default-disabled behavior. Offline runner, jobs, processor and pipeline smokes PASS. Targeted MBRBI-015 canary is NOT READY: installed release/config/schema, job/holding and actual NFO/poster/thumb/ownership are NOT_VERIFIED; thumbnail_enabled exists only as a programmatic default-false setting, with no approved operational activation procedure.
+
+A separately approved plan must verify release/source hashes, schema/migration and preflight, exact single holding/video path and size, NFO/poster/thumb absence or conflicts, owner and complete listing; use the existing target filter and bounded one-item limits, independent thumbnail state and lock checks. Record before/after sidecar names, owners, file hashes and job states without exposing credentials, preserve original image bytes, stop on mismatch, conflict, uncertainty or error with no overwrite or retry. Poster recheck/upload remain non-atomic. No live site, production DB/NAS/Jellyfin access, deployment, timer or activation performed.
+
 ## STG9MEDIA-001 DEFAULT-DISABLED THUMB RUNNER — OFFLINE — 2026-11-03
 
 Stage9 runner supports an explicit programmatic `thumbnail_enabled` flag, default false; no operational CLI/activation policy or deployment added. Enabled offline path reuses the configured proxy, title/DB/runner locks, shared media attempt limit and target filter, existing thumbnail jobs and processor. FileStation rechecks poster existence before create-only thumb; skips when found and fails closed on uncertainty. Offline runner integration two IDs and retry/backoff PASS; thumbnail processor 20 checks, thumbnail 11, FileStation 7, jobs and media pipeline smoke PASS. JPEG full decoding is NOT_VERIFIED; recheck and upload are separate operations, not atomic against concurrent poster creation. No live site, NAS, DB migration, Jellyfin or service activity. Jellyfin Primary change and deletion remain unimplemented.

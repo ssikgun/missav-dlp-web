@@ -717,17 +717,33 @@ def run_stage9_media_once(
             )
         thumbnail_summary = None
         remaining = max(0, normalized["max_items"] - jobs["attempted"])
-        if config.thumbnail_enabled and not jobs["failed"] and remaining:
-            thumb_results = active["run_thumbnail_jobs"](
-                db_path=normalized["media_db_path"], writer_lock_path=normalized["media_writer_lock_path"],
-                title_lock_dir=normalized["title_lock_dir"], processor=active["thumbnail_processor"],
-                max_items=remaining, target_dvd_id=target)
-            thumbnail_summary = {"attempted": sum(bool(item.get("attempted")) for item in thumb_results),
-                "complete": sum(item.get("status") == "COMPLETE" for item in thumb_results),
-                "pending": sum(item.get("status") in {"PENDING", "FAILED"} for item in thumb_results),
-                "attention": sum(item.get("status") in {"ATTENTION", "HELD_CONFLICT"} for item in thumb_results),
-                "skipped": sum(item.get("status") == "SKIPPED" for item in thumb_results)}
-        status = "PARTIAL_FAILURE" if jobs["failed"] else "COMPLETE"
+        if config.thumbnail_enabled:
+            if jobs["failed"] or not remaining:
+                reason = "MEDIA_FAILURE" if jobs["failed"] else "MEDIA_ITEM_LIMIT"
+                thumbnail_summary = {"state": "HELD", "held_reasons": {reason: 1},
+                    "attempted": 0, "complete": 0, "pending": 0, "attention": 0, "skipped": 0}
+            else:
+                thumb_results = active["run_thumbnail_jobs"](
+                    db_path=normalized["media_db_path"], writer_lock_path=normalized["media_writer_lock_path"],
+                    title_lock_dir=normalized["title_lock_dir"], processor=active["thumbnail_processor"],
+                    max_items=remaining, target_dvd_id=target, include_held=True)
+                attention_states = {"ATTENTION", "HELD_CONFLICT", "HELD_INVALID_STATE", "HELD_INVALID_TIMESTAMP", "EXHAUSTED"}
+                held_reasons = {}
+                for item in thumb_results:
+                    state = item.get("status")
+                    if state in attention_states or state in {"HELD_TITLE_LOCK", "HELD_BACKOFF", "HELD_FRESH_RUNNING", "HELD_NFO_INCOMPLETE", "HELD_ITEM_LIMIT"}:
+                        held_reasons[state] = held_reasons.get(state, 0) + 1
+                thumbnail_summary = {"attempted": sum(bool(item.get("attempted")) for item in thumb_results),
+                    "complete": sum(item.get("status") == "COMPLETE" for item in thumb_results),
+                    "pending": sum(item.get("status") in {"PENDING", "FAILED"} for item in thumb_results),
+                    "attention": sum(item.get("status") in attention_states for item in thumb_results),
+                    "skipped": sum(item.get("status") == "SKIPPED" for item in thumb_results),
+                    "held_reasons": held_reasons}
+                thumbnail_summary["state"] = ("ATTENTION" if thumbnail_summary["attention"] else
+                    "PENDING" if thumbnail_summary["pending"] or held_reasons else "COMPLETE")
+        status = "PARTIAL_FAILURE" if jobs["failed"] or (thumbnail_summary and thumbnail_summary.get("attention", 0)) else "COMPLETE"
+        if status == "COMPLETE" and thumbnail_summary and thumbnail_summary["state"] in {"PENDING", "HELD"}:
+            status = "PENDING"
         budget = active.get("get_budget")
         return {
             "status": status,

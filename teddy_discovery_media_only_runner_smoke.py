@@ -549,10 +549,10 @@ def thumbnail_runner_integration(root: Path):
            'jellyfin': FakeJellyfin(), 'run_thumbnail_jobs':run_thumbnail_jobs, 'thumbnail_processor':process}
     default = make_config(root, apply=True, max_items=2)
     result = runner.run_stage9_media_once(default, services=svc)
-    assert result['thumbnail'] is None and not calls and not fake.uploads
+    assert result['status'] == 'COMPLETE' and result['thumbnail'] is None and not calls and not fake.uploads
     enabled = replace(default, thumbnail_enabled=True)
     result = runner.run_stage9_media_once(enabled, services=svc)
-    assert result['thumbnail']['complete'] == 2 and len(calls) == 2 and len(fake.uploads) == 2, (result['thumbnail'], calls, fake.uploads)
+    assert result['status'] == 'COMPLETE' and result['thumbnail']['complete'] == 2 and len(calls) == 2 and len(fake.uploads) == 2, (result['thumbnail'], calls, fake.uploads)
     for dvd in ids: assert fake.files[API_LIBRARY_ROOT + '/' + dvd.split('-')[0] + '/' + dvd + '/thumb.jpg'] == image
     again = runner.run_stage9_media_once(enabled, services=svc)
     assert again['thumbnail']['attempted'] == 0 and len(calls) == 2
@@ -569,9 +569,17 @@ def thumbnail_runner_integration(root: Path):
             return run_thumbnail_processor(db_path=root / 'discovery.sqlite3', dvd_id=dvd, file_station=adapter, fetcher=denied)
     svc['thumbnail_processor'] = failed_processor
     pending = runner.run_stage9_media_once(enabled, services=svc)
-    assert pending['thumbnail']['pending'] == 1 and len(failed_calls) == 1
+    assert pending['status'] == 'PENDING' and pending['thumbnail']['pending'] == 1 and len(failed_calls) == 1
     delayed = runner.run_stage9_media_once(enabled, services=svc)
-    assert delayed['thumbnail']['attempted'] == 0 and len(failed_calls) == 1
+    assert delayed['status'] == 'PENDING' and delayed['thumbnail']['held_reasons'] == {'HELD_BACKOFF': 1} and len(failed_calls) == 1
+    with sqlite3.connect(root / 'media.sqlite3') as db:
+        db.execute("UPDATE media_jobs SET thumbnail_status='PENDING', thumbnail_attempt_count=0, thumbnail_updated_at=NULL WHERE dvd_id=?", (ids[0],))
+    svc['thumbnail_processor'] = process
+    attention = runner.run_stage9_media_once(enabled, services=svc)
+    assert attention['status'] == 'PARTIAL_FAILURE' and attention['thumbnail']['attention'] == 1
+    svc['run_jobs'] = lambda **k: {'attempted': 1, 'failed': 1}
+    failed = runner.run_stage9_media_once(enabled, services=svc)
+    assert failed['status'] == 'PARTIAL_FAILURE' and failed['thumbnail']['held_reasons'] == {'MEDIA_FAILURE': 1}
     print('THUMBNAIL_RUNNER_INTEGRATION=PASS')
 
 
