@@ -1,5 +1,14 @@
 # Stage9 Media workstream — active work
 
+
+## STG9MEDIA-001 THUMBNAIL STORAGE — OFFLINE REVIEW INCOMPLETE (2026-11-03 KST)
+
+Source base `5b03b847e594099bec4e9554d92c116f669f0924`; Stage9 contract 1.0.2 and scoped offline implementation approval checked. Existing isolated candidate and smoke SHA-256 matched the prior checkpoint; seven synthetic tests pass. The candidate is not integrated and does not establish actual page provenance, image role, proxy behavior, or full image decoding.
+
+BLOCKER: No verified actual work page and source-specific evidence distinguishes its still thumbnail from an authentic poster; existing Discovery cover URL collection does not establish image role. The Stage9 contract requires source and provenance evidence before source-specific implementation. Do not treat `cover_url`, `og:image`, URL path shape, or synthetic tests as proof, and do not enable a pipeline that guesses. The already-recorded Jellyfin conditional replacement limitation remains; no Primary POST or thumbnail cleanup is enabled. No production access, writes, or deployment occurred.
+
+NEXT: obtain bounded, read-only evidence of an actual exact-ID work page and its image role, plus trustworthy poster-role evidence, then finish Stage9-only proxy, publication, retry and locking integration and offline regression tests. A real NAS/Jellyfin test needs separate approval. The independently isolated working copy is `/tmp/stg9-thumb-storage-20261103`; the pre-existing dirty candidate remains untouched.
+
 ## STG9MEDIA-001 THUMB CLEANUP DESIGN AMENDMENT APPROVED / GOVERNANCE CLOSED — 2026-11-03 KST
 
 USER expressly approved changing the prior unconditional thumb retention: after a verified authentic poster is created without clobber, successfully becomes the exact movie's Jellyfin Primary, and is read back, only the exact program-owned temporary thumb (verified path, identity, file type, owner and hash) may be deleted under separately scoped future operational authorization. If the Jellyfin Primary is manual/non-owned/unconfirmed, image identity is uncertain, or any verification fails, retain the thumb; never delete user files, NFO, video or poster. Stage9 contract v1.0.2 APPROVED, STG9MEDIA-001 IN_PROGRESS; one-time paired governance routing used and reverted to INACTIVE/NONE. No code, NAS/DB/Jellyfin operation or deletion executed. Crucially, Jellyfin 10.11.11 no-atomic-CAS blocker still applies; this deletion-policy approval does NOT waive the user's manual-image protection requirement or approve a best-effort Primary replacement race. Future implementation scope and explicit canary/production authorization remain required.

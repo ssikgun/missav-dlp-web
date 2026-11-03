@@ -1,5 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+
+## Stage9 thumbnail storage checkpoint — 2026-11-03
+
+STG9MEDIA-001 remains IN_PROGRESS. Offline candidate synthetic smoke: 7 PASS, but integration is INCOMPLETE because exact work-page image provenance and authentic-poster role are not established. See Stage9 ACTIVE_WORK for evidence, limits and next step. No production modification or deployment.
+
 ## STG9MEDIA-001 THUMBNAIL FALLBACK — ISOLATED PARTIAL CHECKPOINT (2026-11-03 KST)
 
 PREFLIGHT: Canonical source `658460bec51b5f450fa9e3d18fddc06bf53727be`; common/Stage9 contracts 1.0.1 and STG9MEDIA-001 IN_PROGRESS confirmed. Independent clean clone `/tmp/stg9-thumb-isolated-20261103` based on that exact SHA; pre-existing dirty clone untouched. No operational resource accessed or modified.
