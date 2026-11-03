@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit
 import re
+import hashlib
+import hmac
 
 from teddy_discovery_media_metadata import MAX_POSTER_BYTES, _detect_image_extension, _normalize_dvd_id
 
@@ -181,3 +183,23 @@ def store_candidate_thumbnail(*, dvd_id, video_relative, fetcher, file_station, 
         return {'status': 'PENDING', 'error': 'CANDIDATE_RESPONSE_INVALID'}
     return file_station.create_thumbnail(dvd_id=_normalize_dvd_id(dvd_id), video_relative=video_relative,
         content_type='image/jpeg', data=data)
+
+
+def one_shot_verified_fetch(fetch, *, exact_url, expected_size, expected_sha256):
+    if not callable(fetch) or not isinstance(exact_url, str) or not isinstance(expected_size, int) or expected_size <= 0:
+        raise ValueError('INVALID_GATE_CONFIG')
+    if not isinstance(expected_sha256, str) or len(expected_sha256) != 64 or any(c not in '0123456789abcdef' for c in expected_sha256):
+        raise ValueError('INVALID_GATE_HASH')
+    used = False
+    def guarded(url, maximum):
+        nonlocal used
+        if used or url != exact_url or maximum < expected_size:
+            raise ValueError('ONE_SHOT_OR_TARGET_MISMATCH')
+        used = True
+        status, final, content_type, data = fetch(url, maximum)
+        if (status != 200 or final != exact_url or str(content_type).split(';', 1)[0].strip().lower() != 'image/jpeg'
+                or not isinstance(data, bytes) or len(data) != expected_size
+                or not hmac.compare_digest(hashlib.sha256(data).hexdigest(), expected_sha256)):
+            raise ValueError('CANDIDATE_IDENTITY_MISMATCH')
+        return status, final, content_type, data
+    return guarded

@@ -1,6 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## Stage9 canary hash gate integrated — 2026-11-03
+
+Verified prior guard SHA and reused it in thumbnail module. Explicit --canary-image-size / --canary-image-sha256 inputs are allowed only together in thumbnail-only mode; existing strict proxy fetcher is wrapped with exact target URL and single-use HTTP/MIME/size/SHA validation before storage. No work-specific values in product code. Runner smoke including success/hash-mismatch-before-upload passes; thumbnail smoke 12 PASS including second-GET blocking. FileStation credential/CA paths exist and are readable; no repeated blocked network or systemd request. FILESTATION_READ_ONLY remains INCOMPLETE. User command: python3 -B /tmp/stg9-filestation-readonly-20261103.py (existing API authentication, video stat and complete target listing only, no image GET/upload). Prior staging is preserved and stale relative to the changed source; a new release must use the new verified source SHA. READY_FOR_TIMER_PAUSE=NO; all production changes NOT_RUN.
+
 ## Stage9 one-shot canary hash gate candidate — 2026-11-03
 
 Reused the existing timestamped user systemd readback; no bus retry or bypass. Offline-only gate candidate `/tmp/stg9-canary-gate-20261103/guard.py` SHA256 `7f34d5330509ed3f0f8b43b5dc648798bf1a11390a4951fc67869388b8c98cb2` wraps an injected fetcher with exact URL, single-use, HTTP/final URL/MIME/length/SHA checks. Three synthetic checks pass. It is NOT wired to the existing thumbnail-only CLI, not tested end-to-end against FileStation, not an operational activation command, and no live request occurred. The read-only staged release remains at `/tmp/stg9-release-staging-20261103/cbbe424cb6aad0b7cbf316749a7a56629447d3af` and is not deployed.

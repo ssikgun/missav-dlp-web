@@ -764,6 +764,7 @@ def thumbnail_only_service_boundary(root: Path):
     config = make_config(root, apply=True, thumbnail_only=True, target=ids[0])
     config = replace(config, expected_release_id='a' * 40, jellyfin_base_url='', jellyfin_key_path=None)
     image = b'\xff\xd8\xffoffline candidate\xff\xd9'
+    config = replace(config, canary_image_size=len(image), canary_image_sha256=hashlib.sha256(image).hexdigest())
     requests = []
     def fetch(url, maximum):
         requests.append(url)
@@ -788,8 +789,15 @@ def thumbnail_only_service_boundary(root: Path):
             assert result['jellyfin_get_requests'] == result['jellyfin_post_attempts'] == 0
             assert fake.files[API_LIBRARY_ROOT + '/' + dvd.split('-')[0] + '/' + dvd + '/thumb.jpg'] == image
         assert tls.call_count == adapter.call_count == 2 and publish.call_count == 0
+        # Verify a mismatched expected hash blocks before the storage method.
+        with sqlite3.connect(config.media_db_path) as db:
+            db.execute("UPDATE media_jobs SET thumbnail_status='PENDING',thumbnail_attempt_count=0,thumbnail_updated_at=NULL WHERE dvd_id=?", (ids[0],))
+        db.close()
+        bad = runner.run_stage9_media_once(replace(config, canary_image_sha256='0' * 64))
+        assert bad['status'] == 'PENDING' and len(fake.uploads) == 2
+
         assert all(call.args == (config.poster_proxy_url,) for call in proxy.call_args_list)
-    assert len(requests) == len(fake.uploads) == 2 and all(fake.files[k] == v for k, v in before.items())
+    assert len(requests) == 3 and len(fake.uploads) == 2 and all(fake.files[k] == v for k, v in before.items())
     print('THUMBNAIL_ONLY_SERVICE_BOUNDARY=2 PASS / 0 FAIL')
 
 

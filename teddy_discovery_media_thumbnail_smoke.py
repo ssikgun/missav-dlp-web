@@ -161,4 +161,17 @@ class CandidateSmoke(unittest.TestCase):
         with self.assertRaises(ValueError): make_candidate_proxy_fetcher('http://example.com:8888')
 
 
+class CanaryGateSmoke(unittest.TestCase):
+    def test_single_get_and_hash(self):
+        import hashlib
+        from teddy_discovery_media_thumbnail import one_shot_verified_fetch
+        url='https://fourhoi.com/abc-123/cover-n.jpg'; data=b'fixture'; calls=[]
+        def fetch(u,m): calls.append(u); return 200,u,'image/jpeg',data
+        gate=one_shot_verified_fetch(fetch,exact_url=url,expected_size=len(data),expected_sha256=hashlib.sha256(data).hexdigest())
+        self.assertEqual(gate(url,100)[3],data)
+        with self.assertRaises(ValueError): gate(url,100)
+        self.assertEqual(len(calls),1)
+        bad=one_shot_verified_fetch(fetch,exact_url=url,expected_size=len(data),expected_sha256='0'*64)
+        with self.assertRaises(ValueError): bad(url,100)
+
 if __name__ == '__main__': unittest.main(verbosity=2)

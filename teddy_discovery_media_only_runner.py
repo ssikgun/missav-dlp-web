@@ -116,6 +116,8 @@ class RunnerConfig:
     expected_release_id: str | None = None
     thumbnail_enabled: bool = False
     thumbnail_only: bool = False
+    canary_image_size: int | None = None
+    canary_image_sha256: str | None = None
 
 
 def _normal_path(raw: str | Path, *, allow_missing: bool, expected: str) -> Path:
@@ -449,6 +451,11 @@ def _validate_config(
 ) -> dict:
     if type(config.thumbnail_enabled) is not bool or type(config.thumbnail_only) is not bool:
         raise RunnerError("INVALID_THUMBNAIL_FLAG")
+    if config.canary_image_size is not None or config.canary_image_sha256 is not None:
+        if (not config.thumbnail_only or type(config.canary_image_size) is not int
+                or config.canary_image_size <= 0 or not isinstance(config.canary_image_sha256, str)
+                or not re.fullmatch(r"[0-9a-f]{64}", config.canary_image_sha256)):
+            raise RunnerError("INVALID_CANARY_IMAGE_IDENTITY")
     try:
         max_items = int(config.max_items)
         visibility_max = int(config.visibility_max_items)
@@ -639,6 +646,11 @@ def _build_thumbnail_services(config: RunnerConfig, normalized: dict, *, tls_con
         except Exception as exc:
             raise RunnerError(str(getattr(exc, "code", "FILESTATION_TLS_PREFLIGHT_FAILED"))) from exc
     fetcher = make_candidate_proxy_fetcher(config.poster_proxy_url)
+    if config.canary_image_sha256 is not None:
+        from teddy_discovery_media_thumbnail import candidate_thumbnail_url, one_shot_verified_fetch
+        fetcher = one_shot_verified_fetch(fetcher,
+            exact_url=candidate_thumbnail_url(normalized["target_dvd_id"]),
+            expected_size=config.canary_image_size, expected_sha256=config.canary_image_sha256)
 
     def processor(dvd_id):
         with SynologyFileStationMediaAdapter(
@@ -872,6 +884,8 @@ def _config_from_args(args) -> RunnerConfig:
         target_dvd_id=args.target_dvd_id,
         apply=args.apply,
         thumbnail_only=args.thumbnail_only,
+        canary_image_size=args.canary_image_size,
+        canary_image_sha256=args.canary_image_sha256,
         confirm=args.confirm,
         filestation_password_path=args.filestation_password_file,
         filestation_ca_path=args.filestation_ca_file,
@@ -899,6 +913,8 @@ def main(argv=None) -> int:
     parser.add_argument("--target-dvd-id")
     parser.add_argument("--thumbnail-only", action="store_true",
                         help="Run only one existing NFO-complete target thumbnail job; requires --target-dvd-id and --max-items 1.")
+    parser.add_argument("--canary-image-size", type=int)
+    parser.add_argument("--canary-image-sha256")
     parser.add_argument("--expected-release-id")
     parser.add_argument("--filestation-password-file", type=Path)
     parser.add_argument("--filestation-ca-file", type=Path)
