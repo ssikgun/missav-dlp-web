@@ -1,5 +1,13 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 SINGLE-TITLE OPERATIONAL APPROVAL — 2026-11-03
+
+USER explicitly approves only: a complete immutable Stage9 release deployment preserving the old release; consistent dedicated Media DB backup and four additive thumbnail columns; bounded Stage9-only service/timer maintenance; one MBRBI-015 candidate image GET and create-only thumb.jpg; pre/post video/NFO/file/ownership/job verification. Before upload the one received image must match image/jpeg, 87575 bytes and SHA256 80cf0caae57e3a370fc5c52d98a819c496a8868bb2428f73a2a3bacd139a57f1; do not hardcode this identity into general product code or issue a separate image retry. Exact target, max_items=1, thumbnail-only mode, existing apply confirmation, release and all locks/guards are mandatory. Existing MP4 size 2052142311 and NFO SHA 686d6129a44cecd1fea8f91ace17db808f5a50a96887bed6d528a5ba50f970d3 must be preserved; @eaDir only recognized by exact name and directory type.
+
+User accepts residual non-atomic poster/Thumb simultaneous creation for this one trial only; retain resulting files without overwrite/deletion. Default scheduled thumbnail remains disabled. No other workstream service changes, Discovery writes, bulk work, Jellyfin API change/Primary/scan, ACL/account change or general automatic activation. If systemd bus denial repeats, stop without bypass and supply minimal user-executed read-only commands. Stop on unexpected writers/WAL, backup/integrity failure, release/dependency mismatch, FileStation failure/incomplete listing, identity/ownership conflict or image mismatch. Record each completed phase before advancing; no automatic restore over potentially newer DB data.
+
+INITIAL_CHECKPOINT: repository/task preflight PASS at cbbe424cb6aad0b7cbf316749a7a56629447d3af; operational eligibility is not yet verified. Deployment, DB backup/migration and canary remain NOT_RUN until all required preconditions pass.
+
 ## STG9MEDIA-001 THUMBNAIL-ONLY CLI — SOURCE/OFFLINE COMPLETE (2026-11-03)
 
 Added explicit `--thumbnail-only` / RunnerConfig.thumbnail_only, default false, requiring one exact existing NFO-complete target and max_items=1. The existing apply confirmation and release/path/proxy/lock protections remain. Dedicated service construction calls only existing thumbnail jobs/processor; no normal reconcile/media/NFO/poster publication, Jellyfin client or visibility work. General mode behavior and default-disabled thumbnails are retained.

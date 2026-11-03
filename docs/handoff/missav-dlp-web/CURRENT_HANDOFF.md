@@ -1,6 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## Stage9 one-title deployment approval checkpoint — 2026-11-03
+
+User approves a bounded Stage9-only immutable release, dedicated Media DB backup/four-column migration, limited Stage9 maintenance and exactly one MBRBI-015 image GET/create-only thumb with pre-upload expected SHA/size and post-verification. Residual poster-create race accepted for this one trial; default scheduled thumbnails disabled. See Stage9 ACTIVE_WORK for exact limits and stop conditions. Systemd bus denial must stop work without bypass. This is approval recording only: all operational phases initially NOT_RUN.
+
 ## Stage9 thumbnail-only execution mode — source/offline complete (2026-11-03)
 
 The prior activation-code gap is resolved in source: --thumbnail-only requires a target and max_items=1; dedicated thumbnail services avoid general media/NFO/Jellyfin work. Missing thumbnail DB columns fail before migration-capable functions; dry-run is read-only and refuses nonempty/changing WAL. New checks 25 PASS plus existing runner/jobs/processor regressions PASS. See Stage9 ACTIVE_WORK for details and the stable/checkpointed-DB prerequisite. Release deployment, operational DB migration and live single-title creation remain NOT_RUN and require separate approval; JPEG decode and poster/thumb atomicity limits remain.
