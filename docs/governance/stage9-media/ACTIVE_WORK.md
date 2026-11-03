@@ -1,5 +1,12 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 USER-ATTACHED COVER-N JPEG READBACK — 2026-11-03 KST
+
+USER reports direct opening and right-click saving `https://fourhoi.com/mbrbi-015/cover-n.jpg` outside Gluetun and attached the resulting file for analysis. Local attached file `cover-n.jpg`: JPEG progressive sRGB, **800x536, 87,575 bytes**, full pixel decode with ImageMagick exit 0, SHA-256 `80cf0caae57e3a370fc5c52d98a819c496a8868bb2428f73a2a3bacd139a57f1`. Visual evidence is **front + spine + back DVD jacket artwork** with MBRBI-015 identity, NOT an ordinary in-video scene still. This supports an authentic-*looking* jacket/artwork **candidate**; official publisher authenticity, canonical front-cover selection, and intended Jellyfin poster role are NOT independently certified. Preserve source classification/ownership distinction; do NOT automatically publish this as a generic fallback Thumb or assume it is confirmed authentic poster just because the tag is `og:image`.
+
+CHECKPOINT: `USER_LOCAL_FILE_IMAGE_DECODE=PASS; USER_LOCAL_IMAGE_SHA=RECORDED; CT108_GLUTUEN_IMAGE_FETCH=NOT_RUN; PROVENANCE=USER_REPORTED_BROWSER_DOWNLOAD; OFFICIAL_POSTER_AUTHENTICITY=NOT_VERIFIED; SOURCE_ROLE_REVIEW=REQUIRED; NAS_WRITE=0; DB_WRITE=0; JELLYFIN_WRITE=0; DEPLOYMENT=0`. USER separately approved exactly one bounded CT108 Gluetun-proxied, image-only read-only GET for this exact URL; no page GET repeats, no direct fallback or proxy bypass, no downloads to disk, and no operational changes. Next: compare proxy-fetched bytes/hash with the attached file if reachable. Do not treat the user file verification as proof of CT108 network access.
+
+
 ## STG9MEDIA-001 FOURHOI EXACT-ID SOURCE VALIDATION — OFFLINE (2026-11-03)
 
 User-observed MissAV page-linked fourhoi.com image is accepted only over HTTPS with exact DVD-ID path `/ID/cover-n.jpg`; conflicting twitter:image is rejected. Existing canonical/og:url checks remain. Synthetic thumbnail smoke 9 PASS and FileStation regression 7 PASS. No live page or image request, image decoding, deployment, NAS or Jellyfin write. Production wiring, real image validation and safe Jellyfin Primary replacement remain unverified.
