@@ -1,6 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## STG9MEDIA-001 PAUSED TIMER PREFLIGHT — WRITER VISIBILITY BLOCKED (2026-11-03)
+
+User-reported timer stop is a production change; timer/service inactive at the user observation. PRODUCTION_CHANGED=YES. Five staged Stage9 files byte-match canonical source 3d97c998299ccb88e1f59a96fdeb3088f76b7924. Read-only current filesystem observation: dedicated media DB main 98304, WAL 0, SHM 32768 bytes. Codex /proc sees only three processes, one access error, zero matching FDs; namespace completeness UNKNOWN. User's prior inspection also had two /proc errors. Therefore absence of other writers, live service and locks cannot be proven; stop per user instruction before backup, migration, release deployment or one-title canary. No operational DB writes, NAS/Jellyfin access, image GET, release changes or additional service changes by this attempt.
+
+Old release and DB were not changed by this attempt; compatibility has not been fully reverified and live systemd state is unavailable to Codex. For prompt timer restoration if user elects to end maintenance, first verify in the CT108 general terminal the running Stage9 service is inactive with MainPID 0, WorkingDirectory remains the old b318 release, and no DB/release migration occurred; then start only teddy-stage9-media.timer and verify its active state. Do not restore/replace DB or release. Otherwise hold and inspect. Existing approval remains; resume only when user provides complete writer/lock/WAL and service evidence.
+
 ## STG9MEDIA-001 USER PAUSED STAGE9 TIMER — 2026-11-03
 
 User reports CT108 Stage9 timer stopped and service inactive/dead MainPID 0; before stop timer active and installed release b31873824527bbcdf800d141b40eaf6e2af03abd. No other services changed. PRODUCTION_CHANGED=YES due to user timer stop. User observed zero DB file descriptors but two /proc access errors, so absence of other writers is not established. This is user-reported state at observation time; recheck safety before DB backup/migration or release change. Existing one-title approval and stop conditions remain.
