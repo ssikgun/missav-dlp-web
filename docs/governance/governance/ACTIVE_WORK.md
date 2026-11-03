@@ -1,10 +1,14 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: NONE
-STATUS: INACTIVE
+TASK_ID: STG9MEDIA-001
+STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.1
-REQUIRES_WORKSTREAMS: governance
+REQUIRES_WORKSTREAMS: governance,stage9-media
+
+## STG9MEDIA-001 TEMPORARY CONTRACT AMENDMENT APPROVED — 2026-11-03
+
+User authorizes only the Stage9 v1.0.3 narrow fourhoi.com exact DVD-ID candidate URL exception, governance validation and restoration. No common-contract or unrelated workstream changes; no production operations.
 
 ## STG9MEDIA-001 TEMPORARY GOVERNANCE CLOSEOUT — 2026-11-03 KST
 
