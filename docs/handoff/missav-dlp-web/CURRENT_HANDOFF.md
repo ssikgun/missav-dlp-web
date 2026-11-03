@@ -1,6 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## MBRBI-015 thumbnail canary read-only preflight — 2026-11-03
+
+Read-only host reports `downloader`; CT ID and active service/timer state could not be independently verified because system bus access was denied in the execution environment. Installed unit WorkingDirectory is `/opt/missav-dlp-web/stage9-runtime/releases/b31873824527bbcdf800d141b40eaf6e2af03abd`; its runner differs from canonical and has no thumbnail_enabled support. Unit contains a loopback poster-proxy argument; actual proxy reachability was not tested. Timer unit specifies ten-minute schedule; active state unknown.
+
+Exact MBRBI-015 read-only SQLite URI mode=ro + immutable=1 + query_only, empty WAL and unchanged pre/post file/WAL observations: one title, one present jav holding `MBRBI/MBRBI-015/MBRBI-015.mp4`, size 2052142311; media job COMPLETED, attempt 1, NFO COMPLETE, poster PENDING; thumbnail columns absent. Immutable snapshot remains subject to concurrent-change limitations; no migration performed. `/proc/locks` showed no matching writer, runner or target title lock at that instant, not a future guarantee. Read-only FileStation attempt failed HTTP_REQUEST_FAILED inside sandbox; video, folder completeness and NFO/poster/thumb owners remain NOT_VERIFIED. CANARY=BLOCKED; cannot infer NAS absence from failed access. No live canary, NAS/DB/Jellyfin write or service change. Fresh authorization and safe release/schema/activation plan plus complete target NAS readback are required; posterior poster/thumb races remain non-atomic.
+
 ## Stage9 thumbnail runner result and canary preparation — 2026-11-03
 
 Runner reports thumbnail attention/exhaustion as PARTIAL_FAILURE, retry/lock/item-limit holds as PENDING with reason counts, and preserves default-disabled behavior. Offline runner, jobs, processor and pipeline smokes PASS. Targeted MBRBI-015 canary is NOT READY: installed release/config/schema, job/holding and actual NFO/poster/thumb/ownership are NOT_VERIFIED; thumbnail_enabled exists only as a programmatic default-false setting, with no approved operational activation procedure.
