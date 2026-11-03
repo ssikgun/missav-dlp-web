@@ -1,6 +1,10 @@
 # Stage9 Media workstream — active work
 
 
+## STG9MEDIA-001 SOURCE TO THUMB STORAGE — OFFLINE ONLY (2026-11-03)
+
+Reused prior isolated thumbnail candidate and connected explicit injected preview data to FileStation create_thumbnail; no default transport or production pipeline wiring. A verified poster skips storage, unknown poster state fails closed and absent page remains pending. Offline synthetic tests: thumbnail 8 PASS; FileStation regression 7 PASS, covering two IDs, collisions and invalid input. Source-role verification is the caller's responsibility; actual site behavior, proxy route, image decoding, NAS and Jellyfin are not verified. No operational writes or deployment.
+
 ## STG9MEDIA-001 THUMB CREATE-ONLY STORAGE — OFFLINE (2026-11-03)
 
 Added an explicit FileStation thumbnail create operation for caller-verified JPEG/PNG/WebP data, with exact video identity, no-overwrite, existing thumbnail collision checks and existing post-upload owner/hash checks. Offline fake FileStation smoke: 7 PASS including two IDs and unchanged other files. Not wired to site collection, pipeline or Jellyfin. Format checks use MIME and magic signatures, not full image decoding. Actual NAS behavior is unverified; production changes and deployment remain unauthorized. Site image provenance and race-safe Jellyfin Primary switching remain unresolved.
