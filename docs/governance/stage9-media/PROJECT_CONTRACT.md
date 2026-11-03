@@ -1,6 +1,6 @@
 # Stage9 Media workstream contract
 
-CONTRACT_VERSION: 1.0.2
+CONTRACT_VERSION: 1.0.3
 PROJECT_CONTRACT_STATUS: APPROVED
 APPLIES_TO: Stage9 media metadata, NFO/poster lifecycle, publication state, and Jellyfin item-state integration.
 
@@ -36,7 +36,11 @@ USER DESIGN APPROVAL: if no verified authentic poster exists, use a **site-suppl
 - **Later official poster:** if a verified authentic poster becomes available, safely create the separate `poster.<validated-extension>` only if an approved no-clobber create is possible; retain the existing `thumb` until successful official-poster Primary readback; switch Jellyfin's Primary to authentic poster only if the current image is the exact program-owned temporary fallback, not a user's custom image. After successful readback, the exact program-owned temporary `thumb` may be removed only under the cleanup policy below. Avoid rewriting a completed NFO or any video, replacing an existing poster, or issuing uncontrolled Jellyfin scans/re-notifications.
 - **No verified image:** continue the successful NFO-only `PENDING` path. Keep bounded retries, metadata/DVDid identity, network host/redirect/bytes verification, per-title/DB locks, and existing write safeguards.
 
-This is an **approved design-policy amendment, not an implementation or deployment approval**. The specific external site(s) including `missav123.com`, the actual preview endpoint, stable provenance signals, existing Jellyfin Primary ownership handling, and source-specific metadata collection must be verified read-only before a separately approved implementation. Never invent image URLs. Use a Stage9-only integration where feasible; if shared Discovery/Downloader code or Writer resources must change, require matched shared-workstream authorization before edits. Before any runtime write, specify exact affected product files, safe offline tests, one user-approved limited operational canary, and explicit NAS/Jellyfin production write scope in an active task. This new policy supersedes the older blanket prohibition **only** for externally supplied, verified, temporary thumbnail artwork in this section; all other existing Stage9 preservation rules remain in force.
+This is an **approved design-policy amendment, not an implementation or deployment approval**. The specific external site(s) including `missav123.com`, the actual preview endpoint, stable provenance signals, existing Jellyfin Primary ownership handling, and source-specific metadata collection must be verified read-only before a separately approved implementation. Never invent image URLs except for the narrowly approved candidate rule below. Use a Stage9-only integration where feasible; if shared Discovery/Downloader code or Writer resources must change, require matched shared-workstream authorization before edits. Before any runtime write, specify exact affected product files, safe offline tests, one user-approved limited operational canary, and explicit NAS/Jellyfin production write scope in an active task. This new policy supersedes the older blanket prohibition **only** for externally supplied, verified, temporary thumbnail artwork in this section; all other existing Stage9 preservation rules remain in force.
+
+## Approved bounded thumbnail candidate URL exception — 2026-11-03
+
+When an independently verified authentic poster is unavailable, Stage9 may derive only `https://fourhoi.com/<normalized-lowercase-dvd-id>/cover-n.jpg` as a temporary thumbnail candidate. The user accepts that matching an ID in this URL does not prove image content identity or page association; do not claim either or label it an official poster. Require exact HTTPS host and path, no query, fragment, arbitrary port or redirect, existing Gluetun proxy only, bounded response and valid JPEG. Preserve original bytes and create only `thumb.jpg`; failures remain pending/held. Authentic poster takes priority. Preserve all no-overwrite, locking, retry, user-image protection and conditional cleanup requirements. Do not generalize the exception to other domains or paths.
 
 ## User-approved temporary-thumbnail cleanup amendment — 2026-11-03
 
