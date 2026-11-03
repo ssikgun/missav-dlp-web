@@ -1,5 +1,9 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 USER PAUSED STAGE9 TIMER — 2026-11-03
+
+User reports CT108 Stage9 timer stopped and service inactive/dead MainPID 0; before stop timer active and installed release b31873824527bbcdf800d141b40eaf6e2af03abd. No other services changed. PRODUCTION_CHANGED=YES due to user timer stop. User observed zero DB file descriptors but two /proc access errors, so absence of other writers is not established. This is user-reported state at observation time; recheck safety before DB backup/migration or release change. Existing one-title approval and stop conditions remain.
+
 ## STG9MEDIA-001 USER FILESTATION READBACK AND LATEST RELEASE STAGING — 2026-11-03
 
 User reports FileStation read-only PASS at observation time: MBRBI-015.mp4 2052142311 bytes ssikgun:users; MBRBI-015.nfo 622 bytes stage9_media:users; complete FileStation listing MP4/NFO only. User separately observed @eaDir directory by NAS SSH; preserve. FileStation module SHA256 f6d688358932829879693af768459c69f6c544c32f30cb1b5c87b6366fbd05f1. This is not a fresh pre-upload absence check. No sandbox network or systemd retry.

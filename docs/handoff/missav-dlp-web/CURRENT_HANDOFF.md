@@ -1,6 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## STG9MEDIA-001 USER PAUSED STAGE9 TIMER — 2026-11-03
+
+User reports CT108 Stage9 timer stopped and service inactive/dead MainPID 0; before stop timer active and installed release b31873824527bbcdf800d141b40eaf6e2af03abd. No other services changed. PRODUCTION_CHANGED=YES due to user timer stop. User observed zero DB file descriptors but two /proc access errors, so absence of other writers is not established. This is user-reported state at observation time; recheck safety before DB backup/migration or release change. Existing one-title approval and stop conditions remain.
+
 ## Stage9 FileStation user evidence and staged release — 2026-11-03
 
 User reports read-only FileStation PASS for MBRBI-015 at observation time; exact video/NFO size/owner and @eaDir evidence are in Stage9 ACTIVE_WORK. Latest source archive staged separately under /tmp and local imports/smokes passed. Stage9 other-writer visibility and live invocation remain unverified; no timer pause, DB backup/migration, release switch or canary occurred.
