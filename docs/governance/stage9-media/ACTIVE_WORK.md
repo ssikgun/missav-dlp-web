@@ -1,5 +1,9 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 THUMBNAIL JOB STATE — OFFLINE — 2026-11-03
+
+Independent thumbnail status, attempts, timestamp and error plus additive media-job migration and an explicitly invoked injected-processor job-management path are implemented. Existing title and DB locks protect claim/recheck; thumbnail state transitions do not rewrite NFO, poster or Jellyfin states. Synthetic DB checks cover two IDs, completion, backoff, exhaustion, title lock and changed-state claim conflict; existing jobs smoke, thumbnail smoke 11 PASS and FileStation smoke 7 PASS. No actual site/NAS/Jellyfin operation or production database migration occurred. Runner and pipeline are not wired: existing poster checks, real fetch/storage and deployment require separately scoped work. Existing creator collision and uncertain outcomes require careful fail-closed handling before connecting a real processor.
+
 ## STG9MEDIA-001 THUMB STATE OFFLINE CANDIDATE — INCOMPLETE — 2026-11-03
 
 Isolated uncommitted candidate `/tmp/stg9-thumb-state-20261103` adds thumbnail state/attempt/timestamp/error columns, additive isolated-DB migration and a pure retry eligibility helper. Existing jobs smoke plus representative state checks pass; no operational database touched. This is NOT integrated: job selection/atomic claims, per-title locking and state finishing, thumbnail-only pipeline without NFO republishing, FileStation existing-poster gating, and runner proxy wiring remain unimplemented and must be tested together. Do not deploy or treat this candidate as safe production behavior. Existing canonical product code remains unchanged; no live network, NAS, Jellyfin or timer activity.

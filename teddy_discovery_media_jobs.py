@@ -53,6 +53,12 @@ CREATE TABLE IF NOT EXISTS media_jobs (
 
     poster_error TEXT,
 
+    thumbnail_status TEXT NOT NULL DEFAULT 'UNKNOWN'
+        CHECK (thumbnail_status IN ('UNKNOWN', 'PENDING', 'RUNNING', 'FAILED', 'COMPLETE', 'ATTENTION', 'SKIPPED')),
+    thumbnail_attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (thumbnail_attempt_count >= 0),
+    thumbnail_updated_at TEXT,
+    thumbnail_error TEXT,
+
     jellyfin_notification_status TEXT NOT NULL DEFAULT 'UNKNOWN'
         CHECK (jellyfin_notification_status IN ('UNKNOWN', 'ATTEMPTED', 'NOTIFIED', 'VISIBLE', 'ATTENTION')),
 
@@ -302,6 +308,10 @@ def _migrate_media_artifact_columns(db: sqlite3.Connection) -> None:
         "nfo_status": "TEXT NOT NULL DEFAULT 'UNKNOWN' CHECK (nfo_status IN ('UNKNOWN', 'PENDING', 'COMPLETE', 'ATTENTION'))",
         "poster_status": "TEXT NOT NULL DEFAULT 'UNKNOWN' CHECK (poster_status IN ('UNKNOWN', 'PENDING', 'RUNNING', 'FAILED', 'COMPLETE', 'ATTENTION'))",
         "poster_error": "TEXT",
+        "thumbnail_status": "TEXT NOT NULL DEFAULT 'UNKNOWN' CHECK (thumbnail_status IN ('UNKNOWN', 'PENDING', 'RUNNING', 'FAILED', 'COMPLETE', 'ATTENTION', 'SKIPPED'))",
+        "thumbnail_attempt_count": "INTEGER NOT NULL DEFAULT 0 CHECK (thumbnail_attempt_count >= 0)",
+        "thumbnail_updated_at": "TEXT",
+        "thumbnail_error": "TEXT",
         "jellyfin_notification_status": "TEXT NOT NULL DEFAULT 'UNKNOWN' CHECK (jellyfin_notification_status IN ('UNKNOWN', 'ATTEMPTED', 'NOTIFIED', 'VISIBLE', 'ATTENTION'))",
         "jellyfin_error": "TEXT",
         "jellyfin_recovery_status": "TEXT NOT NULL DEFAULT 'UNKNOWN' CHECK (jellyfin_recovery_status IN ('UNKNOWN', 'CHECK_PENDING', 'VISIBLE', 'ATTENTION', 'MANUAL_ACTION_REQUIRED'))",
@@ -727,6 +737,104 @@ def retry_eligibility(
                 return "HELD_BACKOFF"
         return "ELIGIBLE"
     return "HELD_INVALID_STATE"
+
+
+def thumbnail_retry_eligibility(job, *, now, max_attempts, retry_backoff_seconds, running_stale_seconds):
+    """Evaluate thumbnail retry independently of poster and NFO attempt counters."""
+    try:
+        count = int(job.get('thumbnail_attempt_count'))
+        limit = int(max_attempts)
+        backoff = int(retry_backoff_seconds)
+        stale = int(running_stale_seconds)
+        current = _now_utc(now)
+    except (TypeError, ValueError, OverflowError):
+        return 'HELD_INVALID_STATE'
+    if count < 0 or limit < 1 or backoff < 0 or stale < 1:
+        return 'HELD_INVALID_STATE'
+    if job.get('nfo_status') != 'COMPLETE':
+        return 'HELD_NFO_INCOMPLETE'
+    state = job.get('thumbnail_status')
+    if state in {'COMPLETE', 'SKIPPED', 'ATTENTION'}:
+        return state
+    if state not in {'UNKNOWN', 'PENDING', 'FAILED', 'RUNNING'}:
+        return 'HELD_INVALID_STATE'
+    if count >= limit:
+        return 'EXHAUSTED'
+    if state in {'UNKNOWN', 'PENDING'} and count == 0:
+        return 'ELIGIBLE'
+    updated = _as_utc(job.get('thumbnail_updated_at'))
+    if updated is None:
+        return 'HELD_INVALID_TIMESTAMP'
+    elapsed = (current - updated).total_seconds()
+    wait = stale if state == 'RUNNING' else backoff
+    return 'ELIGIBLE' if elapsed >= wait else 'HELD_BACKOFF'
+
+
+def run_thumbnail_jobs(*, db_path, writer_lock_path, processor, title_lock_dir=None,
+                       now=None, max_items=1, max_attempts=DEFAULT_MEDIA_MAX_ATTEMPTS,
+                       retry_backoff_seconds=DEFAULT_MEDIA_RETRY_BACKOFF_SECONDS,
+                       running_stale_seconds=DEFAULT_MEDIA_RUNNING_STALE_SECONDS):
+    """Explicit job-management entrypoint; processor is injected, no runtime wiring."""
+    if not callable(processor) or int(max_items) < 1:
+        raise ValueError('invalid thumbnail processor or item limit')
+    current_time = _now_utc(now)
+    stamp = current_time.isoformat(timespec='seconds')
+    options = dict(now=current_time, max_attempts=max_attempts,
+                   retry_backoff_seconds=retry_backoff_seconds,
+                   running_stale_seconds=running_stale_seconds)
+    with _media_transaction(db_path, writer_lock_path) as db:
+        candidates = [dict(row) for row in db.execute(
+            """SELECT media_job_id, dvd_id, status, nfo_status, thumbnail_status,
+                      thumbnail_attempt_count, thumbnail_updated_at
+               FROM media_jobs WHERE status='COMPLETED' AND nfo_status='COMPLETE'
+               ORDER BY media_job_id""")]
+    lock_dir = title_lock_dir if title_lock_dir is not None else configured_lock_dir()
+    outcomes = []
+    for candidate in candidates:
+        if len([item for item in outcomes if item.get('attempted')]) >= int(max_items):
+            break
+        if thumbnail_retry_eligibility(candidate, **options) != 'ELIGIBLE':
+            continue
+        title_lock = try_acquire_title_lock(candidate['dvd_id'], lock_dir=lock_dir)
+        if title_lock.status != ACQUIRED:
+            outcomes.append({'dvd_id': candidate['dvd_id'], 'status': 'HELD_TITLE_LOCK', 'attempted': False})
+            continue
+        with title_lock:
+            with _media_transaction(db_path, writer_lock_path) as db:
+                row = db.execute("""SELECT media_job_id, dvd_id, status, nfo_status, thumbnail_status,
+                    thumbnail_attempt_count, thumbnail_updated_at FROM media_jobs WHERE media_job_id=?""",
+                    (candidate['media_job_id'],)).fetchone()
+                if row is None or dict(row) != candidate or thumbnail_retry_eligibility(dict(row), **options) != 'ELIGIBLE':
+                    outcomes.append({'dvd_id': candidate['dvd_id'], 'status': 'HELD_CONFLICT', 'attempted': False})
+                    continue
+                cursor = db.execute("""UPDATE media_jobs SET thumbnail_status='RUNNING',
+                    thumbnail_attempt_count=thumbnail_attempt_count+1, thumbnail_updated_at=?, thumbnail_error=NULL
+                    WHERE media_job_id=? AND status='COMPLETED' AND nfo_status='COMPLETE'
+                    AND thumbnail_status=? AND thumbnail_attempt_count=? AND thumbnail_updated_at IS ?""",
+                    (stamp, candidate['media_job_id'], candidate['thumbnail_status'],
+                     candidate['thumbnail_attempt_count'], candidate['thumbnail_updated_at']))
+                if cursor.rowcount != 1:
+                    outcomes.append({'dvd_id': candidate['dvd_id'], 'status': 'HELD_CONFLICT', 'attempted': False})
+                    continue
+            try:
+                result = processor(candidate['dvd_id'])
+                result_status = result.get('status') if isinstance(result, dict) else None
+                if result_status not in {'COMPLETE', 'FAILED', 'PENDING', 'ATTENTION', 'SKIPPED'}:
+                    raise ValueError('invalid thumbnail processor outcome')
+                error = str(result.get('error') or '')[:500] or None
+            except Exception:
+                result_status, error = 'FAILED', 'THUMBNAIL_PROCESSOR_FAILED'
+            with _media_transaction(db_path, writer_lock_path) as db:
+                cursor = db.execute("""UPDATE media_jobs SET thumbnail_status=?, thumbnail_error=?,
+                    thumbnail_updated_at=? WHERE media_job_id=? AND thumbnail_status='RUNNING'
+                    AND thumbnail_attempt_count=? AND thumbnail_updated_at IS ?""",
+                    (result_status, error, stamp, candidate['media_job_id'],
+                     candidate['thumbnail_attempt_count'] + 1, stamp))
+                if cursor.rowcount != 1:
+                    outcomes.append({'dvd_id': candidate['dvd_id'], 'status': 'HELD_CONFLICT', 'attempted': True})
+                    continue
+            outcomes.append({'dvd_id': candidate['dvd_id'], 'status': result_status, 'attempted': True})
+    return outcomes
 
 
 def _mark_running_if_unchanged(

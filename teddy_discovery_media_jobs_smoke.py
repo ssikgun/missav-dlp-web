@@ -322,6 +322,10 @@ def artifact_retry_and_migration_smoke(root):
     assert migrated_row["attempt_count"] == 4
     assert migrated_row["nfo_status"] == "UNKNOWN"
     assert migrated_row["poster_status"] == "UNKNOWN"
+    assert migrated_row["thumbnail_status"] == "UNKNOWN"
+    assert migrated_row["thumbnail_attempt_count"] == 0
+    assert migrated_row["thumbnail_updated_at"] is None
+    assert migrated_row["thumbnail_error"] is None
     assert migrated_row["jellyfin_notification_status"] == "UNKNOWN"
     assert migrated_row["jellyfin_recovery_status"] == "UNKNOWN"
     assert migrated_row["jellyfin_next_check_at"] is None
@@ -773,12 +777,85 @@ def current_input_guard_smoke(root):
     print("CURRENT_INPUT_GUARD_SMOKE=PASS")
 
 
+def thumbnail_state_smoke():
+    from datetime import datetime, timezone
+    from teddy_discovery_media_jobs import thumbnail_retry_eligibility
+    now = datetime(2026, 11, 3, tzinfo=timezone.utc)
+    options = dict(now=now, max_attempts=2, retry_backoff_seconds=60, running_stale_seconds=120)
+    job = dict(nfo_status='COMPLETE', thumbnail_status='PENDING', thumbnail_attempt_count=0, thumbnail_updated_at=None)
+    assert thumbnail_retry_eligibility(job, **options) == 'ELIGIBLE'
+    job.update(thumbnail_status='FAILED', thumbnail_attempt_count=1, thumbnail_updated_at='2026-11-02T23:59:30+00:00')
+    assert thumbnail_retry_eligibility(job, **options) == 'HELD_BACKOFF'
+    job['thumbnail_attempt_count'] = 2
+    assert thumbnail_retry_eligibility(job, **options) == 'EXHAUSTED'
+    job['thumbnail_status'] = 'COMPLETE'
+    assert thumbnail_retry_eligibility(job, **options) == 'COMPLETE'
+
+
+def thumbnail_jobs_integration_smoke(root):
+    from datetime import datetime, timedelta, timezone
+    from teddy_discovery_media_jobs import _media_transaction, run_thumbnail_jobs
+    from teddy_title_exclusion import try_acquire_title_lock, ACQUIRED
+    db_path = root / 'thumbnail-jobs.sqlite'
+    writer_lock = root / 'thumbnail-writer.lock'
+    title_dir = root / 'thumb-title-locks'
+    title_dir.mkdir()
+    now = datetime(2026, 11, 3, tzinfo=timezone.utc)
+    with _media_transaction(db_path, writer_lock) as db:
+        for dvd in ('ABC-123', 'XYZ-456'):
+            db.execute("""INSERT INTO media_jobs(dvd_id,status,attempt_count,nfo_status,poster_status,
+                       poster_error,jellyfin_notification_status,jellyfin_error,jellyfin_recovery_status,
+                       created_at,updated_at) VALUES (?, 'COMPLETED', 0, 'COMPLETE', 'PENDING',
+                       'cover pending', 'VISIBLE', 'retained', 'VISIBLE', ?, ?)""", (dvd, now.isoformat(), now.isoformat()))
+    opts = dict(db_path=db_path, writer_lock_path=writer_lock, title_lock_dir=title_dir,
+                max_items=2, max_attempts=2, retry_backoff_seconds=60, running_stale_seconds=120)
+    calls = []
+    def process(dvd):
+        calls.append(dvd)
+        return {'status': 'COMPLETE' if dvd == 'ABC-123' else 'FAILED'}
+    result = run_thumbnail_jobs(processor=process, now=now, **opts)
+    assert [x['status'] for x in result] == ['COMPLETE', 'FAILED'], result
+    assert calls == ['ABC-123', 'XYZ-456']
+    assert run_thumbnail_jobs(processor=process, now=now + timedelta(seconds=30), **opts) == []
+    # A concurrent holder prevents a second processor from claiming this work.
+    lock = try_acquire_title_lock('XYZ-456', lock_dir=title_dir)
+    assert lock.status == ACQUIRED
+    with lock:
+        held = run_thumbnail_jobs(processor=process, now=now + timedelta(seconds=61), **opts)
+        assert held[0]['status'] == 'HELD_TITLE_LOCK' and len(calls) == 2
+    retry = run_thumbnail_jobs(processor=process, now=now + timedelta(seconds=61), **opts)
+    assert [x['status'] for x in retry] == ['FAILED'] and len(calls) == 3
+    assert run_thumbnail_jobs(processor=process, now=now + timedelta(seconds=180), **opts) == []
+    with _media_transaction(db_path, writer_lock) as db:
+        rows = [dict(row) for row in db.execute('SELECT * FROM media_jobs ORDER BY dvd_id')]
+    assert [r['thumbnail_status'] for r in rows] == ['COMPLETE', 'FAILED']
+    assert [r['thumbnail_attempt_count'] for r in rows] == [1, 2]
+    for row in rows:
+        assert (row['status'], row['nfo_status'], row['poster_status'], row['poster_error'],
+                row['jellyfin_notification_status'], row['jellyfin_error'], row['jellyfin_recovery_status']) == (
+                'COMPLETED', 'COMPLETE', 'PENDING', 'cover pending', 'VISIBLE', 'retained', 'VISIBLE')
+    # Simulate a state change between selection and the locked DB recheck.
+    from unittest.mock import patch
+    with _media_transaction(db_path, writer_lock) as db:
+        db.execute("UPDATE media_jobs SET thumbnail_status='PENDING', thumbnail_attempt_count=0, thumbnail_updated_at=NULL WHERE dvd_id='ABC-123'")
+    def race(dvd, *, lock_dir):
+        with _media_transaction(db_path, writer_lock) as db:
+            db.execute("UPDATE media_jobs SET thumbnail_status='COMPLETE' WHERE dvd_id=?", (dvd,))
+        return try_acquire_title_lock(dvd, lock_dir=lock_dir)
+    with patch('teddy_discovery_media_jobs.try_acquire_title_lock', side_effect=race):
+        conflict = run_thumbnail_jobs(processor=process, now=now + timedelta(seconds=240), **opts)
+    assert conflict[0]['status'] == 'HELD_CONFLICT' and len(calls) == 3
+    print('THUMBNAIL_JOBS_INTEGRATION=PASS')
+
+
 def main():
+    thumbnail_state_smoke()
     with tempfile.TemporaryDirectory(
         prefix="teddy-stage9-media-db-"
     ) as temp:
 
         root = Path(temp)
+        thumbnail_jobs_integration_smoke(root)
 
         discovery_db = (
             root / "discovery.sqlite3"
