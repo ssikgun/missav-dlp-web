@@ -1,5 +1,11 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 OPERATIONAL PREFLIGHT STOP — SYSTEMD BUS DENIED — 2026-11-03
+
+Approval checkpoint 69a327d19df006c1f61e6c6e44ab78b5bf3075d2 was pushed and read back before operations. Hostname reports downloader; read-only `systemctl show` for Stage9 service and timer both failed with system scope bus Operation not permitted. User explicitly required stopping if this recurred, so no permission bypass or alternate control channel was attempted. PRE_DEPLOY_PREFLIGHT=BLOCKED; release deployment, media DB backup/migration, canary and image GET all NOT_RUN; NAS/Jellyfin/operational DB/services/timers unchanged by this attempt. MP4/NFO post-readback, current scheduling/locks/writers and rollback readiness remain NOT_VERIFIED.
+
+NEXT user CT108 general terminal read-only commands: `hostname`; `systemctl show teddy-stage9-media.service -p ActiveState -p SubState -p MainPID -p User -p WorkingDirectory -p ExecMainStatus`; `systemctl show teddy-stage9-media.timer -p ActiveState -p SubState -p LastTriggerUSec -p NextElapseUSecRealtime`. No secret-bearing arguments are requested. Existing explicit bounded operational approval is retained; command output is evidence for resuming preflight, not proof of completed deployment or permission to skip other gates.
+
 ## STG9MEDIA-001 SINGLE-TITLE OPERATIONAL APPROVAL — 2026-11-03
 
 USER explicitly approves only: a complete immutable Stage9 release deployment preserving the old release; consistent dedicated Media DB backup and four additive thumbnail columns; bounded Stage9-only service/timer maintenance; one MBRBI-015 candidate image GET and create-only thumb.jpg; pre/post video/NFO/file/ownership/job verification. Before upload the one received image must match image/jpeg, 87575 bytes and SHA256 80cf0caae57e3a370fc5c52d98a819c496a8868bb2428f73a2a3bacd139a57f1; do not hardcode this identity into general product code or issue a separate image retry. Exact target, max_items=1, thumbnail-only mode, existing apply confirmation, release and all locks/guards are mandatory. Existing MP4 size 2052142311 and NFO SHA 686d6129a44cecd1fea8f91ace17db808f5a50a96887bed6d528a5ba50f970d3 must be preserved; @eaDir only recognized by exact name and directory type.

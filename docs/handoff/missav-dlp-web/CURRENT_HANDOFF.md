@@ -1,6 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## Stage9 approved deployment stopped at systemd preflight — 2026-11-03
+
+Approval checkpoint 69a327d19df006c1f61e6c6e44ab78b5bf3075d2 was pushed and read back before operations. Hostname reports downloader; read-only `systemctl show` for Stage9 service and timer both failed with system scope bus Operation not permitted. User explicitly required stopping if this recurred, so no permission bypass or alternate control channel was attempted. PRE_DEPLOY_PREFLIGHT=BLOCKED; release deployment, media DB backup/migration, canary and image GET all NOT_RUN; NAS/Jellyfin/operational DB/services/timers unchanged by this attempt. MP4/NFO post-readback, current scheduling/locks/writers and rollback readiness remain NOT_VERIFIED.
+
+NEXT user CT108 general terminal read-only commands: `hostname`; `systemctl show teddy-stage9-media.service -p ActiveState -p SubState -p MainPID -p User -p WorkingDirectory -p ExecMainStatus`; `systemctl show teddy-stage9-media.timer -p ActiveState -p SubState -p LastTriggerUSec -p NextElapseUSecRealtime`. No secret-bearing arguments are requested. Existing explicit bounded operational approval is retained; command output is evidence for resuming preflight, not proof of completed deployment or permission to skip other gates.
+
 ## Stage9 one-title deployment approval checkpoint — 2026-11-03
 
 User approves a bounded Stage9-only immutable release, dedicated Media DB backup/four-column migration, limited Stage9 maintenance and exactly one MBRBI-015 image GET/create-only thumb with pre-upload expected SHA/size and post-verification. Residual poster-create race accepted for this one trial; default scheduled thumbnails disabled. See Stage9 ACTIVE_WORK for exact limits and stop conditions. Systemd bus denial must stop work without bypass. This is approval recording only: all operational phases initially NOT_RUN.
