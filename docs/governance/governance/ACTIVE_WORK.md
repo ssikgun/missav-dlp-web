@@ -1,10 +1,14 @@
 # Governance workstream — active work
 
 WORKSTREAM: governance
-TASK_ID: NONE
-STATUS: INACTIVE
+TASK_ID: STG9MEDIA-001
+STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.1
-REQUIRES_WORKSTREAMS: governance
+REQUIRES_WORKSTREAMS: governance,stage9-media
+
+## STG9MEDIA-001 TEMPORARY GOVERNANCE AUTHORIZATION — 2026-11-03 KST
+
+USER APPROVAL: one-time temporary governance participation under the existing STG9MEDIA-001 task, paired with stage9-media, solely to amend the Stage9 Media domain contract for verified program-owned temporary-thumbnail cleanup and record/verify the result. No unrelated governance, common-contract, downloader, Stage11, NAS, database, Jellyfin, implementation, deployment, or production deletion scope. After the contract/documentation update and readback, restore governance to INACTIVE/NONE and Stage9-only routing; report the result.
 
 ## DLDLIB-001 CLOSEOUT — 2026-10-28 KST
 

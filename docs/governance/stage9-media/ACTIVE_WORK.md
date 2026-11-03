@@ -1,5 +1,9 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 TEMPORARY SHARED GOVERNANCE PREFLIGHT — 2026-11-03 KST
+
+USER authorized a narrowly scoped design/contract update permitting cleanup of only program-owned temporary thumbnails after exact official-poster Jellyfin Primary readback. The same task ID STG9MEDIA-001 is temporarily active in governance and stage9-media. Stage9 source-only implementation approval and all previous NAS/Jellyfin production prohibitions remain unchanged. No runtime writes or file deletion are authorized. Next: apply Stage9 contract v1.0.2, validate, restore governance INACTIVE/NONE and Stage9-only routing.
+
 ## STG9MEDIA-001 JELLYFIN 10.11.11 IMAGE UPDATE NO ATOMIC CAS — DESIGN CHOICE REQUIRED (2026-11-03 KST)
 
 USER performed the one authorized read-only actual server check from CT108: `GET http://192.168.1.205:8096/System/Info/Public` with proxy disabled, 8192 byte cap, timeout 7, output `PRODUCT=Jellyfin Server;VERSION=10.11.11;CHECK=PASS;METHOD=GET;SERVER_WRITE=0`. No API key used, DB/NAS/Jellyfin modifications none.
@@ -1046,7 +1050,7 @@ WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.1
-REQUIRES_WORKSTREAMS: stage9-media
+REQUIRES_WORKSTREAMS: governance,stage9-media
 
 ## P03-H NAS DUAL-UID TWO TARGETS ABSENT / SOURCE VERIFIED PREFLIGHT PASS — 2026-11-02 KST
 
