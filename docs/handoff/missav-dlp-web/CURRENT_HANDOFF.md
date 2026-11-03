@@ -1,6 +1,14 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## STG9MEDIA-001 USER SQLITE LOCK EVIDENCE / MAINTENANCE CANDIDATE — 2026-11-03
+
+User reports CT108 service/timer inactive, dedicated media DB WAL empty, BEGIN IMMEDIATE PASS, integrity_check ok, ROLLBACK and lock release PASS; no DB schema/data change. fuser unavailable, no installation. This is a timestamped observation, not future writer exclusion. Timer was user-stopped: PRODUCTION_CHANGED=YES.
+
+Prepared one-shot CT108 maintenance script `/tmp/stg9-db-maintenance-20261103/maintenance.py` SHA256 `798cf4115003a3c3bdd0565b00322bbd2e8d1beb4cec96d950c3c6128405d38d`. It rechecks systemd inactive/MainPID, fixed DB and empty WAL, existing Stage9 runner/writer flock and BEGIN IMMEDIATE; validates target/schema/integrity; creates a private consistent SQLite backup under `/opt/missav-dlp-web/backups`, compares all existing table rows and schema, records backup hash, adds four columns in a transaction and checks existing rows/integrity, then rechecks service/timer before commit. Errors roll back the transaction and preserve any partial backup; no automatic restoration. Synthetic tests: migration/data preservation, lock contention and duplicate columns 3 PASS. This script has NOT been run on CT108 production DB, and actual service/lock/integrity conditions must pass at execution.
+
+Five staged modules under `/tmp/stg9-release-staging-3d97c99/3d97c998299ccb88e1f59a96fdeb3088f76b7924` import locally and release-ID path passes; old release is preserved. Staging is not deployed or an installed immutable release. Systemd access remains unavailable to Codex; do not bypass. No production DB backup/migration, release switch, image GET, NAS/Jellyfin write or further service/timer action performed. NEXT: user-run one-shot maintenance procedure under the existing approval, review returned backup path/hash and outcome, then separately handle release installation and systemd switch with preconditions. Stop on any error; no automatic DB restoration.
+
 ## STG9MEDIA-001 PAUSED TIMER PREFLIGHT — WRITER VISIBILITY BLOCKED (2026-11-03)
 
 User-reported timer stop is a production change; timer/service inactive at the user observation. PRODUCTION_CHANGED=YES. Five staged Stage9 files byte-match canonical source 3d97c998299ccb88e1f59a96fdeb3088f76b7924. Read-only current filesystem observation: dedicated media DB main 98304, WAL 0, SHM 32768 bytes. Codex /proc sees only three processes, one access error, zero matching FDs; namespace completeness UNKNOWN. User's prior inspection also had two /proc errors. Therefore absence of other writers, live service and locks cannot be proven; stop per user instruction before backup, migration, release deployment or one-title canary. No operational DB writes, NAS/Jellyfin access, image GET, release changes or additional service changes by this attempt.
