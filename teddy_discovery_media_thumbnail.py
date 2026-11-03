@@ -167,12 +167,24 @@ def make_candidate_proxy_fetcher(proxy_url):
 
 THUMBNAIL_ERROR_CODES = frozenset({
     'CANDIDATE_NETWORK_ERROR', 'CANDIDATE_HTTP_ERROR', 'CANDIDATE_REDIRECT_REJECTED',
+    'CANDIDATE_HTTP_403', 'CANDIDATE_HTTP_404', 'CANDIDATE_HTTP_429', 'CANDIDATE_HTTP_5XX',
     'CANDIDATE_RESPONSE_INVALID', 'CANDIDATE_MIME_MISMATCH', 'CANDIDATE_SIZE_MISMATCH',
     'CANDIDATE_SHA256_MISMATCH', 'CANDIDATE_UNKNOWN_ERROR', 'CANDIDATE_REQUEST_LIMIT',
     'CANDIDATE_TARGET_MISMATCH', 'CANDIDATE_FETCH_FAILED', 'THUMBNAIL_PROCESSOR_FAILED',
     'HOLDING_SIZE_UNKNOWN', 'VIDEO_SIZE_OR_IDENTITY_UNCERTAIN', 'POSTER_STATUS_UNKNOWN',
     'THUMBNAIL_OUTCOME_UNKNOWN', 'THUMBNAIL_TARGET_OR_STORAGE_UNCERTAIN',
 })
+
+
+def _http_error_code(status):
+    if type(status) is int:
+        if 300 <= status < 400:
+            return 'CANDIDATE_REDIRECT_REJECTED'
+        if status in (403, 404, 429):
+            return {403: 'CANDIDATE_HTTP_403', 404: 'CANDIDATE_HTTP_404', 429: 'CANDIDATE_HTTP_429'}[status]
+        if 500 <= status <= 599:
+            return 'CANDIDATE_HTTP_5XX'
+    return 'CANDIDATE_HTTP_ERROR'
 
 
 def safe_thumbnail_error(value):
@@ -196,7 +208,7 @@ def _validated_candidate_response(response, exact_url, expected_size=None, expec
     if 300 <= status < 400 or final != exact_url:
         raise CandidateFetchError('CANDIDATE_REDIRECT_REJECTED')
     if status != 200:
-        raise CandidateFetchError('CANDIDATE_HTTP_ERROR')
+        raise CandidateFetchError(_http_error_code(status))
     if mime.split(';', 1)[0].strip().lower() != 'image/jpeg':
         raise CandidateFetchError('CANDIDATE_MIME_MISMATCH')
     if not isinstance(data, bytes):
@@ -224,7 +236,7 @@ def store_candidate_thumbnail(*, dvd_id, video_relative, fetcher, file_station, 
     except CandidateFetchError as exc:
         return {'status': 'PENDING', 'error': safe_thumbnail_error(exc.code)}
     except HTTPError as exc:
-        code = 'CANDIDATE_REDIRECT_REJECTED' if type(exc.code) is int and 300 <= exc.code < 400 else 'CANDIDATE_HTTP_ERROR'
+        code = _http_error_code(exc.code)
         return {'status': 'PENDING', 'error': code}
     except (URLError, OSError):
         return {'status': 'PENDING', 'error': 'CANDIDATE_NETWORK_ERROR'}

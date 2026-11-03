@@ -188,7 +188,7 @@ class DiagnosticCodesSmoke(unittest.TestCase):
         cases=[
             (URLError(secret),'CANDIDATE_NETWORK_ERROR'),
             (ConnectionRefusedError(secret),'CANDIDATE_NETWORK_ERROR'),
-            (HTTPError(secret,403,secret,{},None),'CANDIDATE_HTTP_ERROR'),
+            (HTTPError(secret,403,secret,{},None),'CANDIDATE_HTTP_403'),
             (HTTPError(secret,302,secret,{},None),'CANDIDATE_REDIRECT_REJECTED'),
             ((302,url,'image/jpeg',data),'CANDIDATE_REDIRECT_REJECTED'),
             ((200,url+'?secret','image/jpeg',data),'CANDIDATE_REDIRECT_REJECTED'),
@@ -199,6 +199,11 @@ class DiagnosticCodesSmoke(unittest.TestCase):
             ((200,url),'CANDIDATE_RESPONSE_INVALID'),
             (RuntimeError(secret),'CANDIDATE_UNKNOWN_ERROR'),
         ]
+        for status, code in ((403,'CANDIDATE_HTTP_403'), (404,'CANDIDATE_HTTP_404'),
+                             (429,'CANDIDATE_HTTP_429'), (500,'CANDIDATE_HTTP_5XX'),
+                             (599,'CANDIDATE_HTTP_5XX'), (418,'CANDIDATE_HTTP_ERROR')):
+            cases.extend(((HTTPError(secret,status,secret,{},None),code),
+                          ((status,url,'image/jpeg',data),code)))
         for index,(response,expected) in enumerate(cases):
             with self.subTest(expected=expected), tempfile.TemporaryDirectory() as tmp:
                 p=Path(tmp); locks=p/'titles';locks.mkdir();db=p/'media.sqlite'
