@@ -22,6 +22,22 @@ class ThumbnailSmoke(unittest.TestCase):
             result=extract_thumbnail(dvd_id=dvd,page_url=page,fetcher=fetch)
             self.assertEqual(result.filename,'thumb.jpg');self.assertEqual(result.image_url,image);self.assertEqual(len(calls),2)
 
+    def test_fourhoi_exact_id_and_twitter(self):
+        for dvd in ('ABC-123', 'XYZ-456'):
+            page, _, responses, _, fetch = self.fixture(dvd)
+            image = 'https://fourhoi.com/' + dvd.lower() + '/cover-n.jpg'
+            responses[page] = (200, page, 'text/html', f'<link rel="canonical" href="{page}"><meta property="og:image" content="{image}"><meta name="twitter:image" content="{image}">'.encode())
+            responses[image] = (200, image, 'image/jpeg', b'\xff\xd8\xfffixture')
+            self.assertEqual(extract_thumbnail(dvd_id=dvd, page_url=page, fetcher=fetch).image_url, image)
+            for bad in ('https://fourhoi.com/other-1/cover-n.jpg', 'https://fourhoi.com/'+dvd.lower()+'/cover-t.jpg', 'https://fourhoi.com/'+dvd.lower()+'/cover-n.jpg?x=1', 'https://evil.invalid/'+dvd.lower()+'/cover-n.jpg', 'https://fourhoi.com/%61bc-123/cover-n.jpg'):
+                responses[page] = (200, page, 'text/html', f'<link rel="canonical" href="{page}"><meta property="og:image" content="{bad}">'.encode())
+                with self.assertRaises(ValueError): extract_thumbnail(dvd_id=dvd, page_url=page, fetcher=fetch)
+            responses[page] = (200, page, 'text/html', f'<link rel="canonical" href="{page}"><meta property="og:image" content="{image}"><meta name="twitter:image" content="https://fourhoi.com/other-1/cover-n.jpg">'.encode())
+            with self.assertRaises(ValueError): extract_thumbnail(dvd_id=dvd, page_url=page, fetcher=fetch)
+            responses[page] = (200, page, 'text/html', f'<link rel="canonical" href="{page}"><meta property="og:image" content="{image}">'.encode())
+            responses[image] = (200, image + '?redirect', 'image/jpeg', b'\xff\xd8\xfffixture')
+            with self.assertRaises(ValueError): extract_thumbnail(dvd_id=dvd, page_url=page, fetcher=fetch)
+
     def test_wrong_identity(self):
         page,_,_,calls,fetch=self.fixture()
         with self.assertRaises(ValueError):extract_thumbnail(dvd_id='XYZ-456',page_url=page,fetcher=fetch)

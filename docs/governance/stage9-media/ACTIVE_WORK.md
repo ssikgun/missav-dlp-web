@@ -1,5 +1,9 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 FOURHOI EXACT-ID SOURCE VALIDATION — OFFLINE (2026-11-03)
+
+User-observed MissAV page-linked fourhoi.com image is accepted only over HTTPS with exact DVD-ID path `/ID/cover-n.jpg`; conflicting twitter:image is rejected. Existing canonical/og:url checks remain. Synthetic thumbnail smoke 9 PASS and FileStation regression 7 PASS. No live page or image request, image decoding, deployment, NAS or Jellyfin write. Production wiring, real image validation and safe Jellyfin Primary replacement remain unverified.
+
 ## STG9MEDIA-001 USER SELKIES DOM EXACT-IMAGE PROVENANCE CHECKPOINT — 2026-11-03 KST
 
 USER-EXECUTED F12 READ-ONLY DOM of the already-open real browser work page `https://missav123.com/ko/mbrbi-015`: `dvd_id_found=true`; the page's `og:image` AND `twitter:image` both equal `https://fourhoi.com/mbrbi-015/cover-n.jpg`. This is **user-browser page-to-image URL provenance for exact DVD-ID MBRBI-015**, not proof of successful image GET, decoded bytes/dimensions, authentic official-poster role, NAS availability, or production pipeline functioning. `video_posters=[]`. Eight visible large `cover-t.jpg` images refer to OTHER work IDs (OAE-210, MBR-099, MBRBI-005, OAE-212, MMND-106, MMRAA-323, MMRAA-295, VNTG-023); do not use those unrelated images for the target. The earlier DB-only 203 no-cover candidates being source-unlinked is not contradicted: user DOM now supplies one independently observed, exact page-linked candidate.

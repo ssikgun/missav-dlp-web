@@ -48,21 +48,24 @@ class _Page(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.urls = []
         self.images = []
+        self.twitter_images = []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         if tag.lower() == 'meta':
-            prop = (attrs.get('property') or '').strip().lower()
+            prop = (attrs.get('property') or attrs.get('name') or '').strip().lower()
             if prop == 'og:url':
                 self.urls.append(attrs.get('content'))
             elif prop == 'og:image':
                 self.images.append(attrs.get('content'))
+            elif prop == 'twitter:image':
+                self.twitter_images.append(attrs.get('content'))
         elif tag.lower() == 'link' and 'canonical' in (attrs.get('rel') or '').lower().split():
             self.urls.append(attrs.get('href'))
 
 
 def extract_thumbnail(*, dvd_id, page_url, fetcher):
-    """Return a thumbnail from a verified same-origin page or raise ValueError.
+    """Return a thumbnail from a verified page or raise ValueError.
 
     fetcher(url, max_bytes) must enforce the approved proxy and return
     (status, final_url, content_type, bytes). Redirects fail closed.
@@ -90,7 +93,11 @@ def extract_thumbnail(*, dvd_id, page_url, fetcher):
     if any(urljoin(page_url, value or '') != page_url for value in parser.urls):
         raise ValueError('PAGE_PROVENANCE_MISMATCH')
     image_url = urljoin(page_url, parser.images[0])
-    _url(image_url, frozenset({page.hostname}))
+    if any(not value or urljoin(page_url, value) != image_url for value in parser.twitter_images):
+        raise ValueError('IMAGE_METADATA_CONFLICT')
+    image = _url(image_url, frozenset({page.hostname, 'fourhoi.com'}))
+    if image.hostname == 'fourhoi.com' and (image.query or image.path.lower() != '/' + dvd_id.lower() + '/cover-n.jpg'):
+        raise ValueError('IMAGE_IDENTITY_INVALID')
     status, final, content_type, data = fetcher(image_url, MAX_POSTER_BYTES)
     if status != 200 or final != image_url:
         raise ValueError('IMAGE_UNAVAILABLE_OR_REDIRECTED')

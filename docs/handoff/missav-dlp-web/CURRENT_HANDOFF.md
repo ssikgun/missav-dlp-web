@@ -1,6 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## Stage9 exact-ID thumbnail source — offline checkpoint (2026-11-03)
+
+User-observed MissAV page-linked fourhoi.com image is accepted only over HTTPS with exact DVD-ID path `/ID/cover-n.jpg`; conflicting twitter:image is rejected. Existing canonical/og:url checks remain. Synthetic thumbnail smoke 9 PASS and FileStation regression 7 PASS. No live page or image request, image decoding, deployment, NAS or Jellyfin write. Production wiring, real image validation and safe Jellyfin Primary replacement remain unverified.
+
 ## Stage9 thumbnail storage checkpoint — 2026-11-03
 
 STG9MEDIA-001 remains IN_PROGRESS. Offline candidate synthetic smoke: 7 PASS, but integration is INCOMPLETE because exact work-page image provenance and authentic-poster role are not established. See Stage9 ACTIVE_WORK for evidence, limits and next step. No production modification or deployment.
