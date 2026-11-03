@@ -1,5 +1,11 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 BOUNDED URL AMENDMENT COMPLETE / IMPLEMENTATION INCOMPLETE — 2026-11-03
+
+User approved the narrow fourhoi.com exact normalized DVD-ID candidate rule; Stage9 contract v1.0.3 is approved, temporary shared governance routing was validated and restored, and remote readback verified. URL matching does not establish image identity or page provenance.
+
+Source implementation remains INCOMPLETE: current cover_url is not authenticated as a canonical poster, thumbnail retry/state is not independent in the media_jobs schema, and existing image validation uses signatures/MIME rather than full JPEG decoding; Pillow is not installed in the examined Python environment. Existing proxy fetcher also does not provide the required no-redirect/final-URL contract. Do not automatically publish or claim valid image decoding. Resolve these within approved Stage9 scope, including bounded retry and state handling, before integration; no runtime schema migration or product deployment is authorized by this offline step. No live site, NAS, DB or Jellyfin operation performed.
+
 ## STG9MEDIA-001 AUTOMATIC THUMB INPUT REVIEW — BLOCKED (2026-11-03)
 
 Automatic thumbnail wiring remains INCOMPLETE: Stage9 MediaMetadata/pipeline receives cover_url and metadata_source, but no verified exact MissAV page/image URL or reliable official-poster role. Shared MissAV collectors may record source_url in latest_items or raw metadata, but the movie writer validates missav.ws/en, not the observed missav123.com/ko source; no generic equivalence is established. The prior bounded DB review found no verified source for its no-cover candidates. Do not infer URLs or classify cover_url as an official poster. Existing proxy-only poster fetcher has a different response contract and default redirect handling than the thumbnail extractor requires. Jobs track NFO and poster states but no independent thumbnail state; missing-cover completed jobs are held.
