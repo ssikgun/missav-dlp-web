@@ -1,5 +1,9 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 THUMB STATE OFFLINE CANDIDATE — INCOMPLETE — 2026-11-03
+
+Isolated uncommitted candidate `/tmp/stg9-thumb-state-20261103` adds thumbnail state/attempt/timestamp/error columns, additive isolated-DB migration and a pure retry eligibility helper. Existing jobs smoke plus representative state checks pass; no operational database touched. This is NOT integrated: job selection/atomic claims, per-title locking and state finishing, thumbnail-only pipeline without NFO republishing, FileStation existing-poster gating, and runner proxy wiring remain unimplemented and must be tested together. Do not deploy or treat this candidate as safe production behavior. Existing canonical product code remains unchanged; no live network, NAS, Jellyfin or timer activity.
+
 ## STG9MEDIA-001 TEMPLATE CANDIDATE OFFLINE CONNECTION — 2026-11-03
 
 Stage9-only explicit candidate path derives the approved exact fourhoi URL, uses a strict loopback-proxy/no-redirect bounded fetcher and passes unchanged JPEG candidate bytes to existing create-only thumbnail storage. Poster verified present skips; unknown status stops; HTTP/validation failure stays PENDING. This does not establish work identity or page provenance. MIME, JPEG start/end markers and byte limit are checked; full decode is NOT_VERIFIED. Offline thumbnail smoke 11 PASS, FileStation regression 7 PASS. Not wired to Stage9 runtime, retry DB, NAS or Jellyfin; no live request or production change.
