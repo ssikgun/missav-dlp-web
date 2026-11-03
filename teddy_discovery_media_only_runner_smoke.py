@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 import hashlib
 import importlib
+import json
 import os
 import sqlite3
 import subprocess
@@ -583,11 +584,224 @@ def thumbnail_runner_integration(root: Path):
     print('THUMBNAIL_RUNNER_INTEGRATION=PASS')
 
 
+def thumbnail_only_guards(root: Path):
+    from contextlib import ExitStack, redirect_stdout
+    from io import StringIO
+    from unittest.mock import patch
+    root.mkdir()
+    ids = ['ABC-123', 'XYZ-456']
+    init_discovery(root / 'discovery.sqlite3', ids)
+    init_media(root / 'media.sqlite3', jobs=[dict(dvd_id=d, status='COMPLETED', nfo_status='COMPLETE') for d in ids] + [dict(dvd_id='NFO-000')])
+    config = make_config(root, thumbnail_only=True, target=ids[0])
+    checks = 0
+
+    def snapshot():
+        return {p.name: (p.stat().st_size, p.stat().st_mtime_ns, p.stat().st_ctime_ns,
+                         hashlib.sha256(p.read_bytes()).hexdigest())
+                for p in root.iterdir() if p.is_file()}
+
+    def expect_error(candidate, code):
+        try:
+            runner.run_stage9_media_once(candidate, services={})
+        except runner.RunnerError as exc:
+            assert exc.code == code, exc.code
+        else:
+            raise AssertionError('expected ' + code)
+
+    before = snapshot()
+    with ExitStack() as stack:
+        for name in ('_build_services', '_build_thumbnail_services', '_exclusive_run_lock'):
+            stack.enter_context(patch.object(runner, name, side_effect=AssertionError('dry-run execution')))
+        for name in ('_connect_media', '_migrate_media_artifact_columns'):
+            stack.enter_context(patch('teddy_discovery_media_jobs.' + name, side_effect=AssertionError('migration')))
+        result = runner.run_stage9_media_once(config)
+        assert result['status'] == 'DRY_RUN' and result['stage'] == 'stage9-thumbnail-only'
+        assert result['external_calls'] == result['database_writes'] == 0
+        assert not config.run_lock_path.exists() and not config.media_writer_lock_path.exists()
+        checks += 1
+        args = ['--thumbnail-only', '--target-dvd-id', ids[1], '--max-items', '1',
+                '--discovery-db', str(config.discovery_db_path), '--media-db', str(config.media_db_path),
+                '--media-writer-lock', str(config.media_writer_lock_path), '--run-lock', str(config.run_lock_path),
+                '--title-lock-dir', str(config.title_lock_dir)]
+        out = StringIO()
+        with redirect_stdout(out):
+            assert runner.main(args) == 0
+        assert json.loads(out.getvalue())['target_dvd_id'] == ids[1]
+        checks += 1
+    assert snapshot() == before
+    checks += 1
+    for candidate, code in (
+        (replace(config, target_dvd_id=None), 'THUMBNAIL_TARGET_REQUIRED'),
+        (replace(config, target_dvd_id=''), 'INVALID_TARGET_DVD_ID'),
+        (replace(config, max_items=2), 'THUMBNAIL_SINGLE_ITEM_REQUIRED'),
+        (replace(config, thumbnail_enabled=True), 'CONFLICTING_THUMBNAIL_MODES'),
+        (replace(config, target_dvd_id='MISSING-789'), 'THUMBNAIL_TARGET_NOT_FOUND'),
+        (replace(config, target_dvd_id='NFO-000'), 'THUMBNAIL_TARGET_NOT_READY'),
+    ):
+        expect_error(candidate, code)
+        checks += 1
+
+    apply_config = make_config(root, apply=True, thumbnail_only=True, target=ids[0])
+    expect_error(replace(apply_config, confirm=''), 'APPLY_CONFIRMATION_REQUIRED')
+    checks += 1
+    # Each missing column independently blocks both dry-run and apply before
+    # any service construction or migration-capable application initialization.
+    for column in sorted(runner.REQUIRED_THUMBNAIL_COLUMNS):
+        missing_root = root / column
+        missing_root.mkdir()
+        init_discovery(missing_root / 'discovery.sqlite3', ids)
+        init_media(missing_root / 'media.sqlite3', jobs=[dict(dvd_id=ids[0], status='COMPLETED', nfo_status='COMPLETE')])
+        missing = make_config(missing_root, thumbnail_only=True, target=ids[0])
+        with sqlite3.connect(missing.media_db_path) as db:
+            db.execute('ALTER TABLE media_jobs DROP COLUMN ' + column)
+        content = Path(missing.media_db_path).read_bytes()
+        with patch('teddy_discovery_media_jobs._connect_media', side_effect=AssertionError('initialization')), \
+             patch('teddy_discovery_media_jobs._migrate_media_artifact_columns', side_effect=AssertionError('migration')), \
+             patch.object(runner, '_build_thumbnail_services', side_effect=AssertionError('service')):
+            expect_error(missing, 'THUMBNAIL_SCHEMA_MIGRATION_REQUIRED')
+            expect_error(replace(missing, apply=True, confirm=runner.CONFIRMATION), 'THUMBNAIL_SCHEMA_MIGRATION_REQUIRED')
+        assert Path(missing.media_db_path).read_bytes() == content
+        assert not missing.run_lock_path.exists() and not missing.media_writer_lock_path.exists()
+        checks += 1
+    # An uncheckpointed DB cannot be assumed immutable or read without side effects.
+    wal = Path(str(config.media_db_path) + '-wal')
+    wal.write_bytes(b'active WAL fixture')
+    expect_error(config, 'THUMBNAIL_PREFLIGHT_ACTIVE_WAL')
+    wal.unlink()
+    checks += 1
+    print(f'THUMBNAIL_ONLY_GUARDS={checks} PASS / 0 FAIL')
+
+
+def thumbnail_only_processing(root: Path):
+    from contextlib import ExitStack
+    from unittest.mock import patch
+    from teddy_discovery_media_jobs import run_thumbnail_jobs
+    root.mkdir()
+    ids = ['ABC-123', 'XYZ-456']
+    init_discovery(root / 'discovery.sqlite3', ids)
+    init_media(root / 'media.sqlite3', jobs=[dict(dvd_id=d, status='COMPLETED', nfo_status='COMPLETE',
+               poster_status='PENDING', jellyfin_notification_status='VISIBLE', jellyfin_recovery_status='VISIBLE') for d in ids])
+    config = make_config(root, apply=True, thumbnail_only=True, target=ids[0])
+    # A thumbnail-only mode has no dependency on visibility state or Jellyfin credentials.
+    with sqlite3.connect(config.media_db_path) as db:
+        db.execute('DROP TABLE media_jellyfin_visibility')
+    db.close()
+    config = replace(config, jellyfin_base_url='', jellyfin_key_path=None)
+    calls = []
+    outcome = {'status': 'COMPLETE'}
+    def processor(dvd):
+        calls.append(dvd)
+        return outcome
+    def fields():
+        return read_rows(config.media_db_path, 'SELECT dvd_id,status,attempt_count,nfo_status,poster_status,jellyfin_notification_status,jellyfin_recovery_status,created_at,updated_at FROM media_jobs ORDER BY dvd_id')
+    before = fields()
+    services = {'run_thumbnail_jobs': run_thumbnail_jobs, 'thumbnail_processor': processor}
+    checks = 0
+    with ExitStack() as stack:
+        for name in ('teddy_discovery_media_jobs.reconcile_media_jobs',
+                     'teddy_discovery_media_jobs.run_retryable_media_jobs',
+                     'teddy_discovery_media_pipeline.run_media_pipeline',
+                     'teddy_discovery_media_metadata.build_media_bundle',
+                     'teddy_discovery_jellyfin.JellyfinClient',
+                     'teddy_discovery_jellyfin_visibility.reconcile_jellyfin_visibility'):
+            stack.enter_context(patch(name, side_effect=AssertionError('non-thumbnail execution')))
+        stack.enter_context(patch.object(runner, '_build_services', side_effect=AssertionError('normal services')))
+        first = runner.run_stage9_media_once(config, services=services)
+        assert first['status'] == 'COMPLETE' and first['thumbnail']['complete'] == 1 and calls == [ids[0]]
+        assert first['non_thumbnail_execution'] == first['registered'] == first['jellyfin_get_requests'] == first['jellyfin_post_attempts'] == 0
+        assert first['jellyfin_visibility'] is None
+        checks += 1
+        assert read_rows(config.media_db_path, "SELECT thumbnail_attempt_count FROM media_jobs WHERE dvd_id='XYZ-456'") == [(0,)]
+        checks += 1
+        again = runner.run_stage9_media_once(config, services=services)
+        assert again['thumbnail']['attempted'] == 0 and calls == [ids[0]]
+        checks += 1
+        second_config = replace(config, target_dvd_id=ids[1])
+        outcome = {'status': 'PENDING', 'error': 'candidate unavailable'}
+        pending = runner.run_stage9_media_once(second_config, services=services)
+        assert pending['status'] == 'PENDING' and pending['thumbnail']['pending'] == 1 and calls == ids
+        delayed = runner.run_stage9_media_once(second_config, services=services)
+        assert delayed['status'] == 'PENDING' and delayed['thumbnail']['held_reasons'] == {'HELD_BACKOFF': 1} and calls == ids
+        checks += 1
+        # Explicit fixture reset to examine the other processor outcomes.
+        for expected, status in (('FAILED', 'PENDING'), ('ATTENTION', 'PARTIAL_FAILURE'), ('SKIPPED', 'COMPLETE')):
+            with sqlite3.connect(config.media_db_path) as db:
+                db.execute("UPDATE media_jobs SET thumbnail_status='PENDING',thumbnail_attempt_count=0,thumbnail_updated_at=NULL WHERE dvd_id=?", (ids[1],))
+            db.close()
+            outcome = {'status': expected}
+            result = runner.run_stage9_media_once(second_config, services=services)
+            assert result['status'] == status
+            checks += 1
+    assert fields() == before
+    checks += 1
+    print(f'THUMBNAIL_ONLY_PROCESSING={checks} PASS / 0 FAIL')
+
+
+
+def thumbnail_only_service_boundary(root: Path):
+    from contextlib import ExitStack
+    from unittest.mock import patch
+    from teddy_discovery_media_filestation_smoke import FakeFileStation, _adapter, API_LIBRARY_ROOT, VIDEO_BYTES
+    from teddy_discovery_media_filestation import SynologyFileStationMediaAdapter
+    root.mkdir()
+    ids = ['ABC-123', 'XYZ-456']
+    init_discovery(root / 'discovery.sqlite3', ids)
+    init_media(root / 'media.sqlite3', jobs=[dict(dvd_id=d, status='COMPLETED', nfo_status='COMPLETE',
+        poster_status='PENDING', jellyfin_notification_status='VISIBLE', jellyfin_recovery_status='VISIBLE') for d in ids])
+    with sqlite3.connect(root / 'discovery.sqlite3') as db:
+        for dvd in ids:
+            db.execute('UPDATE holdings SET size_bytes=?,relative_path=? WHERE dvd_id=?',
+                       (len(VIDEO_BYTES), dvd.split('-')[0] + '/' + dvd + '/' + dvd + '.mp4', dvd))
+    db.close()
+    fake = FakeFileStation()
+    for dvd in ids:
+        family = dvd.split('-')[0]
+        folder = API_LIBRARY_ROOT + '/' + family + '/' + dvd
+        fake.directories.update({API_LIBRARY_ROOT + '/' + family, folder})
+        fake.files[folder + '/' + dvd + '.mp4'] = VIDEO_BYTES
+        fake.files[folder + '/' + dvd + '.nfo'] = b'original nfo'
+    before = dict(fake.files)
+    config = make_config(root, apply=True, thumbnail_only=True, target=ids[0])
+    config = replace(config, expected_release_id='a' * 40, jellyfin_base_url='', jellyfin_key_path=None)
+    image = b'\xff\xd8\xffoffline candidate\xff\xd9'
+    requests = []
+    def fetch(url, maximum):
+        requests.append(url)
+        return 200, url, 'image/jpeg', image
+    with ExitStack() as stack:
+        stack.enter_context(patch.object(runner, '_validate_runtime', return_value=Path(runner.__file__).parent))
+        stack.enter_context(patch.object(runner, '_build_services', side_effect=AssertionError('normal services')))
+        for name in ('teddy_discovery_jellyfin.JellyfinClient',
+                     'teddy_discovery_media_jobs.reconcile_media_jobs',
+                     'teddy_discovery_media_jobs.run_retryable_media_jobs',
+                     'teddy_discovery_media_pipeline.run_media_pipeline',
+                     'teddy_discovery_media_metadata.build_nfo_bytes',
+                     'teddy_discovery_jellyfin_visibility.reconcile_jellyfin_visibility'):
+            stack.enter_context(patch(name, side_effect=AssertionError('forbidden general execution')))
+        publish = stack.enter_context(patch.object(SynologyFileStationMediaAdapter, 'publish_bundle', side_effect=AssertionError('NFO publication')))
+        tls = stack.enter_context(patch('teddy_discovery_media_filestation.make_tls_context', return_value=object()))
+        adapter = stack.enter_context(patch('teddy_discovery_media_filestation.SynologyFileStationMediaAdapter', side_effect=lambda **kw: _adapter(root, fake)))
+        proxy = stack.enter_context(patch('teddy_discovery_media_thumbnail.make_candidate_proxy_fetcher', return_value=fetch))
+        for dvd in ids:
+            result = runner.run_stage9_media_once(replace(config, target_dvd_id=dvd))
+            assert result['thumbnail']['complete'] == 1 and result['status'] == 'COMPLETE'
+            assert result['jellyfin_get_requests'] == result['jellyfin_post_attempts'] == 0
+            assert fake.files[API_LIBRARY_ROOT + '/' + dvd.split('-')[0] + '/' + dvd + '/thumb.jpg'] == image
+        assert tls.call_count == adapter.call_count == 2 and publish.call_count == 0
+        assert all(call.args == (config.poster_proxy_url,) for call in proxy.call_args_list)
+    assert len(requests) == len(fake.uploads) == 2 and all(fake.files[k] == v for k, v in before.items())
+    print('THUMBNAIL_ONLY_SERVICE_BOUNDARY=2 PASS / 0 FAIL')
+
+
+
 def main():
     import_is_side_effect_free()
     with tempfile.TemporaryDirectory(prefix="stage9-media-runner-") as raw:
         root = Path(raw)
         dry_run_is_read_only(root / "dry")
+        thumbnail_only_guards(root / "thumb-only-guards")
+        thumbnail_only_processing(root / "thumb-only-processing")
+        thumbnail_only_service_boundary(root / "thumb-only-services")
         thumbnail_runner_integration(root / "thumb-integration")
         bounded_root = root / "bounded"
         bounded_root.mkdir()

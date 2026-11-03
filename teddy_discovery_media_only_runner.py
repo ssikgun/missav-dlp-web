@@ -52,6 +52,9 @@ REQUIRED_MEDIA_JOB_COLUMNS = {
     "created_at",
     "updated_at",
 }
+REQUIRED_THUMBNAIL_COLUMNS = {
+    "thumbnail_status", "thumbnail_attempt_count", "thumbnail_updated_at", "thumbnail_error",
+}
 REQUIRED_VISIBILITY_COLUMNS = {
     "dvd_id",
     "media_job_id",
@@ -112,6 +115,7 @@ class RunnerConfig:
     jellyfin_key_path: str | Path | None = None
     expected_release_id: str | None = None
     thumbnail_enabled: bool = False
+    thumbnail_only: bool = False
 
 
 def _normal_path(raw: str | Path, *, allow_missing: bool, expected: str) -> Path:
@@ -222,9 +226,28 @@ def _table_sql(db: sqlite3.Connection, table: str) -> str:
     return str(row[0] or "").upper() if row else ""
 
 
-def _validate_database(path: Path, required_tables: dict[str, set[str]]) -> None:
+def _thumbnail_snapshot(path: Path) -> tuple:
+    """Allow immutable reads only with an empty WAL and detect concurrent changes."""
+    snapshot = []
+    for candidate in (path, Path(str(path) + "-wal")):
+        try:
+            info = candidate.stat()
+        except FileNotFoundError:
+            snapshot.append(None)
+        else:
+            snapshot.append((info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns))
+    if snapshot[1] is not None and snapshot[1][2] != 0:
+        raise RunnerError("THUMBNAIL_PREFLIGHT_ACTIVE_WAL")
+    return tuple(snapshot)
+
+
+def _validate_database(path: Path, required_tables: dict[str, set[str]], *,
+                       stable_read: bool = False, thumbnail_target: str | None = None) -> None:
+    snapshot = None
     try:
-        db = sqlite3.connect(_sqlite_uri(path), uri=True, timeout=2)
+        if stable_read:
+            snapshot = _thumbnail_snapshot(path)
+        db = sqlite3.connect(_sqlite_uri(path) + ("&immutable=1" if stable_read else ""), uri=True, timeout=2)
         db.execute("PRAGMA query_only=ON")
         if db.execute("PRAGMA query_only").fetchone()[0] != 1:
             raise RunnerError("READ_ONLY_GUARD_UNAVAILABLE")
@@ -242,6 +265,22 @@ def _validate_database(path: Path, required_tables: dict[str, set[str]]) -> None
                 raise RunnerError("REQUIRED_TABLE_MISSING")
             if not required_columns.issubset(_table_columns(db, table)):
                 raise RunnerError("REQUIRED_COLUMNS_MISSING")
+        if thumbnail_target is not None:
+            if not REQUIRED_THUMBNAIL_COLUMNS.issubset(_table_columns(db, "media_jobs")):
+                raise RunnerError("THUMBNAIL_SCHEMA_MIGRATION_REQUIRED")
+            _require_column_contract(db, "media_jobs", {
+                "thumbnail_status": ("TEXT", 1, 0),
+                "thumbnail_attempt_count": ("INTEGER", 1, 0),
+                "thumbnail_updated_at": ("TEXT", 0, 0),
+                "thumbnail_error": ("TEXT", 0, 0),
+            })
+            target = db.execute(
+                "SELECT status,nfo_status FROM media_jobs WHERE dvd_id=?", (thumbnail_target,)
+            ).fetchone()
+            if target is None:
+                raise RunnerError("THUMBNAIL_TARGET_NOT_FOUND")
+            if tuple(target) != ("COMPLETED", "COMPLETE"):
+                raise RunnerError("THUMBNAIL_TARGET_NOT_READY")
         if "media_jobs" in required_tables:
             _require_column_contract(
                 db,
@@ -325,6 +364,8 @@ def _validate_database(path: Path, required_tables: dict[str, set[str]]) -> None
             db.close()
         except (UnboundLocalError, AttributeError):
             pass
+    if snapshot is not None and snapshot != _thumbnail_snapshot(path):
+        raise RunnerError("THUMBNAIL_PREFLIGHT_DATABASE_CHANGED")
 
 
 def _validate_runtime(expected_release_id: str | None) -> Path:
@@ -348,7 +389,10 @@ def _validate_runtime(expected_release_id: str | None) -> Path:
 
 
 def _validate_remote_config(config: RunnerConfig) -> None:
-    for path in (config.filestation_password_path, config.filestation_ca_path, config.jellyfin_key_path):
+    credential_paths = (config.filestation_password_path, config.filestation_ca_path)
+    if not config.thumbnail_only:
+        credential_paths += (config.jellyfin_key_path,)
+    for path in credential_paths:
         if path is None:
             raise RunnerError("REQUIRED_CREDENTIAL_PATH_MISSING")
         _normal_path(path, allow_missing=False, expected="file")
@@ -370,26 +414,30 @@ def _validate_remote_config(config: RunnerConfig) -> None:
         or config.library_root != "/volume1/video/video2/JAV"
     ):
         raise RunnerError("INVALID_LIBRARY_ROOT")
-    try:
-        base = urlsplit(config.jellyfin_base_url)
-        _ = base.port
-    except ValueError as exc:
-        raise RunnerError("INVALID_JELLYFIN_URL") from exc
-    if (
-        base.scheme not in {"http", "https"}
-        or not base.hostname
-        or base.username is not None
-        or base.password is not None
-        or base.query
-        or base.fragment
-    ):
-        raise RunnerError("INVALID_JELLYFIN_URL")
+    if not config.thumbnail_only:
+        try:
+            base = urlsplit(config.jellyfin_base_url)
+            _ = base.port
+        except ValueError as exc:
+            raise RunnerError("INVALID_JELLYFIN_URL") from exc
+        if (
+            base.scheme not in {"http", "https"}
+            or not base.hostname
+            or base.username is not None
+            or base.password is not None
+            or base.query
+            or base.fragment
+        ):
+            raise RunnerError("INVALID_JELLYFIN_URL")
     if not config.poster_proxy_url:
         raise RunnerError("POSTER_PROXY_REQUIRED")
     try:
-        from teddy_discovery_media_metadata import make_poster_fetcher
-
-        make_poster_fetcher(config.poster_proxy_url)
+        if config.thumbnail_only:
+            from teddy_discovery_media_thumbnail import make_candidate_proxy_fetcher
+            make_candidate_proxy_fetcher(config.poster_proxy_url)
+        else:
+            from teddy_discovery_media_metadata import make_poster_fetcher
+            make_poster_fetcher(config.poster_proxy_url)
     except (ImportError, TypeError, ValueError) as exc:
         raise RunnerError("INVALID_POSTER_PROXY") from exc
 
@@ -399,7 +447,7 @@ def _validate_config(
     *,
     require_release_id: bool = False,
 ) -> dict:
-    if type(config.thumbnail_enabled) is not bool:
+    if type(config.thumbnail_enabled) is not bool or type(config.thumbnail_only) is not bool:
         raise RunnerError("INVALID_THUMBNAIL_FLAG")
     try:
         max_items = int(config.max_items)
@@ -409,12 +457,19 @@ def _validate_config(
         raise RunnerError("INVALID_ITEM_LIMIT") from exc
     if not 1 <= max_items <= MAX_ITEMS_LIMIT:
         raise RunnerError("MEDIA_ITEM_LIMIT_OUT_OF_RANGE")
+    if config.thumbnail_only:
+        if config.thumbnail_enabled:
+            raise RunnerError("CONFLICTING_THUMBNAIL_MODES")
+        if config.target_dvd_id is None:
+            raise RunnerError("THUMBNAIL_TARGET_REQUIRED")
+        if type(config.max_items) is not int or max_items != 1:
+            raise RunnerError("THUMBNAIL_SINGLE_ITEM_REQUIRED")
     if not 0 <= visibility_max <= MAX_VISIBILITY_LIMIT:
         raise RunnerError("VISIBILITY_ITEM_LIMIT_OUT_OF_RANGE")
     if not 0 <= visibility_seed_max <= MAX_VISIBILITY_LIMIT:
         raise RunnerError("VISIBILITY_SEED_LIMIT_OUT_OF_RANGE")
 
-    required_gets = (5 * max_items) + (4 * visibility_max)
+    required_gets = 0 if config.thumbnail_only else (5 * max_items) + (4 * visibility_max)
     try:
         get_budget = (
             required_gets
@@ -454,14 +509,12 @@ def _validate_config(
     )
     _validate_runtime(config.expected_release_id)
 
-    _validate_database(
-        media_path,
-        {
+    if not config.thumbnail_only:
+        _validate_database(media_path, {
             "media_jobs": REQUIRED_MEDIA_JOB_COLUMNS,
             "media_jellyfin_visibility": REQUIRED_VISIBILITY_COLUMNS,
-        },
-    )
-    _validate_database(discovery_path, REQUIRED_DISCOVERY_COLUMNS)
+        })
+        _validate_database(discovery_path, REQUIRED_DISCOVERY_COLUMNS)
 
     target = None
     if config.target_dvd_id is not None:
@@ -471,6 +524,14 @@ def _validate_config(
             target = normalize_media_target_dvd_id(config.target_dvd_id)
         except (ImportError, ValueError, TypeError) as exc:
             raise RunnerError("INVALID_TARGET_DVD_ID") from exc
+
+    if config.thumbnail_only:
+        _normal_path(Path(__file__).absolute().parent / "teddy_discovery_media_thumbnail.py",
+                     allow_missing=False, expected="file")
+        _validate_database(media_path, {"media_jobs": REQUIRED_MEDIA_JOB_COLUMNS},
+                           stable_read=True, thumbnail_target=target)
+        _validate_database(discovery_path, {"holdings": REQUIRED_DISCOVERY_COLUMNS["holdings"]},
+                           stable_read=True)
 
     if config.apply:
         if config.confirm != CONFIRMATION:
@@ -566,6 +627,30 @@ class _JellyfinRequestBudget:
         return self.opener.open(request, timeout=timeout)
 
 
+def _build_thumbnail_services(config: RunnerConfig, normalized: dict, *, tls_context=None) -> dict:
+    from teddy_discovery_media_jobs import run_thumbnail_jobs
+    from teddy_discovery_media_pipeline import run_thumbnail_processor
+    from teddy_discovery_media_thumbnail import make_candidate_proxy_fetcher
+    from teddy_discovery_media_filestation import SynologyFileStationMediaAdapter, make_tls_context
+
+    if tls_context is None:
+        try:
+            tls_context = make_tls_context(config.filestation_ca_path)
+        except Exception as exc:
+            raise RunnerError(str(getattr(exc, "code", "FILESTATION_TLS_PREFLIGHT_FAILED"))) from exc
+    fetcher = make_candidate_proxy_fetcher(config.poster_proxy_url)
+
+    def processor(dvd_id):
+        with SynologyFileStationMediaAdapter(
+            password_file=config.filestation_password_path, ca_file=config.filestation_ca_path,
+            tls_context=tls_context,
+        ) as media_remote:
+            return run_thumbnail_processor(db_path=normalized["discovery_db_path"],
+                dvd_id=dvd_id, file_station=media_remote, fetcher=fetcher)
+
+    return {"run_thumbnail_jobs": run_thumbnail_jobs, "thumbnail_processor": processor}
+
+
 def _build_services(config: RunnerConfig, normalized: dict) -> dict:
     from teddy_discovery_jellyfin import JellyfinClient
     from teddy_discovery_jellyfin_visibility import reconcile_jellyfin_visibility
@@ -612,20 +697,7 @@ def _build_services(config: RunnerConfig, normalized: dict) -> dict:
 
     thumbnail_services = {}
     if config.thumbnail_enabled:
-        from teddy_discovery_media_jobs import run_thumbnail_jobs
-        from teddy_discovery_media_pipeline import run_thumbnail_processor
-        from teddy_discovery_media_thumbnail import make_candidate_proxy_fetcher
-        thumbnail_fetcher = make_candidate_proxy_fetcher(config.poster_proxy_url)
-        def thumbnail_processor(dvd_id):
-            with SynologyFileStationMediaAdapter(
-                password_file=config.filestation_password_path,
-                ca_file=config.filestation_ca_path,
-                tls_context=tls_context,
-            ) as media_remote:
-                return run_thumbnail_processor(db_path=normalized["discovery_db_path"],
-                    dvd_id=dvd_id, file_station=media_remote, fetcher=thumbnail_fetcher)
-        thumbnail_services = {"run_thumbnail_jobs": run_thumbnail_jobs,
-                              "thumbnail_processor": thumbnail_processor}
+        thumbnail_services = _build_thumbnail_services(config, normalized, tls_context=tls_context)
 
     return {
         **thumbnail_services,
@@ -660,6 +732,24 @@ def _summarize_visibility(result: dict | None) -> dict | None:
     return {name: int(result.get(name, 0) or 0) for name in fields}
 
 
+def _summarize_thumbnail(thumb_results: list[dict]) -> dict:
+    attention_states = {"ATTENTION", "HELD_CONFLICT", "HELD_INVALID_STATE", "HELD_INVALID_TIMESTAMP", "EXHAUSTED"}
+    held_reasons = {}
+    for item in thumb_results:
+        state = item.get("status")
+        if state in attention_states or state in {"HELD_TITLE_LOCK", "HELD_BACKOFF", "HELD_FRESH_RUNNING", "HELD_NFO_INCOMPLETE", "HELD_ITEM_LIMIT"}:
+            held_reasons[state] = held_reasons.get(state, 0) + 1
+    summary = {"attempted": sum(bool(item.get("attempted")) for item in thumb_results),
+        "complete": sum(item.get("status") == "COMPLETE" for item in thumb_results),
+        "pending": sum(item.get("status") in {"PENDING", "FAILED"} for item in thumb_results),
+        "attention": sum(item.get("status") in attention_states for item in thumb_results),
+        "skipped": sum(item.get("status") == "SKIPPED" for item in thumb_results),
+        "held_reasons": held_reasons}
+    summary["state"] = ("ATTENTION" if summary["attention"] else
+        "PENDING" if summary["pending"] or held_reasons else "COMPLETE")
+    return summary
+
+
 def run_stage9_media_once(
     config: RunnerConfig,
     *,
@@ -673,7 +763,8 @@ def run_stage9_media_once(
     if not config.apply:
         return {
             "status": "DRY_RUN",
-            "stage": "stage9-media-only",
+            "stage": "stage9-thumbnail-only" if config.thumbnail_only else "stage9-media-only",
+            **({"target_dvd_id": normalized["target_dvd_id"], "non_thumbnail_execution": 0} if config.thumbnail_only else {}),
             "non_media_execution": 0,
             "media_max_items": normalized["max_items"],
             "visibility_max_items": normalized["visibility_max_items"],
@@ -684,6 +775,24 @@ def run_stage9_media_once(
         }
 
     with _exclusive_run_lock(normalized["run_lock_path"]):
+        if config.thumbnail_only:
+            # Repeat the read-only gate inside the runner lock, before service
+            # construction or any job transaction that can initialize/migrate.
+            _validate_database(normalized["media_db_path"], {"media_jobs": REQUIRED_MEDIA_JOB_COLUMNS},
+                               stable_read=True, thumbnail_target=normalized["target_dvd_id"])
+            active = services if services is not None else _build_thumbnail_services(config, normalized)
+            outcomes = active["run_thumbnail_jobs"](
+                db_path=normalized["media_db_path"], writer_lock_path=normalized["media_writer_lock_path"],
+                title_lock_dir=normalized["title_lock_dir"], processor=active["thumbnail_processor"],
+                max_items=1, target_dvd_id=normalized["target_dvd_id"], include_held=True)
+            summary = _summarize_thumbnail(outcomes)
+            status = "PARTIAL_FAILURE" if summary["attention"] else "PENDING" if summary["state"] == "PENDING" else "COMPLETE"
+            return {
+                "status": status, "stage": "stage9-thumbnail-only", "target_dvd_id": normalized["target_dvd_id"],
+                "non_thumbnail_execution": 0, "non_media_execution": 0, "registered": 0,
+                "thumbnail": summary, "media_max_items": 1,
+                "jellyfin_visibility": None, "jellyfin_get_requests": 0, "jellyfin_post_attempts": 0,
+            }
         active = services if services is not None else _build_services(config, normalized)
         target = normalized["target_dvd_id"]
         registration = active["reconcile"](
@@ -727,20 +836,7 @@ def run_stage9_media_once(
                     db_path=normalized["media_db_path"], writer_lock_path=normalized["media_writer_lock_path"],
                     title_lock_dir=normalized["title_lock_dir"], processor=active["thumbnail_processor"],
                     max_items=remaining, target_dvd_id=target, include_held=True)
-                attention_states = {"ATTENTION", "HELD_CONFLICT", "HELD_INVALID_STATE", "HELD_INVALID_TIMESTAMP", "EXHAUSTED"}
-                held_reasons = {}
-                for item in thumb_results:
-                    state = item.get("status")
-                    if state in attention_states or state in {"HELD_TITLE_LOCK", "HELD_BACKOFF", "HELD_FRESH_RUNNING", "HELD_NFO_INCOMPLETE", "HELD_ITEM_LIMIT"}:
-                        held_reasons[state] = held_reasons.get(state, 0) + 1
-                thumbnail_summary = {"attempted": sum(bool(item.get("attempted")) for item in thumb_results),
-                    "complete": sum(item.get("status") == "COMPLETE" for item in thumb_results),
-                    "pending": sum(item.get("status") in {"PENDING", "FAILED"} for item in thumb_results),
-                    "attention": sum(item.get("status") in attention_states for item in thumb_results),
-                    "skipped": sum(item.get("status") == "SKIPPED" for item in thumb_results),
-                    "held_reasons": held_reasons}
-                thumbnail_summary["state"] = ("ATTENTION" if thumbnail_summary["attention"] else
-                    "PENDING" if thumbnail_summary["pending"] or held_reasons else "COMPLETE")
+                thumbnail_summary = _summarize_thumbnail(thumb_results)
         status = "PARTIAL_FAILURE" if jobs["failed"] or (thumbnail_summary and thumbnail_summary.get("attention", 0)) else "COMPLETE"
         if status == "COMPLETE" and thumbnail_summary and thumbnail_summary["state"] in {"PENDING", "HELD"}:
             status = "PENDING"
@@ -775,6 +871,7 @@ def _config_from_args(args) -> RunnerConfig:
         jellyfin_get_max_requests=args.jellyfin_get_max_requests,
         target_dvd_id=args.target_dvd_id,
         apply=args.apply,
+        thumbnail_only=args.thumbnail_only,
         confirm=args.confirm,
         filestation_password_path=args.filestation_password_file,
         filestation_ca_path=args.filestation_ca_file,
@@ -800,6 +897,8 @@ def main(argv=None) -> int:
     parser.add_argument("--visibility-seed-max-items", type=int, default=1)
     parser.add_argument("--jellyfin-get-max-requests", type=int)
     parser.add_argument("--target-dvd-id")
+    parser.add_argument("--thumbnail-only", action="store_true",
+                        help="Run only one existing NFO-complete target thumbnail job; requires --target-dvd-id and --max-items 1.")
     parser.add_argument("--expected-release-id")
     parser.add_argument("--filestation-password-file", type=Path)
     parser.add_argument("--filestation-ca-file", type=Path)

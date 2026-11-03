@@ -1,5 +1,15 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 THUMBNAIL-ONLY CLI — SOURCE/OFFLINE COMPLETE (2026-11-03)
+
+Added explicit `--thumbnail-only` / RunnerConfig.thumbnail_only, default false, requiring one exact existing NFO-complete target and max_items=1. The existing apply confirmation and release/path/proxy/lock protections remain. Dedicated service construction calls only existing thumbnail jobs/processor; no normal reconcile/media/NFO/poster publication, Jellyfin client or visibility work. General mode behavior and default-disabled thumbnails are retained.
+
+Before any migration-capable job function or service construction, read-only preflight verifies all four thumbnail columns, their basic types and target readiness; absent columns report THUMBNAIL_SCHEMA_MIGRATION_REQUIRED with no initialization. The gate repeats inside the runner lock. Thumbnail-only preflight uses mode=ro, immutable=1 and query_only; nonempty WAL or changed database/WAL metadata causes a fail-closed error rather than SHM side effects or ignoring WAL. This adds a stable/checkpointed-DB prerequisite for a later authorized canary, not permission to checkpoint or stop a service now. No automatic migration is provided by this mode for missing columns.
+
+OFFLINE: 25 new representative checks (15 guards including each missing column, 8 outcome/state checks, 2 fake source-to-storage/service-boundary checks) PASS; existing runner, jobs and thumbnail-processor smoke (20 checks) PASS; git diff --check and Stage9 task preflight PASS. Dry-run database bytes/metadata and lock-file absence verified unchanged; tests cover CLI parsing, two IDs, target limits, retries/holds/attention, unrelated state preservation, and zero general-service/client/publication calls. Only runner and its existing smoke source changed. No site, operational DB, NAS or Jellyfin access, deployment, service or timer change.
+
+NEXT: separately authorize verified immutable release deployment, media-DB backup/migration and a bounded single-title canary using this dedicated mode. Source completion is not operating success. Existing JPEG full-decode limitation and non-atomic poster-recheck/upload race remain; no Primary POST or cleanup implemented.
+
 ## MBRBI-015 DEPLOYMENT PREPARATION — READ ONLY (2026-11-03)
 
 REPOSITORY: canonical 8a19b9af4f7858cd64f2ff13c4778bc8d5da6108; Stage9 v1.0.3 / STG9MEDIA-001 confirmed. Installed release b31873824527bbcdf800d141b40eaf6e2af03abd differs in media_only_runner, media_jobs, media_pipeline and media_filestation; media_thumbnail is absent; media_metadata matches. These five Stage9 source files form the currently identified minimum release delta, subject to import/dependency verification of a complete immutable release. Do not copy only a runner into the old release. systemd active state remains NOT_VERIFIED (bus access denied); unit paths and ten-minute schedule were previously read, not changed.

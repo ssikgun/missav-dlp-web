@@ -1,6 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## Stage9 thumbnail-only execution mode — source/offline complete (2026-11-03)
+
+The prior activation-code gap is resolved in source: --thumbnail-only requires a target and max_items=1; dedicated thumbnail services avoid general media/NFO/Jellyfin work. Missing thumbnail DB columns fail before migration-capable functions; dry-run is read-only and refuses nonempty/changing WAL. New checks 25 PASS plus existing runner/jobs/processor regressions PASS. See Stage9 ACTIVE_WORK for details and the stable/checkpointed-DB prerequisite. Release deployment, operational DB migration and live single-title creation remain NOT_RUN and require separate approval; JPEG decode and poster/thumb atomicity limits remain.
+
 ## Stage9 MBRBI-015 deployment preparation — 2026-11-03
 
 Read-only release diff and user NAS inventory recorded in Stage9 ACTIVE_WORK. Minimum source delta: four changed Stage9 modules plus new thumbnail module. Canary remains blocked until a default-off thumbnail-only targeted execution mode is implemented and separately approved release/DB/maintenance/canary scope is granted. Current runner also runs normal media/Jellyfin stages, so its flag alone is unsuitable for this narrow canary. Operational owners/current listing/service state remain NOT_VERIFIED; no operational change performed.
