@@ -1,6 +1,14 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 
+## STG9MEDIA-001 DIAGNOSTIC RELEASE INSTALLED, UNIT UNCHANGED — 2026-11-03
+
+User-approved phase 1 only. Installed separate complete Stage9 release `/opt/missav-dlp-web/stage9-runtime/releases/3ec25fff9441fa4e6c2613d2fa00ef16cf605bc3`; ID is the exact diagnostic source commit and matches directory. Based on copy of installed `3d97c998299ccb88e1f59a96fdeb3088f76b7924`; old release and backups preserved. The only three changed files match 3ec source: thumbnail SHA256 3b88f27cec62e71134a79960575eec08c3f159a23e74af347a5867be352a14e1; jobs 490b19214642ece735ce94b01076b52a9ec2ad4cfb01b7f5bd23375b74db9895; runner 167028915484848285b6ba4cb39f0447fb04334c885b750c210fb4376bc05347. An independent 589-file manifest is `/tmp/stg9-diagnostic-release-20261103/sha256-manifest.txt`, SHA256 b974d583b86abdc197fceca0301d4111248e7ce0859ef897911f1ec976af77fa; inherited `.runtime-source-manifest` is historical and not current evidence. Installed tree matched staged copy 589 files and all paths, no symlinks; write bits absent (root can still alter permissions, not immutable against root). Eleven required modules present, local /usr/bin/python3 imports and release ID PASS. Offline thumbnail 13 and runner smoke (25 thumbnail-only checks plus existing) PASS with no network.
+
+Dedicated Media DB examined via immutable=1, mode=ro and query_only; WAL stable/empty, existing schema passes runner guard; MBRBI-015 remains COMPLETED/NFO COMPLETE/thumbnail PENDING/attempts 1. Existing DB backup SHA cb76c692cd5e1f23edab8542fcb5039ada6d23fcc45e7e6fefd1b4a842f1a8cb and unit backups d1046937b507a7e594e74d15679d982562352bb133b5f293330c3f2669c6ef6a, abfa24140f735debdd329aa5f564afa59c4d796768b8829abc50c46e8e678dac remain. No service/timer/systemd calls in this phase, no unit modification, database write/migration, image GET, NAS/Jellyfin access or canary retry. PRODUCTION_CHANGED=YES (new release directory installed; prior timer pause and DB schema change also historical). Service/timer current state NOT_VERIFIED in Codex; user previously reported stopped.
+
+NEXT: user CT108 root must freshly verify stopped Stage9 service/timer, unit identity/backup and DB writer/WAL conditions before separately performing the already-approved Stage9 unit reference switch; do not start timer/service or repeat MBRBI-015 canary. No claim of actual thumbnail success.
+
 ## Stage9 sanitized fetch diagnostics — source/offline complete (2026-11-03)
 
 Fixed error-category allowlist is propagated from candidate validation through new thumbnail DB errors to runner code counts. Thumbnail tests 13 PASS with 12 diagnostic subcases; jobs/runner/processor/FileStation regressions PASS. No raw exception/URL/body output, no production access or deployment, no historical state reset and no live canary retry. Prior CANDIDATE_FETCH_FAILED cause remains UNKNOWN. See Stage9 ACTIVE_WORK for evidence.
