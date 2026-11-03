@@ -381,10 +381,42 @@ def test_postupload_content_mismatch_fails(root: Path):
     assert fake.files[NFO_PATH] == NFO_BYTES
 
 
+def test_thumb_create_only(root: Path):
+    for dvd, prefix in (("ABC-123", "ABC"), ("XYZ-456", "XYZ")):
+        fake = FakeFileStation()
+        folder = API_LIBRARY_ROOT + "/" + prefix + "/" + dvd
+        fake.directories.update({API_LIBRARY_ROOT + "/" + prefix, folder})
+        video = folder + "/" + dvd + ".mp4"
+        fake.files[video] = VIDEO_BYTES
+        fake.owners[video] = "admin"
+        fake.files[folder + "/" + dvd + ".nfo"] = NFO_BYTES
+        fake.files[folder + "/poster.jpg"] = POSTER_BYTES
+        before = dict(fake.files)
+        rel = prefix + "/" + dvd + "/" + dvd + ".mp4"
+        with _adapter(root, fake) as adapter:
+            for mime, data, wrong in (("image/jpeg", b"not an image", dvd), ("image/png", b"\x89PNG\r\n\x1a\nfixture", "BAD-1")):
+                try:
+                    adapter.create_thumbnail(dvd_id=wrong, video_relative=rel, content_type=mime, data=data)
+                    raise AssertionError("invalid input accepted")
+                except FileStationMediaError:
+                    pass
+            image = b"\x89PNG\r\n\x1a\nfixture"
+            assert adapter.create_thumbnail(dvd_id=dvd, video_relative=rel, content_type="image/png", data=image)["status"] == "CREATED"
+            try:
+                adapter.create_thumbnail(dvd_id=dvd, video_relative=rel, content_type="image/png", data=image)
+                raise AssertionError("existing thumbnail accepted")
+            except FileStationMediaError as exc:
+                assert exc.code == "THUMBNAIL_ALREADY_EXISTS"
+        assert all(fake.files[k] == value for k, value in before.items())
+        assert fake.files[folder + "/thumb.png"] == image
+        assert len(fake.uploads) == 1
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="stage9-filestation-smoke-") as temp:
         root = Path(temp)
         for name, test in [
+            ("thumb-create-only-two-ids", test_thumb_create_only),
             ("nfo-only-create-and-stat", test_nfo_only_create_and_verified_stat),
             ("identical-reuse-and-poster-create", test_identical_existing_reused_and_poster_create),
             ("different-sidecar-collision", test_different_existing_nfo_is_collision),
@@ -396,7 +428,7 @@ def main():
             case.mkdir()
             test(case)
             print("PASS " + name)
-    print("RESULT 6 PASS / 0 FAIL")
+    print("RESULT 7 PASS / 0 FAIL")
 
 
 if __name__ == "__main__":

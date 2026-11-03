@@ -930,6 +930,33 @@ class SynologyFileStationMediaAdapter:
         result = self._json_body(response, "UPLOAD_OUTCOME_UNKNOWN_RESPONSE")
         return result
 
+    def create_thumbnail(self, *, dvd_id: str, video_relative: str, content_type: str, data: bytes) -> dict:
+        """Create a caller-verified thumbnail without touching other sidecars."""
+        canonical, video_api_path, _ = _video_paths(video_relative)
+        if not isinstance(dvd_id, str) or dvd_id != PurePosixPath(canonical).parent.name.upper():
+            raise FileStationMediaError("BUNDLE_DVD_ID_MISMATCH")
+        if not isinstance(data, bytes) or not data or len(data) > MAX_POSTER_BYTES:
+            raise FileStationMediaError("THUMBNAIL_FORMAT_INVALID")
+        formats = {"image/jpeg": (".jpg", data.startswith(b"\xff\xd8\xff")),
+                   "image/png": (".png", data.startswith(b"\x89PNG\r\n\x1a\n")),
+                   "image/webp": (".webp", len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP")}
+        if content_type not in formats or not formats[content_type][1]:
+            raise FileStationMediaError("THUMBNAIL_FORMAT_INVALID")
+        video = self._resolve(video_api_path)
+        if video is None or video["isdir"] is not False:
+            raise FileStationMediaError("VIDEO_UNAVAILABLE_FOR_PUBLICATION")
+        api_folder = PurePosixPath(video_api_path).parent.as_posix()
+        filename = "thumb" + formats[content_type][0]
+        # Any existing thumb extension is a conflict, including identical bytes.
+        if any(item["name"].lower() in {"thumb.jpg", "thumb.jpeg", "thumb.png", "thumb.webp"}
+               for item in self._parent_listing(api_folder)):
+            raise FileStationMediaError("THUMBNAIL_ALREADY_EXISTS")
+        folder = PurePosixPath(api_folder).relative_to(API_LIBRARY_ROOT).as_posix()
+        result = self._publish_one(folder, filename, data, hashlib.sha256(data).hexdigest(), expected_max=MAX_POSTER_BYTES)
+        if result["status"] != "CREATED":
+            raise FileStationMediaError("THUMBNAIL_ALREADY_EXISTS")
+        return result
+
     def publish_bundle(self, *, video_relative: str, bundle) -> dict:
         canonical, video_api_path, _ = _video_paths(video_relative)
         if bundle.dvd_id is None or str(bundle.dvd_id).strip().upper() != PurePosixPath(canonical).parent.name.upper():

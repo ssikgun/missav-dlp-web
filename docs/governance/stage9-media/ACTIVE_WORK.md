@@ -1,6 +1,10 @@
 # Stage9 Media workstream — active work
 
 
+## STG9MEDIA-001 THUMB CREATE-ONLY STORAGE — OFFLINE (2026-11-03)
+
+Added an explicit FileStation thumbnail create operation for caller-verified JPEG/PNG/WebP data, with exact video identity, no-overwrite, existing thumbnail collision checks and existing post-upload owner/hash checks. Offline fake FileStation smoke: 7 PASS including two IDs and unchanged other files. Not wired to site collection, pipeline or Jellyfin. Format checks use MIME and magic signatures, not full image decoding. Actual NAS behavior is unverified; production changes and deployment remain unauthorized. Site image provenance and race-safe Jellyfin Primary switching remain unresolved.
+
 ## STG9MEDIA-001 THUMBNAIL STORAGE — OFFLINE REVIEW INCOMPLETE (2026-11-03 KST)
 
 Source base `5b03b847e594099bec4e9554d92c116f669f0924`; Stage9 contract 1.0.2 and scoped offline implementation approval checked. Existing isolated candidate and smoke SHA-256 matched the prior checkpoint; seven synthetic tests pass. The candidate is not integrated and does not establish actual page provenance, image role, proxy behavior, or full image decoding.
