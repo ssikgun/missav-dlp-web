@@ -1,5 +1,14 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-04 — Teddy authorizes next Stage9 immutable-release and limited operational check; actual-host preflight required
+
+After source-only canonical promotion `e2654af70e8d278129a68ea5e7130d283e6db254` completed with exact two thumbnail source/test Git SHA matches and no runtime changes, Teddy replied **`승인할께`** to the assistant's immediately preceding proposal: prepare a new immutable Stage9 release and a **limited** real-world verification. This is a **new phase approval**, not evidence of deployment or product success. Restrict to `STG9MEDIA-001`, the reviewed `curl` transport and existing Stage9-only thumbnail path; preserve current canonical poster/NFO, all other Media rows, NAS videos/art and Jellyfin state. Do not modify other workstreams or start routine/bulk scheduling.
+
+**Next: CT108 actual-host read-only preflight FIRST.** Confirm stopped Stage9 service/timer and effective release/unit identity, exact prior source and new candidate SHA, dedicated Media DB WAL/integrity/target attempt state, no active writer, backup availability and current proxy/FileStation prerequisites. Historical last confirmed target `MBRBI-015` was `COMPLETED / NFO COMPLETE / THUMBNAIL PENDING`, attempts **3**, error `CANDIDATE_HTTP_403`, no NAS thumb, and its prior one-shot marker was **CONSUMED**. Never delete/reset/reuse that marker, re-run old wrappers, use an old expected-attempt value of 2 or assume prior GET budget remains. A later new test, if eligible, must have its **own freshly scoped one-request marker/gate**, exact target/attempt and no-clobber postcheck; only the prior exact endpoint `https://fourhoi.com/mbrbi-015/cover-n.jpg` via `127.0.0.1:58888` is under consideration. Any output/status conflict or uncertain writer/proxy/identity means **HOLD** before mutations; no HEAD, retry, automatic failover, cleanup, manual image replacement or Jellyfin Primary change. An independent new canary execution plan/marker and actual write scope must be reviewed before invoking it.
+
+**At this checkpoint:** user approval received; `HOST_PREFLIGHT=NOT_RUN`; `IMMUTABLE_RELEASE_INSTALL=NOT_RUN`; `UNIT_SWITCH=NOT_RUN`; `LIVE_HTTP=0`; `NEW_CANARY=NOT_RUN`; `DB_NAS_JELLYFIN_WRITES=0`. Follow up with CT108 read-only results, then prepare one safe install/cutover and bounded canary. No approval for broad scheduling.
+
+
 ## 2026-11-04 — Approved curl transport candidate promoted to canonical source; deployment remains separately gated
 
 Teddy explicitly answered `응 승인해` to the narrow proposal to promote **only** the two previously reviewed Stage9 thumbnail source/test files from isolated candidate `630da1f4066ec389a227dc088b182562b386c69b` into canonical branch `teddy-subtitle-stage11`. Approved scope: `teddy_discovery_media_thumbnail.py` and `teddy_discovery_media_thumbnail_smoke.py`, plus this Stage9 checkpoint and the integrated handoff. No additional product or governance file changes.
