@@ -1,5 +1,16 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 CT108 ATOMIC GUARD RELEASE INSTALLED AND UNIT SWITCHED — USER SCRIPT PASS (2026-11-04)
+
+User executed the newly prepared `/tmp/stg9-atomic-release-prep-20261104/install_zombie_checked.py` at CT108 `root@downloader`. Both pre-execution `sha256sum -c` checks returned `OK`: original `install.py` SHA256 `d8a7d9500e58890d3de93356d3e55f002de5401695b3b07a77f7b6617f6896a3`, new zombie-safe installer SHA256 `3f9f740efeba104c2bd4271c9b062d1ff27a3e4b10718e1a10990bda5cd3488a`. Actual script stdout:
+
+- `RELEASE_INSTALLED=/opt/missav-dlp-web/stage9-runtime/releases/6b6b73630efa85bbb7a5e95585ba6ae28d9ee8c1`
+- `UNIT_BACKUP=/opt/missav-dlp-web/backups/stage9-unit-before-atomic-6b6b7363-20261104.service SHA256=ba19dbdf1eb89b5557e9364a8fc001b84989d228bee7dff0ba16e06b70d981fc`
+- `UNIT_SWITCH=PASS SERVICE=inactive TIMER=inactive`
+- Python completed and returned shell prompt without error.
+
+**Classification:** `RELEASE_INSTALLED=PASS(USER_SCRIPT)`; `UNIT_SWITCH=PASS(USER_SCRIPT)`; `SERVICE_TIMER_STOPPED=PASS(USER_SCRIPT)`. This is **not yet an independently read-back postcheck**; exact new release source-delta/manifest, effective WorkingDirectory/ExecStart/expected ID, old release preservation, timer MainPID and DB target state still need **fresh CT108 read-only independent verification**. Script is intended not to write Media DB/NAS/Jellyfin or fetch image, but the user pasted only stdout, not a separate DB/NAS observation; do not claim independent proof of zero external effects. Old 22e baseline and new 6b6 release IDs must be treated as separate immutable versions. Do not run original or new installer again, and never start service/timer during postcheck. Earlier contract source-guard 5-attempt standard behavior remains unchanged; planned one-shot diagnostic `MBRBI-015` with explicit `--expected-thumbnail-attempt-count 2` is separate and remains `LIVE_CANARY=NOT_RUN`, `NEW_ONE_SHOT_AUTH=UNCONSUMED`. No Jellyfin art update authorized. Next: independent CT108 read-only postcheck; checkpoint results in Stage9 ACTIVE_WORK and CURRENT_HANDOFF; only then prepare strictly bounded single target runtime canary command using previously approved authorization, not generic unit start.
+
 ## 2026-11-04 — Stage9 installer zombie visibility fix prepared offline
 
 Original installer `/tmp/stg9-atomic-release-prep-20261104/install.py` SHA256 `d8a7d9500e58890d3de93356d3e55f002de5401695b3b07a77f7b6617f6896a3` was preserved and not rerun. New separate `/tmp/stg9-atomic-release-prep-20261104/install_zombie_checked.py` SHA256 `3f9f740efeba104c2bd4271c9b062d1ff27a3e4b10718e1a10990bda5cd3488a` changes only `no_db_users`: inaccessible FD scan may skip only a uniquely identified `State: Z` with matching PID and unchanged proc inode. Unknown/live/status error/PID reuse fail closed; DB holder still blocks. Offline fake checks: 8 PASS / 0 FAIL including PID disappearance and ambiguous state; fake installation/unit switch and repeat protection PASS. Real install, unit switch and live canary NOT_RUN; fresh actual-host preflight remains required, the single GET authorization remains unconsumed. The user had reported the prior attempt did not install or switch and service/timer were inactive at that observation.
