@@ -1,5 +1,15 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-04 — STG9MEDIA-001 USER-APPROVED SIMPLIFIED NAS-LOCAL POSTER POLICY v1.0.6 / DOCS ONLY
+
+Teddy expressly replaced Stage9 Media contract v1.0.5's “protect all existing Jellyfin Primaries by forbidding local poster/cover backfill” rule with a simpler **local representative-image-file gap** model. This is **design/documentation approval only**, not approval to fetch/create images or deploy code. **Do not check Jellyfin Primary ownership/status to decide whether an existing movie needs a local poster**; do not perform Jellyfin Primary API POST/metadata refresh/full-library scan. For each exact current owned video folder on NAS: recognize `poster.*` / `cover.*` and other Jellyfin local movie Primary names including `folder.*`, `default.*`, `movie.*` with supported image extensions. Existing local Primary means skip; missing local Primary means a **candidate**, not permission to write. Obtain authentic verified poster first as `poster.<validated-extension>`, else verified site static JPEG fallback `cover.jpg`; if no verified image, PENDING. Do not rename/delete/overwrite files; `thumb.jpg` alone does not cover the local Primary gap. Future new downloads follow this identical local-file rule. All pre-existing MP4/NFO/subtitle/user art and ownership are protected.
+
+Explicitly accepted trade-off: Jellyfin may use newly added local `poster/cover` over even a manually chosen/internal Primary on subsequent indexing; **automatic pickup is not yet proven**, and this must be confirmed by **one** separately approved local-file-only canary. Jellyfin API direct image writes and ownership/race lab are out of future normal poster management; existing registration/notification flows for new items are not changed. Do not replay the consumed `MBRBI-015` one-time Jellyfin POST; preserve its existing NAS `thumb.jpg` and original Jellyfin Primary backup. Its local `poster/cover` presence is **not established** and must be assessed by ordinary local-file inventory, not the historic API test.
+
+**Historical count recovered:** Stage8 2026-08-31 showed 130 titles, 85 local posters and **45 without local poster**. The 2026-11-04 discovery SQL showed **260 currently present JAV holdings**, plus absent historical `VEMA-246` (`present=0`). **Present-day 260-title local-file missing count is still UNKNOWN**; do not claim 45, 11 poster-PENDING, or 10 existing Jellyfin Primary is the current missing-files count. Prior ten-title Jellyfin GET-only checks were correct historical evidence but **are no longer eligibility gates** under the user-approved updated policy.
+
+`STG9MEDIA-001 / IN_PROGRESS`; `CONTRACT_VERSION: 1.0.6 / APPROVED`; `REQUIRES_WORKSTREAMS: stage9-media`. **Next single checkpoint:** bounded CT108+NAS read-only inspection of local Primary filenames for exact current 260 DB-known holdings; report covered/missing/HOLD counts, without any image download/write/Jellyfin API requests. Stage9 service/timer last user-verified stopped, fresh live check mandatory before next operation. Contract and ACTIVE_WORK/HANDOFF modified, no operational/implementation files.
+
 ## 2026-11-04 — STG9MEDIA-001 nine remaining poster-PENDING Jellyfin Primary GET-only inventory PASS; 10 existing Primary images protected
 
 Teddy executed the remaining **nine** exact-title Jellyfin **GET-only** Primary image checks on CT108 after the one-title user-context canary PASS. User-provided console: `STAGE9_STOPPED=PASS`; all 9 return `PRIMARY=EXISTS_PROTECT`; `PRIMARY_EXISTS_PROTECT=9`, `PRIMARY_ABSENT_CANDIDATE=0`, `PRIMARY_HOLD=0`, `JELLYFIN_GET_COUNT=54`, `JELLYFIN_POST_COUNT=0`, `NAS_DB_WRITE=0`, `PREVIOUS_PROTECTED_ITEM_SKIPPED=YES`, `MBRBI_015_SKIPPED=YES`, `NINE_TITLE_READONLY=PASS`. Each item was constrained to a unique current JAV holding, canonical path, exact Jellyfin Movie ID/path, prior validated user-context GET, and Primary image metadata. The exact 9 protected IDs are `FC2-PPV-4982148`, `FC2-PPV-4983582`, `GANA-3223`, `LUXU-1725`, `MAAN-945`, `MIUM-1406`, `NTR-102`, `PRIAN-059`, `PRIAN-060`.
@@ -1896,7 +1906,7 @@ NEXT SINGLE CHECKPOINT: Separate bounded NAS read-only verification of the exact
 WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.5
+CONTRACT_VERSION: 1.0.6
 REQUIRES_WORKSTREAMS: stage9-media
 
 ## P03-H NAS DUAL-UID TWO TARGETS ABSENT / SOURCE VERIFIED PREFLIGHT PASS — 2026-11-02 KST
