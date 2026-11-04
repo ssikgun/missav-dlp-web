@@ -1,5 +1,13 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-04 — STG9MEDIA-001 Jellyfin Primary GET-only 10-item inventory BLOCKED by HTTP 400; known user context recovered
+
+User ran the approved **GET-only**, bounded Stage9 image inventory against 10 exact poster-PENDING holdings, explicitly excluding already-closed `MBRBI-015`. Console: `STAGE9_STOPPED=PASS`; 50 authenticated Jellyfin GETs; **all 10 item lookups ended `PRIMARY=HOLD REASON=JellyfinError Jellyfin HTTP 400`**; `PRIMARY_EXISTS_PROTECT=0`, `PRIMARY_ABSENT_CANDIDATE=0`, `PRIMARY_HOLD=10`; `JELLYFIN_POST_COUNT=0`, `NAS_DB_WRITE=0`, `MBRBI_015_REPROCESSED=NO`. `JELLYFIN_PRIMARY_INVENTORY=PASS_READONLY` means only the safe no-write test procedure completed; **no actual Primary status was determined**. Never treat zero known images as absence.
+
+Teddy recalled a previously supplied Jellyfin **user ID**. The exact user ID was recovered from the same user's earlier 2026-11-04 conversation and that earlier read-only canary had **already confirmed** `GET /Items/{id}?userId=<exact previously validated Jellyfin user ID>` succeeded after `GET /Items/{id}` without user context returned HTTP 400. Therefore **likely regression in this ad hoc inspection script: missing `userId` query parameter**, not evidence of absence or defective artworks. Do not commit personal identifiers, API keys or secrets into repo source/docs; use previously verified user ID only as runtime input. A fresh narrowed one-title read-only GET verification remains required before classifying results or running the other nine.
+
+**Verdict:** `PRIMARY_INVENTORY_10=INCOMPLETE_HTTP_400`, `PRIMARY_HOLD=10`, `PRODUCTION_WRITES=0`, `STAGE9_SERVICE_TIMER=STOPPED`, `COVER_NAMING_IMPLEMENTATION=NOT_RUN`, `BULK_BACKFILL=NOT_RUN`. Current Stage9 contract `1.0.5 APPROVED` and task `STG9MEDIA-001 IN_PROGRESS` unchanged. Next only: run one bounded DB-known exact-item Jellyfin GET-only readback with prior verified `userId`, ensure item/path match and image descriptors agree, then proceed. Protect every existing Jellyfin Primary and preserve MBRBI-015 original image backup, with no refresh/POST/canonical NAS changes.
+
 ## 2026-11-04 — STG9MEDIA-001 bounded poster-PENDING candidate inventory PASS; 10 titles need Jellyfin Primary GET
 
 Teddy executed the follow-up CT108 `root@downloader` **read-only** Python+SQLite candidate inventory, after verifying Stage9 dedicated `teddy-stage9-media.service` inactive, MainPID=0 and `teddy-stage9-media.timer` inactive (`STAGE9_STOPPED=PASS`). The two databases were opened read-only; no operational writes or Jellyfin API calls were performed. User console: `CANDIDATE_INVENTORY=PASS`, `PRODUCTION_WRITES=0`, `JELLYFIN_PRIMARY_CHECK=NOT_RUN`, `ELIGIBLE_BACKFILL_COUNT=UNKNOWN`.
