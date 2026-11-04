@@ -1,5 +1,13 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-04 — STG9MEDIA-001 EXISTING-ART-PROTECTED COVER POLICY DESIGN APPROVED / DOCS ONLY
+
+Teddy explicitly **approved** the narrower general Stage9 future-image policy after reviewing `poster.jpg` vs `cover.jpg` and the existing `MBRBI-015` result. **Leave every existing Jellyfin representative Primary untouched**, including Jellyfin-generated, manually selected and unknown-owner images; **do not even add a competing poster/cover file or force a refresh** for such existing items. Treat missing authentic artwork and missing Jellyfin Primary as different facts. Only (a) newly obtained works and (b) exact existing holdings read-only verified to have **no Jellyfin Primary** are eligible. Official verified art: `poster.<validated-extension>` (JPEG `poster.jpg`); verified work-page static JPEG fallback when no official poster: `cover.jpg` (true provenance remains `thumbnail`, program ownership recorded, no local video frame capture). Old program-owned `thumb.jpg` may be reused only with verified bytes/ownership and a separately authorized no-clobber cover create for an otherwise eligible item; no automatic rename, rewrite or deletion. A later official poster may supersede only the program-owned temporary fallback after fresh identity/ownership checks, exact readback and separate write/cleanup approval. No verified art -> NFO-only PENDING. Targeted Jellyfin index/readback is an operational question, not an automatic action.
+
+Stage9 contract **1.0.4 -> 1.0.5 / APPROVED (DESIGN ONLY)**; task `STG9MEDIA-001 / IN_PROGRESS`; no router or unrelated workstream change. The previous 2026-11-03 `thumb.jpg` naming / temporary Jellyfin API promotion policy is superseded for **future general behavior only** by the new local `cover.jpg` rule; its source validation, fail-closed, no-overwrite and history remain. Historical `MBRBI-015` Jellyfin Primary image migration **OPERATIONAL_AND_VISUAL_PASS** is *consumed*: do not POST again or convert the old NAS `thumb.jpg`, preserve original image backup. Current source still writes `thumb.jpg`; `COVER_NAMING_IMPLEMENTATION=NOT_RUN`; `BULK_READONLY_INVENTORY=NOT_RUN`; `PRODUCTION_MUTATION=0`; Stage9 service/timer last evidenced stopped, **fresh live state check required** before future use.
+
+Teddy requires each important completed checkpoint to be entered promptly in **this Stage9 ACTIVE_WORK** and `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md`, committed to canonical branch `teddy-subtitle-stage11` with remote SHA/readback. **Next checkpoint only:** proportionate read-only inventory of DB-known existing media and exact Jellyfin Primary state, avoiding unbounded NAS scans. No implementation, NAS/DB/Jellyfin mutation, cleanup, timer start, or deployment is granted by this design approval.
+
 ## 2026-11-04 — STG9MEDIA-001 MBRBI-015 visual acceptance PASS; cover.jpg proposal REVIEW ONLY
 
 Teddy explicitly reported viewing Jellyfin after the one-time `MBRBI-015` image POST and confirming that the replacement representative image displays correctly (`JELLYFIN_USER_VISUAL_ACCEPTANCE=PASS`). This closes **only that single item's user-visible image migration**, complementing the authenticated 204/Primary SHA readback already recorded. No further POST or retry should run against `MBRBI-015`; preserve the original image backup. Stage9 service/timer continue stopped as last verified by the user, but their state has **not** been freshly checked after this report.
@@ -1841,7 +1849,7 @@ NEXT SINGLE CHECKPOINT: Separate bounded NAS read-only verification of the exact
 WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.4
+CONTRACT_VERSION: 1.0.5
 REQUIRES_WORKSTREAMS: stage9-media
 
 ## P03-H NAS DUAL-UID TWO TARGETS ABSENT / SOURCE VERIFIED PREFLIGHT PASS — 2026-11-02 KST
