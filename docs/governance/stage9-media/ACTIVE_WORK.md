@@ -1,5 +1,23 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-04 — STG9MEDIA-001 isolated cover.jpg candidate: Codex offline report INCOMPLETE (2026-11-04 23:32 KST)
+
+Teddy supplied a **Codex completion report** from an isolated offline candidate; this records reported evidence rather than ChatGPT's independent execution or an exact-file diff review. Current canonical HEAD at report intake: `0c1f9f6205ca314535b7d4707fabd398fdd97074`; source candidate root: `/tmp/stg9-cover-010f/` (not committed or promoted). Reported changed files (isolated only):
+- `teddy_discovery_media_filestation.py`
+- `teddy_discovery_media_filestation_smoke.py`
+- `teddy_discovery_media_thumbnail_smoke.py`
+
+**Reported implemented behavior:** no-clobber fallback JPEG creation as `cover.jpg`, skip when local Primary exists (poster/cover/folder/default/movie families), and preserve old `thumb.jpg` without rename/delete. **Official poster fetch/publish code was NOT changed.** Codex reported offline FileStation smoke `7 PASS / 0 FAIL`, thumbnail smoke `13 PASS / 0 FAIL`, jobs/pipeline regression `PASS`, and `git diff --check PASS`. Reported production DB/NAS/Jellyfin writes `0`, commit/push `0`, deployment `0`. Candidate file bytes and test logs were **not independently inspected in this checkpoint**; live Stage9 service/timer state not freshly checked.
+
+**Outstanding blockers (whole task INCOMPLETE):**
+1. Official `poster.<ext>` path must enforce the same existing-local-Primary collision protection and verify exact-work authentic official-poster provenance; a `titles.cover_url` is not authenticity proof.
+2. Existing NFO-complete/legacy `FAILED`/`UNKNOWN` jobs need a safe **image-only** selection path that does not recreate MP4/NFO, issue Jellyfin image API POST/refresh, or replay registration.
+3. Five target movie states/sources remain **HOLD / NOT VERIFIED**: `AT-099`, `DANDYA-033`, `FC2-PPV-3087371`, `FC2-PPV-4451371`, `MBRBI-015`. Only `DANDYA-033` has prior DB `cover_url`, not yet authenticated as official art; the other four have no stored `cover_url` (not proof no other source exists). MBRBI's historical `thumb.jpg` and original Jellyfin backup remain protected; no replay of old one-time POST.
+
+**Independent canonical source readback this checkpoint:** contract `v1.0.6 APPROVED`, task `STG9MEDIA-001 IN_PROGRESS`; `teddy_discovery_media_filestation.py` still creates `thumb.<ext>` and only checks `poster.*`; metadata `fetch_poster/build_media_bundle` still writes `poster.<ext>` using stored `cover_url`; `run_thumbnail_processor` is distinct from full NFO/Jellyfin path, while job eligibility is narrower than the entire 59-title NAS-local gap inventory. Therefore **do not promote the candidate as complete**.
+
+**Next single checkpoint:** a **minimal isolated Stage9-only code follow-up** to finish the official-poster collision/identity path and completed-existing-title image-only eligibility, reusing the three isolated files and existing smoke tests. Only offline validation/dry-run; **no NAS/DB/Jellyfin writes, service/timer start, deployment, or product code commit/push without separate review/authorization**. If shared product modules must change, stop and request matching workstream authorization. Preserve candidate and current operating artifacts.
+
 ## 2026-11-04 — STG9MEDIA-001 existing official/fallback pipeline READ-ONLY CODE REVIEW; cover.jpg implementation gap confirmed
 
 After CT108's 5-title source preflight (only `DANDYA-033` has a stored `titles.cover_url` pointing to `www.javdatabase.com`, authenticity UNVERIFIED), Teddy explicitly asked to **reuse the existing official-poster and fallback-image download pipeline for all five** and identified that **old fallback `thumb.jpg` naming should be updated to `cover.jpg`**. Read-only canonical source inspection at exact branch HEAD `fe1e812d7c94b2fa6d06b7a1fd0246e82190b7ac` confirms existing stages are reusable but **not a fully integrated Stage9 v1.0.6 no-clobber poster/cover management pipeline yet**:
