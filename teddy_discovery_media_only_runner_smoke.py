@@ -623,6 +623,7 @@ def thumbnail_only_guards(root: Path):
                 '--discovery-db', str(config.discovery_db_path), '--media-db', str(config.media_db_path),
                 '--media-writer-lock', str(config.media_writer_lock_path), '--run-lock', str(config.run_lock_path),
                 '--title-lock-dir', str(config.title_lock_dir)]
+        args += ['--expected-thumbnail-attempt-count', '2']
         out = StringIO()
         with redirect_stdout(out):
             assert runner.main(args) == 0
@@ -631,6 +632,10 @@ def thumbnail_only_guards(root: Path):
     assert snapshot() == before
     checks += 1
     for candidate, code in (
+        (replace(config, expected_thumbnail_attempt_count=-1), 'INVALID_EXPECTED_THUMBNAIL_ATTEMPT_COUNT'),
+        (replace(config, expected_thumbnail_attempt_count=True), 'INVALID_EXPECTED_THUMBNAIL_ATTEMPT_COUNT'),
+        (replace(config, thumbnail_only=False, expected_thumbnail_attempt_count=2), 'INVALID_EXPECTED_THUMBNAIL_ATTEMPT_COUNT'),
+        (replace(config, target_dvd_id=None, expected_thumbnail_attempt_count=2), 'INVALID_EXPECTED_THUMBNAIL_ATTEMPT_COUNT'),
         (replace(config, target_dvd_id=None), 'THUMBNAIL_TARGET_REQUIRED'),
         (replace(config, target_dvd_id=''), 'INVALID_TARGET_DVD_ID'),
         (replace(config, max_items=2), 'THUMBNAIL_SINGLE_ITEM_REQUIRED'),
@@ -697,6 +702,10 @@ def thumbnail_only_processing(root: Path):
     before = fields()
     services = {'run_thumbnail_jobs': run_thumbnail_jobs, 'thumbnail_processor': processor}
     checks = 0
+    mismatch = runner.run_stage9_media_once(replace(config, expected_thumbnail_attempt_count=2), services=services)
+    assert mismatch['thumbnail']['held_reasons'] == {'HELD_CONFLICT': 1} and not calls
+    checks += 1
+    config = replace(config, expected_thumbnail_attempt_count=0)
     with ExitStack() as stack:
         for name in ('teddy_discovery_media_jobs.reconcile_media_jobs',
                      'teddy_discovery_media_jobs.run_retryable_media_jobs',
@@ -716,7 +725,7 @@ def thumbnail_only_processing(root: Path):
         again = runner.run_stage9_media_once(config, services=services)
         assert again['thumbnail']['attempted'] == 0 and calls == [ids[0]]
         checks += 1
-        second_config = replace(config, target_dvd_id=ids[1])
+        second_config = replace(config, target_dvd_id=ids[1], expected_thumbnail_attempt_count=None)
         outcome = {'status': 'PENDING', 'error': 'candidate unavailable'}
         pending = runner.run_stage9_media_once(second_config, services=services)
         assert pending['status'] == 'PENDING' and pending['thumbnail']['pending'] == 1 and calls == ids

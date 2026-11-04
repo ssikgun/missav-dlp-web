@@ -848,6 +848,52 @@ def thumbnail_jobs_integration_smoke(root):
     print('THUMBNAIL_JOBS_INTEGRATION=PASS')
 
 
+def expected_thumbnail_attempt_smoke(root):
+    from datetime import datetime, timezone
+    from unittest.mock import patch
+    from teddy_discovery_media_jobs import _media_transaction, run_thumbnail_jobs, thumbnail_retry_eligibility, DEFAULT_MEDIA_MAX_ATTEMPTS
+    from teddy_title_exclusion import try_acquire_title_lock
+    db_path, lock, locks = root / 'expected.sqlite', root / 'expected.lock', root / 'expected-titles'
+    locks.mkdir()
+    now = datetime(2026, 11, 4, tzinfo=timezone.utc)
+    with _media_transaction(db_path, lock) as db:
+        for dvd in ('ABC-123', 'XYZ-456'):
+            db.execute("INSERT INTO media_jobs(dvd_id,status,nfo_status,thumbnail_status,thumbnail_attempt_count,thumbnail_updated_at,created_at,updated_at) VALUES (?, 'COMPLETED','COMPLETE','PENDING',2,?,?,?)", (dvd, '2026-11-03T00:00:00+00:00', now.isoformat(), now.isoformat()))
+    calls=[]
+    def processor(dvd):
+        calls.append(dvd)
+        return {'status':'COMPLETE'}
+    opts=dict(db_path=db_path,writer_lock_path=lock,title_lock_dir=locks,processor=processor,now=now,target_dvd_id='ABC-123',expected_thumbnail_attempt_count=2,include_held=True)
+    def row():
+        with _media_transaction(db_path, lock) as db:
+            return dict(db.execute('SELECT * FROM media_jobs WHERE dvd_id=?', ('ABC-123',)).fetchone())
+    result=run_thumbnail_jobs(**opts)
+    assert result[0]['status']=='COMPLETE' and row()['thumbnail_attempt_count']==3 and calls==['ABC-123']
+    with _media_transaction(db_path,lock) as db:
+        db.execute("UPDATE media_jobs SET thumbnail_status='PENDING',thumbnail_attempt_count=3 WHERE dvd_id='ABC-123'")
+    before=row(); result=run_thumbnail_jobs(**opts)
+    assert result[0]['status']=='HELD_CONFLICT' and row()==before and len(calls)==1
+    with _media_transaction(db_path,lock) as db:
+        db.execute("UPDATE media_jobs SET thumbnail_attempt_count=2,thumbnail_updated_at='2026-11-03T00:00:00+00:00' WHERE dvd_id='ABC-123'")
+    def race(dvd, *, lock_dir):
+        with _media_transaction(db_path,lock) as db:
+            db.execute("UPDATE media_jobs SET thumbnail_attempt_count=3 WHERE dvd_id=?", (dvd,))
+        return try_acquire_title_lock(dvd, lock_dir=lock_dir)
+    with patch('teddy_discovery_media_jobs.try_acquire_title_lock',side_effect=race):
+        result=run_thumbnail_jobs(**opts)
+    assert result[0]['status']=='HELD_CONFLICT' and row()['thumbnail_attempt_count']==3 and len(calls)==1
+    for val,target in ((-1,'ABC-123'),(True,'ABC-123'),('2','ABC-123'),(2,None)):
+        try: run_thumbnail_jobs(**dict(opts,expected_thumbnail_attempt_count=val,target_dvd_id=target))
+        except ValueError: pass
+        else: raise AssertionError('invalid expected count accepted')
+    options=dict(now=now,max_attempts=DEFAULT_MEDIA_MAX_ATTEMPTS,retry_backoff_seconds=3600,running_stale_seconds=7200)
+    job=dict(nfo_status='COMPLETE',thumbnail_status='PENDING',thumbnail_attempt_count=5,thumbnail_updated_at='2026-11-03T00:00:00+00:00')
+    assert thumbnail_retry_eligibility(job,**options)=='EXHAUSTED'
+    job.update(thumbnail_attempt_count=3,thumbnail_updated_at=now.isoformat())
+    assert thumbnail_retry_eligibility(job,**options)=='HELD_BACKOFF'
+    print('EXPECTED_ATTEMPT_GUARD=8 PASS / 0 FAIL')
+
+
 def main():
     thumbnail_state_smoke()
     with tempfile.TemporaryDirectory(
@@ -856,6 +902,7 @@ def main():
 
         root = Path(temp)
         thumbnail_jobs_integration_smoke(root)
+        expected_thumbnail_attempt_smoke(root)
 
         discovery_db = (
             root / "discovery.sqlite3"

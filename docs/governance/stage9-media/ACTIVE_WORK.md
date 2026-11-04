@@ -1,5 +1,10 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 — atomic expected thumbnail attempt count: offline source complete (2026-11-04)
+
+`run_thumbnail_jobs()` accepts an optional nonnegative expected attempt count only for an explicit target. Candidate mismatch holds without processing; under the existing title/writer locks the claim transaction rechecks the value and its UPDATE requires the same expected count. The optional `--expected-thumbnail-attempt-count` is restricted to thumbnail-only single-target mode. Omission preserves the five-attempt policy and existing retry/backoff. Offline jobs smoke (8 guard cases plus existing regressions), runner smoke (19 guard, 9 processing, 2 service-boundary checks and existing integration), thumbnail smoke (13 tests) and diff check PASS. No real network or production changes; release deployment and live canary NOT_RUN. The guard does not detect an external reset or replacement that recreates the same counter/state. Wrapper readiness and the single operational attempt remain separate future work.
+
+
 ## STG9MEDIA-001 USER APPROVES MINIMAL ATOMIC EXPECTED-ATTEMPT SOURCE GUARD (2026-11-04)
 
 User explicitly replied **"응 승인해"** to the assistant's proposal to **modify the minimum general Stage9 code so the pending single canary can require an exact pre-claim attempt count** rather than relying on a wrapper precheck and existing default five-attempt retry cap. Approval here authorizes **Stage9 source code + small offline synthetic regression tests + canonical Stage9 work/handoff documentation only**. It is separate from, and does not consume, the already approved future one-shot `MBRBI-015` live image diagnostic trial. This is the narrowly permitted product-source change that was forbidden before this explicit reply. `STG9MEDIA-001 / IN_PROGRESS`, approved Stage9 contract v1.0.3 and common contract v1.0.1 remain unchanged.

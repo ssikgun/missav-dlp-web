@@ -116,6 +116,7 @@ class RunnerConfig:
     expected_release_id: str | None = None
     thumbnail_enabled: bool = False
     thumbnail_only: bool = False
+    expected_thumbnail_attempt_count: int | None = None
     canary_image_size: int | None = None
     canary_image_sha256: str | None = None
 
@@ -451,6 +452,11 @@ def _validate_config(
 ) -> dict:
     if type(config.thumbnail_enabled) is not bool or type(config.thumbnail_only) is not bool:
         raise RunnerError("INVALID_THUMBNAIL_FLAG")
+    if config.expected_thumbnail_attempt_count is not None and (
+            not config.thumbnail_only or config.target_dvd_id is None or
+            type(config.expected_thumbnail_attempt_count) is not int or
+            config.expected_thumbnail_attempt_count < 0):
+        raise RunnerError("INVALID_EXPECTED_THUMBNAIL_ATTEMPT_COUNT")
     if config.canary_image_size is not None or config.canary_image_sha256 is not None:
         if (not config.thumbnail_only or type(config.canary_image_size) is not int
                 or config.canary_image_size <= 0 or not isinstance(config.canary_image_sha256, str)
@@ -803,7 +809,9 @@ def run_stage9_media_once(
             outcomes = active["run_thumbnail_jobs"](
                 db_path=normalized["media_db_path"], writer_lock_path=normalized["media_writer_lock_path"],
                 title_lock_dir=normalized["title_lock_dir"], processor=active["thumbnail_processor"],
-                max_items=1, target_dvd_id=normalized["target_dvd_id"], include_held=True)
+                max_items=1, target_dvd_id=normalized["target_dvd_id"], include_held=True,
+                **({"expected_thumbnail_attempt_count": config.expected_thumbnail_attempt_count}
+                   if config.expected_thumbnail_attempt_count is not None else {}))
             summary = _summarize_thumbnail(outcomes)
             status = "PARTIAL_FAILURE" if summary["attention"] else "PENDING" if summary["state"] == "PENDING" else "COMPLETE"
             return {
@@ -891,6 +899,7 @@ def _config_from_args(args) -> RunnerConfig:
         target_dvd_id=args.target_dvd_id,
         apply=args.apply,
         thumbnail_only=args.thumbnail_only,
+        expected_thumbnail_attempt_count=args.expected_thumbnail_attempt_count,
         canary_image_size=args.canary_image_size,
         canary_image_sha256=args.canary_image_sha256,
         confirm=args.confirm,
@@ -920,6 +929,7 @@ def main(argv=None) -> int:
     parser.add_argument("--target-dvd-id")
     parser.add_argument("--thumbnail-only", action="store_true",
                         help="Run only one existing NFO-complete target thumbnail job; requires --target-dvd-id and --max-items 1.")
+    parser.add_argument("--expected-thumbnail-attempt-count", type=int)
     parser.add_argument("--canary-image-size", type=int)
     parser.add_argument("--canary-image-sha256")
     parser.add_argument("--expected-release-id")
