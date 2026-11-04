@@ -1,5 +1,20 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-04 — STG9MEDIA-001 five local-poster-gap candidates metadata source read-only preflight PASS; DANDYA-033 URL present, image unverified
+
+Teddy executed the next CT108 `root@downloader` bounded **read-only** SQLite `holdings`/`titles` join for exactly five movie IDs previously in the confirmed **59 local-primary-file-missing** cohort under Stage9 contract **v1.0.6 APPROVED**. Service `teddy-stage9-media.service` inactive, MainPID=0 and timer inactive were asserted; `POSTER_SOURCE_PREFLIGHT=PASS_READONLY`, `NAS_DB_JELLYFIN_WRITES=0`.
+
+User-provided `cover_url` presence, hostname and `metadata_source` results (no image request, URL download or data writes):
+- `AT-099`: `URL_PRESENT=False`, `HOST=NONE`, `SOURCE=missav-en-movie`.
+- `DANDYA-033`: `URL_PRESENT=True`, `HOST=www.javdatabase.com`, `SOURCE=javdatabase-movie`.
+- `FC2-PPV-3087371`: `URL_PRESENT=False`, `HOST=NONE`, `SOURCE=missav-en-movie`.
+- `FC2-PPV-4451371`: `URL_PRESENT=False`, `HOST=NONE`, `SOURCE=missav-en-movie`.
+- `MBRBI-015`: `URL_PRESENT=False`, `HOST=NONE`, `SOURCE=missav-en-movie`.
+
+**Interpretation:** `DANDYA-033` is the only one of five with an existing metadata `cover_url`, hence a practical first **source-verification candidate**, not a verified official poster or permission to save anything. URI string, image content/type/size, exact work association, source authenticity, HTTPS redirect/proxy path, and current live downloadability were **NOT CHECKED**. `URL_PRESENT=False` for the other four means only *no `titles.cover_url`*, not that no valid poster exists anywhere. The canonical **59/260 NAS local file gap inventory** remains intact (201 covered, 59 missing, 0 HOLD); no broader image discovery has been done. Prior `MBRBI-015` Jellyfin API one-shot is closed and must not be repeated; preserve its NAS `thumb.jpg` and original Jellyfin Primary backup.
+
+**Next single checkpoint:** read-only bounded exact `DANDYA-033` `titles.cover_url` source/form and site-image classification verification through approved Stage9 fetch/proxy rules (plus fresh exact NAS local-path no-clobber check if an operational canary is later authorized), no image file writing, no Jellyfin API POST/refresh, no Stage9 start, no NAS/DB changes or mass backfill. Only propose one exact local poster/cover create-only canary after source is sufficiently verified and Teddy separately approves the operational scope. `STG9MEDIA-001 / IN_PROGRESS`, contract `1.0.6`, branch `teddy-subtitle-stage11`. Update this record + CURRENT_HANDOFF and check exact new commit's Project Governance result.
+
 ## 2026-11-04 — STG9MEDIA-001 exact-260 NAS-local Primary filename inventory PASS; 59 uncovered
 
 Teddy ran the CT108 `root@downloader` bounded **read-only** SQLite + pinned SSH-to-NAS Python inventory under current Stage9 contract **v1.0.6 APPROVED**. It first verified dedicated Stage9 service `inactive`, `MainPID=0`, and timer `inactive` (`STAGE9_STOPPED=PASS`). Discovery DB `holdings WHERE present=1 AND storage_root='jav' AND parse_status='MATCHED'` returned exactly **260** distinct, current DVD IDs. The remote NAS script used the previously established pinned SSH identity/known_hosts and verified NAS identity and root `/volume1/video/video2/JAV`; inspected only **immediate entries** of 260 exact DB-derived video directories after validating their canonical relative video paths/regular video files. It checked basename forms for `poster`, `cover`, `folder`, `default`, `movie` and exact-DVD-prefix variants, with JPEG/PNG/WebP extensions. **Observed counts from user console:** `LOCAL_PRIMARY_PRESENT=201`, `LOCAL_PRIMARY_MISSING=59`, `HOLD=0`, `THUMB_ONLY_NO_PRIMARY=1`, `NAS_DB_JELLYFIN_WRITES=0`, `NAS_LOCAL_POSTER_INVENTORY=PASS_READONLY`. Full list of 59 was **not printed**; only first 20 sorted missing IDs were supplied:
