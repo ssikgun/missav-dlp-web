@@ -1,5 +1,10 @@
 # Stage9 Media workstream — active work
 
+## STG9MEDIA-001 — atomic-guard release isolated preparation (2026-11-04)
+
+Prepared isolated full release `6b6b73630efa85bbb7a5e95585ba6ae28d9ee8c1` based on installed 22e; 589 file hashes match baseline except the two approved jobs and runner files, thumbnail SHA unchanged. Manifest SHA256 `9cfdb8a1656160f6cfc3d60a693ed4d5f2e8e1189f533572d19bf3d7e3e5023b`. Offline import, jobs/runner and 13 thumbnail tests PASS; fake installer cutover/repeat and DB-state rejection PASS. User-run installer `/tmp/stg9-atomic-release-prep-20261104/install.py`, SHA256 `d8a7d9500e58890d3de93356d3e55f002de5401695b3b07a77f7b6617f6896a3`. Fresh actual-host stopped state, no competing DB users, exact release/unit and empty WAL remain required before installation. `RELEASE_INSTALLED=NOT_RUN`, `UNIT_SWITCH=NOT_RUN`, `SERVICE_TIMER_STOPPED=NOT_VERIFIED`, `LIVE_CANARY=NOT_RUN`; no DB/NAS/Jellyfin modification. One-shot canary remains unconsumed.
+
+
 ## STG9MEDIA-001 USER APPROVES NEW ATOMIC-GUARD RELEASE INSTALL AND UNIT-ONLY CUTOVER (2026-11-04)
 
 User explicitly replied **"응 진행해"** after assistant described **a new, separate full Stage9 runtime release with the previously offline-verified atomic expected-thumbnail-attempt-count guard, switch only the existing Stage9 systemd service release references, and leave Stage9 service/timer stopped**. This is explicit **narrow Stage9 CT108 release installation and service unit configuration update approval** under `STG9MEDIA-001 / IN_PROGRESS`, Stage9 contract v1.0.3. Latest GitHub baseline before this approval: `053af75344b88d01ba4b82bb8aa2acb98abbe8da` (code and offline tests PASS only). Does not add product-code changes or alter 5-attempt policy; this is promotion of existing verified source. The new single-use `MBRBI-015` HTTP diagnostic GET permission remains separately approved **but NOT CONSUMED**, and **is NOT part of this deployment operation**.
