@@ -1,5 +1,17 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-04 — STG9MEDIA-001 bounded poster-PENDING candidate inventory PASS; 10 titles need Jellyfin Primary GET
+
+Teddy executed the follow-up CT108 `root@downloader` **read-only** Python+SQLite candidate inventory, after verifying Stage9 dedicated `teddy-stage9-media.service` inactive, MainPID=0 and `teddy-stage9-media.timer` inactive (`STAGE9_STOPPED=PASS`). The two databases were opened read-only; no operational writes or Jellyfin API calls were performed. User console: `CANDIDATE_INVENTORY=PASS`, `PRODUCTION_WRITES=0`, `JELLYFIN_PRIMARY_CHECK=NOT_RUN`, `ELIGIBLE_BACKFILL_COUNT=UNKNOWN`.
+
+**260 vs 261 reconciliation:** the single `MATCHED` holding excluded from the `present=1 AND storage_root='jav'` count was exact `VEMA-246`, `present=0`, `storage_root=jav`. Therefore current present-JAV count 260 vs unfiltered `MATCHED` 261 is explained by different query filters; it does not establish a corrupt record or authorize modifying the historical absent holding.
+
+**Exact 11 `media_jobs.poster_status='PENDING'` IDs:** `FC2-PPV-3087371`, `FC2-PPV-4982148`, `FC2-PPV-4983582`, `GANA-3223`, `LUXU-1725`, `MAAN-945`, `MBRBI-015`, `MIUM-1406`, `NTR-102`, `PRIAN-059`, `PRIAN-060`. Every one matched exactly one current `MATCHED / present=1 / storage_root=jav` holding and had `jellyfin_notification_status='VISIBLE'`; 10 have `thumbnail_status='UNKNOWN'`, while `MBRBI-015` has `thumbnail_status='COMPLETE'`. The one-time `MBRBI-015` Primary replacement and user-visible acceptance are already PASS; **exclude it from all further image POST, migration, or backfill and preserve its original backup**.
+
+**Remaining read-only check set = 10 IDs:** `FC2-PPV-3087371`, `FC2-PPV-4982148`, `FC2-PPV-4983582`, `GANA-3223`, `LUXU-1725`, `MAAN-945`, `MIUM-1406`, `NTR-102`, `PRIAN-059`, `PRIAN-060`. **They are NOT 10 confirmed backfill-eligible works**: database `poster_status=PENDING` or Jellyfin notification `VISIBLE` does not prove actual Jellyfin Primary absence. Existing Jellyfin-generated/manual/unknown-owner Primary must be protected as prescribed by the approved Stage9 contract v1.0.5. Additional media jobs with `poster_status=UNKNOWN` also do not establish image absence, so the 10-item query is a focused priority subset, not an exhaustive library audit.
+
+**Next single checkpoint:** exact DB-known paths + verified Jellyfin item identity and **GET-only** `/Items/{id}/Images` Primary metadata for these ten titles, bounded requests; no Primary image POST, refresh, thumbnail download, NAS scan or files, database changes, Stage9 service/timer start, automatic cleanup, or changed old-image backup. If target/path identity is unclear, report HOLD per title and do not assume absent Primary. Update this ACTIVE_WORK and CURRENT_HANDOFF after results, preserving approved branch/contract.
+
 ## 2026-11-04 — STG9MEDIA-001 bounded read-only inventory preflight PASS / Jellyfin image inventory not run
 
 Teddy executed the agreed CT108 `root@downloader` SQLite **read-only** inventory preflight against `/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3` and `/opt/missav-dlp-web/discovery/teddy-stage9-media.sqlite3`. The user-provided stdout reported Stage9 dedicated service `inactive`, MainPID `0`, and timer `inactive` (`STAGE9_STOPPED=PASS`).
