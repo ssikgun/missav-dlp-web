@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-04 — STG9MEDIA-001 isolated cover.jpg follow-up: 8/13 offline smoke PASS, official source evidence unresolved (Codex report 23:43:54 KST)
+
+Teddy shared a second isolated Codex result for `/tmp/stg9-cover-010f/`. **INCOMPLETE** despite reported FileStation `8/8` PASS, thumbnail `13/13` PASS, jobs/runner/pipeline regressions and diff check PASS. Candidate was not promoted/committed; ChatGPT did not read candidate bytes or reproduce tests. Codex reports local Primary-name precheck before official poster, JPEG fallback `cover.jpg`, old `thumb.jpg` preserved, plus explicit target-only image processing for NFO-complete `FAILED` jobs without changing their original failed state/error or invoking NFO/Jellyfin in synthetic trial. Cross-call read/create atomicity is not established.
+
+**Blocking gap:** existing `titles.cover_url` has no verified exact-title authentic official-art proof; canonical `fetch_poster` produces `poster.<actual-ext>` from image bytes without validating provenance. All five selected titles still HOLD (only DANDYA has stored URL; MBRBI legacy thumb and prior Jellyfin backup protected). No Stage9 start, NAS/DB/Jellyfin writes, operational deployment, or product source commit. Canonical scope `stage9-media v1.0.6 / STG9MEDIA-001 IN_PROGRESS` unchanged.
+
+**NEXT one checkpoint:** inspect existing collectors/metadata pipeline read-only for direct proof of authentic exact-work official poster and an existing way to propagate it. Report evidence and smallest Stage9-local safe gate; if not supported, official `poster.<ext>` stays HOLD, independent verified JPEG site fallback can remain `cover.jpg` after later approval. No new code or production actions in this check. Full detail recorded in Stage9 ACTIVE_WORK.
+
 ## 2026-11-04 — STG9MEDIA-001 isolated cover.jpg candidate: Codex offline report INCOMPLETE (2026-11-04 23:32 KST)
 
 **Verdict: INCOMPLETE (Codex-reported isolated offline work).** Candidate `/tmp/stg9-cover-010f/`: Stage9 FileStation adapter + FileStation smoke + thumbnail smoke modified. Reported new `cover.jpg` JPEG fallback, existing local poster/cover/folder/default/movie no-clobber skip, historical `thumb.jpg` preserved. Reported 7/7 FileStation and 13/13 thumbnail smoke PASS, jobs/pipeline regression PASS, diff check PASS; no Git product commit, production database/NAS/Jellyfin write, or deployment. These are **Codex claims**, not independent candidate-byte or live-test confirmation.
