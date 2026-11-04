@@ -1,5 +1,14 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-04 — Approved curl transport candidate promoted to canonical source; deployment remains separately gated
+
+Teddy explicitly answered `응 승인해` to the narrow proposal to promote **only** the two previously reviewed Stage9 thumbnail source/test files from isolated candidate `630da1f4066ec389a227dc088b182562b386c69b` into canonical branch `teddy-subtitle-stage11`. Approved scope: `teddy_discovery_media_thumbnail.py` and `teddy_discovery_media_thumbnail_smoke.py`, plus this Stage9 checkpoint and the integrated handoff. No additional product or governance file changes.
+
+Promotion source was reconstructed by applying the exact 231-line user-provided candidate diff to the canonical old Git blobs. Candidate contents were checked against user-observed SHA-256: `7b48331f9e5776c6a33fbc93fe36ba18c791be29d32f50ede250ecdc8ad7f059` and `57ba74589049c2eef4a0f29c77e7762e9df37f0daf2e494b74faa6dc76357bd6`; both **MATCH**. Git blob IDs also match the candidate commit diff (`b41ea3a2e136ce35e31dd135b6f416f15d9dc25b`, `598c29e340af0db0c228a4eb7d16a2b94fbcc83b`). Syntax-only compilation of both reconstructed files passed. Prior Codex-reported offline smoke: thumbnail 13/13, FileStation 7/7, jobs/runner regressions PASS; independent full smoke rerun **NOT_RUN**.
+
+**Source promotion is code-only**, based on previous canonical HEAD `049cca06cd76c9975bc49fef9a81b147b61c0e15`; no immutable release built or switched, no CT108 runtime source synchronized, no database migration or write, no NAS or Jellyfin change, no service/timer action, and **no live external request**. Previous `curl 8.14.1` read-only local compatibility check remains PASS, but post-change proxied HTTPS image success is **NOT_VERIFIED**. `STG9MEDIA-001=IN_PROGRESS`; `SOURCE_PROMOTION=COMMITTED_CANONICAL`; `RUNTIME_DEPLOYMENT=NOT_APPROVED`; `LIVE_HTTP=NOT_APPROVED`; `PRODUCTION_WRITES=0`. Next decision: separately approve a bounded immutable-release deployment and exact one-request operational canary after fresh CT108 preflight/backups; do not imply that source-only promotion grants that permission.
+
+
 ## 2026-11-04 — CT108 offline curl compatibility PASS; candidate ready for separate source-promotion decision
 
 Teddy executed the approved/no-network CT108 root read-only local-file curl check and pasted stdout: `CURL_BIN=/usr/bin/curl`; `curl 8.14.1` (libcurl 8.14.1, OpenSSL 3.5.6); `env -i PATH=/usr/bin:/bin ... --proto '=file' --output /dev/null --write-out '%{stderr}CURL_WRITEOUT_OK\\n' file:///dev/null` produced the exact marker, and the verified wrapper printed `CURL_COMPATIBILITY=PASS`, `EXTERNAL_HTTP_REQUESTS=0`, `PRODUCTION_WRITES=0`. This establishes that CT108 can find and execute curl under the restricted PATH and supports the candidate's `%{stderr}` write-out syntax with a minimal environment. It **does not** exercise HTTPS proxy/TLS in the candidate or prove real image access after source modification.

@@ -135,29 +135,65 @@ class CandidateSmoke(unittest.TestCase):
                     self.assertEqual(len(fake.uploads), 1)
 
     def test_proxy_transport(self):
+        import subprocess
+        import sys
         from unittest.mock import patch
-        from teddy_discovery_media_thumbnail import make_candidate_proxy_fetcher, candidate_thumbnail_url, MAX_POSTER_BYTES
-        from teddy_discovery_media_metadata import _PosterOnlyProxyHandler
-        class Response:
-            status = 200
-            headers = {'Content-Type': 'image/jpeg'}
-            def __enter__(self): return self
-            def __exit__(self, *args): pass
-            def geturl(self): return candidate_thumbnail_url('ABC-123')
-            def read(self, count):
-                assert count == MAX_POSTER_BYTES + 1
-                return b'bytes'
-        class Opener:
-            def open(self, request, timeout):
-                assert request.full_url == candidate_thumbnail_url('ABC-123') and timeout == 20
-                return Response()
-        with patch('urllib.request.build_opener', return_value=Opener()) as build:
+        from teddy_discovery_media_thumbnail import (make_candidate_proxy_fetcher, candidate_thumbnail_url,
+            MAX_POSTER_BYTES, CandidateFetchError)
+        url = candidate_thumbnail_url('ABC-123')
+        data = b'\xff\xd8\xfffixture\xff\xd9'
+        actual_popen = subprocess.Popen
+        calls = []
+        scenario = {'status': 200, 'final': url, 'mime': 'image/jpeg', 'body': repr(data), 'exit': 0}
+        def fake_popen(command, **kwargs):
+            calls.append(command)
+            self.assertEqual(command[0:3], ['curl', '-q', '--silent'])
+            self.assertEqual(command[command.index('--proxy')+1], 'http://127.0.0.1:58888')
+            self.assertEqual(command[command.index('--noproxy')+1], '')
+            self.assertEqual(command[command.index('--proto')+1], '=https')
+            self.assertEqual(command[command.index('--retry')+1], '0')
+            self.assertEqual(command[command.index('--max-redirs')+1], '0')
+            self.assertNotIn('--location', command)
+            self.assertEqual(kwargs['env'], {'PATH': '/usr/bin:/bin'})
+            script = ("import sys;sys.stdout.buffer.write(" + scenario['body'] + ");"
+                + "sys.stderr.write(" + repr(str(scenario['status'])+'\n'+scenario['final']+'\n'+scenario['mime']+'\n') + ");"
+                + "sys.exit(" + str(scenario['exit']) + ")")
+            return actual_popen([sys.executable, '-c', script], **kwargs)
+        with patch('subprocess.Popen', side_effect=fake_popen):
             fetch = make_candidate_proxy_fetcher('http://127.0.0.1:58888')
-            self.assertIsInstance(build.call_args.args[0], _PosterOnlyProxyHandler)
-            self.assertIsNone(build.call_args.args[1].redirect_request(None, None, 302, '', {}, 'https://evil.invalid'))
-            self.assertEqual(fetch(candidate_thumbnail_url('ABC-123'), MAX_POSTER_BYTES)[0], 200)
-            for bad in ('https://fourhoi.com/xyz-1/cover-n.jpg?x=1', 'https://fourhoi.com:443/abc-123/cover-n.jpg', 'https://evil.invalid/abc-123/cover-n.jpg', 'https://fourhoi.com/abc-123/cover-t.jpg'):
+            self.assertEqual(fetch(url, MAX_POSTER_BYTES), (200, url, 'image/jpeg', data))
+            for status, code in ((403,'CANDIDATE_HTTP_403'),(404,'CANDIDATE_HTTP_404'),
+                                 (429,'CANDIDATE_HTTP_429'),(500,'CANDIDATE_HTTP_5XX'),
+                                 (302,'CANDIDATE_REDIRECT_REJECTED'),(418,'CANDIDATE_HTTP_ERROR')):
+                scenario.update(status=status)
+                with self.subTest(status=status), self.assertRaises(CandidateFetchError) as raised:
+                    fetch(url, MAX_POSTER_BYTES)
+                self.assertEqual(raised.exception.code, code)
+            scenario.update(status=200, final=url+'?unexpected')
+            with self.assertRaises(CandidateFetchError) as raised: fetch(url, MAX_POSTER_BYTES)
+            self.assertEqual(raised.exception.code,'CANDIDATE_REDIRECT_REJECTED')
+            scenario.update(final=url, mime='text/html')
+            with self.assertRaises(CandidateFetchError) as raised: fetch(url, MAX_POSTER_BYTES)
+            self.assertEqual(raised.exception.code,'CANDIDATE_MIME_MISMATCH')
+            scenario.update(mime='image/jpeg', body=repr(b'bad bytes'))
+            with self.assertRaises(CandidateFetchError) as raised: fetch(url, MAX_POSTER_BYTES)
+            self.assertEqual(raised.exception.code,'CANDIDATE_RESPONSE_INVALID')
+            scenario.update(body="b'x' * ("+str(MAX_POSTER_BYTES)+"+1)")
+            with self.assertRaises(CandidateFetchError) as raised: fetch(url, MAX_POSTER_BYTES)
+            self.assertEqual(raised.exception.code,'CANDIDATE_SIZE_MISMATCH')
+            scenario.update(body=repr(b''), exit=7)
+            with self.assertRaises(CandidateFetchError) as raised: fetch(url, MAX_POSTER_BYTES)
+            self.assertEqual(raised.exception.code,'CANDIDATE_NETWORK_ERROR')
+            before = len(calls)
+            for bad in ('https://fourhoi.com/xyz-1/cover-n.jpg?x=1',
+                        'https://fourhoi.com:443/abc-123/cover-n.jpg',
+                        'https://evil.invalid/abc-123/cover-n.jpg',
+                        'https://fourhoi.com/abc-123/cover-t.jpg'):
                 with self.assertRaises(ValueError): fetch(bad, MAX_POSTER_BYTES)
+            self.assertEqual(len(calls), before)
+        with patch('subprocess.Popen', side_effect=FileNotFoundError('sensitive details')):
+            with self.assertRaises(CandidateFetchError) as raised: fetch(url, MAX_POSTER_BYTES)
+            self.assertEqual(str(raised.exception),'CANDIDATE_NETWORK_ERROR')
         with self.assertRaises(ValueError): make_candidate_proxy_fetcher('http://example.com:8888')
 
 

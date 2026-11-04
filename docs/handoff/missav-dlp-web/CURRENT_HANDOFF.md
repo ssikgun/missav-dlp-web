@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-04 — Stage9 curl thumbnail source-only promotion approved and committed
+
+Teddy explicitly approved canonical **source-only** promotion from isolated CT108 candidate `630da1f4066ec389a227dc088b182562b386c69b` into `ssikgun/missav-dlp-web` branch `teddy-subtitle-stage11` (pre-promotion HEAD `049cca06cd76c9975bc49fef9a81b147b61c0e15`). This commit changes two product files and the two handoff/status documents only: `teddy_discovery_media_thumbnail.py`, `teddy_discovery_media_thumbnail_smoke.py`, `docs/governance/stage9-media/ACTIVE_WORK.md`, `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md`. Candidate source SHA-256 verified exact (`7b48331f9e5776c6a33fbc93fe36ba18c791be29d32f50ede250ecdc8ad7f059`; smoke `57ba74589049c2eef4a0f29c77e7762e9df37f0daf2e494b74faa6dc76357bd6`), Git blob IDs match `b41ea3a2e136ce35e31dd135b6f416f15d9dc25b` and `598c29e340af0db0c228a4eb7d16a2b94fbcc83b`, read-only syntax checks PASS. Prior Codex reported offline thumbnail 13/13, FileStation 7/7 and jobs/runner regressions PASS; not independently rerun.
+
+This is **not an operational success claim**. CT108 `curl` local-only compatibility PASS, but real HTTPS/Gluetun POST-change delivery not tried; Python HTTP403 root cause **CONFIRM_NEEDED**. No new release, deployment, DB/NAS/Jellyfin operation, timer/service edit, external HTTP request or real canary authorized or performed. `STG9MEDIA-001` remains `IN_PROGRESS`. Before any production action, get separate scoped user approval and verify preflight, backup, no-overwrite, and the limited canary. `SOURCE_PROMOTION=COMMITTED_CANONICAL`; `PRODUCTION_WRITES=0`.
+
+
 ## 2026-11-04 — CT108 offline curl compatibility PASS; candidate ready for separate source-promotion decision
 
 Teddy executed the approved/no-network CT108 root read-only local-file curl check and pasted stdout: `CURL_BIN=/usr/bin/curl`; `curl 8.14.1` (libcurl 8.14.1, OpenSSL 3.5.6); `env -i PATH=/usr/bin:/bin ... --proto '=file' --output /dev/null --write-out '%{stderr}CURL_WRITEOUT_OK\\n' file:///dev/null` produced the exact marker, and the verified wrapper printed `CURL_COMPATIBILITY=PASS`, `EXTERNAL_HTTP_REQUESTS=0`, `PRODUCTION_WRITES=0`. This establishes that CT108 can find and execute curl under the restricted PATH and supports the candidate's `%{stderr}` write-out syntax with a minimal environment. It **does not** exercise HTTPS proxy/TLS in the candidate or prove real image access after source modification.

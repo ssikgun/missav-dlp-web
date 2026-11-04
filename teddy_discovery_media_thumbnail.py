@@ -139,18 +139,77 @@ def candidate_thumbnail_url(dvd_id):
     return 'https://fourhoi.com/' + _normalize_dvd_id(dvd_id).lower() + '/cover-n.jpg'
 
 
+def _curl_candidate_response(url, proxy, maximum):
+    """Bound the child process and both pipes; never expose curl diagnostics."""
+    import os
+    import selectors
+    import subprocess
+    import time
+
+    command = [
+        'curl', '-q', '--silent', '--proxy', proxy, '--noproxy', '',
+        '--proto', '=https', '--connect-timeout', '5', '--max-time', '15',
+        '--max-filesize', str(maximum), '--retry', '0', '--max-redirs', '0',
+        '--output', '-', '--write-out', '%{stderr}%{http_code}\n%{url_effective}\n%{content_type}\n',
+        '--', url,
+    ]
+    try:
+        process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE, env={'PATH': '/usr/bin:/bin'})
+    except OSError:
+        raise CandidateFetchError('CANDIDATE_NETWORK_ERROR') from None
+    streams = {'body': bytearray(), 'metadata': bytearray()}
+    deadline = time.monotonic() + 20
+    try:
+        with selectors.DefaultSelector() as selector:
+            selector.register(process.stdout, selectors.EVENT_READ, 'body')
+            selector.register(process.stderr, selectors.EVENT_READ, 'metadata')
+            while selector.get_map():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise CandidateFetchError('CANDIDATE_NETWORK_ERROR')
+                events = selector.select(remaining)
+                if not events:
+                    raise CandidateFetchError('CANDIDATE_NETWORK_ERROR')
+                for key, _ in events:
+                    limit = maximum if key.data == 'body' else 8192
+                    chunk = os.read(key.fileobj.fileno(), min(65536, limit + 1 - len(streams[key.data])))
+                    if not chunk:
+                        selector.unregister(key.fileobj)
+                        continue
+                    streams[key.data].extend(chunk)
+                    if len(streams[key.data]) > limit:
+                        code = 'CANDIDATE_SIZE_MISMATCH' if key.data == 'body' else 'CANDIDATE_RESPONSE_INVALID'
+                        raise CandidateFetchError(code)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise CandidateFetchError('CANDIDATE_NETWORK_ERROR')
+        try:
+            returncode = process.wait(timeout=remaining)
+        except subprocess.TimeoutExpired:
+            raise CandidateFetchError('CANDIDATE_NETWORK_ERROR') from None
+        if returncode != 0:
+            raise CandidateFetchError('CANDIDATE_SIZE_MISMATCH' if returncode == 63 else 'CANDIDATE_NETWORK_ERROR')
+        try:
+            lines = bytes(streams['metadata']).decode('ascii').splitlines()
+            if len(lines) != 3 or not re.fullmatch(r'[0-9]{3}', lines[0]):
+                raise ValueError('invalid curl metadata')
+            response = (int(lines[0]), lines[1], lines[2], bytes(streams['body']))
+        except (UnicodeError, ValueError):
+            raise CandidateFetchError('CANDIDATE_RESPONSE_INVALID') from None
+        return _validated_candidate_response(response, url)
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.wait()
+        process.stdout.close()
+        process.stderr.close()
+
+
 def make_candidate_proxy_fetcher(proxy_url):
-    """Strictly bounded transport through the configured loopback proxy."""
-    import urllib.request
-    from teddy_discovery_media_metadata import _PosterOnlyProxyHandler, _validate_poster_proxy_url
-
-    class NoRedirect(urllib.request.HTTPRedirectHandler):
-        def redirect_request(self, req, fp, code, msg, headers, newurl):
-            return None
-
+    """Fetch only approved candidates through the configured loopback proxy."""
+    from teddy_discovery_media_metadata import _validate_poster_proxy_url
     proxy = _validate_poster_proxy_url(proxy_url)
-    opener = urllib.request.build_opener(
-        _PosterOnlyProxyHandler({'http': proxy, 'https': proxy}), NoRedirect())
 
     def fetch(url, maximum):
         parsed = _url(url, frozenset({'fourhoi.com'}))
@@ -158,10 +217,7 @@ def make_candidate_proxy_fetcher(proxy_url):
         if (len(parts) != 3 or parsed.query or parsed.netloc != 'fourhoi.com'
                 or url != candidate_thumbnail_url(parts[1]) or maximum != MAX_POSTER_BYTES):
             raise ValueError('CANDIDATE_URL_INVALID')
-        request = urllib.request.Request(url, headers={'Accept': 'image/jpeg'})
-        with opener.open(request, timeout=20) as response:
-            return (response.status, response.geturl(), response.headers.get('Content-Type', ''),
-                    response.read(MAX_POSTER_BYTES + 1))
+        return _curl_candidate_response(url, proxy, maximum)
     return fetch
 
 
