@@ -1,5 +1,10 @@
 # Stage9 Media workstream — active work
 
+## Stage9 e265 canary v2 — offline safety correction
+
+Prepared `/tmp/stg9-curl-canary-prep-20261104/canary_v2.py` SHA256 `e9a7b17c7ee0a339d4f5d6fe923e21f46c05bb7d2ddfc1c8c3cc47812e8d9867`; original `canary.py` SHA `03099950a59b99a76a0a82a178560ff05d9dccc99a9f262784412c89ed8195e0` retained. Whole runner timeout increased from 20 to 90 seconds; internal curl 15-second limit and one-shot marker unchanged. Runner start error/timeout/nonzero, count not exactly 4, DB/thumb disagreement, changed other rows or failed readback HOLD with nonzero exit, after attempting safe DB/NAS/system readbacks. PENDING/4 without thumb is reported as completed attempt and no thumbnail, not product success; MP4 report is limited to path/size/ownership, NFO SHA checked. Synthetic offline tests 19 PASS/0 FAIL including timeouts, nonzero, start failure, unchanged and excessive count, both DB/thumb conflicts, PENDING/4, and marker protection. No real dry-run, apply, external request, DB/NAS/Jellyfin write or service/timer start. Fresh user-operated dry-run, independent review and separate live authorization remain required; a timeout may leave uncertain NAS state and must never be retried automatically.
+
+
 ## 2026-11-04 — Stage9 e265 canary.py direct source review: APPLY HOLD
 
 Teddy attached `canary.py` twice (`canary.py`, `canary(1).py`), and both SHA256 digests match the CT108 dry-run-pinned `03099950a59b99a76a0a82a178560ff05d9dccc99a9f262784412c89ed8195e0` exactly. ChatGPT directly read all 155 lines and cross-checked canonical Stage9 runner, thumbnail transport, FileStation and job functions. Positive static findings: unique new marker uses exclusive no-follow create before runner; old consumed marker is required/preserved; exact Stage9 target/attempt=3, pinned release and unit, stopped systemd, fresh DB/locks/NAS/NFO guards, at-most-once curl gate, thumb create-only and no Jellyfin path. Prior user-run `DRY_RUN=PASS` remains valid for that candidate.
