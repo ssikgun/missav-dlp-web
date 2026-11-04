@@ -1,5 +1,13 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-04 — STG9MEDIA-001 Project Governance CI version mismatch corrected
+
+GitHub `Project Governance / validate` failed on the Stage9 contract-amendment commit `e47b8985650a0b802d05bcc768dd6f0b70523455` and subsequent commits, including `c21abc3988e3dce29981702cb6eebe39e81c6ca0`. GitHub Actions job logs unambiguously report `FAIL: workstream stage9-media active-work CONTRACT_VERSION does not match its contract`. Approved Stage9 contract was advanced to `1.0.4`, but the authoritative active-work metadata below remained `CONTRACT_VERSION: 1.0.3`. Under Teddy's explicit request to resolve this governance alert, only that Stage9 active-work version metadata is synchronized to **`1.0.4`**. No contract content/policy, routing, task ID, implementation or production state is changed. Local `--all-workstreams` validation and governance smoke must pass, followed by GitHub Actions readback before CI resolution is considered confirmed. Current Jellyfin migration read-only preflight was user-run PASS; live image replacement remains HOLD pending a separate final approval.
+
+## 2026-11-04 — STG9MEDIA-001 MBRBI-015 exact Jellyfin/NAS migration READ-ONLY PREFLIGHT PASS
+
+Teddy executed the corrected bounded CT108 read-only preflight following the multiline `ExecStart` parser fix. User-provided output: `SERVICE_SAFETY=PASS`, `CONFIG=PASS`, protected old Primary backup `BACKUP=PASS` (37915 bytes, previously pinned SHA256 `37020de3df7832606cf4d0468bd859f936992744d67faa48cead59cdfe7f9d59`); exact Jellyfin Movie ItemId `f752cdb76bc93416b03c3440f9fbb17e` and media path `/media/adult/MBRBI/MBRBI-015/MBRBI-015.mp4` (`JELLYFIN_IDENTITY=PASS`), one existing old Primary ImageTag `cd5cb09dd7f9c435195f1c6feaef358d`, JPEG bytes matching old-image backup (`OLD_PRIMARY=PASS`, `PRIMARY_MATCHES_BACKUP=PASS`); verified exact NAS `MBRBI/MBRBI-015/thumb.jpg` 87575 bytes, SHA256 `80cf0caae57e3a370fc5c52d98a819c496a8868bb2428f73a2a3bacd139a57f1` (`NAS_THUMB=PASS`, `NAS_THUMB_SHA256=PASS`). Final Stage9 service/timer stop recheck PASS, `JELLYFIN_IMAGE_WRITES=0`, `NAS_DB_MEDIA_WRITES=0`, overall `READ_ONLY_PREFLIGHT=PASS`. Jellyfin image and NAS image were fetched only through the authenticated existing services, not re-fetched from the consumed external image source; no file created/replaced/deleted. User console evidence only, no direct ChatGPT CT108 access. Next: review an exact one-item **no-write replacement dry-run/request shape** and conditional manual rollback procedure using the verified protected backup. Final production Jellyfin image POST still **NOT_AUTHORIZED/HOLD**, and a rollback would require its own fresh authorization. Contract v1.0.4 unchanged; no Stage9 service/timer restart, NAS/DB write, source retry, cleanup or other-item action.
+
 ## 2026-11-04 — STG9MEDIA-001 multiline ExecStart parser corrected, CT108 read-only config PASS
 
 Teddy ran the compact corrected no-write CT108 configuration parser after the prior single-line `shlex` HOLD. It safely combined the `teddy-stage9-media.service` multiline `ExecStart=` continuation lines before tokenization. User-reported output: `EXECSTART_MULTILINE_PARSE=PASS`, `REQUIRED_ARGUMENTS=PASS`, `CONFIG_PARSE=PASS`, `PRODUCTION_WRITES=0`. This resolves **only** the earlier parser failure and identifies the five expected option flags; it does not independently validate their sensitive values, current Jellyfin Primary, NAS thumb bytes or migration readiness. The protected old Primary backup retains previous independent readback PASS. Next: run the remaining exact-item GET-only Jellyfin and read-only FileStation thumbnail hash checks with this corrected parser and fresh stopped-unit gates. `JELLYFIN_PRIMARY_POST=HOLD`; no source re-fetch, DB/NAS media file mutation, service/timer restart or automatic rollback.
@@ -1797,7 +1805,7 @@ NEXT SINGLE CHECKPOINT: Separate bounded NAS read-only verification of the exact
 WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.3
+CONTRACT_VERSION: 1.0.4
 REQUIRES_WORKSTREAMS: stage9-media
 
 ## P03-H NAS DUAL-UID TWO TARGETS ABSENT / SOURCE VERIFIED PREFLIGHT PASS — 2026-11-02 KST
