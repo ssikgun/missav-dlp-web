@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-04 — STG9MEDIA-001 poster source forensic: JavDatabase/MissAV image ID association confirmed, official provenance UNVERIFIED (Codex 23:53 KST)
+
+Read-only Codex source-trace report confirmed (also cross-checked current GitHub collector/metadata code structure): JavDatabase links an image to an exact DVD-ID page through thumbnail area, alt and `/covers/` source constraints; MissAV links items to site images and checks some detailed page IDs. Neither proves *publisher-authentic official poster* status. JavDatabase `raw_metadata` may contain a verified site linkage, but its writer does not necessarily update `titles.cover_url`; `metadata_source` is insufficient to authenticate that old URL. Stage9 `build_media_bundle()/fetch_poster()` still can promote an unverified URL to `poster.<ext>`.
+
+**DANDYA-033 official poster: UNVERIFIED -> HOLD.** All five test works remain not production-eligible; no live URL/bytes/history check performed. Codex reported no code, candidate, DB, NAS, Jellyfin or service changes in this investigation. Stage9 task `STG9MEDIA-001`, approved contract `v1.0.6` unchanged.
+
+**NEXT:** minimal isolated fail-closed `build_media_bundle()` official poster guard: unverified official role -> no `poster.<ext>`, retain NFO; independently verified exact-work site JPEG can proceed via existing `cover.jpg` fallback; no image -> PENDING. Bounded offline smoke only, no production changes or code push. See Stage9 ACTIVE_WORK for evidence/scope.
+
 ## 2026-11-04 — STG9MEDIA-001 isolated cover.jpg follow-up: 8/13 offline smoke PASS, official source evidence unresolved (Codex report 23:43:54 KST)
 
 Teddy shared a second isolated Codex result for `/tmp/stg9-cover-010f/`. **INCOMPLETE** despite reported FileStation `8/8` PASS, thumbnail `13/13` PASS, jobs/runner/pipeline regressions and diff check PASS. Candidate was not promoted/committed; ChatGPT did not read candidate bytes or reproduce tests. Codex reports local Primary-name precheck before official poster, JPEG fallback `cover.jpg`, old `thumb.jpg` preserved, plus explicit target-only image processing for NFO-complete `FAILED` jobs without changing their original failed state/error or invoking NFO/Jellyfin in synthetic trial. Cross-call read/create atomicity is not established.
