@@ -1,13 +1,15 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-05 KST (AT-099 실제 SSH·FileStation 읽기 전용 비교 PASS / 운영 배포 HOLD)
+UPDATED_AT: 2026-11-05 KST (CT108 새 Stage9 릴리스 생성·systemd 전환 PASS / AT-099 이미지 운영 시험 HOLD)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
 ## 0. 최신 확인 결과 — 2026-11-05
+
+- **P00 Stage9 새 릴리스 배포 설정 PASS (CT108 root 사용자 출력):** 기준 정본 `81be3d8`의 Stage9 파일 6개 SHA와 기존 manifest 29/29, 새 manifest 30/30 및 변경 없는 파일 보존을 검증하고 불변 릴리스 `81be3d8`을 create-only로 생성했다. 운영 백업 경로 `backups/stage9-at099-predeploy-mbmju96z`의 SQLite 2건과 기존 systemd 설정 백업 SHA 검증 PASS. 서비스 unit의 세 릴리스 참조만 새 경로로 원자적 전환, `daemon-reload` 뒤 WorkingDirectory/ExecStart/중지 상태 PASS; 새 unit SHA `25e8454215f35d6b024e60ea18031c124faecbec105f93c16414a6c523951f99`. 구 릴리스 보존, 서비스/타이머 미시작, 이미지 GET·NAS/DB/Jellyfin 쓰기 0. **AT-099 단일 create-only 이미지 실증과 Jellyfin 일반 화면 확인은 HOLD**, 다른 세 작품 및 대량 실행 금지. 이전 항목은 해당 시점의 이력이다.
 
 - **P00 배포 스크립트 준비 미완료:** 기존 불변 e265 릴리스와 서비스, 이전 전환 스크립트를 읽기 전용 검토했다. 기존 스크립트는 다른 릴리스·대상 전용이므로 재실행 금지. 새 단일 설치 스크립트 및 DB 백업·복구 격리 검증은 미완료이며 배포·이미지 생성 NOT_RUN.
 
