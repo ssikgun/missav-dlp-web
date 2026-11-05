@@ -1,5 +1,22 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 CT108 Discovery/Stage9 database read-only inventory
+
+**Evidence (Teddy CT108 actual shell):** User ran a read-only Python SQLite inventory with `file:` URI `mode=ro`, `PRAGMA query_only=ON`, against `/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3` and `/opt/missav-dlp-web/discovery/teddy-stage9-media.sqlite3`. User console reports `DB_CHECK=PASS` for both and `READ_ONLY_INVENTORY=COMPLETE`. This is a logical SQL read-only check; independent SQLite sidecar timestamps/bytes were not inspected. No media/artwork/file write was requested.
+
+| Live table / metric | Count |
+| --- | ---: |
+| Discovery `holdings` total | 261 |
+| Discovery `holdings WHERE present=1` | **260** |
+| Discovery `titles` metadata rows | 951 |
+| Stage9 `media_jobs` total | **131** |
+| Stage9 `media_jobs` `COMPLETED` | **128** |
+| Stage9 `media_jobs` `FAILED` | **3** |
+
+**Interpretation/limitations:** `260` is the **DB-reported present holdings count**, not a verified count of NAS media folders or missing local artwork. `951` title records are not all downloaded works; `128` media-job COMPLETED rows do **not** imply 128 posters present or complete NFO/poster publication, and 3 FAILED rows are **not** a count of missing posters. Media-job coverage (131) is not equivalent to holdings coverage (260): jobs may not exist for older holdings, and a movie can have local poster/NFO without a completed Stage9 media job. `MISSING_NAS_PRIMARY_COUNT=NOT_VERIFIED`. No claim that 129 titles are missing images. Do not infer eligible queue population from numeric subtraction alone.
+
+**Next (read-only, bounded):** Inspect the precise `holdings` schema/metadata and Stage9 job artwork fields, then select a small deterministic candidate subset of `present=1` unique holdings for **exact-folder** NAS-local Jellyfin-primary image inspection (`poster.*`, `cover.*`, `folder.*`, `default.*`, `movie.*`); preserve existing poster, NFO, MP4 and older jobs. Avoid an unbounded NAS tree scan or mixing historical failed jobs with title-level artwork presence. Later backfill or unattended activation is not approved from this inventory. Stage9 Media timer/service still last verified inactive; general Completion timer active, wrapper has `--skip-media` token but actual argv placement not yet verified.
+
 ## 2026-11-06 — STG9MEDIA-001 CT108 general Completion wrapper static skip-media inspection
 
 **Evidence (Teddy actual CT108 root terminal):** A read-only Python inspection of regular, non-symlink `/usr/local/sbin/teddy-completion-stage9-runner` read the wrapper's bytes, computed SHA-256 and inspected nonblank, non-comment text without printing secrets. Console: `WRAPPER_SHA256=a3e0db7b7ea399066692fcf7f488eceba856eec01f3b607182867ebc465e3718`; `SKIP_MEDIA_TOKEN_PRESENT=YES`; `GENERAL_RUNNER_REFERENCED=YES`; `MEDIA_ONLY_RUNNER_REFERENCED=NO`; `WRAPPER_INSPECTION=COMPLETE`; `READ_ONLY_CHECK=COMPLETE`.
