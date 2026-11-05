@@ -78,7 +78,9 @@ def extract_thumbnail(*, dvd_id, page_url, fetcher):
         raise ValueError('PROXY_FETCHER_REQUIRED')
     page = _url(page_url, SITE_HOSTS)
     parts = page.path.strip('/').split('/')
-    if len(parts) != 2 or parts[0] != 'ko' or parts[1].upper() != dvd_id or page.query:
+    valid_path = ((len(parts) == 2 and parts[0] == 'ko') or
+                  (len(parts) == 3 and re.fullmatch(r'dm[0-9]{1,3}', parts[0]) is not None and parts[1] == 'ko'))
+    if not valid_path or parts[-1].upper() != dvd_id or page.query:
         raise ValueError('PAGE_IDENTITY_INVALID')
     status, final, content_type, data = fetcher(page_url, MAX_PAGE_BYTES)
     if status != 200 or final != page_url:
@@ -130,6 +132,8 @@ def store_injected_thumbnail(*, dvd_id, video_relative, page_url, fetcher, file_
     if page_url is None:
         return {'status': 'PENDING'}
     thumbnail = extract_thumbnail(dvd_id=dvd_id, page_url=page_url, fetcher=fetcher)
+    if thumbnail.content_type != "image/jpeg":
+        return {"status": "PENDING", "error": "THUMBNAIL_FORMAT_UNSUPPORTED"}
     return file_station.create_thumbnail(dvd_id=dvd_id, video_relative=video_relative,
         content_type=thumbnail.content_type, data=thumbnail.data)
 
@@ -139,7 +143,7 @@ def candidate_thumbnail_url(dvd_id):
     return 'https://fourhoi.com/' + _normalize_dvd_id(dvd_id).lower() + '/cover-n.jpg'
 
 
-def _curl_candidate_response(url, proxy, maximum):
+def _curl_candidate_response(url, proxy, maximum, *, page=False):
     """Bound the child process and both pipes; never expose curl diagnostics."""
     import os
     import selectors
@@ -197,6 +201,11 @@ def _curl_candidate_response(url, proxy, maximum):
             response = (int(lines[0]), lines[1], lines[2], bytes(streams['body']))
         except (UnicodeError, ValueError):
             raise CandidateFetchError('CANDIDATE_RESPONSE_INVALID') from None
+        if page:
+            status, final, mime, data = response
+            if status != 200 or final != url:
+                raise CandidateFetchError('CANDIDATE_REDIRECT_REJECTED' if 300 <= status < 400 or final != url else _http_error_code(status))
+            return status, final, mime, data
         return _validated_candidate_response(response, url)
     finally:
         if process.poll() is None:
@@ -221,6 +230,28 @@ def make_candidate_proxy_fetcher(proxy_url):
     return fetch
 
 
+def make_page_proxy_fetcher(proxy_url):
+    """Bounded proxy-only transport for a validated page and its JPEG."""
+    from teddy_discovery_media_metadata import _validate_poster_proxy_url
+    proxy = _validate_poster_proxy_url(proxy_url)
+    image_fetch = make_candidate_proxy_fetcher(proxy_url)
+
+    def fetch(url, maximum):
+        if maximum == MAX_POSTER_BYTES:
+            return image_fetch(url, maximum)
+        if maximum != MAX_PAGE_BYTES:
+            raise ValueError('PAGE_RESPONSE_INVALID')
+        parsed = _url(url, SITE_HOSTS)
+        parts = parsed.path.strip('/').split('/')
+        if (parsed.query or parsed.netloc != 'missav123.com' or not
+                ((len(parts) == 2 and parts[0] == 'ko') or
+                 (len(parts) == 3 and re.fullmatch(r'dm[0-9]{1,3}', parts[0]) and parts[1] == 'ko'))):
+            raise ValueError('PAGE_IDENTITY_INVALID')
+        _normalize_dvd_id(parts[-1])
+        return _curl_candidate_response(url, proxy, maximum, page=True)
+    return fetch
+
+
 THUMBNAIL_ERROR_CODES = frozenset({
     'CANDIDATE_NETWORK_ERROR', 'CANDIDATE_HTTP_ERROR', 'CANDIDATE_REDIRECT_REJECTED',
     'CANDIDATE_HTTP_403', 'CANDIDATE_HTTP_404', 'CANDIDATE_HTTP_429', 'CANDIDATE_HTTP_5XX',
@@ -229,6 +260,7 @@ THUMBNAIL_ERROR_CODES = frozenset({
     'CANDIDATE_TARGET_MISMATCH', 'CANDIDATE_FETCH_FAILED', 'THUMBNAIL_PROCESSOR_FAILED',
     'HOLDING_SIZE_UNKNOWN', 'VIDEO_SIZE_OR_IDENTITY_UNCERTAIN', 'POSTER_STATUS_UNKNOWN',
     'THUMBNAIL_OUTCOME_UNKNOWN', 'THUMBNAIL_TARGET_OR_STORAGE_UNCERTAIN',
+    'THUMBNAIL_SOURCE_UNVERIFIED', 'THUMBNAIL_FORMAT_UNSUPPORTED',
 })
 
 

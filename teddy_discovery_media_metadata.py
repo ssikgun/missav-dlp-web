@@ -564,6 +564,11 @@ class _PosterOnlyProxyHandler(
         )
 
 
+class _NoPosterRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def make_poster_fetcher(
     proxy_url: str | None = None,
 ):
@@ -586,7 +591,8 @@ def make_poster_fetcher(
         }
     )
     opener = urllib.request.build_opener(
-        proxy_handler
+        proxy_handler,
+        _NoPosterRedirect(),
     )
 
     def fetcher(
@@ -713,6 +719,7 @@ def build_media_bundle(
     dvd_id: str,
     *,
     fetcher=None,
+    defer_poster=False,
 ) -> MediaBundle:
     metadata = load_media_metadata(
         db_path,
@@ -722,6 +729,11 @@ def build_media_bundle(
     nfo = build_nfo_bytes(
         metadata
     )
+
+    if defer_poster:
+        return MediaBundle(dvd_id=metadata.dvd_id,
+            nfo_filename=metadata.dvd_id + '.nfo', nfo_data=nfo,
+            poster=None, poster_status='PENDING', poster_error='IMAGE_PROCESSING_DEFERRED')
 
     if not metadata.cover_url:
         return MediaBundle(

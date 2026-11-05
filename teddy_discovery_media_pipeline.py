@@ -24,6 +24,20 @@ class MediaPipelineError(
     pass
 
 
+def _metadata_cover_url(db_path, dvd_id):
+    """Read the exact title record without changing Discovery."""
+    db = sqlite3.connect('file:' + str(Path(db_path).resolve()) + '?mode=ro', uri=True)
+    try:
+        db.execute('PRAGMA query_only=ON')
+        row = db.execute('SELECT cover_url FROM titles WHERE dvd_id=?',
+                         (dvd_id,)).fetchone()
+    finally:
+        db.close()
+    if not row:
+        raise MediaPipelineError('metadata not found')
+    return row[0]
+
+
 def _present_holding(
     db_path: str | Path,
     dvd_id: str,
@@ -86,10 +100,49 @@ def _present_holding(
     return row
 
 
-def run_thumbnail_processor(*, db_path, dvd_id, file_station, fetcher):
+def run_existing_image_only(*, db_path, dvd_id, file_station, fetcher, title_lock_dir,
+                            path_verifier=None, poster_fetcher=None, max_items=1):
+    """Process one known holding without changing or creating a media job.
+
+    The caller must supply a current, trustworthy regular-file/path verifier;
+    FileStation's isdir flag alone cannot establish POSIX link safety.
+    """
+    from teddy_discovery_media_metadata import _normalize_dvd_id
+    from teddy_title_exclusion import ACQUIRED, try_acquire_title_lock
+    try:
+        dvd_id = _normalize_dvd_id(dvd_id)
+        if type(max_items) is not int or max_items != 1 or not callable(path_verifier):
+            return {'status': 'ATTENTION', 'error': 'PATH_VERIFICATION_REQUIRED'}
+        if getattr(file_station, 'image_only', False) is not True:
+            return {'status': 'ATTENTION', 'error': 'IMAGE_ONLY_ADAPTER_REQUIRED'}
+        lock = try_acquire_title_lock(dvd_id, lock_dir=title_lock_dir)
+        if lock.status != ACQUIRED:
+            return {'status': 'ATTENTION', 'error': 'TITLE_LOCK_UNAVAILABLE'}
+        with lock:
+            holding = _present_holding(db_path, dvd_id)
+            if path_verifier(dvd_id, dict(holding)) is not True:
+                return {'status': 'ATTENTION', 'error': 'PATH_VERIFICATION_REQUIRED'}
+            class CheckedStorage:
+                def __getattr__(self, name):
+                    return getattr(file_station, name)
+                def _check(self):
+                    if _present_holding(db_path, dvd_id) != holding or path_verifier(dvd_id, dict(holding)) is not True:
+                        raise MediaPipelineError('PATH_RECHECK_FAILED')
+                def create_poster(self, **kwargs):
+                    self._check()
+                    return file_station.create_poster(**kwargs)
+                def create_thumbnail(self, **kwargs):
+                    self._check()
+                    return file_station.create_thumbnail(**kwargs)
+            return run_thumbnail_processor(db_path=db_path, dvd_id=dvd_id,
+                file_station=CheckedStorage(), fetcher=fetcher, poster_fetcher=poster_fetcher)
+    except Exception:
+        return {'status': 'ATTENTION', 'error': 'THUMBNAIL_TARGET_OR_STORAGE_UNCERTAIN'}
+
+
+def run_thumbnail_processor(*, db_path, dvd_id, file_station, fetcher, poster_fetcher=None):
     """Thumbnail-only operation for injection into the existing job manager."""
     from teddy_discovery_media_metadata import _normalize_dvd_id
-    from teddy_discovery_media_thumbnail import store_candidate_thumbnail
     try:
         dvd_id = _normalize_dvd_id(dvd_id)
         holding = _present_holding(db_path, dvd_id)
@@ -105,15 +158,54 @@ def run_thumbnail_processor(*, db_path, dvd_id, file_station, fetcher):
             return {'status': 'SKIPPED'}
         if poster_exists is not False:
             return {'status': 'ATTENTION', 'error': 'POSTER_STATUS_UNKNOWN'}
-        result = store_candidate_thumbnail(dvd_id=dvd_id, video_relative=relative,
-            fetcher=fetcher, file_station=file_station, official_poster_verified=False)
+        cover_url = _metadata_cover_url(db_path, dvd_id)
+        if cover_url:
+            from teddy_discovery_cover import _validated_cover_url, CoverValidationError
+            from teddy_discovery_media_metadata import fetch_poster
+            from urllib.error import HTTPError, URLError
+            poster = None
+            try:
+                _validated_cover_url(cover_url)
+                if not callable(poster_fetcher):
+                    return {'status': 'ATTENTION', 'error': 'THUMBNAIL_TARGET_OR_STORAGE_UNCERTAIN'}
+                poster = fetch_poster(cover_url, fetcher=poster_fetcher)
+                mime = poster.content_type.split(';', 1)[0].strip().lower()
+                body = poster.data
+                valid = ((mime == 'image/jpeg' and body.startswith(b'\xff\xd8\xff') and body.endswith(b'\xff\xd9') and poster.filename == 'poster.jpg') or
+                         (mime == 'image/png' and body.startswith(b'\x89PNG\r\n\x1a\n') and poster.filename == 'poster.png') or
+                         (mime == 'image/webp' and len(body) >= 12 and body[:4] == b'RIFF' and body[8:12] == b'WEBP' and poster.filename == 'poster.webp'))
+                if not valid:
+                    return {'status': 'ATTENTION', 'error': 'THUMBNAIL_TARGET_OR_STORAGE_UNCERTAIN'}
+            except HTTPError as exc:
+                if 300 <= exc.code < 400:
+                    return {'status': 'ATTENTION', 'error': 'THUMBNAIL_TARGET_OR_STORAGE_UNCERTAIN'}
+            except (URLError, TimeoutError, ConnectionError):
+                pass
+            except (CoverValidationError, ValueError, TypeError):
+                return {'status': 'ATTENTION', 'error': 'THUMBNAIL_TARGET_OR_STORAGE_UNCERTAIN'}
+            if poster is not None:
+                saved = file_station.create_poster(dvd_id=dvd_id, video_relative=relative, poster=poster)
+                if saved.get('status') == 'CREATED':
+                    return {'status': 'COMPLETE'}
+                if saved.get('status') == 'POSTER_PRESENT':
+                    return {'status': 'SKIPPED'}
+                return {'status': 'ATTENTION', 'error': 'THUMBNAIL_TARGET_OR_STORAGE_UNCERTAIN'}
+        from teddy_discovery_media_thumbnail import store_candidate_thumbnail
+        try:
+            result = store_candidate_thumbnail(dvd_id=dvd_id, video_relative=relative,
+                fetcher=fetcher, file_station=file_station,
+                official_poster_verified=False)
+        except (ValueError, OSError):
+            return {'status': 'PENDING', 'error': 'THUMBNAIL_SOURCE_UNVERIFIED'}
         if result.get('status') == 'CREATED':
             return {'status': 'COMPLETE'}
         if result.get('status') == 'POSTER_PRESENT':
             return {'status': 'SKIPPED'}
-        if result.get('status') == 'PENDING':
-            return {'status': 'PENDING', 'error': result.get('error')}
-        return {'status': 'ATTENTION', 'error': 'THUMBNAIL_OUTCOME_UNKNOWN'}
+        if result.get('error') in {'CANDIDATE_RESPONSE_INVALID', 'CANDIDATE_MIME_MISMATCH',
+                                   'CANDIDATE_SIZE_MISMATCH', 'CANDIDATE_REDIRECT_REJECTED',
+                                   'CANDIDATE_SHA256_MISMATCH', 'CANDIDATE_TARGET_MISMATCH'}:
+            return {'status': 'ATTENTION', 'error': result['error']}
+        return {'status': 'PENDING', 'error': 'THUMBNAIL_SOURCE_UNVERIFIED'}
     except Exception:
         return {'status': 'ATTENTION', 'error': 'THUMBNAIL_TARGET_OR_STORAGE_UNCERTAIN'}
 
@@ -126,6 +218,7 @@ def run_media_pipeline(
     metadata_mutator,
     jellyfin,
     fetcher=None,
+    image_processor=None,
 ):
     holding = _present_holding(
         db_path,
@@ -169,6 +262,7 @@ def run_media_pipeline(
         db_path,
         dvd_id,
         fetcher=fetcher,
+        defer_poster=image_processor is not None,
     )
 
     publish_result = (
@@ -180,6 +274,21 @@ def run_media_pipeline(
             bundle=bundle,
         )
     )
+
+    if image_processor is not None:
+        nfo_result = publish_result.get('nfo', {})
+        if nfo_result.get('status') not in {'CREATED', 'ALREADY_PRESENT'}:
+            raise MediaPipelineError('NFO publication was not verified')
+        image = image_processor(dvd_id)
+        image_status = image.get('status') if isinstance(image, dict) else None
+        if image_status == 'COMPLETE':
+            publish_result['poster'] = {'status': 'CREATED'}
+        elif image_status == 'SKIPPED':
+            publish_result['poster'] = {'status': 'ALREADY_PRESENT'}
+        elif image_status in {'PENDING', 'ATTENTION'}:
+            publish_result['poster'] = {'status': image_status, 'error': image.get('error')}
+        else:
+            raise MediaPipelineError('invalid image processor response')
 
     library = jellyfin.resolve_library(
             name="Adult",

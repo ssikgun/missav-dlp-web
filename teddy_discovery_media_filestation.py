@@ -207,11 +207,18 @@ def _safe_api_relative(value: str) -> PurePosixPath:
     return path
 
 
-def _video_paths(relative_path: str) -> tuple[str, str, str]:
+def _video_paths(relative_path: str, *, image_only: bool = False) -> tuple[str, str, str]:
     relative = _safe_api_relative(relative_path)
     dvd_id = relative.parent.name.upper()
     try:
-        canonical = _safe_video_relative(relative.as_posix(), dvd_id)
+        if image_only and relative.suffix.lower() == '.ts':
+            from teddy_discovery_media_metadata import _normalize_dvd_id
+            normalized = _normalize_dvd_id(dvd_id)
+            if relative.parent != PurePosixPath(normalized.rsplit('-', 1)[0], normalized) or relative.stem.upper() != normalized:
+                raise ValueError('TS video identity mismatch')
+            canonical = relative.as_posix()
+        else:
+            canonical = _safe_video_relative(relative.as_posix(), dvd_id)
     except (MediaMetadataPublishError, TypeError, ValueError) as exc:
         raise FileStationMediaError("VIDEO_IDENTITY_INVALID") from exc
     api_path = API_LIBRARY_ROOT + "/" + canonical
@@ -261,10 +268,14 @@ class SynologyFileStationMediaAdapter:
         transport=None,
         tls_context: ssl.SSLContext | None = None,
         max_requests: int = MAX_API_REQUESTS,
+        image_only: bool = False,
     ):
         self.password_file = Path(password_file)
         self.ca_file = Path(ca_file)
         self.transport = transport
+        if type(image_only) is not bool:
+            raise FileStationMediaError('IMAGE_ONLY_FLAG_INVALID')
+        self.image_only = image_only
         self.tls_context = tls_context
         self.max_requests = int(max_requests)
         if not 1 <= self.max_requests <= MAX_API_REQUESTS:
@@ -773,14 +784,14 @@ class SynologyFileStationMediaAdapter:
             raise FileStationMediaError("LIBRARY_ROOT_MAPPING_MISMATCH")
 
     def stat_library(self, relative_path: str) -> dict | None:
-        _, api_path, _ = _video_paths(relative_path)
+        _, api_path, _ = _video_paths(relative_path, image_only=self.image_only)
         item = self._resolve(api_path)
         if item is None:
             return None
         if item["isdir"] is not False:
             raise FileStationMediaError("VIDEO_NOT_REGULAR_FILE")
         expected_ext = PurePosixPath(relative_path).suffix.lower()
-        if expected_ext not in {".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"}:
+        if expected_ext not in {".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"} and not (self.image_only and expected_ext == '.ts'):
             raise FileStationMediaError("VIDEO_TYPE_INVALID")
         # File Station exposes isdir=false, extension/type, size, owner and the
         # resolved path; it does not expose POSIX S_IFREG. Keep the source size
@@ -932,39 +943,56 @@ class SynologyFileStationMediaAdapter:
 
     def thumbnail_poster_exists(self, *, dvd_id: str, video_relative: str) -> bool:
         """Read a complete verified folder listing; ambiguous poster entries fail."""
-        canonical, video_api_path, _ = _video_paths(video_relative)
+        canonical, video_api_path, _ = _video_paths(video_relative, image_only=self.image_only)
         if not isinstance(dvd_id, str) or dvd_id != PurePosixPath(canonical).parent.name.upper():
             raise FileStationMediaError('BUNDLE_DVD_ID_MISMATCH')
         video = self._resolve(video_api_path)
         if video is None or video['isdir'] is not False:
             raise FileStationMediaError('VIDEO_UNAVAILABLE_FOR_PUBLICATION')
         folder = PurePosixPath(video_api_path).parent.as_posix()
-        matches = [item for item in self._parent_listing(folder) if item['name'].lower().startswith('poster.')]
+        pattern = re.compile(r'^(?:' + re.escape(dvd_id.lower()) + r'[-_. ])?(?:poster|cover|folder|default|movie)\.(?:jpg|jpeg|png|webp)$')
+        matches = [item for item in self._parent_listing(folder) if pattern.fullmatch(item['name'].lower())]
         if any(item['isdir'] is not False for item in matches):
             raise FileStationMediaError('POSTER_TYPE_UNCERTAIN')
         return bool(matches)
 
+    def create_poster(self, *, dvd_id: str, video_relative: str, poster) -> dict:
+        """Create one validated poster without publishing an NFO."""
+        canonical, video_api_path, _ = _video_paths(video_relative, image_only=self.image_only)
+        if not isinstance(dvd_id, str) or dvd_id != PurePosixPath(canonical).parent.name.upper():
+            raise FileStationMediaError('BUNDLE_DVD_ID_MISMATCH')
+        if poster.filename not in POSTER_FILENAMES or not isinstance(poster.data, bytes) or not 0 < len(poster.data) <= MAX_POSTER_BYTES:
+            raise FileStationMediaError('POSTER_FORMAT_INVALID')
+        mime = str(getattr(poster, 'content_type', '')).split(';', 1)[0].strip().lower()
+        data = poster.data
+        valid = ((poster.filename == 'poster.jpg' and mime == 'image/jpeg' and data.startswith(b'\xff\xd8\xff') and data.endswith(b'\xff\xd9')) or
+                 (poster.filename == 'poster.png' and mime == 'image/png' and data.startswith(b'\x89PNG\r\n\x1a\n')) or
+                 (poster.filename == 'poster.webp' and mime == 'image/webp' and len(data) >= 12 and data[:4] == b'RIFF' and data[8:12] == b'WEBP'))
+        if not valid:
+            raise FileStationMediaError('POSTER_FORMAT_INVALID')
+        if self.thumbnail_poster_exists(dvd_id=dvd_id, video_relative=video_relative):
+            return {'status': 'POSTER_PRESENT'}
+        folder = PurePosixPath(video_api_path).parent.relative_to(API_LIBRARY_ROOT).as_posix()
+        result = self._publish_one(folder, poster.filename, poster.data,
+            hashlib.sha256(poster.data).hexdigest(), expected_max=MAX_POSTER_BYTES)
+        if result['status'] != 'CREATED':
+            raise FileStationMediaError('POSTER_ALREADY_EXISTS')
+        return result
+
     def create_thumbnail(self, *, dvd_id: str, video_relative: str, content_type: str, data: bytes) -> dict:
         """Create a caller-verified thumbnail without touching other sidecars."""
-        canonical, video_api_path, _ = _video_paths(video_relative)
+        canonical, video_api_path, _ = _video_paths(video_relative, image_only=self.image_only)
         if not isinstance(dvd_id, str) or dvd_id != PurePosixPath(canonical).parent.name.upper():
             raise FileStationMediaError("BUNDLE_DVD_ID_MISMATCH")
         if not isinstance(data, bytes) or not data or len(data) > MAX_POSTER_BYTES:
             raise FileStationMediaError("THUMBNAIL_FORMAT_INVALID")
-        formats = {"image/jpeg": (".jpg", data.startswith(b"\xff\xd8\xff")),
-                   "image/png": (".png", data.startswith(b"\x89PNG\r\n\x1a\n")),
-                   "image/webp": (".webp", len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP")}
-        if content_type not in formats or not formats[content_type][1]:
+        if content_type != "image/jpeg" or not data.startswith(b"\xff\xd8\xff") or not data.endswith(b"\xff\xd9"):
             raise FileStationMediaError("THUMBNAIL_FORMAT_INVALID")
         video = self._resolve(video_api_path)
         if video is None or video["isdir"] is not False:
             raise FileStationMediaError("VIDEO_UNAVAILABLE_FOR_PUBLICATION")
         api_folder = PurePosixPath(video_api_path).parent.as_posix()
-        filename = "thumb" + formats[content_type][0]
-        # Any existing thumb extension is a conflict, including identical bytes.
-        if any(item["name"].lower() in {"thumb.jpg", "thumb.jpeg", "thumb.png", "thumb.webp"}
-               for item in self._parent_listing(api_folder)):
-            raise FileStationMediaError("THUMBNAIL_ALREADY_EXISTS")
+        filename = "cover.jpg"
         if self.thumbnail_poster_exists(dvd_id=dvd_id, video_relative=video_relative):
             return {"status": "POSTER_PRESENT"}
         folder = PurePosixPath(api_folder).relative_to(API_LIBRARY_ROOT).as_posix()
@@ -1010,6 +1038,9 @@ class SynologyFileStationMediaAdapter:
                 raise FileStationMediaError("POSTER_SIZE_INVALID")
             poster_sha = hashlib.sha256(poster_data).hexdigest()
             try:
+                if self.thumbnail_poster_exists(dvd_id=bundle.dvd_id, video_relative=video_relative):
+                    return {"status": "METADATA_PARTIAL", "nfo": nfo,
+                            "poster": {"status": "ATTENTION", "error": "LOCAL_PRIMARY_EXISTS"}}
                 poster = self._publish_one(
                     relative_folder,
                     bundle.poster.filename,

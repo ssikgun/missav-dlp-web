@@ -38,6 +38,18 @@ class ThumbnailSmoke(unittest.TestCase):
             responses[image] = (200, image + '?redirect', 'image/jpeg', b'\xff\xd8\xfffixture')
             with self.assertRaises(ValueError): extract_thumbnail(dvd_id=dvd, page_url=page, fetcher=fetch)
 
+    def test_dm_page_exact_work(self):
+        from teddy_discovery_media_thumbnail import extract_thumbnail, MAX_PAGE_BYTES
+        for dvd in ('ABC-123', 'XYZ-456'):
+            page='https://missav123.com/dm26/ko/'+dvd.lower()
+            image='https://fourhoi.com/'+dvd.lower()+'/cover-n.jpg'
+            html=('<link rel="canonical" href="'+page+'"><meta property="og:image" content="'+image+'">').encode()
+            def fetch(url,maximum):
+                if url==page:return (200,url,'text/html',html)
+                return (200,url,'image/jpeg',b'\xff\xd8\xfffixture\xff\xd9')
+            self.assertEqual(extract_thumbnail(dvd_id=dvd,page_url=page,fetcher=fetch).image_url,image)
+            with self.assertRaises(ValueError):extract_thumbnail(dvd_id='BAD-999',page_url=page,fetcher=fetch)
+
     def test_wrong_identity(self):
         page,_,_,calls,fetch=self.fixture()
         with self.assertRaises(ValueError):extract_thumbnail(dvd_id='XYZ-456',page_url=page,fetcher=fetch)
@@ -92,13 +104,18 @@ class StorageConnectionSmoke(unittest.TestCase):
                     self.assertFalse(calls)
                     with self.assertRaises(ValueError): run(official_poster_verified=None)
                     with self.assertRaises(ValueError): run(dvd_id='BAD-1')
+                    responses[image] = (200, image, 'image/jpeg', b'\xff\xd8\xfffixture\xff\xd9')
                     original = responses[image]
+                    responses[image] = (200, image, 'image/webp', b'RIFF\x04\x00\x00\x00WEBP')
+                    self.assertEqual(run()['status'], 'PENDING')
+                    self.assertFalse(fake.uploads)
+                    responses[image] = original
                     responses[image] = (200, image, 'image/jpeg', b'invalid')
                     with self.assertRaises(ValueError): run()
                     responses[image] = original
                     before = dict(fake.files)
                     self.assertEqual(run()['status'], 'CREATED')
-                    with self.assertRaises(FileStationMediaError): run()
+                    self.assertEqual(run()['status'], 'POSTER_PRESENT')
                     self.assertTrue(all(fake.files[k] == v for k, v in before.items()))
                     self.assertEqual(len(fake.uploads), 1)
 
@@ -129,8 +146,8 @@ class CandidateSmoke(unittest.TestCase):
                         self.assertEqual(run(lambda u,m: response)['status'], 'PENDING')
                     before = dict(fake.files)
                     self.assertEqual(run(good)['status'], 'CREATED')
-                    self.assertEqual(fake.files[folder + '/thumb.jpg'], data)
-                    with self.assertRaises(FileStationMediaError): run(good)
+                    self.assertEqual(fake.files[folder + '/cover.jpg'], data)
+                    self.assertEqual(run(good)["status"], "POSTER_PRESENT")
                     self.assertTrue(all(fake.files[k] == v for k,v in before.items()))
                     self.assertEqual(len(fake.uploads), 1)
 

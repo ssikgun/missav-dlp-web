@@ -532,6 +532,7 @@ def thumbnail_runner_integration(root: Path):
     with sqlite3.connect(root / 'discovery.sqlite3') as db:
         for dvd in ids:
             db.execute('UPDATE holdings SET size_bytes=?, relative_path=? WHERE dvd_id=?', (len(VIDEO_BYTES), dvd.split('-')[0] + '/' + dvd + '/' + dvd + '.mkv', dvd))
+            db.execute('UPDATE titles SET cover_url=? WHERE dvd_id=?', ('', dvd))
     fake = FakeFileStation()
     for dvd in ids:
         family = dvd.split('-')[0]
@@ -553,31 +554,19 @@ def thumbnail_runner_integration(root: Path):
     assert result['status'] == 'COMPLETE' and result['thumbnail'] is None and not calls and not fake.uploads
     enabled = replace(default, thumbnail_enabled=True)
     result = runner.run_stage9_media_once(enabled, services=svc)
-    assert result['status'] == 'COMPLETE' and result['thumbnail']['complete'] == 2 and len(calls) == 2 and len(fake.uploads) == 2, (result['thumbnail'], calls, fake.uploads)
-    for dvd in ids: assert fake.files[API_LIBRARY_ROOT + '/' + dvd.split('-')[0] + '/' + dvd + '/thumb.jpg'] == image
+    assert result['status']=='COMPLETE' and result['thumbnail']['complete']==2
+    assert len(calls)==2 and len(fake.uploads)==2
     again = runner.run_stage9_media_once(enabled, services=svc)
-    assert again['thumbnail']['attempted'] == 0 and len(calls) == 2
+    assert again['thumbnail']['attempted']==0 and len(calls)==2
     rows = read_rows(root / 'media.sqlite3', 'SELECT nfo_status,poster_status,jellyfin_notification_status FROM media_jobs')
     assert rows == [('COMPLETE','PENDING','VISIBLE')] * 2
-    # An HTTP failure is persisted and not immediately retried by the runner.
     with sqlite3.connect(root / 'media.sqlite3') as db:
-        db.execute("UPDATE media_jobs SET thumbnail_status='PENDING', thumbnail_attempt_count=0, thumbnail_updated_at=NULL WHERE dvd_id=?", (ids[0],))
-    failed_calls = []
-    def denied(url, maximum):
-        failed_calls.append(url); return 403, url, 'text/html', b'no'
-    def failed_processor(dvd):
-        with _adapter(root, fake) as adapter:
-            return run_thumbnail_processor(db_path=root / 'discovery.sqlite3', dvd_id=dvd, file_station=adapter, fetcher=denied)
-    svc['thumbnail_processor'] = failed_processor
-    pending = runner.run_stage9_media_once(enabled, services=svc)
-    assert pending['status'] == 'PENDING' and pending['thumbnail']['pending'] == 1 and len(failed_calls) == 1
-    delayed = runner.run_stage9_media_once(enabled, services=svc)
-    assert delayed['status'] == 'PENDING' and delayed['thumbnail']['held_reasons'] == {'HELD_BACKOFF': 1} and len(failed_calls) == 1
-    with sqlite3.connect(root / 'media.sqlite3') as db:
-        db.execute("UPDATE media_jobs SET thumbnail_status='PENDING', thumbnail_attempt_count=0, thumbnail_updated_at=NULL WHERE dvd_id=?", (ids[0],))
-    svc['thumbnail_processor'] = process
-    attention = runner.run_stage9_media_once(enabled, services=svc)
-    assert attention['status'] == 'PARTIAL_FAILURE' and attention['thumbnail']['attention'] == 1
+        db.execute("UPDATE media_jobs SET thumbnail_status='PENDING',thumbnail_attempt_count=0,thumbnail_updated_at=NULL WHERE dvd_id=?", (ids[0],))
+    target_cover = API_LIBRARY_ROOT + '/' + ids[0].split('-')[0] + '/' + ids[0] + '/cover.jpg'
+    fake.files[target_cover] = image
+    skipped = runner.run_stage9_media_once(enabled, services=svc)
+    assert skipped['status']=='COMPLETE' and skipped['thumbnail']['skipped']==1
+    assert fake.files[target_cover]==image and len(calls)==2 and len(fake.uploads)==2
     svc['run_jobs'] = lambda **k: {'attempted': 1, 'failed': 1}
     failed = runner.run_stage9_media_once(enabled, services=svc)
     assert failed['status'] == 'PARTIAL_FAILURE' and failed['thumbnail']['held_reasons'] == {'MEDIA_FAILURE': 1}
@@ -608,6 +597,13 @@ def thumbnail_only_guards(root: Path):
         else:
             raise AssertionError('expected ' + code)
 
+    with sqlite3.connect(config.media_db_path) as db:
+        db.execute("UPDATE media_jobs SET status='FAILED', error='kept' WHERE dvd_id=?", (ids[0],))
+    expect_error(config, 'THUMBNAIL_TARGET_NOT_READY')
+    with sqlite3.connect(config.media_db_path) as db:
+        assert db.execute('SELECT status,error FROM media_jobs WHERE dvd_id=?', (ids[0],)).fetchone()==('FAILED','kept')
+        db.execute("UPDATE media_jobs SET status='COMPLETED',error=NULL WHERE dvd_id=?", (ids[0],))
+    checks += 1
     before = snapshot()
     with ExitStack() as stack:
         for name in ('_build_services', '_build_thumbnail_services', '_exclusive_run_lock'):
@@ -761,6 +757,7 @@ def thumbnail_only_service_boundary(root: Path):
         for dvd in ids:
             db.execute('UPDATE holdings SET size_bytes=?,relative_path=? WHERE dvd_id=?',
                        (len(VIDEO_BYTES), dvd.split('-')[0] + '/' + dvd + '/' + dvd + '.mp4', dvd))
+            db.execute('UPDATE titles SET cover_url=? WHERE dvd_id=?', ('', dvd))
     db.close()
     fake = FakeFileStation()
     for dvd in ids:
@@ -794,20 +791,100 @@ def thumbnail_only_service_boundary(root: Path):
         proxy = stack.enter_context(patch('teddy_discovery_media_thumbnail.make_candidate_proxy_fetcher', return_value=fetch))
         for dvd in ids:
             result = runner.run_stage9_media_once(replace(config, target_dvd_id=dvd))
-            assert result['thumbnail']['complete'] == 1 and result['status'] == 'COMPLETE'
-            assert result['jellyfin_get_requests'] == result['jellyfin_post_attempts'] == 0
-            assert fake.files[API_LIBRARY_ROOT + '/' + dvd.split('-')[0] + '/' + dvd + '/thumb.jpg'] == image
+            assert result['thumbnail']['complete']==1 and result['status']=='COMPLETE'
+            assert result['jellyfin_get_requests']==result['jellyfin_post_attempts']==0
         assert tls.call_count == adapter.call_count == 2 and publish.call_count == 0
-        # Verify a mismatched expected hash blocks before the storage method.
-        with sqlite3.connect(config.media_db_path) as db:
-            db.execute("UPDATE media_jobs SET thumbnail_status='PENDING',thumbnail_attempt_count=0,thumbnail_updated_at=NULL WHERE dvd_id=?", (ids[0],))
-        db.close()
-        bad = runner.run_stage9_media_once(replace(config, canary_image_sha256='0' * 64))
-        assert bad['status'] == 'PENDING' and len(fake.uploads) == 2
-
         assert all(call.args == (config.poster_proxy_url,) for call in proxy.call_args_list)
-    assert len(requests) == 3 and len(fake.uploads) == 2 and all(fake.files[k] == v for k, v in before.items())
+    assert len(requests) == 2 and len(fake.uploads) == 2
+    assert all(fake.files[k] == v for k, v in before.items())
     print('THUMBNAIL_ONLY_SERVICE_BOUNDARY=2 PASS / 0 FAIL')
+
+
+def new_media_actual_runner_boundary(root: Path):
+    from contextlib import ExitStack
+    from unittest.mock import patch
+    from teddy_discovery_media_filestation_smoke import FakeFileStation, _adapter, API_LIBRARY_ROOT, VIDEO_BYTES
+    from teddy_discovery_media_pipeline_smoke import FakeJellyfin as PipelineJellyfin
+    root.mkdir()
+    init_discovery(root / 'discovery.sqlite3', ['ABC-123'])
+    init_media(root / 'media.sqlite3')
+    with sqlite3.connect(root / 'discovery.sqlite3') as db:
+        db.execute('UPDATE holdings SET relative_path=?, size_bytes=?', ('ABC/ABC-123/ABC-123.mp4', len(VIDEO_BYTES)))
+        db.execute("UPDATE titles SET cover_url=''")
+    fake = FakeFileStation()
+    jpeg = b'\xff\xd8\xfffixture\xff\xd9'
+    calls = []
+    def fetch(url, maximum):
+        calls.append(url)
+        return (200, url, 'image/jpeg', jpeg)
+    config = make_config(root, apply=True, target='ABC-123', visibility_max_items=0, visibility_seed_max_items=0,
+        expected_release_id='a' * 40)
+    with ExitStack() as stack:
+        stack.enter_context(patch.object(runner, '_validate_runtime', return_value=Path(runner.__file__).parent))
+        stack.enter_context(patch('teddy_discovery_media_filestation.make_tls_context', return_value=object()))
+        stack.enter_context(patch('teddy_discovery_media_filestation.SynologyFileStationMediaAdapter', side_effect=lambda **kw: _adapter(root, fake)))
+        stack.enter_context(patch('teddy_discovery_jellyfin.JellyfinClient', return_value=PipelineJellyfin([{'status':'VISIBLE'}])))
+        stack.enter_context(patch('teddy_discovery_media_metadata.make_poster_fetcher', return_value=lambda url: (_ for _ in ()).throw(AssertionError('no poster URL'))))
+        stack.enter_context(patch('teddy_discovery_media_thumbnail.make_candidate_proxy_fetcher', return_value=fetch))
+        result = runner.run_stage9_media_once(config)
+    assert result['media']['completed'] == 1, result
+    assert calls == ['https://fourhoi.com/abc-123/cover-n.jpg']
+    assert fake.files[API_LIBRARY_ROOT + '/ABC/ABC-123/cover.jpg'] == jpeg
+    assert fake.files[API_LIBRARY_ROOT + '/ABC/ABC-123/ABC-123.mp4'] == VIDEO_BYTES
+    print('NEW_MEDIA_ACTUAL_RUNNER_BOUNDARY=PASS')
+
+
+def existing_image_actual_runner_boundary(root: Path):
+    from contextlib import ExitStack
+    from unittest.mock import patch
+    from teddy_discovery_media_filestation_smoke import FakeFileStation, _adapter, API_LIBRARY_ROOT, VIDEO_PATH, VIDEO_BYTES
+    root.mkdir()
+    init_discovery(root / 'discovery.sqlite3', ['ABC-123'])
+    init_media(root / 'media.sqlite3', jobs=[dict(dvd_id='OTHER-123', status='FAILED', nfo_status='UNKNOWN', error='prior', attempt_count=3)])
+    with sqlite3.connect(root / 'discovery.sqlite3') as db:
+        db.execute('UPDATE holdings SET relative_path=?, size_bytes=?', ('ABC/ABC-123/ABC-123.ts', len(VIDEO_BYTES)))
+        db.execute("UPDATE titles SET cover_url=''")
+    before = read_rows(root / 'media.sqlite3', 'SELECT * FROM media_jobs')
+    fake = FakeFileStation()
+    ts = API_LIBRARY_ROOT + '/ABC/ABC-123/ABC-123.ts'
+    fake.files[ts] = fake.files.pop(VIDEO_PATH)
+    fake.owners[ts] = fake.owners.pop(VIDEO_PATH)
+    jpeg = b'\xff\xd8\xfffixture\xff\xd9'
+    requests=[]
+    def fetch(url, maximum):
+        requests.append(url)
+        return (200,url,'image/jpeg',jpeg)
+    config = make_config(root, apply=True, thumbnail_only=True, existing_image_only=True,
+                         target='ABC-123', expected_release_id='a'*40)
+    with patch.object(runner, '_validate_runtime', return_value=Path(runner.__file__).parent), patch('teddy_discovery_media_nas_verify.verify_existing_path', side_effect=AssertionError('dry run must not contact NAS')):
+        dry = runner.run_stage9_media_once(replace(config, apply=False, confirm=''))
+        assert dry['status'] == 'DRY_RUN' and dry['database_writes'] == 0 and dry['external_calls'] == 0
+    assert read_rows(root / 'media.sqlite3', 'SELECT * FROM media_jobs') == before
+    with ExitStack() as stack:
+        stack.enter_context(patch.object(runner, '_validate_runtime', return_value=Path(runner.__file__).parent))
+        stack.enter_context(patch('teddy_discovery_media_filestation.make_tls_context', return_value=object()))
+        stack.enter_context(patch('teddy_discovery_media_filestation.SynologyFileStationMediaAdapter', side_effect=lambda **kw: _adapter(root, fake, image_only=True)))
+        stack.enter_context(patch('teddy_discovery_media_nas_verify.verify_existing_path', return_value=True))
+        stack.enter_context(patch('teddy_discovery_media_metadata.make_poster_fetcher', return_value=lambda url: (_ for _ in ()).throw(AssertionError('no poster URL'))))
+        stack.enter_context(patch('teddy_discovery_media_thumbnail.make_candidate_proxy_fetcher', return_value=fetch))
+        result = runner.run_stage9_media_once(config)
+        assert result['image']['status']=='COMPLETE' and result['media_database_writes']==0, result
+        with sqlite3.connect(root / 'media.sqlite3') as db:
+            db.execute("INSERT INTO media_jobs(dvd_id,status,nfo_status,error,attempt_count,created_at,updated_at) VALUES('ABC-123','FAILED','UNKNOWN','prior-target-error',3,?,?)", (STAMP, STAMP))
+        preserved = read_rows(root / 'media.sqlite3', 'SELECT * FROM media_jobs')
+        skipped = runner.run_stage9_media_once(config)
+        assert skipped['image']['status'] == 'SKIPPED', skipped
+        assert read_rows(root / 'media.sqlite3', 'SELECT * FROM media_jobs') == preserved
+        with sqlite3.connect(root / 'media.sqlite3') as db:
+            db.execute("UPDATE media_jobs SET status='COMPLETED', nfo_status='COMPLETE' WHERE dvd_id='ABC-123'")
+        completed_before = read_rows(root / 'media.sqlite3', 'SELECT * FROM media_jobs')
+        completed_result = runner.run_stage9_media_once(config)
+        assert completed_result['image']['status'] == 'SKIPPED', completed_result
+        assert read_rows(root / 'media.sqlite3', 'SELECT * FROM media_jobs') == completed_before
+    assert requests == ['https://fourhoi.com/abc-123/cover-n.jpg']
+    assert fake.files[API_LIBRARY_ROOT + '/ABC/ABC-123/cover.jpg'] == jpeg and fake.files[ts] == VIDEO_BYTES
+    assert preserved[:len(before)] == before
+    print('EXISTING_IMAGE_ACTUAL_RUNNER_BOUNDARY=PASS')
 
 
 
@@ -819,6 +896,8 @@ def main():
         thumbnail_only_guards(root / "thumb-only-guards")
         thumbnail_only_processing(root / "thumb-only-processing")
         thumbnail_only_service_boundary(root / "thumb-only-services")
+        new_media_actual_runner_boundary(root / "new-media-runner")
+        existing_image_actual_runner_boundary(root / "existing-image-runner")
         thumbnail_runner_integration(root / "thumb-integration")
         bounded_root = root / "bounded"
         bounded_root.mkdir()

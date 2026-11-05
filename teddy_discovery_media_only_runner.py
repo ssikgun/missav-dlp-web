@@ -116,6 +116,7 @@ class RunnerConfig:
     expected_release_id: str | None = None
     thumbnail_enabled: bool = False
     thumbnail_only: bool = False
+    existing_image_only: bool = False
     expected_thumbnail_attempt_count: int | None = None
     canary_image_size: int | None = None
     canary_image_sha256: str | None = None
@@ -450,8 +451,10 @@ def _validate_config(
     *,
     require_release_id: bool = False,
 ) -> dict:
-    if type(config.thumbnail_enabled) is not bool or type(config.thumbnail_only) is not bool:
+    if type(config.thumbnail_enabled) is not bool or type(config.thumbnail_only) is not bool or type(config.existing_image_only) is not bool:
         raise RunnerError("INVALID_THUMBNAIL_FLAG")
+    if config.existing_image_only and (not config.thumbnail_only or config.expected_thumbnail_attempt_count is not None or config.canary_image_size is not None or config.canary_image_sha256 is not None):
+        raise RunnerError('INVALID_EXISTING_IMAGE_MODE')
     if config.expected_thumbnail_attempt_count is not None and (
             not config.thumbnail_only or config.target_dvd_id is None or
             type(config.expected_thumbnail_attempt_count) is not int or
@@ -541,9 +544,12 @@ def _validate_config(
     if config.thumbnail_only:
         _normal_path(Path(__file__).absolute().parent / "teddy_discovery_media_thumbnail.py",
                      allow_missing=False, expected="file")
+        if config.existing_image_only:
+            _normal_path(Path(__file__).absolute().parent / 'teddy_discovery_media_nas_verify.py',
+                         allow_missing=False, expected='file')
         _validate_database(media_path, {"media_jobs": REQUIRED_MEDIA_JOB_COLUMNS},
-                           stable_read=True, thumbnail_target=target)
-        _validate_database(discovery_path, {"holdings": REQUIRED_DISCOVERY_COLUMNS["holdings"]},
+                           stable_read=True, thumbnail_target=None if config.existing_image_only else target)
+        _validate_database(discovery_path, {"holdings": REQUIRED_DISCOVERY_COLUMNS["holdings"], **({'titles': {'dvd_id', 'cover_url'}} if config.existing_image_only else {})},
                            stable_read=True)
 
     if config.apply:
@@ -644,6 +650,7 @@ def _build_thumbnail_services(config: RunnerConfig, normalized: dict, *, tls_con
     from teddy_discovery_media_jobs import run_thumbnail_jobs
     from teddy_discovery_media_pipeline import run_thumbnail_processor
     from teddy_discovery_media_thumbnail import make_candidate_proxy_fetcher
+    from teddy_discovery_media_metadata import make_poster_fetcher
     from teddy_discovery_media_filestation import SynologyFileStationMediaAdapter, make_tls_context
 
     if tls_context is None:
@@ -652,6 +659,7 @@ def _build_thumbnail_services(config: RunnerConfig, normalized: dict, *, tls_con
         except Exception as exc:
             raise RunnerError(str(getattr(exc, "code", "FILESTATION_TLS_PREFLIGHT_FAILED"))) from exc
     fetcher = make_candidate_proxy_fetcher(config.poster_proxy_url)
+    poster_fetcher = make_poster_fetcher(config.poster_proxy_url)
     if config.canary_image_sha256 is not None:
         from teddy_discovery_media_thumbnail import candidate_thumbnail_url, one_shot_verified_fetch
         fetcher = one_shot_verified_fetch(fetcher,
@@ -664,9 +672,29 @@ def _build_thumbnail_services(config: RunnerConfig, normalized: dict, *, tls_con
             tls_context=tls_context,
         ) as media_remote:
             return run_thumbnail_processor(db_path=normalized["discovery_db_path"],
-                dvd_id=dvd_id, file_station=media_remote, fetcher=fetcher)
+                dvd_id=dvd_id, file_station=media_remote, fetcher=fetcher,
+                poster_fetcher=poster_fetcher)
 
     return {"run_thumbnail_jobs": run_thumbnail_jobs, "thumbnail_processor": processor}
+
+
+def _build_existing_image_services(config, normalized):
+    from teddy_discovery_media_filestation import SynologyFileStationMediaAdapter, make_tls_context
+    from teddy_discovery_media_metadata import make_poster_fetcher
+    from teddy_discovery_media_thumbnail import make_candidate_proxy_fetcher
+    from teddy_discovery_media_pipeline import run_existing_image_only
+    from teddy_discovery_media_nas_verify import verify_existing_path
+    tls_context = make_tls_context(config.filestation_ca_path)
+    poster_fetcher = make_poster_fetcher(config.poster_proxy_url)
+    fetcher = make_candidate_proxy_fetcher(config.poster_proxy_url)
+    def process(dvd_id):
+        with SynologyFileStationMediaAdapter(password_file=config.filestation_password_path,
+                ca_file=config.filestation_ca_path, tls_context=tls_context, image_only=True) as remote:
+            return run_existing_image_only(db_path=normalized['discovery_db_path'], dvd_id=dvd_id,
+                file_station=remote, fetcher=fetcher, poster_fetcher=poster_fetcher,
+                title_lock_dir=normalized['title_lock_dir'],
+                path_verifier=lambda target, holding: verify_existing_path(target, holding, remote))
+    return {'existing_image_processor': process}
 
 
 def _build_services(config: RunnerConfig, normalized: dict) -> dict:
@@ -674,7 +702,8 @@ def _build_services(config: RunnerConfig, normalized: dict) -> dict:
     from teddy_discovery_jellyfin_visibility import reconcile_jellyfin_visibility
     from teddy_discovery_media_jobs import reconcile_media_jobs, run_retryable_media_jobs
     from teddy_discovery_media_metadata import make_poster_fetcher
-    from teddy_discovery_media_pipeline import run_media_pipeline
+    from teddy_discovery_media_pipeline import run_media_pipeline, run_thumbnail_processor
+    from teddy_discovery_media_thumbnail import make_candidate_proxy_fetcher
     from teddy_discovery_media_filestation import (
         SynologyFileStationMediaAdapter,
         make_tls_context,
@@ -698,6 +727,7 @@ def _build_services(config: RunnerConfig, normalized: dict) -> dict:
         opener=get_budget,
     )
     fetcher = make_poster_fetcher(config.poster_proxy_url)
+    fallback_fetcher = make_candidate_proxy_fetcher(config.poster_proxy_url)
     def processor(dvd_id):
         with SynologyFileStationMediaAdapter(
             password_file=config.filestation_password_path,
@@ -711,6 +741,10 @@ def _build_services(config: RunnerConfig, normalized: dict) -> dict:
                 metadata_mutator=media_remote,
                 jellyfin=jellyfin,
                 fetcher=fetcher,
+                image_processor=lambda target: run_thumbnail_processor(
+                    db_path=normalized['discovery_db_path'], dvd_id=target,
+                    file_station=media_remote, fetcher=fallback_fetcher,
+                    poster_fetcher=fetcher),
             )
 
     thumbnail_services = {}
@@ -801,6 +835,16 @@ def run_stage9_media_once(
 
     with _exclusive_run_lock(normalized["run_lock_path"]):
         if config.thumbnail_only:
+            if config.existing_image_only:
+                active = services if services is not None else _build_existing_image_services(config, normalized)
+                result = active['existing_image_processor'](normalized['target_dvd_id'])
+                status = result.get('status') if isinstance(result, dict) else None
+                if status not in {'COMPLETE', 'SKIPPED', 'PENDING', 'ATTENTION'}:
+                    raise RunnerError('EXISTING_IMAGE_RESULT_INVALID')
+                return {'status': 'PARTIAL_FAILURE' if status == 'ATTENTION' else 'PENDING' if status == 'PENDING' else 'COMPLETE',
+                        'stage': 'stage9-existing-image-only', 'target_dvd_id': normalized['target_dvd_id'],
+                        'image': result, 'non_media_execution': 0, 'jellyfin_get_requests': 0,
+                        'jellyfin_post_attempts': 0, 'media_database_writes': 0}
             # Repeat the read-only gate inside the runner lock, before service
             # construction or any job transaction that can initialize/migrate.
             _validate_database(normalized["media_db_path"], {"media_jobs": REQUIRED_MEDIA_JOB_COLUMNS},
@@ -899,6 +943,7 @@ def _config_from_args(args) -> RunnerConfig:
         target_dvd_id=args.target_dvd_id,
         apply=args.apply,
         thumbnail_only=args.thumbnail_only,
+        existing_image_only=args.existing_image_only,
         expected_thumbnail_attempt_count=args.expected_thumbnail_attempt_count,
         canary_image_size=args.canary_image_size,
         canary_image_sha256=args.canary_image_sha256,
@@ -929,6 +974,7 @@ def main(argv=None) -> int:
     parser.add_argument("--target-dvd-id")
     parser.add_argument("--thumbnail-only", action="store_true",
                         help="Run only one existing NFO-complete target thumbnail job; requires --target-dvd-id and --max-items 1.")
+    parser.add_argument('--existing-image-only', action='store_true', help='Use the exact-target image-only path without changing media job history.')
     parser.add_argument("--expected-thumbnail-attempt-count", type=int)
     parser.add_argument("--canary-image-size", type=int)
     parser.add_argument("--canary-image-sha256")

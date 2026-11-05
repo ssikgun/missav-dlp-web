@@ -201,6 +201,96 @@ def make_db(path, *, dvd_id="ABC-123", cover_url="https://example.invalid/poster
     db.close()
 
 
+def integrated_existing_image_only(root):
+    from teddy_discovery_media_pipeline import run_existing_image_only
+    from teddy_discovery_media_filestation_smoke import FakeFileStation, _adapter, API_LIBRARY_ROOT, VIDEO_PATH, VIDEO_BYTES
+    from teddy_discovery_media_filestation import FileStationMediaError
+    root.mkdir()
+    db_path = root / 'discovery.sqlite'
+    make_db(db_path, cover_url='')
+    with sqlite3.connect(db_path) as db:
+        db.execute('UPDATE holdings SET relative_path=?, size_bytes=?',
+            ('ABC/ABC-123/ABC-123.ts', len(VIDEO_BYTES)))
+    fake = FakeFileStation()
+    ts = API_LIBRARY_ROOT + '/ABC/ABC-123/ABC-123.ts'
+    fake.files[ts] = fake.files.pop(VIDEO_PATH)
+    fake.owners[ts] = fake.owners.pop(VIDEO_PATH)
+    fake.files[API_LIBRARY_ROOT + '/ABC/ABC-123/movie.nfo'] = b'existing-nfo'
+    before = dict(fake.files)
+    image = b'\xff\xd8\xfffixture\xff\xd9'
+    calls = []
+    def fetch(url, maximum):
+        calls.append(url)
+        return (200, url, 'image/jpeg', image)
+    with _adapter(root, fake) as normal:
+        try:
+            normal.stat_library('ABC/ABC-123/ABC-123.ts')
+            raise AssertionError('normal media path must reject TS')
+        except FileStationMediaError:
+            pass
+    locks = root / 'locks'
+    locks.mkdir()
+    media_db = root / 'media.sqlite'
+    with sqlite3.connect(media_db) as db:
+        db.execute('CREATE TABLE media_jobs(dvd_id, status, nfo_status, error, attempt_count)')
+        db.execute('INSERT INTO media_jobs VALUES (?,?,?,?,?)', ('ABC-123','FAILED','UNKNOWN','prior-error',3))
+    with _adapter(root, fake, image_only=True) as adapter:
+        denied = run_existing_image_only(db_path=db_path, dvd_id='ABC-123', file_station=adapter,
+            fetcher=fetch, title_lock_dir=locks)
+        assert denied['status'] == 'ATTENTION' and not calls
+        result = run_existing_image_only(db_path=db_path, dvd_id='ABC-123', file_station=adapter,
+            fetcher=fetch, title_lock_dir=locks, path_verifier=lambda dvd, holding: True)
+        assert result['status'] == 'COMPLETE' and len(calls) == 1, result
+    assert fake.files[API_LIBRARY_ROOT + '/ABC/ABC-123/cover.jpg'] == image
+    assert all(fake.files[k] == v for k,v in before.items())
+    with sqlite3.connect(media_db) as db:
+        assert db.execute('SELECT * FROM media_jobs').fetchall() == [('ABC-123','FAILED','UNKNOWN','prior-error',3)]
+    print('EXISTING_IMAGE_ONLY_TS=PASS; WITHOUT_PATH_PROOF=HOLD')
+
+
+def integrated_new_media_images(root):
+    from teddy_discovery_media_pipeline import run_thumbnail_processor
+    from teddy_discovery_media_filestation_smoke import FakeFileStation, _adapter, API_LIBRARY_ROOT, VIDEO_PATH, VIDEO_BYTES
+    from urllib.error import URLError
+    jpeg = b'\xff\xd8\xfffixture\xff\xd9'
+    webp = b'RIFF\x04\0\0\0WEBPtest'
+    cases = [('poster', 'https://www.javdatabase.com/covers/a.webp', 'poster.webp'),
+             ('poster-unavailable', 'https://www.javdatabase.com/covers/a.webp', 'cover.jpg'),
+             ('fallback', '', 'cover.jpg'), ('missing', '', None),
+             ('existing', '', None), ('unsafe', 'https://evil.invalid/a.jpg', None)]
+    for label, cover_url, output in cases:
+        case = root / label
+        case.mkdir()
+        db_path = case / 'discovery.sqlite'
+        make_db(db_path, cover_url=cover_url)
+        with sqlite3.connect(db_path) as db:
+            db.execute('UPDATE holdings SET size_bytes=?', (len(VIDEO_BYTES),))
+        fake = FakeFileStation()
+        folder = API_LIBRARY_ROOT + '/ABC/ABC-123/'
+        if label == 'existing':
+            fake.files[folder + 'folder.jpg'] = b'existing-image'
+        before = dict(fake.files)
+        def poster_fetch(_url):
+            if label == 'poster-unavailable': raise URLError('fixture unavailable')
+            return ('image/webp', webp)
+        def fallback(url, _maximum):
+            return (404, url, 'text/html', b'') if label == 'missing' else (200, url, 'image/jpeg', jpeg)
+        with _adapter(case, fake) as adapter:
+            result = run_media_pipeline(db_path=db_path, dvd_id='ABC-123', ssh=adapter,
+                metadata_mutator=adapter, jellyfin=FakeJellyfin([{'status':'VISIBLE'}]),
+                fetcher=poster_fetch, image_processor=lambda dvd: run_thumbnail_processor(
+                    db_path=db_path, dvd_id=dvd, file_station=adapter,
+                    fetcher=fallback, poster_fetcher=poster_fetch))
+        assert result['nfo_status'] == 'COMPLETE'
+        assert fake.files[VIDEO_PATH] == VIDEO_BYTES
+        assert all(fake.files[k] == v for k,v in before.items())
+        actual = [name for name in ('poster.webp','cover.jpg') if folder + name in fake.files]
+        assert actual == ([output] if output else []), (label, actual, result)
+        if output: assert fake.files[folder + output] == (webp if output == 'poster.webp' else jpeg)
+        assert result['poster_status'] == ('PENDING' if label == 'missing' else 'ATTENTION' if label == 'unsafe' else 'COMPLETE')
+    print('NEW_MEDIA_IMAGE_INTEGRATION=6 PASS / 0 FAIL')
+
+
 class FakeJellyfin:
     def __init__(self, visibility=None, *, item_id="11111111111141118111111111111111"):
         self.resolves = []
@@ -679,6 +769,10 @@ def main():
         assert hashlib.sha256(failed_video.read_bytes()).hexdigest() == failed_video_hash
         assert (failed_dir / "poster.jpg").read_bytes() == b"\xff\xd8\xffRST-POSTER"
 
+    with tempfile.TemporaryDirectory(prefix='stage9-existing-image-') as raw:
+        integrated_existing_image_only(Path(raw) / 'case')
+    with tempfile.TemporaryDirectory(prefix='stage9-new-media-image-') as raw:
+        integrated_new_media_images(Path(raw))
     print(
         "STAGE9_MEDIA_PIPELINE_SMOKE=PASS"
     )

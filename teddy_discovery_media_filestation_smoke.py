@@ -54,6 +54,7 @@ class FakeFileStation:
         self.calls: list[tuple[str, str, dict, bytes | None]] = []
         self.uploads: list[tuple[str, bytes]] = []
         self.upload_error_code: int | None = None
+        self.upload_owner = 'stage9_media'
         self.upload_http_status: int | None = None
         self.upload_commit_before_http_error = False
         self.getinfo_error_path: str | None = None
@@ -216,7 +217,7 @@ class FakeFileStation:
             if target_path in self.files or target_path in self.directories:
                 return _json_response({"success": False, "error": {"code": 414}})
             self.files[target_path] = data
-            self.owners[target_path] = "stage9_media"
+            self.owners[target_path] = self.upload_owner
             self.uploads.append((target_path, data))
             return _json_response({"success": True})
 
@@ -234,7 +235,7 @@ def _bundle(*, poster=None):
     )
 
 
-def _adapter(root: Path, fake: FakeFileStation):
+def _adapter(root: Path, fake: FakeFileStation, *, image_only=False):
     password = root / "stage9-password"
     password.write_text("synthetic-password\n", encoding="utf-8")
     os.chmod(password, 0o600)
@@ -242,6 +243,7 @@ def _adapter(root: Path, fake: FakeFileStation):
         password_file=password,
         ca_file=root / "unused-ca.pem",
         transport=fake,
+        image_only=image_only,
     )
 
 
@@ -390,31 +392,92 @@ def test_thumb_create_only(root: Path):
         fake.files[video] = VIDEO_BYTES
         fake.owners[video] = "admin"
         fake.files[folder + "/" + dvd + ".nfo"] = NFO_BYTES
+        fake.files[folder + "/thumb.jpg"] = b"legacy thumb"
         before = dict(fake.files)
         rel = prefix + "/" + dvd + "/" + dvd + ".mp4"
         with _adapter(root, fake) as adapter:
+            for existing in ("poster.jpg", "cover.png", "folder.webp", "default.jpeg", "movie.jpg", dvd + "-poster.jpg"):
+                fake.files[folder + "/" + existing] = b"protected"
+                assert adapter.thumbnail_poster_exists(dvd_id=dvd, video_relative=rel) is True
+                del fake.files[folder + "/" + existing]
             for mime, data, wrong in (("image/jpeg", b"not an image", dvd), ("image/png", b"\x89PNG\r\n\x1a\nfixture", "BAD-1")):
                 try:
                     adapter.create_thumbnail(dvd_id=wrong, video_relative=rel, content_type=mime, data=data)
                     raise AssertionError("invalid input accepted")
                 except FileStationMediaError:
                     pass
-            image = b"\x89PNG\r\n\x1a\nfixture"
-            assert adapter.create_thumbnail(dvd_id=dvd, video_relative=rel, content_type="image/png", data=image)["status"] == "CREATED"
-            try:
-                adapter.create_thumbnail(dvd_id=dvd, video_relative=rel, content_type="image/png", data=image)
-                raise AssertionError("existing thumbnail accepted")
-            except FileStationMediaError as exc:
-                assert exc.code == "THUMBNAIL_ALREADY_EXISTS"
+            image = b"\xff\xd8\xfffixture\xff\xd9"
+            assert adapter.create_thumbnail(dvd_id=dvd, video_relative=rel, content_type="image/jpeg", data=image)["status"] == "CREATED"
+            assert adapter.create_thumbnail(dvd_id=dvd, video_relative=rel, content_type="image/jpeg", data=image)["status"] == "POSTER_PRESENT"
         assert all(fake.files[k] == value for k, value in before.items())
-        assert fake.files[folder + "/thumb.png"] == image
+        assert fake.files[folder + "/cover.jpg"] == image
         assert len(fake.uploads) == 1
+
+
+def test_official_poster_existing_cover_guard(root: Path):
+    from teddy_discovery_media_metadata import PosterPayload
+    fake = FakeFileStation()
+    folder = API_LIBRARY_ROOT + '/ABC/ABC-123'
+    fake.files[folder + '/cover.jpg'] = b'existing-cover'
+    poster = PosterPayload(filename='poster.jpg', content_type='image/jpeg', data=b'\xff\xd8\xffposter\xff\xd9')
+    with _adapter(root, fake) as adapter:
+        result = adapter.publish_bundle(video_relative='ABC/ABC-123/ABC-123.mp4', bundle=_bundle(poster=poster))
+    assert result['poster']['status']=='ATTENTION' and result['poster']['error']=='LOCAL_PRIMARY_EXISTS'
+    assert fake.files[folder + '/cover.jpg']==b'existing-cover' and folder + '/poster.jpg' not in fake.files
+
+
+def test_image_only_poster_storage(root: Path):
+    from teddy_discovery_media_metadata import PosterPayload
+    path = API_LIBRARY_ROOT + '/ABC/ABC-123/poster.webp'
+    video = 'ABC/ABC-123/ABC-123.mp4'
+    poster = PosterPayload('poster.webp', 'image/webp', b'RIFF\x04\0\0\0WEBPtest')
+    fake = FakeFileStation(existing_nfo=NFO_BYTES)
+    before = dict(fake.files)
+    with _adapter(root, fake) as adapter:
+        result = adapter.create_poster(dvd_id='ABC-123', video_relative=video, poster=poster)
+        assert result['status'] == 'CREATED'
+        assert result['sha256'] == hashlib.sha256(poster.data).hexdigest()
+        assert adapter.create_poster(dvd_id='ABC-123', video_relative=video, poster=poster)['status'] == 'POSTER_PRESENT'
+    assert fake.files[path] == poster.data and len(fake.uploads) == 1
+    assert all(fake.files[k] == v for k, v in before.items())
+
+    fake = FakeFileStation(existing_nfo=NFO_BYTES)
+    fake.type_overrides[VIDEO_PATH] = 'symlink'
+    with _adapter(root, fake) as adapter:
+        try:
+            adapter.create_poster(dvd_id='ABC-123', video_relative=video, poster=poster)
+            raise AssertionError('unexpected video type')
+        except FileStationMediaError:
+            pass
+    assert not fake.uploads and fake.files[NFO_PATH] == NFO_BYTES
+
+    fake = FakeFileStation(existing_nfo=NFO_BYTES)
+    fake.download_overrides[path] = b'changed'
+    with _adapter(root, fake) as adapter:
+        try:
+            adapter.create_poster(dvd_id='ABC-123', video_relative=video, poster=poster)
+            raise AssertionError('bad post-upload hash')
+        except FileStationMediaError as exc:
+            assert exc.code == 'UPLOAD_POSTVERIFY_HASH_MISMATCH'
+    assert fake.files[VIDEO_PATH] == VIDEO_BYTES and fake.files[NFO_PATH] == NFO_BYTES
+
+    fake = FakeFileStation(existing_nfo=NFO_BYTES)
+    fake.upload_owner = 'unexpected-owner'
+    with _adapter(root, fake) as adapter:
+        try:
+            adapter.create_poster(dvd_id='ABC-123', video_relative=video, poster=poster)
+            raise AssertionError('bad post-upload owner')
+        except FileStationMediaError as exc:
+            assert exc.code == 'UPLOAD_POSTVERIFY_OWNER_MISMATCH'
+    assert fake.files[VIDEO_PATH] == VIDEO_BYTES and fake.files[NFO_PATH] == NFO_BYTES
 
 
 def main():
     with tempfile.TemporaryDirectory(prefix="stage9-filestation-smoke-") as temp:
         root = Path(temp)
         for name, test in [
+            ("official-poster-existing-cover", test_official_poster_existing_cover_guard),
+            ("image-only-poster-storage", test_image_only_poster_storage),
             ("thumb-create-only-two-ids", test_thumb_create_only),
             ("nfo-only-create-and-stat", test_nfo_only_create_and_verified_stat),
             ("identical-reuse-and-poster-create", test_identical_existing_reused_and_poster_create),
@@ -427,7 +490,7 @@ def main():
             case.mkdir()
             test(case)
             print("PASS " + name)
-    print("RESULT 7 PASS / 0 FAIL")
+    print("RESULT 9 PASS / 0 FAIL")
 
 
 if __name__ == "__main__":
