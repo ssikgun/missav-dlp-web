@@ -1,15 +1,23 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
-ROADMAP_VERSION: 1
-UPDATED_AT: 2026-10-30 KST (P03-N MOVIE_NFO_129_XML_ID_PASS_TITLE_PREFIX_ABSENT_129; P03-H DESIGN_ONLY_APPROVED; NAS_WRITE_NOT_AUTHORIZED; P03-T_LAST)
+ROADMAP_VERSION: 2
+UPDATED_AT: 2026-11-05 KST (Stage9 포스터 자동 폴백 INCOMPLETE / NFO 완료 증거 정리 / 파일관리 UI 후속 등록)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
-**P03-H 사전 조사 결과:** 과거 감사 파일 해시 일치, 현재 읽기 전용 DB에서 기존 119개 및 129개 대상 경로 확인. File Station 연결은 샌드박스 EPERM으로 차단되어 현재 NFO 내용·해시·소유권·권한/ACL 미확인; 두 집단 조사 PARTIAL, 현재 안전한 수정 대상 수 UNKNOWN. NAS/DB SQL/Jellyfin 쓰기 및 배포 없음. 읽기 전용 SQLite의 WAL/SHM 부수효과 여부는 미확인.
+## 0. 최신 확인 결과 — 2026-11-05
 
-**P03-H 최신 상태 (2026-10-30, 사용자 보고):** EBWH-350 기존 `movie.nfo` 제목 보정 후 NAS 해시·소유권·권한과 Jellyfin 제목 표시·`ebwh-350` 검색 PASS. 원본 SHA-256 `c60e9ad6f108a531193a56bc0563b446f1fdb9fd3e290ef5726fa3955d0652d4`, 결과 `63f3d1e1cb32b0db1ca477a59aea6f39236dd5c0ad77a714f53a2f9e5e185432`. Codex 독립 재검증은 없음. 기존 129+119 계획 후보에 대해 정확한 과거 자료와 현재 상태를 이용한 읽기 전용 사전 조사만 승인; EBWH-350 중복 수정 제외, 13 소유권 차이·3 품번 충돌·4 상태 예외 보호. 248은 현재 적용 가능 건수가 아니다. 전체 수정·운영 배포 미승인; P03-T 10분 타이머 변경은 마지막 단계.
+- **현재 보유 작품:** Discovery DB의 현재 JAV 보유 **260개**, 모두 제목 행·비어 있지 않은 제목·유효한 raw JSON 존재 **260/260 PASS (읽기 전용)**. 이는 메타데이터 필드 전체의 정확성이나 NAS NFO 260/260 존재를 뜻하지 않는다. 최신 NAS NFO 총수와 실제 필드 완전성은 **확인필요**. 과거 Stage8 **130/130 메타데이터·NFO 완료**와 현재 전체 260개를 혼동하지 않는다.
+- **기존 정식 포스터 경로:** Stage8 85/85 PASS (WebP 83, JPEG 2) 기록은 유효하고 보호한다. **2026-11-04 실제 로컬 대표 이미지 조사:** 260개 중 201개 보유, **59개 미보유**. 웹 포스터·폴백 자동 연결 및 새 `cover.jpg` 실제 반영은 **미완료**.
+- **기존 NFO 중복 방지:** 10월 30일 '129건 NFO 없음'은 **품번.nfo 이름만 확인한 오분류**로 확정, 해당 **129개 모두 유효한 `movie.nfo` 존재·XML/ID 검사 PASS**. 별도 사용자 승인으로 진행된 **기존 NFO 제목 접두사 보정 225건**, **추가 NFO 3건(MFCS-085, DANDYA-033, NHDTB-778)** 은 11월 2일까지 각각 완료·독립 readback PASS. 재생성하지 않는다.
+- **실사용 NFO 자동화:** Stage9 10분 타이머 설정·자연 기동·신규 MBRBI-015 NFO 생성 및 Jellyfin 작품번호 표시 **한 작품 제품 시험 PASS(11월 2일)**. 11월 4~5일 포스터 진단에서는 전용 서비스·타이머 **중지 상태가 확인**되었으며, 과거 10분 운영 PASS를 현재 활성 상태로 오해하거나 무단 재시작하지 않는다.
+- **현재 집중:** 기존 포스터 경로를 보존하고 정확한 작품의 Fourhoi JPEG만 `cover.jpg`로 이어 주는 **Stage9 자동 폴백 완성 → 오프라인 회귀 → 4개 작품 통합 시험**. `AT-099`, `DANDYA-033`, `FC2-PPV-3087371`, `FC2-PPV-4451371`만 대상으로 하고 `MBRBI-015`는 제외한다. Codex 11:56 KST 문서 커밋 `d7c0bdb443ba0eac31d008f56e54ba50e2b2b08f`까지 **구현 INCOMPLETE, 운영 쓰기 0**.
+
+**최신 근거:** `docs/governance/stage9-media/ACTIVE_WORK.md`, `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md`, Stage9 계약 v1.0.6. 이 로드맵의 완료 표시는 해당 확인 범위만 닫고, 각 작업의 계약·승인 상태는 변경하지 않는다.
+
+> 10월 30일 P03-H 상세 조사·대상·해시와 당시 보류 이력은 Git 기록 및 Stage9 ACTIVE_WORK에서 확인한다. 이 로드맵에서는 11월 2일의 실제 완료 결과를 현재 상태로 우선 표시한다.
 
 ## 1. 읽는 순서 및 업데이트 규칙
 
@@ -22,23 +30,32 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 2. 고정 우선순위 / 앞으로의 작업
 
-| 순번 | ID | 기능별 작업 | 상태 (2026-10-29) | 다음 단계 / 완료 조건 / 승인 |
+| 순번 | ID | 기능별 작업 | 현재 상태 (2026-11-05) | 다음 단계 / 완료 조건 / 승인 |
 | --- | --- | --- | --- | --- |
-| 1 | P01 | **미디어 자동화 잔여 항목 원인 확인** (과거 Stage9 Media) | **완료 — 조사 범위 한정** | CT108 읽기 전용 DB 확인: COMPLETED 122, FAILED 3, PENDING/RUNNING 0; 오래된 COMPLETED/UNKNOWN 조합 108, 포스터 PENDING 8건 모두 COVER_URL_MISSING, FNS-267 내부 Jellyfin CHECK_PENDING 1건, 타이머 active 및 마지막 서비스 Result=success. 강제 재시도·정리·DB 변경은 별도 항목 P01-H로 **보류**. |
+| 0 | P00 | **Stage9 포스터 자동화 완성 및 4개 작품 통합 시험** | **진행 중 — 구현 INCOMPLETE / 실전 4건 NOT_RUN** | 완료된 기존 메타데이터 기반 정식 포스터(형식별 `poster.*`) 보존 → URL 없거나 신뢰할 수 없는 경우 페이지·작품 일치 검증된 Fourhoi JPEG를 `cover.jpg` create-only → 둘 다 없으면 PENDING. 최소 오프라인 회귀 후 동일 경로로 정확한 4건 시험. 첫 신규 로컬 이미지의 Jellyfin 표시 확인을 통과한 뒤 나머지 3건. 운영 배포/쓰기 및 서비스 시작은 별도 승인. 260개 전체 재처리 금지. |
+| 1 | P01 | **미디어 자동화 잔여 항목 원인 확인** (과거 Stage9 Media) | **완료 — 조사 범위 한정** | 2026-10-29 당시 CT108 읽기 전용 DB 확인: COMPLETED 122, FAILED 3, PENDING/RUNNING 0; 오래된 COMPLETED/UNKNOWN 조합 108, 포스터 PENDING 8건 모두 COVER_URL_MISSING, FNS-267 내부 Jellyfin CHECK_PENDING 1건, 당시 타이머 active 및 마지막 서비스 Result=success. 현재 타이머는 포스터 작업 중 중지 상태. 강제 재시도·정리·DB 변경은 별도 항목 P01-H로 **보류**. |
 | 2 | P02 | **루트/Overlay 중복 파일 5쌍의 읽기 전용 정밀 검수** | **완료 — 정적 소스·패치 비교 범위만 (2026-10-29)** | 5쌍 모두 분석: HTML은 최종 Overlay 기준 UI/패치 순서, 저장 코드는 no-overwrite·SHA-256, 엔트리포인트는 HLS/MP4, 부트스트랩은 보호된 게시·복구, 앱은 영속 상태·재시도 안전성 차이가 핵심. 실제 빌드 중간 산출물과 새 단일 원본의 byte-identical 동등성은 미검증이며 P04 구현·검증 승인 시 별도 확인. 소스·이미지·운영 변경 0. |
-| 3 | P03 | **Jellyfin에서 `[작품번호] 작품 제목` 표시 및 작품번호 검색** (미디어 메타데이터) | **과거 보유 작품 NFO-only 4파일 정본 소스 승격 PASS; 운영 배포·실제 생성·기존 NFO 수정은 미실행, Jellyfin 검색 미검증** | 신규 NFO 생성 코드 정본 승격 `b31873824527bbcdf800d141b40eaf6e2af03abd`, Stage9 전용 배포 PASS, 자연 실행 PASS(10:01:16 KST; 미디어 처리 0). 255개 보유 중 NFO 존재 122개(119개 품번 추가 후보, 3개 다른 품번 충돌), NFO 부재 133개. 부재 133개 원인: 129개는 provenance 필터(`library-inventory` 68, `organizer-apply` 61), 3개 실패/재시도 한도, 1개 DB NFO 완료 대 과거 NAS 파일 부재. **순서:** (1) P03-N NFO-only/create-only **설계 PASS**, Synology 업로드 충돌 오류 1805/모의 414 차이와 실 NAS 동시 생성 보호는 확인 필요 → (2) **v2 4파일 GitHub 정본 소스만 승격 PASS (`fc8671487a7a1adb033619b58878f6bddb0c5d48`), 1건 읽기 전용 점검 1차 PASS(감사 스냅샷 3파일+현재 DB 68/61), 과거 누락 교집합 129건·시험 작품 `EBWH-350` 선정 PASS, NAS 단일 작품 조회 PASS이지만 동일 폴더 기존 `movie.nfo` 확인으로 생성 카나리 BLOCKED, EBWH-350 기존 `movie.nfo` XML PASS·품번 접두사 없음, 129개 폴더 모든 `.nfo` 파일명 재조사 PASS: `movie.nfo` 129, NFO 없는 폴더 0; XML·제목 읽기 전용 후속 검증 예정, 운영 배포·NAS 실제 생성 별도 승인 필요**, 실제 새 NFO 생성은 기존 `movie.nfo` 129건 확인으로 BLOCKED, 다른 예외 4건은 별도; 기존 `movie.nfo` XML 129/129 정상·제목 접두사 누락 129 확정, 기존 NFO 제목 수정 안전 설계 검토 승인 → (3) 기존 119개 NFO `<title>` 수정 안전 경로 설계/검증·별도 승인된 적용(13 소유권 불일치와 3 품번 충돌 보호) → (4) 실제 Jellyfin 품번 검색 검증 → (5) **P03 마지막 작업: Stage9 1시간→10분 전용 타이머 변경**(별도 승인/검증 전 NOT_RUN). 영상/기존 포스터·provenance/Organizer/다른 타이머 보호. |
+| 3 | P03 | **NFO 작품번호 표시·Jellyfin 검색 및 신규 NFO 자동화** | **대표 제품 시험 PASS / 완료된 세부 작업 정리, 전체 일관성 확인필요** | 기존 `movie.nfo` 129개 존재·XML/ID PASS, 기존 NFO 품번 제목 보정 225건 PASS, 기존 누락 NFO 3건 복구 PASS, Stage9 10분 타이머·실제 신규 MBRBI-015 NFO/Jellyfin 표시 PASS(11/02), EBWH-350 실제 품번 검색 PASS(10/30). **완료한 NFO를 재생성하지 않는다.** 전체 260개 NAS NFO/필드 완전성은 아직 조사 안 됨. 잔여 예외만 별도 범위 승인 뒤 처리; 타이머는 현재 포스터 작업 중지 상태 유지. |
 | 4 | P04 | **검수로 확정된 중복만 단계적 단일 원본화** | **미착수 — 범위/구현 승인 전** | P02 결과로 각 파일의 patch 의존성, 실행 동등성, 데이터 보호 경계를 문서화하고 승인된 파일에만 변경→격리 검증→별도 운영 배포 승인. 위험도가 낮은 HTML부터 제안하되 확정 우선순위는 검수 결과에 따른다. |
 | 5 | P05 | **일반 다운로드/Discovery Writer 작업 DLDWS-001 종료 조건 점검** | **미착수 — 대표 운영 검증 PASS** | 이미 완료한 Docker 이미지 교체·FNS-267 실사용 성공을 재검증 없이 활용한다. 남은 계약상 미완료 조건과 Writer 소켓 안전성 이력만 정리하고 사용자 결정 후 종료 여부 판단. 현재 두 영역 모두 `IN_PROGRESS / DLDWS-001`. |
 | 6 | P06 | **한국어 자막 음성 인식/화자 근거 확인** (이전 Stage11) | **진행 중 — 별도 독립 작업** | 현재 `S11-WX011 / IN_PROGRESS`. 기존 S04/S08/S13 일본어 후보와 오디오를 사용자에게 비교 제시할 다음 결정이 남아 있음. S03/S11/S15 누락 의심, 일본어 정답/정확한 경계/화자 DER는 UNKNOWN. 계약에 따른 읽기 전용 범위만. |
 | 7 | P07 | **한국어 자동 자막 품질·게시 최종 완성** | **미착수/후속 승인 필요** | 외부 JA+ASR 증거, 누락 대화 회복, 자연스러운 Hermes 번역/문장·화자 경계와 Stage12 안전 게시까지 제품 품질 입증 필요. 설계 우선순위 충돌은 사용자 결정, 자막 생성·실행·게시는 별도 승인. |
+| 8 | P08 | **파일 관리: 보유 라이브러리 요약·라이브러리 DB 현황 화면 개편** | **요구사항 등록 완료 / 구현 미착수 — P00 이후** | 상단 요약: 전체 작품 수 / 한국어 자막 / 메타데이터 / 포스터 / 전체 라이브러리 용량. 기존 `자막 처리 현황` 탭 명칭을 `라이브러리 DB 현황`(가칭)으로 바꾸고 하위에 자막 처리 현황 / 메타데이터 처리 현황 / 포스터 처리 현황을 배치. 기존 자막 미해결·자막 없음 세부 현황은 자막 섹션 안에 보존. 실제 파일·DB의 의미와 일치하는 집계 정의·UI/API 구현/검증은 별도 승인. |
 
-### 별도 보류 / 자동 수행하지 않는 항목
+### 이후 UI 개편 요구 — P08 (설계 기록만, 구현 미승인)
 
-- **P01-H — 미디어 자동화 잔여 운영 처리:** `DANDYA-033`, `NHDTB-778` = unsupported video extension (각 실패 5회), `MFCS-085` = cover_url missing (과거 누적 17,161회); 포스터 대기 8건은 URL 없음; `FNS-267`은 Jellyfin 실제 재생 PASS지만 DB의 recovery/visibility PENDING이 관찰됨. 이전 완료 108건의 신규 필드 UNKNOWN은 미처리 108건이라고 단정하지 않는다. 처리를 원하면 최신 상태 읽기 전용 재확인 후 안전한 별도 승인. **보류**.
-- **P03-H — 기존 NFO 제목 품번 추가:** **255개 전체 NFO 인벤토리 완료 (2026-10-30 Codex 보고)**. NFO 122개 중 119개는 올바른 ID 메타데이터와 XML을 갖지만 `<title>`에 `[DVD-ID]` 접두사 없음; 3개는 다른 품번 접두사로 별도 판별 필요. 119개 중 영상/NFO 소유자·그룹 불일치 13개 별도 보호. 전체 NFO 없는 133개는 P03-M에서 원인별 분류 완료(129 provenance 필터·3 실패 한도·1 DB/과거 NAS 상태 불일치). **119개 기존 제목 수정 목표 사용자 사전 승인**; 기존 File Station create-only로 수정 수단 **BLOCKED/운영 적용 NOT_STARTED**. 원본 백업·해시·원자적 교체·소유권 검증 필요. 포스터 존재 수는 별도 조사하지 않아 UNKNOWN. **2026-10-30 직접 검증:** 129개 기존 `movie.nfo` GET-only XML 파싱 **129 PASS**, DVD-ID 일치 **129**, 제목 `[DVD-ID]` 접두사 없음 **129**, XML/ID 오류·읽기 실패 **0**. 따라서 신규 NFO 생성 불필요하고 기존 제목 수정 129개 후보로 재분류. 기존 119개 `품번.nfo` 후보와 합계 **248개 계획 후보**이나 119개는 최신 검증 필요, 그중 owner/group 차이 13개 보호. 사용자가 **P03-H 설계/읽기 전용 검토만 승인**(2026-10-30, `응 진행 하자`); EBWH-350 한 작품 중심 원본 백업·해시·충돌·원자성·복구 및 최소 안전 경로 비교, Codex 디자인-only. 실제 기존 NFO 덮어쓰기/소스 구현/배포/Jellyfin/P03-T 타이머 변경 **미승인**.
-- **P03-M — NFO 미존재 133개 원인 분석:** **CT108 읽기 전용 원인별 분류 PASS (2026-10-30 사용자 로그)**. 이전 NAS 인벤토리에서 NFO 없는 133개 중 129개는 현재 `media_jobs` 미등록이며, Stage9 등록 조건 중 오직 `holdings.discovered_by='completion-stage9'`가 불일치: **`library-inventory` 68개 + `organizer-apply` 61개**. 두 출처 모두 영상 보유(`storage_root='jav'`, `present=1`)와 Organizer `COMPLETED` 조건 충족. 즉 현재 자동화가 등록하지 않는 이유는 출처 필터, 실제 과거 NFO 미생성의 모든 인과는 별도. 그 외 3개는 media job FAILED/재시도 한도, 1개는 media job NFO COMPLETE지만 **과거** NAS 확인 시 누락(현시점 파일 상태 재확인 필요). NFO 신규 생성이나 재시도 대상 변경 없이 **역사적 보유 자료의 `discovered_by`를 보존하는 NFO-only create-only 경로 설계 제안**. 전수 129건 자동 실행, provenance 변경, 소유권 우회는 미승인. 기존 119개 제목 수정 안전 교체도 BLOCKED / 미실행. Jellyfin 품번 검색 NOT_VERIFIED; P03-T Stage9 10분 타이머는 P03 마지막 단계에 유지 / 변경 미실행. **해석 정정:** 이 조사는 133개에서 `<DVD-ID>.nfo`라는 특정 파일명이 없는 사실만 조사했고, `movie.nfo` 부재 여부는 검사하지 않았다. EBWH-350은 `movie.nfo` 존재 확인. 따라서 NFO 자체가 없는 작품 133개라는 결론은 지지되지 않으며, 129개 전체의 대체 NFO 현황은 UNKNOWN.
-- **P03-N — 과거 보유 129개 NFO 신규 생성:** **v2 4파일 GitHub 정본 소스-only 승격 PASS (2026-10-30) / 운영 배포 및 실 NAS 생성 미승인·NOT_RUN**. 사용자 별도 승인을 기록한 뒤 정확한 검수 패치 `p03n-review-v2-twr9OL.patch` 15,692B SHA-256 `85a292816c3c457d6b712d8b62d1961afc1d1d72d69f7be70e2732f914a44802`의 4 Git blob SHA를 검증, 하나의 원자적 source commit `fc8671487a7a1adb033619b58878f6bddb0c5d48`으로 정본 `teddy-subtitle-stage11`에 승격. GitHub HEAD/4파일 읽기-back·커밋 diff EXACT-4 PASS; 신규 합성 33·File Station 회귀 6 PASS는 Codex 보고 및 v2 독립 정적 검수 PASS_OFFLINE, 신규 독립 실행은 없음. NFO-only는 2개 역사적 provenance/Organizer 완료/작품번호·제목 메타데이터·영상 경로·크기/소유권 조건과 기존 NFO 충돌 정지를 사용하되 **실제 129개 대상은 DB/NAS에서 아직 확인하지 않음**. `LIVE_CREATE_ONLY_GUARD=UNVERIFIED`, 실제 NFO 현재 부재·영상 owner/group 독립 검증·실 NAS File Station 동시 생성 보호는 확인 필요. **다음(사용자 승인됨):** 과거 NFO 누락 감사 스냅샷을 확인해 정확한 DVD-ID **1건 선택 → 해당 1건만 운영 DB/NAS 읽기 전용 사전점검**. 1차 CT108 점검에서 감사 스냅샷 `summary.json`·`targets.jsonl`·`inventory.jsonl` 존재/형식 PASS, 실 DB `mode=ro`+`query_only=ON` 현재 적격군 `library-inventory` 68건 + `organizer-apply` 61건 확인(합계 129). 단 기존 129개 NFO 누락 ID 집합과의 **실제 교집합은 아직 미확인**이고 감사 첫 샘플은 NFO가 존재하는 작품임. **진행:** 과거 NFO 누락 133건과 현재 DB 적격 129건 교집합(작품번호 기준) **129건 PASS**, 1건 **`EBWH-350` 선정 PASS**. DB 영상 `EBWH/EBWH-350/EBWH-350.mp4` (4,445,557,425바이트), 예정 NFO `EBWH/EBWH-350/EBWH-350.nfo`, provenance `organizer-apply`, metadata `javdatabase-weekly`. **다음:** 이 한 작품에 한정하여 기존 File Station GET 기반 실제 영상 크기/owner/group 및 NFO 현재 부재를 읽기 전용으로 확인(아직 NAS_CHECK=NOT_RUN). 운영 NFO 생성은 다시 별도 승인. 기존 119 NFO 제목 보정·3 품번 충돌·13 owner 불일치·3 실패/1 과거 시차 문제 별도; 포스터 129개 현황 UNKNOWN. P03-T 1시간→10분 타이머는 최종 단계 유지. **중요한 새 증거(2026-10-30):** EBWH-350의 실제 NAS 영상 `4,445,557,425`바이트·owner `admin`·group `users` 및 `EBWH-350.nfo` 부재 확인 PASS. 그러나 사용자 Windows 탐색기에서 같은 폴더에 기존 **`movie.nfo`(약 1KB)** 존재가 확인돼 **`EBWH350_NFO_CANARY=BLOCKED_EXISTING_ALTERNATE_NFO`**. Jellyfin은 `movie.nfo`와 `<영상명>.nfo` 모두 공식 지원; 과거 조사 133건은 **품번 파일명 NFO 부재 건수**이지 영화 NFO 자체 부재 건수가 아니다. 129개 중 다른 `movie.nfo` 존재 수는 UNKNOWN. **확인:** 사용자 첨부 `movie.nfo` 669B XML 파싱 PASS, `<uniqueid type="teddy">EBWH-350</uniqueid>`, `<title>`에 품번 접두사 없음, `<originaltitle>` 없음, SHA-256 `c60e9ad6f108a531193a56bc0563b446f1fdb9fd3e290ef5726fa3955d0652d4`. 현행 NFO builder는 `<DVD-ID>.nfo` 및 `<title>[DVD-ID] ...</title>`, `<uniqueid type="dvd_id">` 사용; 서로 다른 생성 형식이지만 실제 과거 생성자는 UNKNOWN. **다음:** 129개 모두에서 대체 `movie.nfo` 존재와 품번·제목 확인하는 제한된 읽기 전용 실사 **별도 승인 대기**. 무단 생성·중복 파일/수정 금지. 1건 신규 NFO 실제 생성 승인 없음. 재생성/중복 NFO 금지. **새로 승인된 129건 읽기 전용 재조사 범위:** 기존 `품번.nfo`나 `movie.nfo`뿐 아니라 **각 승인된 폴더 안의 모든 `.nfo` 파일(대소문자 무관)** 이름과 개수를 조사. 0/1/복수/불확실로 분리하고, 기존 NFO XML·작품번호·`<title>` 접두사 유효성도 확인하되 읽기/호출량 상한 적용. 사용자 `응 진행해` 승인 후 `.nfo` 전부 조사 제안을 직접 추가해 범위 구체화. 조사 129개 폴더로 제한, 다른 폴더 확대·NAS NFO 신규 생성·제목 수정·덮어쓰기·원본 변경 금지. 실제 조사 결과 미제출/미실행. **최종 129개 파일명 재조사 결과(2026-10-30, 사용자 CT108 읽기 전용 로그): `AUDIT_TOTAL=129 / PASS`, `NONE=0`, `ONE_MOVIE=129`, `ONE_CANONICAL=0`, `ONE_OTHER=0`, `MULTIPLE=0`, `UNKNOWN=0`.** 각 승인된 작품 폴더에 **기존 `movie.nfo`가 정확히 하나씩** 존재하며, 기존 129개 NFO 누락은 `품번.nfo`만 확인한 **파일명 기준 오분류**로 정정. **신규 NFO 129건 생성 및 해당 집단 1건 카나리 실행 BLOCKED**(중복 NFO 생성 방지). 이는 XML/품번/제목/Jellyfin 표시 정상성 증거는 아니며, 3 FAILED+1 과거 DB/NAS 불일치 4건은 별도. **다음:** 이미 승인된 129건 감사의 나머지 범위 안에서 기존 `movie.nfo` 파일을 GET-only(크기 제한 2MiB)로 읽어 XML·DVD-ID·`<title>[품번]` 여부만 분류. 운영 NAS 수정·배포·새 NFO 생성·기존 119개 수정·Stage9 타이머 변경은 미승인/NOT_RUN. **129개 기존 NFO XML 후속 검증 PASS:** `XML_VALID=129`, `ID_MATCH=129`, `TITLE_PREFIX_ABSENT=129`, 그 외 읽기·XML·ID 오류 0; 신규 NFO 생성 미필요. 제목 수정은 P03-H 설계/별도 실행 승인으로만.
-- **P03-T — P03 최종 단계 (10분 Stage9 타이머):** 기존 1시간 주기 → **10분 주기**를 사용자 요청에 따라 P03-H 및 Jellyfin 대표 품번 검색 확인 **뒤에** 배치함. 설계/검토 계획으로만 등록; 실제 `teddy-stage9-media.timer` 변경 **NOT_RUN**, 현재 Codex 조사 완료 전 변경하지 않음. 단위 설정(무작위 지연 포함), 재진입·부하·실패 중지 정책·기존 다운로드 타이머 분리 검증 후 별도 변경 승인과 백업/복구 절차 필요.
+- **파일 관리 → 보유 라이브러리:** 요약 카드 5개 — `전체 작품 수`, `한국어 자막`, `메타데이터`, `포스터`, `전체 라이브러리 용량`. 상단에서는 `자막 미해결`, `자막 없음`을 빼되 해당 정보·필터를 삭제하지 않고 세부 자막 현황에 유지한다.
+- **파일 관리 → `자막 처리 현황` 탭 → `라이브러리 DB 현황`(가칭):** `자막 처리 현황` / `메타데이터 처리 현황` / `포스터 처리 현황` 3개 섹션. 각 영역에서 완료·미완료·진행/실패·보류와 원인을 확인할 수 있도록 설계한다. 세부 UI 구성과 명칭은 구현 전 확정한다.
+- **집계 원칙:** `메타데이터`는 단순 `titles` DB 행 개수가 아니라 **실제 NFO 존재와 유효 상태를 구분**한다. `포스터`는 NAS에 존재하는 Jellyfin 대표 이미지(`poster.*`, `cover.*`, 기타 인정 Primary)로 집계하고 `thumb.jpg`만 있는 경우 완료로 속이지 않는다. 자막·용량도 현재 실제 보유 작품 기준으로 집계하되, DB 상태와 NAS 현황이 다르면 **확인필요/HOLD**를 구분한다. 서버 전체 재스캔을 UI 요청마다 반복하거나 완료된 미디어를 재생성하지 않는다.
+- **보존 조건:** PC·모바일 반응형 UI 및 기존 파일 관리 `재생`·`다운로드`·`삭제` 동작 유지. 현재는 로드맵 기록만. 실제 UI/API 구현은 Downloader 및 관련 Stage9/자막 정보 소비 경계를 계약·라우팅으로 확인한 뒤 별도 승인한다. 기존 Stage11 자막 파이프라인 자체를 개편하는 작업은 아니다.
+
+### 남은 보류 / 과거 조사 기록 (2026-11-02 완료 증거가 10-30 당시 기록에 우선)
+
+- **P01-H:** 운영 오류/DB 상태 재정리: 10-29 당시 실패 작업·PENDING 등의 분석 이력은 유지. 11-02 세 작품(MFCS-085, DANDYA-033, NHDTB-778)의 **실제 NFO 파일 복구는 완료/PASS**. 과거 media_jobs 실패 카운터/상태까지 수리됐다는 증거는 없으므로 DB 재시도·초기화·광역 정리는 별도 승인 전 보류.
+- **P03-H:** 기존 NFO 품번 제목 보정은 정확한 **225개(188+37) 완료/PASS**, 백업·독립 검증 완료(11-02). 추가 기존 NFO 누락 세 작품도 별도 승인으로 복구·독립 검증 PASS. EBWH-350 제목·품번 검색은 대표 1건 PASS. 그 밖의 소유권/품번 충돌/전체 일관성은 별도 증거 없이 완료로 확대하지 않는다.
+- **P03-M:** 10-30 'NFO 미존재 133'은 `<ID>.nfo` 기준 초기 판정. **129개에 `movie.nfo`가 이미 존재했고 XML/ID 검증 PASS**이므로 해당 129건은 실제 NFO 누락이 아니었다. 나머지 3건은 11-02 개별 복구 PASS; 과거 시차 1건은 최신 전체 파일 실측 확인필요. 잘못 분류된 129건의 신규 NFO 재생성 금지.
+- **P03-N:** NFO-only 129건 신규 생성 소스는 과거 정본 승격 이력이 있지만, 실제 129개 모두 `movie.nfo`가 있어 **그 129개 신규 생성은 필요 없음 / 적용 차단이 정상**. 이 구현의 실제 129건 NAS 적용은 하지 않았고 앞으로도 기존 파일을 중복 생성하지 않는다.
+- **P03-T:** **10분 전용 타이머 배포·자연 실행 PASS(11-02)**, 신규 MBRBI-015 다운로드 후 자동 NFO/Jellyfin 작품번호 표시 제품 시험 PASS(대표 1건). 이후 11-04~05 포스터 시험 중 서비스·타이머는 중지 상태가 확인됨. 다시 시작하거나 타이머를 바꾸는 작업은 별도 운영 승인 전 금지.
 - 재생 정상 파일의 대체 코덱/Jellyfin 강제 트랜스코딩, 1회성 iPhone Safari 다운로드 실패 등 과거 선택적 기능은 재현/필요성 증거 없이는 후순위.
 - 과거 Stage10의 보유목록/중복방지 등 완료 이력은 새 작업으로 재등록하지 않는다. 2026-10-29 최신 라우터에 별도 Stage10 workstream은 없다.
 
@@ -53,6 +70,10 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 | D05 | Python 3.10 Docker 신규 이미지 빌드·운영 배포 | 2026-10-29 새 이미지 `sha256:ba31ba9cfcc481dc1f658312a3155a3496856008ff4d52f5a652de0766fd0dbe` 운영 DEPLOY/HTTP/MANIFEST/PRESERVED-SIDECARS PASS; 기존 이미지·롤백 자료 보존. 롤백 *실행* 테스트는 아님. |
 | D06 | FNS-267 다운로드→MP4 변환→NAS 저장→포스터/NFO 존재→Jellyfin 재생 | 2026-10-29 사용자 직접 확인 PASS (작품 한 건의 E2E, 모든 제목/파일 내용 품질 확인은 아님). |
 | D07 | 미디어 자동화 미완료·오류 원인 구분 | 2026-10-29 CT108 DB/타이머 읽기 전용 점검 완료; 실제 미해결 운영 처리와 분리하여 P01-H로 보류. |
+| D08 | 기존 NFO 품번 제목 보정 및 3개 NFO 복구 | **225개 품번 제목 보정 + MFCS-085/DANDYA-033/NHDTB-778 신규 sidecar 3개** 실제 운영 적용·별도 NAS 검증 PASS (2026-11-02). 원본 백업 보존. |
+| D09 | P03 10분 타이머와 신규 다운로드 NFO 대표 제품 시험 | **2026-11-02 10분 타이머 설정·자연 실행 PASS**, MBRBI-015 신규 NFO NAS 확인·Jellyfin 작품번호 표시 PASS. 현재 타이머 active를 의미하지 않음. |
+| D10 | 보유작품 메타데이터 행 및 로컬 대표 이미지 갭 현황 | **2026-11-05 Discovery 260/260 제목 행/유효 JSON PASS**, **2026-11-04 NAS Primary 201/260 존재, 59/260 없음 PASS**. NFO 실제 존재 260/260이나 poster 자동 폴백 완성을 뜻하지 않음. |
+| D11 | 기존 정식 포스터 경로 및 MBRBI-015 과거 예외 | Stage8 **85/85 포스터 PASS (WebP 83/JPEG 2)**, MBRBI-015 1회성 NAS thumb + Jellyfin API 변경/사용자 화면 확인 PASS. 새 `cover.jpg` 로컬 파일 자동 인식 통합 시험과는 별개. |
 
 ## 4. 현재 검수 기준선: P02 / HTML
 
@@ -66,7 +87,7 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 - **다운로드 진입점:** 10개 top-level 함수 중 4개 변경; HLS 세그먼트 안전 저장/매니페스트, 비동기 처리, MP4 큐·일시정지·재시도 경계가 Overlay에 있으며 root 단독 사용 불가.
 - **부트스트랩:** 변경된 top-level 함수 5개와 Overlay-only 함수 4개(분석한 정의 기준); 완료파일 게시 복구·안전 잠금·저장 오류에 따른 무의미한 네트워크 fallback 차단·MP4 큐 보호 경계 보존이 필요.
 - **앱:** 변경된 top-level 함수 10개와 Overlay-only 함수 9개(분석한 정의 기준); 작업 상태 파일의 안전한 저장·복구, retry 큐 등록 원자성, 건강 검사 모드, MP4 상태 보호 경계가 있어 통합 변경은 고위험.
-- **판정:** P02는 **정적 소스/패치 차이 검수 범위에 한해 완료**. 새 이미지에서 동등 실행 테스트, 빌드 중간 결과 byte 비교, 원본 통합 변경·배포는 **NOT_RUN / 미승인(P04)**. 지금까지 동작 중인 Overlay를 임의 삭제하거나 root로 되돌리지 않는다. **다음 우선순위는 P03 Jellyfin 작품번호 제목 기능**이지만 Stage9 Media의 별도 신규 기능 승인 후에만 구현할 수 있다.
+- **판정:** P02는 **정적 소스/패치 차이 검수 범위에 한해 완료**. 새 이미지에서 동등 실행 테스트, 빌드 중간 결과 byte 비교, 원본 통합 변경·배포는 **NOT_RUN / 미승인(P04)**. 지금까지 동작 중인 Overlay를 임의 삭제하거나 root로 되돌리지 않는다. **현재 제품 집중 순서는 P00 Stage9 포스터 자동 폴백 완성 → 4개 작품 통합 시험**이다. P03의 검증된 NFO 제품 결과를 다시 수행하지 않는다. UI 개편 P08은 이후이며 P04 같은 별도 작업은 사용자가 우선순위를 바꾸지 않는 한 착수하지 않는다.
 
 ## 5. 정확한 진행 현황의 원천
 
