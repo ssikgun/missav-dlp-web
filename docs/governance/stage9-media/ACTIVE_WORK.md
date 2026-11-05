@@ -1,3 +1,14 @@
+## 2026-11-05 — STG9MEDIA-001 AT-099 exact NAS read-only preflight PASS; image source remains HOLD
+
+Teddy provided the output from a single `root@downloader` read-only preflight executed on 2026-11-05. **Reported result: `AT099_READONLY_CHECK=COMPLETE`, `AT099_NAS=PASS; LOCAL_PRIMARY_MISSING`.** This is user-submitted operational evidence, not an independent ChatGPT connection to CT108/NAS.
+
+- Stage9 `teddy-stage9-media.service` and `.timer`: both `inactive` at check; `STAGE9_STOPPED=PASS`. Exact read-only immutable Discovery DB query matched one present/parsed JAV holding, `AT/AT-099/AT-099.mp4`, with valid recorded size; NAS regular-file video size matched (`AT099_DB_IDENTITY=PASS`, `VIDEO_IDENTITY=PASS`).
+- Exact NAS movie folder `/volume1/video/video2/JAV/AT/AT-099`: `FOLDER_OWNER=admin`, `VIDEO_OWNER=admin`; immediate recognized image inventory `IMAGE_FILES=[]`, `PRIMARY_FILES=[]`, `THUMB_FILES=[]`. No local Primary or thumb was present at the time. **Owner name alone does not prove safe permission or authorization to create a new file.**
+- Script reported `NAS_DB_JELLYFIN_WRITES=0`; no source-image request, new JPEG, Jellyfin API, restart, scan or service start was made by this preflight. Existing 260-holding snapshot's 59 missing-local-Primary count is historical inventory context, not remeasured by this one-item run.
+- **Remaining blocker:** for AT-099, stored `raw_metadata.result` previously identified the exact MissAV source page but contained no image URL. No currently verified page->image linkage, HTTP JPEG bytes, or official poster evidence. Do not derive `fourhoi.com/at-099/cover-n.jpg` solely from an ID template, and do not label a site thumbnail as an official poster.
+- **Next scoped step:** inspect AT-099's exact title page and linked static image through read-only, bounded verification (e.g. F12 page `og:image`/link evidence and separately validated JPEG response through existing Gluetun path). Return PASS with exact provenance/bytes hash or HOLD. Then prepare a separate one-title no-clobber `cover.jpg` NAS-create plan only if source PASS, requesting Teddy's explicit approval before any file creation. Continue to preserve `MBRBI-015` historical `thumb.jpg`/Jellyfin Primary/backups; no repeat of its completed canary.
+- **Authorization/status:** Stage9 contract v1.0.6 APPROVED; `STG9MEDIA-001 / IN_PROGRESS`, `REQUIRES_WORKSTREAMS: stage9-media`. `AT099_SOURCE_JPEG=UNVERIFIED`, `AT099_NAS_CREATE=NOT_AUTHORIZED/NOT_RUN`, `JELLYFIN_WRITE=0`, generalized automatic fallback INCOMPLETE. This entry records evidence only and grants no product, network-fetch, NAS/DB/Jellyfin write, deployment, or cleanup authority.
+
 # Stage9 Media workstream — active work
 
 ## 2026-11-05 — STG9MEDIA-001 canary target correction: MBRBI-015 already visually tested, use AT-099 pending preflight
