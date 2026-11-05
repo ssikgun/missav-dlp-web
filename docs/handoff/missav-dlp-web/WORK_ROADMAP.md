@@ -1,13 +1,15 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-05 KST (AT-099 CT108 직접 NAS SSH POSIX READONLY PASS / FileStation 후보 통합 미완료 / 파일관리 UI 후속 유지)
+UPDATED_AT: 2026-11-05 KST (Codex sandbox NAS TCP22 EPERM 확인 / CT108 직접 SSH PASS / FileStation 실제 비교 미완료)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
 ## 0. 최신 확인 결과 — 2026-11-05
+
+- **P00 실패 원인 분리:** CT108 안에서 실행 중인 Codex의 자체 명령 실행 환경은 NAS `192.168.1.201:22` TCP 연결이 `PermissionError / errno=1`로 차단됨을 실제 확인했다. 같은 CT108의 일반 root 셸은 기존 SSH/POSIX 읽기 전용 검사 PASS. 따라서 Codex 격리 테스트의 live SSH HOLD를 NAS 장애나 제품 로직 실패로 판정하지 않는다. 샌드박스 권한 확장 없이 일반 CT108에서 실제 FileStation 정보와 SSH 결과를 읽기 전용 대조하는 것이 다음 단일 관문이다. 여전히 신규 이미지 생성·배포·4건 시험 HOLD.
 
 - **P00 실제 NAS SSH 한 건 PASS:** Teddy가 CT108 일반 root 셸에서 기존 고정 SSH 키·known_hosts로 `AT-099` 실제 폴더·영상에 대한 POSIX `lstat`을 읽기 전용 실행해 `SSH_EXIT_CODE=0`, `NAS_POSIX=PASS`, 영상 크기 `4782523478`바이트를 확인했다. **격리 Codex 후보에서 실패한 SSH/HOLD의 원인은 아직 확인필요**이며, 같은 CT108이어도 Codex 샌드박스의 네트워크 차단 가능성은 미검증이다. 실제 FileStation 조회와 새 후보 비교도 아직 NOT_RUN. 코드 승격·운영 이미지 생성·Jellyfin 확인은 HOLD.
 
