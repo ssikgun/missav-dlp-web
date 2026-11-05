@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-05 — STG9MEDIA-001 AT-099 one-time exact JPEG GET authorized; pending user-run evidence
+
+Teddy explicitly authorized a **single bounded read-only GET** of the F12-observed `https://fourhoi.com/at-099/cover-n.jpg` through the existing CT108 Gluetun proxy `http://127.0.0.1:58888` after inactive Stage9 service/timer preflight. Use 5-second connect/15-second total/2 MiB response limit, HTTPS-only, no redirects/retries, in-memory response, print status/content type/size/JPEG signature/SHA only, and create no file. **One attempt is consumed even if unsuccessful; no automatic retry.** No NAS/DB/Jellyfin writes, no Stage9 restart/scan, no new program implementation. This records the authorization, **not a completed GET**. `AT099_SOURCE_GET=APPROVED_ONCE/NOT_RUN`; local `cover.jpg` create remains separately unapproved. Stage9 v1.0.6, `STG9MEDIA-001 IN_PROGRESS` unchanged.
+
 ## 2026-11-05 — STG9MEDIA-001 AT-099 F12 page-linked image candidate; DM26 path is diagnostic variant
 
 Teddy's user-browser F12 read-only result: requested `https://missav123.com/ko/at-099` resolved to page `https://missav123.com/dm26/ko/at-099`; this same actual URL appears in `canonical` and `og_url`. Both `og:image` and `twitter:image` are `https://fourhoi.com/at-099/cover-n.jpg`. The prior `exact_page=false` reflected the test expression's unanticipated `/dm26` prefix; it does **not** alone invalidate the actual page or verify its entire content. **Status:** `PAGE_METADATA_LINK=PASS_USER_F12`, `JPEG_HTTP_BYTES=NOT_VERIFIED`, `OFFICIAL_POSTER=UNVERIFIED`. No assistant-run live image request or operational writes.
