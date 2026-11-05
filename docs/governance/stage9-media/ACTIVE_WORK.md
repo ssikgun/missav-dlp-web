@@ -1,5 +1,15 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-05 — STG9MEDIA-001 AT-099 one bounded source-JPEG GET explicitly approved; not yet run
+
+Teddy replied `응 승인해` to the exact **one-request read-only image-GET proposal** following the AT-099 F12 evidence. This is new authorization to *inspect a source image only*; it is not approval to save the image locally or create NAS `cover.jpg`.
+
+**Allowed once, exact scope:** on CT108 `root@downloader`, after checking `teddy-stage9-media.service` and `.timer` are both inactive, run exactly one HTTPS GET of the F12-observed `https://fourhoi.com/at-099/cover-n.jpg` through pre-existing Gluetun HTTP proxy `http://127.0.0.1:58888`. Use curl with explicit proxy, `-q`, no redirect following, no retry, 5-second connect / 15-second total deadline and 2,097,152-byte maximum response. Collect response in process memory only, validate actual final URL, 200 response, JPEG MIME, body length/bounded size and SOI/EOI signature; print only outcome, HTTP/MIME/size and SHA-256. Discard bytes on exit. One request is consumed even on failure or timeout; **do not repeat without a new approval**.
+
+**Excluded:** image download to filesystem, temp output, stdout binary logging, source-code modification/deploy, NAS file creation/replacement, DB/Jellyfin write, Jellyfin API/refresh/scan, service/timer start, retries and alternative image hosts. HOLD on any preflight, network, content or identity mismatch. This approval alone does not establish a verified official poster or complete Jellyfin local-image behavior.
+
+**Current status:** `AT099_SOURCE_GET=APPROVED_ONCE / NOT_RUN`; `AT099_JPEG_BYTES=UNVERIFIED`; `AT099_COVER_CREATE=NOT_AUTHORIZED`; Stage9 v1.0.6 APPROVED and `STG9MEDIA-001 / IN_PROGRESS` unchanged. Await Teddy's terminal output before recording PASS/FAIL/HOLD and considering a distinct NAS-create proposal.
+
 ## 2026-11-05 — STG9MEDIA-001 AT-099 F12 page/image link observed; /dm26 path variant, JPEG bytes still unverified
 
 Teddy provided a **read-only browser F12 DOM result** for the candidate AT-099 page. The earlier exact-page script returned `exact_page=false` because it checked only `/ko/at-099`, while the browser's actual page was `https://missav123.com/dm26/ko/at-099`. This is a **path-pattern mismatch in that diagnostic**, not by itself proof of a wrong work. Actual page URL, `canonical`, and `og_url` all matched the same exact `/dm26/ko/at-099` URL; `og:image` and `twitter:image` both pointed to `https://fourhoi.com/at-099/cover-n.jpg`.
