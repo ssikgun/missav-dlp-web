@@ -1,5 +1,15 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-05 — Upload API version confirmed; candidate review HOLD
+
+Real FileStation API discovery reported Upload minVersion=2, maxVersion=3; candidate selects v3 and omits overwrite. Synology's official API guide specifies an error on an existing destination when overwrite is omitted for v2/v3. Existing collision, uncertain-upload and post-upload hash synthetic smoke passed (9/9); other candidate runner, pipeline, verifier, thumbnail and jobs smoke passed. No collision upload was sent. This does not demonstrate actual server collision behavior.
+
+Candidate review found the ordinary targeted thumbnail-job path now includes FAILED rows with COMPLETE NFO and updates thumbnail status, error and attempt count. The separate existing-image-only path bypasses this, but promotion of the whole candidate would also expose the changed thumbnail-job path, conflicting with preservation of FAILED job history. `SOURCE_PROMOTION=HOLD`; correct and verify the candidate before promotion. Deployment and AT-099 image execution NOT_RUN; no operational data mutation.
+
+## 2026-11-05 — AT-099 single operational trial explicitly authorized; preflight pending
+
+Teddy authorized Stage9 candidate source promotion, limited CT108 deployment and one AT-099 image-only attempt using the existing proxy, with create-only publication and ordinary Jellyfin visual confirmation. The other three titles, bulk execution, overwrites, Media DB history changes, Jellyfin image API writes or forced scans and timer activation remain excluded. This approval does not establish any preflight or operational result. Candidate `/tmp/stg9-ssh-image-8a3eb` is preserved; source promotion, deployment and AT-099 execution remain HOLD pending review and the stated gates.
+
 ## 2026-11-05 — STG9MEDIA-001 Codex NAS TCP/22 after explicit network enable: PASS (user-reported)
 
 Teddy relaunched Codex CLI inside CT108 with `--sandbox workspace-write --ask-for-approval on-request -c approvals_reviewer=auto_review -c 'sandbox_workspace_write.network_access=true' -C /tmp/p03n-clean-xOKlUfE7/repo`. The same `socket.create_connection(('192.168.1.201',22))` probe run **within the new Codex execution environment** now reports `CODEX_NAS_TCP22=PASS`, superseding the preceding session's sandbox `EPERM`. This isolates the previous socket failure to the former Codex execution permission context and permits the approved Stage9 real read-only SSH+FileStation comparison to be attempted next. `-C` selects the requested path, but the actual Git root, origin, branch, and current HEAD of that temporary directory have **not yet been verified** and must be checked before any code work. A successful TCP connect is not SSH authentication, remote POSIX verification, FileStation getinfo/list consistency, image retrieval, NAS publication, or live Jellyfin proof. Preserve staged candidates and four-title operational HOLD; no production mutation, deployment, service/timer start, or contract version change.
