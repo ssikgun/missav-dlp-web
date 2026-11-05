@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-05 — STG9MEDIA-001 canary target correction: MBRBI-015 already visually tested, use AT-099 pending preflight
+
+Teddy corrected the canary plan: `MBRBI-015` has already been successfully tested as a Jellyfin Primary replacement with user-visible acceptance. Do not replay it merely to confirm another display test. Prior suggestion to create `MBRBI-015/cover.jpg` as the next canary is superseded; preserve its verified NAS `thumb.jpg`, existing Jellyfin Primary, and original image backup.
+
+**New provisional different-title target: `AT-099`**, listed among 59 missing local Primary files on the earlier exact-260 NAS read-only inventory. Existing DB reports exact MissAV ID/page but no stored image URL, so its source JPEG remains UNVERIFIED; no write eligibility yet. **NEXT:** one exact-item CT108/NAS read-only local folder+video identity/ownership/Primary-filename preflight. If clear, locate/verify actual matching site JPEG via F12, then ask for distinct explicit approval before creating `cover.jpg`. No assumed template URL, live NAS/DB/Jellyfin mutation or Jellyfin API operation. General auto fallback still INCOMPLETE. Stage9 v1.0.6/STG9MEDIA-001 unchanged.
+
 ## 2026-11-05 — STG9MEDIA-001 prior F12 fallback success rediscovered; reuse-first canary priority, avoid duplicate provenance engineering
 
 Teddy correctly recalled the earlier F12/browser discovery and real `MBRBI-015` fallback-image test. **This URL is already known and was successfully fetched:** `https://missav123.com/ko/mbrbi-015` page `og:image/twitter:image` -> `https://fourhoi.com/mbrbi-015/cover-n.jpg`, real Gluetun/curl HTTP 200 JPEG **87,575 bytes**, SHA-256 `80cf0caae57e3a370fc5c52d98a819c496a8868bb2428f73a2a3bacd139a57f1`, validated NAS `thumb.jpg`. Separate **37,915-byte** SHA `37020de3df7832606cf4d0468bd859f936992744d67faa48cead59cdfe7f9d59` belongs to historical original Jellyfin Primary-image backup, NOT the fallback source; protect both. Historical one-time Jellyfin Primary POST already consumed; do not repeat.
