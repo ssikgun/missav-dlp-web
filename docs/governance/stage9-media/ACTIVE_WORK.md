@@ -1,5 +1,16 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-05 — STG9MEDIA-001 AT-099 single source-JPEG GET PASS; approval consumed, no files created
+
+Teddy submitted the terminal result of the **one explicitly approved** `root@downloader` HTTPS GET diagnostic against the exact user-F12-linked `https://fourhoi.com/at-099/cover-n.jpg`, via existing `http://127.0.0.1:58888` Gluetun proxy. User-reported result:
+
+- `STAGE9_STOPPED=PASS`, `ONE_GET_ATTEMPTED=YES`, `AUTOMATIC_RETRY=DISABLED`; `CURL_EXIT_CODE=0`, `PROXY_CONNECT=200`, `HTTP_STATUS=200`, `CONTENT_TYPE=image/jpeg`.
+- `BODY_BYTES=176781`, `JPEG_SIGNATURE=PASS`; in-memory response SHA-256 **`65ec74216086c52d7d8108285fdd9664faf206964617e3867d72f1c8e2c078d1`**; `AT099_JPEG_GET=PASS`.
+- `FILES_CREATED=0`, `NAS_DB_JELLYFIN_WRITES=0` as reported by the script. The response bytes were intentionally discarded, **not** persisted in CT108 or NAS; no separate decoder/image-dimension/visual identity test was run. This is user-submitted evidence, not an independent ChatGPT operational execution.
+- The F12 page canonical/OG linkage and this real HTTP JPEG response together establish a concrete **exact-AT-099 page-linked static-JPEG fallback candidate**, not authentic official publisher artwork. No official poster has yet been independently verified. Do not call this `poster.jpg`, and do not assume identical behavior for other titles. Prior AT-099 local Primary inventory was empty, but becomes stale until a fresh exact-folder no-clobber preflight.
+- **Approval exhausted:** the one-time GET permission is **CONSUMED**; do not replay it for validation, fetching to disk or runtime publishing. Re-fetch plus create would require a **new separately approved exact one-title NAS `cover.jpg` operation** and fresh checks of target existence/type, path/permissions, identity, expected source bytes SHA/size and collisions. Preserve existing MP4, NFO, all local art, `MBRBI-015` legacy thumbnail/Jellyfin Primary/backup and stopped Stage9 units; do not force Jellyfin scans, image POST, DB changes, or start services/timers.
+- **Checkpoint:** `AT099_PAGE_LINK=PASS_USER_F12`, `AT099_HTTPS_JPEG_GET=PASS_USER_RUN`, `AT099_SHA256=65ec74216086c52d7d8108285fdd9664faf206964617e3867d72f1c8e2c078d1`, `AT099_NAS_COVER_CREATE=NOT_AUTHORIZED/NOT_RUN`, `JELLYFIN_LOCAL_PICKUP=NOT_VERIFIED`. Stage9 contract v1.0.6 APPROVED, `STG9MEDIA-001 / IN_PROGRESS`, generalized automatic fallback INCOMPLETE.
+
 ## 2026-11-05 — STG9MEDIA-001 AT-099 one bounded source-JPEG GET explicitly approved; not yet run
 
 Teddy replied `응 승인해` to the exact **one-request read-only image-GET proposal** following the AT-099 F12 evidence. This is new authorization to *inspect a source image only*; it is not approval to save the image locally or create NAS `cover.jpg`.
