@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-05 — STG9MEDIA-001 isolated official-poster hold gate installed; fallback auto-wiring and regression still INCOMPLETE (Codex 09:29 KST)
+
+Codex reported isolated `/tmp/stg9-cover-010f/` official-art guard: `build_media_bundle()` retains NFO but no longer fetches/publishes `cover_url` as a presumed official `poster.<ext>`; instead `poster=None / PENDING / OFFICIAL_POSTER_UNVERIFIED`. Pattern-only Fourhoi image fallback also holds `PENDING`; existing page-verified injection and `cover.jpg` candidate remain. **Unwired feature:** runner's proxy only supports a guessed candidate URL and does not carry the verified movie-page ↔ image association into an automatic fallback for newly downloaded movies or older missing-local-Primary movies.
+
+**Verification only partial:** metadata core, FileStation 8, thumbnail 13, jobs smoke and diff check PASS (Codex-reported); full metadata local proxy-socket test NOT RUN (sandbox permissions); pipeline and runner regressions FAIL due to old unconditional image-creation assumptions (must inspect, not blanket mark obsolete). Candidate unchanged in GitHub/production; no external image fetch, NAS/DB/Jellyfin writes, stage9 service start, deployment, product commit/push. Five target titles HOLD. Contract `v1.0.6`, task `STG9MEDIA-001 IN_PROGRESS` unchanged.
+
+**NEXT:** one bounded offline Stage9 follow-up to classify/repair intentional-policy regression expectations, connect existing verified page/image extraction through runner without guessing evidence from URL alone, preserve NFO/Jellyfin and local no-clobber protections; if impossible, explicitly report exact minimal blocker. Retest, separate sandbox socket restriction from functional FAIL, no production action or code push. See Stage9 ACTIVE_WORK.
+
 ## 2026-11-04 — STG9MEDIA-001 poster source forensic: JavDatabase/MissAV image ID association confirmed, official provenance UNVERIFIED (Codex 23:53 KST)
 
 Read-only Codex source-trace report confirmed (also cross-checked current GitHub collector/metadata code structure): JavDatabase links an image to an exact DVD-ID page through thumbnail area, alt and `/covers/` source constraints; MissAV links items to site images and checks some detailed page IDs. Neither proves *publisher-authentic official poster* status. JavDatabase `raw_metadata` may contain a verified site linkage, but its writer does not necessarily update `titles.cover_url`; `metadata_source` is insufficient to authenticate that old URL. Stage9 `build_media_bundle()/fetch_poster()` still can promote an unverified URL to `poster.<ext>`.
