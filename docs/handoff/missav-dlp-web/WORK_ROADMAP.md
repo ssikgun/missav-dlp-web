@@ -1,13 +1,15 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-05 KST (Stage9 4건 NAS 이미지 공백 READONLY PASS / 제품 통합 미완성 / 파일관리 UI 후속 유지)
+UPDATED_AT: 2026-11-05 KST (AT-099 CT108 직접 NAS SSH POSIX READONLY PASS / FileStation 후보 통합 미완료 / 파일관리 UI 후속 유지)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
 ## 0. 최신 확인 결과 — 2026-11-05
+
+- **P00 실제 NAS SSH 한 건 PASS:** Teddy가 CT108 일반 root 셸에서 기존 고정 SSH 키·known_hosts로 `AT-099` 실제 폴더·영상에 대한 POSIX `lstat`을 읽기 전용 실행해 `SSH_EXIT_CODE=0`, `NAS_POSIX=PASS`, 영상 크기 `4782523478`바이트를 확인했다. **격리 Codex 후보에서 실패한 SSH/HOLD의 원인은 아직 확인필요**이며, 같은 CT108이어도 Codex 샌드박스의 네트워크 차단 가능성은 미검증이다. 실제 FileStation 조회와 새 후보 비교도 아직 NOT_RUN. 코드 승격·운영 이미지 생성·Jellyfin 확인은 HOLD.
 
 - **P00 SSH·기존 작품:** 단일 대상 SSH 검사와 runner 연결을 격리 구현하고 합성 검증했다. 실제 SSH·FileStation 일치 확인은 HOLD이며 운영 배포와 네 작품 시험은 미승인이다.
 
