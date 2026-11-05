@@ -1,5 +1,27 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-05 — STG9MEDIA-001 five-title DB raw_metadata.result source inventory: 1 WebP-URL candidate, 4 HOLD (Codex 09:48 KST)
+
+Teddy supplied Codex's bounded **read-only** exact-5-title Discovery DB report (2026-11-05 09:48:45 KST). This reports observed production DB rows; ChatGPT has NOT independently queried CT108 or requested images. Codex confirmed it accessed only five specified rows using read-only SQLite `immutable` mode after checking WAL empty. No operational NAS/DB/Jellyfin write, external URL request, candidate change, deployment, or product-source commit/push occurred.
+
+**Important schema correction:** these five rows' valid JSON is `titles.raw_metadata.result`, **NOT** `raw_metadata.item`. The earlier expected `item` shape was wrong for these actual rows. All five `raw_metadata.source` values matched each row's `metadata_source`; all five `result.sourceUrl` paths and recorded item IDs matched the requested DVD-IDs. The result does NOT imply the raw image bytes or their original collector attestation were freshly verified.
+
+| Exact owned work | Source | Recorded work ID | Image in `raw_metadata.result` | Matches `titles.cover_url` | Status |
+| --- | --- | --- | --- | --- | --- |
+| `AT-099` | MissAV | match | none | n/a | HOLD |
+| `DANDYA-033` | JavDatabase | match | `result.jacketFullUrl` | yes | additional verification candidate; not publishable |
+| `FC2-PPV-3087371` | MissAV | match | none | n/a | HOLD |
+| `FC2-PPV-4451371` | MissAV | match | none | n/a | HOLD |
+| `MBRBI-015` | MissAV | match | none | n/a | HOLD, historical `thumb.jpg`/Jellyfin backup protected |
+
+Four MissAV `result.sourceUrl` values follow `missav.ws/en/<dvd-id>`, not the existing strict `missav123.com/ko/<dvd-id>` validated-page parser contract. DANDYA `result.sourceUrl` is JavDatabase `/movies/<dvd-id>`; `result.jacketFullUrl` is an HTTPS JavDatabase `/covers/` URL ending **`.webp`** (extension only, actual MIME/bytes untested), equal to `titles.cover_url`. The image URL and ID association support a **site-image candidate** only; they do NOT attest official/publisher art. No request/response, current image content, stored collector HTML, or fresh publisher identity proof was checked. Do not represent DANDYA as verified site JPEG or as an authentic official poster.
+
+**Core implication:** approved Stage9 v1.0.6 permits an authenticated exact-work static **JPEG** fallback `cover.jpg`. A `.webp` URL alone is not JPEG evidence; if response is WebP, do not rename its bytes `cover.jpg`, automatically convert file type, or put it in `poster.webp` as supposed official art. It stays HOLD unless a separate eligible genuine JPEG or approved design change is established. The other four have no stored image URL, so automated code may need genuine page fetch+identity/image verification, or they stay PENDING; do not guess image links from URL templates. Site URL and work ID matching alone is insufficient for publication.
+
+**Verdict:** FIVE_ROW_READONLY_DB_INVENTORY=PASS_REPORTED; VERIFIED_JPEG_FALLBACK=NONE; OFFICIAL_POSTER=NONE; GENERAL_AUTOMATIC_FALLBACK=INCOMPLETE; CANARY=NOT_AUTHORIZED. Existing isolated code under `/tmp/stg9-cover-010f/` remains unpromoted, with Codex-reported metadata core, FileStation 8, thumbnail 13, jobs/pipeline/runner PASS and full metadata Unix-socket smoke NOT RUN due to sandbox restriction. Stage9 governance `v1.0.6 APPROVED`, `STG9MEDIA-001 IN_PROGRESS` unchanged.
+
+**Next single checkpoint (no repeat of five-row DB query):** in the isolated candidate, inspect the **actual `raw_metadata.result` JSON producer/schema** and map its precise source fields to existing Stage9 site JPEG fallback functions; choose a minimal offline-only connection that can consume recorded exact-work `result.sourceUrl/jacketFullUrl` when available, but returns PENDING for WebP / missing URLs / unverified HTML link or response. For records without recorded image URL, state the smallest bounded host/page/JPEG validation interface needed (existing MissAV collector may be reused) rather than inventing one-shot link templates; do not automatically trust `raw_metadata.result` as current verified HTML. Reuse existing validators and run limited synthetic JPEG and WebP cases, no real network/NAS/Jellyfin writes, product code commit/push, or deployment. If no safe JPEG route is possible without expanding design or shared workstreams, explicitly report BLOCKED instead of overengineering. MBRBI earlier verified `thumb.jpg` is a *separate* possible user-approved file-copy canary, not part of this automatic URL fallback path.
+
 ## 2026-11-05 — STG9MEDIA-001 regression PASS, automatic verified site fallback BLOCKED by page/proxy mismatch (Codex 09:35 KST)
 
 Teddy supplied Codex's isolated work result (2026-11-05 09:35:32 KST) from `/tmp/stg9-cover-010f/`; GitHub canonical product code remains unmodified and the isolated diff was NOT independently read back. **Overall INCOMPLETE / no production canary authorization**. Existing isolated modifications across Stage9 FileStation, jobs, metadata, pipeline, only-runner, thumbnail and related smoke files are preserved and uncommitted.

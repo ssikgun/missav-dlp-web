@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-05 — STG9MEDIA-001 five-title DB raw_metadata.result source inventory: 1 WebP-URL candidate, 4 HOLD (Codex 09:48 KST)
+
+Codex read-only five-row Stage9 DB inventory found valid `raw_metadata.result` (NOT previous assumed `raw_metadata.item`) for `AT-099`, `DANDYA-033`, `FC2-PPV-3087371`, `FC2-PPV-4451371`, `MBRBI-015`. All recorded IDs match, `raw_metadata.source` matches `metadata_source`, and all `result.sourceUrl` fields exist. Four MissAV records `missav.ws/en/<id>` have **no** recorded image URL. DANDYA JavDatabase `/movies/<id>` has `result.jacketFullUrl` on HTTPS `/covers/` ending `.webp`, which matches existing `titles.cover_url`. Image response/MIME, official role, page linkage at current time unverified; therefore still HOLD. `.webp` bytes cannot simply be relabeled `cover.jpg` under approved JPEG fallback policy. No network or production write, isolated candidate unchanged, no deployment.
+
+**Next:** bounded isolated offline check of actual `raw_metadata.result` producer and Stage9 fallback wiring with strict source/JPEG/ID validation; preserve PENDING if image absent/WebP/unverified, no guessed URL promotion or new broad scraper. No repeat broad DB inventory. Stage9 `v1.0.6 / STG9MEDIA-001` unchanged. See Stage9 ACTIVE_WORK.
+
 ## 2026-11-05 — STG9MEDIA-001 regression PASS, automatic verified site fallback BLOCKED by page/proxy mismatch (Codex 09:35 KST)
 
 Codex reported candidate-only regression repairs: metadata core PASS, FileStation 8/8 PASS, thumbnail 13/13 PASS, jobs/pipeline/runner PASS, diff check PASS. Full metadata Unix-socket proxy smoke NOT RUN (sandbox permission); overall **INCOMPLETE** because new-title automatic verified site `cover.jpg` fallback is unconnected. Candidate only under `/tmp/stg9-cover-010f/`; no real fetch, product commit, deployment, Stage9 start, production NAS/DB/Jellyfin mutation or approved canary.
