@@ -1,5 +1,30 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 CT108 present-holdings source breakdown and 10-title sample
+
+**Evidence (Teddy CT108 root console):** Read-only SQLite `mode=ro` + `PRAGMA query_only=ON` query grouped `holdings WHERE present=1` by `storage_root` and `discovered_by`. Results exactly: `jav | completion-stage9 | 131`, `jav | library-inventory | 68`, `jav | organizer-apply | 61`. Sum **260**, matching the previous live Discovery present-holdings count. This was a DB inventory only; no NAS directories or local artwork were checked. No Stage9 service or timer start, code change, DB/NAS/Jellyfin/image write.
+
+**Source-route implications (from verified current Stage9 code):** `teddy_discovery_media_jobs.reconcile_media_jobs` registers completed Organizer jobs only when `holdings.storage_root='jav'`, `present=1` and `discovered_by='completion-stage9'`. Thus legacy `library-inventory` + `organizer-apply` **129 present holdings** cannot be assumed to receive image handling merely by enabling the dedicated Stage9 Media timer; backfill may require a separate exact-holding `--thumbnail-only --existing-image-only` operation, one title at a time under scope/safety/approval. The `131` general-completion source holdings and `131` Stage9 job rows equal numerically but have **not** been proven one-to-one. Missing-image count remains `NOT_VERIFIED`: no subtraction or job status can establish actual NAS Primary absence.
+
+**Deterministic DB-only sample (10 unique present JAV holdings; exclusions AT-099, DANDYA-033, FC2-PPV-3087371, FC2-PPV-4451371, MBRBI-015):**
+
+| DVD-ID | Exact `holdings.relative_path` |
+| --- | --- |
+| `ACHJ-097` | `ACHJ/ACHJ-097/ACHJ-097.mp4` |
+| `ADN-785` | `ADN/ADN-785/ADN-785.mp4` |
+| `ADN-799` | `ADN/ADN-799/ADN-799.mp4` |
+| `AKDL-312` | `AKDL/AKDL-312/AKDL-312.mp4` |
+| `AVSA-455` | `AVSA/AVSA-455/AVSA-455.mp4` |
+| `AVSA-456` | `AVSA/AVSA-456/AVSA-456.mp4` |
+| `BAGR-093` | `BAGR/BAGR-093/BAGR-093.mp4` |
+| `BLOR-289` | `BLOR/BLOR-289/BLOR-289.mp4` |
+| `CAWB-039` | `CAWB/CAWB-039/CAWB-039.mp4` |
+| `DAL-012` | `DAL/DAL-012/DAL-012.mp4` |
+
+User-reported `SAMPLE_COUNT=10`, `READ_ONLY_CANDIDATES=COMPLETE`. This sample is **not** proven to lack artwork, nor automatically eligible for a new poster: all ten need an exact movie-folder NAS-local Primary check before any potential apply.
+
+**Next checkpoint:** One bounded read-only NAS SSH check of only the ten exact paths above, with lstat/no-symlink validation of path/video and Jellyfin-recognized `poster|cover|folder|default|movie` Primary filename detection (verified current regular-file rules), including no writes. Record each FOUND/MISSING/UNSAFE outcome and source-route class before choosing a tiny safe missing-artwork canary. Do not restart `teddy-stage9-media.timer` or bulk-process titles from this evidence. Current Stage9 contract v1.0.9 / STG9MEDIA-001 IN_PROGRESS unchanged.
+
 ## 2026-11-06 — STG9MEDIA-001 CT108 Discovery/Stage9 database read-only inventory
 
 **Evidence (Teddy CT108 actual shell):** User ran a read-only Python SQLite inventory with `file:` URI `mode=ro`, `PRAGMA query_only=ON`, against `/opt/missav-dlp-web/discovery/teddy-discovery.sqlite3` and `/opt/missav-dlp-web/discovery/teddy-stage9-media.sqlite3`. User console reports `DB_CHECK=PASS` for both and `READ_ONLY_INVENTORY=COMPLETE`. This is a logical SQL read-only check; independent SQLite sidecar timestamps/bytes were not inspected. No media/artwork/file write was requested.
