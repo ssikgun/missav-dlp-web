@@ -1,13 +1,15 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-05 KST (Codex sandbox NAS TCP22 EPERM 확인 / CT108 직접 SSH PASS / FileStation 실제 비교 미완료)
+UPDATED_AT: 2026-11-05 KST (새 Codex 세션 NAS TCP22 PASS / CT108 직접 SSH PASS / FileStation 실제 비교 미완료)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
 ## 0. 최신 확인 결과 — 2026-11-05
+
+- **P00 Codex 네트워크 제한 해소 확인:** CT108에서 Teddy가 `workspace-write + network_access=true + on-request + auto_review`로 새 Codex 세션을 시작했고, 같은 NAS TCP 22번 포트가 코덱스 명령 실행 내부에서도 `CODEX_NAS_TCP22=PASS`로 전환됐다. 예전 `EPERM`은 이전 세션의 샌드박스 제한으로 설명된다. 단, `-C /tmp/p03n-clean-xOKlUfE7/repo`의 Git 정본·브랜치·HEAD는 확인필요. 다음은 해당 작업 트리 검증 후 `AT-099` 실제 SSH와 FileStation GET-only 일치 확인. 운영 이미지 쓰기·제품 승격 HOLD.
 
 - **P00 실패 원인 분리:** CT108 안에서 실행 중인 Codex의 자체 명령 실행 환경은 NAS `192.168.1.201:22` TCP 연결이 `PermissionError / errno=1`로 차단됨을 실제 확인했다. 같은 CT108의 일반 root 셸은 기존 SSH/POSIX 읽기 전용 검사 PASS. 따라서 Codex 격리 테스트의 live SSH HOLD를 NAS 장애나 제품 로직 실패로 판정하지 않는다. 샌드박스 권한 확장 없이 일반 CT108에서 실제 FileStation 정보와 SSH 결과를 읽기 전용 대조하는 것이 다음 단일 관문이다. 여전히 신규 이미지 생성·배포·4건 시험 HOLD.
 
