@@ -1,5 +1,13 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-05 — STG9MEDIA-001 metadata-source poster trust clarification APPROVED / v1.0.7
+
+Teddy explicitly replied “응 승인해.. 내가 원하던 방식이야” to the exact decision: keep the previously established and validated metadata `titles.cover_url` source-poster path as the source for local `poster.<validated extension>`, **without inventing a new independent publisher-official certification flag**. This does not claim every existing image is publisher-issued, nor waive existing source identity, HTTPS host, bounded response, MIME/magic, no-clobber and wrong-title protections. Stage8 historic 85/85 image success remains valid; no retroactive reclassification or refetch.
+
+When no usable accepted metadata-source poster is available, the Stage9 pipeline should safely retrieve the verified exact-work page URL already stored in metadata, fetch/inspect the page through bounded proxy-only transport, verify canonical/OG linkage to the exact work, and only then accept a linked static JPEG from Fourhoi as new `cover.jpg`; otherwise PENDING without a file. Supports general exact-ID MissAV page variants including `/dmNN/ko/<ID>`. No generic template-only identity assumption. Existing files, NFOs, Stage9 DB/job attempt history, Jellyfin Primary state and consumed MBRBI-015 one-time test are protected. One first new-file Jellyfin visual canary remains required before the remaining three integrated titles.
+
+**Authorization:** this user reply approves **contract clarification** to Stage9 `v1.0.7`; still no live production image GET, NAS/DB/Jellyfin mutation, deployment or Stage9 timer/service start. Stage9-only isolated offline implementation was already requested; next apply code with minimal reuse of existing source poster/thumbnail/page helpers, test official-source/fallback/no-image/collision, and return a single release candidate and 4-title apply proposal. The isolated candidate remains NOT_PROMOTED; `FOUR_TITLE_E2E=NOT_RUN`. `STG9MEDIA-001 / IN_PROGRESS`, `REQUIRES_WORKSTREAMS: stage9-media`. No unrelated workstream edits or Stage11 activity.
+
 ## 2026-11-05 — Poster fallback isolated candidate: INCOMPLETE
 
 Existing `/tmp/stg9-cover-010f/` preserved. Separate `/tmp/stg9-auto-fallback-3790/` adds exact-work `/dmNN/ko/<id>` validation to the existing MissAV parser; thumbnail smoke 14/14 and FileStation 8/8 pass, jobs, pipeline and runner smoke pass; metadata proxy-socket test NOT_RUN (sandbox). Automatic page-input/fetch integration is not connected; candidate currently holds unverified `cover_url`, so preservation of existing poster behavior is not complete. Stage8 85/85 evidence remains valid. No real HTTP, production DB/NAS/Jellyfin write, service/timer change, deployment or source promotion. Four-title live integration NOT_RUN. Confirm a trusted source/role signal and safely connect the actual stored page URL before finalizing; do not infer official poster from URL alone.
@@ -2183,7 +2191,7 @@ NEXT SINGLE CHECKPOINT: Separate bounded NAS read-only verification of the exact
 WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.6
+CONTRACT_VERSION: 1.0.7
 REQUIRES_WORKSTREAMS: stage9-media
 
 ## P03-H NAS DUAL-UID TWO TARGETS ABSENT / SOURCE VERIFIED PREFLIGHT PASS — 2026-11-02 KST

@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-05
 
+- **포스터 출처 정책 승인(12시 이후 사용자 승인):** 기존 메타데이터 `cover_url`을 Stage8에서 검증·채택해 온 소스 포스터로 계속 사용하고, 발행사 공식 인증용 신규 필드를 요구하지 않는다. 계약 **v1.0.7 승인**. 이미지 형식·URL·작품 일치 검증은 유지하고, 연결이 검증된 Fourhoi JPEG만 `cover.jpg`로 저장한다. 제품 코드는 아직 미승격; 네 작품 운영 시험은 NOT_RUN.
+
 - **P00 후보 보완:** 격리 후보의 `/dmNN/ko/` 작품 검증과 관련 오프라인 회귀를 확인했으나 페이지 입력의 자동 연결과 기존 정식 포스터 경로 보존은 미완료. 실사이트·운영 시험은 NOT_RUN.
 
 - **현재 보유 작품:** Discovery DB의 현재 JAV 보유 **260개**, 모두 제목 행·비어 있지 않은 제목·유효한 raw JSON 존재 **260/260 PASS (읽기 전용)**. 이는 메타데이터 필드 전체의 정확성이나 NAS NFO 260/260 존재를 뜻하지 않는다. 최신 NAS NFO 총수와 실제 필드 완전성은 **확인필요**. 과거 Stage8 **130/130 메타데이터·NFO 완료**와 현재 전체 260개를 혼동하지 않는다.
@@ -17,7 +19,7 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 - **실사용 NFO 자동화:** Stage9 10분 타이머 설정·자연 기동·신규 MBRBI-015 NFO 생성 및 Jellyfin 작품번호 표시 **한 작품 제품 시험 PASS(11월 2일)**. 11월 4~5일 포스터 진단에서는 전용 서비스·타이머 **중지 상태가 확인**되었으며, 과거 10분 운영 PASS를 현재 활성 상태로 오해하거나 무단 재시작하지 않는다.
 - **현재 집중:** 기존 포스터 경로를 보존하고 정확한 작품의 Fourhoi JPEG만 `cover.jpg`로 이어 주는 **Stage9 자동 폴백 완성 → 오프라인 회귀 → 4개 작품 통합 시험**. `AT-099`, `DANDYA-033`, `FC2-PPV-3087371`, `FC2-PPV-4451371`만 대상으로 하고 `MBRBI-015`는 제외한다. Codex 11:56 KST 문서 커밋 `d7c0bdb443ba0eac31d008f56e54ba50e2b2b08f`까지 **구현 INCOMPLETE, 운영 쓰기 0**.
 
-**최신 근거:** `docs/governance/stage9-media/ACTIVE_WORK.md`, `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md`, Stage9 계약 v1.0.6. 이 로드맵의 완료 표시는 해당 확인 범위만 닫고, 각 작업의 계약·승인 상태는 변경하지 않는다.
+**최신 근거:** `docs/governance/stage9-media/ACTIVE_WORK.md`, `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md`, Stage9 계약 v1.0.7. 이 로드맵의 완료 표시는 해당 확인 범위만 닫고, 각 작업의 계약·승인 상태는 변경하지 않는다.
 
 > 10월 30일 P03-H 상세 조사·대상·해시와 당시 보류 이력은 Git 기록 및 Stage9 ACTIVE_WORK에서 확인한다. 이 로드맵에서는 11월 2일의 실제 완료 결과를 현재 상태로 우선 표시한다.
 
