@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-05 — STG9MEDIA-001 regression PASS, automatic verified site fallback BLOCKED by page/proxy mismatch (Codex 09:35 KST)
+
+Codex reported candidate-only regression repairs: metadata core PASS, FileStation 8/8 PASS, thumbnail 13/13 PASS, jobs/pipeline/runner PASS, diff check PASS. Full metadata Unix-socket proxy smoke NOT RUN (sandbox permission); overall **INCOMPLETE** because new-title automatic verified site `cover.jpg` fallback is unconnected. Candidate only under `/tmp/stg9-cover-010f/`; no real fetch, product commit, deployment, Stage9 start, production NAS/DB/Jellyfin mutation or approved canary.
+
+Current GitHub code inspection found an important mismatch: `extract_thumbnail` page parser requires `https://missav123.com/ko/<DVD-ID>`, but the runner proxy fetcher only accesses a Fourhoi image template. Neither JavDatabase nor MissAV `raw_metadata.item.source_url` can be assumed to satisfy the `missav123` page contract. Existing validated JavDatabase collection, however, contains exact-work `item.source_url` and `item.cover_url` stored in `raw_metadata`, potentially reusable strictly as **site-image fallback evidence**, NOT official art; whether these bytes exist for actual works is still UNKNOWN.
+
+**NEXT checkpoint:** only 5-title bounded read-only Stage9 DB metadata-source/URL-host/path/JSON field inventory; compare existing evidence with needed exact-work page/image proof. No extra scraper/transport until real inputs are known. DANDYA-033 and all four other titles still HOLD. Full detail in Stage9 ACTIVE_WORK.
+
 ## 2026-11-05 — STG9MEDIA-001 isolated official-poster hold gate installed; fallback auto-wiring and regression still INCOMPLETE (Codex 09:29 KST)
 
 Codex reported isolated `/tmp/stg9-cover-010f/` official-art guard: `build_media_bundle()` retains NFO but no longer fetches/publishes `cover_url` as a presumed official `poster.<ext>`; instead `poster=None / PENDING / OFFICIAL_POSTER_UNVERIFIED`. Pattern-only Fourhoi image fallback also holds `PENDING`; existing page-verified injection and `cover.jpg` candidate remain. **Unwired feature:** runner's proxy only supports a guessed candidate URL and does not carry the verified movie-page ↔ image association into an automatic fallback for newly downloaded movies or older missing-local-Primary movies.
