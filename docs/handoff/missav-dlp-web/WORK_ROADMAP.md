@@ -1,13 +1,15 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-05 KST (AT-099 단일 이미지 생성·NAS 해시·Jellyfin 표시 검증 PASS / 다른 3개 HOLD)
+UPDATED_AT: 2026-11-05 KST (AT-099 PASS / 나머지 3개 사전 점검 후 조건부 순차 실행 승인, 적용 전 검증 대기)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
 ## 0. 최신 확인 결과 — 2026-11-05
+
+- **P00 나머지 3개 조건부 실행 승인 / 지금은 PREFLIGHT 단계:** Teddy가 `DANDYA-033`, `FC2-PPV-3087371`, `FC2-PPV-4451371`의 읽기 전용 점검에서 모두 안전할 경우 세 작품 이미지 전용 처리를 명시적으로 요청했다. 기존 runner는 정확한 한 작품만 `--max-items 1`로 처리하므로 승인 범위는 **각각 대상 지정한 순차 3회**다. 일반 `--max-items 3`, 전체 예약/타이머, 다른 작품, 덮어쓰기·강제 스캔은 미승인. 과거 `FC2-PPV-3087371`에는 Jellyfin 내부 Primary가 확인됐으므로 GET-only 재확인 후 기존 이미지 보호 여부 판단 필요. 세 작품의 DB·NAS·Jellyfin Primary·서비스·경로·프록시 점검 완료 전 APPLY 0; 이상 발생 시 HOLD. AT-099는 재처리하지 않음.
 
 - **P00 AT-099 이미지 단일 실증 제품 PASS (CT108 root + NAS SSH + Jellyfin 사용자 확인):** 새 Stage9 불변 릴리스 `81be3d8`, 로컬 Gluetun 경로와 대상 `AT-099` / `existing-image-only` / 제한 1의 dry-run PASS 후 단 한 번 APPLY 실행: runner exit 0, `image.status=COMPLETE`, Jellyfin GET/POST 0, media DB row write 0, media-job 이력 불변, service/timer 중지 유지. 독립 NAS 읽기 검증 `NAS_COVER_READONLY=PASS`: `/volume1/video/video2/JAV/AT/AT-099/cover.jpg` 일반 파일(심볼릭 링크 아님), 크기 **164743바이트**, JPEG header `ffd8ff`, SHA-256 **`013fdad0fc90157037e1a82c9af8121530ffda653e57bb4382d42129ce0523e4`**. Teddy가 Jellyfin 일반 화면 대표 이미지 `cover.jpg` 적용 직접 확인. 이 결과는 **AT-099 한 작품의 이미지 생성→NAS 파일→Jellyfin 표시**에 한정; 다른 3개와 자동 타이머·대량 실행은 여전히 HOLD, 별도 승인 없이 재시도·강제 스캔·파일 덮어쓰기 금지. 아래 과거 HOLD 이력은 그 당시 상태이다.
 
