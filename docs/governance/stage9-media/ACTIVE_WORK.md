@@ -1,5 +1,15 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 CT108 general Completion wrapper static skip-media inspection
+
+**Evidence (Teddy actual CT108 root terminal):** A read-only Python inspection of regular, non-symlink `/usr/local/sbin/teddy-completion-stage9-runner` read the wrapper's bytes, computed SHA-256 and inspected nonblank, non-comment text without printing secrets. Console: `WRAPPER_SHA256=a3e0db7b7ea399066692fcf7f488eceba856eec01f3b607182867ebc465e3718`; `SKIP_MEDIA_TOKEN_PRESENT=YES`; `GENERAL_RUNNER_REFERENCED=YES`; `MEDIA_ONLY_RUNNER_REFERENCED=NO`; `WRAPPER_INSPECTION=COMPLETE`; `READ_ONLY_CHECK=COMPLETE`.
+
+**Assessment:** `PASS` for static wrapper shape: the currently installed general Completion wrapper contains an active (non-comment) `--skip-media` token and references `teddy_discovery_completion_runner`, but not the dedicated `teddy_discovery_media_only_runner`. This materially reduces the previous concern that the generic Completion timer would independently run the Stage9 media-only entrypoint. **However**, the search did not establish argv placement/branch reachability, nor did it inspect the process's effective argv on a live invocation. Therefore `SKIP_MEDIA_ACTIVE_INVOCATION=NOT_VERIFIED` and `DUAL_MEDIA_ROUTE_SAFETY=NOT_FULLY_VERIFIED`; do not upgrade this to verified unattended E2E or authorize timer restart from token presence alone. Compared with earlier historical wrapper evidence, the present measured SHA has changed; do not rely on older e49be... wrapper contents.
+
+**State/protection:** As of the immediately prior CT108 checks, generic `teddy-completion-stage9.timer` was active/enabled with service exit 0 at `2026-11-06 08:03:15 KST`; dedicated `teddy-stage9-media.timer` remains inactive/enabled on a nominal 10-minute schedule, and its service inactive. This wrapper inspection did not start/stop anything; no DB/NAS/Jellyfin writes or product source edits were requested or made. Keep AT-099 and the three previously successful exact-title image canaries protected. Stage9 contract `v1.0.9 / APPROVED`, `STG9MEDIA-001 / IN_PROGRESS` unchanged. Existing-artwork bulk and unattended Stage9 activation are still separately scoped operational decisions.
+
+**Next read-only checkpoint:** Establish the actual `--skip-media` argument in the current wrapper's general runner invocation without displaying credentials, then proceed to a bounded existing-missing-primary inventory and new-download automation assessment. Any service/timer activation and image publication need user approval within the applicable active task.
+
 ## 2026-11-06 — STG9MEDIA-001 CT108 Completion service and timer wiring inspection
 
 **Evidence:** Teddy ran a read-only `systemctl show` plus filtered `systemctl cat` on the actual `root@downloader` CT108 shell. No systemd unit, wrapper, service state or media data was changed. Under **Stage9 contract v1.0.9 / STG9MEDIA-001 IN_PROGRESS**, record this as an operational observation and keep unattended activation unapproved.
