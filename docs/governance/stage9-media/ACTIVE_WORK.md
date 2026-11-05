@@ -1,5 +1,14 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-05 — STG9MEDIA-001 AT-099 F12 page/image link observed; /dm26 path variant, JPEG bytes still unverified
+
+Teddy provided a **read-only browser F12 DOM result** for the candidate AT-099 page. The earlier exact-page script returned `exact_page=false` because it checked only `/ko/at-099`, while the browser's actual page was `https://missav123.com/dm26/ko/at-099`. This is a **path-pattern mismatch in that diagnostic**, not by itself proof of a wrong work. Actual page URL, `canonical`, and `og_url` all matched the same exact `/dm26/ko/at-099` URL; `og:image` and `twitter:image` both pointed to `https://fourhoi.com/at-099/cover-n.jpg`.
+
+- **Positive bounded evidence:** User-browser exact-ID URL and two matching page metadata links to one same-origin-elsewhere static-image candidate. This is a real page-linked candidate, **not** a URL blindly derived from the Fourhoi path template.
+- **Remaining checks:** exact work-title/heading content has not been independently read back, redirected page semantics beyond observed canonical metadata are not proven, and the linked image's HTTP status, final URL, MIME, bytes, decode/dimensions, SHA-256 and authenticity are all **NOT_VERIFIED**. It is not an official poster; at most a candidate static JPEG fallback. Do not broadly add `/dm26` routing to code from one observation or label an untested JPEG as verified.
+- **Next:** seek explicit approval for **one** existing-Gluetun-proxied bounded HTTPS GET of only the exact observed `fourhoi.com/at-099/cover-n.jpg`, no redirect/retry, capped body and runtime, in-memory response checks and SHA only; no local artifact or NAS/Jellyfin/DB write. HOLD on failure. A separate exact-title/no-clobber `cover.jpg` creation approval is still required afterward, with fresh target/ownership checks. Stage9 contract v1.0.6, `STG9MEDIA-001 / IN_PROGRESS` unchanged.
+- **Checkpoint:** `AT099_PAGE_METADATA_LINK=PASS_USER_F12`; `AT099_EXACT_PAGE_PATTERN=VARIANT_DM26`; `AT099_JPEG_BYTES=NOT_VERIFIED`; `AT099_NAS_CREATE=NOT_AUTHORIZED/NOT_RUN`; general automatic fallback INCOMPLETE. This documentation does not authorize a live image GET, code change, deployment or production mutation.
+
 ## 2026-11-05 — STG9MEDIA-001 AT-099 exact NAS read-only preflight PASS; image source remains HOLD
 
 Teddy provided the output from a single `root@downloader` read-only preflight executed on 2026-11-05. **Reported result: `AT099_READONLY_CHECK=COMPLETE`, `AT099_NAS=PASS; LOCAL_PRIMARY_MISSING`.** This is user-submitted operational evidence, not an independent ChatGPT connection to CT108/NAS.
