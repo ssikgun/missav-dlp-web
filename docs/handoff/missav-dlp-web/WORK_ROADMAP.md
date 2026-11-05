@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-05
 
+- **P00 v1.0.8:** 이미지 전용 후보의 합성 분기와 runner 경로를 일부 검증했다. 신규 다운로드 통합과 실제 FileStation 포스터 생성 보호 검증은 미완료이며 4건 운영 시험은 HOLD다.
+
 - **P00 v1.0.8 설계 승인 (2026-11-05):** Teddy가 저장된 작품 페이지 canonical/OG 연결 증명 조건 대신, DB에서 검증된 작품 ID로 정확한 `https://fourhoi.com/<소문자 작품ID>/cover-n.jpg` 한 주소만 폴백 후보로 시도하는 방식을 승인했다. 기존 메타데이터 `cover_url` 포스터 `poster.<확인된 확장자>`가 우선이며, 이 경로 실패·부재 시 유효한 Fourhoi JPEG만 `cover.jpg` create-only. HTTPS/프록시/형식·크기/덮어쓰기 방지와 첫 신규 파일 Jellyfin 화면 확인 유지. 주소 규칙만으로 이미지 내용의 작품 일치가 증명되지는 않는다. **설계 승인 완료 / 제품 구현 미완성 / 운영 4건 NOT_RUN**. 새 코드·서비스·NAS/DB/Jellyfin 운영 변경 미승인.
 
 - **P00 v1.0.7 후보:** 기존 포스터 경로 복원 및 격리된 페이지·JPEG 연결을 일부 검증했다. 실제 저장된 페이지 형식과 신규 작품 자동 실행 연결이 미완료이므로 제품 소스 미반영, 4건 운영 시험 NOT_RUN.
