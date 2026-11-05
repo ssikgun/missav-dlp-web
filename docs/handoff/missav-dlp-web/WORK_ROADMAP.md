@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-05
 
+- **P00 FAILED 이력 보존:** 일반 jobs 변경을 제외하고 이미지 전용 경로의 무행·FAILED/UNKNOWN·COMPLETED/COMPLETE 합성 이력 보존 및 신규·폴백 회귀 PASS. 제품 소스 `6be6133fb0cb070a6ee76417e3e903a35ec3c560` 승격. 해당 제품 전용 커밋은 경로 필터로 Project Governance가 실행되지 않아 배포 관문 HOLD; 운영 시험 NOT_RUN.
+
 - **P00 후보 검토 HOLD:** 실제 FileStation Upload 선택 버전 3 및 overwrite 생략 규칙을 공식 문서와 대조했고 기존 합성 충돌·해시 회귀는 PASS. 후보의 일반 지정 thumbnail-job 경로가 FAILED 행의 thumbnail 상태·오류·시도 횟수를 수정할 수 있어 이력 보존 조건과 충돌한다. 기존 작품 전용 경로는 해당 경로를 우회하지만 후보 전체 승격 전 수정·검증이 필요하다. 운영 배포 및 AT-099 이미지 실행 NOT_RUN.
 
 - **P00 AT-099 실제 통합 읽기 전용 PASS:** Codex 기존 키 SSH와 FileStation에서 정확한 경로, 크기 4,782,523,478바이트, 소유자 `admin:users` 및 NAS 로컬 Primary 부재가 일치했고 후보 비교 함수도 PASS. 기존 작품 합성 runner와 신규·폴백 회귀 PASS; 로컬 거버넌스 검사와 21개 smoke PASS. 실제 이미지 GET·운영 DB/NAS/Jellyfin 쓰기 0, 제품 승격·배포·서비스/타이머 시작 NOT_RUN. 업로드 안전성·이미지 내용·Jellyfin 반영은 미검증이며 네 작품 운영 시험 HOLD. 상세는 Stage9 ACTIVE_WORK 참조.

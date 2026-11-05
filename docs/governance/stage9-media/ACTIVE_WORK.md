@@ -1,5 +1,11 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-05 — FAILED history isolation and source promotion checkpoint
+
+The historical general thumbnail job already existed and selected only COMPLETED/COMPLETE; the candidate had newly expanded it to FAILED. The existing-image-only runner uses its separate processor and does not call run_thumbnail_jobs. A new isolated candidate preserved the prior candidate and excluded both jobs-module changes, restoring the original normal thumbnail target gate. Synthetic exact-target runs preserved every media_jobs column for no target row, FAILED/UNKNOWN, and COMPLETED/COMPLETE; new-download runner and image priority/fallback regression PASS. FileStation, thumbnail, verifier and original jobs smoke PASS. Source promoted as `6be6133fb0cb070a6ee76417e3e903a35ec3c560`; no deployment or live image attempt.
+
+The Project Governance workflow is path-filtered and did not trigger on that product-only commit. This documentation checkpoint triggers governance on the same resulting source tree, but does not itself establish a Project Governance run for the product commit SHA. Deployment remains HOLD pending the requested Actions gate and operational preflight. No service/timer, production file, database or Jellyfin mutation.
+
 ## 2026-11-05 — Upload API version confirmed; candidate review HOLD
 
 Real FileStation API discovery reported Upload minVersion=2, maxVersion=3; candidate selects v3 and omits overwrite. Synology's official API guide specifies an error on an existing destination when overwrite is omitted for v2/v3. Existing collision, uncertain-upload and post-upload hash synthetic smoke passed (9/9); other candidate runner, pipeline, verifier, thumbnail and jobs smoke passed. No collision upload was sent. This does not demonstrate actual server collision behavior.
