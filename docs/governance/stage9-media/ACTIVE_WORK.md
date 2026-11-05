@@ -1,5 +1,11 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-05 — STG9MEDIA-001 NAS SSH read-only verifier approved; Project Governance version repair
+
+Teddy explicitly approved reusing the **existing** CT108→NAS SSH connection (existing pinned key, known_hosts, and NAS account) solely for Stage9 Media's bounded, read-only current POSIX file, directory, symlink, ownership, and size safety inspection on an exact DB-identified existing movie target. Implement the production verifier and connect the existing-image runner entrypoint only within approved Stage9 implementation/test scope; this approval alone does **not** mean the runtime verifier is integrated, or authorize remote writes, new credentials, arbitrary general-purpose SSH execution, NAS/DB/Jellyfin mutations, deployment, or starting the Stage9 service/timer. Fail closed if current evidence is unavailable; keep the four-title live image creation on HOLD until separately approved.
+
+**Governance incident and durable version-upgrade checklist:** GitHub Actions `Project Governance` failed after the Stage9 contract changed to `1.0.8` because this active-work document still declared `CONTRACT_VERSION: 1.0.7`. Correct its single metadata declaration to `1.0.8` in this commit. At **each future Stage9 contract version update**, atomically update `docs/governance/stage9-media/PROJECT_CONTRACT.md` and this file's `CONTRACT_VERSION` metadata in the same commit; run `python3 scripts/check_project_governance.py --all-workstreams` before declaring the change complete, and verify the **actual GitHub Actions run concludes success**. Never report a documentation version bump as finished when CI has not passed. This checkpoint is Stage9 task guidance; it does not change common governance scripts or other workstreams.
+
 ## 2026-11-05 — STG9MEDIA-001 existing-image TS candidate: INCOMPLETE
 
 Preserved `/tmp/stg9-v108-integrated-93566/`; new isolated candidate `/tmp/stg9-existing-image-eb80/`. Added one-target image-only function using the existing title lock, independent of Media DB rows, and a narrowly image-only `.ts` FileStation path validator; normal media publication still rejects `.ts`. An explicit injected current path/regular-file verifier is required; no verifier means HOLD before image fetch. Offline fake test: TS image-only create PASS, missing verifier HOLD, prior FAILED/UNKNOWN/error/attempt row unchanged, video/NFO retained. New-media pipeline six branches and actual runner fake boundary PASS; FileStation 9/9, thumbnail 14/14, jobs/pipeline/runner and diff-check PASS; proxy socket test NOT_RUN sandbox. This is not deployable completion: no verified production provider of the required current POSIX/symlink evidence and no production runner/CLI integration for the new existing-image entrypoint; FileStation's API does not itself prove POSIX regular-file status. Existing four-title user read-only inventory remains valid only for its observation time. No live image GET, NAS/DB/Jellyfin write, deployment, or timer/service action; product source not promoted; four-title canary HOLD. Template URL is candidate selection, not independent proof of image content.
@@ -2221,7 +2227,7 @@ NEXT SINGLE CHECKPOINT: Separate bounded NAS read-only verification of the exact
 WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.7
+CONTRACT_VERSION: 1.0.8
 REQUIRES_WORKSTREAMS: stage9-media
 
 ## P03-H NAS DUAL-UID TWO TARGETS ABSENT / SOURCE VERIFIED PREFLIGHT PASS — 2026-11-02 KST
