@@ -1,5 +1,9 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-05 — STG9MEDIA-001 synthetic source-failure branch
+
+Follow-up to the checkpoint below: added the source-poster network-failure -> Fourhoi JPEG -> fake FileStation `cover.jpg` case; new-media pipeline synthetic integration now 6/6 PASS and `git diff --check` PASS. The listed existing-job selection, `.ts` allowlist, NAS/link preflight and production-approval holds remain unchanged. Product candidate remains unpromoted.
+
 ## 2026-11-05 — STG9MEDIA-001 new-media image wiring checkpoint: INCOMPLETE
 
 Prior candidates preserved; new isolated candidate `/tmp/stg9-v108-integrated-93566/`. General Stage9 runner now injects the existing image-only processor after verified NFO publication. Synthetic actual runner boundary PASS and new-media pipeline + fake FileStation five branches PASS; image-only FileStation source WebP create, repeat SKIP, synthetic file-type mismatch, post-upload SHA mismatch and owner mismatch checked; FileStation smoke 9/9, thumbnail smoke 14/14, jobs/pipeline/runner smoke and diff-check PASS. Metadata core PASS; proxy socket test NOT_RUN (sandbox). Remaining: existing thumbnail job selector still cannot process an exact holding when its Media DB row is absent or its NFO state is UNKNOWN without mutating prior state; source-fetch failure->fallback has not yet been exercised through the full new-media fake adapter; FileStation POSIX symlink/regular-file semantics and current NAS folder preflight NOT_VERIFIED. DANDYA-033's observed `.ts` holding is outside the existing Stage9 video-extension allowlist. No product promotion, live HTTP, production NAS/DB/Jellyfin writes, deployment or service/timer change. Four-title operational readiness HOLD; do not treat template identity as image-content proof.
