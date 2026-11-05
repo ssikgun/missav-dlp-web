@@ -1,5 +1,10 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-05 — Stage9 four-title poster/fallback follow-up: INCOMPLETE
+
+Codex read-only Discovery SQLite immutable/query-only aggregate with empty WAL and unchanged DB/WAL stat: 260 distinct present MATCHED JAV IDs; all 260 have a titles row, nonempty title, and nonempty valid raw JSON. This establishes presence only, not metadata completeness or NFO existence. No NAS inventory was run; current NFO-file and insufficient-metadata counts remain UNKNOWN. User's accepted Stage8 85/85 poster results remain historical evidence for those outputs, not proof that all current cover_url values identify official art. Existing source lacks a per-artifact verified-official signal, while Fourhoi URL pattern alone does not independently establish exact-work image linkage. The existing isolated candidate `/tmp/stg9-cover-010f/` remains uncommitted and incomplete: official provenance gate and template-only hold retained; no new implementation, no live image request, production NAS/DB/Jellyfin write, deployment, or service/timer change in this attempt. Four-title pipeline is not ready for canary; no retroactive reclassification of prior posters. Identify a contract-compliant verified-art signal and exact-work page/image linkage while preserving accepted historical behavior, then complete offline integration before separate operational approval. `IMPLEMENTATION=INCOMPLETE`, `NFO_COUNT=UNKNOWN`, `LIVE_CANARY=NOT_RUN`.
+
+
 ## 2026-11-05 — STG9MEDIA-001 historical official-poster pipeline evidence reconciled; preserve tested cover path
 
 Teddy challenged an overly broad suggestion to reverify whether the established metadata poster URLs were authentic: his concern is justified because the **existing source-cover → poster pipeline was previously accepted with real data**, and the present request is to validate the **added fallback → `cover.jpg`** behavior, not to start Stage8/9 design from scratch.
