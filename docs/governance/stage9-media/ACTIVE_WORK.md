@@ -1,6 +1,14 @@
 # Stage9 Media workstream — active work
 
-## 2026-11-05 — Teddy conditional operational authorization for remaining three-image trial (PREFLIGHT FIRST)
+## 2026-11-05 — STG9MEDIA-001 contract v1.0.9: local-only image eligibility clarified (Teddy explicit approval)
+
+**Current rule (overrides conflicting older preflight interpretations):** Stage9 checks only **NAS-local Jellyfin-recognized Primary image files** to decide whether a safe new local `poster.<validated extension>` or `cover.jpg` may be created. A Jellyfin *internal* `Primary` / `EXISTS_PROTECT` is **not** a local-file existence signal and **not** a reason to block create-only NAS artwork. It remains protected from direct Jellyfin API overwrite/deletion; normal Jellyfin library indexing may later select newly added local art, and Teddy will verify that in the ordinary UI. No forced scan/refresh or automated Jellyfin Primary API POST. The v1.0.5 any-Jellyfin-Primary blocker is historical and was already superseded by v1.0.6; the v1.0.8 lead wording had left this distinction too implicit, now expressly fixed in contract v1.0.9.
+
+**Observed preflight (user-run CT108):** three exact holdings and media DB rows: `DANDYA-033` `.ts`, source `cover_url` present and media row `FAILED/UNKNOWN/UNKNOWN`; `FC2-PPV-3087371` `.mp4`, no `cover_url`, media row `COMPLETED/COMPLETE/PENDING`; `FC2-PPV-4451371` `.mp4`, no `cover_url`, media job row absent. NAS video path/size/owner SSH–FileStation read-only crosscheck PASS for all three; **NAS_PRIMARY=ABSENT 3/3**. First ad hoc Jellyfin detail GET lacked `userId` and returned HTTP 400, a **diagnostic query mistake**, not evidence against image processing. Corrected GET with pre-verified user context returned exact Movie/path and `PRIMARY=EXISTS_PROTECT` **3/3** (internal-only). No user ID or credential is recorded here. This internal state does **not** change NAS eligibility. **APPLY=NOT_RUN; NAS/DB/Jellyfin production writes 0; service/timer stopped** at last user check. Old `EXISTS_PROTECT => skip local image` assessment is **retracted**.
+
+**Next bounded step:** retain conditional user approval for the exact three sequential existing-image-only invocations with fresh stopped-state, immutable release, locks, proxy/source and local create-only checks before each target; do not run `--max-items 3`. Preserve FAILED history; no code, service or timer start, unrelated media work or Jellyfin image API change. Actual NAS publication and user-visible Jellyfin result require separate evidence; user will inspect the Jellyfin screen after image work. AT-099 previously closed PASS, no repeat.
+
+## 2026-11-05 — Teddy conditional operational authorization for remaining three-image trial (HISTORICAL PREFLIGHT; Jellyfin internal-Primary gate superseded by v1.0.9)
 
 Teddy explicitly requested read-only preflight of exactly `DANDYA-033`, `FC2-PPV-3087371`, and `FC2-PPV-4451371`, and, **only if all three are safe**, authorized bounded operational image-only processing of all three to validate multiple-title behavior. This is a new **conditional** approval within `STG9MEDIA-001` / contract v1.0.8, not a timer/service start or 59-title mass run. Prior `AT-099` single-item canary is already PASS and must not be reprocessed. 
 
@@ -2303,7 +2311,7 @@ NEXT SINGLE CHECKPOINT: Separate bounded NAS read-only verification of the exact
 WORKSTREAM: stage9-media
 TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.8
+CONTRACT_VERSION: 1.0.9
 REQUIRES_WORKSTREAMS: stage9-media
 
 ## P03-H NAS DUAL-UID TWO TARGETS ABSENT / SOURCE VERIFIED PREFLIGHT PASS — 2026-11-02 KST

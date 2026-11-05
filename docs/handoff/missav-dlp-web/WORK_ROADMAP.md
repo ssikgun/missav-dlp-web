@@ -1,13 +1,15 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-05 KST (AT-099 PASS / 나머지 3개 사전 점검 후 조건부 순차 실행 승인, 적용 전 검증 대기)
+UPDATED_AT: 2026-11-05 KST (Stage9 v1.0.9 로컬 이미지 기준 명확화 / 3개 NAS 이미지 없음, Jellyfin 내부 Primary 있음 / 순차 이미지 실행 미실시)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
 ## 0. 최신 확인 결과 — 2026-11-05
+
+- **P00 Stage9 포스터 계약 v1.0.9 / 이전 Jellyfin EXISTS_PROTECT 판정 정정 (2026-11-05):** 정식 메타데이터 포스터 `poster.<검증된 확장자>` 우선, 없으면 정확한 Fourhoi JPEG `cover.jpg` 폴백, 둘 다 안 되면 PENDING. **신규 이미지 생성 여부는 NAS 로컬 `poster/cover/folder/default/movie` 대표 이미지 파일 존재 기준**이고, Jellyfin 내부 `Primary` 존재만으로 생성 금지하지 않는다(구 v1.0.5 규칙 폐기). Jellyfin API로 기존 대표 이미지를 직접 교체하거나 강제 스캔하지 않고 일반 라이브러리 인식을 Teddy가 화면으로 확인한다. 실제 CT108 확인: `DANDYA-033`, `FC2-PPV-3087371`, `FC2-PPV-4451371` NAS 로컬 Primary **3/3 부재**, Jellyfin 내부 Primary **3/3 존재**; 이는 NAS 포스터 추가의 차단 조건이 아니므로 과거 `EXISTS_PROTECT => 전체 HOLD` 판단을 철회한다. 세 작품은 새 이미지 처리 **NOT_RUN**, 조건부 승인된 exact-target 순차 3회만 최신 안전 검증 후 가능. `AT-099` 완료 PASS 보존, 서비스/타이머 중지 유지; 이번 문서 변경 자체는 운영 쓰기/실행 0.
 
 - **P00 나머지 3개 조건부 실행 승인 / 지금은 PREFLIGHT 단계:** Teddy가 `DANDYA-033`, `FC2-PPV-3087371`, `FC2-PPV-4451371`의 읽기 전용 점검에서 모두 안전할 경우 세 작품 이미지 전용 처리를 명시적으로 요청했다. 기존 runner는 정확한 한 작품만 `--max-items 1`로 처리하므로 승인 범위는 **각각 대상 지정한 순차 3회**다. 일반 `--max-items 3`, 전체 예약/타이머, 다른 작품, 덮어쓰기·강제 스캔은 미승인. 과거 `FC2-PPV-3087371`에는 Jellyfin 내부 Primary가 확인됐으므로 GET-only 재확인 후 기존 이미지 보호 여부 판단 필요. 세 작품의 DB·NAS·Jellyfin Primary·서비스·경로·프록시 점검 완료 전 APPLY 0; 이상 발생 시 HOLD. AT-099는 재처리하지 않음.
 
