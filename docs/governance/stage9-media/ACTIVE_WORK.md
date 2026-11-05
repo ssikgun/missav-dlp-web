@@ -1,5 +1,9 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-05 — STG9MEDIA-001 v1.0.7 poster/fallback candidate: INCOMPLETE
+
+Isolated `/tmp/stg9-v107-candidate-6341/` preserves both earlier candidate directories. Restored the canonical metadata `cover_url` poster path and its metadata/pipeline tests; added a stored exact-ID/source page seam and a bounded proxy-only page transport in the candidate. Injected synthetic page/JPEG processor and local-primary skip: 2 PASS; thumbnail 14 PASS, FileStation 8 PASS, pipeline/jobs/runner smoke PASS, metadata core PASS; proxy-socket smoke NOT_RUN (sandbox). Actual stored `missav.ws/en/` and JavDatabase pages are not accepted by the current `missav123.com` page validator, accepted poster priority in image-only processing and automatic scheduling for new work are incomplete; four-branch end-to-end PASS is NOT established. Preserve Stage8 85/85, existing data, failures and candidate directories. No real HTTP or production DB/NAS/Jellyfin writes, deployment or service/timer changes. Product source NOT_PROMOTED; live four-title test NOT_RUN. Complete bounded page/proxy integration and poster priority before requesting the separate production approval.
+
 ## 2026-11-05 — STG9MEDIA-001 metadata-source poster trust clarification APPROVED / v1.0.7
 
 Teddy explicitly replied “응 승인해.. 내가 원하던 방식이야” to the exact decision: keep the previously established and validated metadata `titles.cover_url` source-poster path as the source for local `poster.<validated extension>`, **without inventing a new independent publisher-official certification flag**. This does not claim every existing image is publisher-issued, nor waive existing source identity, HTTPS host, bounded response, MIME/magic, no-clobber and wrong-title protections. Stage8 historic 85/85 image success remains valid; no retroactive reclassification or refetch.
