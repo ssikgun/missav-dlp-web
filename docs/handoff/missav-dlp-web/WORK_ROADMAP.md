@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-05
 
+- **P00 기존 작품:** 격리 후보에서 Media DB 행과 독립된 단일 대상·TS 이미지 전용 검사를 합성 검증했다. 운영에서 사용할 현재 링크·일반 파일 검증과 실행 진입점은 미완료이며 배포·4건 시험은 HOLD.
+
 - **P00 네 작품 NAS 사전 점검 PASS (읽기 전용):** `AT-099`, `DANDYA-033`, `FC2-PPV-3087371`, `FC2-PPV-4451371` 모두 현재 DB와 일치하는 영상 파일·크기·폴더 및 NFO 파일명 1개 존재, 로컬 대표 이미지·썸네일·기타 이미지 0개, NAS 계정 PASS. `DANDYA-033` 영상은 실존 `.ts`로 기존 Stage9 확장자 제한에 걸리고, 폴더/영상 소유자는 앞의 `AT-099`와 `FC2-PPV-4451371`은 admin, 뒤의 `DANDYA-033`와 `FC2-PPV-3087371`은 ssikgun. **NAS 파일 존재·미보유 상태 확인 완료**, 신규 이미지 쓰기 권한·FileStation 링크 보호와 Jellyfin 시각 결과는 NOT_RUN. 4개 운영 시험 HOLD 유지. NFO 내용을 새로 수집/생성하지 않는다.
 
 - **P00 신규 경로:** 격리 후보에서 일반 runner → NFO → 공통 이미지 처리와 가짜 FileStation 5개 분기를 확인했다. 기존 작업 행 부재·UNKNOWN 선택, `.ts` 대상, NAS 링크 판별과 실제 NAS 사전 확인은 미해결이다. 운영 시험 HOLD.
