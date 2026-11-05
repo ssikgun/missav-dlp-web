@@ -1,5 +1,13 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 full 260-title NAS image inventory: 205 present, 55 missing, 0 hold
+
+**User CT108 read-only checkpoint: PASS.** The entire `holdings WHERE present=1 AND storage_root='jav'` population was checked at exactly 260 DB-identified movie folders on NAS, without broad NAS scan or file writes: **205** recognized NAS-local Primary present, **55** Primary missing, **0** HOLD. Breakdown: `completion-stage9` 119 present / 12 missing; `library-inventory` 38 present / 30 missing; `organizer-apply` 48 present / 13 missing. `CHECKED=260`, `NAS_FILE_WRITES=0`, `MEDIA_RUNNER_EXECUTIONS=0`, `ALL_HOLDINGS_INVENTORY=COMPLETE`.
+
+**Full exact list and source grouping preserved in** [`docs/governance/stage9-media/evidence/2026-11-06-all-present-primary-inventory.md`](evidence/2026-11-06-all-present-primary-inventory.md). This report establishes missing **NAS-local** files, not Jellyfin UI blanks or verified download-source availability. All 205 existing Primaries are protected. `MBRBI-015` is among 55 but has historical Primary backup/protection and must not be silently bulk-applied. `GANA-3223` is among 55 despite NFO complete; no NFO overwrite/job reset. No image generation, code change or timer start occurred.
+
+**Teddy direction:** no further arbitrary 5/10-item trials after completed AT-099 + three-title product canaries; assess all 55 together in one bounded read-only preflight and only then plan sequential exact-title create-only handling under separate production-write approval. Current media reconciler only enrolls `completion-stage9` holdings, so the **43** missing legacy holdings need explicit backfill planning; timer activation alone will not cover them. Stage9 contract v1.0.9 / `STG9MEDIA-001 IN_PROGRESS` unchanged.
+
 ## 2026-11-06 — STG9MEDIA-001 ten-title exact NAS primary inventory and full-inventory decision
 
 **User-directed scope correction:** Teddy confirmed that after prior single-item `AT-099` and 3-title production image/Jellyfin PASS there is **no value in repeated small artwork-production canaries** simply to increment the count. The prior ten-title query was a *read-only inspection sample*, not approval to download/poster-update ten titles. Teddy explicitly requested a **complete read-only NAS-local Primary-image inventory across all 260 currently present DB holdings** rather than another arbitrary small sample. The full inventory is allowed as a bounded exact-DB-holdings read-only inspection; it is **not** approval for a 260-item image backfill, timer activation, DB mutation, or overwrite.
