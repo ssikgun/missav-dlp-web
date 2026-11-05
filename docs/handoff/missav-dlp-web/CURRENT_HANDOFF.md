@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-05 — STG9MEDIA-001 AT-099 F12 page-linked image candidate; DM26 path is diagnostic variant
+
+Teddy's user-browser F12 read-only result: requested `https://missav123.com/ko/at-099` resolved to page `https://missav123.com/dm26/ko/at-099`; this same actual URL appears in `canonical` and `og_url`. Both `og:image` and `twitter:image` are `https://fourhoi.com/at-099/cover-n.jpg`. The prior `exact_page=false` reflected the test expression's unanticipated `/dm26` prefix; it does **not** alone invalidate the actual page or verify its entire content. **Status:** `PAGE_METADATA_LINK=PASS_USER_F12`, `JPEG_HTTP_BYTES=NOT_VERIFIED`, `OFFICIAL_POSTER=UNVERIFIED`. No assistant-run live image request or operational writes.
+
+**NEXT:** with separate explicit user authorization, one bounded read-only GET of only the F12-observed JPEG through the existing Gluetun proxy, no redirect/retry, validate HTTP 200 + JPEG MIME/signature/size/SHA, discard bytes without file creation. HOLD on any mismatch. Before any later one-title NAS `AT-099/cover.jpg` no-clobber creation, obtain a distinct write approval plus fresh ownership/collision checks. No Jellyfin image API/scan, MP4/NFO/DB change or Stage9 service/timer start. Contract v1.0.6, `STG9MEDIA-001 IN_PROGRESS`; stage9-media ACTIVE_WORK has the detailed evidence.
+
 ## 2026-11-05 — STG9MEDIA-001 AT-099 exact NAS preflight PASS, JPEG source still unverified
 
 Teddy ran and provided the bounded read-only `AT-099` CT108/NAS check on 2026-11-05: `STAGE9_STOPPED=PASS` (both Stage9 service/timer inactive); one exact matched Discovery DB holding `AT/AT-099/AT-099.mp4`; NAS video regular-file/size check `PASS`; NAS folder `/volume1/video/video2/JAV/AT/AT-099`, folder/video owner `admin`; immediate image listing `IMAGE_FILES=[]`, `PRIMARY_FILES=[]`, `THUMB_FILES=[]`; `AT099_NAS=PASS; LOCAL_PRIMARY_MISSING`, `AT099_READONLY_CHECK=COMPLETE`, `NAS_DB_JELLYFIN_WRITES=0`. Evidence is user-submitted, not independently reconnected; folder ownership is not file-creation authorization.
