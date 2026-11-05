@@ -1,5 +1,21 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-05 — STG9MEDIA-001 three-title NAS image readback + Jellyfin visual confirmation: PRODUCT PASS (Teddy CT108 + UI)
+
+**Product acceptance evidence / user confirmation:** Following the authorized 3/3 sequential image-only `CREATED` batch, Teddy ran a **read-only NAS SSH** inspection on exactly the known three folders. The helper verified no symlink path components, the exact expected video size, one recognized local movie Primary file in each target folder, regular non-symlink image files, bounded size, JPEG/WebP magic and SHA-256 of current bytes. Reported `IMAGE_READBACK=PASS` for all three and `THREE_IMAGE_FILES_READONLY=PASS`, with `NAS_WRITE=0`, `JELLYFIN_WRITE=0`.
+
+| DVD-ID | NAS-local image filename | Bytes | SHA-256 | NAS readback | Jellyfin ordinary UI |
+| --- | --- | ---: | --- | --- | --- |
+| `DANDYA-033` | `poster.webp` | 10450 | `804622a549a4b0c1fed16449bbe6e9171066357da709d6666dc1f14c13b809f2` | PASS | PASS (Teddy visually matched downloaded image) |
+| `FC2-PPV-3087371` | `cover.jpg` | 224022 | `fff794dbb30a680280592c5c4ef1434d6e2ba6254451da34457716dac2bae482` | PASS | PASS (Teddy visually matched downloaded image) |
+| `FC2-PPV-4451371` | `cover.jpg` | 42756 | `85f4900525ebc8e22c47131b4fb67fbc4c195fb9930c06b8a71f08e6c652f321` | PASS | PASS (Teddy visually matched downloaded image) |
+
+**Result:** Three-title sequential Stage9 production image-flow **PRODUCT PASS (3/3)**: accepted metadata cover URL yielded one validated source `poster.webp`; the two works without metadata cover URLs yielded `cover.jpg` fallback. Files were verified independently on NAS, and Teddy explicitly confirmed the Jellyfin representative artwork for **all three** matched the newly downloaded images without an automatic Jellyfin image API write or forced refresh. The former `EXISTS_PROTECT` interpretation must not be resurrected as a NAS-local image-creation block: internal Jellyfin Primary existed for these titles before the local files were added, as expected under **Stage9 v1.0.9**.
+
+**Preservation and scope:** The batch runner already reported `DB_JOB_HISTORY_UNCHANGED=PASS` and `JELLYFIN_IMAGE_API_WRITES=0`, with Stage9 service/timer stopped; this latest exact NAS inspection was read-only. DANDYA's pre-existing FAILED history, the other titles' jobs, video/NFO and unrelated holdings were not intentionally modified. This confirms the 3-title **sequential** single-wrapper test, not concurrent multi-item execution, scheduled/unattended pipeline operation, other/future titles, blanket collection or 59-title rollout. `AT-099` earlier single-item E2E PASS and `MBRBI-015` protected original Primary backup remain closed; **no automatic reprocessing**. Stage9 contract v1.0.9 / `STG9MEDIA-001 IN_PROGRESS` unchanged.
+
+**Next:** Keep timer/service stopped and preserve image bytes, filenames and hashes. Future unattended activation or broader library work is a separate operational decision requiring current applicable contract/task authorization and appropriate safety checks; do not infer deployment permission from the three-title product PASS.
+
 ## 2026-11-05 — STG9MEDIA-001 three-title sequential image-only production batch: 3/3 CREATED (Teddy CT108 console)
 
 **User-executed operational checkpoint / approval:** Teddy ran one wrapper from the actual CT108 `root@downloader` shell for exactly `DANDYA-033`, `FC2-PPV-3087371`, and `FC2-PPV-4451371`, internally invoking the immutable Stage9 `--thumbnail-only --existing-image-only` runner **separately, sequentially, one target at a time**. The preflight verified service/timer stopped, pinned release/unit, exact DB holdings/metadata/job states, three NAS video paths/sizes/owners via existing SSH+FileStation, and **NAS-local Primary absent for all three**. Output: `PREFLIGHT=<each>:PASS`, `BATCH_PREFLIGHT=PASS`, `START=<each>`, each `RUNNER_EXIT_CODE=0`, each `RESULT=<each>:CREATED`, each `MEDIA_JOB_HISTORY_UNCHANGED=PASS`, `BATCH_ATTEMPTED=3`, `BATCH_SAFETY=PASS`, `DB_JOB_HISTORY_UNCHANGED=PASS`, `JELLYFIN_IMAGE_API_WRITES=0`, `STAGE9_SERVICE_TIMER_STOPPED=PASS`, `THREE_TITLE_IMAGE_BATCH=COMPLETE`. Each result was corroborated by a subsequent read-only exact NAS-video/Primary-existence check; no old local Primary was overwritten. No generic `--max-items 3` runner or service/timer start was used.

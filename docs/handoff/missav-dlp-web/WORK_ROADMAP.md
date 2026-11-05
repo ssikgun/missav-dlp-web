@@ -1,13 +1,15 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-05 KST (Stage9 v1.0.9 / DANDYA-033 + FC2 두 작품 이미지 묶음 3/3 CREATED; NAS 이름/해시·Jellyfin 화면 검증 대기)
+UPDATED_AT: 2026-11-05 KST (Stage9 v1.0.9 / 3작품 NAS 파일 SHA·Jellyfin 실제 대표 이미지 3/3 제품 PASS / 자동화 별도)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
 ## 0. 최신 확인 결과 — 2026-11-05
+
+- **P00 Stage9 3작품 묶음 파이프라인 NAS+Jellyfin 제품 PASS 3/3 (2026-11-05):** 사용자 CT108 NAS SSH 읽기 전용 검사 `THREE_IMAGE_FILES_READONLY=PASS`: DANDYA-033 `poster.webp` 10,450B SHA256 `804622a549a4b0c1fed16449bbe6e9171066357da709d6666dc1f14c13b809f2`; FC2-PPV-3087371 `cover.jpg` 224,022B SHA256 `fff794dbb30a680280592c5c4ef1434d6e2ba6254451da34457716dac2bae482`; FC2-PPV-4451371 `cover.jpg` 42,756B SHA256 `85f4900525ebc8e22c47131b4fb67fbc4c195fb9930c06b8a71f08e6c652f321`. JPEG/WebP 바이트·크기·정확 경로·일반 파일 확인 PASS. **Teddy가 Jellyfin 일반 UI에서 세 작품 모두 새로 내려받은 이미지와 동일한 대표 이미지 적용을 직접 확인**. 앞 단계 batch 3/3 CREATED, media_jobs 이력 불변, Jellyfin API 이미지 쓰기 0, Stage9 서비스/타이머 중지와 합쳐 **source poster 1건 + Fourhoi fallback 2건의 3작품 순차 파이프라인 제품 PASS**. 계약 v1.0.9 보존; Jellyfin 내부 기존 Primary 유무는 NAS 이미지 생성 차단 조건이 아님. 자동 타이머·전체 라이브러리·병렬 대량 처리는 별도 미검증/미승인. AT-099 및 MBRBI-015 재작업 금지.
 
 - **P00 Stage9 3작품 실제 묶음 이미지 처리 CREATED 3/3 (2026-11-05 CT108 실측):** DRY_RUN 3/3 PASS 이후 사용자 직접 하나의 Bash/Python wrapper로 정확한 3개 제목 순차 개별 runner APPLY, 각 exit 0 + `CREATED`, NAS 로컬 Primary 존재 후검증 3/3, 기존 `media_jobs` 전체 행 불변 PASS, Jellyfin 이미지 API 쓰기 0, Stage9 service/timer 중지 유지 PASS. DANDYA-033 기존 FAILED, FC2-PPV-3087371 기존 COMPLETED/PENDING, FC2-PPV-4451371 기존 media row 없음 모두 유지. 계약 v1.0.9에 따라 Jellyfin 내부 Primary EXIST는 새 NAS 로컬 파일 생성의 차단 조건이 아님. **개별 파일명·이미지 크기·SHA-256 및 Jellyfin 실제 표시 확인은 아직 미실시**이므로 최종 제품 UI PASS로 확대하지 않음. 다음: 세 정확한 NAS 폴더의 신규 sidecar 3건을 읽기 전용으로 이름/크기/SHA 확인하고 사용자 화면 확인. 3개 재실행 금지, AT-099 재실행 금지.
 
