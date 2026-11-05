@@ -1,13 +1,15 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-05 KST (CT108 새 Stage9 릴리스 생성·systemd 전환 PASS / AT-099 이미지 운영 시험 HOLD)
+UPDATED_AT: 2026-11-05 KST (AT-099 단일 이미지 runner COMPLETE·Jellyfin cover.jpg 적용 확인 / NAS 파일 해시 검증 HOLD)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
 ## 0. 최신 확인 결과 — 2026-11-05
+
+- **P00 AT-099 단일 이미지 APPLY 실행 완료, 실물 검증 HOLD (CT108 root 사용자 출력):** 새 불변 Stage9 릴리스 `81be3d8`와 중지 상태를 확인하고 NAS/DB exact-target 사전 검사 및 17개 systemd 인자 분석을 PASS했다. 로컬 Gluetun 경유, `existing-image-only` / 대상 `AT-099` / 제한 1의 dry-run PASS 후 단 한 번 APPLY를 실행해 `RUNNER_EXIT_CODE=0`, `status=COMPLETE`, `image.status=COMPLETE`를 받았다. Jellyfin GET·POST 0, media DB write 0, non-media 실행 0, media-job 이력 전후 동일 PASS, 서비스·타이머 중지 유지. 메타데이터 poster URL이 없어 정적 fallback `cover.jpg`를 기대하지만 **Teddy가 Jellyfin 일반 화면에서 `cover.jpg`가 대표 이미지로 적용된 것을 직접 확인했다(PASS)**. 별도 SSH 경로에서 NAS 실물 이름·파일 크기·JPEG 내용·SHA-256을 독립 검증하는 절차는 아직 HOLD. `AT-099` 재시도 금지, 다른 세 작품 HOLD, 자동/대량 실행 금지. 아래 이전 HOLD·NOT_RUN 항목은 각 기록 시점의 역사이다.
 
 - **P00 Stage9 새 릴리스 배포 설정 PASS (CT108 root 사용자 출력):** 기준 정본 `81be3d8`의 Stage9 파일 6개 SHA와 기존 manifest 29/29, 새 manifest 30/30 및 변경 없는 파일 보존을 검증하고 불변 릴리스 `81be3d8`을 create-only로 생성했다. 운영 백업 경로 `backups/stage9-at099-predeploy-mbmju96z`의 SQLite 2건과 기존 systemd 설정 백업 SHA 검증 PASS. 서비스 unit의 세 릴리스 참조만 새 경로로 원자적 전환, `daemon-reload` 뒤 WorkingDirectory/ExecStart/중지 상태 PASS; 새 unit SHA `25e8454215f35d6b024e60ea18031c124faecbec105f93c16414a6c523951f99`. 구 릴리스 보존, 서비스/타이머 미시작, 이미지 GET·NAS/DB/Jellyfin 쓰기 0. **AT-099 단일 create-only 이미지 실증과 Jellyfin 일반 화면 확인은 HOLD**, 다른 세 작품 및 대량 실행 금지. 이전 항목은 해당 시점의 이력이다.
 
