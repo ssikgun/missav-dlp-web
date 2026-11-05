@@ -1,7 +1,7 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-05 KST (새 Codex 세션 NAS TCP22 PASS / CT108 직접 SSH PASS / FileStation 실제 비교 미완료)
+UPDATED_AT: 2026-11-05 KST (AT-099 실제 SSH·FileStation 읽기 전용 비교 PASS / 운영 배포 HOLD)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
@@ -9,13 +9,15 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-05
 
-- **P00 Codex 네트워크 제한 해소 확인:** CT108에서 Teddy가 `workspace-write + network_access=true + on-request + auto_review`로 새 Codex 세션을 시작했고, 같은 NAS TCP 22번 포트가 코덱스 명령 실행 내부에서도 `CODEX_NAS_TCP22=PASS`로 전환됐다. 예전 `EPERM`은 이전 세션의 샌드박스 제한으로 설명된다. 단, `-C /tmp/p03n-clean-xOKlUfE7/repo`의 Git 정본·브랜치·HEAD는 확인필요. 다음은 해당 작업 트리 검증 후 `AT-099` 실제 SSH와 FileStation GET-only 일치 확인. 운영 이미지 쓰기·제품 승격 HOLD.
+- **P00 AT-099 실제 통합 읽기 전용 PASS:** Codex 기존 키 SSH와 FileStation에서 정확한 경로, 크기 4,782,523,478바이트, 소유자 `admin:users` 및 NAS 로컬 Primary 부재가 일치했고 후보 비교 함수도 PASS. 기존 작품 합성 runner와 신규·폴백 회귀 PASS; 로컬 거버넌스 검사와 21개 smoke PASS. 실제 이미지 GET·운영 DB/NAS/Jellyfin 쓰기 0, 제품 승격·배포·서비스/타이머 시작 NOT_RUN. 업로드 안전성·이미지 내용·Jellyfin 반영은 미검증이며 네 작품 운영 시험 HOLD. 상세는 Stage9 ACTIVE_WORK 참조.
 
-- **P00 실패 원인 분리:** CT108 안에서 실행 중인 Codex의 자체 명령 실행 환경은 NAS `192.168.1.201:22` TCP 연결이 `PermissionError / errno=1`로 차단됨을 실제 확인했다. 같은 CT108의 일반 root 셸은 기존 SSH/POSIX 읽기 전용 검사 PASS. 따라서 Codex 격리 테스트의 live SSH HOLD를 NAS 장애나 제품 로직 실패로 판정하지 않는다. 샌드박스 권한 확장 없이 일반 CT108에서 실제 FileStation 정보와 SSH 결과를 읽기 전용 대조하는 것이 다음 단일 관문이다. 여전히 신규 이미지 생성·배포·4건 시험 HOLD.
+- **P00 Codex 네트워크 확인:** 이전 세션의 TCP22 `EPERM`과 달리 현재 세션의 SSH·FileStation 읽기 전용 검사는 통과했다. 이는 이 세션의 AT-099 검사 결과만 설명하며, 제품 배포·NAS 이미지 쓰기 승인으로 확대되지 않는다.
 
-- **P00 실제 NAS SSH 한 건 PASS:** Teddy가 CT108 일반 root 셸에서 기존 고정 SSH 키·known_hosts로 `AT-099` 실제 폴더·영상에 대한 POSIX `lstat`을 읽기 전용 실행해 `SSH_EXIT_CODE=0`, `NAS_POSIX=PASS`, 영상 크기 `4782523478`바이트를 확인했다. **격리 Codex 후보에서 실패한 SSH/HOLD의 원인은 아직 확인필요**이며, 같은 CT108이어도 Codex 샌드박스의 네트워크 차단 가능성은 미검증이다. 실제 FileStation 조회와 새 후보 비교도 아직 NOT_RUN. 코드 승격·운영 이미지 생성·Jellyfin 확인은 HOLD.
+- **P00 이전 실패와 현재 결과:** 과거 세션의 차단 결과는 NAS나 제품 코드 장애 근거가 아니다. 이번 후보의 SSH와 FileStation 읽기 전용 실제 비교가 통과해 해당 확인 관문은 닫혔다. 파일 생성·배포·네 작품 운영 시험은 별도 HOLD.
 
-- **P00 SSH·기존 작품:** 단일 대상 SSH 검사와 runner 연결을 격리 구현하고 합성 검증했다. 실제 SSH·FileStation 일치 확인은 HOLD이며 운영 배포와 네 작품 시험은 미승인이다.
+- **P00 NAS SSH·FileStation 대조 PASS:** 기존 pinned key/known_hosts로 POSIX parent/folder/video `lstat`을 검사했고, 실제 FileStation `getinfo/list` 및 후보 비교 함수에서 경로·크기·소유자/그룹·Primary 상태가 일치했다. SSH exit 0; 영상 크기 4,782,523,478바이트. 대조는 순차 실행이므로 원자성이나 실제 create-only 동작을 증명하지 않는다.
+
+- **P00 SSH·기존 작품:** 실제 비교 함수와 기존 작품 합성 runner 경로 PASS. 운영 배포 및 네 작품 시험은 미실행/HOLD.
 
 - **P00 기존 작품:** 격리 후보에서 Media DB 행과 독립된 단일 대상·TS 이미지 전용 검사를 합성 검증했다. 운영에서 사용할 현재 링크·일반 파일 검증과 실행 진입점은 미완료이며 배포·4건 시험은 HOLD.
 
