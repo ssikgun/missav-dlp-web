@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-05 — STG9MEDIA-001 WebP fallback hold smoke PASS, automatic page/image verification remains disconnected (Codex 09:57 KST)
+
+Codex reported `teddy_discovery_media_thumbnail.py` and its smoke updated in preserved unpromoted `/tmp/stg9-cover-010f/`: verified-page injection **WebP -> PENDING** rather than mislabel `cover.jpg`, synthetic page-linked JPEG -> `cover.jpg` candidate PASS. Metadata core, FileStation 8, thumbnail 13, jobs/pipeline/runner, diff check PASS reported; full metadata local Unix-socket proxy case NOT RUN owing to sandbox permissions. These synthetic results do not test real new-title automatic fallback.
+
+Canonical collectors confirm `teddy_discovery_held_backfill.py` builds `raw_metadata.result.dvdId/sourceUrl/jacketFullUrl`, stored by `teddy_discovery_javinfo.py`. The payload is historical linkage only. Stage9 runner still cannot fetch/validate the **actual source page HTML** and linked JPEG: configured fetcher only accepts Fourhoi image template, whereas existing injected-page parser expects `missav123.com/ko/<dvd-id>`; observed real rows use `missav.ws/en/<dvd-id>` or JavDatabase `/movies/<dvd-id>`. No real network/DB/NAS/Jellyfin operations, deployment or product commit.
+
+**NEXT one isolated offline scope:** implement a small bounded exact-work page->image verification path for the two observed DB source page forms using existing proxy and Stage9 files only, or report specific missing real-page markup evidence; no blind image URL trust, no WebP relabeling, no broad scraper/schema/production action. All five remain HOLD, no live canary approval. Stage9 `v1.0.6 / STG9MEDIA-001` unchanged; more detail in Stage9 ACTIVE_WORK.
+
 ## 2026-11-05 — STG9MEDIA-001 five-title DB raw_metadata.result source inventory: 1 WebP-URL candidate, 4 HOLD (Codex 09:48 KST)
 
 Codex read-only five-row Stage9 DB inventory found valid `raw_metadata.result` (NOT previous assumed `raw_metadata.item`) for `AT-099`, `DANDYA-033`, `FC2-PPV-3087371`, `FC2-PPV-4451371`, `MBRBI-015`. All recorded IDs match, `raw_metadata.source` matches `metadata_source`, and all `result.sourceUrl` fields exist. Four MissAV records `missav.ws/en/<id>` have **no** recorded image URL. DANDYA JavDatabase `/movies/<id>` has `result.jacketFullUrl` on HTTPS `/covers/` ending `.webp`, which matches existing `titles.cover_url`. Image response/MIME, official role, page linkage at current time unverified; therefore still HOLD. `.webp` bytes cannot simply be relabeled `cover.jpg` under approved JPEG fallback policy. No network or production write, isolated candidate unchanged, no deployment.
