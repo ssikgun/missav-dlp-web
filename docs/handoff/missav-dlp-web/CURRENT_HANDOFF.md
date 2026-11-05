@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-05 — STG9MEDIA-001 correction: user wants four-work integrated poster pipeline test, not manual AT-099 canary
+
+Teddy clarified the acceptance objective: test the **existing Stage9 automated poster pipeline** on four of the prior five no-local-Primary cases. Provisional cohort: `AT-099`, `DANDYA-033`, `FC2-PPV-3087371`, `FC2-PPV-4451371`; exclude previously tested `MBRBI-015`. For each item, attempt a **verified authentic poster** (`poster.<validated-ext>`) first; if unavailable, a verified exact-work site JPEG fallback (`cover.jpg`); otherwise **no file and PENDING**, with reasons recorded. Preserve all current images/video/NFO and make no Jellyfin image API calls. The AT-099 F12/curl 176,781-byte SHA evidence is source-only and does **not** pass the automated pipeline.
+
+Read-only canonical code comparison shows the current poster bundle consumes `titles.cover_url` and returns `COVER_URL_MISSING` if absent, while thumbnail-only candidate logic is separately controlled; it does not establish full automatic official-first/page-validated fallback for the four. Preserved isolated candidate `/tmp/stg9-cover-010f/` is not promoted and previously reported auto fallback INCOMPLETE. No four-title test, deployment, or operational write has occurred.
+
+**NEXT:** bounded audit of current canonical + preserved Stage9 isolated candidate and four exact source/DB rows, then a minimal Stage9-only implementation/test plan and explicit user decision on the current v1.0.6 **one-title local-file canary first** requirement versus a four-title production test. No silent contract or active-task expansion, network re-fetch, NAS/DB/Jellyfin write, service/timer start or shared collector edit. Stage9 v1.0.6 APPROVED / `STG9MEDIA-001 IN_PROGRESS`. Full details in Stage9 ACTIVE_WORK.
+
 ## 2026-11-05 — STG9MEDIA-001 AT-099 approved one-time source GET PASS, SHA pinned; next NAS-create approval separate
 
 Teddy's user-run one-time Gluetun HTTPS GET of the F12-linked `https://fourhoi.com/at-099/cover-n.jpg` completed **PASS**: Stage9 service/timer inactive, curl exit 0, proxy CONNECT 200, HTTP 200, `image/jpeg`, body **176,781 bytes**, valid JPEG start/end signature, SHA-256 **`65ec74216086c52d7d8108285fdd9664faf206964617e3867d72f1c8e2c078d1`**. Script printed `FILES_CREATED=0`, `NAS_DB_JELLYFIN_WRITES=0`; bytes were kept only in memory and discarded. The approved single GET is now **CONSUMED — no retry or replay**. This is an evidenced exact-work page-linked site thumbnail candidate, **not verified official artwork or a persisted JPEG file**. Full decoder/visual check and Jellyfin local-file pickup remain unverified.
