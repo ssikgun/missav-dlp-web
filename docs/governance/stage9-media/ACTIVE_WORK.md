@@ -1,5 +1,21 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-05 — STG9MEDIA-001 user clarifies 4-title integrated official→fallback→pending pipeline test, not one-off AT-099
+
+**User clarification of intended acceptance target:** Teddy does **not** want an isolated `AT-099` URL/download or a separate one-off local `cover.jpg` creation as the product test. He wants the **existing Stage9 poster-related pipeline itself** validated on a **bounded four-work set**: for each existing title lacking a local Primary, attempt the verified authentic poster path first, otherwise try an independently verified exact-work static-JPEG fallback, otherwise make no image file and retain **PENDING** for later bounded retry. A successful run must prove automatic branch selection and reported outcome per work, not merely that a URL manually downloaded.
+
+**Provisional exact four-work test set (derived from the previously inspected exact five, with the already completed/explicitly protected MBRBI-015 omitted):** `AT-099`, `DANDYA-033`, `FC2-PPV-3087371`, `FC2-PPV-4451371`. Exclude `MBRBI-015` and preserve its one-time Jellyfin image state, old Primary backup and NAS `thumb.jpg`. Confirm this interpretation if Teddy indicates a different excluded work.
+
+**Read-only canonical code/implementation check, as of branch SHA `242f5aada265ad3e31f4ecd71fe216f5db6f3d10`:**
+- `teddy_discovery_media_metadata.py::build_media_bundle` consumes existing `titles.cover_url` and returns `PENDING/COVER_URL_MISSING` without a poster fetch when absent. It is not itself a new/source-specific authentic poster search.
+- `teddy_discovery_media_only_runner.py` contains a separately controlled `thumbnail_enabled/thumbnail_only` route using the Fourhoi candidate fetcher. It is not proof that the canonical installed runner automatically performs the v1.0.6 authentic-poster → page-verified fallback → no-image branch for these four titles.
+- Prior Codex isolated candidate `/tmp/stg9-cover-010f/` was not promoted; reported partial synthetic passes but automatic real source-page/image transport and four-title production workflow remained INCOMPLETE. Its actual current bytes/live deployment remain unverified from this GitHub-only review.
+- Earlier AT-099 NAS gap and one-time browser+curl JPEG checks are **source evidence only**. They do not constitute pipeline integration, official-poster priority, NAS create, user-visible Jellyfin pickup or general 4-title acceptance PASS.
+
+**Important scope/authorization boundary:** This records the desired **test objective**, not approval for product edits, four-title external fetching, DB/NAS/Jellyfin writes, deployment, timer start or concurrent bulk retry. Stage9 contract v1.0.6 explicitly requires a separately authorized **one-title local-file canary before wider rollout**; a real four-title write test would expand that gate. Do not silently override it; present the tested minimum isolated Stage9-only design and a contract/task adjustment for Teddy's explicit decision. Do not modify a shared Downloader/Discovery collector without matched workstream authorization. Existing Stage9 service/timer stay stopped.
+
+**NEXT:** perform a bounded read-only gap audit of current canonical Stage9 components vs preserved isolated candidate and exact four-title metadata/source status; propose minimal Stage9-only wiring and representative synthetic official/fallback/no-image/collision checks. Then seek user approval for concrete implementation, deployment and bounded operational acceptance sequence, including whether the v1.0.6 one-title-first gate should be amended to authorize a four-title canary. **Verdict:** `USER_DESIRED_TEST=FOUR_TITLE_PIPELINE_E2E`; `PIPELINE_FOUR_TITLE_E2E=NOT_READY/NOT_RUN`; `AT099_MANUAL_GET=PASS_SOURCE_ONLY`; `PRODUCTION_WRITES=0`; `STG9MEDIA-001 IN_PROGRESS`.
+
 ## 2026-11-05 — STG9MEDIA-001 AT-099 single source-JPEG GET PASS; approval consumed, no files created
 
 Teddy submitted the terminal result of the **one explicitly approved** `root@downloader` HTTPS GET diagnostic against the exact user-F12-linked `https://fourhoi.com/at-099/cover-n.jpg`, via existing `http://127.0.0.1:58888` Gluetun proxy. User-reported result:
