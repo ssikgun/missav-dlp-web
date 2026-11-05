@@ -1,3 +1,9 @@
+## 2026-11-05 — STG9MEDIA-001 AT-099 exact NAS preflight PASS, JPEG source still unverified
+
+Teddy ran and provided the bounded read-only `AT-099` CT108/NAS check on 2026-11-05: `STAGE9_STOPPED=PASS` (both Stage9 service/timer inactive); one exact matched Discovery DB holding `AT/AT-099/AT-099.mp4`; NAS video regular-file/size check `PASS`; NAS folder `/volume1/video/video2/JAV/AT/AT-099`, folder/video owner `admin`; immediate image listing `IMAGE_FILES=[]`, `PRIMARY_FILES=[]`, `THUMB_FILES=[]`; `AT099_NAS=PASS; LOCAL_PRIMARY_MISSING`, `AT099_READONLY_CHECK=COMPLETE`, `NAS_DB_JELLYFIN_WRITES=0`. Evidence is user-submitted, not independently reconnected; folder ownership is not file-creation authorization.
+
+**NEXT:** one short, bounded **read-only exact-page/static-JPEG source check** for `AT-099` (real site page linkage, exact title ID, source URL, validated JPEG bytes/hash). Its earlier `raw_metadata.result` stored no image URL; do not assume an ID-templated Fourhoi link. If verified, seek separate Teddy authorization for exactly one no-clobber NAS `cover.jpg` creation; no Jellyfin API operation, forced scan/refresh, DB change or Stage9 service/timer start. Preserve existing art/user data and historical `MBRBI-015` thumb/Jellyfin image/backup. **Status:** Stage9 contract v1.0.6 APPROVED, `STG9MEDIA-001 IN_PROGRESS`, `AT099_SOURCE=HOLD`, `AT099_LOCAL_FILE_CREATE=NOT_AUTHORIZED`, generalized automatic fallback INCOMPLETE. Canonical Stage9 ACTIVE_WORK holds detailed preflight notes.
+
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
 ## 2026-11-05 — STG9MEDIA-001 canary target correction: MBRBI-015 already visually tested, use AT-099 pending preflight
