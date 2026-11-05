@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-05
 
+- **P00 AT-099 운영 사전 검사 HOLD:** Teddy가 제품 소스를 포함한 정본 `95000e9`의 성공 Actions를 CI 관문으로 승인했다. 현재 Codex 실행 환경에서 PID 1은 `codex`이고 systemd 버스 연결이 `No data available`로 실패해 서비스·타이머 중지 상태는 UNKNOWN. 배포·운영 백업·이미지 요청·생성은 NOT_RUN. 실제 CT108의 중지 상태와 나머지 사전 검사가 확인될 때 승인된 단일 시험 재개.
+
 - **P00 FAILED 이력 보존:** 일반 jobs 변경을 제외하고 이미지 전용 경로의 무행·FAILED/UNKNOWN·COMPLETED/COMPLETE 합성 이력 보존 및 신규·폴백 회귀 PASS. 제품 소스 `6be6133fb0cb070a6ee76417e3e903a35ec3c560` 승격. 해당 제품 전용 커밋은 경로 필터로 Project Governance가 실행되지 않아 배포 관문 HOLD; 운영 시험 NOT_RUN.
 
 - **P00 후보 검토 HOLD:** 실제 FileStation Upload 선택 버전 3 및 overwrite 생략 규칙을 공식 문서와 대조했고 기존 합성 충돌·해시 회귀는 PASS. 후보의 일반 지정 thumbnail-job 경로가 FAILED 행의 thumbnail 상태·오류·시도 횟수를 수정할 수 있어 이력 보존 조건과 충돌한다. 기존 작품 전용 경로는 해당 경로를 우회하지만 후보 전체 승격 전 수정·검증이 필요하다. 운영 배포 및 AT-099 이미지 실행 NOT_RUN.

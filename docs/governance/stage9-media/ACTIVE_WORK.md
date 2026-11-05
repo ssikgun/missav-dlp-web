@@ -1,5 +1,9 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-05 — AT-099 operational preflight HOLD: systemd state unavailable
+
+Teddy explicitly accepted the successful Project Governance run on canonical `95000e94de6c9720b6cd875c02c50ae09449f24d`, whose direct parent is product commit `6be6133fb0cb070a6ee76417e3e903a35ec3c560` and whose changes are only this active-work file and WORK_ROADMAP. The exact-target AT-099 deployment and one image-only trial remain authorized. Codex read-only preflight found the remote branch at that SHA, but `systemctl is-active teddy-stage9-media.service teddy-stage9-media.timer` failed: `Failed to connect to system scope bus via local transport: No data available`; PID 1 in this execution environment is `codex`. Thus current service/timer state is UNKNOWN, not stopped. Deployment, operational backup, image request and AT-099 execution are HOLD/NOT_RUN. No systemd start, NAS/DB/Jellyfin write, or product deployment was performed. Resume only when the actual CT108 systemd state can be reliably read, then complete the already authorized remaining safety preflight.
+
 ## 2026-11-05 — FAILED history isolation and source promotion checkpoint
 
 The historical general thumbnail job already existed and selected only COMPLETED/COMPLETE; the candidate had newly expanded it to FAILED. The existing-image-only runner uses its separate processor and does not call run_thumbnail_jobs. A new isolated candidate preserved the prior candidate and excluded both jobs-module changes, restoring the original normal thumbnail target gate. Synthetic exact-target runs preserved every media_jobs column for no target row, FAILED/UNKNOWN, and COMPLETED/COMPLETE; new-download runner and image priority/fallback regression PASS. FileStation, thumbnail, verifier and original jobs smoke PASS. Source promoted as `6be6133fb0cb070a6ee76417e3e903a35ec3c560`; no deployment or live image attempt.
