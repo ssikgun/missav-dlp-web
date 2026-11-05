@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-05 — STG9MEDIA-001 existing-collector gaps confirmed: JavDatabase alt substring and MissAV no image field (Codex 10:10 KST)
+
+2026-11-05 10:10:47 KST Codex report: **INCOMPLETE**, no additional isolated file changes. `teddy_discovery_javdatabase_movie.py` selected thumbnail image with substring alt DVD ID test, despite exact movie-page DVD ID validation; not strong enough for exact alt image association. `teddy_discovery_missav_movie.py` handles exact detail metadata but returns no representative image URL, and Stage9 proxy fetcher remains limited to Fourhoi template image instead of exact stored MissAV/JavDatabase page->image requests. Independent GitHub source read supports these two gaps. All source URLs/ID templates alone are insufficient to publish `cover.jpg`.
+
+Metadata core, FileStation 8, thumbnail 13, jobs/pipeline/runner regression, diff check PASS per Codex; metadata proxy socket test and actual site HTML/image compatibility NOT RUN. Still no new/existing title automatic safe fallback. No external network, DB/NAS/Jellyfin changes, production/deploy/code commit, and prior isolated candidate `/tmp/stg9-cover-010f/` preserved.
+
+**NEXT:** small Stage9-only offline exact-ID image association gate plus constrained page/image proxy seam, using existing validator, first source only. Keep MissAV image path PENDING pending real trusted HTML/link evidence, and report exact limited real-page read-only validation required before any live write. Do not change shared Discovery collector unless all affected workstreams authorize. No production/commit/push. Stage9 v1.0.6/STG9MEDIA-001 unchanged. Full detail in Stage9 ACTIVE_WORK.
+
 ## 2026-11-05 — STG9MEDIA-001 WebP fallback hold smoke PASS, automatic page/image verification remains disconnected (Codex 09:57 KST)
 
 Codex reported `teddy_discovery_media_thumbnail.py` and its smoke updated in preserved unpromoted `/tmp/stg9-cover-010f/`: verified-page injection **WebP -> PENDING** rather than mislabel `cover.jpg`, synthetic page-linked JPEG -> `cover.jpg` candidate PASS. Metadata core, FileStation 8, thumbnail 13, jobs/pipeline/runner, diff check PASS reported; full metadata local Unix-socket proxy case NOT RUN owing to sandbox permissions. These synthetic results do not test real new-title automatic fallback.
