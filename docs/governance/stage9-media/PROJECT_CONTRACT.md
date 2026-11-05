@@ -1,12 +1,26 @@
 # Stage9 Media workstream contract
 
-CONTRACT_VERSION: 1.0.7
+CONTRACT_VERSION: 1.0.8
 PROJECT_CONTRACT_STATUS: APPROVED
 APPLIES_TO: Stage9 media metadata, NFO/poster lifecycle, publication state, and Jellyfin item-state integration.
 
 This contract approves the Stage9 Media design and safety goals only. It does not authorize product implementation, tests, deployment, runtime changes, or writes to production databases, NAS, or Jellyfin. Each such activity requires a separate active task with explicit user approval.
 
-## Existing accepted metadata poster + verified page-linked fallback — 2026-11-05 (CURRENT; v1.0.7)
+## Metadata poster priority + deterministic exact-ID Fourhoi fallback — 2026-11-05 (CURRENT; v1.0.8)
+
+**TEDDY EXPLICITLY APPROVED:** For a uniquely identified, present owned movie missing any Jellyfin-recognized NAS-local Primary image, keep the existing Stage8-accepted metadata `titles.cover_url` poster retrieval first. A successful validated original source image is created as `poster.<actual validated extension>` (including WebP/JPEG/PNG). Do not invent a publisher-certified official-image flag or reopen the historical Stage8 85/85 PASS.
+
+**Approved fallback simplification:** If there is no accepted metadata poster URL, or the existing bounded poster retrieval cannot obtain a usable image without a security/identity error, form exactly one static Fourhoi candidate from the DB-verified normalized movie ID: `https://fourhoi.com/<lowercase-validated-DVD-ID>/cover-n.jpg`. This ID-based URL convention is an **approved candidate selection method**, **not independent proof that the site JPEG depicts the correct movie**. Unlike v1.0.7, no stored work-page URL, page HTML, canonical, OG metadata, or page-to-image link verification is required before attempting this exact candidate. Do not crawl alternate domains/paths or infer work IDs from an unrelated page. A bounded, safely fetched and validated real JPEG may be **created without overwrite** as `cover.jpg`; failed, empty, invalid, ambiguous or missing image -> PENDING/no new image. A safety or ownership/identity failure -> HOLD, not a fallback bypass.
+
+**Security and data protections retained:** Unique exact current DB-owned movie/video identity, safe normalized DVD ID and NAS folder/path ownership, symlink/regular-file checks, exact HTTPS host/path allowlists, existing fixed Gluetun proxy route and no direct network fallback, redirects off, existing size/time/request limits, MIME/magic/bytes and matching extension checks, checksum and atomic/create-only/no-clobber publication, existing attempts/history boundaries. Never overwrite, rename or delete any poster, cover, thumb, NFO, MP4, subtitle, Jellyfin Primary or backup. Existing local `poster/cover/folder/default/movie` Primary means SKIP; `thumb.jpg` alone does not. No Jellyfin automatic image API changes, forced scans or refresh.
+
+**Product completion target:** Reuse the same source-poster-first -> direct static fallback -> PENDING/SKIP/HOLD logic for both new Stage9 completed downloads and approved existing locally uncovered movies. Verify offline branches: existing Primary SKIP, source-poster success (including WebP), absent/failed source->Fourhoi valid JPEG `cover.jpg`, both missing PENDING, unsafe/collision HOLD, plus injection-guarded end-to-end pipeline/runner wiring and regression. Do not apply item-specific exceptions. Use exactly the agreed four-title trial `AT-099`, `DANDYA-033`, `FC2-PPV-3087371`, `FC2-PPV-4451371`; exclude `MBRBI-015` and preserve its consumed test/backup. Observe the first created local Primary's ordinary Jellyfin pickup **visually** before the other three; this mitigates, but does not automatically prove away, the wrong-image risk from template-based mapping. No 59-title bulk run.
+
+**Authorization:** This is an expressly user-approved Stage9 **contract/design change** plus already requested **isolated offline Stage9 implementation and regression** under `STG9MEDIA-001`. It is **not** a deployment, live GET, production NAS/DB/Jellyfin write, service/timer start, or four-title create-only test approval. Obtain a separate exact operational approval when offline readiness and safe release proposal are established. No unrelated Downloader, Discovery Writer, Stage11, UI or timer changes without matching authorization.
+
+**Supersedes only:** v1.0.7 fallback requirement to fetch the stored page and establish canonical/OG page-to-Fourhoi link. v1.0.7 acceptance of metadata `cover_url` as the existing source poster remains current; all other proven safety and data-preservation requirements stay in force.
+
+## Existing accepted metadata poster + verified page-linked fallback — 2026-11-05 (HISTORICAL; fallback page linkage superseded by v1.0.8)
 
 **DESIGN CLARIFICATION EXPRESSLY APPROVED BY TEDDY:** The established Stage8/Stage9 source-cover pipeline is the accepted poster path. When an exact-work metadata record supplies `titles.cover_url`, use that existing source-poster retrieval/validation path and preserve the actual validated image extension (JPEG/PNG/WebP) in `poster.<extension>`. **Do not add a new publisher-issued/independently certified “official poster” flag or demand publisher-origin attestation solely to continue this previously accepted source-cover behavior.** “Poster” in this workflow means an accepted metadata-source poster image for the correct movie; it is **not** a factual claim that the original publisher issued or certified the image. The historic 85/85 Stage8 successful posters (83 WebP, 2 JPEG) remain accepted; do not re-fetch, relabel, reclassify or re-audit them without specific contrary evidence.
 

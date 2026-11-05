@@ -1,13 +1,15 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-05 KST (Stage9 포스터 자동 폴백 INCOMPLETE / NFO 완료 증거 정리 / 파일관리 UI 후속 등록)
+UPDATED_AT: 2026-11-05 KST (Stage9 v1.0.8 폴백 설계 승인 / 제품 구현 미완성 / 파일관리 UI 후속 유지)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
 ## 0. 최신 확인 결과 — 2026-11-05
+
+- **P00 v1.0.8 설계 승인 (2026-11-05):** Teddy가 저장된 작품 페이지 canonical/OG 연결 증명 조건 대신, DB에서 검증된 작품 ID로 정확한 `https://fourhoi.com/<소문자 작품ID>/cover-n.jpg` 한 주소만 폴백 후보로 시도하는 방식을 승인했다. 기존 메타데이터 `cover_url` 포스터 `poster.<확인된 확장자>`가 우선이며, 이 경로 실패·부재 시 유효한 Fourhoi JPEG만 `cover.jpg` create-only. HTTPS/프록시/형식·크기/덮어쓰기 방지와 첫 신규 파일 Jellyfin 화면 확인 유지. 주소 규칙만으로 이미지 내용의 작품 일치가 증명되지는 않는다. **설계 승인 완료 / 제품 구현 미완성 / 운영 4건 NOT_RUN**. 새 코드·서비스·NAS/DB/Jellyfin 운영 변경 미승인.
 
 - **P00 v1.0.7 후보:** 기존 포스터 경로 복원 및 격리된 페이지·JPEG 연결을 일부 검증했다. 실제 저장된 페이지 형식과 신규 작품 자동 실행 연결이 미완료이므로 제품 소스 미반영, 4건 운영 시험 NOT_RUN.
 
@@ -21,7 +23,7 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 - **실사용 NFO 자동화:** Stage9 10분 타이머 설정·자연 기동·신규 MBRBI-015 NFO 생성 및 Jellyfin 작품번호 표시 **한 작품 제품 시험 PASS(11월 2일)**. 11월 4~5일 포스터 진단에서는 전용 서비스·타이머 **중지 상태가 확인**되었으며, 과거 10분 운영 PASS를 현재 활성 상태로 오해하거나 무단 재시작하지 않는다.
 - **현재 집중:** 기존 포스터 경로를 보존하고 정확한 작품의 Fourhoi JPEG만 `cover.jpg`로 이어 주는 **Stage9 자동 폴백 완성 → 오프라인 회귀 → 4개 작품 통합 시험**. `AT-099`, `DANDYA-033`, `FC2-PPV-3087371`, `FC2-PPV-4451371`만 대상으로 하고 `MBRBI-015`는 제외한다. Codex 11:56 KST 문서 커밋 `d7c0bdb443ba0eac31d008f56e54ba50e2b2b08f`까지 **구현 INCOMPLETE, 운영 쓰기 0**.
 
-**최신 근거:** `docs/governance/stage9-media/ACTIVE_WORK.md`, `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md`, Stage9 계약 v1.0.7. 이 로드맵의 완료 표시는 해당 확인 범위만 닫고, 각 작업의 계약·승인 상태는 변경하지 않는다.
+**최신 근거:** `docs/governance/stage9-media/ACTIVE_WORK.md`, `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md`, Stage9 계약 v1.0.8. 이 로드맵의 완료 표시는 해당 확인 범위만 닫고, 각 작업의 계약·승인 상태는 변경하지 않는다.
 
 > 10월 30일 P03-H 상세 조사·대상·해시와 당시 보류 이력은 Git 기록 및 Stage9 ACTIVE_WORK에서 확인한다. 이 로드맵에서는 11월 2일의 실제 완료 결과를 현재 상태로 우선 표시한다.
 
@@ -38,7 +40,7 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 | 순번 | ID | 기능별 작업 | 현재 상태 (2026-11-05) | 다음 단계 / 완료 조건 / 승인 |
 | --- | --- | --- | --- | --- |
-| 0 | P00 | **Stage9 포스터 자동화 완성 및 4개 작품 통합 시험** | **진행 중 — 구현 INCOMPLETE / 실전 4건 NOT_RUN** | 완료된 기존 메타데이터 기반 정식 포스터(형식별 `poster.*`) 보존 → URL 없거나 신뢰할 수 없는 경우 페이지·작품 일치 검증된 Fourhoi JPEG를 `cover.jpg` create-only → 둘 다 없으면 PENDING. 최소 오프라인 회귀 후 동일 경로로 정확한 4건 시험. 첫 신규 로컬 이미지의 Jellyfin 표시 확인을 통과한 뒤 나머지 3건. 운영 배포/쓰기 및 서비스 시작은 별도 승인. 260개 전체 재처리 금지. |
+| 0 | P00 | **Stage9 포스터 자동화 완성 및 4개 작품 통합 시험** | **진행 중 — 구현 INCOMPLETE / 실전 4건 NOT_RUN** | 기존 `titles.cover_url` 포스터 `poster.<검증된 확장자>` 우선 → 이미지 확보 실패/URL 부재 시 DB 작품 ID로 생성한 정확한 Fourhoi `cover-n.jpg` 한 후보를 안전 검증해 `cover.jpg` create-only → 둘 다 없으면 PENDING, 안전·소유권 이상은 HOLD. 최소 오프라인 회귀 후 동일 경로로 정확한 4건 시험. 첫 신규 로컬 이미지의 Jellyfin 표시 확인을 통과한 뒤 나머지 3건. 운영 배포/쓰기 및 서비스 시작은 별도 승인. 260개 전체 재처리 금지. |
 | 1 | P01 | **미디어 자동화 잔여 항목 원인 확인** (과거 Stage9 Media) | **완료 — 조사 범위 한정** | 2026-10-29 당시 CT108 읽기 전용 DB 확인: COMPLETED 122, FAILED 3, PENDING/RUNNING 0; 오래된 COMPLETED/UNKNOWN 조합 108, 포스터 PENDING 8건 모두 COVER_URL_MISSING, FNS-267 내부 Jellyfin CHECK_PENDING 1건, 당시 타이머 active 및 마지막 서비스 Result=success. 현재 타이머는 포스터 작업 중 중지 상태. 강제 재시도·정리·DB 변경은 별도 항목 P01-H로 **보류**. |
 | 2 | P02 | **루트/Overlay 중복 파일 5쌍의 읽기 전용 정밀 검수** | **완료 — 정적 소스·패치 비교 범위만 (2026-10-29)** | 5쌍 모두 분석: HTML은 최종 Overlay 기준 UI/패치 순서, 저장 코드는 no-overwrite·SHA-256, 엔트리포인트는 HLS/MP4, 부트스트랩은 보호된 게시·복구, 앱은 영속 상태·재시도 안전성 차이가 핵심. 실제 빌드 중간 산출물과 새 단일 원본의 byte-identical 동등성은 미검증이며 P04 구현·검증 승인 시 별도 확인. 소스·이미지·운영 변경 0. |
 | 3 | P03 | **NFO 작품번호 표시·Jellyfin 검색 및 신규 NFO 자동화** | **대표 제품 시험 PASS / 완료된 세부 작업 정리, 전체 일관성 확인필요** | 기존 `movie.nfo` 129개 존재·XML/ID PASS, 기존 NFO 품번 제목 보정 225건 PASS, 기존 누락 NFO 3건 복구 PASS, Stage9 10분 타이머·실제 신규 MBRBI-015 NFO/Jellyfin 표시 PASS(11/02), EBWH-350 실제 품번 검색 PASS(10/30). **완료한 NFO를 재생성하지 않는다.** 전체 260개 NAS NFO/필드 완전성은 아직 조사 안 됨. 잔여 예외만 별도 범위 승인 뒤 처리; 타이머는 현재 포스터 작업 중지 상태 유지. |
