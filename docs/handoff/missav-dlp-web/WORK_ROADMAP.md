@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-06
 
+- **P08 포스터 보수적 보완 보고(17:04:02):** 정상 헤더만으로 `PRESENT` 확정하던 문제 제거. 현재 인식된 로컬 Primary는 정상·손상 모두 `UNKNOWN`, `thumb.jpg` 단독/확인된 부재는 `ABSENT`이므로 **유효 포스터 집계 목표는 미완료**. 오프라인 smoke 5종 및 `git diff --check`는 Codex 보고상 PASS, 독립 diff 검토·NAS 이미지 디코더 확인·실운영 검증/배포는 `NOT_RUN`. 다음은 NAS 디코더/처리 한도 읽기 전용 점검.
+
 - **P08LIB-001 후보 오프라인 테스트 보고(16:56:01):** 격리 `/tmp/p08lib-001-work`에서 UI/API·smoke 5종·`git diff --check` PASS를 Codex가 보고(독립 재검증 전). 단, 포스터는 헤더 서명만 확인하여 손상 이미지까지 `PRESENT`로 잘못 집계할 수 있음. **이미지 무결성 보완 필요 → P08 제품 완료 보류.** Stage9 작업 상태 `UNKNOWN`, 실운영 검증/배포 `NOT_RUN`, 제품 소스 Git 승격 없음.
 
 - **P08 오프라인 구현 승인 정본 반영·검사 PASS:** 승인 범위는 `db51f021337d9061a11a61dfeeea06fee22edc26`의 4개 `ACTIVE_WORK.md`·로드맵·인계에 반영되었고 GitHub Project Governance run `42183404910`이 `success`. 코드 구현과 대표 테스트는 아직 `NOT_RUN`; Docker·NAS·DB·Stage9 운영 변경도 `NOT_RUN`.

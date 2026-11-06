@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — P08LIB-001 poster false-PRESENT prevented; product poster metric still blocked (17:04:02 KST)
+
+**Codex/user report, diff not independently inspected:** isolated candidate `/tmp/p08lib-001-work` fixed `teddy_library_api.py` and `teddy_library_api_smoke.py`; full candidate patch `/tmp/p08lib-complete-candidate.patch`, focused poster patch `/tmp/p08lib-poster-integrity.patch` exist on Teddy's CT108, **not uploaded to this workspace**. Current recognized named poster files now map to `UNKNOWN` regardless of validity because remote NAS validated full decoder unavailable/unverified; only `thumb.jpg` and confirmed Primary absence map to `ABSENT`. This is a **safe fail-closed mitigation, not completion of poster counts**. No new NAS byte reads/SSH calls, no new image decoder dependency; NFO, subtitle and size logic preserved.
+
+**Reported regression PASS** using existing Python 3.10 test environment: `teddy_library_api_smoke.py` with valid-intent JPEG/PNG/WebP (also `UNKNOWN`), damaged/truncated formats, 100 MiB size, thumb-only, missing and inventory-failure cases; `teddy_library_ui_smoke.py`, `teddy_file_management_navigation_smoke.py`, `teddy_library_delete_dryrun_smoke.py`, `teddy_library_delete_commit_smoke.py`, `git diff --check`. No actual valid-vs-corrupt full-decode test PASS. Operational NAS image decoder availability, bounded time/byte budget, browser desktop/mobile visuals, runtime data, Docker deploy, source commit/push remain **NOT_RUN**.
+
+**Next safety-gated step:** read-only NAS decoder/tool and resource availability preflight, then propose bounded validation (or deliberate UNKNOWN design with Teddy's explicit product decision). Avoid unbounded new reads and never count `UNKNOWN` as `PRESENT`. Review actual patch contents before product source promotion. `P08LIB-001` remains active; Stage11 and Stage9 runtime unchanged.
+
 ## 2026-11-06 — P08LIB-001 CT108 offline candidate test report; poster-integrity blocker (16:56:01 KST)
 
 **Reported by Codex/user; source diff not independently reviewed here.** Isolated candidate worktree `/tmp/p08lib-001-work`, branch `teddy-subtitle-stage11`, base/remote `0df82e15c37cbd159854794a9e6b1ce96aa768e8`; original working directory changes preserved. Candidate files: `teddy_library_api.py`, `downloader_runtime_overlay/templates/index.html`, `templates/teddy-library.js`, `templates/teddy-library.css`, `teddy_library_api_smoke.py`. Reported: five summary cards and three subtitle/NFO/poster sections; bounded inventory NFO/Primary stats; full holdings summary distinct from filtered list.
