@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-06
 
+- **P08 최종 후보 업로드 및 독립 코드 검토(17:46 KST):** 업로드 패치 SHA-256 `22476e19e1f234bdf22222ea003e7d733572e3fa871ee4d09693e7be2ae035e5`를 격리 worktree에 적용해 허용된 5파일만 변경됨을 확인. diff/문법, JS 검사, 가짜 NAS 포스터/NFO 판정, Overlay 연결 표식, 기존 루트 UI/이동 smoke PASS. 다만 기존 UI smoke는 **실제 최종 Overlay HTML이 아닌 루트 HTML**을 읽으므로 해당 경로 전용 대표 smoke 1건 보완 권고. 이 환경에는 Flask가 없어 API·삭제 smoke 3개는 import 전 중단(CT108의 기존 Codex PASS 보고는 유지하되 독립 재실행 PASS로 표현하지 않음). DB상 보유·NAS 영상 실재 불일치 시 포스터를 셀 수 있는 사례는 기존 DB `present=1` 기준의 경계로 기록, 별도 의미 판단 필요. **정본 제품 승격/배포 미승인**, 운영 변경 0.
+
 - **P08 포스터 파일 존재 판정 후보 수정 완료 보고(17:33:22 KST):** 기존 `/tmp/p08lib-001-work` 오프라인 후보에서 인정 파일명·안전한 일반 파일·0바이트 초과는 `PRESENT`, 검증된 부재는 `ABSENT`, 조회 실패·위험한 파일·빈 파일은 `UNKNOWN`으로 수정했다고 Teddy가 Codex 결과를 전달. 이미지 전체 손상/디코딩 검사는 하지 않음. 변경 후보 파일 5개(API·최종 Overlay HTML·라이브러리 JS/CSS·API smoke), API/UI/이동/삭제 준비/삭제 확정 smoke 및 `git diff --check` **보고상 PASS**. 최종 패치 `/tmp/p08lib-final-candidate.patch`는 CT108에 보존; **ChatGPT의 실제 diff 독립 검토·실행은 NOT_RUN**. 후보 기준 `0df82e15`, 정본 확인 `140293f`; 두 커밋 사이 제품 소스 변경 0건. **다음은 후보 원문 검토 후 별도 정본 승격 결정**. NAS·브라우저·Docker 배포 NOT_RUN, Stage9 작업 상태 UNKNOWN, 운영 변경 없음.
 
 - **P08 포스터 기준 Teddy 승인:** 이미지 전체 손상/디코딩 검증 제외. NAS에 안전한 일반 파일로 존재하고 포스터 이름/확장자·0바이트 여부가 확인되면 `PRESENT`; 실제 부재는 `ABSENT`, 조회·안전 여부 불확실하면 `UNKNOWN`. 포스터 파일 '보유 현황' 카드로 표시하며 JPEG/PNG/WebP 변환·전체 디코딩·추가 NAS 대량 조회 금지. 기존 후보의 '전부 UNKNOWN' 임시 처리를 이 기준으로 좁혀 수정하고 오프라인 smoke 후 리뷰. 배포/정본 제품 승격 별도 승인.
