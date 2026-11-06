@@ -26,7 +26,7 @@ def main():
     require("JAV 보유 작품 · 자막 · Jellyfin 상태" in HTML, "File Management subtitle")
     require('data-file-management-view="library" aria-selected="true">보유 라이브러리' in HTML,
             "Library is default subtab")
-    require('data-file-management-view="subtitle-status" aria-selected="false">자막 처리 현황' in HTML,
+    require(('data-file-management-view="subtitle-status" aria-selected="false">' + ('라이브러리 DB 현황' if 'id="libraryDbStatus"' in HTML else '자막 처리 현황')) in HTML,
             "subtitle status subtab")
     require('id="librarySummary"' in HTML and 'id="librarySearch"' in HTML
             and 'id="libraryFilter"' in HTML and 'id="librarySort"' in HTML
