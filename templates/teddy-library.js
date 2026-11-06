@@ -78,19 +78,21 @@
     }
 
     function renderSummary(data) {
-        const value = data || {};
-        const total = Number(value.total_titles) || 0;
-        const size = formatBytes(value.library_known_total_bytes);
-        const sizeText = value.size_complete && size
-            ? `💾 전체 라이브러리 ${size}`
-            : `💾 확인된 용량 ${size || '계산 불가'} · ${Number(value.size_unknown_count) || 0}개 확인 필요`;
-        summary.innerHTML = `<div class="library-summary-text">
-            <span>🎬 전체 ${total.toLocaleString()}작품</span>
-            <span>📝 한국어 자막 ${Number(value.ko_present_count) || 0}</span>
-            <span>🧩 자막 미해결 ${Number(value.unresolved_count) || 0}</span>
-            <span>📭 자막 없음 ${Number(value.no_subtitle_count) || 0}</span>
-            <span>${sizeText}</span>
+        const v = data || {}, n = v.nfo_counts || {}, p = v.poster_counts || {};
+        const count = x => Number(x) || 0;
+        const size = formatBytes(v.library_known_total_bytes) || '계산 불가';
+        const card = (title, main, detail) => `<div class="library-metric"><span>${title}</span><strong>${main}</strong><small>${detail}</small></div>`;
+        summary.innerHTML = `<div class="library-summary-cards">
+            ${card('현재 보유 작품', `${count(v.total_titles)}작품`, `검색 결과 ${count(v.filtered_count)}작품`)}
+            ${card('한국어 자막', `${count(v.ko_present_count)}작품`, `없음 ${count(v.no_subtitle_count)} · 미해결 ${count(v.unresolved_count)} · 확인 필요 ${count(v.mismatch_count)}`)}
+            ${card('유효한 로컬 NFO', `${count(n.VALID)}작품`, `없음 ${count(n.ABSENT)} · 오류 ${count(n.INVALID)} · 확인 불가 ${count(n.UNKNOWN)}`)}
+            ${card('NAS 로컬 포스터 파일', `${count(p.PRESENT)}작품`, `없음 ${count(p.ABSENT)} · 확인 불가 ${count(p.UNKNOWN)}`)}
+            ${card(v.size_complete ? '전체 용량' : '확인된 용량', size, `확인 불가 ${count(v.size_unknown_count)}작품`)}
         </div>`;
+        const db = document.getElementById('libraryDbStatus');
+        if (db) db.innerHTML = `<section><h3>자막 상태 · 현재 보유 작품</h3><p>한국어 자막 ${count(v.ko_present_count)} · 없음 ${count(v.no_subtitle_count)} · 미해결 ${count(v.unresolved_count)} · 확인 필요 ${count(v.mismatch_count)}</p></section>
+            <section><h3>NFO 상태 · NAS 로컬</h3><p>유효 ${count(n.VALID)} · 없음 ${count(n.ABSENT)} · 오류/충돌 ${count(n.INVALID)} · 확인 불가 ${count(n.UNKNOWN)}</p><p>DVD-ID.nfo 및 movie.nfo 기준</p></section>
+            <section><h3>포스터 파일 상태 · NAS 로컬 Primary</h3><p>보유 ${count(p.PRESENT)} · 없음 ${count(p.ABSENT)} · 확인 불가 ${count(p.UNKNOWN)}</p><p>파일 존재 기준 · 이미지 무결성은 확인하지 않음</p><p>Stage9 작업 상태: 확인 불가</p></section>`;
     }
 
     function detailCell(label, value) {

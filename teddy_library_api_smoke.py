@@ -9,6 +9,8 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import struct
+import zlib
 from pathlib import Path
 
 from flask import Flask
@@ -16,7 +18,7 @@ from werkzeug.security import generate_password_hash
 
 from teddy_discovery_organizer import canonical_destination
 from teddy_discovery_subtitle import derive_target_ko_relative
-from teddy_library_api import create_library_blueprint, _INVENTORY_SCRIPT, _is_canonical_dvd_id, _reason
+from teddy_library_api import create_library_blueprint, _INVENTORY_SCRIPT, _is_canonical_dvd_id, _reason, _sidecar_states
 import teddy_auth
 import teddy_discovery_runtime
 import teddy_storage
@@ -71,6 +73,49 @@ def main():
         def remote(relative):
             proc=subprocess.run([sys.executable,"-c",_INVENTORY_SCRIPT,nas_root,json.dumps([relative])],capture_output=True,text=True,check=True)
             return json.loads(proc.stdout)[relative]
+        def sidecars(): return _sidecar_states(object(), remote("ABCD/ABCD-123"), "ABCD-123")
+        assert sidecars() == ("ABSENT", "ABSENT")
+        nfo=title/"ABCD-123.nfo"
+        nfo.write_text("<movie><id>ABCD-123</id></movie>")
+        assert sidecars()[0] == "VALID"
+        nfo.rename(title/"movie.nfo")
+        assert sidecars()[0] == "VALID"
+        nfo.write_text("<movie><id>ABCD-123</id></movie>")
+        assert sidecars()[0] == "INVALID"
+        nfo.unlink(); (title/"movie.nfo").write_text("<movie>")
+        assert sidecars()[0] == "INVALID"
+        (title/"movie.nfo").write_text("<movie><id>OTHER-123</id></movie>")
+        assert sidecars()[0] == "INVALID"
+        (title/"movie.nfo").unlink()
+        # File presence does not require decoding or prove image integrity.
+        def chunk(kind, data):
+            return struct.pack(">I", len(data))+kind+data+struct.pack(">I", zlib.crc32(kind+data) & 0xffffffff)
+        png=(b"\x89PNG\r\n\x1a\n"+chunk(b"IHDR",struct.pack(">IIBBBBB",1,1,8,2,0,0,0))+
+             chunk(b"IDAT",zlib.compress(b"\0\xff\0\0"))+chunk(b"IEND",b""))
+        jpeg=base64.b64decode("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdAB//2Q==")
+        webp=base64.b64decode("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA")
+        for name, content in (("cover.jpg",jpeg),("poster.png",png),("poster.webp",webp)):
+            image=title/name
+            image.write_bytes(content)
+            assert sidecars()[1] == "PRESENT"
+            image.write_bytes(content[:16]+b"corrupt")
+            assert sidecars()[1] == "PRESENT"
+            image.write_bytes(content[:12])
+            assert sidecars()[1] == "PRESENT"
+            image.unlink()
+        image=title/"poster.webp"
+        with image.open("wb") as f: f.truncate(100*1024*1024)
+        assert sidecars()[1] == "PRESENT"
+        image.write_bytes(b"")
+        assert sidecars()[1] == "UNKNOWN"
+        image.unlink()
+        (title/"thumb.jpg").write_bytes(jpeg)
+        assert sidecars()[1] == "ABSENT"
+        (title/"thumb.jpg").unlink()
+        assert sidecars()[1] == "ABSENT"
+        assert _sidecar_states(None, {}, "ABCD-123") == ("UNKNOWN", "UNKNOWN")
+        assert _sidecar_states(object(), {"status":"unknown"}, "ABCD-123") == ("UNKNOWN", "UNKNOWN")
+        assert _sidecar_states(object(), {"status":"ok", "primary_files":[None]}, "ABCD-123")[1] == "UNKNOWN"
         first=remote("ABCD/ABCD-123")
         assert first["status"]=="ok" and first["bytes"]==5
         (title/"link").symlink_to(title/"ABCD-123.mp4")
@@ -150,7 +195,9 @@ def main():
         assert not data["summary"]["size_complete"] and data["summary"]["library_known_total_bytes"]==4000 and data["summary"]["size_unknown_count"]==1
         assert by_id["EBWH-296"]["jellyfin_state"]=="RECOGNIZED"
         assert by_id["SKMJ-774"]["jellyfin_state"]=="ABSENT"
-        assert client.get("/api/library?q=ebwh-296").get_json()["items"][0]["dvd_id"]=="EBWH-296"
+        filtered=client.get("/api/library?q=ebwh-296").get_json()
+        assert filtered["items"][0]["dvd_id"]=="EBWH-296" and filtered["summary"]["total_titles"]==5 and filtered["summary"]["filtered_count"]==1
+        assert filtered["summary"]["stage9_job_status"]=="UNKNOWN"
         assert client.get("/api/library?q=test+title+miad").get_json()["items"][0]["dvd_id"]=="MIAD-866"
         assert len(client.get("/api/library?ko=present").get_json()["items"])==1
         assert len(client.get("/api/library?ko=absent").get_json()["items"])==1

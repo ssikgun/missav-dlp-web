@@ -531,3 +531,11 @@ html[data-theme="dark"] .library-delete-commit {
         grid-template-columns: 1fr;
     }
 }
+
+.library-summary-cards, .library-db-status { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; width: 100%; }
+.library-metric, .library-db-status section { padding: 12px; border: 1px solid #94a3b8; border-radius: 8px; }
+.library-metric { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.library-metric strong { font-size: 20px; }
+.library-metric small, .library-db-status p { line-height: 1.5; }
+.library-db-status h3 { margin: 0; font-size: 15px; }
+.library-db-status p { margin: 8px 0 0; }

@@ -166,4 +166,39 @@ require('data-file-management-view="library"' in html and 'data-file-management-
         "File Management subtabs missing")
 require('GET' not in js, "unexpected Library method marker")
 
+# Docker's final HTML comes from the runtime overlay, not the root template.
+overlay = (root / "downloader_runtime_overlay/templates/index.html").read_text()
+for marker in ('data-page="library"', 'id="page-library"',
+               'data-file-management-view="library"', '보유 라이브러리',
+               'data-file-management-view="subtitle-status"', '라이브러리 DB 현황',
+               'data-file-management-panel="library"',
+               'data-file-management-panel="subtitle-status"', 'id="libraryDbStatus"',
+               'id="subtitle-status-panel"', 'id="subtitle-status-current"',
+               'id="subtitle-count-published"', 'id="subtitle-count-pending"',
+               'id="subtitle-count-retryable"', 'id="subtitle-count-terminal"',
+               'id="subtitle-count-unresolved"', '/static/teddy-subtitle-status.css',
+               '/static/teddy-library.js', '/static/teddy-library.css',
+               "window.playLibraryItem", "openVideoStream", "'/stream'",
+               '/api/files/', '/download', 'data-download-view="preclean"'):
+    require(marker in overlay, f"missing overlay connection: {marker}")
+for element_id in ('page-library', 'librarySummary', 'librarySearch', 'libraryFilter',
+                   'librarySort', 'libraryStatus', 'libraryList', 'libraryDbStatus'):
+    require(f'id="{element_id}"' in overlay and f"getElementById('{element_id}')" in js,
+            f"overlay/JS ID mismatch: {element_id}")
+for key in ('nas_added:desc', 'nas_added:asc', 'release_date:desc', 'dvd_id:asc',
+            'title:asc', 'size:desc', 'subtitle_status:asc'):
+    require(key in overlay, f"overlay sort missing: {key}")
+summary_render = js.split('function renderSummary(data)', 1)[1].split('function detailCell(', 1)[0]
+require(summary_render.count('${card(') == 5, 'five summary cards must be rendered')
+require(summary_render.count('<section><h3>') == 3, 'three DB status sections must be rendered')
+for marker in ('nfo_counts', 'poster_counts', 'total_titles', 'filtered_count',
+               'ko_present_count', 'library_known_total_bytes', 'db.innerHTML',
+               '자막 상태', 'NFO 상태', '포스터 파일 상태'):
+    require(marker in summary_render, f"missing summary/status data: {marker}")
+for selector in ('.library-summary-cards', '.library-metric', '.library-db-status'):
+    require(selector in css, f"missing shared library style: {selector}")
+require('class="library-db-status"' in overlay and 'class="library-summary-cards"' in js,
+        'overlay/JS summary CSS classes are disconnected')
+print("P08 final overlay library wiring smoke: PASS")
+
 print("Stage13 UI-P1 Library UI shell smoke: OK")

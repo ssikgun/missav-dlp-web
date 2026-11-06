@@ -746,7 +746,7 @@
             </div>
             <div class="section-tabs file-management-tabs" role="tablist" aria-label="파일 관리 보기">
                 <button class="section-tab active" type="button" data-file-management-view="library" aria-selected="true">보유 라이브러리</button>
-                <button class="section-tab" type="button" data-file-management-view="subtitle-status" aria-selected="false">자막 처리 현황</button>
+                <button class="section-tab" type="button" data-file-management-view="subtitle-status" aria-selected="false">라이브러리 DB 현황</button>
             </div>
             <section id="file-management-view-library" class="file-management-view active" data-file-management-panel="library">
             <div class="discovery-header library-header">
@@ -781,7 +781,9 @@
             </div>
             </section>
             <section id="file-management-view-subtitle-status" class="file-management-view" data-file-management-panel="subtitle-status" hidden>
-                <p class="subtitle-status-context">자막 생성 파이프라인의 작업 상태 · 라이브러리 보유 현황과 별도</p>
+                <h2>라이브러리 DB 현황</h2>
+                <div id="libraryDbStatus" class="library-db-status" aria-live="polite">보유 현황을 확인하고 있습니다.</div>
+                <p class="subtitle-status-context">아래 Stage12 자막 생성 파이프라인 작업 상태는 현재 보유 작품 집계와 별도입니다.</p>
                 <section class="subtitle-status-panel" id="subtitle-status-panel" aria-live="polite">
                     <div class="subtitle-status-head">
                         <div class="subtitle-status-title">자막 처리 현황</div>

@@ -9,6 +9,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import sqlite3
+import xml.etree.ElementTree as ET
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
@@ -138,7 +139,7 @@ def _nas_client_from_env():
 
 
 _INVENTORY_SCRIPT = r'''import base64,json,os,stat,sys
-root=os.path.normpath(sys.argv[1]); requested=json.loads(sys.argv[2]); out={}; total=0; subtitle_bytes=0; limit_hit=False
+root=os.path.normpath(sys.argv[1]); requested=json.loads(sys.argv[2]); out={}; total=0; subtitle_bytes=0; sidecar_bytes=0; limit_hit=False
 def inside(p):
  r=os.path.realpath(root); q=os.path.realpath(p)
  return os.path.commonpath((r,q))==r
@@ -148,7 +149,7 @@ for rel in requested:
   continue
  if not isinstance(rel,str) or rel.startswith('/') or '..' in rel.split('/'):
   raise SystemExit(3)
- title=os.path.join(root,rel); result={'status':'ok','bytes':0,'ko':None,'subtitle_names':[]}
+ title=os.path.join(root,rel); result={'status':'ok','bytes':0,'ko':None,'subtitle_names':[],'nfo_files':[],'primary_files':[]}
  try:
   st=os.lstat(title)
   if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode) or not inside(title): raise ValueError('unsafe_title')
@@ -168,6 +169,23 @@ for rel in requested:
      if not stat.S_ISREG(mode): raise ValueError('unexpected_type')
      size=entry_stat.st_size
      result['bytes']+=size
+     if current==title:
+      name=ent.name.lower(); stem=os.path.basename(title).lower()
+      is_nfo=name in (stem+'.nfo','movie.nfo')
+      is_image=any(name==base+ext or name==stem+'-'+base+ext for base in ('poster','cover','folder','default','movie') for ext in ('.jpg','.jpeg','.png','.webp')) or any(name==stem+sep+base+ext for sep in ('_','.',' ') for base in ('poster','cover','folder','default','movie') for ext in ('.jpg','.jpeg','.png','.webp'))
+      if is_image:
+       # This records file presence, not image integrity.
+       result['primary_files'].append(size > 0)
+      if is_nfo:
+       if size>1048576 or sidecar_bytes+size>16777216: raise ValueError('sidecar_limit')
+       fd=os.open(ent.path,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0))
+       try:
+        opened=os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode) or (opened.st_dev,opened.st_ino,opened.st_size)!=(entry_stat.st_dev,entry_stat.st_ino,size): raise ValueError('sidecar_identity_changed')
+        with os.fdopen(fd,'rb',closefd=False) as f: data=f.read(1048577)
+       finally: os.close(fd)
+       sidecar_bytes+=len(data)
+       result['nfo_files'].append(base64.b64encode(data).decode('ascii'))
      if current==title and ent.name.lower().endswith(('.srt','.vtt')):
       result['subtitle_names'].append(ent.name)
      if current==title and ent.name.lower()==(os.path.basename(title)+'.ko.srt').lower():
@@ -278,6 +296,31 @@ def _ko_state(row, video, inventory, terminal):
     return "UNRESOLVED",code,label
 
 
+def _sidecar_states(video, inventory, dvd):
+    if video is None or inventory.get("status") != "ok":
+        return "UNKNOWN", "UNKNOWN"
+    nfos, images = inventory.get("nfo_files"), inventory.get("primary_files")
+    nfo = "UNKNOWN"
+    if isinstance(nfos, list):
+        if not nfos: nfo = "ABSENT"
+        elif len(nfos) != 1: nfo = "INVALID"
+        else:
+            try:
+                raw = base64.b64decode(nfos[0], validate=True)
+                if len(raw) > 1048576: raise ValueError()
+                xml = raw.decode("utf-8-sig")
+                if "<!DOCTYPE" in xml.upper() or "<!ENTITY" in xml.upper(): raise ValueError()
+                root = ET.fromstring(xml)
+                ids = [str(x.text or "").strip() for x in root.findall("id")]
+                if root.tag != "movie" or ids != [dvd]: raise ValueError()
+                nfo = "VALID"
+            except (ValueError, TypeError, ET.ParseError): nfo = "INVALID"
+    poster = "UNKNOWN"
+    if isinstance(images, list) and all(type(x) is bool for x in images):
+        poster = "ABSENT" if not images else ("PRESENT" if all(images) else "UNKNOWN")
+    return nfo, poster
+
+
 def _build_items(db_path, rollout_path, nas_reader, jellyfin_loader, dvd_id=None):
     rows, terminal = _holding_rows(db_path, rollout_path, dvd_id)
     rows = [dict(r) for r in rows]
@@ -309,6 +352,7 @@ def _build_items(db_path, rollout_path, nas_reader, jellyfin_loader, dvd_id=None
         mismatch=video is None
         size=invrow.get("bytes") if invrow.get("status")=="ok" else None
         ko,reason_code,reason_label=_ko_state(row,video,invrow,state)
+        nfo,poster=_sidecar_states(video,invrow,dvd)
         organizer_ok=(row.get("organizer_status")=="COMPLETED" and video is not None and row.get("destination_path")==video.relative_path)
         created=_kst_date(row.get("organizer_created_at")); completed=_kst_date(row.get("organizer_completed_at"))
         added=created if organizer_ok and created and created==completed else None
@@ -316,7 +360,7 @@ def _build_items(db_path, rollout_path, nas_reader, jellyfin_loader, dvd_id=None
         jf="UNKNOWN" if jf_paths is None else ("RECOGNIZED" if media and jellyfin_media_path(media) in jf_paths else "ABSENT")
         raw_size_error=str(invrow.get("error") or "")
         size_error={"symlink":"SYMLINK","entry_limit":"ENTRY_LIMIT","depth_limit":"DEPTH_LIMIT","unexpected_type":"UNEXPECTED_TYPE","missing":"MISSING","global_entry_limit":"GLOBAL_ENTRY_LIMIT","subtitle_limit":"SUBTITLE_SIZE_LIMIT","unsafe_title":"UNSAFE_TITLE"}.get(raw_size_error,"REMOTE_OR_INVENTORY_ERROR" if raw_size_error or not nas_reader else ("CANONICAL_PATH_INVALID" if mismatch else "INVENTORY_UNAVAILABLE"))
-        items.append({"dvd_id":dvd,"title":row.get("title"),"release_date":row.get("release_date"),"maker":row.get("maker"),"cover_url":row.get("cover_url") or (f"/api/discovery/media/cover/{dvd}" if dvd else None),"managed_relative_path":directory,"media_identity":PurePosixPath(media).name if media else None,"media_relative_path":media,"managed_size_bytes":size,"size_status":"KNOWN" if size is not None else "UNKNOWN","size_error_code":None if size is not None else size_error,"ko_status":ko,"stage12_status":state.get("status"),"unresolved_reason_code":reason_code,"unresolved_label":reason_label,"jellyfin_state":jf,"nas_added_date":added,"nas_added_at":None,"nas_added_date_status":"KNOWN_BOUNDED_DATE" if added else "UNKNOWN","nas_added_date_provenance":"ORGANIZER_COMPLETION_BOUNDED_DATE" if added else None,"mismatch":mismatch})
+        items.append({"dvd_id":dvd,"title":row.get("title"),"release_date":row.get("release_date"),"maker":row.get("maker"),"cover_url":row.get("cover_url") or (f"/api/discovery/media/cover/{dvd}" if dvd else None),"managed_relative_path":directory,"media_identity":PurePosixPath(media).name if media else None,"media_relative_path":media,"managed_size_bytes":size,"size_status":"KNOWN" if size is not None else "UNKNOWN","size_error_code":None if size is not None else size_error,"ko_status":ko,"nfo_status":nfo,"poster_status":poster,"stage12_status":state.get("status"),"unresolved_reason_code":reason_code,"unresolved_label":reason_label,"jellyfin_state":jf,"nas_added_date":added,"nas_added_at":None,"nas_added_date_status":"KNOWN_BOUNDED_DATE" if added else "UNKNOWN","nas_added_date_provenance":"ORGANIZER_COMPLETION_BOUNDED_DATE" if added else None,"mismatch":mismatch})
     return items
 
 
@@ -471,6 +515,7 @@ def create_library_blueprint(db_path, rollout_path="", *, core=None, nas_reader=
             items.sort(key=key,reverse=order=="desc")
         known=[x["managed_size_bytes"] for x in all_items if x["managed_size_bytes"] is not None]
         summary={"total_titles":len(all_items),"ko_present_count":sum(x["ko_status"]=="VALID" for x in all_items),"unresolved_count":sum(x["ko_status"]=="UNRESOLVED" for x in all_items),"no_subtitle_count":sum(x["ko_status"]=="ABSENT" for x in all_items),"mismatch_count":sum(x["mismatch"] for x in all_items),"library_known_total_bytes":sum(known),"size_complete":len(known)==len(all_items),"size_unknown_count":len(all_items)-len(known)}
+        summary.update({"nfo_counts":{s:sum(x["nfo_status"]==s for x in all_items) for s in ("VALID","ABSENT","INVALID","UNKNOWN")}, "poster_counts":{s:sum(x["poster_status"]==s for x in all_items) for s in ("PRESENT","ABSENT","UNKNOWN")}, "stage9_job_status":"UNKNOWN", "filtered_count":len(items)})
         return jsonify({"summary":summary,"items":items,"query":{"q":q,"ko":ko,"unresolved":unresolved,"mismatch":mismatch,"sort":sort,"order":order}})
     @bp.get("/<dvd_id>")
     def detail(dvd_id):
