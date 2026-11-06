@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — P08 NAS image decoder command inventory PASS; codec/full-decode NOT YET CHECKED (KST)
+
+Teddy ran an interactive authenticated, read-only NAS inventory via `ssikgun@192.168.1.201`, result `READ_ONLY_CHECK=PASS`. Installed commands: `python3`, `ffmpeg`, `identify`, `convert`, `djpeg`, `timeout`; not found: `ffprobe`, `magick`, `dwebp`, `pngcheck`, `vips`; Python `PIL` and `cv2` missing. This establishes executable availability **only**, not JPEG/PNG/WebP decoder support, full-pixel decoding, processing throughput, safety resource limits or production fit. No image was read in this inventory and no NAS/DB/container/service files changed. P08 poster `PRESENT` must remain unpromoted pending bounded capability/real-sample checks, performance/caching design, and offline code review. Current candidate `/tmp/p08lib-001-work` still treats recognized Primary as `UNKNOWN` and has not been committed/pushed or deployed.
+
 ## 2026-11-06 — P08 NAS password-based SSH authentication reverified; decoder inventory pending (KST)
 
 Teddy reran `ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=10 ssikgun@192.168.1.201 'echo NAS_AUTH=PASS'` from `root@downloader`, entered the NAS account password interactively, and received `NAS_AUTH=PASS`. This confirms the prior `BatchMode=yes` was incompatible with this access path, not that NAS was unreachable. No password or credential was shared/saved. NAS decoder commands and image validity remain **NOT_CHECKED**; use ordinary interactive SSH without `BatchMode=yes` for the next read-only command inventory. No NAS file, API, DB, timer or Docker changes.

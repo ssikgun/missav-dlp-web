@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-06
 
+- **NAS 이미지 검사 도구 목록 PASS:** `ffmpeg`, `identify`, `convert`, `djpeg`, `timeout`, `python3` 있음; `PIL/cv2`, `ffprobe`, `magick`, `dwebp`, `pngcheck`, `vips` 없음. 파일·설정 변경 없이 확인. **실제 JPEG/PNG/WebP 디코딩 지원·성능·안전 한도는 확인 필요**. P08 포스터 `PRESENT` 집계와 제품 승격은 계속 보류.
+
 - **NAS SSH 인증 정상 복구 확인:** `BatchMode` 옵션 없이 `ssikgun@192.168.1.201` 비밀번호 인증 후 `NAS_AUTH=PASS`; 앞선 권한 오류는 비대화형 인증 방식 때문으로 확인. 이미지 디코더 설치 여부는 아직 확인 전. 다음은 대화형 SSH를 이용한 읽기 전용 도구 목록 검사.
 
 - **P08 NAS 디코더 사전 점검 BLOCKED:** `ssh -o BatchMode=yes` 실행에서 `Permission denied (publickey,password)`로 NAS 스크립트 시작 전 중단. 디코더 설치 여부는 전혀 확인되지 않음(`UNKNOWN`). 이전 성공한 NAS SSH는 `BatchMode`가 없었음. 사용자 인증 방식 확인 후 정상 대화형 SSH로 재검사 필요; 이미지·DB·NAS 변경 0.
