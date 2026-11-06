@@ -1,5 +1,9 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 Teddy reports SW-216 folder has no image
+
+**User observation after journal audit:** Teddy directly stated **"SW-216 폴더에는 이미지는 없어."** This is the operator's actual movie-folder observation, **not yet an independent SSH/size/SHA readback**. The exact prior batch remains `53 COMPLETE / 1 ERROR` (`SW-216`, `STAGE9_MEDIA_RUN_FAILED`), with no retry. The generic error is emitted by `teddy_discovery_media_only_runner.py`'s broad unexpected-exception handler, so its specific cause is still `UNKNOWN` from existing persisted logs; the helper discarded child stderr and the child emits no traceback. Current safe next action: one bounded **read-only** SW-216 DB holding/metadata/config/NAS state examination, without runner APPLY, new network image fetch, journal rewrite or automatic retry. The 53 other Runner COMPLETE statuses still need physical NAS image readback before product PASS.
+
 ## 2026-11-06 — STG9MEDIA-001 JOURNAL_AUDIT=PASS; 53 COMPLETE, SW-216 ERROR
 
 **Teddy actual root@downloader read-only journal audit:** The operational approval, pinned 54-target manifest, journal header and full runner attempt order matched (`RUN_ID_MATCH=PASS`, `PLAN_IDENTITY=PASS`). Every local evidence file was a regular, non-symlink file with bounded size, with approval/journal/result root-owned and private. The audit found **108 journal events** (one RUNNING and one terminal record per target), **54 attempted**, **53 COMPLETE**, **0 SKIPPED**, **0 PENDING**, **0 ATTENTION**, **1 ERROR**, no duplicates or unfinished RUNNING. Final result corroborated `STOPPED` at last target `SW-216`; exact journal detail was **`STAGE9_MEDIA_RUN_FAILED`**. `JOURNAL_CONSISTENCY=PASS`, `RETRY_EXECUTIONS=0`, `READ_ONLY_AUDIT=PASS`.
