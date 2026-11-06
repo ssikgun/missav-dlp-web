@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — Stage9 timer 10-minute readiness preflight HOLD on 14 historic rows
+
+Teddy's CT108 read-only unit/DB check after requesting fully automatic new-download-to-Jellyfin (before subtitles) confirmed Stage9 service inactive/static, timer inactive/enabled, loaded `OnCalendar=*-*-* *:00/10:00`, `Persistent=false`, `RandomizedDelaySec=0`, `AccuracySec=1s`, `--max-items=1`, immutable Runner release `81be3d80a991a921ce4c82a42a1556f5956be78c` PASS. DB/WAL snapshot safe (both WAL=0), zero unregistered completed jobs, visibility 128 VISIBLE. But current media table has **14 prior retryable candidates**: 11 COMPLETED with poster_status=PENDING (including protected MBRBI-015), 3 FAILED (MFCS-085 attempt_count 17161, NHDTB-778 and DANDYA-033 attempt_count 5). Existing source classifies the 11 PENDING as eligible when under attempt limit, so a default timer could touch old history and postpone the intended new work at one job per ten-minute tick. `BACKLOG_REVIEW_REQUIRED=YES`, **`TIMER_ACTIVATION=HOLD`**, production writes 0.
+
+Before enabling, Teddy must select a safe operating approach: bounded exact-target timer canary with temporary verified unit profile and restoration, or generic timer after explicitly resolving legacy backlog/eligibility and protected records. Stage11 remains out. Preserve the approved 54 NAS images, past media jobs, journal and Jellyfin state. No timer/systemd mutation or new download was performed.
+
 ## 2026-11-06 — User requests full automatic Stage9-timer new-title E2E
 
 Teddy explicitly chose **timer-inclusive unattended** validation after Stage9 54/54 NAS artwork PASS and SW-216 ordinary Jellyfin visual PASS. Desired flow: after preflight and Stage9 timer activation, Teddy submits one new video through Downloader Web; Downloader runs the normal download/remux/NAS transfer and, on its configured schedule, the actual Stage9 Media timer automatically processes eligible new NFO/artwork/Jellyfin steps. Stop the acceptance scope **before Stage11 subtitles**; a manual Stage9 one-shot is insufficient proof of the requested schedule-driven product behavior.
