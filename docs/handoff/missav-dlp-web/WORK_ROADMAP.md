@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-06
 
+- **P08 포스터 파일 존재 판정 후보 수정 완료 보고(17:33:22 KST):** 기존 `/tmp/p08lib-001-work` 오프라인 후보에서 인정 파일명·안전한 일반 파일·0바이트 초과는 `PRESENT`, 검증된 부재는 `ABSENT`, 조회 실패·위험한 파일·빈 파일은 `UNKNOWN`으로 수정했다고 Teddy가 Codex 결과를 전달. 이미지 전체 손상/디코딩 검사는 하지 않음. 변경 후보 파일 5개(API·최종 Overlay HTML·라이브러리 JS/CSS·API smoke), API/UI/이동/삭제 준비/삭제 확정 smoke 및 `git diff --check` **보고상 PASS**. 최종 패치 `/tmp/p08lib-final-candidate.patch`는 CT108에 보존; **ChatGPT의 실제 diff 독립 검토·실행은 NOT_RUN**. 후보 기준 `0df82e15`, 정본 확인 `140293f`; 두 커밋 사이 제품 소스 변경 0건. **다음은 후보 원문 검토 후 별도 정본 승격 결정**. NAS·브라우저·Docker 배포 NOT_RUN, Stage9 작업 상태 UNKNOWN, 운영 변경 없음.
+
 - **P08 포스터 기준 Teddy 승인:** 이미지 전체 손상/디코딩 검증 제외. NAS에 안전한 일반 파일로 존재하고 포스터 이름/확장자·0바이트 여부가 확인되면 `PRESENT`; 실제 부재는 `ABSENT`, 조회·안전 여부 불확실하면 `UNKNOWN`. 포스터 파일 '보유 현황' 카드로 표시하며 JPEG/PNG/WebP 변환·전체 디코딩·추가 NAS 대량 조회 금지. 기존 후보의 '전부 UNKNOWN' 임시 처리를 이 기준으로 좁혀 수정하고 오프라인 smoke 후 리뷰. 배포/정본 제품 승격 별도 승인.
 
 - **NAS 코덱 지원 조회 PASS + 포스터 집계 기준 논의:** FFmpeg `4.1.9`의 MJPEG/PNG/WebP, ImageMagick `6.9.12-61`의 JPEG/JPG/PNG/WebP 지원 확인. **실제 포스터 디코딩·변환 0건**; ImageMagick 기본 디스크·시간 제한 무제한이므로 무제한 대량 검증 금지. Teddy가 P08의 목적은 '로컬 포스터 보유 현황'인데 전체 디코딩이 필요한지 질문함. 안전한 파일 존재+기본 형식 확인과 전체 무결성 검증 중 **제품 기준은 결정 대기**. 코드 승격/배포 보류.
