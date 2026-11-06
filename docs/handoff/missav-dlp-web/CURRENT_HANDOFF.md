@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — SW-216 ordinary Jellyfin display verified; new-download E2E next
+
+Teddy confirmed that `SW-216` now visibly shows the updated image in normal Jellyfin UI after the independently NAS-verified `cover.jpg` create-only one-shot; `SW216_JELLYFIN_VISUAL=PASS` user-observed. Stage9 approved 54-title NAS-image coverage remains 54/54 PASS. No forced Jellyfin scan/API, Stage9 service/timer activation or further media writes occurred in this visual verification. The specific original generic SW-216 exception root cause remains UNKNOWN, and the other 53 titles' Jellyfin UI was not individually checked.
+
+Next functional gap is a representative **newly submitted download -> MP4/TS final NAS storage -> Stage9 metadata/NFO poster or cover/PENDING -> ordinary Jellyfin pickup** check under current Stage9 v1.0.9. Previous `FNS-267` Downloader end-to-end user PASS (2026-10-29) exists but does not independently prove the now-current Stage9 poster/fallback integration. This proposed new production operation requires separate target and operational authorization, and governance routing review where Downloader `DLDWS-001` and Stage9 `STG9MEDIA-001` touch the same end-to-end run; no shared authorization inferred. Stage11 subtitles are out of scope unless separately selected.
+
 ## 2026-11-06 — Stage9 existing-image 54-title backfill: NAS 54/54 PASS
 
 Current canonical Stage9 `STG9MEDIA-001` / contract v1.0.9. Teddy approved one sequential 54-title create-only image backfill from pinned manifest SHA-256 `8f72735b4c8b72315e88e0c881c15f2895b3993dd7177089a0cc88ecc27665dd`, excluding protected `MBRBI-015`. CT108 installed helper was plan-checked, explicit root-only approval created, runner invoked one title at a time with Stage9 service/timer stopped. Journal: 108 transition events, 54 attempts, 53 COMPLETE, 0 SKIPPED/PENDING, and final `SW-216` ERROR `STAGE9_MEDIA_RUN_FAILED`; no automatic retry. A read-only single-SSH, exact DB-owned NAS inventory verified the first 53 images' file/format/size/SHA-256, zero issues, aggregate `244fbabf94baba1ccc59b26136b4407de394ab1bc900ca3d563d0c4e27758452`. SW-216 had unique present holding `SW/SW-216/SW-216.mp4`, 4172018393 bytes, no metadata cover URL, and no NAS Primary.
