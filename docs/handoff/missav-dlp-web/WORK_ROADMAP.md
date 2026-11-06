@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-06
 
+- **P08 제품 6파일 정본 승격 PASS(17:57 KST):** Teddy 별도 승인 후 검증된 v2 후보 패치 SHA `661285f725ca482e307a776fd739e787f723e6e2eb4258697e355ba73eec35b8`의 정확한 6개 제품/테스트 파일만 `teddy-subtitle-stage11` 원격에 일반 순방향 승격. 제품 커밋 `a8e9156bfc0a966ea3af3778aacd11c02ec719fa`; 커밋 비교 6파일 외 변경 0, 원격 파일 blob SHA **6/6 PASS**. Docker 빌드·운영 배포·NAS/DB/Jellyfin 실검증 NOT_RUN, Stage9 작업 DB 상태 UNKNOWN, 현재 웹 컨테이너 변경 없음. P08LIB-001은 계속 IN_PROGRESS. **다음은 별도 승인된 빌드 전용 검증**, 배포/실화면 확인은 그다음 별도 결정.
+
 - **P08 Overlay smoke v2 독립 검증 PASS(17:53 KST):** 업로드 패치 SHA-256 `661285f725ca482e307a776fd739e787f723e6e2eb4258697e355ba73eec35b8` 일치. v1과 비교해 `teddy_library_ui_smoke.py`의 35줄만 추가, 나머지 후보 소스 차이 0. 격리 patch 적용/diff 검사, 최종 Overlay UI smoke, 화면 이동 smoke, 별도 환경 Node JS 문법·Python compile **PASS**. CT108의 API·삭제 smoke는 Codex 보고상 PASS, 독립 Flask 재실행은 환경 부재로 NOT_RUN. 브라우저 실화면·NAS 런타임·Docker 배포 미실행, Stage9 DB 작업 상태 UNKNOWN. **다음은 Teddy의 별도 6파일 제품 정본 승격 승인 결정**; 운영 배포는 이후 별도 승인. 원본 패치 보존, 운영 변경 0.
 
 - **P08 최종 후보 업로드 및 독립 코드 검토(17:46 KST):** 업로드 패치 SHA-256 `22476e19e1f234bdf22222ea003e7d733572e3fa871ee4d09693e7be2ae035e5`를 격리 worktree에 적용해 허용된 5파일만 변경됨을 확인. diff/문법, JS 검사, 가짜 NAS 포스터/NFO 판정, Overlay 연결 표식, 기존 루트 UI/이동 smoke PASS. 다만 기존 UI smoke는 **실제 최종 Overlay HTML이 아닌 루트 HTML**을 읽으므로 해당 경로 전용 대표 smoke 1건 보완 권고. 이 환경에는 Flask가 없어 API·삭제 smoke 3개는 import 전 중단(CT108의 기존 Codex PASS 보고는 유지하되 독립 재실행 PASS로 표현하지 않음). DB상 보유·NAS 영상 실재 불일치 시 포스터를 셀 수 있는 사례는 기존 DB `present=1` 기준의 경계로 기록, 별도 의미 판단 필요. **정본 제품 승격/배포 미승인**, 운영 변경 0.
