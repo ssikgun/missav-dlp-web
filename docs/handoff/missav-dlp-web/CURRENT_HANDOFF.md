@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — Stage9 historical DB backlog cleaned: 11-row APPLY PASS
+
+CT108 executed approved SHA-pinned one-shot reconciliation script. Backup `/opt/missav-dlp-web/backups/stage9-media-before-poster-reconcile-11-20261106T044432Z-54963a195f3a.sqlite3`, SHA-256 `0368717848a0a3cf86c6e087972f60ea1b8689a0eb7de4f983bea1b1c772c0ca`, created and read-back checked before writes. Exact 10 NAS-image-backed rows changed `poster=PENDING -> COMPLETE`; protected `MBRBI-015 -> ATTENTION`; 3 FAILED/EXHAUSTED preserved along with all other rows and attempts. Actual transaction `DB_COMMIT=PASS`, `MEDIA_DB_RECONCILIATION=PASS`, `ELIGIBLE_REMAINING=0`; `NAS_JELLYFIN_WRITES=0`. Stage9 service/timer remained inactive. Distinguish this targeted 11-row state repair from deletion/cleanup of historic failures; all source DB history is in the backup.
+
+Next: independent live read-only DB/backup/Unit check, then Stage9 timer activation and normal 10-minute schedule-driven new-download-to-Jellyfin E2E with Stage11 subtitles out of scope. No new title submitted or timer enabled yet.
+
 ## 2026-11-06 — Approval granted: exact 11 historic Stage9 DB row cleanup; helper PREPARED
 
 Teddy explicitly approved the Stage9-only exact cleanup: ten verified-NAS-image historic poster PENDING jobs to `COMPLETE`, one protected `MBRBI-015` to `ATTENTION` without changing its Jellyfin Primary/NAS thumb, preserve all three historic FAILED/EXHAUSTED jobs and all unrelated rows. A one-shot script was prepared at `ops/stage9/stage9_media_backlog_reconcile_once_20261106.py` SHA-256 `7d9aa900612e2ceab232ab5e4c5aaabc253d19ec0898dfeb513982a15fbfae14`; checks CT108 pinned Stage9 helper, systemd stopped, 11 exact prior job IDs/attempts, 3 FAILED identity, actual writer/run locks, consistent root-only SQLite backup and quick_check/readback before a single guarded DB transaction. Only `poster_status/poster_error/updated_at` for exact 11 rows are in scope. Postcommit expected `ELIGIBLE_REMAINING=0`; original prior errors recoverable in full DB backup. **Helper prepared/compile PASS, production CT108 APPLY NOT_RUN, timer inactive, full new-download E2E not started.** Await user executing exact script, reporting output, independent readback and canonical record before Stage9 timer.

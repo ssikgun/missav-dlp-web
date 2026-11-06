@@ -1,5 +1,13 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 production media DB 11-row reconciliation APPLY PASS
+
+**CT108 direct user-executed operational evidence:** Exact approved `ops/stage9/stage9_media_backlog_reconcile_once_20261106.py`, SHA-256 `7d9aa900612e2ceab232ab5e4c5aaabc253d19ec0898dfeb513982a15fbfae14` passed file SHA check, imported the pinned installed Stage9 runner and confirmed `PINNED_RUNNER=PASS`, `TIMER_REMAINS_STOPPED=PASS`, `EXCLUSIVE_LOCKS=PASS`. Pre-state and dry run `DRY_RUN_ELIGIBLE=11`, `DRY_RUN_EXHAUSTED=3`, plan `10_COMPLETE_1_ATTENTION_3_UNCHANGED`. Backup-before-write created/read back/quick_check PASS at `/opt/missav-dlp-web/backups/stage9-media-before-poster-reconcile-11-20261106T044432Z-54963a195f3a.sqlite3`, SHA-256 `0368717848a0a3cf86c6e087972f60ea1b8689a0eb7de4f983bea1b1c772c0ca`.
+
+**Atomic live result:** `DB_COMMIT=PASS`, `COMMIT_OCCURRED=YES`, `MEDIA_DB_RECONCILIATION=PASS`, postcommit `ELIGIBLE_REMAINING=0`. Exact ten previously NAS-art-verified job rows `MAAN-945`, `NTR-102`, `FC2-PPV-4983582`, `PRIAN-060`, `PRIAN-059`, `FC2-PPV-4982148`, `FC2-PPV-3087371`, `GANA-3223`, `MIUM-1406`, `LUXU-1725`: poster `PENDING -> COMPLETE`; only prior `poster_status/poster_error/updated_at` changed. Protected `MBRBI-015`: poster `PENDING -> ATTENTION` with manual protection marker, without local Primary/Jellyfin/NAS write. Historical `MFCS-085`, `NHDTB-778`, `DANDYA-033` 3 FAILED/EXHAUSTED and all unrelated media jobs preserved byte-for-byte at row-value level by in-transaction comparison; attempts and historic error evidence in backup. `NAS_JELLYFIN_WRITES=0`, `TIMER_ACTIVATION=NOT_RUN`.
+
+**Next:** Independently read-only recheck live media DB `eligible=0`, exhausted=3, exact 10 COMPLETE + MBRBI ATTENTION, SQLite integrity, backup SHA, and effective service/timer schedule/activation prerequisites. Only then enable the approved Stage9 10-minute timer for real unattended new-download E2E before Stage11. User has not yet submitted a new download for this acceptance test. `E2E=NOT_RUN`.
+
 ## 2026-11-06 — STG9MEDIA-001 Teddy explicitly approved 11-row production poster-state reconciliation
 
 **Authorization:** After the exact current 14-row audit, Teddy expressly responded “응 승인해. db 싹 정리 해줘.” to the concrete proposed Stage9-only **10 local-NAS-image-proven `COMPLETED/PENDING -> poster COMPLETE`** + **protected `MBRBI-015 -> poster ATTENTION`** plan, leaving **3 historic `FAILED/EXHAUSTED` jobs untouched**. This is **not** blanket database deletion or permission to alter other rows. Approved only this Stage9 media SQLite reconciliation, plus needed read-only preflight/backup/verification. Stage9 service/timer activation and new-download E2E still await separate readiness checks.
