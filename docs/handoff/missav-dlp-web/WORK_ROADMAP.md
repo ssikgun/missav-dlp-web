@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-06
 
+- **P08 오프라인 구현 승인 정본 반영·검사 PASS:** 승인 범위는 `db51f021337d9061a11a61dfeeea06fee22edc26`의 4개 `ACTIVE_WORK.md`·로드맵·인계에 반영되었고 GitHub Project Governance run `42183404910`이 `success`. 코드 구현과 대표 테스트는 아직 `NOT_RUN`; Docker·NAS·DB·Stage9 운영 변경도 `NOT_RUN`.
+
 - **P08LIB-001 오프라인 코드 구현·대표 테스트 사용자 승인(2026-11-06):** 네 공유 workstream ID/계약 버전 유지, 기존 등록 전용 단계를 승인된 **오프라인 후보 구현** 단계로 확장. 허용 소스는 `teddy_library_api.py`, 최종 Overlay `downloader_runtime_overlay/templates/index.html`, 기존 `templates/teddy-library.js/.css`와 해당 smoke만. NAS 유효 NFO/로컬 Primary 상태·UNKNOWN 집계를 기존 제한된 인벤토리에서 구현하고 5카드+3상태 화면을 수정하되 현재 재생/삭제 보호 및 자막/용량을 보존한다. 실제 Stage9 Media DB는 현재 Docker에 마운트되지 않으므로 선택적 read-only 작업 상태는 DB 없으면 UNKNOWN. **Docker/Compose/mount/운영 DB·NAS/Jellyfin 쓰기, Stage9/11/Writer 변경, 정본 제품 승격은 별도 승인**. 오프라인 PASS ≠ 운영 제품 PASS.
 
 - **P08 Stage9 DB 접근 원인 확정(CT108 읽기 전용, 2026-11-06):** 호스트 `/opt/missav-dlp-web/discovery/teddy-stage9-media.sqlite3`는 일반 파일 **98,304B**, `-wal` 일반 파일 **0B**, `-shm` 일반 파일 **32,768B**. 실제 `missav-dlp-web` Docker `Mounts`의 `/discovery` 항목은 `preview-cache` RW, `cover-cache` RW, `stage12-rollout-state.sqlite3` RO, `teddy-discovery.sqlite3` RO 네 개이고 `STAGE9_DB_MOUNT_COVERED=False`. 따라서 이전 `STAGE9_MEDIA_DB=UNKNOWN`은 정상 호스트 DB를 **웹 컨테이너에 마운트하지 않은 현재 구성**으로 설명된다. DB 내용/정합성은 조회하지 않았으므로 확인필요. P08 상단 NFO·포스터 숫자는 기존 NAS 실파일 읽기에서 독립 판정하고, Stage9 `media_jobs` 작업 상태 상세 조회는 별도 read-only 접근 경계를 정식 검토. SQLite WAL은 운용 중 크기가 달라질 수 있으므로 DB 파일 하나만 별도 mount하는 방식은 신선도·일관성이 검증되지 않음. 새 mount/Compose/컨테이너 재시작은 배포 승인 전 금지.

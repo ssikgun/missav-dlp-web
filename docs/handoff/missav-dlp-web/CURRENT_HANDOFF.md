@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — P08LIB-001 shared offline implementation authorization recorded and governance PASS
+
+Canonical `teddy-subtitle-stage11` commit `db51f021337d9061a11a61dfeeea06fee22edc26` updated all four selected workstream `ACTIVE_WORK.md` files and both handoff/roadmap docs to allow the bounded P08 UI/API **offline candidate implementation and representative smokes** under the existing `P08LIB-001` task. GitHub Project Governance run `42183404910` completed **SUCCESS**. No product source was changed in that commit. Actual implementation/testing, promotion, CT108 Docker rebuild/redeploy and Stage9 DB mount remain **NOT_RUN** and require the documented separate checks/approvals.
+
 ## 2026-11-06 — P08LIB-001 offline UI/API implementation and representative smokes APPROVED; not yet executed
 
 Teddy explicitly authorized the scoped **offline implementation and representative testing** phase for P08 after verified shared-route registration and CT108 source/runtime/Stage9 DB preflights. Existing four-workstream `P08LIB-001` registration and contract versions stay unchanged. The new leading CURRENT phase in the four `ACTIVE_WORK.md` files authorizes a candidate only in `teddy_library_api.py`, final Overlay `downloader_runtime_overlay/templates/index.html`, shared `templates/teddy-library.js`, `templates/teddy-library.css`, and directly relevant existing smoke files. Use a verified isolated worktree and run a small representative offline suite. Never modify root `templates/index.html`, Stage9 producer/worker, Stage11/Stage12, Writer, protected file-manager playback/delete semantics, or unrelated code.
