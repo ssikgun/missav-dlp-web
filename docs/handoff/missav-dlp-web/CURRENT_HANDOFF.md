@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — Both new HUNTB Jellyfin poster cards PASS (user); 10/10min requested
+
+Teddy visually confirmed HUNTB-653 and HUNTB-662 both display posters in normal Jellyfin after their newly completed web downloads and observed NFO/poster creation. This is real user-facing evidence; exact HUNTB-662 14:50 journal/DB and remote NAS readback remain independently unverified. User now prefers **10 Stage9 metadata/NFO/poster works per 10min**. Source code range supports 10 items but Jellyfin GET budget scales as `5*media_max_items+4*visibility_max_items`; e.g. 10 media + 10 visibility needs **90** GET request allowance, compared with 9 observed at 1+1. Check effective live ExecStart for explicit budget and systemd start/runtime timeout before changing. Batch loops are sequential and no extra parallel service is proposed. No timer/unit edits have been made; follow exact approval, backup/dry-run, atomic service args update, and next scheduled tick verification. Stage11 excluded.
+
 ## 2026-11-06 — Teddy reports both HUNTB-653 / HUNTB-662 NFO and poster created
 
 User verified both newly downloaded titles now have NFO and poster. The first title HUNTB-653 has actual Stage9 14:40 journal/DB `COMPLETE` evidence; HUNTB-662 14:50 journal/DB, NAS remote bytes, and ordinary Jellyfin visible screen still need independent confirmation. User asked if increasing one-item-per-ten-minute throughput completes Stage9 metadata: **almost**, pending coordinated Stage9 media/visibility batch-cap tuning and a bounded scheduled verification; a new-download fallback without a cover URL was not exercised by these two titles (both had cover_url). Do not change unit/runner until an explicit throughput policy/production-change approval. Stage11 remains excluded.
