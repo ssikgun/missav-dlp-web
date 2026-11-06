@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — Confirmed exact Stage9 queue: 11 ELIGIBLE stale poster, 3 EXHAUSTED
+
+CT108 current installed runner + media SQLite read-only row audit completed: `QUEUE_ROWS=14`, `ELIGIBILITY_COUNTS={'ELIGIBLE': 11, 'EXHAUSTED': 3}`, snapshot SHA256 `34197f36887ffa97ca3aadde7c8be7f92e6aa11bdbd41d1e919a7bde68e81f18`. All 11 are completed NFO/Jellyfin-visible entries with only stale `poster_status=PENDING`, `poster_error_present=True`; 10 have separately verified NAS artwork from the 54-title image-only operation. The 11th, `MBRBI-015`, is protected Jellyfin-primary/thumbnail and cannot be blindly treated as local-art COMPLETE. Three historic FAILED rows are EXHAUSTED, not eligible: MFCS-085 17161 attempts, NHDTB-778 5, DANDYA-033 5. `QUEUE_READONLY_AUDIT=PASS`, `DATABASE_WRITES=0`, `TIMER_ACTIVATION=NOT_RUN`.
+
+Next: before enabling the 10-minute Stage9 timer, request explicit bounded approval for fresh-backed-up exact-state media DB reconciliation of 10 proven images, separate safe non-retry handling for protected MBRBI, and preservation of the three historic FAILED rows. Use dry-run, backup, writer lock/transaction and verify queue eligible count 0 before any unattended E2E download. Stage11 excluded. Do not perform any DB mutation without a distinct explicit approval.
+
 ## 2026-11-06 — Backlog cleanup prioritized before timer: 11 stale poster PENDING
 
 Teddy asked why 11 Stage9 media rows still have `poster_status=PENDING` after NAS art backfill and requested queue cleanup before activating the regular 10-minute timer or submitting a new download. Root explanation confirmed: the exact 54-title `--existing-image-only` path **deliberately wrote zero media DB rows**, so this is stale historic poster status rather than proof artwork was not created. Ten of the PENDING titles have independent prior NAS Primary verification; `MBRBI-015` was intentionally excluded and remains protected. The separate 3 FAILED rows have attempts >= 5 and are `EXHAUSTED` under current code; do not clear their failure history or assume they will execute as normal retryable work. Normal Stage9 timer remains inactive, E2E not run.
