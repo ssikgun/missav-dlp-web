@@ -1,5 +1,13 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 JOURNAL_AUDIT=PASS; 53 COMPLETE, SW-216 ERROR
+
+**Teddy actual root@downloader read-only journal audit:** The operational approval, pinned 54-target manifest, journal header and full runner attempt order matched (`RUN_ID_MATCH=PASS`, `PLAN_IDENTITY=PASS`). Every local evidence file was a regular, non-symlink file with bounded size, with approval/journal/result root-owned and private. The audit found **108 journal events** (one RUNNING and one terminal record per target), **54 attempted**, **53 COMPLETE**, **0 SKIPPED**, **0 PENDING**, **0 ATTENTION**, **1 ERROR**, no duplicates or unfinished RUNNING. Final result corroborated `STOPPED` at last target `SW-216`; exact journal detail was **`STAGE9_MEDIA_RUN_FAILED`**. `JOURNAL_CONSISTENCY=PASS`, `RETRY_EXECUTIONS=0`, `READ_ONLY_AUDIT=PASS`.
+
+**Meaning and held boundary:** The 53 COMPLETE statuses are *Runner-reported* image successes, **not yet independently NAS file/size/SHA readback proof** and not Jellyfin screen verification. SW-216 might or might not have created a file before its error; current physical image/file/DB state is unknown. No automatic/manual retry or `--resume`, approval replacement, journal reset, service/timer activation, Jellyfin API write, or cleanup is authorized by this audit. Preserve the entire run journal and approval and inspect targeted SW-216 existing-image-only runner error path and NAS local state read-only; also verify 53 NAS-created images in a bounded independent readback before declaring the product rollout PASS.
+
+**Pinned evidence:** run ID `stg9_54_b498ac842b0e4234bcd1fd6171c21db7`; journal `/opt/missav-dlp-web/backups/stage9-existing-image-stg9_54_b498ac842b0e4234bcd1fd6171c21db7.jsonl`, result `/opt/missav-dlp-web/backups/stage9-existing-image-stg9_54_b498ac842b0e4234bcd1fd6171c21db7.result.json`.
+
 ## 2026-11-06 — STG9MEDIA-001 live 54-title batch STOPPED at SW-216; journal triage required
 
 **Actual Teddy root@downloader stdout:** The approved create-only operational command completed `FINAL_SAFETY=PASS`, created a root-owned bounded approval record (`APPROVAL_RECORD=PASS`) with `run_id=stg9_54_b498ac842b0e4234bcd1fd6171c21db7`, and started the pinned existing-image-only Stage9 sequential helper. The command reported `TARGET_COUNT=54`, `MAX_ITEMS_PER_RUNNER=1`, `AUTOMATIC_RETRY=DISABLED`. Its final process exit was **`BATCH_EXIT_CODE=2`**, JSON `{"status":"STOPPED","stopped_at":"SW-216","reason":"ERROR"}`; the returned `attempted` array listed all 54 approved targets, ending at `SW-216`.
