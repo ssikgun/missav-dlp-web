@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — P08LIB-001 CT108 live memory / swap pre-build check PASS (KST)
+
+- Teddy real `root@downloader` terminal evidence: `MemAvailable=2.7GiB`, RAM `10GiB` total; swap `1.0GiB` used with only `132KiB` free. This is a **static snapshot**, not a guaranteed future build budget.
+- `vmstat 1 5`: the first row is historical averages. Four live one-second samples: `si=0,4,0,4` KiB/s and `so=0,0,0,0` KiB/s, CPU idle `93-94%`. `/proc/pressure/memory` `some` and `full` avg10/60/300 all `0.00`. **No observed active memory thrashing in those four samples.**
+- `docker stats --no-stream`: Downloader `693.1MiB`, Gluetun `38.44MiB`, Selkies desktop `2.972GiB / 3GiB` (near its own limit), Selkies mobile `827.3MiB / 2GiB`. Do not infer future resource behavior or restart any service from this evidence.
+- **Decision:** memory gate representative read-only check PASS; short-term isolated Docker build **eligible to attempt with resource/identity guards and current source SHA**, but success and safety throughout build remain unverified. Previously approved one unique-tag Docker image build only, no deployment. `BUILD_ONLY=NOT_RUN`; continue using a clean SHA-pinned archive and existing unchanged Dockerfile smoke, preserve all current containers/images. Stop on guard or build failure without source/validator edits.
+
 ## 2026-11-06 — P08LIB-001 real CT108 host/runtime read-only preflight PASS; build resource safety CHECK_REQUIRED (KST)
 
 - **Evidence source:** Teddy pasted terminal output from `root@downloader` on real CT108. `hostname=downloader`, `/proc/1/comm=systemd` (unlike previous Codex sandbox PID1 `codex`). Docker server version `29.7.2` responded.
