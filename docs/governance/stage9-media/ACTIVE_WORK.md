@@ -1,5 +1,24 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 isolated 54-title helper candidate: Codex offline PASS (not promoted)
+
+**Source:** Teddy supplied the finished Codex report (09:38:30 KST) about a candidate based on canonical `9c513b1fce0cb0195fcf7fa3e351b273e230c642`, under Stage9 v1.0.9 / task `STG9MEDIA-001`. **This is Codex-reported offline evidence, not independent file review or production acceptance.** The canonical head was fetched and matched that base before this evidence-only documentation update.
+
+**Isolated local candidate, not committed or pushed:** `/tmp/stg9-54-helper-candidate`.
+
+| Candidate file | Codex-reported SHA-256 |
+| --- | --- |
+| `teddy_discovery_existing_image_batch.py` | `22b33d1a0702946b134f82196de4fd054c1a68ab8f5cdd0810a42d808a07890c` |
+| `teddy_discovery_existing_image_batch_smoke.py` | `df7ef198917edea1c229a46c4d3ac801b3de569170d4946d2632143f8d811482` |
+| `docs/governance/stage9-media/evidence/2026-11-06-existing-image-targets-54.json` | `8f72735b4c8b72315e88e0c881c15f2895b3993dd7177089a0cc88ecc27665dd` |
+| `docs/governance/stage9-media/ACTIVE_WORK.md` | candidate-local documentation only, distinct from canonical |
+
+**Codex-reported behavior:** 54-ID input manifest from full 55 missing-item inventory excluding protected `MBRBI-015`, unique IDs; helper plans by default (`runner_invocations=0`), and in future explicitly approved apply mode invokes the already existing Stage9 `--thumbnail-only --existing-image-only` runner one title at a time with `--max-items 1`. `PENDING` is recorded and can proceed, safety errors stop, and checkpointed results are not automatically reexecuted when resuming. No new poster scraper, source policy or image-publish engine is intended. Prior canary successes are not replayed.
+
+**Codex-reported offline verification:** 8 helper smoke checks PASS; Python compilation PASS; default plan PASS with `runner_invocations=0`; `git diff --check` PASS; full governance validation PASS; existing dirty/unfinished worktree unchanged. Actual `54-title APPLY=NOT_RUN`, live poster/image network request `NOT_RUN`, NAS/DB/Jellyfin media writes `NOT_RUN`, service/timer operations `NOT_RUN`. **Not yet verified independently:** source contents, manifest exact 54 IDs against evidence, actual hash readback, scope of candidate diff, effective CT108 production runner invocation, deployment readiness and restart/resume behavior after actual external side effects.
+
+**Next authorization boundary:** Before any promotion or runtime use, inspect the candidate in its isolated worktree read-only, compare exactly the reported three SHA-256s and canonical evidence 54 IDs, check for direct media-file/network/Jellyfin operations, validate runner argument capture and state/resume safety. Then seek explicit approval to promote only the bounded helper/manifest/smoke plus necessary Stage9 active-work evidence to the *then-current* `teddy-subtitle-stage11` head using fast-forward with readback, preserving any pre-existing dirty trees. **GitHub source promotion is separate from CT108 deploy; 54-image live APPLY and timer activation require their own explicit authorization.** No product code was pushed as a result of this evidence update.
+
 ## 2026-11-06 — STG9MEDIA-001 next work: reuse pinned Stage9 pipeline through a thin sequential backfill helper
 
 **User decision / current scope:** Following the 55/55 metadata preflight (`1` accepted poster-URL shape, `53` Fourhoi fallback candidates, `1` protected `MBRBI-015`), Teddy directed the next task to **prepare a thin helper that invokes the existing production Stage9 image-only pipeline**, rather than writing a standalone 53/54-title scraper/poster engine. The goal is to exercise the actual Stage9 image processor with the dedicated timer still stopped. This authorizes **Stage9-only helper design and offline implementation/smoke preparation**, not a 54-title live APPLY, network fetch, NAS/DB/Jellyfin write, systemd modification, generic Completion workflow change, or timer activation.
