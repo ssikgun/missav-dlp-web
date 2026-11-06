@@ -1,5 +1,22 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 final read-only helper review FAIL: apply/resume scope unsafe
+
+**Actual Codex read-only review report provided by Teddy, 2026-11-06 09:54:47 KST.** Candidate isolated at `/tmp/stg9-54-helper-candidate` derived from `9c513b1fce0cb0195fcf7fa3e351b273e230c642`; current canonical preceding this documentation update `b1810b9cd5999e969cc5d899b32650dfc2639c32`. Verdict: `CODE_REVIEW=FAIL`, `MANIFEST_54=PASS`, `RUNNER_REUSE=PASS`, `APPLY_SAFETY=FAIL`, `RESUME_SAFETY=FAIL`, `PROMOTION_READY=NO`. The review was **read-only**: candidate changes 0, live production executions 0, pre-existing dirty worktree untouched.
+
+**Positive findings confirmed by Codex reviewer:** Exact 54 unique target IDs match latest canonical 55 missing-ID inventory after excluding protected `MBRBI-015`, including order. Helper delegates image work to existing per-title runner with `--thumbnail-only --existing-image-only --target-dvd-id <ID> --max-items 1`, without direct scraping, NAS write or Jellyfin API. Default plan, `PENDING` continuation, `ATTENTION`/runner-error stop and already-recorded completion skip were observed.
+
+**Promotion-blocking findings:**
+
+1. `teddy_discovery_existing_image_batch.py:305`: `--targets-file` override remains available to APPLY. Existing check is merely target count/ID syntax/protected `MBRBI-015` exclusion. A different 54-title list can pass. Approved target-set/content/order needs cryptographic pinning against canonical evidence, not just shape. An item-specific `EXPECTED_EXCLUSIONS` hardcode in generic logic violates data-driven scope.
+2. Same helper `:317`: `--apply` plus a static confirmation string embedded in source can invoke the production runner without a distinct verified operational approval. Current design must remain default-fail-closed; do **not** treat a public fixed word as authorization. A separate user-authorized run binding/gate is required before APPLY can be enabled; when no such authorization is present, reject with zero runner calls.
+3. Same helper `:218`: resume journal records item states but not the approved manifest identity nor the immutable installed runner release and effective per-target argv/config. Reusing a journal against a changed list or release can run newly introduced targets. Bind the journal to fixed manifest digest, runner executable/release digest, and exact invocation mode/argv profile; validate before resume, and fail closed without replay/reset on mismatch.
+4. Same helper `:67`: preflight checks root/systemd but does not check actual local target host identity `downloader`/CT108. Add an appropriate live identity bound; PID/root alone is not enough.
+
+**Correction scope:** Keep original isolated files and passing behavior; modify only Stage9 candidate helper, its minimal smoke, and manifest if strictly needed. No new poster fetching logic or generic one-off hardcoded target IDs. Before any promotion, obtain a fresh read-only code review of these four boundaries plus offline smoke. The older candidate-local `ACTIVE_WORK.md` is based on `9c513b1...` and MUST NOT overwrite newer canonical Stage9 progress. Append or merge new evidence only into latest `teddy-subtitle-stage11` ACTIVE_WORK.
+
+**Safety / next approval:** `CODE_REVIEW=FAIL`, `PROMOTION_READY=NO`, `CT108_HELPER_DEPLOY=NOT_RUN`, `PRODUCTION_54_APPLY=NOT_RUN`, `TIMER_START=NOT_RUN`. This step only authorizes narrow isolated offline correction. No GitHub source promotion, production image fetch/NAS/DB/Jellyfin writes, or service/timer change is approved by this report. Prior full NAS check 260 (205 present/55 missing) and 55 metadata check (1 URL/53 fallback/1 protected) remain preserved.
+
 ## 2026-11-06 — STG9MEDIA-001 CT108 readback: 54-target helper candidate three SHA-256 PASS
 
 **Live CT108 console evidence (Teddy):** User ran a Python **read-only** content hash and Git HEAD check on isolated `/tmp/stg9-54-helper-candidate`. All three files existed as ordinary files and matched their previously reported exact SHA-256:
