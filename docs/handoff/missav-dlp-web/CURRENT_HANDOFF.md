@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — Actual Stage9 timer activated; first tick / next schedule pending verification
+
+Teddy ran approved guarded preflight then `systemctl start teddy-stage9-media.timer`. `TIMER_ACTIVATION=PASS`, `ActiveState=active`, `SubState=running`, `UnitFileState=enabled`, last trigger `Fri 2026-11-06 13:53:45 KST`, next realtime elapse field empty. No new web download yet. Stage9 queue clean `ELIGIBLE=0`, exhausted historic 3; credential paths, runner identity and effective OnCalendar unit line passed. Because timer appears to have triggered immediately at 13:53:45, verify the *actual* service current status and effective time expressions with read-only `systemctl show/cat/list-timers`, wait for clean exit and next tick before starting the user's new-title E2E. Do not infer full automatic schedule behavior solely from `ActiveState=active`.
+
 ## 2026-11-06 — Independent Stage9 backlog readback PASS; timer still STOPPED
 
 Following 11-row DB apply, Teddy's separate read-only checker verified backup SHA, pinned runner, SQLite quick_check, exactly ten `COMPLETE` posters, protected `MBRBI-015 ATTENTION`, three preserved FAILED records, candidate queue `ELIGIBLE=0/EXHAUSTED=3`, `FINAL_QUEUE_CHECK=PASS`. `DB_WRITES=0` and `TIMER_ACTIVATION=NOT_RUN` for this check. Source review shows an exhausted-history manual-action helper may be invoked for at most one old failure per timed run, but its WHERE clause does not match their observed `jellyfin_notification/recovery=UNKNOWN/UNKNOWN` states; no direct new row update expected under the same current states. Actual deployed code/row verification and effective unit/dependency preflight are the remaining timer activation gates; after that, user's previously requested normal 10-minute-timer E2E through Jellyfin excludes Stage11.
