@@ -1,13 +1,21 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-05 KST (Stage9 v1.0.9 / 3작품 NAS 파일 SHA·Jellyfin 실제 대표 이미지 3/3 제품 PASS / 자동화 별도)
+UPDATED_AT: 2026-11-06 KST (P00 Stage9 메타데이터/포스터 자동화 운영 완료·10건/10분 예약 실행 PASS; 포화 10건 처리와 신규 무포스터 폴백 실전은 NOT_RUN)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
-## 0. 최신 확인 결과 — 2026-11-05
+## 0. 최신 확인 결과 — 2026-11-06
+
+- **P00 Stage9 미디어 메타데이터/포스터 자동화 — 승인 범위 완료(2026-11-06):** 기존 4작품 대표 이미지 시험은 `AT-099` 1건 + `DANDYA-033`, `FC2-PPV-3087371`, `FC2-PPV-4451371` 3건의 NAS 파일 및 Teddy의 일반 Jellyfin 화면 확인으로 PASS(원본 포스터/검증된 Fourhoi 폴백 분기 포함). 기존 미보유 이미지 54건은 정확 대상 순차 처리 후 NAS **54/54** PASS. 새 웹 다운로드 `HUNTB-653`, `HUNTB-662`는 Teddy가 각각 NFO·포스터 생성 및 일반 Jellyfin 포스터 표시를 확인. Stage9 계약 `1.0.9` 및 no-clobber 정책 유지.
+- **P00 10건/10분 운영 최적화 PASS(2026-11-06):** 운영 Stage9 서비스 옵션이 `max-items/visibility-max-items/visibility-seed-max-items=10/10/10`, Jellyfin GET 한도 `90`으로 백업 후 변경됨. 15:30 정상 타이머 JSON `status=COMPLETE`, 네 제한값 일치, `attempted=0,failed=0`; 15:40 서비스 정상 종료, 타이머 `active/waiting`. **최대 처리량 설정/예약 실행 PASS**이며 자연 대기열이 0이므로 **실제 10건 연속 처리 NOT_RUN**. 새 다운로드에서 포스터 원본 부재→Fourhoi `cover.jpg` 경로도 실전 신규 사례 **NOT_RUN**; 이미 검증된 기존 작품 폴백·코드는 보존하고 억지 신규 다운로드/재시도는 하지 않는다.
+- **다음 고정 순번 P04 — 미착수 / 실행 승인 필요:** P02에서 확인한 루트/Overlay 중복 중 안전한 범위만 단일 원본화할 수 있도록 먼저 최신 소스·실제 Docker 빌드 최종 산출물의 읽기 전용 관계를 정리하고 정확한 최소 대상·검증·복구 계획을 제안한다. 실제 코드 제거/통합 및 운영 배포는 별도 사용자 승인. 이후 P05(`DLDWS-001` Downloader+Writer 종료 조건 점검), P06(`S11-WX011` 독립 자막 근거 검토), P07(자동 자막/게시), P08(라이브러리 UI)의 기존 우선순위는 변경하지 않는다.
+- **Stage11 현재 승인 상태:** `S11-WX011 / IN_PROGRESS`; 기존 16창 음성 평가 자료 보존. 즉시 다음 결정은 S04/S08/S13의 기존 일본어 후보 문자열을 사용자에게 오디오와 함께 제한적으로 확인받아 형태를 구분하는 것. 일본어 정답 정확도·시간 경계·화자 DER와 최종 자막 제품 품질은 여전히 `UNKNOWN/INCONCLUSIVE`. 모델 실행·Hermes 번역·NAS 자막 게시 미승인.
+
+### 이하 2026-11-05 이력 (당시 상태로 보존)
+
 
 - **P00 Stage9 3작품 묶음 파이프라인 NAS+Jellyfin 제품 PASS 3/3 (2026-11-05):** 사용자 CT108 NAS SSH 읽기 전용 검사 `THREE_IMAGE_FILES_READONLY=PASS`: DANDYA-033 `poster.webp` 10,450B SHA256 `804622a549a4b0c1fed16449bbe6e9171066357da709d6666dc1f14c13b809f2`; FC2-PPV-3087371 `cover.jpg` 224,022B SHA256 `fff794dbb30a680280592c5c4ef1434d6e2ba6254451da34457716dac2bae482`; FC2-PPV-4451371 `cover.jpg` 42,756B SHA256 `85f4900525ebc8e22c47131b4fb67fbc4c195fb9930c06b8a71f08e6c652f321`. JPEG/WebP 바이트·크기·정확 경로·일반 파일 확인 PASS. **Teddy가 Jellyfin 일반 UI에서 세 작품 모두 새로 내려받은 이미지와 동일한 대표 이미지 적용을 직접 확인**. 앞 단계 batch 3/3 CREATED, media_jobs 이력 불변, Jellyfin API 이미지 쓰기 0, Stage9 서비스/타이머 중지와 합쳐 **source poster 1건 + Fourhoi fallback 2건의 3작품 순차 파이프라인 제품 PASS**. 계약 v1.0.9 보존; Jellyfin 내부 기존 Primary 유무는 NAS 이미지 생성 차단 조건이 아님. 자동 타이머·전체 라이브러리·병렬 대량 처리는 별도 미검증/미승인. AT-099 및 MBRBI-015 재작업 금지.
 
@@ -80,17 +88,17 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 2. 고정 우선순위 / 앞으로의 작업
 
-| 순번 | ID | 기능별 작업 | 현재 상태 (2026-11-05) | 다음 단계 / 완료 조건 / 승인 |
+| 순번 | ID | 기능별 작업 | 현재 상태 (2026-11-06) | 다음 단계 / 완료 조건 / 승인 |
 | --- | --- | --- | --- | --- |
-| 0 | P00 | **Stage9 포스터 자동화 완성 및 4개 작품 통합 시험** | **진행 중 — 구현 INCOMPLETE / 실전 4건 NOT_RUN** | 기존 `titles.cover_url` 포스터 `poster.<검증된 확장자>` 우선 → 이미지 확보 실패/URL 부재 시 DB 작품 ID로 생성한 정확한 Fourhoi `cover-n.jpg` 한 후보를 안전 검증해 `cover.jpg` create-only → 둘 다 없으면 PENDING, 안전·소유권 이상은 HOLD. 네 작품 NAS 영상·NFO 파일 존재, 로컬 Primary 0개 READONLY PASS. 기존 작품 job-row/UNKNOWN 게이트와 DANDYA .ts의 이미지 전용 경계, FileStation 충돌 보호를 오프라인에서 완료한 뒤 4건 운영 시험. 첫 신규 로컬 이미지의 Jellyfin 표시 확인을 통과한 뒤 나머지 3건. 운영 배포/쓰기 및 서비스 시작은 별도 승인. 260개 전체 재처리 금지. |
-| 1 | P01 | **미디어 자동화 잔여 항목 원인 확인** (과거 Stage9 Media) | **완료 — 조사 범위 한정** | 2026-10-29 당시 CT108 읽기 전용 DB 확인: COMPLETED 122, FAILED 3, PENDING/RUNNING 0; 오래된 COMPLETED/UNKNOWN 조합 108, 포스터 PENDING 8건 모두 COVER_URL_MISSING, FNS-267 내부 Jellyfin CHECK_PENDING 1건, 당시 타이머 active 및 마지막 서비스 Result=success. 현재 타이머는 포스터 작업 중 중지 상태. 강제 재시도·정리·DB 변경은 별도 항목 P01-H로 **보류**. |
+| 0 | P00 | **Stage9 포스터 자동화 완성 및 4개 작품 통합 시험** | **완료 — Stage9 메타데이터·포스터 운영 및 10건/10분 설정 PASS (11-06)** | 4개 기존 작품 이미지/NAS/Jellyfin 실증, 기존 이미지 54/54 보완, 신규 HUNTB 2건 NFO·포스터·Jellyfin 사용자 확인, 10건 제한 설정 및 첫 예약 실행 PASS. 실제 10건 동시 대기열 연속 처리와 신규 다운로드의 포스터 원본 부재→Fourhoi 폴백 사례는 NOT_RUN; 자연 발생 시 확인. 전체 260개 NFO의 독립 파일 완전성까지 증명한 것은 아님. 기존 파일·백업·기록 보존, 무단 재처리 금지. |
+| 1 | P01 | **미디어 자동화 잔여 항목 원인 확인** (과거 Stage9 Media) | **완료 — 조사 범위 한정** | 10-29 과거 DB 원인 분류 후 11-06 정확한 구형 포스터 상태 11행 조정 PASS. 현재 Stage9 전용 타이머는 10분 주기로 정상 active/waiting. 기존 exhausted=3, held_backoff=1 관찰값은 과거 상태이며 새 실패를 뜻하지 않음. 나머지 FAILED 상태의 임의 초기화·재시도·광역 정리는 미승인/보류. |
 | 2 | P02 | **루트/Overlay 중복 파일 5쌍의 읽기 전용 정밀 검수** | **완료 — 정적 소스·패치 비교 범위만 (2026-10-29)** | 5쌍 모두 분석: HTML은 최종 Overlay 기준 UI/패치 순서, 저장 코드는 no-overwrite·SHA-256, 엔트리포인트는 HLS/MP4, 부트스트랩은 보호된 게시·복구, 앱은 영속 상태·재시도 안전성 차이가 핵심. 실제 빌드 중간 산출물과 새 단일 원본의 byte-identical 동등성은 미검증이며 P04 구현·검증 승인 시 별도 확인. 소스·이미지·운영 변경 0. |
-| 3 | P03 | **NFO 작품번호 표시·Jellyfin 검색 및 신규 NFO 자동화** | **대표 제품 시험 PASS / 완료된 세부 작업 정리, 전체 일관성 확인필요** | 기존 `movie.nfo` 129개 존재·XML/ID PASS, 기존 NFO 품번 제목 보정 225건 PASS, 기존 누락 NFO 3건 복구 PASS, Stage9 10분 타이머·실제 신규 MBRBI-015 NFO/Jellyfin 표시 PASS(11/02), EBWH-350 실제 품번 검색 PASS(10/30). **완료한 NFO를 재생성하지 않는다.** 전체 260개 NAS NFO/필드 완전성은 아직 조사 안 됨. 잔여 예외만 별도 범위 승인 뒤 처리; 타이머는 현재 포스터 작업 중지 상태 유지. |
-| 4 | P04 | **검수로 확정된 중복만 단계적 단일 원본화** | **미착수 — 범위/구현 승인 전** | P02 결과로 각 파일의 patch 의존성, 실행 동등성, 데이터 보호 경계를 문서화하고 승인된 파일에만 변경→격리 검증→별도 운영 배포 승인. 위험도가 낮은 HTML부터 제안하되 확정 우선순위는 검수 결과에 따른다. |
+| 3 | P03 | **NFO 작품번호 표시·Jellyfin 검색 및 신규 NFO 자동화** | **대표 제품 및 신규 자동화 PASS / 전체 260개 NFO 정합성 확인필요** | 기존 movie.nfo 129개 확인, 제목 보정 225건과 누락 NFO 3건 복구 PASS, MBRBI-015 대표 NFO/Jellyfin 검색 PASS, 신규 HUNTB-653·662 NFO/포스터/Jellyfin 사용자 확인 PASS. Stage9 10분 타이머는 현재 active, 10건 제한 예약 실행 PASS. 전체 보유작품 260개 NFO 실파일·필드 완전성은 별도 실측하지 않았음. 완료 NFO 재생성 금지. |
+| 4 | P04 | **검수로 확정된 중복만 단계적 단일 원본화** | **다음 고정 순번 — 미착수 / 구현 승인 필요** | 먼저 P02의 5쌍 중 최종 Docker 빌드·Overlay 패치 의존성과 코드 보호 경계를 읽기 전용으로 짧게 확인해 최소 대상·위험·격리 테스트·복구 계획을 제안. 우선 HTML 검토 제안이나 실제 제거·단일화는 확정 대상과 사용자 승인 후에만. DLDWS-001 공유 영향은 Downloader/Writer 계약 모두 확인. |
 | 5 | P05 | **일반 다운로드/Discovery Writer 작업 DLDWS-001 종료 조건 점검** | **미착수 — 대표 운영 검증 PASS** | 이미 완료한 Docker 이미지 교체·FNS-267 실사용 성공을 재검증 없이 활용한다. 남은 계약상 미완료 조건과 Writer 소켓 안전성 이력만 정리하고 사용자 결정 후 종료 여부 판단. 현재 두 영역 모두 `IN_PROGRESS / DLDWS-001`. |
 | 6 | P06 | **한국어 자막 음성 인식/화자 근거 확인** (이전 Stage11) | **진행 중 — 별도 독립 작업** | 현재 `S11-WX011 / IN_PROGRESS`. 기존 S04/S08/S13 일본어 후보와 오디오를 사용자에게 비교 제시할 다음 결정이 남아 있음. S03/S11/S15 누락 의심, 일본어 정답/정확한 경계/화자 DER는 UNKNOWN. 계약에 따른 읽기 전용 범위만. |
 | 7 | P07 | **한국어 자동 자막 품질·게시 최종 완성** | **미착수/후속 승인 필요** | 외부 JA+ASR 증거, 누락 대화 회복, 자연스러운 Hermes 번역/문장·화자 경계와 Stage12 안전 게시까지 제품 품질 입증 필요. 설계 우선순위 충돌은 사용자 결정, 자막 생성·실행·게시는 별도 승인. |
-| 8 | P08 | **파일 관리: 보유 라이브러리 요약·라이브러리 DB 현황 화면 개편** | **요구사항 등록 완료 / 구현 미착수 — P00 이후** | 상단 요약: 전체 작품 수 / 한국어 자막 / 메타데이터 / 포스터 / 전체 라이브러리 용량. 기존 `자막 처리 현황` 탭 명칭을 `라이브러리 DB 현황`(가칭)으로 바꾸고 하위에 자막 처리 현황 / 메타데이터 처리 현황 / 포스터 처리 현황을 배치. 기존 자막 미해결·자막 없음 세부 현황은 자막 섹션 안에 보존. 실제 파일·DB의 의미와 일치하는 집계 정의·UI/API 구현/검증은 별도 승인. |
+| 8 | P08 | **파일 관리: 보유 라이브러리 요약·라이브러리 DB 현황 화면 개편** | **요구사항 등록 완료 / 구현 미착수 — P00 선행조건 충족** | 전체 작품·한국어 자막·NFO 메타데이터·NAS 로컬 포스터·용량 요약 및 자막/메타데이터/포스터 현황 섹션. 집계 정의·실제 DB/NAS 연동·UI/API 변경은 별도 승인; P04~P07 고정 순번을 자동으로 건너뛰지는 않는다. |
 
 ### 이후 UI 개편 요구 — P08 (설계 기록만, 구현 미승인)
 
@@ -124,6 +132,7 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 | D09 | P03 10분 타이머와 신규 다운로드 NFO 대표 제품 시험 | **2026-11-02 10분 타이머 설정·자연 실행 PASS**, MBRBI-015 신규 NFO NAS 확인·Jellyfin 작품번호 표시 PASS. 현재 타이머 active를 의미하지 않음. |
 | D10 | 보유작품 메타데이터 행 및 로컬 대표 이미지 갭 현황 | **2026-11-05 Discovery 260/260 제목 행/유효 JSON PASS**, **2026-11-04 NAS Primary 201/260 존재, 59/260 없음 PASS**. NFO 실제 존재 260/260이나 poster 자동 폴백 완성을 뜻하지 않음. |
 | D11 | 기존 정식 포스터 경로 및 MBRBI-015 과거 예외 | Stage8 **85/85 포스터 PASS (WebP 83/JPEG 2)**, MBRBI-015 1회성 NAS thumb + Jellyfin API 변경/사용자 화면 확인 PASS. 새 `cover.jpg` 로컬 파일 자동 인식 통합 시험과는 별개. |
+| D12 | Stage9 포스터/NFO 신규 및 기존 자동화, 10건/10분 타이머 | **2026-11-06** 4개 이미지 canary NAS/Jellyfin PASS, 기존 이미지 54/54 PASS, 신규 HUNTB 2건 NFO·포스터·Jellyfin 확인 PASS, 전용 타이머 10건 한도·GET 90 및 15:30 실제 자동 실행 PASS. 실제 10건 연속 처리/신규 무원본 폴백 실전은 NOT_RUN. |
 
 ## 4. 현재 검수 기준선: P02 / HTML
 
@@ -137,7 +146,7 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 - **다운로드 진입점:** 10개 top-level 함수 중 4개 변경; HLS 세그먼트 안전 저장/매니페스트, 비동기 처리, MP4 큐·일시정지·재시도 경계가 Overlay에 있으며 root 단독 사용 불가.
 - **부트스트랩:** 변경된 top-level 함수 5개와 Overlay-only 함수 4개(분석한 정의 기준); 완료파일 게시 복구·안전 잠금·저장 오류에 따른 무의미한 네트워크 fallback 차단·MP4 큐 보호 경계 보존이 필요.
 - **앱:** 변경된 top-level 함수 10개와 Overlay-only 함수 9개(분석한 정의 기준); 작업 상태 파일의 안전한 저장·복구, retry 큐 등록 원자성, 건강 검사 모드, MP4 상태 보호 경계가 있어 통합 변경은 고위험.
-- **판정:** P02는 **정적 소스/패치 차이 검수 범위에 한해 완료**. 새 이미지에서 동등 실행 테스트, 빌드 중간 결과 byte 비교, 원본 통합 변경·배포는 **NOT_RUN / 미승인(P04)**. 지금까지 동작 중인 Overlay를 임의 삭제하거나 root로 되돌리지 않는다. **현재 제품 집중 순서는 P00 Stage9 포스터 자동 폴백 완성 → 4개 작품 통합 시험**이다. P03의 검증된 NFO 제품 결과를 다시 수행하지 않는다. UI 개편 P08은 이후이며 P04 같은 별도 작업은 사용자가 우선순위를 바꾸지 않는 한 착수하지 않는다.
+- **판정:** P02는 **정적 소스/패치 차이 검수 범위에 한해 완료**. 새 이미지에서 동등 실행 테스트, 빌드 중간 결과 byte 비교, 원본 통합 변경·배포는 **NOT_RUN / 미승인(P04)**. 지금까지 동작 중인 Overlay를 임의 삭제하거나 root로 되돌리지 않는다. **P00 Stage9 제품/예약 실행 검증은 2026-11-06 완료**되었다. 다음 고정 순번은 P04지만 실제 중복 파일 통합·배포는 아직 승인되지 않았으므로 먼저 읽기 전용 최소 변경 계획을 제안한다. P03의 검증된 NFO 결과는 재작업하지 않고, P05/P06/P07/P08은 각 독립 승인 범위를 유지한다.
 
 ## 5. 정확한 진행 현황의 원천
 

@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — 사용자 요청에 따른 P00-P08 로드맵 현행화 (실행 승인이 아닌 상태 정리)
+
+`docs/handoff/missav-dlp-web/WORK_ROADMAP.md`의 11-05까지 P00 미완료 표시를 11-06 Stage9 실제 결과에 맞춰 바로잡았다. P00 Stage9 이미지 4개 시범/54개 기존 보완/새 HUNTB 2개 NFO·포스터·Jellyfin 사용자 확인/10건 상한+15:30 예약 실행을 **해당 검증 범위 완료**로 기록한다. 자연 대기열 0건이므로 실제 10건 연속 처리와 새 다운로드 무원본 포스터 Fourhoi 폴백은 여전히 NOT_RUN, 260개 전체 NFO 독립 정합성도 확인필요다. 10분 타이머는 active; 과거 '현재 중지' 문구는 로드맵 표에서 현재 상태로 수정했다.
+
+원래 고정 순번은 P04 → P05 → P06 → P07 → P08로 유지한다. **다음 P04 첫 단계는 P02 검수 5쌍 중 실제 빌드·Overlay 관계를 읽기 전용으로 확인하고 최소 대상/검증/복구 계획을 제안하는 것**; 실제 코드 합치기·Docker 배포는 별도 승인 필요. P05는 `DLDWS-001` Downloader+Discovery Writer 공유 종료 기준 검토; Stage11은 현 `S11-WX011`의 S04/S08/S13 사용자 오디오·일본어 후보 확인이 다음 승인된 판단 단계이며 한국어 번역·게시 및 새 모델 실행은 미승인. P08 라이브러리 현황 UI는 P00 선행조건을 충족했지만 고정 순서를 자동 변경하지 않는다. 이 업데이트는 로드맵/인계 문서만 수정하며 계약·작업 ID·제품/운영 상태를 바꾸지 않았다.
+
 ## 2026-11-06 — First normal Stage9 15:30 scheduled run confirms 10/10/10/90 PASS
 
 Teddy's CT108 read-only journal for the first post-change 15:30 KST timer tick shows service `stage9-media-only` `status=COMPLETE`, `registered=0`, `media_max_items=10`, `visibility_max_items=10`, `visibility_seed_max_items=10`, `jellyfin_get_max_requests=90`; media `attempted=0, completed=0, failed=0`, with historic `exhausted=3, held_backoff=1`, ordinary `manual_action_updates=3`, `poster_pending=0`; Jellyfin GET/POST attempts 0 and visibility `visible=130` counter. Normal start and exit recorded. Separately systemd reports the 15:40 invocation started at 15:40:00 and exited at 15:40:04, `Result=success, ExecMainStatus=0`, timer `active/waiting` with next 15:50. The 15:40 JSON payload was not collected. Operational Stage9 10-items-per-10-minute configuration and first normal scheduled invocation **PASS**; zero eligible attempts means actual ten-title workload **NOT_RUN**, not a fault. Do not infer 130 new posters from visibility counter, or no DB state maintenance because `manual_action_updates=3`. No new-download no-source-poster fallback live canary yet. No manual runner invocation or repair authorized/needed. Keep earlier recorded exact original unit backup and hashes.
