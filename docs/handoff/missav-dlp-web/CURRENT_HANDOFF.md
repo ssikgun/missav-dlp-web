@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — Independent Stage9 backlog readback PASS; timer still STOPPED
+
+Following 11-row DB apply, Teddy's separate read-only checker verified backup SHA, pinned runner, SQLite quick_check, exactly ten `COMPLETE` posters, protected `MBRBI-015 ATTENTION`, three preserved FAILED records, candidate queue `ELIGIBLE=0/EXHAUSTED=3`, `FINAL_QUEUE_CHECK=PASS`. `DB_WRITES=0` and `TIMER_ACTIVATION=NOT_RUN` for this check. Source review shows an exhausted-history manual-action helper may be invoked for at most one old failure per timed run, but its WHERE clause does not match their observed `jellyfin_notification/recovery=UNKNOWN/UNKNOWN` states; no direct new row update expected under the same current states. Actual deployed code/row verification and effective unit/dependency preflight are the remaining timer activation gates; after that, user's previously requested normal 10-minute-timer E2E through Jellyfin excludes Stage11.
+
 ## 2026-11-06 — Stage9 historical DB backlog cleaned: 11-row APPLY PASS
 
 CT108 executed approved SHA-pinned one-shot reconciliation script. Backup `/opt/missav-dlp-web/backups/stage9-media-before-poster-reconcile-11-20261106T044432Z-54963a195f3a.sqlite3`, SHA-256 `0368717848a0a3cf86c6e087972f60ea1b8689a0eb7de4f983bea1b1c772c0ca`, created and read-back checked before writes. Exact 10 NAS-image-backed rows changed `poster=PENDING -> COMPLETE`; protected `MBRBI-015 -> ATTENTION`; 3 FAILED/EXHAUSTED preserved along with all other rows and attempts. Actual transaction `DB_COMMIT=PASS`, `MEDIA_DB_RECONCILIATION=PASS`, `ELIGIBLE_REMAINING=0`; `NAS_JELLYFIN_WRITES=0`. Stage9 service/timer remained inactive. Distinguish this targeted 11-row state repair from deletion/cleanup of historic failures; all source DB history is in the backup.
