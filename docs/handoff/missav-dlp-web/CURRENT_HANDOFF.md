@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — User requests full automatic Stage9-timer new-title E2E
+
+Teddy explicitly chose **timer-inclusive unattended** validation after Stage9 54/54 NAS artwork PASS and SW-216 ordinary Jellyfin visual PASS. Desired flow: after preflight and Stage9 timer activation, Teddy submits one new video through Downloader Web; Downloader runs the normal download/remux/NAS transfer and, on its configured schedule, the actual Stage9 Media timer automatically processes eligible new NFO/artwork/Jellyfin steps. Stop the acceptance scope **before Stage11 subtitles**; a manual Stage9 one-shot is insufficient proof of the requested schedule-driven product behavior.
+
+At this checkpoint `TIMER_ACTIVATION=NOT_RUN`, `NEW_TITLE_DOWNLOAD=NOT_RUN`, `AUTOMATIC_E2E=NOT_VERIFIED`. CT108 read-only service/timer unit scheduling/persistent catch-up, release, DB retryable backlog and downloader state must be checked before any start; older queued media jobs could be affected. Stage9 `STG9MEDIA-001` and Downloader `DLDWS-001` have different task IDs; route any genuine shared operational task through matching user-approved scope rather than assuming blanket authorization. No timer/systemd/DB/NAS/Jellyfin mutation or Stage11 operation was performed by this decision record.
+
 ## 2026-11-06 — SW-216 ordinary Jellyfin display verified; new-download E2E next
 
 Teddy confirmed that `SW-216` now visibly shows the updated image in normal Jellyfin UI after the independently NAS-verified `cover.jpg` create-only one-shot; `SW216_JELLYFIN_VISUAL=PASS` user-observed. Stage9 approved 54-title NAS-image coverage remains 54/54 PASS. No forced Jellyfin scan/API, Stage9 service/timer activation or further media writes occurred in this visual verification. The specific original generic SW-216 exception root cause remains UNKNOWN, and the other 53 titles' Jellyfin UI was not individually checked.
