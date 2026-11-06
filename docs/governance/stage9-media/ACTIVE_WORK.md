@@ -1,5 +1,22 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 all-55 metadata preflight: 1 poster, 53 fallback, 1 protected
+
+**User-run CT108 SQLite read-only check / PASS:** Checked **all exact 55 NAS-local-Primary-missing IDs** from the 260-holdings audit against live Discovery DB (`mode=ro`, `PRAGMA query_only=ON`). Guarded against duplicate IDs and ambiguous current present holding, checked `storage_root='jav'`, exact DB `discovered_by` class, DVD-ID canonical `prefix/DVD-ID/DVD-ID.mp4|.ts` path, positive `size_bytes`, and matching exact-title metadata. Classified metadata `cover_url` by the Stage9-accepted HTTPS cover-host/port/credentials/fragment shape; **no network fetch** was made. Output: `TARGETS=55`, `POSTER_URL_CANDIDATES=1`, `FALLBACK_CANDIDATES=53`, `PROTECTED=1`, `OTHER_HOLDS=0`, `ALL_55_METADATA_PREFLIGHT=COMPLETE`.
+
+| Source | Poster URL candidate | Approved Fourhoi exact-ID fallback candidate | Protected/HOLD |
+| --- | ---: | ---: | ---: |
+| completion-stage9 | 1 | 10 | 1 |
+| library-inventory | 0 | 30 | 0 |
+| organizer-apply | 0 | 13 | 0 |
+| **Total** | **1** | **53** | **1** |
+
+**Only protected title:** `MBRBI-015` (`completion-stage9`) yielded `HOLD_PROTECTED_MBRBI`; its earlier Jellyfin internal Primary backup and protection must remain in force. `OTHER_HOLDS=0` applies only to this database/URL-form preflight; this is not proof that future NAS conditions or image fetches will succeed. The one poster-URL title ID was **not printed** in this output and remains `POSTER_URL_CANDIDATE_ID=NOT_VERIFIED`. All 53 fallback titles have an **approved deterministic candidate URL pattern**, not independent existence/content proof. Do not report 54 successful image downloads.
+
+**Read-only protection results:** `POSTER_NETWORK_FETCHES=0`, `DATABASE_WRITES=0`, `NAS_WRITES=0`, `JELLYFIN_WRITES=0`, `MEDIA_RUNNER_EXECUTIONS=0`, `SOURCE_BYTES_VALIDATED=NO`. The Stage9 Media dedicated timer/service remains last-verified stopped, and the generic Completion wrapper's `--skip-media` text token has been observed but effective argv not independently proven. No new deployment/activation or 54-item production APPLY was authorized by the preflight or done.
+
+**Next operational decision:** Scope a **sequential per-title create-only** backfill of the 54 non-protected targets via the existing exact-target `--thumbnail-only --existing-image-only` runner (`--max-items 1` per invocation, no media-job history writes). Before each publication reuse the runner's live unique present-holding, exact video/path/owner/size, NAS-local Primary absent and title/run-lock safety checks; stop/skip newly present or unsafe items. Keep `MBRBI-015` excluded; protect every existing NFO/video/image and job, do not force Jellyfin image API updates or scans, and summarize created/skipped/pending/held. **Require distinct user approval** for 54-target production artwork creation and for any subsequent dedicated timer restart. No further arbitrary random samples required after earlier 4 title product canaries.
+
 ## 2026-11-06 — STG9MEDIA-001 full 260-title NAS image inventory: 205 present, 55 missing, 0 hold
 
 **User CT108 read-only checkpoint: PASS.** The entire `holdings WHERE present=1 AND storage_root='jav'` population was checked at exactly 260 DB-identified movie folders on NAS, without broad NAS scan or file writes: **205** recognized NAS-local Primary present, **55** Primary missing, **0** HOLD. Breakdown: `completion-stage9` 119 present / 12 missing; `library-inventory` 38 present / 30 missing; `organizer-apply` 48 present / 13 missing. `CHECKED=260`, `NAS_FILE_WRITES=0`, `MEDIA_RUNNER_EXECUTIONS=0`, `ALL_HOLDINGS_INVENTORY=COMPLETE`.
