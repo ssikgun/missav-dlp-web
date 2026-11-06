@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-06
 
+- **P08 Overlay checksum manifest correction PASS (2026-11-06 KST):** Teddy approved the exact single-line update; remote commit `89a8c31e1036f22cdb4f316b715b779f55c83cc1` changed only `downloader_runtime_overlay/dldws001-source-sha256.txt` (+1/-1). Actual final Overlay HTML SHA-256 `63fb18077033ddd82e1785f2018622e5aeaf44007a8d8e34b550e50573b14733` is now the manifest's HTML entry; other 9 rows unchanged, 10/10 source-list structure and remote readback PASS. Earlier build blocker is resolved at source level. **CT108 Docker build NOT_RUN / deployment NOT_RUN**; real CT108 resource and operational snapshots still need direct verification under already approved build-only scope. No operational change.
+
 - **P08 격리 Docker 사전 검사 BLOCKED(2026-11-06 KST):** Dockerfile 후반 `sha256sum -c dldws001-source-sha256.txt`에 기록된 Overlay HTML SHA-256은 `4d379e37...`이지만 정본 승격 파일의 실제 값은 `63fb1807...`라 그대로 빌드하면 검증 실패가 확실함. 로컬 읽기 전용 검사에서 `templates/index.html: FAILED`; CT108 빌드/운영 배포 NOT_RUN, 운영 변경 0. **안전 체크섬 파일 1줄 정본 갱신 별도 승인 대기**, 빌드 승인만으로 소스 수정하지 않음.
 
 - **P08 격리 Docker 이미지 빌드 전용 승인(2026-11-06 KST):** Teddy가 정본 소스 6개 승격 `a8e9156bfc0a966ea3af3778aacd11c02ec719fa` 이후 **고유 태그의 격리 이미지 빌드와 검사까지만** 별도로 승인. `P08LIB-001 / IN_PROGRESS` 4영역 동일 승인 기록. 정확한 정본/제품 SHA와 CT108 자원·기존 운영 컨테이너 상태 선확인 → Dockerfile 무수정 빌드와 기존 smoke → 이미지 ID/내용 및 운영 무변경 후검증. `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`, Stage9 DB 상태 UNKNOWN. Compose/컨테이너 교체·재시작, NAS/DB/Jellyfin 실조회/쓰기, Stage9/Writer 변경은 여전히 금지. 다음은 CT108 빌드 증거 후 **운영 배포를 별도 승인할지** 결정.
