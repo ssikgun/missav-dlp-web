@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — P08 NAS password-based SSH authentication reverified; decoder inventory pending (KST)
+
+Teddy reran `ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=10 ssikgun@192.168.1.201 'echo NAS_AUTH=PASS'` from `root@downloader`, entered the NAS account password interactively, and received `NAS_AUTH=PASS`. This confirms the prior `BatchMode=yes` was incompatible with this access path, not that NAS was unreachable. No password or credential was shared/saved. NAS decoder commands and image validity remain **NOT_CHECKED**; use ordinary interactive SSH without `BatchMode=yes` for the next read-only command inventory. No NAS file, API, DB, timer or Docker changes.
+
 ## 2026-11-06 — P08 NAS image decoder preflight BLOCKED at SSH authentication (KST)
 
 Teddy executed the read-only NAS command inventory from `root@downloader` with SSH `-o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10` to `ssikgun@192.168.1.201`. Result: `Permission denied (publickey,password)` **before the NAS script started**; no command/PIL/OpenCV/image-decoder inventory ran. This is **not** evidence that decoders are missing. `BatchMode=yes` suppresses interactive password prompts; the previously successful NAS checks did not require this flag, so password-based SSH is a plausible explanation, **not confirmed**. No NAS images read, no data/config/service changes. Next: obtain Teddy's confirmation of intended SSH authentication and, if appropriate, have Teddy retry an interactive login under his own credentials; do not request or store a password, disable host-key validation or modify NAS auth. Poster product metric remains blocked and candidate is unpromoted.
