@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — P08 NAS decoder capability preflight PASS; poster metric semantics decision pending (KST)
+
+Teddy ran read-only NAS codec inventory with interactive SSH. FFmpeg `4.1.9` advertises decoders `mjpeg`, `png`, `webp`; ImageMagick `6.9.12-61 Q8` advertises formats `JPEG/JPG/PNG/WEBP`, with resource defaults memory `3.628GiB`, map `7.2561GiB`, disk/time unlimited. Thus listed codec availability is **confirmed**, while actual read of a poster, successful full pixel decoding, safe bounded performance and cache design remain **NOT_RUN**; no image data was touched or transformed.
+
+Teddy questioned *why* P08 library poster summary needs NAS-side full image decoding at all. This reveals a product semantics decision: `local Primary poster file present` (regular safe matching file + basic bounded size/signature metadata, no exhaustive decode) versus `fully decoded, uncorrupted artwork`. The latter is heavier and would require explicit byte/time/memory caps plus reuse/caching to avoid per-request 130-title re-decode. For P08's simple **holdings/status UI**, the former may be adequate and avoids unnecessary NAS load, but **do not silently redefine the existing candidate's `UNKNOWN` or promote source** until Teddy confirms desired meaning. The original source product has not been committed or deployed. Stage9/Jellyfin production remains unchanged.
+
 ## 2026-11-06 — P08 NAS image decoder command inventory PASS; codec/full-decode NOT YET CHECKED (KST)
 
 Teddy ran an interactive authenticated, read-only NAS inventory via `ssikgun@192.168.1.201`, result `READ_ONLY_CHECK=PASS`. Installed commands: `python3`, `ffmpeg`, `identify`, `convert`, `djpeg`, `timeout`; not found: `ffprobe`, `magick`, `dwebp`, `pngcheck`, `vips`; Python `PIL` and `cv2` missing. This establishes executable availability **only**, not JPEG/PNG/WebP decoder support, full-pixel decoding, processing throughput, safety resource limits or production fit. No image was read in this inventory and no NAS/DB/container/service files changed. P08 poster `PRESENT` must remain unpromoted pending bounded capability/real-sample checks, performance/caching design, and offline code review. Current candidate `/tmp/p08lib-001-work` still treats recognized Primary as `UNKNOWN` and has not been committed/pushed or deployed.

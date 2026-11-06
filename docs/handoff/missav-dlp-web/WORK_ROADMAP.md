@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-06
 
+- **NAS 코덱 지원 조회 PASS + 포스터 집계 기준 논의:** FFmpeg `4.1.9`의 MJPEG/PNG/WebP, ImageMagick `6.9.12-61`의 JPEG/JPG/PNG/WebP 지원 확인. **실제 포스터 디코딩·변환 0건**; ImageMagick 기본 디스크·시간 제한 무제한이므로 무제한 대량 검증 금지. Teddy가 P08의 목적은 '로컬 포스터 보유 현황'인데 전체 디코딩이 필요한지 질문함. 안전한 파일 존재+기본 형식 확인과 전체 무결성 검증 중 **제품 기준은 결정 대기**. 코드 승격/배포 보류.
+
 - **NAS 이미지 검사 도구 목록 PASS:** `ffmpeg`, `identify`, `convert`, `djpeg`, `timeout`, `python3` 있음; `PIL/cv2`, `ffprobe`, `magick`, `dwebp`, `pngcheck`, `vips` 없음. 파일·설정 변경 없이 확인. **실제 JPEG/PNG/WebP 디코딩 지원·성능·안전 한도는 확인 필요**. P08 포스터 `PRESENT` 집계와 제품 승격은 계속 보류.
 
 - **NAS SSH 인증 정상 복구 확인:** `BatchMode` 옵션 없이 `ssikgun@192.168.1.201` 비밀번호 인증 후 `NAS_AUTH=PASS`; 앞선 권한 오류는 비대화형 인증 방식 때문으로 확인. 이미지 디코더 설치 여부는 아직 확인 전. 다음은 대화형 SSH를 이용한 읽기 전용 도구 목록 검사.
