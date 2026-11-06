@@ -1,10 +1,49 @@
 # Downloader non-subtitle workstream — active work
 
+## CURRENT TEMPORARY P08 SHARED REGISTRATION — P08LIB-001 (2026-11-06 KST)
+
+Teddy approved a bounded shared registration to prepare P08 library UI work before P04 consolidation. Temporary participants are Governance, Downloader, Discovery Writer Safety, and Stage9 Media; Stage11 is independent. Original assignments at parent `c020a8a9bbf9ac05b34975894edb9dd5d630a275` are preserved and recoverable: Governance INACTIVE/NONE, Downloader+Writer Safety IN_PROGRESS/DLDWS-001 as a pair, Stage9 IN_PROGRESS/STG9MEDIA-001. This temporary transition does not close, cancel or overwrite original approved work/evidence; those task IDs will be restored at explicit P08 closeout.
+
+## OBJECTIVE
+
+Register a consistent shared task for P08 NFO/poster library-status UI and prepare a minimal implementation/verification plan while preserving existing behavior. Own P08 non-subtitle library UI and read-only NAS inventory/API planning.
+
+## APPROVED_SCOPE
+
+- Perform registration-only governance metadata and handoff/roadmap updates; validate all four participants with a single `P08LIB-001` and `REQUIRES_WORKSTREAMS=governance,downloader,discovery-writer-safety,stage9-media`.
+- Review canonical Overlay `templates/index.html`, shared library JS/CSS, `teddy_library_api.py`, existing library/Stage12 read-only state, and Stage9 v1.0.9 source-of-truth rules; propose additive summary/status fields and bounded tests.
+- Distinguish actual NAS-local NFO XML/movie ID validity and recognized NAS-local Primary files from historical `media_jobs` rows, remote `cover_url` or Jellyfin cached Primary. Count valid legacy `movie.nfo` as well as `DVD-ID.nfo`; `thumb.jpg` alone is not local Primary. Unknown inventory stays UNKNOWN, not false ABSENT.
+- Preserve current file-manager search, sort, preview, playback, download and permanent-delete protections; preserve the current Stage12 subtitle processing panel and its different population of records.
+- Preserve all current Stage9 scheduled operation, historical task evidence, Stage11 independence and Writer socket lifecycle. Make no production operation as part of registration. Seek separate explicit authorization to change product source, build or deploy.
+
+## PROHIBITED_SCOPE
+
+- No product source edits or test-code edits **in this registration-only phase**. No Docker build/deploy/restart, live API/NAS scan, actual download, Stage9 manual runner/timer/service changes, Stage11 model/subtitle changes, Writer code/socket changes, operational DB/NAS/Jellyfin writes, sidecar regeneration, deletion, cleanup, or backup modifications.
+- Do not weaken approved Stage9 local Primary/no-overwrite/Jellyfin separation, Downloader or Writer safeguards, alter any approved contract, or infer an actual media completion count from stale DB job rows.
+- Do not advance P04/P05/P06/P07 or treat previous workstream IDs as simultaneously active while this temporary route is registered.
+
+## ACCEPTANCE_CRITERIA
+
+- Router and all four ACTIVE_WORK metadata blocks match `P08LIB-001` and the identical four-workstream requirement; Stage11 S11-WX011 and all contract versions remain unchanged.
+- Governance structural and smoke validations PASS; normal fast-forward commit and exact canonical remote SHA/readback PASS.
+- Parent `c020a8a9bbf9ac05b34975894edb9dd5d630a275` preserves previous task metadata and historical evidence without deletion; scope and restoration steps are recorded.
+- No product code, timers, containers, DB, NAS, Jellyfin or Stage11 source change; implementation/deployment gates remain distinct.
+
+## EVIDENCE
+
+- Teddy explicitly accepted the P08 Downloader+Stage9 shared route after static source/data design proposal `c020a8a9`; original routes anchored at `c020a8a9bbf9ac05b34975894edb9dd5d630a275`.
+- Prior one-time `DLDLIB-001` transition demonstrated temporary Governance/Downloader/Writer alignment and later restoration under the existing router. Writer Safety joins solely to maintain previous DLDWS-001 pairing and verify non-interference; it owns no P08 product changes.
+- This registration contains no production/runtime evidence. Source audit and proposed design are documented in the handoff and roadmap.
+
+## NEXT_DECISION
+
+After registration is verified, request explicitly scoped approval for offline P08 UI/API source implementation and representative smoke tests. Check actual deployed Docker UI and read-only Stage9 database availability before deciding status integration; ask separately for Docker deployment/live validation. At P08 closeout restore Governance INACTIVE/NONE, Downloader+Writer Safety DLDWS-001 pair, Stage9 STG9MEDIA-001; preserve Stage11 S11-WX011 throughout.
+
 WORKSTREAM: downloader
-TASK_ID: DLDWS-001
+TASK_ID: P08LIB-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
 
 ## DLDWS-001 FNS-267 POST-DEPLOY JELLYFIN AND MEDIA FILE CHECK — USER CONFIRMED (2026-10-29 KST)
 

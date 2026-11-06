@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — Teddy approved temporary P08 joint governance registration (registration-only)
+
+**Transition:** User explicitly accepted P08 Downloader + Stage9 shared work. Existing router v1.0.0 permits exactly one active TASK_ID per workstream; past `DLDLIB-001` registration/closeout demonstrates a temporary shared route preserving original task evidence. New bounded `P08LIB-001` registration aligns **governance,downloader,discovery-writer-safety,stage9-media** with the same ID and requires set. Downloader owns UI/API planning; Stage9 owns local NFO/poster/job-state semantics (read-only consumption, no producer change); Governance owns temporary routing and later restoration; Writer Safety only verifies invariance to preserve original DLDWS-001 pairing. Stage11 `S11-WX011` remains independently routable/unchanged.
+
+**Exact restore anchor:** Pre-transition canonical commit `c020a8a9bbf9ac05b34975894edb9dd5d630a275` and original metadata: Governance `INACTIVE/NONE` requires governance; Downloader and Writer Safety `IN_PROGRESS/DLDWS-001` both require `downloader,discovery-writer-safety`; Stage9 `IN_PROGRESS/STG9MEDIA-001` requires stage9-media; Stage11 `IN_PROGRESS/S11-WX011` requires stage11. Original active-work history retained under each new current header and restored upon P08 closeout; previous tasks are neither canceled nor completed by registration.
+
+**Approval boundary:** Route + four ACTIVE_WORK files + roadmap/handoff only; governance structural/smoke and remote SHA readback. No product/UI/API/test source edit, Docker build/restart/deployment, Stage9 runner/timer modification, Writer socket change, Stage11 execution, NAS/DB/Jellyfin write. Offline implementation needs a subsequent scoped approval and a later separate deployment approval. Earlier detailed five-card/three-section proposal remains a design candidate, not product PASS.
+
 ## 2026-11-06 — P08 proposed detailed data/UI contract and workstream gate (NOT YET APPROVED)
 
 Teddy authorized continuing the P08 next-step design review; no implementation/deployment authorization is inferred. Latest inspected canonical `7770f9dc7670247549da74dc108c9dbb1e91670f` retains router 1.0.0 and common contract 1.0.1 APPROVED. Existing Downloader/Discovery Writer Safety `DLDWS-001` is jointly active for previous download/socket work, Stage9 Media `STG9MEDIA-001` active (contract 1.0.9), and Stage11 `S11-WX011` active read-only evidence work. None explicitly lists P08 implementation; never repurpose these IDs or edit their contracts without scoped approval. The workspace scratch directory is not the repository git checkout; source of truth is remote `teddy-subtitle-stage11`.
