@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-07 — P08LIB-001 real CT108 two-phase navigation smoke PASS (KST)
+
+- **Evidence:** Teddy's real CT108 `root@downloader` terminal transcript. Hostname `downloader`, PID1 `systemd`; fetched exact `teddy-subtitle-stage11` SHA `b03a2b15aa82c92dc9cc3a126b961ff48edc78de` with `FETCH_HEAD` equality. Created isolated archive in `/tmp/p08lib-nav-smoke-LPDFKa5O`; no modification of the protected canonical/operational checkout.
+- **Test byte identity:** `git hash-object` of isolated `teddy_file_management_navigation_smoke.py` matched approved Git blob `54cfab3332ee2a4975fa7d5e9b5be641675afcdf`.
+- **Actual Python smoke result:** baseline/root `templates/index.html` -> `FILE_MANAGEMENT_NAVIGATION_SMOKE=PASS` and `BASE_HTML_SMOKE=PASS`. After copying approved final Overlay HTML into the **isolated test directory only**, repeat -> `FILE_MANAGEMENT_NAVIGATION_SMOKE=PASS` and `FINAL_OVERLAY_SMOKE=PASS`. Exit success; final test directory `/tmp/p08lib-nav-smoke-LPDFKa5O` retained.
+- **Conclusion:** previous Dockerfile `RUN python teddy_file_management_navigation_smoke.py` deterministic tab-label assertion failure is **resolved at tested smoke/source level**. The old failed Docker image build (`BUILD_EXIT=1`) is still failed; no later Dockerfile steps, final image ID, built image content or live P08 UI behavior have been validated. `BUILD_ONLY_AFTER_FIX=NOT_RUN`, `DEPLOY=NOT_RUN`. User test performed no Docker build/recreate/restart or production file writes; post-run operational-state comparison `NOT_RECHECKED`.
+- **NEXT decision:** separately approve another bounded **unique-tag isolated Docker build attempt** at exact new canonical SHA, with real CT108 identity/resource/Stage9 preflight, before/after running-container snapshot, unchanged Dockerfile/all smoke, preserve old failed log and all existing images. The prior build-only approval permitted a single bounded build which failed, so do not silently treat that as a retry approval. No Compose, operation deployment, NAS/DB/Jellyfin/Writer/Stage11 changes.
+
 ## 2026-11-06 — P08LIB-001 exact one-line navigation smoke source repair PROMOTED (KST)
 
 - **Teddy approval:** Explicitly approved one-line correction, regression checking, and GitHub canonical promotion of `teddy_file_management_navigation_smoke.py` following the failed one-off isolated Docker build at `/tmp/p08lib-build-ivpIA4gM/build.log`. No further test/product files or operations were approved under this fix.
