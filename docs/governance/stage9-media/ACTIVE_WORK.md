@@ -1,5 +1,19 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 CT108 readback: 54-target helper candidate three SHA-256 PASS
+
+**Live CT108 console evidence (Teddy):** User ran a Python **read-only** content hash and Git HEAD check on isolated `/tmp/stg9-54-helper-candidate`. All three files existed as ordinary files and matched their previously reported exact SHA-256:
+
+- `teddy_discovery_existing_image_batch.py`: `22b33d1a0702946b134f82196de4fd054c1a68ab8f5cdd0810a42d808a07890c` — PASS.
+- `teddy_discovery_existing_image_batch_smoke.py`: `df7ef198917edea1c229a46c4d3ac801b3de569170d4946d2632143f8d811482` — PASS.
+- `docs/governance/stage9-media/evidence/2026-11-06-existing-image-targets-54.json`: `8f72735b4c8b72315e88e0c881c15f2895b3993dd7177089a0cc88ecc27665dd` — PASS.
+
+Candidate Git `HEAD` equals `9c513b1fce0cb0195fcf7fa3e351b273e230c642` (`BASE_CHECK=PASS`). `git status --short` displayed exactly one modified `docs/governance/stage9-media/ACTIVE_WORK.md` plus the above three untracked files; `git diff --check` had no findings; `CANDIDATE_READONLY_CHECK=PASS`, `PRODUCTION_APPLY=NOT_RUN`. The original unrelated dirty worktree was not touched. The canonical head prior to this documentation record was `c3be8f883d19abdff83cb8372da97cb53d360b88`, ahead of the candidate base.
+
+**Interpretation:** Byte identity and branch-base verification **PASS**; substantive source audit of shell/subprocess argv, explicit apply gating, lock/safety failure handling, bounded results, exact 54-item manifest vs historical 55-item evidence, and interruption/restart handling is **NOT_YET_INDEPENDENTLY_VERIFIED**. This is **not** authorization to deploy to CT108 or to execute a production 54-title batch. Stage9 timer should remain stopped. The 54 items are 53 fallback candidates plus one valid metadata-poster candidate; protected `MBRBI-015` excluded.
+
+**Next:** Inspect the isolated candidate code/read-only diff and smoke evidence. If sound, request/pursue **separate explicit source-promotion approval**, fast-forward the approved minimal Stage9 files onto the then-current `teddy-subtitle-stage11` without rewriting other worktrees or broadening the contract, verify GitHub readback and governance CI. Deploy, production image creation and unattended timer activation remain separate decisions.
+
 ## 2026-11-06 — STG9MEDIA-001 isolated 54-title helper candidate: Codex offline PASS (not promoted)
 
 **Source:** Teddy supplied the finished Codex report (09:38:30 KST) about a candidate based on canonical `9c513b1fce0cb0195fcf7fa3e351b273e230c642`, under Stage9 v1.0.9 / task `STG9MEDIA-001`. **This is Codex-reported offline evidence, not independent file review or production acceptance.** The canonical head was fetched and matched that base before this evidence-only documentation update.
