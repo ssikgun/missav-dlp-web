@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — P08LIB-001 real CT108 host/runtime read-only preflight PASS; build resource safety CHECK_REQUIRED (KST)
+
+- **Evidence source:** Teddy pasted terminal output from `root@downloader` on real CT108. `hostname=downloader`, `/proc/1/comm=systemd` (unlike previous Codex sandbox PID1 `codex`). Docker server version `29.7.2` responded.
+- **Stage9:** `teddy-stage9-media.service` `ActiveState=inactive`, `SubState=dead`, `MainPID=0`, `Result=success`. `teddy-stage9-media.timer` `active/waiting`, last trigger `2026-11-06 23:30:00 KST`, scheduled next `23:40:00 KST`. These are instantaneous read-only observations; no claim on future ticks.
+- **Docker production baseline:** `missav-dlp-web` running, container `b2a79e47b09f18e765aba42c264f7d0ad09dd5b964fdab5284ba5bc5ff905683`, image `sha256:ba31ba9cfcc481dc1f658312a3155a3496856008ff4d52f5a652de0766fd0dbe`, started `2026-10-29T07:05:18.822470837Z`. Companion `gluetun-missav`, `missav-vpn-browser-selkies`, `missav-vpn-browser-mobile-selkies` all reported Up. No container or service mutation performed in this preflight.
+- **CT108 available resources:** root/Docker filesystem `98G` total, `52G` used, `42G` available; RAM `10Gi` total, `2.7Gi` available; swap `1.0Gi` total and `1.0Gi` used, `132Ki` free. **Memory pressure risk is not resolved:** full swap occupancy alone does not prove active swap thrashing, so do not assert failure; however safe build budget is **NOT_VERIFIED**. Disk snapshot only, build actual cost UNKNOWN.
+- **Scope/status:** approved isolated Docker image build is **NOT_RUN**; no image ID/smoke result; deployment **NOT_RUN**. Real CT108 identity and Stage9 timer/service readback are PASS; next one checkpoint is a small real CT108 **read-only current memory/swap activity + Docker container memory consumption** measurement before deciding whether to execute the previously approved one isolated build. Keep all running containers, Stage9 timer, NAS/DB/Jellyfin/Writer untouched.
+
 ## 2026-11-06 23:05 KST — P08LIB-001 isolated Docker build attempt BLOCKED: not proven CT108
 
 - **Evidence category:** Teddy pasted a Codex run report, completed at 2026-11-06 23:05:34 KST. This is **reported execution evidence**, not an independent host-system readback by ChatGPT.
