@@ -1,5 +1,20 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 offline safety patch partial PASS; approval gate blocks runner
+
+**Teddy supplied Codex completion report 2026-11-06 10:02:32 KST.** Existing isolated candidate `/tmp/stg9-54-helper-candidate` changed only the generic helper and smoke; neither canonical source nor unrelated pre-existing dirty worktree was modified. This is **Codex-reported** (not independent source readback). Verdict: `CODE_REVIEW=FAIL`, `MANIFEST_SCOPE=FAIL`, `APPLY_APPROVAL_GATE=PASS`, `RESUME_SAFETY=FAIL`, `CT108_IDENTITY_GATE=FAIL`, `OFFLINE_SMOKE=PASS` (original 8 + new no-approval test = 9), `PROMOTION_READY=NO`, `PRODUCTION_APPLY=NOT_RUN`.
+
+| Isolated file | Reported SHA-256 |
+| --- | --- |
+| `teddy_discovery_existing_image_batch.py` | `9044ee046d3171c9965d98cbeaf0213c52a185ba5f70517673a3b5e62b711772` |
+| `teddy_discovery_existing_image_batch_smoke.py` | `40209facf4e509e1eb4efffa05332f26e170c006dfa2b2e3dfcac4234056c698` |
+
+**Actual progress:** When `--apply` is requested, the helper rejects with `BLOCKED_NO_APPROVAL` and makes **zero production runner calls**. A generic-code title-specific `EXPECTED_EXCLUSIONS` ID hardcode was removed. Existing manifest from prior checkpoint and already validated exact 54-item content remain candidate-local. This change is **fail-closed**, not ready to promote a live APPLY.
+
+**Still missing / do not infer:** (1) Trusted deployed manifest digest/pin that cannot be bypassed by `--targets-file` or shape-only verification. (2) Journal identity tying exact manifest ordering/content to installed runner digest/release and argv profile for safe resume. (3) Trusted local `downloader`/CT108 host identity signal and check. (4) A **separate user-approved, bounded production execution authorization**; a public confirmation string is not approval, and no approval has been granted yet. Lack of trustworthy approval data must continue to block APPLY.
+
+**Pragmatic next action:** First gather **read-only CT108 host fingerprint and immutable installed-runner path/release** from the actual user shell without printing raw `/etc/machine-id` or secrets. Use the pinned list SHA-256 already in evidence `8f72735b4c8b72315e88e0c881c15f2895b3993dd7177089a0cc88ecc27665dd` as the expected current candidate manifest digest, then require that value for APPLY and store it with runner/argv fingerprint in the journal; do not implement another image engine or unrelated approval infrastructure. Keep APPLY disabled until a separate user-authorized run configuration is specified. A small offline regression for bypass/restart/host mismatch is enough under GOV-008. Do not promote or deploy now, and never overwrite the more-current canonical ACTIVE_WORK from the older candidate.
+
 ## 2026-11-06 — STG9MEDIA-001 final read-only helper review FAIL: apply/resume scope unsafe
 
 **Actual Codex read-only review report provided by Teddy, 2026-11-06 09:54:47 KST.** Candidate isolated at `/tmp/stg9-54-helper-candidate` derived from `9c513b1fce0cb0195fcf7fa3e351b273e230c642`; current canonical preceding this documentation update `b1810b9cd5999e969cc5d899b32650dfc2639c32`. Verdict: `CODE_REVIEW=FAIL`, `MANIFEST_54=PASS`, `RUNNER_REUSE=PASS`, `APPLY_SAFETY=FAIL`, `RESUME_SAFETY=FAIL`, `PROMOTION_READY=NO`. The review was **read-only**: candidate changes 0, live production executions 0, pre-existing dirty worktree untouched.
