@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — Teddy explicitly reprioritizes P08 UI BEFORE P04 source consolidation (roadmap-only)
+
+Teddy reasoned that P08 library status/file-management UI will alter the same effective UI/code surfaces that P04 proposes to consolidate; performing P04 first risks a second round of refactoring when P08 modifies them. This is a sound dependency ordering. The informational `WORK_ROADMAP.md` now lists P00–P03 completed/qualified history followed by **P08 → P04 → P05 → P06 → P07**. Stage11 `S11-WX011` remains an independently active read-only evidence task and may continue separately.
+
+**P08 immediate proposed next step:** inspect effective production/root/Overlay HTML and current UI/API read paths, identify NAS/Discovery/Stage9/Stage11 status semantics with read-only evidence, and define summary cards/sections with exact data sources and no repeated filesystem scans or misleading NFO/poster completion counts. Then obtain explicit scoped approval for actual UI/API code, rollout and any shared workstream routing (Downloader currently `DLDWS-001`, Stage9 `STG9MEDIA-001`, Stage11 `S11-WX011`—not automatically interchangeable). **No product source, contract, active task, timer, NAS, database, Jellyfin or runtime change by this priority-documentation update.**
+
 ## 2026-11-06 — 사용자 요청에 따른 P00-P08 로드맵 현행화 (실행 승인이 아닌 상태 정리)
 
 `docs/handoff/missav-dlp-web/WORK_ROADMAP.md`의 11-05까지 P00 미완료 표시를 11-06 Stage9 실제 결과에 맞춰 바로잡았다. P00 Stage9 이미지 4개 시범/54개 기존 보완/새 HUNTB 2개 NFO·포스터·Jellyfin 사용자 확인/10건 상한+15:30 예약 실행을 **해당 검증 범위 완료**로 기록한다. 자연 대기열 0건이므로 실제 10건 연속 처리와 새 다운로드 무원본 포스터 Fourhoi 폴백은 여전히 NOT_RUN, 260개 전체 NFO 독립 정합성도 확인필요다. 10분 타이머는 active; 과거 '현재 중지' 문구는 로드맵 표에서 현재 상태로 수정했다.
