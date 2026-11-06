@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 23:05 KST — P08LIB-001 isolated Docker build attempt BLOCKED: not proven CT108
+
+- **Evidence category:** Teddy pasted a Codex run report, completed at 2026-11-06 23:05:34 KST. This is **reported execution evidence**, not an independent host-system readback by ChatGPT.
+- **Canonical source:** Codex confirmed `teddy-subtitle-stage11` `9c1fd898a359a624ed3b2b035abd164f0300588d` and matching build-only authorization for all four shared `P08LIB-001` workstreams. The one-line Overlay checksum repair `89a8c31e` was already promoted; no new source correction is requested.
+- **Preflight:** Docker daemon responded; reported free disk `42 GiB`, available memory `5.7 GiB`. However hostname `downloader` was not proof of actual CT108: PID 1 was `codex` and `systemctl` failed to access system bus. Stage9 service/timer and authoritative CT108 resource/runtime snapshot remained UNKNOWN.
+- **Result:** `BUILD_ONLY=NOT_RUN`, `DEPLOY=NOT_RUN`, new image ID NONE, Dockerfile smoke/image-content inspection NOT_RUN. No build/deployment command was attempted; post-state service/container invariance remains **NOT_VERIFIED**, not PASS. Codex left only offline draft edits under `/tmp/p08lib-build-9c1fd-reference/`; the drafts were not promoted.
+- **NEXT ONE CHECKPOINT:** Teddy should run a short **read-only preflight in the real `root@downloader` (CT108) terminal** to prove PID1/systemd, Docker state, memory/disk, running containers and Stage9 service/timer. Do not repeat the Codex sandbox attempt or treat Docker daemon reachability as CT108 identity. Existing isolated build-only approval remains; source changes, runtime deploy, Compose, service/timer actions, NAS/DB/Jellyfin/Writer/Stage11 mutations remain prohibited. Resume the single isolated build only after verified CT108 safety preflight.
+
 ## 2026-11-06 — P08LIB-001 Overlay checksum manifest repair PASS (KST)
 
 - **Teddy explicit approval:** After build preflight identified a stale manifest entry, Teddy approved updating the exact one checksum line and promoting that correction. This is not additional product source change or deployment authorization.
