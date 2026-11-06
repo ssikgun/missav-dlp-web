@@ -1,5 +1,15 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 Teddy explicitly approved source-only helper promotion
+
+**Explicit user decision:** After Codex reported `FINAL_CODE_REVIEW=PASS`, `MANIFEST_SCOPE=PASS`, `APPLY_GATE=PASS`, `RESUME_SAFETY=PASS`, `RUNNER_REUSE=PASS`, `PROMOTION_READY=YES`, Teddy explicitly replied **'승인해'** to the precisely scoped request to promote the **three isolated Stage9 helper candidate files to canonical GitHub**, using a clean worktree with current `teddy-subtitle-stage11` HEAD, preserving unrelated dirty worktrees and the newer canonical `ACTIVE_WORK.md`. Source promotion is therefore **APPROVED**, distinct from production deployment.
+
+**Approved exact files and reviewed SHA-256:** `teddy_discovery_existing_image_batch.py` `503598bded6f5c358c2078e3c4623d98f7eab5255debc3e1cdce6f1b8d4c5131`; `teddy_discovery_existing_image_batch_smoke.py` `38895d6e0d1069e7cf91b99f3ecc3913c1988e7b71cb683555c74c64aa136808`; `docs/governance/stage9-media/evidence/2026-11-06-existing-image-targets-54.json` `8f72735b4c8b72315e88e0c881c15f2895b3993dd7177089a0cc88ecc27665dd`. Candidate remains at `/tmp/stg9-54-helper-candidate`; do not copy its stale `ACTIVE_WORK.md` over the current canonical version. The Stage9 canonical `ACTIVE_WORK.md` may receive only a minimal status/readback checkpoint.
+
+**Required promotion checks:** Verify `AGENTS.md`, common/Stage9 contracts and router, actual repo/branch/remote SHA and task `STG9MEDIA-001 IN_PROGRESS`; verify isolated SHA-256 content and exactly the three requested paths before commit; use clean isolated worktree based on current remote HEAD, never overwrite existing uncommitted changes; small Stage9-only validation, `git diff --check`, governance; fast-forward push only to `teddy-subtitle-stage11`, exact GitHub blob readback and CI result. Record canonical promoted commit/paths/hashes and `PROMOTION_SOURCE=PASS/FAIL`.
+
+**Not authorized:** CT108 helper install, real approval-file creation, image fetch, 54-title APPLY, NAS/DB/Jellyfin modifications, media service/timer start/restart/enable or changes, any other workstream source modifications. Even after source promotion, these remain `NOT_RUN`, pending separate user approvals. Keep failures fail-closed without silently relaxing existing safety checks.
+
 ## 2026-11-06 — STG9MEDIA-001 isolated 54-title helper final read-only review PASS; promotion awaiting separate approval
 
 **Source: Teddy provided final Codex read-only review, 2026-11-06 10:54:48 KST.** On isolated uncommitted `/tmp/stg9-54-helper-candidate`, based on earlier canonical `9c513b1f...`, reviewer reported `FINAL_CODE_REVIEW=PASS`, `MANIFEST_SCOPE=PASS`, `APPLY_GATE=PASS`, `RESUME_SAFETY=PASS`, `RUNNER_REUSE=PASS`, `PROMOTION_READY=YES` **conditional on separate source-promotion approval**. Changed files 0; actual runner execution 0. All three candidate SHA-256s match previously reported values, per Codex; earlier 14 offline smoke PASS reused without rerun. This is final Codex review evidence, **not independent byte inspection by ChatGPT**, and does not assert a real CT108 production run or independent future runtime attestation.
