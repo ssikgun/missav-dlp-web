@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — Backlog cleanup prioritized before timer: 11 stale poster PENDING
+
+Teddy asked why 11 Stage9 media rows still have `poster_status=PENDING` after NAS art backfill and requested queue cleanup before activating the regular 10-minute timer or submitting a new download. Root explanation confirmed: the exact 54-title `--existing-image-only` path **deliberately wrote zero media DB rows**, so this is stale historic poster status rather than proof artwork was not created. Ten of the PENDING titles have independent prior NAS Primary verification; `MBRBI-015` was intentionally excluded and remains protected. The separate 3 FAILED rows have attempts >= 5 and are `EXHAUSTED` under current code; do not clear their failure history or assume they will execute as normal retryable work. Normal Stage9 timer remains inactive, E2E not run.
+
+Next: one bounded read-only snapshot of 14 complete media rows, their exact retry eligibility, NFO/poster/Jellyfin states and current NAS Primary truth; then a minimal protected, backed-up database reconciliation proposal for explicit user approval. Never sweep/overwrite videos, NFOs, old image backups or historic failures; no DB write or timer start was performed by this record.
+
 ## 2026-11-06 — Stage9 timer 10-minute readiness preflight HOLD on 14 historic rows
 
 Teddy's CT108 read-only unit/DB check after requesting fully automatic new-download-to-Jellyfin (before subtitles) confirmed Stage9 service inactive/static, timer inactive/enabled, loaded `OnCalendar=*-*-* *:00/10:00`, `Persistent=false`, `RandomizedDelaySec=0`, `AccuracySec=1s`, `--max-items=1`, immutable Runner release `81be3d80a991a921ce4c82a42a1556f5956be78c` PASS. DB/WAL snapshot safe (both WAL=0), zero unregistered completed jobs, visibility 128 VISIBLE. But current media table has **14 prior retryable candidates**: 11 COMPLETED with poster_status=PENDING (including protected MBRBI-015), 3 FAILED (MFCS-085 attempt_count 17161, NHDTB-778 and DANDYA-033 attempt_count 5). Existing source classifies the 11 PENDING as eligible when under attempt limit, so a default timer could touch old history and postpone the intended new work at one job per ten-minute tick. `BACKLOG_REVIEW_REQUIRED=YES`, **`TIMER_ACTIVATION=HOLD`**, production writes 0.
