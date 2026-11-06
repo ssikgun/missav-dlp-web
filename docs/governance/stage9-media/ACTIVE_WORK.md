@@ -1,5 +1,11 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 54-title helper source promotion
+
+Teddy approved promotion of the isolated sequential helper to `teddy-subtitle-stage11` only. The three candidate files were SHA-256 checked against the approved values before copying into a clean worktree based on canonical `710cf8cee8cd2b7641c5ce3d71c834a2c2a3906a`; the older candidate `ACTIVE_WORK.md` was not copied. Existing 14-test offline PASS and final code review were reused. This promotion does not authorize CT108 installation, creating the external approval file, 54-title APPLY, or service/timer changes; all remain `NOT_RUN` pending separate authorization.
+
+Promoted inputs: helper `503598bded6f5c358c2078e3c4623d98f7eab5255debc3e1cdce6f1b8d4c5131`, smoke `38895d6e0d1069e7cf91b99f3ecc3913c1988e7b71cb683555c74c64aa136808`, manifest `8f72735b4c8b72315e88e0c881c15f2895b3993dd7177089a0cc88ecc27665dd`. Awaiting scoped governance checks and fast-forward publication/readback.
+
 ## 2026-11-06 — STG9MEDIA-001 Teddy explicitly approved source-only helper promotion
 
 **Explicit user decision:** After Codex reported `FINAL_CODE_REVIEW=PASS`, `MANIFEST_SCOPE=PASS`, `APPLY_GATE=PASS`, `RESUME_SAFETY=PASS`, `RUNNER_REUSE=PASS`, `PROMOTION_READY=YES`, Teddy explicitly replied **'승인해'** to the precisely scoped request to promote the **three isolated Stage9 helper candidate files to canonical GitHub**, using a clean worktree with current `teddy-subtitle-stage11` HEAD, preserving unrelated dirty worktrees and the newer canonical `ACTIVE_WORK.md`. Source promotion is therefore **APPROVED**, distinct from production deployment.
