@@ -1,5 +1,11 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 SW-216 DB metadata read-only PASS
+
+**Teddy root@downloader read-only SQL/Runner check:** Exact pinned installed batch helper SHA and live host/systemd/runner plan recheck succeeded (`RUNNER_IDENTITY=PASS`, `SERVICE_TIMER_STOPPED=PASS`). SQLite `mode=ro&immutable=1` / `PRAGMA query_only=ON` showed **one `SW-216` holding and one titles metadata record**: `storage_root=jav`, `relative_path=SW/SW-216/SW-216.mp4`, `size_bytes=4172018393`, `present=1`, `discovered_by=organizer-apply`, `HAS_POSTER_URL=False`, `metadata_source=missav-en-movie`. Console confirmed `RUNNER_EXECUTIONS=0`, `IMAGE_WRITES=0`, `SW216_READONLY_CHECK=COMPLETE`.
+
+**Interpretation:** Exact DB movie identity/metadata existence **PASS**, and the accepted metadata source has no cover URL, making the approved static Fourhoi candidate the expected **fallback path** if NAS-local Primary is absent. This does not prove the remote image exists or explain the broad `STAGE9_MEDIA_RUN_FAILED` exception. User separately reported SW-216 folder has no image; independent NAS/SSH readback pending. No retry or image fetch permitted by this diagnostic. Before any new one-title operation, perform bounded read-only NAS verification of the 53 Runner-COMPLETE folders plus SW-216, preserve the original journal/approval, and separately obtain user approval for a targeted replay if needed.
+
 ## 2026-11-06 — STG9MEDIA-001 Teddy reports SW-216 folder has no image
 
 **User observation after journal audit:** Teddy directly stated **"SW-216 폴더에는 이미지는 없어."** This is the operator's actual movie-folder observation, **not yet an independent SSH/size/SHA readback**. The exact prior batch remains `53 COMPLETE / 1 ERROR` (`SW-216`, `STAGE9_MEDIA_RUN_FAILED`), with no retry. The generic error is emitted by `teddy_discovery_media_only_runner.py`'s broad unexpected-exception handler, so its specific cause is still `UNKNOWN` from existing persisted logs; the helper discarded child stderr and the child emits no traceback. Current safe next action: one bounded **read-only** SW-216 DB holding/metadata/config/NAS state examination, without runner APPLY, new network image fetch, journal rewrite or automatic retry. The 53 other Runner COMPLETE statuses still need physical NAS image readback before product PASS.
