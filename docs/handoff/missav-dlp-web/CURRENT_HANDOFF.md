@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — Teddy reports both HUNTB-653 / HUNTB-662 NFO and poster created
+
+User verified both newly downloaded titles now have NFO and poster. The first title HUNTB-653 has actual Stage9 14:40 journal/DB `COMPLETE` evidence; HUNTB-662 14:50 journal/DB, NAS remote bytes, and ordinary Jellyfin visible screen still need independent confirmation. User asked if increasing one-item-per-ten-minute throughput completes Stage9 metadata: **almost**, pending coordinated Stage9 media/visibility batch-cap tuning and a bounded scheduled verification; a new-download fallback without a cover URL was not exercised by these two titles (both had cover_url). Do not change unit/runner until an explicit throughput policy/production-change approval. Stage11 remains excluded.
+
 ## 2026-11-06 — HUNTB-653 first Stage9 auto NFO/poster COMPLETE at 14:40; HUNTB-662 next
 
 Teddy's observed actual 14:40 scheduler-triggered Stage9 service ran 5 seconds and exited successfully (Result success, exit0). Runtime journal `registered=1`, `media attempted=1/completed=1/failed=0`, `media_max_items=1`. Media DB `HUNTB-653#4804209 COMPLETED, nfo=COMPLETE, poster=COMPLETE, notification=NOTIFIED, recovery=CHECK_PENDING`, errors absent. `HUNTB-662` still has zero Stage9 media rows at 14:40, expected next slot 14:50 if eligible. Jellyfin visual confirmation and independent NAS/NFO/poster readback NOT yet performed. User asked whether 10 titles take 100 minutes: yes, one title per ten-minute tick means roughly 90–100 minutes for ten titles if successful, extra Jellyfin visibility lag possible. Current cap is service configuration, not architectural concurrency; wait for second title to close end-to-end canary, then user can decide on separately authorized `max-items=3` or `5` throughput tuning with bounded Jellyfin visibility/resource limits. No systemd config changed.
