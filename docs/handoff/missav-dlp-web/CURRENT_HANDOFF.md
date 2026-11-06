@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — P08 NAS image decoder preflight BLOCKED at SSH authentication (KST)
+
+Teddy executed the read-only NAS command inventory from `root@downloader` with SSH `-o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10` to `ssikgun@192.168.1.201`. Result: `Permission denied (publickey,password)` **before the NAS script started**; no command/PIL/OpenCV/image-decoder inventory ran. This is **not** evidence that decoders are missing. `BatchMode=yes` suppresses interactive password prompts; the previously successful NAS checks did not require this flag, so password-based SSH is a plausible explanation, **not confirmed**. No NAS images read, no data/config/service changes. Next: obtain Teddy's confirmation of intended SSH authentication and, if appropriate, have Teddy retry an interactive login under his own credentials; do not request or store a password, disable host-key validation or modify NAS auth. Poster product metric remains blocked and candidate is unpromoted.
+
 ## 2026-11-06 — P08LIB-001 poster false-PRESENT prevented; product poster metric still blocked (17:04:02 KST)
 
 **Codex/user report, diff not independently inspected:** isolated candidate `/tmp/p08lib-001-work` fixed `teddy_library_api.py` and `teddy_library_api_smoke.py`; full candidate patch `/tmp/p08lib-complete-candidate.patch`, focused poster patch `/tmp/p08lib-poster-integrity.patch` exist on Teddy's CT108, **not uploaded to this workspace**. Current recognized named poster files now map to `UNKNOWN` regardless of validity because remote NAS validated full decoder unavailable/unverified; only `thumb.jpg` and confirmed Primary absence map to `ABSENT`. This is a **safe fail-closed mitigation, not completion of poster counts**. No new NAS byte reads/SSH calls, no new image decoder dependency; NFO, subtitle and size logic preserved.

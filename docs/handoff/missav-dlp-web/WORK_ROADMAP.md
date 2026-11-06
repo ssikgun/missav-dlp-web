@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-06
 
+- **P08 NAS 디코더 사전 점검 BLOCKED:** `ssh -o BatchMode=yes` 실행에서 `Permission denied (publickey,password)`로 NAS 스크립트 시작 전 중단. 디코더 설치 여부는 전혀 확인되지 않음(`UNKNOWN`). 이전 성공한 NAS SSH는 `BatchMode`가 없었음. 사용자 인증 방식 확인 후 정상 대화형 SSH로 재검사 필요; 이미지·DB·NAS 변경 0.
+
 - **P08 포스터 보수적 보완 보고(17:04:02):** 정상 헤더만으로 `PRESENT` 확정하던 문제 제거. 현재 인식된 로컬 Primary는 정상·손상 모두 `UNKNOWN`, `thumb.jpg` 단독/확인된 부재는 `ABSENT`이므로 **유효 포스터 집계 목표는 미완료**. 오프라인 smoke 5종 및 `git diff --check`는 Codex 보고상 PASS, 독립 diff 검토·NAS 이미지 디코더 확인·실운영 검증/배포는 `NOT_RUN`. 다음은 NAS 디코더/처리 한도 읽기 전용 점검.
 
 - **P08LIB-001 후보 오프라인 테스트 보고(16:56:01):** 격리 `/tmp/p08lib-001-work`에서 UI/API·smoke 5종·`git diff --check` PASS를 Codex가 보고(독립 재검증 전). 단, 포스터는 헤더 서명만 확인하여 손상 이미지까지 `PRESENT`로 잘못 집계할 수 있음. **이미지 무결성 보완 필요 → P08 제품 완료 보류.** Stage9 작업 상태 `UNKNOWN`, 실운영 검증/배포 `NOT_RUN`, 제품 소스 Git 승격 없음.
