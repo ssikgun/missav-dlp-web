@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — Stage9 timer first scheduled 14:00 tick SUCCESS; next 14:10 WAITING
+
+Teddy's CT108 read-only follow-up confirmed service executed `2026-11-06 14:00:00 KST`, exited `14:00:00`, `MainPID=0`, `Result=success`, `ExecMainStatus=0`, and `ActiveState=inactive/dead`. Timer remains `active/waiting/enabled` with `LastTrigger=14:00:00 KST`, next wall-clock `14:10:00 KST` from both `TimersCalendar` and `list-timers`; config fixed every 10min, delay=0, accuracy=1s, persistent=false. The earlier temporary `running`/empty-next display is resolved. **Scheduled operation PASS**, **new-download full automatic acceptance NOT_RUN**. Next Teddy submits one new title through Downloader Web without manual media runner, then check normal download and transfer, next timer Stage9 NFO/artwork/Jellyfin, leaving Stage11 subtitles out of scope. Preserve unrelated history and 54 legacy local images.
+
 ## 2026-11-06 — Actual Stage9 timer activated; first tick / next schedule pending verification
 
 Teddy ran approved guarded preflight then `systemctl start teddy-stage9-media.timer`. `TIMER_ACTIVATION=PASS`, `ActiveState=active`, `SubState=running`, `UnitFileState=enabled`, last trigger `Fri 2026-11-06 13:53:45 KST`, next realtime elapse field empty. No new web download yet. Stage9 queue clean `ELIGIBLE=0`, exhausted historic 3; credential paths, runner identity and effective OnCalendar unit line passed. Because timer appears to have triggered immediately at 13:53:45, verify the *actual* service current status and effective time expressions with read-only `systemctl show/cat/list-timers`, wait for clean exit and next tick before starting the user's new-title E2E. Do not infer full automatic schedule behavior solely from `ActiveState=active`.
