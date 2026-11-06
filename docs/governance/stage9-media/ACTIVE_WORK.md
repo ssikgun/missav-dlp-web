@@ -1,5 +1,45 @@
 # Stage9 Media workstream — active work
 
+## CURRENT P08LIB-001 OFFLINE IMPLEMENTATION PHASE — USER APPROVED 2026-11-06 KST
+
+Teddy explicitly approved P08 UI/API source implementation with representative **offline-only** tests after the verified joint registration and CT108 read-only runtime/mount preflights. This scoped implementation authorization supersedes the prior registration-only product-code prohibition **only for the allowed candidate files and offline tests**. Task ID `P08LIB-001` and four-workstream requires set remain unchanged. Review NFO/poster/Stage9 job-state read semantics against contract v1.0.9; do not alter Stage9 producers, job state or services.
+
+## OBJECTIVE
+
+Produce a reviewable, bounded P08 library UI/API candidate with five honest current-holdings metrics and three clear status sections; prove representative offline behavior and keep existing user-data/runtime protections intact.
+
+## APPROVED_SCOPE
+
+- In a verified isolated worktree based on current `ssikgun/missav-dlp-web` `teddy-subtitle-stage11`, edit only P08 candidate source `teddy_library_api.py`, `downloader_runtime_overlay/templates/index.html`, `templates/teddy-library.js`, `templates/teddy-library.css` and existing directly relevant smoke files (e.g. `teddy_library_api_smoke.py`, `teddy_library_ui_smoke.py`, `teddy_file_management_navigation_smoke.py`). Do not rewrite root `templates/index.html` or unrelated source.
+- Reuse the existing one-pass bounded NAS inventory, current holdings identity/KO/size semantics and additive `/api/library` response fields. Count valid sibling `DVD-ID.nfo` or legacy `movie.nfo` by bounded regular-file XML + matching movie ID checks; distinguish `VALID/ABSENT/INVALID/UNKNOWN`. Count accepted NAS-local `poster/cover/folder/default/movie` Primary files (recognized title-prefix variants and JPEG/PNG/WebP extensions) as `PRESENT/ABSENT/UNKNOWN`. `thumb.jpg` alone, source `cover_url`, or Jellyfin cached Primary is not NAS-local poster completion.
+- Keep full-library summary denominator separate from search-filtered item list. Preserve `ko_present`, unresolved/no-subtitle detail, known/unknown storage bytes, mismatch/UNKNOWN behavior; do not count historical `media_jobs.COMPLETE` as live NAS sidecar presence.
+- Build responsive five-card `보유 라이브러리` summary and `라이브러리 DB 현황` containing distinct subtitle, metadata and poster subsections. Keep the present Stage12 pipeline counts visibly separate from current-holdings counts. Preserve existing search/sort/filter/cover preview/playback/download and guarded permanent-delete DOM/handlers, PC/mobile layout.
+- Stage9 task process details may be implemented as an optional read-only bounded query layer with injected SQLite path/connection for offline fixtures only; absent media DB (the current production web container has no mount) must report UNKNOWN without breaking library availability. Do not add a new mount or assume a DB-only bind reads WAL coherently.
+- Run a small representative existing smoke/fixture set for valid `DVD-ID.nfo`, legacy `movie.nfo`, missing/invalid/conflicting/unsafe/unknown NFO, `poster.webp`, `cover.jpg`, `thumb.jpg`-only, Stage9 DB unavailable, summary count consistency, and UI/playback/delete safeguards. Run `git diff --check`; report actual commands, PASS/FAIL, changed files, constraints and remaining UNKNOWN.
+- Preserve implementation candidate/diff in the isolated worktree for review; any canonical source promotion requires separate approval. Important findings may be recorded in existing canonical roadmap/handoff without exposing secrets or private title data.
+
+## PROHIBITED_SCOPE
+
+- No production Docker image build/deploy/recreate/restart or Compose/mount modifications. No Stage9 media DB mount, live DB read/write, NAS/DB/Jellyfin write, new scheduled job, service/timer change, forced library scan, downloads, existing poster/NFO regeneration, media deletion or backup deletion.
+- No Stage9 media pipeline/worker code changes, Stage11/Stage12 model/ASR/translation/publication code change, Writer socket/lock/security code change, or common contract/router/task ID change.
+- No source promotion or production action based solely on offline smoke PASS. Fail closed on unmatched identity, unsafe symlink/path, ambiguous duplicate sidecars, unbounded resource use or unknown status; never silently turn UNKNOWN into ABSENT.
+
+## ACCEPTANCE_CRITERIA
+
+- Verify canonical repo, branch, HEAD and all four shared workstreams `P08LIB-001` before candidate edits; Stage11 remains independent.
+- Only allowed P08 source/related smoke files change in an isolated candidate; default API semantics remain additive and existing client keys unchanged.
+- Representative offline cases and existing library navigation/HTML/script smoke pass; unrelated playback/download/permanent-delete protections remain intact; `git diff --check` PASS.
+- Report test evidence separately from product status. Actual CT108 build, Stage9 DB job-state mounting, live API/NAS/Jellyfin visual validation and deployment remain NOT_RUN.
+
+## EVIDENCE
+
+- User approved offline implementation and tests directly after P08 read-only Docker and Stage9 host DB/mount checks, latest documented at canonical `c993d0135fd152f714e20406aa6f4eb3fa690fd8`. Earlier P08 shared-route registration `f1759073` Project Governance succeeded, and subsequent source-only preflight results are in `CURRENT_HANDOFF.md`.
+- Current host Stage9 DB exists but running web Docker lacks any Stage9 DB mount; Stage9 uses WAL. UI totals must therefore be independent of Stage9 job DB access.
+
+## NEXT_DECISION
+
+Review the offline candidate diff and test results. Only after review/approval may promote source to canonical; Docker build/deployment and any new read-only Stage9 DB mount require further explicit approval and a fresh operational safety preflight. At P08 closeout restore the previous task IDs and routing from `c020a8a9bbf9ac05b34975894edb9dd5d630a275` without erasing history.
+
 ## CURRENT TEMPORARY P08 SHARED REGISTRATION — P08LIB-001 (2026-11-06 KST)
 
 Teddy approved a bounded shared registration to prepare P08 library UI work before P04 consolidation. Temporary participants are Governance, Downloader, Discovery Writer Safety, and Stage9 Media; Stage11 is independent. Original assignments at parent `c020a8a9bbf9ac05b34975894edb9dd5d630a275` are preserved and recoverable: Governance INACTIVE/NONE, Downloader+Writer Safety IN_PROGRESS/DLDWS-001 as a pair, Stage9 IN_PROGRESS/STG9MEDIA-001. This temporary transition does not close, cancel or overwrite original approved work/evidence; those task IDs will be restored at explicit P08 closeout.
