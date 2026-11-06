@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-06
 
+- **P08 격리 Docker 사전 검사 BLOCKED(2026-11-06 KST):** Dockerfile 후반 `sha256sum -c dldws001-source-sha256.txt`에 기록된 Overlay HTML SHA-256은 `4d379e37...`이지만 정본 승격 파일의 실제 값은 `63fb1807...`라 그대로 빌드하면 검증 실패가 확실함. 로컬 읽기 전용 검사에서 `templates/index.html: FAILED`; CT108 빌드/운영 배포 NOT_RUN, 운영 변경 0. **안전 체크섬 파일 1줄 정본 갱신 별도 승인 대기**, 빌드 승인만으로 소스 수정하지 않음.
+
 - **P08 격리 Docker 이미지 빌드 전용 승인(2026-11-06 KST):** Teddy가 정본 소스 6개 승격 `a8e9156bfc0a966ea3af3778aacd11c02ec719fa` 이후 **고유 태그의 격리 이미지 빌드와 검사까지만** 별도로 승인. `P08LIB-001 / IN_PROGRESS` 4영역 동일 승인 기록. 정확한 정본/제품 SHA와 CT108 자원·기존 운영 컨테이너 상태 선확인 → Dockerfile 무수정 빌드와 기존 smoke → 이미지 ID/내용 및 운영 무변경 후검증. `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`, Stage9 DB 상태 UNKNOWN. Compose/컨테이너 교체·재시작, NAS/DB/Jellyfin 실조회/쓰기, Stage9/Writer 변경은 여전히 금지. 다음은 CT108 빌드 증거 후 **운영 배포를 별도 승인할지** 결정.
 
 - **P08 제품 6파일 정본 승격 PASS(17:57 KST):** Teddy 별도 승인 후 검증된 v2 후보 패치 SHA `661285f725ca482e307a776fd739e787f723e6e2eb4258697e355ba73eec35b8`의 정확한 6개 제품/테스트 파일만 `teddy-subtitle-stage11` 원격에 일반 순방향 승격. 제품 커밋 `a8e9156bfc0a966ea3af3778aacd11c02ec719fa`; 커밋 비교 6파일 외 변경 0, 원격 파일 blob SHA **6/6 PASS**. Docker 빌드·운영 배포·NAS/DB/Jellyfin 실검증 NOT_RUN, Stage9 작업 DB 상태 UNKNOWN, 현재 웹 컨테이너 변경 없음. P08LIB-001은 계속 IN_PROGRESS. **다음은 별도 승인된 빌드 전용 검증**, 배포/실화면 확인은 그다음 별도 결정.
