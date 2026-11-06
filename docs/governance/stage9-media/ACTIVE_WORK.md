@@ -1,5 +1,11 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 CT108 live 54-title preflight PASS; APPLY pending
+
+**Actual user-supplied `root@downloader` console:** Teddy ran the previously supplied read-only Python preflight after explicit authorization. The result ended `FINAL_PREFLIGHT=PASS`. Both installed artifact SHA-256 checks matched: helper `503598bded6f5c358c2078e3c4623d98f7eab5255debc3e1cdce6f1b8d4c5131`, 54-target manifest `8f72735b4c8b72315e88e0c881c15f2895b3993dd7177089a0cc88ecc27665dd`. Read-only live helper `prepare_plan` returned `HOST_IDENTITY=PASS`, `SERVICE_TIMER_STOPPED=PASS`, `PINNED_RUNNER=PASS`, `MANIFEST_54=PASS`, `PROTECTED_MBRBI_015=PASS`, `JOURNAL_DIRECTORY=PASS`. Operational approval record remained absent.
+
+**Boundary and next run:** `CT108_LIVE_PREFLIGHT=PASS`, `APPROVAL_FILE=ABSENT`, `PRODUCTION_APPLY=NOT_RUN` at this checkpoint. Teddy's separate 54-title create-only APPLY approval remains valid; proceed only with exact helper-required one-time root-owned 0600 approval record bound to fresh run_id/journal, current plan identity, and a bounded expiration, followed by an existing-runner sequential apply in tmux. Do not enable service/timer, overwrite/delete images, alter Jellyfin API/DB jobs, or auto-retry a failed/ambiguous title. Stop and report live result; verify actual NAS artifacts before claiming product completion.
+
 ## 2026-11-06 — STG9MEDIA-001 Teddy authorized 54-title production APPLY (awaiting CT108 execution)
 
 **Explicit user approval in the continuation chat:** Following the actual CT108 helper-install and 54-item PLAN-only PASS, Teddy replied **"승인할께. 작업 해줘."** to the precise proposal for **one sequential create-only 54-title backfill** through the existing pinned Stage9 runner. Approved scope includes a root-owned 0600 bounded approval record at `/etc/teddy-stage9-media-batch-approval.json`, a unique root-only journal, and sequential per-title image-only runner invocation for the fixed SHA-256 pinned manifest `8f72735b4c8b72315e88e0c881c15f2895b3993dd7177089a0cc88ecc27665dd`. The protected `MBRBI-015` remains excluded.
