@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-06 — HUNTB-662 and HUNTB-653 new-title E2E at 14:38:55: Discovery complete, Stage9 waiting
+
+Teddy submitted two new titles via Downloader Web, reporting download+MP4 conversion complete. CT108 read-only snapshot confirms one `holdings` record each (`jav/HUNTB/HUNTB-662/HUNTB-662.mp4` 6542142974 B; `jav/HUNTB/HUNTB-653/HUNTB-653.mp4` 5561374116 B), `present=1`, discovered by `completion-stage9`, Organizer jobs 263/262 `COMPLETED`, metadata `javdatabase-movie` with poster URL for each. Last Stage9 timer 14:30 service success, next 14:40 timer waiting; media_jobs count **0 for both at 14:38:55**. That may reflect downloads registered after 14:30, not proven failure. Stage9 max one item per tick; verify 14:40 and 14:50 read-only before diagnosis. NAS actual remote file readback, Stage9 NFO/poster and ordinary Jellyfin UI still NOT_VERIFIED; do not manually run the media Runner or Stage11.
+
 ## 2026-11-06 — Stage9 timer first scheduled 14:00 tick SUCCESS; next 14:10 WAITING
 
 Teddy's CT108 read-only follow-up confirmed service executed `2026-11-06 14:00:00 KST`, exited `14:00:00`, `MainPID=0`, `Result=success`, `ExecMainStatus=0`, and `ActiveState=inactive/dead`. Timer remains `active/waiting/enabled` with `LastTrigger=14:00:00 KST`, next wall-clock `14:10:00 KST` from both `TimersCalendar` and `list-timers`; config fixed every 10min, delay=0, accuracy=1s, persistent=false. The earlier temporary `running`/empty-next display is resolved. **Scheduled operation PASS**, **new-download full automatic acceptance NOT_RUN**. Next Teddy submits one new title through Downloader Web without manual media runner, then check normal download and transfer, next timer Stage9 NFO/artwork/Jellyfin, leaving Stage11 subtitles out of scope. Preserve unrelated history and 54 legacy local images.
