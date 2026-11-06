@@ -1,5 +1,25 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-06 — STG9MEDIA-001 helper security functions PASS but approved-run wiring not implemented
+
+**User-provided Codex report (2026-11-06 10:21:10 KST) — isolated candidate ONLY.** Candidate directory `/tmp/stg9-54-helper-candidate`, based on older `9c513b1...` detached from current canonical head. This is a *report*, not fresh independent source inspection or actual live apply.
+
+| Evaluation | Report |
+| --- | --- |
+| `MANIFEST_SCOPE` | `PASS` — fixed path/whole-file SHA-256 guard, alternate path/bytes offline rejected |
+| `RESUME_SAFETY` | `PASS` — manifest/release/runner/argv journal fingerprints reject mismatch offline |
+| `CT108_IDENTITY_GATE` | `PASS` — mock hostname/UID/derived fingerprint checks |
+| `APPLY_APPROVAL_GATE` | `PASS` — current `--apply` still returns `BLOCKED_NO_APPROVAL`, zero runner calls |
+| `OFFLINE_SMOKE` | **`FAIL` overall** — 13 individual tests PASS, but positive *mock-approved* end-to-end execution was not exercised |
+| `PROMOTION_READY` | **`NO`** |
+| `PRODUCTION_APPLY` | **`NOT_RUN`** |
+
+**Candidate SHA-256 as reported** (not independently reread for this version): `teddy_discovery_existing_image_batch.py = 48f8a2c46df8cc8473b6c8dfb7f92f19a4f83fa8e5eb27aee7bc3307b766dc51`; `teddy_discovery_existing_image_batch_smoke.py = d34198c99489ed6fff740329f6aed05d87904ade0929d076e3e7bd25a49dfe3f`; prior 54-ID manifest `8f72735b4c8b72315e88e0c881c15f2895b3993dd7177089a0cc88ecc27665dd` unchanged per report. Candidate source files are uncommitted and unpromoted. No actual image network request, NAS/DB/Jellyfin write, service modification, GitHub source commit or production runner invocation occurred.
+
+**Critical distinction:** The three new controls are implemented as isolated functions and proven with mocks, but the real authorized APPLY execution path **does not yet use them**; currently it is fail-closed due to absent operational approval. Treat code/positive user-visible product readiness as **INCOMPLETE**, regardless of 13 tests passing. Do not accidentally enable an ungated apply path just to make smoke PASS.
+
+**Single next Stage9-only offline step:** Connect a minimal externally supplied, root-owned 0600 *actual operator-approved* authorization record validator to the helper's APPLY path (no auto-mint/create, no literal-public confirmation token, no test-only bypass accepted in production). It must bind exact intended 54-ID manifest SHA, pinned installed runner/executable SHA and release, argv profile, host fingerprint, one run/journal identity and approval scope, and fail closed on missing/stale/unsafe record; check service/timer remain inactive. Reuse already verified manifest/host/journal gates at real invocation boundary, then perform one safe *mock-injected approved* positive control using a fake runner (no network/storage/service effects), plus negative no-record and mismatch guards. Actual trusted authorization parameters/path and on-disk runner bytes still need CT108 read-only verification and Teddy's **separate explicit approval** before any real apply. Avoid new approval backend/infrastructure and excessive mock expansion. Update latest canonical ACTIVE_WORK only after isolated review; never replace it with the stale candidate worktree's copy.
+
 ## 2026-11-06 — STG9MEDIA-001 CT108 read-only host identity and Stage9 release checkpoint
 
 **Actual Teddy CT108 root terminal (read-only Python):** `HOSTNAME=downloader`, `UID=0`, `HOST_FINGERPRINT=7e8e75eb061f614c5f239d9e` (truncated SHA-256 of `stage9-ct108:` + local `/etc/machine-id`; underlying raw machine-id **not** printed or stored). The fingerprint confirms matching a prior agreed local installation when checked again; it does **not** independently prove Proxmox CT numerical ID 108. Console ended `READ_ONLY_IDENTITY_CHECK=COMPLETE`, `PRODUCTION_APPLY=NOT_RUN`.
