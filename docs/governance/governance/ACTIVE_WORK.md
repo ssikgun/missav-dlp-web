@@ -1,5 +1,40 @@
 # Governance workstream — active work
 
+## CURRENT P08LIB-001 ISOLATED DOCKER BUILD-ONLY PHASE — TEDDY APPROVED 2026-11-06 KST
+
+Teddy explicitly approved the next **build-and-inspect-only** step after the six-file P08 canonical source promotion `a8e9156bfc0a966ea3af3778aacd11c02ec719fa` and documentation readback `651b90f8de42aa4ff32e7e5a0f28f53c01382811`. This temporarily supersedes the earlier P08 offline-only **Docker image build prohibition only for one bounded isolated build**; all other old protections and task boundaries remain. The four-workstream shared task remains `P08LIB-001 / IN_PROGRESS`; contracts and router are unchanged.
+
+## OBJECTIVE
+
+Build the exact newly promoted P08 Downloader image in a new isolated clean source directory, verify its existing Dockerfile-provided smoke gates and image contents, and prove the running Downloader/Stage9/Writer/other services were not changed.
+
+## APPROVED_SCOPE
+
+- First verify fresh canonical `teddy-subtitle-stage11` HEAD, the six P08 product blob SHAs and matching four-workstream authorization; use a clean SHA-pinned isolated checkout, not the dirty old candidate or live operational source directory. Confirm real CT108 Docker/host available disk, memory, active jobs and safe build budget before starting.
+- Use the existing unmodified Dockerfile and requirements, with a **unique non-operational build-only image tag**; do not reuse or replace the current production image/tag. An ordinary Docker build may install its declared dependencies and run its existing in-image tests. No unapproved code fixes after a failure.
+- Record build exit, resulting image ID/size and source content/manifest for the final Overlay HTML, API, shared JS/CSS and relevant smoke files. Image-only inspect and, only if needed, a bounded disposable `--network none`, no-operational-mount, read-only-root test container are permitted; never launch the app or attach production sockets, directories, databases, NAS or Jellyfin credentials.
+- Compare before/after read-only Docker container IDs/images/status/start times of running Downloader and companion services and Stage9 service/timer state. Preserve the built image and prior images for explicit later deployment/rollback decisions.
+- Coordinate the shared authorization record, governance validation, canonical readback and later separate deployment decision only; no governance checker/contract/router edits.
+
+## PROHIBITED_SCOPE
+
+No Docker Compose `up`/recreate/restart/deploy, existing image retag/replacement, production web access tests or login, service/timer start/stop, stage9 DB mount, Dockerfile/requirements/product source/test edits, extra OS/daemon changes, active job cleanup, image/backup prune/delete, real downloads, NAS/DB/Jellyfin write, Stage9 manual runner, Writer socket mutation, Stage11/Stage12 execution, governance contract/router/task changes. No forced retry of a failed build by modifying application code or relaxing tests. Stop on unsafe resources or identity mismatch.
+
+## ACCEPTANCE_CRITERIA
+
+- Exact branch/source/blob and matched P08 authorization preflight PASS; clean isolated checkout with unchanged production runtime.
+- One unique build-only image completes with all mandatory existing Dockerfile smoke checks PASS, and image contents match promoted source; full build logs/output preserved without secrets.
+- Production containers, their image IDs/start times, compose config and Stage9 timer unchanged. `BUILD_ONLY=PASS` does not assert browser/NAS/Jellyfin product acceptance or operational deploy PASS.
+
+## EVIDENCE
+
+- Teddy directly answered “응 승인해” to the specifically proposed isolated Docker image **build-only** stage on 2026-11-06 KST, after source promotion PASS and explicit warning that production deployment needs a later separate decision.
+- Pre-approval canonical product commit `a8e9156bfc0a966ea3af3778aacd11c02ec719fa`; prior documentary HEAD `651b90f8de42aa4ff32e7e5a0f28f53c01382811`. No build has occurred from this authorization record.
+
+## NEXT_DECISION
+
+After bounded CT108 build-only evidence and user review, request a separate explicit approval for production Docker deployment, its rollback/monitoring plan, and live API/browser validation. Do not treat an isolated build PASS as deployment approval.
+
 ## CURRENT P08LIB-001 OFFLINE IMPLEMENTATION PHASE — USER APPROVED 2026-11-06 KST
 
 Teddy explicitly approved P08 UI/API source implementation with representative **offline-only** tests after the verified joint registration and CT108 read-only runtime/mount preflights. This scoped implementation authorization supersedes the prior registration-only product-code prohibition **only for the allowed candidate files and offline tests**. Task ID `P08LIB-001` and four-workstream requires set remain unchanged. Coordinate this task's scope and evidence only; do not edit common contracts, router or governance checker.
