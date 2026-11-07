@@ -1,5 +1,12 @@
 # Downloader non-subtitle workstream — active work
 
+## 2026-11-07 — P08LIB-001 approved manifest repair after failed dashboard build
+
+- Teddy explicitly approved (`응 승인해`) correction of one stale `templates/index.html` checksum entry and **one** new Docker build attempt, following the real CT108 step 76/80 checksum mismatch. The previous conditional Downloader-only image promotion authorization remains in effect only after all build and live safety gates.
+- GitHub source commit `7154446cd026b1a364002c4f47b9bf17a3d2e2c7` changed exactly `downloader_runtime_overlay/dldws001-source-sha256.txt`: old `63fb1807...14733` -> verified HTML SHA256 `84609dc23a2c3583bd099a6a2f0ed7e2301bb7645321e087b73595cb88326563`. Other 9 entries unchanged. Canonical handoff updated with root cause and next gate.
+- Status: source patch/readback PASS; `NEW_IMAGE_BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`, product UI/API acceptance INCOMPLETE. Shared `P08LIB-001 / IN_PROGRESS` remains limited to governance, downloader, discovery-writer-safety and stage9-media; independent Stage11 untouched. Preserve existing images/backups/dirty checkout/Stage9/Writer/NAS/Jellyfin, no auto-retry or extra feature/source edits.
+- NEXT: one isolated SHA-pinned no-pull CT108 Docker build after fresh read-only safety preflight, then report log and record another handoff checkpoint before gated deployment.
+
 ## 2026-11-07 — P08LIB-001 unified DB dashboard visual check + one build/Downloader-only deploy approved
 
 - **New explicit Teddy authorization:** `응 디자인 빌드 운영 배포까지 승인해` immediately after canonical source update `dab56af06451c3f1ba0ad500a70a3e627e530ae2` and documentation checkpoint `b53a498e76f0f4ab46214264fcee116a2839d5f6`. Authorizes verification, one exact-source new Docker image build and, only after safety gates, `missav-dlp-web`-only Docker Compose image promotion, rollback preservation, and post-deployment desktop/mobile and read-only API checks. This replaces the prior new-build/deploy `NOT_AUTHORIZED` for this **exact UI-only** delta; unrelated production writes remain forbidden.
