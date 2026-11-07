@@ -1,10 +1,10 @@
 # Downloader non-subtitle workstream — active work
 
-## 2026-11-08 — DLHLS-001: user-approved three-job HLS recovery plan; ROUTING_PENDING
+## 2026-11-08 — DLHLS-001 proposed scope (user approved; not current routed task)
 
-TASK_ID: DLHLS-001
-STATUS: USER_APPROVED_SCOPE__ROUTING_PENDING
-REQUIRES_WORKSTREAMS: downloader
+PROPOSAL_ID: DLHLS-001
+PROPOSAL_STATE: USER_APPROVED_SCOPE__ROUTING_PENDING
+PROPOSAL_AREA: downloader
 RELATED_EXISTING_TASK: P08LIB-001 (UI-only, unchanged and on operational hold)
 USER_APPROVAL: Teddy replied “응 승인해” on 2026-11-08 to the separate Downloader HLS recovery work registration and guarded one-item trial plan.
 
