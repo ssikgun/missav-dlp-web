@@ -68,7 +68,7 @@ Build the exact newly promoted P08 Downloader image in a new isolated clean sour
 
 ## PROHIBITED_SCOPE
 
-No Docker Compose `up`/recreate/restart/deploy, existing image retag/replacement, production web access tests or login, service/timer start/stop, stage9 DB mount, Dockerfile/requirements/product source/test edits, extra OS/daemon changes, active job cleanup, image/backup prune/delete, real downloads, NAS/DB/Jellyfin write, Stage9 manual runner, Writer socket mutation, Stage11/Stage12 execution, governance contract/router/task changes. No forced retry of a failed build by modifying application code or relaxing tests. Stop on unsafe resources or identity mismatch.
+- No Docker Compose `up`/recreate/restart/deploy, existing image retag/replacement, production web access tests or login, service/timer start/stop, stage9 DB mount, Dockerfile/requirements/product source/test edits, extra OS/daemon changes, active job cleanup, image/backup prune/delete, real downloads, NAS/DB/Jellyfin write, Stage9 manual runner, Writer socket mutation, Stage11/Stage12 execution, governance contract/router/task changes. No forced retry of a failed build by modifying application code or relaxing tests. Stop on unsafe resources or identity mismatch.
 
 ## ACCEPTANCE_CRITERIA
 
