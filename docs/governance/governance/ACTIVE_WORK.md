@@ -1,5 +1,11 @@
 # Governance workstream — active work
 
+## 2026-11-08 — DLHLS-001 narrow independent routing (user-approved)
+
+- Teddy explicitly approved changing GitHub routing to keep the shared `P08LIB-001` UI authorization intact while separately registering `DLHLS-001` for only the three 2026-11-07 HLS failed jobs.
+- The existing validator allows one task per workstream. Register `downloader-hls-recovery` with its own v1.0.0 contract and task `DLHLS-001 / IN_PROGRESS / REQUIRES_WORKSTREAMS: downloader-hls-recovery`; do not modify the validator, common contract, existing shared UI task, Stage9, Writer or Stage11.
+- This is GitHub routing/documentation only, not a live download or code, Docker, NAS, DB, queue, stage or service change. UI promotion remains on operational HOLD. Next: exact GitHub readback, then bounded read-only CT108 capacity/destination/worker checks and explicit operator go/no-go.
+
 ## 2026-11-07 — P08LIB-001 mobile DB dashboard CSS one-build + conditional Downloader-only deploy approved (CURRENT)
 
 - **Teddy explicit approval:** After the 20:36 KST CT108 read-only `BUILD_PREFLIGHT=PASS` (`LIVE_DOWNLOADER`, prior image, rollback directory, Writer group, active Stage9 timer, canonical repo identity, 39.3 GiB free), Teddy replied `승인` to **exactly one new Docker image build** from `teddy-subtitle-stage11` canonical commit `891b736119830e4e32e603016ba01b3439abbe83` (CSS change `a774175cc80a122f3c388bb5f034502c00feaff1`) and, only after image/source/runtime preflight PASS, **one `missav-dlp-web`-only Compose promotion** preserving all existing options and rollback data.

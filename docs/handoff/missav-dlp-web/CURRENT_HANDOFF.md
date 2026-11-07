@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-08 — DLHLS-001 separate recovery routing registered (governance-only)
+
+- Teddy approved coexistence of the existing shared UI `P08LIB-001` and the bounded HLS recovery `DLHLS-001`. The one-task-per-workstream validator is unchanged; a narrowly scoped `downloader-hls-recovery` workstream is registered separately with `DLHLS-001 / IN_PROGRESS`. Shared UI `P08LIB-001` in four existing workstreams, other contracts/tasks and Stage11 are unchanged; UI rollout remains on hold.
+- Existing three failed jobs, original IDs and status/parts/manifests, and 1,395 TS segments (1323+72+0) must remain untouched. Historical free 36.61 GiB is not a required+reserve PASS. Next: fresh read-only CT108 checks for a separate new-identity zero-TS trial, source/output collision, no busy worker/remux, reserve-aware capacity and operator go/no-go before any network/write.
+- `PRODUCT_CODE_CHANGED=NO`, `DOWNLOAD=NOT_RUN`, `RETRY=NOT_RUN`, `DEPLOY=NOT_RUN`, `CLEANUP=NOT_RUN`, `NAS_WRITE=0`. This checkpoint only updates GitHub governance and handoff.
+
 ## 2026-11-08 — CT108 three-job recovery preflight PASS, actual execution blocked by task routing
 
 - **Teddy CT108 real read-only preflight:** `ERROR_JOBS=3`, `ACTIVE_OR_OTHER_JOBS=0`, `TASK_1_SAVED=1323`, `TASK_2_SAVED=72`, `TASK_3_SAVED=0`, `ZERO_PART_CANDIDATES=1`, `FREE_GIB=36.61`, `DOWNLOADER_RUNNING=True`, `DOWNLOADER_RESTARTS=0`, `READ_ONLY=YES`, `DOWNLOAD=NOT_RUN`, `DEPLOY=NOT_RUN`, `CLEANUP=NOT_RUN`. This is **BASIC_PREFLIGHT=PASS**; it did not check post-retry full required + reserve budget, output-collision/destination safety, individual HLS source activity, MP4 subprocess state, and no reproduction was performed. Candidate is the original error task having 0 completed TS, but **do not use its current task ID/parts folder for a network retry when plan SHA mismatches**. Create separate isolated identity only after exact authorization and destination gates.

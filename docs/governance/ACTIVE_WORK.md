@@ -10,6 +10,7 @@ This file routes a request to its workstream contract and active task. It is not
 - Classify work by purpose and by the files/resources it may affect. A repository-root file may belong to a domain workstream; paths alone are not sufficient.
 - Select every affected workstream. If work is shared, each selected workstream must show the same authorized task ID and declare the full `REQUIRES_WORKSTREAMS` set.
 - A request outside a registered workstream or mismatching any selected task ID fails closed.
+- The incident-only `DLHLS-001` route never authorizes generic Downloader source changes, other jobs, runtime deployment or resuming the held `P08LIB-001` UI release.
 
 ## WORKSTREAM: governance
 
@@ -50,6 +51,16 @@ AREA_HINTS:
 - Stage11 subtitle work stays in Stage11 even when its files are at the repository root.
 - If another independent workstream is registered later, its contract governs the work assigned to it.
 - Classify by purpose and actual affected files/resources; do not route by file location alone.
+
+## WORKSTREAM: downloader-hls-recovery
+
+STATUS: IN_PROGRESS
+TASK_ID: DLHLS-001
+CONTRACT_PATH: docs/governance/downloader-hls-recovery/PROJECT_CONTRACT.md
+ACTIVE_WORK_PATH: docs/governance/downloader-hls-recovery/ACTIVE_WORK.md
+AREA_HINTS:
+- Only the three failed HLS downloads recorded on 2026-11-07 and their one guarded, separate-identity recovery trial.
+- This narrow incident route takes precedence over the generic downloader route for those jobs only. All other downloads, generic product code, shared queue changes, UI, Writer, Stage9 and Stage11 remain under existing workstream approval.
 
 ## WORKSTREAM: discovery-writer-safety
 

@@ -1,5 +1,10 @@
 # Downloader non-subtitle workstream — active work
 
+## 2026-11-08 — DLHLS-001 independently routed; existing P08LIB-001 unchanged
+
+- The historical DLHLS-001 approved-scope proposal below remains unchanged, but the current route for this exact three-job HLS recovery is now `downloader-hls-recovery / DLHLS-001`, not the shared UI `P08LIB-001`.
+- This Downloader ACTIVE_WORK keeps `P08LIB-001 / IN_PROGRESS` and the existing `REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media`; generic code/queue work still requires separate aligned authorization. UI deployment remains HOLD. No download/retry, product edit, Docker promotion, cleanup, NAS/Jellyfin or TS deletion authorized by this routing record.
+
 ## 2026-11-08 — DLHLS-001 proposed scope (user approved; not current routed task)
 
 PROPOSAL_ID: DLHLS-001
