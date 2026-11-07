@@ -1,5 +1,15 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-07 — CT108 HLS resume file timeline PASS; still no proof of playlist change trigger
+
+- **Teddy's latest CT108 read-only terminal result:** `TIMELINE_CHECK=PASS`; three exact `HLS_SEGMENT_PLAN_CHANGED` task-matched parts directories inspected. No files or database/jobs modified; `RETRY=NOT_RUN`, `DEPLOY=NOT_RUN`, `CLEANUP=NOT_RUN`.
+- **Job 1:** `resume-plan.json` mtime `2026-11-07 21:11:25 KST`; `SAVED_TS_COUNT=1323`; oldest TS mtime `20:56:08 KST`, newest TS mtime `21:11:25 KST`. Previous inventory found 2061 total segment plan, 1323 completed entries (64.2% of segments by count).
+- **Job 2:** manifest mtime `2026-11-07 21:09:51 KST`; `SAVED_TS_COUNT=72`; oldest TS `21:09:27 KST`, newest `21:09:50 KST`. Previous plan 2088 total, 72 completed.
+- **Job 3:** manifest mtime `2026-11-07 21:09:51 KST`; `SAVED_TS_COUNT=0`, oldest/newest TS `NONE`. Previous plan 2118 total, 0 completed.
+- **What this proves:** all three manifests/partial-file timestamps exist in a close interval; first job has meaningful saved data and must not be reset. File mtimes are **not** proof of source playlist changes or timestamps when the source changed; latest manifest modification can be caused by segment completion, and absence of TS in job3 does not itself authorize replacing its manifest. No evidence yet distinguishes a genuinely changed media/variant/segment list from volatile playlist metadata, host/CDN differences or earlier download/storage interruptions. The earlier low-free-space messages and current `error_kind=safety` may be separate stages, not necessarily the same root cause.
+- **Next read-only forensic gate:** inspect actual **runtime** downloader logs in a bounded `2026-11-07 20:50–21:25 KST` interval, report only timestamped categories/counts (never raw URLs, tokens, headers, task IDs, secret-bearing lines) for storage-space exceptions, resume-plan mismatch, retries, starts and any worker/boot events. Also inspect source metadata behavior before proposing a bounded fix. Do not fetch a playlist or modify task, resume manifest, auto-retry setting, space reserve or lock files as part of this diagnostic; product code/logic changes remain outside UI-only `P08LIB-001` approval.
+- **Current production/mobile UI state unchanged:** new CSS image `sha256:a044e011085e957af97d35f71b89127e15a7409039c4fd765c30c7ae5d447be2` was built successfully and remains **not deployed**. Stage9, Writer, NAS, DB and Jellyfin unchanged by these checks.
+
 ## 2026-11-07 — Three HLS resume manifests inspected: 1,395 preserved TS files; source mismatch still unverified (READ-ONLY)
 
 - **Actual Teddy CT108 log** for the same three `HLS_SEGMENT_PLAN_CHANGED` failed jobs: exactly `MATCHING_ERROR_TASKS=3`; all three matching task ID ↔ `resume-plan.json.task_id`, `SCHEMA=1`, `PLAN_HASH_VALID=True`, `PARTS_SCAN_CAPPED=False`, and `FILELIST_PRESENT=True`. No HLS media bytes were inspected, modified or deleted.
