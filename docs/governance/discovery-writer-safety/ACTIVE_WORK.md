@@ -1,5 +1,15 @@
 # Discovery Writer Safety workstream — active work
 
+## 2026-11-07 — P08LIB-001 approved CSS source-only correction, visual check pending
+
+- Teddy's real CT108 read-only post-deploy verification: RUNTIME_CHECKS=PASS, image sha256:146e6bc04ff52e38a14483a4e3bc0eb06df4571bd6e40e4f0a52534d9ecdec31 active, settings/mounts/other containers/Writer socket/Stage9 timer PASS; LIVE_UI_API=NOT_RUN.
+- User screenshots: holdings summary cards collapsed into narrow right column with large blank area; dark-mode file-management tabs too faint. Runtime markup/CSS read-only markers LAYOUT_MARKUP, FLEX_LAYOUT, SUMMARY_SHRINK_BLOCK and CARD_GRID PASS; DARK_TAB_OVERRIDE=NOT_FOUND.
+- Teddy explicitly approved source-only CSS fix, PC/mobile validation and GitHub promotion; NOT a Docker build or redeploy.
+- Exact product commit: 27de4f0c44f0ef2cd10fdee97501b6cb377577a9. Only templates/teddy-library.css changed: full-width holdings summary, dark file-management tab contrast. Existing auto-fit 170px metric grid and responsive breakpoints untouched.
+- Source structural assertions 8/8 PASS, GitHub changed-file readback PASS, mobile stylesheet has no conflicting selectors. Actual PC/mobile rendered visual tests and live authenticated API NOT_RUN. Source fix is NOT YET in current running Docker image; product/UI acceptance remains INCOMPLETE.
+- Protected: no Docker build/rollback/redeploy, NAS/DB/Jellyfin/Writer/Stage9/Stage11 operations, download queue actions or deletion. Preserve rollback at /opt/missav-dlp-web/backups/p08lib-deploy-20261107-b92t5ncp. Shared P08LIB-001 IN_PROGRESS and separate Stage11 S11-WX011 unchanged.
+- NEXT: isolated PC/mobile visual check of exact committed source; new Docker build/deployment require separate explicit approval. Previous postcheck AssertionError remains historically unresolved; do not relabel it as diagnosed.
+
 ## CURRENT P08LIB-001 CT108 SINGLE-SERVICE DEPLOY ATTEMPT — POSTCHECK ASSERTION FAILURE (2026-11-07 KST)
 
 - **Real CT108 output supplied by Teddy (not a Codex execution):** The previously approved precise P08 Docker service-only promotion script was run at `root@downloader`. It reported `LIVE_PREFLIGHT=PASS`, `DEPLOY_CONFIG_ONLY_IMAGE_CHANGED=PASS`, `ROLLBACK_PREPARED=PASS`, and `COMPOSE_UP=PASS`; then `PHASE=APPLY_ATTEMPTED`, `DEPLOYMENT=CHECK_REQUIRED`, `ERROR_TYPE=AssertionError`, blank `ERROR=`, `NO_AUTOMATIC_ROLLBACK=SAFETY`.
