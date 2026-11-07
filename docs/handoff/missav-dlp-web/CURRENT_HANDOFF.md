@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-07 — P08LIB-001 CT108 Docker promotion attempt, postcheck assertion unresolved (KST)
+
+- **Observed on real CT108:** `LIVE_PREFLIGHT=PASS`, `DEPLOY_CONFIG_ONLY_IMAGE_CHANGED=PASS`, `ROLLBACK_PREPARED=PASS`, `COMPOSE_UP=PASS`; immediately after the compose recreation step, the post-deploy script raised `AssertionError` without identifying the exact failed check. It printed `PHASE=APPLY_ATTEMPTED`, `DEPLOYMENT=CHECK_REQUIRED`, `NO_AUTOMATIC_ROLLBACK=SAFETY`.
+- **Frozen candidate:** tag `missav-dlp-web:p08lib-buildonly-3a249f4917d1-r2-20261107`, image `sha256:146e6bc04ff52e38a14483a4e3bc0eb06df4571bd6e40e4f0a52534d9ecdec31`; old/rollback image `sha256:ba31ba9cfcc481dc1f658312a3155a3496856008ff4d52f5a652de0766fd0dbe`. Rollback artifacts created at `/opt/missav-dlp-web/backups/p08lib-deploy-20261107-b92t5ncp`. No rollback was issued, and no rebuild/pull was issued.
+- **Result NOT YET a deployment PASS:** `COMPOSE_UP=PASS` shows only that the Docker Compose up command completed, not that the new runtime passed all assertions. The script compared Docker `Config.Env` using list order equality; that might be one reason for a false mismatch, but **the exact failing assertion is NOT established**. Do not presume the actual problem or modify production to test it.
+- **NEXT / safety:** Run one **read-only** post-apply identity/health/settings/environment-map parity/related-service/Stage9/Writer/rollback-artifacts check, with no secret output and no mutation. Do **not** rerun the deploy command, repeat `--force-recreate`, or roll back before confirming current state and a safe restoration decision. Record actual outcome separately. `P08LIB-001 / IN_PROGRESS` stays authorized across governance/downloader/discovery-writer-safety/stage9-media; no changes to router/contracts/Stage11. `LIVE_UI_API=NOT_RUN`.
+
 ## 2026-11-07 — P08LIB-001 live CT108 eleven-file Compose parity verified PASS, deployment pending (KST)
 
 - **Evidence (actual Teddy `root@downloader` output, not independently executed by GitHub/Codex):** Read-only combined Docker Compose config using the exact **11** config-file paths from the current `missav-dlp-web` container labels, original project name and working directory, `TEDDY_PUBLIC_ORIGIN` recovered from the current running container, and `TEDDY_LIBRARY_DELETE_DISCOVERY_WRITER_GID=988` verified from current `GroupAdd=["988"]`.
