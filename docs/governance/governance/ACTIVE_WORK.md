@@ -1,5 +1,26 @@
 # Governance workstream — active work
 
+## CURRENT P08LIB-001 ONE-TIME ISOLATED DOCKER BUILD RETRY — TEDDY APPROVED 2026-11-07 KST
+
+**Explicit user approval:** Teddy answered "승인해" to a request for exactly **one additional isolated Docker image build attempt** after the previous source-pinned build failed at Dockerfile `77/80` on a stale navigation smoke label. This supersedes only the exhausted *single-build-attempt limit* of the 2026-11-06 P08 build-only phase, not its no-deploy/no-write/source-freeze protections. Shared workstream identity remains `P08LIB-001 / IN_PROGRESS`, requiring `governance,downloader,discovery-writer-safety,stage9-media`. Contracts/router and unrelated workstreams remain unchanged.
+
+### APPROVED_SCOPE — ONE RETRY ONLY
+- Prior fix `teddy_file_management_navigation_smoke.py` was promoted at `0549f2e475a85aa46d025f4b1e2a5a24aab9f1f1`; real CT108 SHA-pinned two-phase `BASE_HTML_SMOKE=PASS` and `FINAL_OVERLAY_SMOKE=PASS` were supplied by Teddy; handoff-readback checkpoint was `ea6332d98cfeb28632314502ab9911e6298cd1cf`.
+- After confirming newest canonical SHA and exact source identity, real CT108 (`hostname=downloader`, PID1 `systemd`), Docker/Stage9 state, running containers and RAM/disk budget, perform **one** uniquely tagged Docker build from a clean `git archive` of the exact promoted SHA in an isolated temporary directory with the **unchanged** Dockerfile, existing manifest and existing smoke tests. Preserve the former failed build log and all images/source candidates.
+- Inspect build exit, smoke logs, final image ID and relevant source files, and compare before/after production container identity/state and Stage9 timer/service. If failure or material safety mismatch: stop; report and record evidence. No automatic second attempt.
+
+### PROHIBITED_SCOPE
+No application or test-source changes, skipping/relaxing smoke or manifest, Dockerfile/requirements edits, Docker Compose, live container deployment/recreate/restart, Stage9 timer/service changes, Writer socket actions, Stage11/Stage12 work, NAS/Jellyfin/DB reads beyond approved static boundaries or any writes, downloads, external publication, cleanup or image pruning. Docker build may only perform its existing declared build-time network/dependency operations.
+
+### ACCEPTANCE_CRITERIA
+One clean, exact-commit, uniquely tagged isolated Docker build completes all in-Dockerfile checks; generated image content/ID are recorded; Docker/Stage9 operational state remains unchanged. A build-only technical PASS is not a deployment or product/UI acceptance; deployment needs new explicit approval.
+
+### EVIDENCE
+Teddy approved the reattempt immediately following a real CT108 two-phase navigation smoke PASS and explicit question whether to retry one isolated Docker build. Previous failed build result and `/tmp/p08lib-build-ivpIA4gM/build.log` remain historical evidence, not deleted or overwritten.
+
+### NEXT_DECISION
+Review real CT108 one-build output; if PASS, decide separately whether to approve isolated image-content checks and eventual production deployment; if FAIL, require a fresh diagnosis/approval before another attempt.
+
 ## CURRENT P08LIB-001 ISOLATED DOCKER BUILD-ONLY PHASE — TEDDY APPROVED 2026-11-06 KST
 
 Teddy explicitly approved the next **build-and-inspect-only** step after the six-file P08 canonical source promotion `a8e9156bfc0a966ea3af3778aacd11c02ec719fa` and documentation readback `651b90f8de42aa4ff32e7e5a0f28f53c01382811`. This temporarily supersedes the earlier P08 offline-only **Docker image build prohibition only for one bounded isolated build**; all other old protections and task boundaries remain. The four-workstream shared task remains `P08LIB-001 / IN_PROGRESS`; contracts and router are unchanged.

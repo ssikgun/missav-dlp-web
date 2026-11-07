@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-07 — P08LIB-001 additional isolated Docker build attempt approved, not yet run (KST)
+
+- Teddy explicitly approved **one new uniquely tagged isolated build retry** after actual CT108 `BASE_HTML_SMOKE=PASS` and `FINAL_OVERLAY_SMOKE=PASS` from `b03a2b15aa82c92dc9cc3a126b961ff48edc78de`. Prior failed Docker build (`BUILD_EXIT=1` at `77/80`) and log `/tmp/p08lib-build-ivpIA4gM/build.log` must be preserved.
+- Record the same limited exception to the previous single-build rule in all four workstreams: governance, downloader, discovery-writer-safety and stage9-media, all `P08LIB-001 / IN_PROGRESS`. No contract/router/product/test modification; clean exact-SHA archive only; existing Dockerfile unchanged.
+- **Next:** run from verified real CT108 (not Codex sandbox), first check host identity, Docker current operating image IDs, Stage9 service/timer and RAM/disk. One uniquely tagged build; record all existing Dockerfile smoke results, image ID, original image and container snapshots, Stage9 state. Fail closed without retries or source edits.
+- This registration is not evidence of any new image: `BUILD_RETRY=NOT_RUN`, `DEPLOY=NOT_RUN`, final image ID `NONE`. No production or external data write is authorized. Deployment remains a separate user decision.
+
 ## 2026-11-07 — P08LIB-001 real CT108 two-phase navigation smoke PASS (KST)
 
 - **Evidence:** Teddy's real CT108 `root@downloader` terminal transcript. Hostname `downloader`, PID1 `systemd`; fetched exact `teddy-subtitle-stage11` SHA `b03a2b15aa82c92dc9cc3a126b961ff48edc78de` with `FETCH_HEAD` equality. Created isolated archive in `/tmp/p08lib-nav-smoke-LPDFKa5O`; no modification of the protected canonical/operational checkout.
