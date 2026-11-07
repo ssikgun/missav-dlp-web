@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-07 — P08LIB-001 isolated Docker build retry PASS; no deployment (KST)
+
+- **Actual source:** Teddy's real CT108 `root@downloader` output, from clean `git archive 3a249f4917d122b95b67ae42fb52ce16f9d96a7d`. SHA checks for Dockerfile, navigation smoke and final Overlay HTML passed (`SOURCE_PREFLIGHT=PASS`). Exactly one authorized source-frozen retry was executed; previous failed build log remains historical evidence.
+- **Build result:** `BUILD_EXIT=0`. Dockerfile `77/80` navigation PASS, `78/80` P08 Library Overlay PASS, `79/80` admin synthetic smoke `8 PASS / 0 FAIL`, `80/80` PASS. New tag `missav-dlp-web:p08lib-buildonly-3a249f4917d1-r2-20261107`, image ID `sha256:146e6bc04ff52e38a14483a4e3bc0eb06df4571bd6e40e4f0a52534d9ecdec31`, Docker size 346117613 bytes, OCI revision `3a249f4917d122b95b67ae42fb52ce16f9d96a7d`. Host log `/tmp/p08lib-build-r2-UaeJAav1/build.log`; former failed log `/tmp/p08lib-build-ivpIA4gM/build.log` was not removed.
+- **Production unaffected:** `RUNNING_CONTAINERS_UNCHANGED=PASS`, `COMPOSE_UNCHANGED=PASS`, Stage9 timer `active/waiting` and service `inactive/success`. Existing running Downloader image `sha256:ba31ba9cfcc481dc1f658312a3155a3496856008ff4d52f5a652de0766fd0dbe` remains. No production deployment, restart, Stage9/Writer/Stage11 activity, NAS/DB/Jellyfin writes, source edits or image pruning by this command.
+- **State:** `BUILD_ONLY=PASS`, `ONE_RETRY_CONSUMED=YES`, `DEPLOY=NOT_RUN`, `LIVE_P08_BROWSER_UI=NOT_RUN`. This is **only a technical Docker build PASS**, not live UI/product PASS. Four shared workstream ACTIVE_WORK files record same result under P08LIB-001; contracts/router/Stage11 unchanged.
+- **Next decision:** separate Teddy approval is needed before additional isolated image inspection and/or exact-image operational deployment, rollback and authenticated UI/API verification. No automatic repeat build or deploy.
+
 ## 2026-11-07 — P08LIB-001 additional isolated Docker build attempt approved, not yet run (KST)
 
 - Teddy explicitly approved **one new uniquely tagged isolated build retry** after actual CT108 `BASE_HTML_SMOKE=PASS` and `FINAL_OVERLAY_SMOKE=PASS` from `b03a2b15aa82c92dc9cc3a126b961ff48edc78de`. Prior failed Docker build (`BUILD_EXIT=1` at `77/80`) and log `/tmp/p08lib-build-ivpIA4gM/build.log` must be preserved.

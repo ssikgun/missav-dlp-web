@@ -1,13 +1,15 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-06 KST (Teddy 승인: P08 라이브러리 UI를 P04 중복 코드 통합보다 먼저; P00 Stage9 완료 상태 유지)
+UPDATED_AT: 2026-11-07 KST (Teddy 승인: P08 라이브러리 UI를 P04 중복 코드 통합보다 먼저; P00 Stage9 완료 상태 유지)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
-## 0. 최신 확인 결과 — 2026-11-06
+## 0. 최신 확인 결과 — 2026-11-07
+
+- **P08 one-time isolated Docker build retry PASS (Teddy's real CT108 output, 2026-11-07):** source `3a249f4917d122b95b67ae42fb52ce16f9d96a7d` exact archive/checks `PASS`; unchanged Dockerfile `BUILD_EXIT=0`; navigation 77/80 PASS, P08 Library Overlay 78/80 PASS, admin synthetic smoke 8/0 PASS. New tag `missav-dlp-web:p08lib-buildonly-3a249f4917d1-r2-20261107`, image `sha256:146e6bc04ff52e38a14483a4e3bc0eb06df4571bd6e40e4f0a52534d9ecdec31`, size 346117613 bytes, revision `3a249f4917d122b95b67ae42fb52ce16f9d96a7d`; log `/tmp/p08lib-build-r2-UaeJAav1/build.log`. Running Downloader/Gluetun/Selkies and Compose unchanged, Stage9 timer active/waiting and service inactive/success. `APPROVED_RETRY=CONSUMED`; `BUILD_ONLY=PASS`; `DEPLOY=NOT_RUN`; actual browser UI `NOT_RUN`. Old failed log/images preserved. Next decision: separately approve image-only content checks and/or exact-image deployment/rollback/live UI acceptance. Do not rebuild, auto-deploy or prune.
 
 - **P08 one-time additional isolated Docker build retry APPROVED (2026-11-07 KST):** Following exact CT108 two-phase navigation smoke PASS, Teddy explicitly approved one fresh clean SHA-pinned Docker build, uniquely tagged and **without** changes to application/tests, Dockerfile, Compose, current running services or operational storage. Four `P08LIB-001` ACTIVE_WORK records updated identically with the bounded exception to the previously consumed single-build limit. Previous failure log retained; **BUILD_RETRY=NOT_RUN, DEPLOY=NOT_RUN, NEW_IMAGE_ID=NONE** at approval recording. Next: real CT108 safety/preflight and one approved Dockerfile build, report existing smoke and immutable before/after operational snapshots; any further retry/deploy needs separate approval.
 
