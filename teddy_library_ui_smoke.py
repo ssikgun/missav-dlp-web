@@ -199,6 +199,30 @@ for selector in ('.library-summary-cards', '.library-metric', '.library-db-statu
     require(selector in css, f"missing shared library style: {selector}")
 require('class="library-db-status"' in overlay and 'class="library-summary-cards"' in js,
         'overlay/JS summary CSS classes are disconnected')
+
+# File Management dashboard separates NAS holdings from Stage12 process status
+# while sharing card layout; no API or refresh contract changes are needed.
+status_css = (root / "templates/teddy-subtitle-status.css").read_text()
+require('<h2>보유 작품 상태</h2>' in overlay,
+        "NAS holdings dashboard section heading missing")
+require('<h2 class="subtitle-status-title">Stage12 자막 생성 작업</h2>' in overlay,
+        "Stage12 process dashboard section heading missing")
+require("NAS 보유 작품 현황과 별도로 집계됩니다." in overlay,
+        "holdings versus Stage12 explanation missing")
+for marker in (
+    "#file-management-view-subtitle-status .subtitle-status-panel",
+    "max-width: none;",
+    "#file-management-view-subtitle-status .subtitle-status-grid",
+    "repeat(auto-fit, minmax(170px, 1fr))",
+    "#file-management-view-subtitle-status .subtitle-status-metric",
+    "flex-direction: column-reverse;",
+    "border: 1px solid #94a3b8;",
+):
+    require(marker in status_css, f"unified dashboard CSS missing: {marker}")
+require('id="subtitle-count-published"' in overlay and
+        'id="subtitle-count-unresolved"' in overlay,
+        "Stage12 counts must be retained")
+
 print("P08 final overlay library wiring smoke: PASS")
 
 print("Stage13 UI-P1 Library UI shell smoke: OK")

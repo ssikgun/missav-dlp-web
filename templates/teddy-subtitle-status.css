@@ -132,3 +132,71 @@ html[data-theme="dark"] .subtitle-status-badge.unavailable {
     background: #1f2937;
     color: #e5e7eb;
 }
+
+/* Unified File Management dashboard: the Stage12 activity counts are separate
+   from NAS holdings, but share the same full-width card system. */
+#file-management-view-subtitle-status > h2 {
+    font-size: 20px;
+    margin-bottom: 12px;
+}
+
+#file-management-view-subtitle-status .subtitle-status-context {
+    margin: 14px 0 20px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #64748b;
+}
+
+html[data-theme="dark"] #file-management-view-subtitle-status .subtitle-status-context {
+    color: #94a3b8;
+}
+
+#file-management-view-subtitle-status .subtitle-status-panel {
+    width: 100%;
+    max-width: none;
+    margin: 0 0 28px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+#file-management-view-subtitle-status .subtitle-status-head {
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+#file-management-view-subtitle-status .subtitle-status-title {
+    margin: 0;
+    font-size: 20px;
+}
+
+#file-management-view-subtitle-status .subtitle-status-grid {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px;
+    width: 100%;
+}
+
+#file-management-view-subtitle-status .subtitle-status-metric {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 6px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid #94a3b8;
+    border-radius: 8px;
+    background: transparent;
+    text-align: left;
+}
+
+#file-management-view-subtitle-status .subtitle-status-metric strong {
+    font-size: 20px;
+    line-height: 1.2;
+}
+
+#file-management-view-subtitle-status .subtitle-status-metric span {
+    margin-top: 0;
+    font-size: 13px;
+    font-weight: 600;
+}
