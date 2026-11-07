@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-07 — P08LIB-001 Project Governance CI repair independently verified PASS (KST)
+
+- Exact pushed fix commit: `04d766c5f6aba173c78f09196dca94e5e04d57af` (`teddy-subtitle-stage11`), four P08 ACTIVE_WORK Markdown-only `PROHIBITED_SCOPE` bullet corrections plus the prior forensic documentation. Four active task IDs/scopes, contracts/router, product source, operational resources and Stage11 unchanged.
+- **Authoritative GitHub Actions run:** `Project Governance` run `42319628423` at commit `04d766c5f6aba173c78f09196dca94e5e04d57af` reached `completed / success`: job `validate=success`, `Validate governance metadata and scope=success`, `Run offline governance smoke checks=success`. URL: `https://github.com/ssikgun/missav-dlp-web/actions/runs/42319628423`.
+- Previous failed runs are retained historical evidence; this new green run closes the formatting-only governance defect. The user-supplied CT108 `COMPOSE_RECONSTRUCTION=BLOCKED` remains a **separate** read-only Docker Compose config subprocess issue with suppressed stderr; neither this GitHub result nor the prior Docker build means deployment has occurred.
+- `GOVERNANCE_CI=PASS`; `P08_DEPLOY_APPROVAL=YES`; `CT108_COMPOSE_RECONSTRUCTION=CHECK_REQUIRED`; `DEPLOY=NOT_RUN`. Next: one bounded, secret-safe read-only diagnostic of the Docker Compose config failure, then only when reconstructed proceed to separately approved exact-image promotion. Do not use the dirty Stage11 worktree or recreate services yet.
+
 ## 2026-11-07 — P08LIB-001 Project Governance CI formatting repair after four documented failures (KST)
 
 - **Confirmed evidence:** GitHub notification emails and the real `Project Governance / validate` logs on `teddy-subtitle-stage11` at commits `4d3ab561` (2026-11-06), `3a249f4`, `32c0294`, and `50d9670` (2026-11-07) show the same **four** structural failures: `docs/governance/{governance,downloader,discovery-writer-safety,stage9-media}/ACTIVE_WORK.md section PROHIBITED_SCOPE must contain at least one bullet`. The pipeline failed before offline smoke tests; these results do **not** imply production image or runtime failure.
