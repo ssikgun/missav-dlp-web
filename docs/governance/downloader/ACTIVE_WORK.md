@@ -1,5 +1,37 @@
 # Downloader non-subtitle workstream — active work
 
+## 2026-11-08 — DLHLS-001: user-approved three-job HLS recovery plan; ROUTING_PENDING
+
+TASK_ID: DLHLS-001
+STATUS: USER_APPROVED_SCOPE__ROUTING_PENDING
+REQUIRES_WORKSTREAMS: downloader
+RELATED_EXISTING_TASK: P08LIB-001 (UI-only, unchanged and on operational hold)
+USER_APPROVAL: Teddy replied “응 승인해” on 2026-11-08 to the separate Downloader HLS recovery work registration and guarded one-item trial plan.
+
+### OBJECTIVE
+Recover the three real failed HLS downloads without sacrificing 1,395 preserved .ts fragments or original job records, and prevent recurrence from overlapping Docker image builds/download storage demands. The UI deployment stays deferred until these three errors are resolved.
+
+### APPROVED INTENT AND BOUNDED PLAN
+- Preserve original failed task IDs, URLs and status records, .parts folders, resume-plan.json manifests, and 1,395 named TS fragments. Do not weaken HLS plan SHA identity guard. No cleanup or overwrite.
+- Run a **read-only** CT108 preflight: current downloader image and process health; actual ongoing download/remux tasks; current free disk plus reserve; three error-state identities/parts/manifests and protected existing output paths; one isolated new-job destination/no collision. No app import, HTTP POST or source fetch in preflight.
+- If router/authorization becomes consistent and preflight passes, try **one** isolated, individually bounded HLS recovery job with new identity, preserving original job and all old parts untouched when plans differ. Prefer assessing the zero-fragment task for the representative trial; ensure no other downloads/remux compete and verify destination collision/no-overwrite protection. An existing task's retry button is **not** a safe substitute; it reuses the mismatched resume plan.
+- Before any network/start or output writes, prepare concrete execution/rollback and record **operator go/no-go** on current capacity, source viability and output identity. Subsequent two jobs, any NAS final publish, or restoration of UI deployment require new gated evidence and their approved appropriate scope; do not assume one successful job clears all production checks.
+- Discuss minimal, generic prevention (block builds while large downloads are active and check required+reserve+build headroom) while preserving download concurrency, globally single MP4 remux, and existing storage guards. Any product code change or Docker rebuild/promotion is a **separate explicit authorization**, not covered by this planning approval.
+
+### PROHIBITED
+- Reusing TS under a changed HLS plan without proof; manually editing manifest hash or task ID; lowering free-space reserve; deleting .parts/TS/task state or Docker caches/images; making simultaneous three-job retries; touching NAS/Jellyfin/Stage9 Writer/Stage11 or the protected checkout; touching UI candidate deployment; generic source changes without separate authorization.
+
+### EVIDENCE / ROOT CAUSE STATUS
+- 2026-11-07 three storage guard stops at 21:10:45/46 and 21:11:25 occurred when `free < required + reserve`, not physical zero free. Build created image at 21:09:30, log mtime 21:09:32 and Docker/download share filesystem; build causal capacity contribution is plausible, **not proven**.
+- Teddy confirmed 21:51–21:52 retries were initiated in web UI; three retry variant URI identities exactly matched original occurrences. Playlist plan semantic SHA mismatches still block recovery; exact differing field/segment is not confirmed. Three old manifests record 1,323/2,061 + 72/2,088 + 0/2,118 TS segments respectively (1,395 total).
+- Last observed free space 36.61 GiB is time-specific; cannot assume capacity at recovery.
+
+### ROUTING / START GATE
+**DO NOT START PRODUCT/OPERATIONAL WORK YET.** Current `docs/governance/ACTIVE_WORK.md` version 1.0.0 routes `downloader` to a single `TASK_ID: P08LIB-001`, which is a cross-workstream UI-only approval. This new user-approved scope is recorded here without removing or silently substituting `P08LIB-001`; but **DLHLS-001 is not yet an active routable task**, pending a consistent, validator-compatible registration mechanism. Any product edits or live requeue/download are BLOCKED until the corresponding router entry is officially registered and confirmed. Read-only investigation and handoff documentation can continue.
+
+### NEXT DECISION
+Determine and record a conflict-free approved downloader task registration that preserves the shared UI task exactly; validate router/ACTIVE_WORK parity; then conduct only the read-only CT108 preflight and report before any one-job network/mutation.
+
 ## 2026-11-07 — P08LIB-001 mobile DB dashboard CSS one-build + conditional Downloader-only deploy approved (CURRENT)
 
 - **Teddy explicit approval:** After the 20:36 KST CT108 read-only `BUILD_PREFLIGHT=PASS` (`LIVE_DOWNLOADER`, prior image, rollback directory, Writer group, active Stage9 timer, canonical repo identity, 39.3 GiB free), Teddy replied `승인` to **exactly one new Docker image build** from `teddy-subtitle-stage11` canonical commit `891b736119830e4e32e603016ba01b3439abbe83` (CSS change `a774175cc80a122f3c388bb5f034502c00feaff1`) and, only after image/source/runtime preflight PASS, **one `missav-dlp-web`-only Compose promotion** preserving all existing options and rollback data.
