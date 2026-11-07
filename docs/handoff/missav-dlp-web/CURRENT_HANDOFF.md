@@ -1,5 +1,16 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-07 — Three HLS resume manifests inspected: 1,395 preserved TS files; source mismatch still unverified (READ-ONLY)
+
+- **Actual Teddy CT108 log** for the same three `HLS_SEGMENT_PLAN_CHANGED` failed jobs: exactly `MATCHING_ERROR_TASKS=3`; all three matching task ID ↔ `resume-plan.json.task_id`, `SCHEMA=1`, `PLAN_HASH_VALID=True`, `PARTS_SCAN_CAPPED=False`, and `FILELIST_PRESENT=True`. No HLS media bytes were inspected, modified or deleted.
+- **Job 1:** `SEGMENT_COUNT=2061`, `RECORDED_COMPLETED=1323`, `SAVED_TS_COUNT=1323` (approximately 64.2% of segments by count).
+- **Job 2:** `SEGMENT_COUNT=2088`, `RECORDED_COMPLETED=72`, `SAVED_TS_COUNT=72` (approximately 3.4% by count).
+- **Job 3:** `SEGMENT_COUNT=2118`, `RECORDED_COMPLETED=0`, `SAVED_TS_COUNT=0`.
+- **Total:** 1,395 existing `.ts` files counted, corresponding to 1,395 completed-segment records. This is **structural evidence only**: no per-file SHA/content/ownership verification and no proof those segments match any new playlist. Preserve all files, including the 0-segment job’s manifest/filelist.
+- **Immediate failure mechanism already confirmed:** saved resume-plan `plan_sha256` is rejected by the newly computed HLS playlist identity, so `prepare_hls_resume()` protects against unsafe reuse. **Underlying reason for changed plan is UNKNOWN**. Existing manifest only stores a plan hash and counts, not a complete historical playlist; a fresh network playlist or other authenticated source evidence must be handled carefully, and an unmatched hash alone cannot prove the new segments are the same. No compatibility bypass, partial-file deletion, requeue/restart, auto retry, storage-reserve change, or live deployment is authorized for this investigation.
+- **Current P08LIB-001 UI candidate:** successful single Docker build `sha256:a044e011085e957af97d35f71b89127e15a7409039c4fd765c30c7ae5d447be2` remains **NOT DEPLOYED**. Prior CT108 predeploy gate reported three `AUTO_RETRY_ELIGIBLE` jobs and could not prove safe runtime idleness; hold production cutover and any change to download logic. Teddy wants a **separately scoped** recurrence-prevention fix after evidence/approval. CodeX/implementation must not be initiated by handoff `NEXT` text alone.
+- **Next evidence gate:** assess HLS source playlist variation and exact task ownership by an explicitly safe, bounded read-only design, while considering dynamic playlist tags, expiring query fields, and segment index/byte identity; do not assume benign token rotation and do not propose ignoring full HLS plan hash without a proof that avoids mixing sources.
+
 ## 2026-11-07 — HLS_SEGMENT_PLAN_CHANGED confirmed for all three errors; preservation gate (READ-ONLY)
 
 - **Actual Teddy CT108 read-only result:** all three current failed download task records show `ERROR_CLASS=HLS_SEGMENT_PLAN_CHANGED`, `ERROR_HINTS=['HLS','재개']`, `ERROR_KIND=safety`, `DETAIL_LENGTH=37`, identical 12-digit fingerprints `e2b3c4fd5d2e`. Therefore the confirmed **immediate refusal** is the HLS resume plan mismatch, not a live low-free-space condition. Do not claim the root cause of the changed source playlist is proven.
