@@ -563,3 +563,11 @@ html[data-theme="dark"] .file-management-tabs .section-tab.active {
     color: #f8fafc;
     border-bottom-color: #60a5fa;
 }
+
+/* Only the NAS holdings DB status uses full-width cards on narrow screens.
+   The Library overview and Stage12 progress grids keep their current layout. */
+@media (max-width: 720px) {
+    #file-management-view-subtitle-status .library-db-status {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
