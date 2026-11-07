@@ -539,3 +539,27 @@ html[data-theme="dark"] .library-delete-commit {
 .library-metric small, .library-db-status p { line-height: 1.5; }
 .library-db-status h3 { margin: 0; font-size: 15px; }
 .library-db-status p { margin: 8px 0 0; }
+
+/* Keep the holdings summary above the search and results at full content width. */
+#file-management-view-library > .library-header {
+    display: block;
+}
+
+#file-management-view-library #librarySummary {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* The shared section-tab text colors are too dark on the dark background. */
+html[data-theme="dark"] .file-management-tabs .section-tab {
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] .file-management-tabs .section-tab:hover:not(.active) {
+    color: #e2e8f0;
+}
+
+html[data-theme="dark"] .file-management-tabs .section-tab.active {
+    color: #f8fafc;
+    border-bottom-color: #60a5fa;
+}
