@@ -1,5 +1,14 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-08 17:02 KST — DLHLS-001 SORA-489 read-only recovery checks (CURRENT EVIDENCE)
+
+- CT108 live console output establishes error states for exactly three safety jobs, all HLS semantic-plan mismatches: `cba0fdda-7f00-460e-b722-fa3e8a78681e` (1323/2061 TS), `be88eb5a-cecd-4aee-8637-d6e16141b394` (72/2088 TS), `4adb423e-5be0-4560-b113-3eef5df6f19b` (0/2118 TS). Manifest completion counts equal actual TS files, total 1395. The initial script mistakenly required `status == "에러"`, while live statuses start `"에러: 저장 공간/잠금 보호: ..."`; the narrower check was fixed in subsequent read-only reports.
+- Candidate: `4adb423e-5be0-4560-b113-3eef5df6f19b`, SORA-489, `missav123.com/dm4/ko/sora-489` (query withheld), `storage_folder=missav`. No other task with exactly the same URL, no locally enumerated filename containing `sora-489`; candidate task has no `filename`, `local_result_path`, or `local_result_paths`. Exact output name, final destination/NAS collision, and live source viability remain NOT_VERIFIED.
+- Current CT108 read-only storage: free 36.58 GiB, reserve 4.89 GiB, available after reserve 31.68 GiB; zero active/other tasks, zero host FFmpeg processes, Downloader container running with zero restarts and correct work mount. Candidate recorded size estimate UNKNOWN.
+- 2118 candidate segments. Two cross-title reference samples imply **rough and non-binding** candidate sizes 3.76 GiB (1323 TS totaling 2.35 GiB) and 5.77 GiB (72 TS totaling 0.20 GiB); not a reliable upper bound. The checked-in safety code calculates conservative remux copy output as input + max(input/10,64 MiB); this is product-code context, not an E2E guarantee.
+- `CHECK=PASS` is limited to these offline/read-only observations. `FULL_REQUIRED_SPACE=CONFIRM_NEEDED`, `OUTPUT_COLLISION=NOT_VERIFIED`, `SOURCE_FETCH=NOT_RUN`, `DOWNLOAD=NOT_RUN`, `RETRY=NOT_RUN`, `DEPLOY=NOT_RUN`, `NAS_WRITE=0`. No existing task or 1395 TS files were changed by the read-only commands.
+- Next: one small read-only local/final-destination inspection, then decide an operator go/no-go with explicit source/network and remaining capacity/ownership gates. Do not treat the reference estimates as clearance or bypass the semantic-plan mismatch.
+
 WORKSTREAM: downloader-hls-recovery
 TASK_ID: DLHLS-001
 STATUS: IN_PROGRESS
