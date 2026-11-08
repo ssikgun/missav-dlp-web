@@ -1,5 +1,13 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-08 — DLHLS-001 SORA-489 one-shot original-page metadata lookup approved (PENDING EXECUTION)
+
+- Teddy explicitly approved **one bounded network metadata lookup** of SORA-489 original page after the read-only NAS checks. This approval is not authorization for a live HLS download, new job creation, HLS segment/playlist retrieval, retry of old jobs, MP4 remux, production change, cleanup or NAS write.
+- Inspect actual source naming rule read-only; **do not import/execute the production `app.py` module** because of initialization side effects. Run one external page HTTP GET only, with no redirect-follow, mirror/proxy fallback, repeated HTTP request, or retry after error. If source page is blocked, report `SOURCE_METADATA=BLOCKED` and stop. Do not print sensitive query strings, cookies, video UUIDs, CDN URLs or HTML bodies.
+- Derive the predicted `[video_id] title.mp4` filename using the deployed source's `_safe_filename` logic, report local output existence read-only, and keep `EXACT_NAS_OUTPUT_COLLISION=NOT_VERIFIED` pending an exact-name remote lookup. A page metadata success alone does not establish HLS availability, full required+reserve disk sizing, or download go/no-go.
+- Original three error jobs and 1395 TS fragments remain protected; `P08LIB-001` UI rollout stays on hold. `METADATA_LOOKUP=APPROVED_NOT_RUN` at this documentation checkpoint; `DOWNLOAD=NOT_RUN`, `NAS_WRITE=0`, `DEPLOY=NOT_RUN`.
+- Next: Teddy runs one bounded container-local source-page metadata GET. Record the observed result immediately in this workstream ACTIVE_WORK and CURRENT_HANDOFF before proposing additional network operations.
+
 ## 2026-11-08 — DLHLS-001 SORA-489 NAS directory-structure read-only PASS (CURRENT)
 
 - Teddy ran the bounded CT108-to-NAS SSH read-only directory-structure check for the SORA-489 / DLHLS-001 zero-TS candidate. Output: `TOP_ENTRY=@eaDir [DIRECTORY]`, `TOP_ENTRIES=1`, `NESTED_ENTRIES_SCANNED=2`, `NESTED_SORA489_MATCHES=0`, `SCAN=PASS`, `SSH_EXIT_CODE=0`, `CHECK=PASS`, `NAS_WRITE=0`, `DOWNLOAD=NOT_RUN`, `READ_ONLY=YES`.
