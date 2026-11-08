@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-08 — DLHLS-001 single direct SORA-489 metadata GET approved (PENDING)
+
+- Teddy approved exactly **one additional direct (no SpoofDPI, no proxy environment) external HTTP GET** for the SORA-489 original page `https://missav123.com/dm4/ko/sora-489` solely to determine metadata and predict the output MP4 filename. The prior one-request **SpoofDPI** permission was already exhausted with `ConnectionError`; this is an explicitly new, narrower allowance.
+- Execute as a standalone container-local `curl_cffi.requests.Session(trust_env=False, retry=0)` call with redirects disabled; one source-page request only, no fallback domains, automatic retries, HLS playlist/segment requests, source app/module import or worker launch. Derive prediction with the deployed `app.py` filename helper extracted by AST without importing the app; do not expose private tokens, CDN URLs, UUIDs or HTML contents.
+- **Status: APPROVED_NOT_EXECUTED.** Direct success would establish page accessibility and a *predicted* MP4 name only; it does not establish valid HLS/media playlist, exact remote NAS collision, required download+remux space, or permission to create/start a trial. For non-200 status or a connection error, stop with `METADATA_LOOKUP=BLOCKED`; do not use fallback or retry without fresh approval.
+- Original failed HLS records and the previously counted 1,395 TS parts remain protected; `P08LIB-001` UI rollout remains on HOLD. No change to source, config, running service, NAS or task state at this checkpoint.
+- NEXT: Teddy runs the one bounded command. Save resulting observed outcome to both workstream ACTIVE_WORK and CURRENT_HANDOFF; any live new-ID download requires separate final gates and operator go/no-go.
+
 ## 2026-11-08 — DLHLS-001 clarified HLS failure cause vs SpoofDPI early exit (CURRENT)
 
 - Teddy's host CT108 read-only Docker log examination confirmed the container `missav-dlp-web` is running (started `2026-11-07T06:02:01.272296867Z`, restart count 0, log driver journald, command `python teddy_bootstrap.py`). First 4,000 lines (scan truncated) contained `WEB_LOG_CAPTURE_INITIALIZED` at `2026-11-07T06:02:01.384517000Z` and `EARLY_EXIT` for SpoofDPI at `2026-11-07T06:02:03.576922000Z`. Redacted filtered log did not expose SpoofDPI exit code or diagnostic body, so **why it exited remains CONFIRM_NEEDED**.
