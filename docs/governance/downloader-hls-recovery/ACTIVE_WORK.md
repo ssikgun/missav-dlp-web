@@ -1,5 +1,12 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-09 — DLHLS-001 user priority correction: storage/retry, not source-page probes
+
+- **User clarification:** Teddy asked why repeated source-page checks continued when the failed downloads were caused by insufficient internal disk space and external pages were normal. The assistant acknowledged misprioritizing source tests. **STOP further source-page GET/SSL/proxy diagnostics as the next work; no fresh network authorization exists.** Prior VPN HTML HTTP 200 is sufficient for this narrowly defined page reachability checkpoint, not evidence of HLS viability.
+- **Proven stop layers:** Initial 2026-11-07 download stops were storage safety gate `free < required + reserve`; later attempted resumptions were blocked by saved HLS playlist/semantic plan mismatch. The immediate protective causes are known; *why* the playlist plan changed and whether an overlapping Docker image build materially depleted space remain `CONFIRM_NEEDED`, not grounds for more page requests.
+- **New NEXT priority:** One bounded **read-only CT108 local storage/worker/job-history preflight**: actual current filesystem free/required+reserve, any Docker-build/download/remux overlap, and preserved three task/TS/manifest identities. No deletion, old-job retry, HLS fragment mixing, app import, Docker build, NAS write, external network, code/UI deployment. Then present a minimal recovery plan with explicit go/no-go and approvals for any live trial. Preserve 1,395 last-verified TS parts and P08LIB-001 UI operational HOLD.
+
+
 ## 2026-11-09 — DLHLS-001 SORA-489 single Gluetun VPN page GET HTTP 200 (EXECUTED; CLOSED)
 
 - **Teddy CT108 actual terminal evidence:** Ran the previously approved one-shot `docker exec -i missav-dlp-web python3 -B` script for failed SORA-489 job `4adb423e-5be0-4560-b113-3eef5df6f19b`. Printed `PREFLIGHT=PASS`, `TARGET=SORA-489`, `ROUTE=VPN_GLUETUN`, `REQUEST_LIMIT=1`, `TLS_VERIFY=ENABLED`. One explicit GET of `https://missav123.com/dm4/ko/sora-489` using `curl_cffi.requests.Session(trust_env=False, retry=0)`, explicit `http://gluetun:8888` proxy and `allow_redirects=False` returned `HTTP_STATUS=200`, `RESPONSE_BYTES=248977`, `HTML_CONTENT_TYPE=True`, `PAGE_HTTP_CHECK=PASS`, `PAGE_IDENTITY=NOT_VERIFIED`.
