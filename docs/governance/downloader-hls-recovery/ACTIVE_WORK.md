@@ -1,5 +1,13 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-08 — DLHLS-001 SORA-489 single approved metadata GET blocked with ConnectionError (CURRENT)
+
+- Teddy executed the **one explicitly approved external page metadata attempt** on CT108 using `docker exec` with the deployed `app.py` filename helper parsed by AST (without importing or initializing the application), and `curl_cffi requests.get` against the SORA-489 original page. The output showed `TARGET=SORA-489`, `SOURCE_CODE=DEPLOYED_APP_PY_FUNCTION_ONLY`, `NETWORK_ATTEMPT_LIMIT=1`, `PROXY_MODE=SPOOFDPI`.
+- Result: `METADATA_LOOKUP=BLOCKED`, `REASON_TYPE=ConnectionError`, `REASON=DETAIL_REDACTED`, `NETWORK_ATTEMPTED=True`. No HTTP status was printed, so the HTTP response was **not established**; this does **not** prove the site blocked access. The exact failure cause is `CONFIRM_NEEDED` (local SpoofDPI listener, upstream network, TLS or other connection failure not distinguished).
+- The command reported `REDIRECT_FOLLOW=NO`, `RETRY=NO`, `HLS_PLAYLIST_FETCH=NOT_RUN`, `HLS_SEGMENTS_DOWNLOADED=0`, `TASK_WRITE=0`, `NAS_WRITE=0`, `DOWNLOAD=NOT_RUN`. Predicted MP4 filename, exact NAS output collision, live HLS source, and total required+remux disk safety remain `NOT_VERIFIED`.
+- **The approved one-request network allowance is exhausted. Do not try another page GET, mirror, direct fallback, proxy swap, playlist request, or download under this allowance.** Next checkpoint is a short *offline only* CT108 inspection of the current SpoofDPI process, local configured port 8080 listener, and the configured proxy flag, with no external network traffic or production writes. Then report diagnosis and request explicit approval before any additional external request.
+- Preserve three failed HLS task records and all last-confirmed 1,395 TS fragments; `P08LIB-001` UI deployment remains on HOLD. This note is evidence only, not source-code, configuration, service, or operational change.
+
 ## 2026-11-08 — DLHLS-001 SORA-489 one-shot original-page metadata lookup approved (PENDING EXECUTION)
 
 - Teddy explicitly approved **one bounded network metadata lookup** of SORA-489 original page after the read-only NAS checks. This approval is not authorization for a live HLS download, new job creation, HLS segment/playlist retrieval, retry of old jobs, MP4 remux, production change, cleanup or NAS write.
