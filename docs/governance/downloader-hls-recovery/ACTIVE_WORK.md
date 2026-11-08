@@ -1,5 +1,13 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-08 — DLHLS-001 clarified HLS failure cause vs SpoofDPI early exit (CURRENT)
+
+- Teddy's host CT108 read-only Docker log examination confirmed the container `missav-dlp-web` is running (started `2026-11-07T06:02:01.272296867Z`, restart count 0, log driver journald, command `python teddy_bootstrap.py`). First 4,000 lines (scan truncated) contained `WEB_LOG_CAPTURE_INITIALIZED` at `2026-11-07T06:02:01.384517000Z` and `EARLY_EXIT` for SpoofDPI at `2026-11-07T06:02:03.576922000Z`. Redacted filtered log did not expose SpoofDPI exit code or diagnostic body, so **why it exited remains CONFIRM_NEEDED**.
+- The SpoofDPI binary exists and is executable but is currently absent, along with port 8080 listener, per earlier offline checks. Its early exit strongly explains the separate SORA-489 one-GET page metadata `ConnectionError` when `PROXY_MODE=SPOOFDPI` was selected. **Do not infer this caused the original three HLS download failures.**
+- **Original HLS failures — confirmed immediate stop mechanism:** three old job states explicitly report `HLS 세그먼트 계획이 기존 재개 자료와 달라 조각을 보존했습니다` with `error_kind=safety`. The resume-plan semantic identity mismatch correctly prevented mixing incompatible TS pieces. Root cause of how/why the source playlist or representation changed **remains CONFIRM_NEEDED**. The last verified preserved count was 1,395 TS pieces (1323+72+0). This safety event is distinct from the later metadata request connection failure.
+- User requested to stop overly granular checks. Prioritize the single safe, bounded new-ID SORA-489 trial only when exact source identity, output collision/ownership, concurrent worker state and required disk+reserve gates can be satisfied with minimal targeted checks and **explicit operator go/no-go**; **do not silently relax gates or create/retry jobs**. Prior permission was for one metadata GET only, already used. Current work is documentation/read-only; no service restart, settings change, external retry, NAS write, job change, remux or UI rollout.
+- Reporting guidance: describe HLS semantic-plan mismatch as **known proximate failure cause**, source of plan drift as **unverified**, SpoofDPI startup early exit as **confirmed**, reason for that early exit as **unverified**, and link to separate metadata GET failure as **probable**, not proven.
+
 ## 2026-11-08 — DLHLS-001 SpoofDPI binary present, recent Docker startup logs absent (CURRENT)
 
 - Teddy ran an offline, read-only binary and Docker-log check in CT108. Container-local `shutil.which("spoofdpi")` found the binary (`BINARY_FOUND=True`), and `os.access(path, os.X_OK)` showed it executable (`BINARY_EXECUTABLE=True`); the executable was **not** run.
