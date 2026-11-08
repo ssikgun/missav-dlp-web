@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-08 — DLHLS-001 SORA-489 final-storage backend confirmation (CURRENT EVIDENCE)
+
+- CT108 Docker-container, read-only inspection of failed candidate `4adb423e-5be0-4560-b113-3eef5df6f19b` confirmed `FINAL_BACKEND=ssh`. Therefore the remote NAS final-file destination was **not** inspected in this step: `FINAL_STORAGE_CHECK=REMOTE_NOT_CHECKED`.
+- Same-title checks found `SAME_TITLE_OTHER_JOBS=0` among the other persisted jobs and `LOCAL_WORK_MATCHES=0` for name-normalized `sora-489` in the local `/downloads` work root. These observations do not prove that a differently named item, a completed file, or a NAS-side file is absent.
+- The candidate has no recorded `filename`, `local_result_path`, or `local_result_paths`; the final MP4 filename generated at source extraction has not been established. `EXACT_OUTPUT_NAME=NOT_VERIFIED`. Previous free-after-reserve 31.68 GiB and cross-title estimates 3.76–5.77 GiB are reference observations, not a safe exact required+remux capacity guarantee.
+- `SOURCE_FETCH=NOT_RUN`, `NETWORK_REQUESTS=0`, `DOWNLOAD=NOT_RUN`, `RETRY=NOT_RUN`, `NAS_WRITE=0`, `DEPLOY=NOT_RUN`, `READ_ONLY=YES` for this check. No original failed job or TS part was changed. The previously checked 1,395 TS fragment count remains the last verified observation.
+- **NEXT GATE:** A small, bounded read-only remote NAS listing/lookup for the `missav` destination, without publication/write, and separate confirmation of the exact generated output name and source viability are still required before any new-identity trial. If the remote read check would require network access outside the currently approved gate, obtain explicit operator authorization first. Continue to block live download and UI rollout.
+
 ## 2026-11-08 17:02 KST — DLHLS-001 SORA-489 read-only recovery checks (CURRENT EVIDENCE)
 
 - CT108 live console output establishes error states for exactly three safety jobs, all HLS semantic-plan mismatches: `cba0fdda-7f00-460e-b722-fa3e8a78681e` (1323/2061 TS), `be88eb5a-cecd-4aee-8637-d6e16141b394` (72/2088 TS), `4adb423e-5be0-4560-b113-3eef5df6f19b` (0/2118 TS). Manifest completion counts equal actual TS files, total 1395. The initial script mistakenly required `status == "에러"`, while live statuses start `"에러: 저장 공간/잠금 보호: ..."`; the narrower check was fixed in subsequent read-only reports.
