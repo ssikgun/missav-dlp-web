@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-08 — DLHLS-001 SORA-489 NAS SSH top-level read-only lookup PASS (CURRENT)
+
+- Teddy executed the approved CT108 Docker-container, read-only NAS SSH lookup for the zero-TS SORA-489 candidate `4adb423e-5be0-4560-b113-3eef5df6f19b`. The live output was `SSH_EXIT_CODE=0`, `NAS_SCAN=PASS`, `NAS_CHECK=PASS`, `NAS_SCANNED_ENTRIES=1`, `NAS_SORA489_MATCHES=0`, `FINAL_BACKEND=ssh` (from prior checkpoint).
+- This proves only that the **top level** of the configured `TEDDY_FINAL_REMOTE_ROOT/missav` directory was reachable and contained no basename matching the checked SORA-489 patterns. The sole entry's name/type was not printed and descendants were not searched: it may be a subdirectory. Exact generated final MP4 filename, nested/alternate-name collision, source viability, and actual required-plus-remux space remain `NOT_VERIFIED`; do **not** promote this to `OUTPUT_COLLISION=PASS`.
+- Observed `EXACT_OUTPUT_NAME=NOT_VERIFIED`, `NAS_WRITE=0`, `DOWNLOAD=NOT_RUN`, `READ_ONLY=YES`. No source fetch, job retry, deployment, cleanup or mutation is authorized by this checkpoint. Keep all 1,395 preserved TS and original three failed jobs untouched; keep the `P08LIB-001` UI deployment on hold.
+- **NEXT:** one minimal read-only inspection of the type/name of that one NAS `missav` entry (and only the relevant subdirectory if necessary). Then confirm exact output identity and source/space gates before requesting any operator go/no-go for a new-identity trial.
+
 ## 2026-11-08 — DLHLS-001 SORA-489 final-storage backend confirmation (CURRENT EVIDENCE)
 
 - CT108 Docker-container, read-only inspection of failed candidate `4adb423e-5be0-4560-b113-3eef5df6f19b` confirmed `FINAL_BACKEND=ssh`. Therefore the remote NAS final-file destination was **not** inspected in this step: `FINAL_STORAGE_CHECK=REMOTE_NOT_CHECKED`.
