@@ -1,5 +1,12 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-08 — DLHLS-001 SORA-489 local SpoofDPI process and listener absent (CURRENT)
+
+- Teddy ran the CT108 container-local offline/read-only diagnostic after the single approved original-page GET had failed with `ConnectionError`. Output: `SPOOFDPI_ENABLED=True` in `/downloads/.settings.json`, `EXPECTED_PROXY=127.0.0.1:8080`, `SPOOFDPI_PROCESSES=0` from `/proc/*/comm`, `PORT_8080_LISTENERS=0` from `/proc/net/tcp*`, `LOCAL_PROXY_CHECK=INCOMPLETE`.
+- The attempted HTTP request selected `PROXY_MODE=SPOOFDPI`. **Strong inference, not confirmed root cause:** it likely failed locally while trying to use the absent proxy listener, rather than receiving an HTTP response from the target website. The actual SpoofDPI startup failure/exit timing, installed binary and cause remain `CONFIRM_NEEDED`. The `/proc` check is a snapshot, not historical proof of process state during the prior attempt.
+- The local diagnostic explicitly reported `PROXY_HTTP_FUNCTION=NOT_TESTED`, `EXTERNAL_NETWORK_REQUESTS=0`, `DOWNLOAD=NOT_RUN`, `READ_ONLY=YES`. The earlier one-GET network authorization remains **exhausted**; no additional external requests, direct fallback or retries without renewed explicit approval.
+- **NEXT:** CT108 read-only inspection of the process binary's presence and safe redacted/filtered downloader startup logs to discover whether SpoofDPI was missing, failed at startup, or exited later. Do not restart containers or services, invoke `spoofdpi`, change settings, retry failed jobs, touch preserved 1395 TS, write NAS, or resume `P08LIB-001` UI rollout. Any remedial runtime change requires independent approval and correct workstream routing.
+
 ## 2026-11-08 — DLHLS-001 SORA-489 single approved metadata GET blocked with ConnectionError (CURRENT)
 
 - Teddy executed the **one explicitly approved external page metadata attempt** on CT108 using `docker exec` with the deployed `app.py` filename helper parsed by AST (without importing or initializing the application), and `curl_cffi requests.get` against the SORA-489 original page. The output showed `TARGET=SORA-489`, `SOURCE_CODE=DEPLOYED_APP_PY_FUNCTION_ONLY`, `NETWORK_ATTEMPT_LIMIT=1`, `PROXY_MODE=SPOOFDPI`.
