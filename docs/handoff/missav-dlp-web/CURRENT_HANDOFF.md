@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-08 — DLHLS-001 SpoofDPI binary present, recent Docker startup logs absent (CURRENT)
+
+- Teddy ran an offline, read-only binary and Docker-log check in CT108. Container-local `shutil.which("spoofdpi")` found the binary (`BINARY_FOUND=True`), and `os.access(path, os.X_OK)` showed it executable (`BINARY_EXECUTABLE=True`); the executable was **not** run.
+- A filtered scan of `docker logs --tail 2500 --timestamps missav-dlp-web`, searching for the defined SpoofDPI startup diagnostic phrases, returned `LOG_EVENTS_FOUND=0` and `STARTUP_LOG_EVIDENCE=NOT_FOUND_IN_LAST_2500_LINES`. Raw log contents were not printed. This is **not** proof that startup never ran, as prior/rotated logs and the application-side tee can differ from the last 2500 Docker lines.
+- Earlier current-state offline evidence remains `SPOOFDPI_ENABLED=True`, `SPOOFDPI_PROCESSES=0`, `PORT_8080_LISTENERS=0`. The previously attempted single SORA-489 GET used the missing local proxy and ended with `ConnectionError` before HTTP status. A missing local listener is a strong **hypothesis** for that failure, not confirmed historic root cause; whether SpoofDPI exited, failed to initialize, was disabled by a startup path, or logs were rotated is `CONFIRM_NEEDED`.
+- `BINARY_EXECUTION=NOT_RUN`, `EXTERNAL_NETWORK_REQUESTS=0`, `READ_ONLY=YES`, `DOWNLOAD=NOT_RUN` in this check. No service restart, settings modification, network retry, task/NAS/write/cleanup or deploy. Preserve original three failed jobs, last-confirmed 1395 TS parts, and `P08LIB-001` UI HOLD.
+- **NEXT:** one bounded offline/read-only check of container start time, configured log driver, early docker log traces and actual application capture destination/process startup code. Do not print raw URLs or secret-bearing full logs. Additional external page GET requires renewed operator authorization; runtime repair needs workstream review and separate approval.
+
 ## 2026-11-08 — DLHLS-001 SORA-489 local SpoofDPI process and listener absent (CURRENT)
 
 - Teddy ran the CT108 container-local offline/read-only diagnostic after the single approved original-page GET had failed with `ConnectionError`. Output: `SPOOFDPI_ENABLED=True` in `/downloads/.settings.json`, `EXPECTED_PROXY=127.0.0.1:8080`, `SPOOFDPI_PROCESSES=0` from `/proc/*/comm`, `PORT_8080_LISTENERS=0` from `/proc/net/tcp*`, `LOCAL_PROXY_CHECK=INCOMPLETE`.
