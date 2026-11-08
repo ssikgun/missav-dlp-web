@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-08 — DLHLS-001 SORA-489 NAS directory-structure read-only PASS (CURRENT)
+
+- Teddy ran the bounded CT108-to-NAS SSH read-only directory-structure check for the SORA-489 / DLHLS-001 zero-TS candidate. Output: `TOP_ENTRY=@eaDir [DIRECTORY]`, `TOP_ENTRIES=1`, `NESTED_ENTRIES_SCANNED=2`, `NESTED_SORA489_MATCHES=0`, `SCAN=PASS`, `SSH_EXIT_CODE=0`, `CHECK=PASS`, `NAS_WRITE=0`, `DOWNLOAD=NOT_RUN`, `READ_ONLY=YES`.
+- In the **configured `TEDDY_FINAL_REMOTE_ROOT/missav` directory**, the sole visible top-level entry during the check was `@eaDir` (a Synology auxiliary metadata directory). It is therefore accurate to say that no ordinary top-level media file was observed in **this exact directory** at the time of the check. The two entries inside `@eaDir` had no checked SORA-489 basename match; their identities/content were not inspected. This is a path-local, name-based check, not a proof of absence across all NAS libraries or alternative title spellings.
+- `SAME_TITLE_OTHER_JOBS=0`, `LOCAL_WORK_MATCHES=0` are prior bounded checks. Exact generated MP4 filename, output-path ownership/collision under all representations, live HLS source availability, and sufficient exact download-plus-remux space remain `CONFIRM_NEEDED`. Historic `FREE_AFTER_RESERVE_GIB=31.68` and the two title-crossing size estimates (3.76/5.77 GiB) are not an unconditional capacity PASS.
+- Continue protecting all 1,395 original TS pieces and all three failed records, preserving `P08LIB-001` UI operational HOLD. No download/retry/NAS write/cleanup/deploy or source network fetch occurred in this check.
+- **NEXT GATE:** inspect the exact current runtime naming/output behavior read-only without importing/running production download modules; then consider a separately approved bounded source-availability check and one-job operator go/no-go only after output collision, activity and required+reserve are verified.
+
 ## 2026-11-08 — DLHLS-001 SORA-489 NAS SSH top-level read-only lookup PASS (CURRENT)
 
 - Teddy executed the approved CT108 Docker-container, read-only NAS SSH lookup for the zero-TS SORA-489 candidate `4adb423e-5be0-4560-b113-3eef5df6f19b`. The live output was `SSH_EXIT_CODE=0`, `NAS_SCAN=PASS`, `NAS_CHECK=PASS`, `NAS_SCANNED_ENTRIES=1`, `NAS_SORA489_MATCHES=0`, `FINAL_BACKEND=ssh` (from prior checkpoint).
