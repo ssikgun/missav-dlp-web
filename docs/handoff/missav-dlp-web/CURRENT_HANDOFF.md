@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-09 — DLHLS-001 SORA-489 fresh local trial preflight PASS; source/size still blocked
+
+- **Direct Teddy CT108 read-only output:** `TASK_STATE=PASS`, `BUSY_TASKS=0`; source job UUID `4adb423e-5be0-4560-b113-3eef5df6f19b`, saved SORA-489 URL identity/failed custom-HLS state PASS, persisted saved route `vpn`, zero original TS, protected old `resume-plan.json` SHA256 `23bb92ff483ef6cc9e57dcdf6562d655c2d3973583d997c07207b6ac01d5afb2`; all three original failure parts counts still 0+72+1323=1395. Saved `total_bytes_estimate=0` means unknown requirement, not zero-size media.
+- **Current no-work/storage facts:** `MP4_QUEUE_RECORDS=0`, `RESERVATION_RECORDS=0`, `PERSISTED_QUEUE_STATE=PASS`, `FFMPEG_PROCESS_COUNT=0`. `DISK_FREE_BYTES=41045176320`, `DISK_RESERVE_BYTES=5254478438`, `HEADROOM_AFTER_RESERVE_BYTES=35790697882` (~33.33 GiB). `LOCAL_PREFLIGHT=PASS`. These records/processes are bounded checks, not a universal negative proof of all possible workers.
+- **Still explicitly unresolved:** `CURRENT_SOURCE_VIABILITY=NOT_CHECKED`, `FULL_REQUIRED_BYTES=UNKNOWN`, `RETRY_POST=NOT_RUN`, `DOWNLOAD=NOT_RUN`. Do not convert 33.33 GiB headroom or reference samples into a proven full download+MP4 bound. Next consider one narrowly scoped metadata-only source/master/variant/HEAD-size probe via the same approved VPN route, with no job registration, TS write or content download; if the full required size remains unknown, `TRIAL_GO=BLOCKED` under DLHLS v1.0.0.
+
+
 ## 2026-11-09 — Teddy approved one guarded SORA-489 live fresh-ID retry trial; preflight still required
 
 - **Direct user question/decision:** After `DLFR-001` API-only release `DEPLOY_APPLY=PASS` and read-only smoke `POST_DEPLOY_SMOKE=PASS`, Teddy asked whether the three original failures are retry-ready and said `재시도 시험 승인 할께`. Interpret within the approved `DLHLS-001 v1.0.0` scope as authorization to prepare **one** deliberate isolated zero-TS SORA-489 new-identity live trial, not simultaneous retry of all 3 jobs. The original 3 records, 1,395 TS and old playlist-plan SHA guards remain protected.
