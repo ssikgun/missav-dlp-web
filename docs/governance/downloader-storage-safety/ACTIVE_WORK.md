@@ -1,5 +1,12 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-09 — DLFR-001 full image config and detailed port/network/bind checks PASS (NO PROMOTION)
+
+- **Direct Teddy CT108 read-only result:** `IMAGE_CONFIG_DIFFERENCES=[]`; all selected inherited image runtime config fields (user, env, working directory, entrypoint, cmd, exposed ports, volumes, health, stop signal, shell, labels) identical between exact old image and candidate. `IMAGE_RUNTIME_CONFIG=PASS`.
+- **Original effective Compose service keys:** `command, container_name, depends_on, entrypoint, environment, group_add, image, networks, ports, restart, volumes`. Port count 1/1 and normalized port bindings match (`PORT_BINDINGS=PASS`); effective network count 1/1 and names match (`NETWORK_NAMES=PASS`); 14 bind propagation/SELinux option checks pass (`BIND_OPTIONS=PASS`). Earlier 13-file Compose render/old-image/user/group/env/mount-core gates PASS remain supported.
+- **Current status:** `DETAIL_INSPECTION=COMPLETE`, `OLD_CONTAINER=STILL_STOPPED`, `DEPLOY=NOT_RUN`. Remaining before independent promotion GO: compare explicit Compose command/entrypoint/container name and relevant dependency/alias state, ground the exact image-only override and old-image Compose rollback procedure, and recheck old stop/space/other services. No media or TS mutation, no P08 UI promotion, no DLHLS live trial.
+
+
 ## 2026-11-09 — DLFR-001 / DLSS-001 post-build Compose preliminary parity PASS (NO PROMOTION)
 
 - **Direct Teddy CT108 read-only check:** old `missav-dlp-web` still `exited`, exact old image; all 13 original Compose paths present as regular non-symlinks, project and working directory matched. Writer numeric GID `988` confirmed from existing container; full Compose model rendered in subprocess-only environment with the existing nonsecret origin value held in memory. No env values printed.
