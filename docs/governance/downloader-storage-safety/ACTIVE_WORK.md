@@ -1,5 +1,14 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-09 — Teddy approved phased DLSS-001 A gates (CONTRACT v1.0.2; NO BUILD)
+
+- **Governance:** DLSS-001 contract advanced from 1.0.1 to 1.0.2 by Teddy's explicit approval on 2026-11-09. DLFR-001 separate v1.0.0 API contract remains unchanged. Previous final preflight `OPERATIONAL_GO=NO-GO` is historical, not retroactively relabeled PASS.
+- **Decision:** Teddy replied `응 진행해` to the proposed split of the already-approved A maintenance method into a controlled **build-only** checkpoint and a distinct **post-build, pre-promotion** checkpoint. This adjusts verification timing, not download/HLS/MP4/storage protection, and does not authorize bypass of actual active work, disk reserve, unrelated Docker builds, or missing restore evidence.
+- **Before any build:** Fresh exact running identity and preserved 13 jobs/1,395 TS; task+MP4 queue and relevant delayed-retry/thread/process evidence; single-operator no-competing-build window; conservative shared-disk build budget above the verified reserve (last free 39,218,970,624 B, reserve 5,254,478,438 B; ~31.63 GiB after reserve), guarded exact local base tag, and the unchanged old container's manual start route. Stop **only** missav-dlp-web, verify actual process exit before Docker build, keep stopped until daemon-side completion is positively confirmed. Local docker-driver and `--pull=false`/`--network=none` do not warrant an absolute registry-isolation claim; fail on remote pull/base-identity uncertainty.
+- **After build, before promoting:** Verify new candidate image/code manifest and all four existing UI SHA baselines, full 13-file Compose parity (including detailed mount/network settings and runtime env without disclosing values), and explicit original-image single-service recreation/rollback. The candidate image cannot be inspected before it exists; a missing candidate UI SHA is **not** by itself a prebuild failure. If a postbuild gate fails, no promotion; after confirmed daemon termination and adequate disk reserve, the same unchanged old container may be manually started, never auto-restored. Only an independently verified second GO can authorize one service-only promotion.
+- **Unchanged protections:** P08LIB-001 UI HOLD, DLHLS-001 separate original three-job recovery GO, no ordinary retry or network download, no 1,395 TS edit/delete, Docker prune, other service stop/restart or hidden credential leakage. No code change, tag, stop, build, deployment or recovery was performed by this governance update. `BUILD/DEPLOY/DOWNLOAD=NOT_RUN`.
+
+
 ## 2026-11-09 — DLFR/DLSS final preflight NO-GO (READ-ONLY)
 
 At canonical 2efa4fa34d00988d3be2e1831d56b2357d680a4f, self-only governance preflights PASS for DLFR-001 and DLSS-001. Read-only Docker inspect reported running Downloader container 2a72fddff02b5ca2c86da5d44dc3bd6b5a2157a782b65685cb3121092bde33fd, image sha256:ebd164d631450660b79ca29141a3b8c317f71df443b2d209feec51a8a35c000a, restart policy unless-stopped. Current task file: 13 records, 10 complete, 3 protected storage/safety errors; MP4 queue JSON 0; three original parts/manifests present with 1323+72+0=1395 TS by file count, not content hashes. Seven Python threads exist and docker top showed only main Python; this snapshot does not prove threads, delayed tasks, host processes or concurrent builds inactive. Buildx history output showed completed/error entries only, but does not establish all builders or daemon work idle.
@@ -104,7 +113,7 @@ NO_GO: actual worker/delayed-retry/other builder idleness not proven, full capac
 WORKSTREAM: downloader-storage-safety
 TASK_ID: DLSS-001
 STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.1
+CONTRACT_VERSION: 1.0.2
 REQUIRES_WORKSTREAMS: downloader-storage-safety
 
 ## OBJECTIVE
@@ -139,4 +148,4 @@ Prevent Downloader storage-guard failures from overlapping Docker builds and dow
 
 ## NEXT_DECISION
 
-Validate approved DLSS-001 v1.0.1 with `python3 scripts/check_project_governance.py --all-workstreams` and `python3 scripts/check_project_governance.py --workstream downloader-storage-safety --task-id DLSS-001` in a verified clean source checkout. Then prepare the minimal Downloader-only idle/stop/build/verified manual resume sequence, preserve the existing runtime UI, and conditionally perform one build + single-service promotion only if the fresh real CT108 capacity, worker, source, Compose and rollback gates all PASS. On uncertainty, report BLOCKED; no automatic restart, retry, cleanup or source-page probes.
+Verify v1.0.2 governance with `python3 scripts/check_project_governance.py --all-workstreams` and the DLSS-001 task-specific check in a verified clean branch. Perform **one** bounded operational-readiness checkpoint according to v1.0.2: current jobs/MP4/retry/process and other-build quiet, conservative actual free+reserve budget, approved staged source and exact local image identity, old-container restart path. Only after build-only GO may the authorized one Downloader-only maintenance stop and image build occur. Verify Docker daemon completion and inspect candidate UI SHA/manifest and detailed Compose/recreation rollback **after** build, before independent deployment GO. Any actual unsafe or ambiguous gate remains BLOCKED; no automatic restart, unrelated service changes, prune or download.
