@@ -1,5 +1,12 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-09 — Teddy approved maintenance-stop design A (CONTRACT v1.0.1)
+
+- **Explicit user decision:** `A로 진행 하자.. 빌드를 자주 하는 것도 아니고.. 빌드 할때만 다운로더를 멈추고 하면 될 것 같아.` This approves the small **Downloader-only stop → build → independently verify completion → explicit restart/promote** procedure for each infrequent build in place of the unfinished always-on host/runtime locking-and-auto-release framework. The shared-storage safety objective and conditional operational approval remain; active task stays `DLSS-001 / IN_PROGRESS`. Existing common contract, routing identity and all other workstream statuses remain unchanged.
+- **Operational boundaries:** Recheck actual zero active/queued/retrying downloads and MP4 processes, capacity+reserve, exact active image and 13 Compose inputs, held P08 UI baseline and rollback immediately before any service stop. The observed `unless-stopped` restart policy is supportive but still verify stopped state. Stop only `missav-dlp-web`; keep it stopped for the full image build and until daemon-side completion is positively confirmed. If build/CLI status is uncertain, leave it stopped and report `BLOCKED`, with no silent restart or automatic marker release. Do not run a build or stop in this documentation checkpoint.
+- **Candidate and scope:** Keep unproven `/tmp/dlss-001-candidate` automatic locks and durable marker as isolated history; do not ship these to production through this task. New build candidate must preserve the exact current runtime UI four-file SHA baseline and existing image/Compose services. Preserve three HLS error jobs, last-observed 1,395 TS fragments, all task/MP4 data, images and backups. No source-page probes, old job retry, deletion, Docker prune, other service action or P08 UI rollout.
+- **Next verification:** Contract bumped to `1.0.1 / APPROVED` for this user-selected A design. Run governance structural and DLSS-specific checks in a verified clean source checkout, then construct the minimal non-mutating maintenance preflight/rollback plan and seek actual CT108 gate PASS before the already-authorized single build and targeted deployment. Validation/build/deploy are `NOT_RUN` by this documentation checkpoint.
+
 ## 2026-11-09 10:27:48 KST — DLSS-001 durable-hold simulation PASS; production release unresolved
 
 - **Teddy-supplied Codex follow-up on `0662fb88c313b15a0b4f5395b8bb0cda26dcf0f6`:** `CODE=BLOCKED`, `BUILD_LIFETIME_GUARD=BLOCKED`, `CRASH_RECOVERY_TEST=BLOCKED`, `DOWNLOAD_MP4_LOCK=BLOCKED`, `FIRST_CUTOVER_PLAN=BLOCKED`, `DATA_PROTECTION=BLOCKED`, `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`; no new product GitHub commit. Isolated candidate remains `/tmp/dlss-001-candidate`, handoff drafts not canonical. Existing operating jobs were not modified and live 1,395 TS were not recounted.
@@ -51,7 +58,7 @@
 WORKSTREAM: downloader-storage-safety
 TASK_ID: DLSS-001
 STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.0
+CONTRACT_VERSION: 1.0.1
 REQUIRES_WORKSTREAMS: downloader-storage-safety
 
 ## OBJECTIVE
@@ -60,9 +67,9 @@ Prevent Downloader storage-guard failures from overlapping Docker builds and dow
 
 ## APPROVED_SCOPE
 
-- Inspect only relevant existing code and runtime capacity/reservation/build path; implement minimum cooperating build/download admission exclusion and required+reserve+build headroom checks.
-- Reuse the existing storage reservation and process locking where possible; keep downloads concurrency policy and globally single MP4 remux unchanged.
-- Implement an actual guarded Docker build path that cannot silently run simultaneously with normal Downloader download/remux admission; document any raw manual Docker bypass rather than claiming universal exclusion.
+- Verify relevant runtime capacity/reservation/queue/build path and implement only the minimal Downloader-only idle/stop/build/confirmed-completion/manual-resume maintenance procedure and required+reserve+build headroom checks.
+- Reuse existing reserve/lease and MP4 serialization policies without deploying the incomplete automatic shared-lock/marker prototype; keep download concurrency unchanged.
+- Guard the authorized Docker build operational path by verifying an idle state and keeping only Downloader stopped until build completion is independently confirmed; document unmanaged raw Docker-build bypass.
 - Build/run proportionate representative tests in an isolated clean checkout; one conditionally permitted build and targeted `missav-dlp-web`-only promotion if all live safety/image-delta/rollback gates PASS.
 - Record meaningful checkpoints immediately in this ACTIVE_WORK and the single existing canonical `CURRENT_HANDOFF.md`.
 
@@ -75,7 +82,7 @@ Prevent Downloader storage-guard failures from overlapping Docker builds and dow
 ## ACCEPTANCE_CRITERIA
 
 - Exact self-only DLSS-001 route + approved contract + active task pass structural governance and task-specific checks; prior workstreams and their task IDs remain unchanged.
-- Admission overlap and no-reserve-space cases fail closed in representative tests without affecting actual downloads or remux concurrency.
+- Idle-stop/build overlap, uncertain completion/manual restart and no-reserve-space cases fail closed in a small representative test without affecting actual downloads or MP4 policy.
 - One build and one service-only promotion only if clean image contents, current CT108 capacity+reserve, worker/process state, rollback and no held UI source changes are verified; separate BUILD/DEPLOY/PRODUCT PASS, BLOCKED or NOT_RUN.
 - No preexisting 1,395 TS fragments or task/NAS/Jellyfin user data modified; existing `DLHLS-001` incident recovery independently gated.
 
@@ -86,4 +93,4 @@ Prevent Downloader storage-guard failures from overlapping Docker builds and dow
 
 ## NEXT_DECISION
 
-Validate newly registered route with `python3 scripts/check_project_governance.py --all-workstreams` and `python3 scripts/check_project_governance.py --workstream downloader-storage-safety --task-id DLSS-001` in a verified clean source checkout. Then implement minimal admission/build guard, test, and conditionally deploy only if the live source, UI-delta, disk headroom and rollback gates are all PASS; otherwise report BLOCKED without retry or source-page probes.
+Validate approved DLSS-001 v1.0.1 with `python3 scripts/check_project_governance.py --all-workstreams` and `python3 scripts/check_project_governance.py --workstream downloader-storage-safety --task-id DLSS-001` in a verified clean source checkout. Then prepare the minimal Downloader-only idle/stop/build/verified manual resume sequence, preserve the existing runtime UI, and conditionally perform one build + single-service promotion only if the fresh real CT108 capacity, worker, source, Compose and rollback gates all PASS. On uncertainty, report BLOCKED; no automatic restart, retry, cleanup or source-page probes.
