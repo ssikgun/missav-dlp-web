@@ -1,5 +1,11 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-09 — DLSS-001 original Compose context still blocked by environment/interpolation
+
+- **Teddy's next real CT108 read-only diagnostic:** Docker Compose project label `missav-dlp-web`, working-directory label `/opt/missav-dlp-web` (`WORKING_DIR=PASS`), all 13 original Compose inputs `COMPOSE_FILES=PASS`. Even with those original `--project-directory`/`-p` arguments, `docker compose ... config -q` returned exit code 1; sanitized classifier produced `ERROR_CLASSES=['ENVIRONMENT','INTERPOLATION']`, stderr SHA256 `a4a548e6598800d7610c382735192ef93c46a35cad26b0fc7ada6f35e1a251c8`. Raw stderr and environment values were deliberately not exposed. The precise missing interpolation input or env-file condition is still **UNKNOWN**.
+- **Preserved gate:** `COMPOSE_CONTEXT_VALIDATION=BLOCKED`, `FIRST_CUTOVER_GATE=BLOCKED`, `ROLLBACK_READY=BLOCKED`, `DOWNLOADER_STOP=NOT_RUN`, `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`; active `missav-dlp-web` remains running. The preceding image and 13-file existence checks PASS but do not substitute for an exact effective Compose configuration or restore path.
+- **Next bounded read-only check:** Run the same pinned 13-file Compose validator using `config --no-interpolate --no-env-resolution -q` to distinguish structural-file failure from unavailable current interpolation/environment inputs; inspect only required variable **names/presence**, not values or rendered `--environment` output. Determine the previously authorized original Compose env-input invocation without extracting runtime container secrets or inventing credentials. If unavailable, keep maintenance build/deployment blocked; no file mutation, container stop, new build or workaround with guessed environment variables.
+
 ## 2026-11-09 — DLSS-001 A maintenance preflight: 13 Compose files present, merged validation BLOCKED
 
 - **Teddy's actual `root@downloader` read-only output after v1.0.1 approval:** running `missav-dlp-web` image `sha256:ebd164d631450660b79ca29141a3b8c317f71df443b2d209feec51a8a35c000a` matched the pinned operating baseline; restart policy `unless-stopped`; local exact image lookup `ROLLBACK_IMAGE_EXISTS=PASS`. Compose label contained exactly **13** file paths, all `PRESENT` regular non-symlink inputs (`COMPOSE_FILES=PASS`). All services and existing data remained untouched.
