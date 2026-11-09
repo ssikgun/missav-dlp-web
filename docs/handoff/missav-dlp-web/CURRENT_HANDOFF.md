@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-09 13:21:39 KST — DLFR-001 atomic new-record wrapper fixtures PASS; full API still BLOCKED
+
+- **Codex report against canonical `10ce37019d9eeaf72e069b7ba6313806c84a79db`:** `ROUTING=PASS` (two governance checks). Only a new-task safe-save/queue wrapper was added to isolated `/tmp/dlfr-001-candidate`; the `POST /api/tasks/<failed_id>/retry-fresh` endpoint is **not connected** and `CODE=BLOCKED`.
+- **Scope of PASS:** bounded fixtures for successful new-job admission, state-save failure, queue insertion failure and partial queue insertion failure proved recovery of preexisting in-memory and on-disk task maps and queue within that isolated fixture. This is **not** an end-to-end API PASS or live crash/restart proof. `NEW_TASK_ATOMICITY=BLOCKED` until full route integration.
+- **Not run / not verified:** authenticated CSRF action, two concurrent requests for the same failed source, normal `/download` duplicate behavior, dynamic actual-output filename collisions locally and via SSH NAS, full live original-state audit and TS count. Prior CT108 1,395 TS observation remains historical; do not claim it was recounted by this run. `UI_ISOLATION=PASS` for no UI source changes; `BUILD/DEPLOY/DOWNLOAD=NOT_RUN`.
+- **Candidate provenance:** isolated partial patch `/tmp/dlfr-001-partial-atomic.patch`, SHA-256 `a69ff26b872a9883d2d56a70e5bfb58e22769e771a44ee182f422db38841b18f`. No product-code GitHub commit or CT108 changes. The local candidate is **not deployable**.
+- **Next bounded approved step:** Reuse the already-tested new-record transaction in the existing protected admin/API route; add a single authenticated + CSRF explicit fresh-ID HLS action, per-parent concurrency and active-child/ownership/reserve gates, and current extracted-filename local/NAS no-overwrite check before any media output. Run one representative integrated success case plus auth, CSRF, concurrency, duplicate, collision and a rollback regression; preserve original job and 1,395 TS. If a guard requires unapproved generic runtime changes, stop and report the specific contract conflict. No build, promotion, source probe, original-ID retry or network download.
+
 ## 2026-11-09 12:19:34 KST — DLFR-001 first implementation attempt blocked at new-ID atomic queue admission
 
 - Codex on `602534deb2f759a25f0f75763a0d34658e5f9fd9` confirmed `ROUTING=PASS` but `CODE=BLOCKED`, no code commit, no offline/auth/duplicate/original-protection/UI tests, and no Docker build/deploy/download. Isolated unfinished candidate: `/tmp/dlfr-001-candidate` (not deployable).
