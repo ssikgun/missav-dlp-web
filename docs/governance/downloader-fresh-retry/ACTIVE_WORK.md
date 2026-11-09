@@ -1,5 +1,12 @@
 # Downloader explicit fresh-identity HLS retry API — active work
 
+## 2026-11-09 — DLFR-001 / DLSS-001 CT108 final pre-promotion read-only gate PASS (DEPLOY NOT RUN)
+
+- **Direct Teddy CT108 result:** `FINAL_PREFLIGHT=PASS`, `OLD_CONTAINER=STILL_STOPPED`, `DEPLOY=NOT_RUN`. Exact existing container/image and 13 Compose inputs stayed unchanged. `CONTAINER_NAME=PASS`, `COMMAND=PASS`, `ENTRYPOINT=PASS`, `DEPENDENCIES=PASS`, `NETWORK_ALIASES=PASS`, `OLD_IMAGE_RESTORE_SOURCE=PASS`, `DISK_RESERVE=PASS`; previous normalized environment, group GID 988, mount core (14), bind options (14), port bindings (1), network names (1), new/old inherited image runtime config, and four held-UI SHA baselines passed.
+- **Deployment decision outstanding:** One image-only `missav-dlp-web` recreation under the same verified 13 Compose files with a persistent, explicit image-only override for candidate `dlfr001-fresh-api-candidate:20261109-1709` (image ID `sha256:b31b0b4dd106abf19d3394b5d703391a7ea522151ae61622ec53b6a1c7b2d7a4`) is **proposed**, not executed. It would replace the currently stopped old container, while preserving the exact old image `sha256:ebd164d631450660b79ca29141a3b8c317f71df443b2d209feec51a8a35c000a` and the 13 original Compose inputs. Rollback plan: explicitly recreate only Downloader from original 13-file Compose old image, without unrelated service recreation or volume deletion, after grounded environment context and safety checks. No automatic rollback, no new download.
+- **GO boundary:** Ask Teddy for separate explicit service-only promotion approval; no deployment command before it. After GO, verify old stop, candidate ID, disk reserve and other services again; stage image-only override without changing held UI inputs; render and compare full effective service config with image as sole permitted difference; perform one `--no-deps` targeted recreation; verify health/source/UI and protected task/TS state; if error, stop and follow approved manual restore. `P08LIB-001` UI HOLD and separate `DLHLS-001` live trial remain unchanged. Technical validation PASS is not production behavior PASS.
+
+
 ## 2026-11-09 — DLFR-001 full image config and detailed port/network/bind checks PASS (NO PROMOTION)
 
 - **Direct Teddy CT108 read-only result:** `IMAGE_CONFIG_DIFFERENCES=[]`; all selected inherited image runtime config fields (user, env, working directory, entrypoint, cmd, exposed ports, volumes, health, stop signal, shell, labels) identical between exact old image and candidate. `IMAGE_RUNTIME_CONFIG=PASS`.
