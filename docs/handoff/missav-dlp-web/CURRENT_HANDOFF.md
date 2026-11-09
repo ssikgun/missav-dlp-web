@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-09 — DLFR-001 CT108 image-only Compose release staging PASS (NO DEPLOY)
+
+- **Direct Teddy CT108 result:** `OLD_CONTAINER=PASS`, `IMAGE_IDENTITIES=PASS`, `ORIGINAL_COMPOSE=PASS`, `IMAGE_ONLY_SCOPE=PASS`, `DISK_RESERVE=PASS`, `SAVED_OVERRIDE=PASS`, `STAGE=PASS`, `OLD_CONTAINER=STILL_STOPPED`, `DEPLOY=NOT_RUN`.
+- **Pinned image-only override:** `/opt/missav-dlp-web/backups/dlfr001-api-release-b31b0b4d/compose-image-only.yml`, SHA256 `501344b65d7a36c0d3f180eeec2e406242519b94afbd55946584f8f97b890027`. The staged command strictly created this new private file, preserving all 13 original Compose files. The parsed 14-file model equaled the parsed original 13-file model with **only** selected Downloader service `image` replaced by `dlfr001-fresh-api-candidate:20261109-1709` (`sha256:b31b0b4dd106abf19d3394b5d703391a7ea522151ae61622ec53b6a1c7b2d7a4`). No runtime service recreation yet.
+- **Next explicitly approved action:** Recheck old container exact stopped identity, override SHA, candidate image ID, Compose-only image diff, reserve and unrelated service baseline. Run one target-only `docker compose ... -f <verified override> up -d --no-deps --no-build --pull never --force-recreate <service>`. Immediately verify candidate image and runtime health, mounts, environment, network/port config and unrelated containers; keep old exact image/13 original Compose inputs for explicit manual rollback on any ambiguity. Do not use `down`, `prune`, `-v`, automatic rollback, resume/retry old jobs, or promote P08 UI.
+
+
 ## 2026-11-09 — Teddy explicit GO for DLFR-001 image-only Downloader promotion (NOT YET EXECUTED)
 
 - **Operator decision:** Teddy explicitly replied `응 승인해` after receiving `FINAL_PREFLIGHT=PASS` evidence and a plan for one `missav-dlp-web`-only image recreation, rollback to exact old image and original 13 Compose inputs, no other service, no media mutation, no old HLS retries, and no P08LIB UI release.
