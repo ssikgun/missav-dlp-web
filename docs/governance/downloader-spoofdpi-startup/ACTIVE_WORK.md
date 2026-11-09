@@ -1,5 +1,11 @@
 # Downloader SpoofDPI headless startup — active work
 
+## 2026-11-10 — DLSPD-001 CT108 read-only deployment capacity/data baseline PASS (NO STOP)
+
+- **Teddy direct CT108 result:** hostname `downloader`, current container ID `62ddcadf45be7a72f121c71802ddc10ada0beab849b7582568d2bee92147099c`, live image `sha256:b31b0b4dd106abf19d3394b5d703391a7ea522151ae61622ec53b6a1c7b2d7a4`, old original image `sha256:ebd164d631450660b79ca29141a3b8c317f71df443b2d209feec51a8a35c000a` both available. All 13 tasks unchanged (10 complete, 3 failed, 0 busy), failed parts count 0+72+1323 = 1,395; running `/app/teddy_spoofdpi.py` SHA256 `ba0a04d5ef952a1b388242154d50daf857a1347508ae39633292c6291d8534ac` matches current pre-fix source.
+- **Rollback and storage:** `/opt/missav-dlp-web/backups/dlfr001-api-release-b31b0b4d/rollback-manifest.json` present; free `41004101632` B (~38.2 GiB), reserve `5254478438` B and one-build budget `8589934592` B passed. Four containers running: `missav-dlp-web`, `gluetun-missav` healthy, `missav-vpn-browser-selkies`, `missav-vpn-browser-mobile-selkies`; their reported short IDs are 62ddcadf45be, 8a66f78e5ff0, c4863d2f00e9, 6c79fd989f56. This is a time-bound snapshot only.
+- **Next:** extract one pinned committed source file to a new isolated private staging directory while current Downloader remains running, verify file SHA256 and provenance; then recheck latest live workers/FFmpeg and stop only Downloader for the offline image build, preserving other container identities and the full rollback. `READ_ONLY_PREFLIGHT=PASS`, `DOWNLOADER_STOP=NOT_RUN`, `IMAGE_BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`, `DOWNLOAD=NOT_RUN`.
+
 ## 2026-11-10 — DLSPD-001 governance CI PASS and one-file headless source candidate committed (NO BUILD)
 
 - **Registration:** atomic governance-only commit `c3c41995af3ac36526f06e246eb8c53f01f3f062` added this narrow route, approved v1.0.0 contract, active task and governance checkpoint. GitHub Actions `Project Governance` run `42719743215` completed `success`, including `Validate governance metadata and scope` and `Run offline governance smoke checks`. Existing routes/P08 UI hold preserved.
