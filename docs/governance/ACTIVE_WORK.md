@@ -62,6 +62,17 @@ AREA_HINTS:
 - Only the three failed HLS downloads recorded on 2026-11-07 and their one guarded, separate-identity recovery trial.
 - This narrow incident route takes precedence over the generic downloader route for those jobs only. All other downloads, generic product code, shared queue changes, UI, Writer, Stage9 and Stage11 remain under existing workstream approval.
 
+## WORKSTREAM: downloader-storage-safety
+
+STATUS: IN_PROGRESS
+TASK_ID: DLSS-001
+CONTRACT_PATH: docs/governance/downloader-storage-safety/PROJECT_CONTRACT.md
+ACTIVE_WORK_PATH: docs/governance/downloader-storage-safety/ACTIVE_WORK.md
+AREA_HINTS:
+- Only generic shared-filesystem admission safety between Docker image build and Downloader downloads/MP4 remux, with existing space reservations and no-overwrite rules preserved.
+- Narrow prevention scope takes precedence over generic downloader routing for the specific build-vs-download disk-contention gate only; it does not reroute ordinary download functionality, the DLHLS-001 three-job recovery, the P08LIB-001 UI, Writer, Stage9 or Stage11.
+- Operational build/deploy is conditional on exact image content, competing activity, capacity+reserve, rollback and no unrelated UI promotion.
+
 ## WORKSTREAM: discovery-writer-safety
 
 STATUS: IN_PROGRESS

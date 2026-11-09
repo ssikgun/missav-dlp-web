@@ -1,5 +1,14 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-09 — DLSS-001 registered: Docker-build vs Downloader shared-storage prevention
+
+- **User authorization:** On 2026-11-09 Teddy approved the new independent `downloader-storage-safety / DLSS-001` route, preserving `DLHLS-001` three-job recovery and four-way `P08LIB-001` UI HOLD. Earlier explicit user message also approved code changes and conditional operating deployment toward resolving shared-storage failures.
+- **GitHub documentation-only registration:** `docs/governance/ACTIVE_WORK.md` adds one self-only DLSS-001 entry; new `docs/governance/downloader-storage-safety/PROJECT_CONTRACT.md` v1.0.0 APPROVED and `ACTIVE_WORK.md` DLSS-001 IN_PROGRESS contain the exact scope. No original task IDs/contracts changed and no existing app code, Docker, running services, .parts/TS, DB, NAS/Jellyfin or UI changed.
+- **Purpose:** Protect against competing Docker image builds and Downloader download/MP4 remux reservations on the same CT108 `/dev/loop4` filesystem. Reuse `teddy_download_safety.py` lease/required+reserve/serial MP4 guards; do not reimplement or weaken them. Record any unmanaged raw `docker build` bypass. Code/test/build/deploy PASS is not presumed by registration.
+- **Gates:** Codex may implement narrowly scoped safeguards only after exact route and clean worktree checks; one production build and target Downloader-only cutover are conditional on current capacity+reserve+build headroom, no conflicting processes, a rollback point and no held/unapproved P08LIB UI delta in image. If any uncertainty, STOP. Original 1,395 last-verified TS and three HLS jobs protected; incident recovery still separately gated by DLHLS-001.
+- **Next:** validate governance `--all-workstreams` and `--workstream downloader-storage-safety --task-id DLSS-001`, then minimum implementation/test/candidate build with conditional promotion; update the same handoff after each meaningful milestone.
+
+
 ## 2026-11-09 — DLHLS-001 remediation and prevention approved in principle; implementation routing gated
 
 - **New direct user authorization:** In response to the storage/three-job read-only preflight, Teddy requested the next task and explicitly stated `코드 변경, 운영 적용까지 모두 승인할께` (approves code changes and operational application for this remediation/prevention objective). Scope is **resolve the three 2026-11-07 failed HLS downloads safely and prevent a recurrence of Docker-build versus Downloader shared-storage pressure**; this is not blanket permission for unrelated source, Stage9, Writer, Stage11, UI, Docker cache deletion, media deletion or NAS overwrite. Preserve the last-verified 1,395 TS fragments, original job IDs/manifests/error state, existing MP4 one-at-a-time rule and no-overwrite rules.
