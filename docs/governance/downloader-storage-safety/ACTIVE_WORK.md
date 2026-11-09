@@ -1,5 +1,11 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-09 — DLSS-001 A maintenance preflight: 13 Compose files present, merged validation BLOCKED
+
+- **Teddy's actual `root@downloader` read-only output after v1.0.1 approval:** running `missav-dlp-web` image `sha256:ebd164d631450660b79ca29141a3b8c317f71df443b2d209feec51a8a35c000a` matched the pinned operating baseline; restart policy `unless-stopped`; local exact image lookup `ROLLBACK_IMAGE_EXISTS=PASS`. Compose label contained exactly **13** file paths, all `PRESENT` regular non-symlink inputs (`COMPOSE_FILES=PASS`). All services and existing data remained untouched.
+- **STOP CONDITION:** `docker compose -f <13 original label files> config -q` returned nonzero, so `COMPOSE_VALIDATION=BLOCKED` and the wrapper exited before filesystem/disk checks or any service stop/build. The script intentionally did not display Docker Compose stderr; the root cause is **UNKNOWN**, not proven missing files or invalid YAML. Possible original working directory/project environment arguments must be verified, not guessed. `ROLLBACK_RESTORE=NOT_TESTED`, `FIRST_CUTOVER_GATE=BLOCKED`, `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`.
+- **Next bounded read-only diagnosis:** Examine live Compose project-name/working-directory labels and classify the validation error without displaying env values, secrets or complete rendered configuration. Determine and validate the exact original Compose invocation; if matching context is unavailable, keep A maintenance stop and any image promotion blocked. Do not modify the 13 files, change their order, use alternate Compose inputs, stop Downloader, prune or retry jobs. Preserve current active image/rollback and held P08 UI.
+
 ## 2026-11-09 — Teddy approved maintenance-stop design A (CONTRACT v1.0.1)
 
 - **Explicit user decision:** `A로 진행 하자.. 빌드를 자주 하는 것도 아니고.. 빌드 할때만 다운로더를 멈추고 하면 될 것 같아.` This approves the small **Downloader-only stop → build → independently verify completion → explicit restart/promote** procedure for each infrequent build in place of the unfinished always-on host/runtime locking-and-auto-release framework. The shared-storage safety objective and conditional operational approval remain; active task stays `DLSS-001 / IN_PROGRESS`. Existing common contract, routing identity and all other workstream statuses remain unchanged.
