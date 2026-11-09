@@ -1,5 +1,12 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — DLHLS-001 SpoofDPI startup failure proven: EARLY_EXIT code 1 (NO RETRY)
+
+- **Teddy CT108 correct-host result:** new-image Downloader still running; original five-minute startup window had 203 log lines and exactly one SpoofDPI event: `EVENT=EARLY_EXIT EXIT_CODE=1`. Actual `/app/app.py` has SpoofDPI startup call, PID1 runs `teddy_bootstrap.py`, `HEALTH_ONLY_MODE=False`. Thus the normal startup **attempted** SpoofDPI and the spawned helper **exited within its first two seconds with status 1**, explaining zero process and closed port observed later.
+- **Unresolved:** specific cause of the helper exit remains **UNKNOWN** because existing diagnostic line's already-redacted `output=` detail was not printed. Next read-only step: extract only sanitized bounded output portion from the *same startup log event* (no external request, restart or service mutation); then decide if a targeted authorized repair is needed. Direct TLS `SSLError`, current source viability, full required bytes, title/SSH destination ownership remain unproven.
+- **Safety:** `SERVICE_RESTART=NOT_RUN`, `RETRY_POST=NOT_RUN`, `DOWNLOAD=NOT_RUN`, `TRIAL_GO=BLOCKED`. Three original failed tasks/1,395 TS protected; no changes to unrelated pipelines.
+
+
 ## 2026-11-10 — DLHLS-001 SpoofDPI runtime/binary inspection: configured but absent (NO RETRY)
 
 - **Teddy CT108 read-only output:** persisted `.settings.json` reports `SPOOFDPI_SETTING_ENABLED=True`; `spoofdpi` executable present and executable; `SPOOFDPI_PROCESS_COUNT=0`; `SPOOFDPI_LISTENER=CLOSED` at loopback:8080; `CURL_CFFI_VERSION=0.17.0`. Sanitized `docker logs --tail 1000` produced `SPOOFDPI_LOG_EVENTS=0`; this is a bounded tail window, **not** proof startup never logged or never attempted the helper.
