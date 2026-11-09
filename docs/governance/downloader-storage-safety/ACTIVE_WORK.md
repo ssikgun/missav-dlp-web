@@ -1,5 +1,12 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-09 — DLFR-001 candidate image source/UI post-build verification PASS (NO PROMOTION)
+
+- **Direct Teddy CT108 result:** `docker run --rm -i --pull=never --network=none --read-only` image-inspection check verified `/app/app.py`, `/app/teddy_entrypoint.py`, `/app/teddy_downloader_admin.py`, `/app/templates/index.html`, `/app/templates/teddy-library.css`, `/app/templates/teddy-library.js`, `/app/templates/teddy-subtitle-status.css` against exact approved old-UI/new-API SHA baselines: `SOURCE_AND_UI_HASH=PASS`. No held `P08LIB-001` UI bytes in these checked runtime files. The first probe's `app.py: path count 2` was a validator ambiguity from name-only recursive search, resolved by exact runtime paths; no source/image defect was shown by that probe.
+- **Build completion and space:** `docker buildx history ls` showed the newest `dlfr-image-plan-57839` build ID `yzn9kenwn99lssrybh7ran7ry` as `Completed` (1.1s); `df -h /opt/missav-dlp-web` reported `/dev/loop4 98G 57G 37G 61%`; `DISK_RESERVE=PASS`. Existing `missav-dlp-web` remained `exited`; `OLD_CONTAINER=STILL_STOPPED`, `DEPLOY=NOT_RUN`, `IMAGE_VERIFICATION=PASS`.
+- **NEXT:** verify exact effective 13-file Docker Compose settings (project, service, Writer GID 988, env presence/equality without exposing values, full mounts/network/port/runtime options), concrete old-image restoration and targeted new-image-only recreation. Maintain original stopped container and old image until separate deployment GO. No live download/retry, data cleanup, Docker prune, UI/Stage9/Writer change.
+
+
 ## 2026-11-09 — DLFR-001 / DLSS-001 CT108 candidate image build succeeded (NO PROMOTION)
 
 - **Evidence:** Teddy pasted direct CT108 `root@downloader` build output. Existing `missav-dlp-web` stayed exited with PID 0 and exact old image `sha256:ebd164d631450660b79ca29141a3b8c317f71df443b2d209feec51a8a35c000a`; guarded local base tag matched it. Pre-build PLAN/Dockerfile SHA checks matched `5d1b338c924a41e5b19f3e280b63074c67dc66979380dab288e2d62657ae5789` / `afe215bdf70d39676d6cf43043637768632b3b5c9f27a3011d50264e65dde887`; three Python overlays matched canonical pinned SHA values. Remaining manifest and two admin smoke files were present, regular, non-symlinks.
