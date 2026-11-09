@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-09 — DLFR-001 API-only Downloader service promotion applied PASS (POST-DEPLOY SMOKE PENDING)
+
+- **Direct Teddy CT108 output:** `PRE_DEPLOY_IDENTITY=PASS`, `OVERRIDE_INTEGRITY=PASS`, `IMAGE_ONLY_SCOPE=PASS`, `DISK_RESERVE=PASS`, `ROLLBACK_MANIFEST=PASS`, then one approved `docker compose ... -f <image-only-override> up --detach --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 60 <Downloader service>`. `COMPOSE_UP=PASS`, `NEW_CONTAINER_RUNNING=PASS`, `RUNTIME_PARITY=PASS`, `OTHER_CONTAINER_IDENTITIES=PASS`, `DEPLOY_APPLY=PASS`, `DOWNLOAD_TEST=NOT_RUN`, `OLD_IMAGE_PRESERVED=PASS`.
+- **New runtime:** container ID `62ddcadf45be7a72f121c71802ddc10ada0beab849b7582568d2bee92147099c`, image ID `sha256:b31b0b4dd106abf19d3394b5d703391a7ea522151ae61622ec53b6a1c7b2d7a4`, `NEW_CONTAINER_HEALTH=NO_HEALTHCHECK`. Existing service runtime user/group/restart/ports/network/mounts matched the prior container, and other container identities stayed unchanged.
+- **Rollback inputs:** private original Compose-order and SHA manifest `/opt/missav-dlp-web/backups/dlfr001-api-release-b31b0b4d/rollback-manifest.json`; image-only override same directory SHA256 `501344b65d7a36c0d3f180eeec2e406242519b94afbd55946584f8f97b890027`; preserved original image `sha256:ebd164d631450660b79ca29141a3b8c317f71df443b2d209feec51a8a35c000a`. Old stopped container was replaced by the target recreation; recovery means manual **old-image recreation** using original 13 inputs, not restarting the deleted old container. No automatic rollback.
+- **Effective status:** `DEPLOY_APPLY=PASS` only, `WEB/API_SMOKE=NOT_RUN`, `PROTECTED_DATA_RECHECK=NOT_RUN`, `PRODUCT_PASS=NOT_YET`. Next run bounded read-only current HTTP/route check and actual 13 jobs/three original protected TS inventories, without POST/retry/download. `P08LIB-001` UI HOLD and `DLHLS-001` real trial independent.
+
+
 ## 2026-11-09 — DLFR-001 CT108 image-only Compose release staging PASS (NO DEPLOY)
 
 - **Direct Teddy CT108 result:** `OLD_CONTAINER=PASS`, `IMAGE_IDENTITIES=PASS`, `ORIGINAL_COMPOSE=PASS`, `IMAGE_ONLY_SCOPE=PASS`, `DISK_RESERVE=PASS`, `SAVED_OVERRIDE=PASS`, `STAGE=PASS`, `OLD_CONTAINER=STILL_STOPPED`, `DEPLOY=NOT_RUN`.
