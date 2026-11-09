@@ -1,5 +1,12 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — DLHLS-001 SORA-489 exact-host metadata probe SOURCE_PAGE_BLOCKED (NO RETRY)
+
+- **Direct Teddy CT108 output:** bounded in-container `curl_cffi.requests.get` probe attempted saved `https://missav123.com/.../sora-489` first via existing local SpoofDPI HTTP proxy 127.0.0.1:8080 and then directly (both within Downloader runtime routing). It required HTTP 200, at most 2 MiB body, and a `seek` marker. Final `AssertionError: SOURCE_PAGE_BLOCKED` fired before any video UUID/master/variant playlist/segment HEAD request.
+- **Evidence limit:** the probe swallowed individual HTTP statuses and exception class, so cannot distinguish HTTP redirect, 403/WAF, empty/changed page, unavailable proxy or unsupported curl_cffi impersonation; current upstream source viability and required full size remain **UNPROVEN**. No new job ID, fresh retry POST, TS media body download, NAS write, MP4, source files or protected task/TS mutation occurred by this probe.
+- **Status:** `LOCAL_PREFLIGHT=PASS` remains the preceding local snapshot; `SOURCE_PAGE=BLOCKED`, `FULL_REQUIRED_BYTES=UNKNOWN`, `TRIAL_GO=BLOCKED`, `RETRY_POST=NOT_RUN`. Next bounded read-only diagnostics should surface only sanitized status/error classes and local proxy readiness for exact source and, if justified, one configured native mirror. Do not broaden to all mirrors/attempts or enqueue a live retry until all DLHLS gates clear.
+
+
 ## 2026-11-09 — DLHLS-001 SORA-489 fresh local trial preflight PASS; source/size still blocked
 
 - **Direct Teddy CT108 read-only output:** `TASK_STATE=PASS`, `BUSY_TASKS=0`; source job UUID `4adb423e-5be0-4560-b113-3eef5df6f19b`, saved SORA-489 URL identity/failed custom-HLS state PASS, persisted saved route `vpn`, zero original TS, protected old `resume-plan.json` SHA256 `23bb92ff483ef6cc9e57dcdf6562d655c2d3973583d997c07207b6ac01d5afb2`; all three original failure parts counts still 0+72+1323=1395. Saved `total_bytes_estimate=0` means unknown requirement, not zero-size media.
