@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-09 — Teddy approved one guarded SORA-489 live fresh-ID retry trial; preflight still required
+
+- **Direct user question/decision:** After `DLFR-001` API-only release `DEPLOY_APPLY=PASS` and read-only smoke `POST_DEPLOY_SMOKE=PASS`, Teddy asked whether the three original failures are retry-ready and said `재시도 시험 승인 할께`. Interpret within the approved `DLHLS-001 v1.0.0` scope as authorization to prepare **one** deliberate isolated zero-TS SORA-489 new-identity live trial, not simultaneous retry of all 3 jobs. The original 3 records, 1,395 TS and old playlist-plan SHA guards remain protected.
+- **Important gate:** Deployed fresh retry endpoint exists in `DLFR-001` source and offline tests passed, but its production authenticated/CSRF POST has **never been exercised**; sending it immediately enqueues a real download. SORA-489's saved `total_bytes_estimate=0` means required full download+MP4 space is **unknown**. Before any POST/network/write, freshly verify persisted source/current source identity, no collision/ownership on local+canonical SSH NAS, full required space plus unchanged reserve, idle workers/MP4, user request authorization and exact single-trial scope. An unquantified required size or uncertain source/worker must remain `TRIAL_GO=BLOCKED`, not be waived by the approval.
+- **Current execution:** `TRIAL_PREFLIGHT=NOT_RUN`, `RETRY_POST=NOT_RUN`, `DOWNLOAD=NOT_RUN`, `NAS_WRITE=NOT_RUN`. Next one bounded CT108 **read-only local** inventory of current job/plan/queue/reservation and capacity; then decide whether a separate bounded source/size viability probe can establish real required capacity. Do not re-run DLFR build/deploy, change UI/queue, or use old same-ID retry.
+
+
 ## 2026-11-09 — DLFR-001 API-only release post-deploy read-only smoke PASS (NO LIVE RETRY)
 
 - **Direct Teddy CT108 verification:** `TASK_COUNT=13`, `COMPLETED=10`, `PROTECTED_ERRORS=3`, `BUSY_TASKS=0`; original three failed jobs' parts directories had `PROTECTED_TS_COUNTS=[0,72,1323]`, `PROTECTED_TS_TOTAL=1395`, `TASK_AND_TS_STATE=PASS` (count/identity check, **not** content hash of every TS). No original HLS job was retried or resumed by this test.
