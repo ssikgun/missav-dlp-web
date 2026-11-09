@@ -1,5 +1,12 @@
 # Downloader SpoofDPI headless startup — active work
 
+## 2026-11-10 — DLSPD-001 governance CI PASS and one-file headless source candidate committed (NO BUILD)
+
+- **Registration:** atomic governance-only commit `c3c41995af3ac36526f06e246eb8c53f01f3f062` added this narrow route, approved v1.0.0 contract, active task and governance checkpoint. GitHub Actions `Project Governance` run `42719743215` completed `success`, including `Validate governance metadata and scope` and `Run offline governance smoke checks`. Existing routes/P08 UI hold preserved.
+- **Code-only commit:** `ca2e5236636d72884241d604df207c256182b3b3` updated exactly `teddy_spoofdpi.py`: `popen(["spoofdpi"], ...)` -> `popen(["spoofdpi", "--no-tui"], ...)`, plus matching docstring. GitHub source readback exact candidate match, new Git blob `afdbae9fb569507973c286a8c34983834a79b7a0` and local Python file SHA256 `4c47ddafe6dcb7c478a47ac711c7c3ef7afcad0cde6c6e176d5a49ac30a1792b`; one-line source delta, `+13` bytes.
+- **Offline checks:** `python3 -m py_compile` PASS and two mocked startup paths `START_ALIVE HEADLESS_ARGV` and `EARLY_EXIT HEADLESS_ARGV` PASS with preserved `stdout=PIPE`, `stderr=STDOUT`, and startup diagnostics. No real SpoofDPI instance or network test; `SOURCE_SMOKE=PASS`, `EXTERNAL_NETWORK=NOT_RUN`, `DOCKER_IMAGE_BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`, `DOWNLOAD=NOT_RUN`.
+- **Next:** CT108 fresh read-only no-active-download/remux, full 13-job protected baseline, space reserve/build headroom, Gluetun/Selkies identity, no competing builder and current DLFR image check; then only if PASS stop just Downloader and extract pinned `teddy_spoofdpi.py` to an isolated build context without modifying the protected dirty checkout. One offline image-derived candidate and image-only Docker Compose promotion on confirmed parity. No SORA-489 POST.
+
 WORKSTREAM: downloader-spoofdpi-startup
 TASK_ID: DLSPD-001
 STATUS: IN_PROGRESS
