@@ -1,5 +1,12 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-09 — DLFR-001 / DLSS-001 post-build Compose preliminary parity PASS (NO PROMOTION)
+
+- **Direct Teddy CT108 read-only check:** old `missav-dlp-web` still `exited`, exact old image; all 13 original Compose paths present as regular non-symlinks, project and working directory matched. Writer numeric GID `988` confirmed from existing container; full Compose model rendered in subprocess-only environment with the existing nonsecret origin value held in memory. No env values printed.
+- **Observed matching fields:** `COMPOSE_OLD_IMAGE=PASS`, `RESTART_POLICY=PASS`, `USER=PASS`, `GROUP_ADD=PASS`, `ENV_PARITY=PASS`, `MOUNT_CORE_PARITY=PASS` (14 mounts). `COMPOSE_PRELIMINARY=PASS`. `DETAILED_NETWORK_PORT_OPTIONS=NOT_YET_CHECKED`; do not equate this core-tuple comparison with complete runtime option parity or `ROLLBACK_READY`.
+- **NEXT:** compare image runtime config inherited by candidate, effective port bindings, network settings/aliases and detailed mount/host options without exposing secrets. Then establish exact single-service image-only promotion and old-image rollback procedure; separate user GO required. No deployment, restart or download; P08 UI HOLD and DLHLS trial separate.
+
+
 ## 2026-11-09 — DLFR-001 candidate image source/UI post-build verification PASS (NO PROMOTION)
 
 - **Direct Teddy CT108 result:** `docker run --rm -i --pull=never --network=none --read-only` image-inspection check verified `/app/app.py`, `/app/teddy_entrypoint.py`, `/app/teddy_downloader_admin.py`, `/app/templates/index.html`, `/app/templates/teddy-library.css`, `/app/templates/teddy-library.js`, `/app/templates/teddy-subtitle-status.css` against exact approved old-UI/new-API SHA baselines: `SOURCE_AND_UI_HASH=PASS`. No held `P08LIB-001` UI bytes in these checked runtime files. The first probe's `app.py: path count 2` was a validator ambiguity from name-only recursive search, resolved by exact runtime paths; no source/image defect was shown by that probe.
