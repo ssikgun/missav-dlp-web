@@ -1,5 +1,11 @@
 # Downloader SpoofDPI headless startup — active work
 
+## 2026-11-10 — DLSPD-001 CT108 private one-file source stage PASS (NO STOP/BUILD)
+
+- **Teddy CT108 operation:** Private staging directory `/opt/missav-dlp-web/backups/dlspd001-headless-tAZ957uv`, sourced by `docker cp` only from current running Downloader's `/app/teddy_spoofdpi.py`. Input source SHA256 `ba0a04d5ef952a1b388242154d50daf857a1347508ae39633292c6291d8534ac`; exact single call edit and docstring correction produced verified staged output SHA256 `4c47ddafe6dcb7c478a47ac711c7c3ef7afcad0cde6c6e176d5a49ac30a1792b`, byte-identical to GitHub `ca2e5236` source.
+- **Transparent failed first check:** First source-staging copy remained unmodified because a prior ChatGPT command mistakenly omitted two SHA hex characters (`c3`) from the expected 64-char new digest, causing fail-before-write. Teddy ran corrected exact digest (`len=64`) and got `ORIGINAL_SOURCE=PASS`, `HEADLESS_PATCH=PASS`, `GITHUB_SOURCE_HASH=PASS`, `SOURCE_STAGE=PASS`. No service/source/binary runtime mutation from this staging step.
+- **State:** `DOWNLOADER_STOP=NOT_RUN`, `IMAGE_BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`, `DOWNLOAD=NOT_RUN`. Next conditional gated maintenance stop/one local-base offline Docker candidate build; preserve existing live image, rollback and all protected job/TS data. No source-page GET or real retry.
+
 ## 2026-11-10 — DLSPD-001 CT108 read-only deployment capacity/data baseline PASS (NO STOP)
 
 - **Teddy direct CT108 result:** hostname `downloader`, current container ID `62ddcadf45be7a72f121c71802ddc10ada0beab849b7582568d2bee92147099c`, live image `sha256:b31b0b4dd106abf19d3394b5d703391a7ea522151ae61622ec53b6a1c7b2d7a4`, old original image `sha256:ebd164d631450660b79ca29141a3b8c317f71df443b2d209feec51a8a35c000a` both available. All 13 tasks unchanged (10 complete, 3 failed, 0 busy), failed parts count 0+72+1323 = 1,395; running `/app/teddy_spoofdpi.py` SHA256 `ba0a04d5ef952a1b388242154d50daf857a1347508ae39633292c6291d8534ac` matches current pre-fix source.
