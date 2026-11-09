@@ -1,5 +1,12 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-09 — DLSS-001 CT108 disk and idle task snapshot (NO MAINTENANCE STOP)
+
+- **Teddy's read-only observation:** Current running image sha256:ebd164d631450660b79ca29141a3b8c317f71df443b2d209feec51a8a35c000a with unless-stopped, docker top only python process. TASK_COUNT=13, BUSY_TASK_COUNT=0, MP4_QUEUE_JSON=0 and preserved historical HLS TS 1323+72+0=1395. This does **not** prove all 7 background threads and delayed retry windows idle.
+- **Shared filesystem evidence:** Docker root /var/lib/docker and /opt/missav-dlp-web are on /dev/loop4 ext4, ~37G available, while candidate /tmp is separate 32G tmpfs (~30G free). Docker storage inventory: images 24.14GB total, containers 1.543GB, build cache 6.257GB. Do not prune; usage snapshot is **not** a hard maximum for a new build and does not establish existing obligations+reserve.
+- **Builder evidence:** Buildx default driver docker, BuildKit v0.32.2; approved dedicated base tag is absent. Staged source 3 approved hashes PASS and plan Dockerfile/PLAN hashes PASS. No tag creation, stop, build, deployment or download.
+- **Remaining A-method gates:** exclude other Docker/BuildKit work and delayed download/remux; establish bounded realistic temporary image-build demand + current reserve; prove unchanged old-container start and full single-service promotion rollback configuration, then recheck live identity/idle before any stop. Keep only Downloader stopped across positively confirmed daemon-side build. Candidate image and UI parity remain NOT_RUN.
+
 ## 2026-11-09 — DLSS-001 original Compose with live Writer GID 988 validates and matches image
 
 - **Teddy's real CT108 read-only result:** Using the running container's verified supplemental group ID `988` as a **subprocess-only** `TEDDY_LIBRARY_DELETE_DISCOVERY_WRITER_GID` interpolation input, the exact original 13-file Compose chain under `--project-directory /opt/missav-dlp-web -p missav-dlp-web` returned `CONFIG_EXIT_CODE=0`, `COMPOSE_CONFIG=PASS`. The merged `missav-dlp-web` service had `GROUP_ADD_MATCH=True` and its configured image reference resolved locally to the **same current running image ID** (`IMAGE_MATCH=True`). No raw rendered configuration or environment values were printed; no `.env` or other config files were written.
