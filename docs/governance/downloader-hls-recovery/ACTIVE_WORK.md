@@ -1,5 +1,12 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — DLHLS-001 SpoofDPI early-exit exact error: TUI requires /dev/tty (NO RETRY)
+
+- **Teddy CT108 stdout-only read-only result:** exactly one normal-startup SpoofDPI diagnostic has `exit_code=1` and bounded redacted `output=application failed to start failed to start tui: could not open a new TTY: open /dev/tty: no such device or address`. The Docker service has no controlling terminal; startup invokes `spoofdpi` with no arguments in `teddy_spoofdpi.py`. This establishes the specific immediate startup failure before any proxy listener is available.
+- **Official upstream source (2026-11-10 check):** https://spoofdpi.dev/user-guide/app/ documents `--no-tui` headless mode and default HTTP listener `127.0.0.1:8080`; command-line settings override TOML. **Version/flag support in installed container still NOT CHECKED**. Remedy hypothesis: startup argv `["spoofdpi", "--no-tui"]` after in-container help/version inspection, isolated smoke and separate approval/authorized workstream scope; do not hotpatch running container or broadly rebuild with held UI changes.
+- **Protected trial state:** current SORA-489 upstream viability, full required+reserve bound, fresh destination/SSH ownership remain unmet. `SERVICE_RESTART=NOT_RUN`, `RETRY_POST=NOT_RUN`, `DOWNLOAD=NOT_RUN`, `TRIAL_GO=BLOCKED`; preserve 3 originals and 1,395 TS.
+
+
 ## 2026-11-10 — DLHLS-001 SpoofDPI startup failure proven: EARLY_EXIT code 1 (NO RETRY)
 
 - **Teddy CT108 correct-host result:** new-image Downloader still running; original five-minute startup window had 203 log lines and exactly one SpoofDPI event: `EVENT=EARLY_EXIT EXIT_CODE=1`. Actual `/app/app.py` has SpoofDPI startup call, PID1 runs `teddy_bootstrap.py`, `HEALTH_ONLY_MODE=False`. Thus the normal startup **attempted** SpoofDPI and the spawned helper **exited within its first two seconds with status 1**, explaining zero process and closed port observed later.
