@@ -1,5 +1,12 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — DLHLS-001 SpoofDPI runtime/binary inspection: configured but absent (NO RETRY)
+
+- **Teddy CT108 read-only output:** persisted `.settings.json` reports `SPOOFDPI_SETTING_ENABLED=True`; `spoofdpi` executable present and executable; `SPOOFDPI_PROCESS_COUNT=0`; `SPOOFDPI_LISTENER=CLOSED` at loopback:8080; `CURL_CFFI_VERSION=0.17.0`. Sanitized `docker logs --tail 1000` produced `SPOOFDPI_LOG_EVENTS=0`; this is a bounded tail window, **not** proof startup never logged or never attempted the helper.
+- **Source cross-check:** canonical `app.py` calls `start_spoofdpi()` on non-health-only import; `teddy_spoofdpi.py` emits bounded startup/early-exit diagnostics and waits 2s. Running helper's absence is proven at inspection instant; whether it exited at startup, exited later, or startup was skipped is **UNKNOWN**. The `curl_cffi` direct `SSLError` root cause is separately **UNKNOWN**; no live source viability/required full bytes proven.
+- **Safety state:** `SERVICE_RESTART=NOT_RUN`, `RETRY_POST=NOT_RUN`, `DOWNLOAD=NOT_RUN`, three failed jobs and 1,395 protected TS preserved. `TRIAL_GO=BLOCKED`. Next: read-only bounded original container-startup log category scan, runtime startup-mode/entrypoint check. No restarting SpoofDPI/Downloader or retries before evidence and appropriate scope authorization.
+
+
 ## 2026-11-10 — DLHLS-001 SORA-489 read-only source/mirror diagnostics: proxy closed, direct SSL errors (NO RETRY)
 
 - **Teddy CT108 output:** `SPOOFDPI_SOCKET=CLOSED` on localhost:8080 inside new Downloader; exact persisted `missav123.com` source through local proxy returned `ConnectionError`, direct returned `SSLError`. One native configured fallback `missav.ai` gave the same proxy/direct error classes. `REQUEST_ATTEMPTS=4`, `SOURCE_PAGE=BLOCKED`, `MASTER_PLAYLIST=NOT_REQUESTED`, `RETRY_POST=NOT_RUN`, `DOWNLOAD=NOT_RUN`. No TS body, playlist, new job or source/data mutation by the probe.
