@@ -320,7 +320,7 @@ class _fixture_context:
 
 def main():
     assert hashlib.sha256(open(admin.__file__, "rb").read()).hexdigest() == (
-        "73984205a2340a05a930132bf248bb1a8c07125391167aa9d5e1c072f247cb31"
+        "c15caa24a2e5e8cb869a86f33ba2432e0336fc50b977099ccc9620efaa2fbd0d"
     )
     test_real_bulk_retry_auth_and_csrf()
     test_bulk_retry_fails_closed_without_safe_callback()

@@ -22,7 +22,7 @@ import teddy_spoofdpi
 ADMIN_MODULE_PATH = Path(admin.__file__).resolve()
 ADMIN_MODULE_SHA256 = hashlib.sha256(ADMIN_MODULE_PATH.read_bytes()).hexdigest()
 assert ADMIN_MODULE_PATH == Path(__file__).resolve().with_name("teddy_downloader_admin.py")
-assert ADMIN_MODULE_SHA256 == "73984205a2340a05a930132bf248bb1a8c07125391167aa9d5e1c072f247cb31"
+assert ADMIN_MODULE_SHA256 == "c15caa24a2e5e8cb869a86f33ba2432e0336fc50b977099ccc9620efaa2fbd0d"
 
 
 def make_core(tmpdir, tasks=None, queue_lock=None, retry_callback=None):

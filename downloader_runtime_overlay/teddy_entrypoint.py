@@ -3,6 +3,7 @@ if __name__ == '__main__':
 
 import os
 import shutil
+import shlex
 import subprocess
 import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
@@ -386,6 +387,30 @@ def _store_info(task_id, info):
     core.save_tasks()
 
 
+
+def _fresh_output_collision_guard(out_name):
+    """Fail closed before media writes for an explicit fresh-ID retry."""
+    if not isinstance(out_name, str) or os.path.basename(out_name) != out_name or not out_name.endswith('.mp4'):
+        raise teddy_download_safety.DownloadSafetyError('출력 이름을 확인할 수 없습니다.')
+    names = (out_name, out_name[:-4] + '.ts')
+    with os.scandir(core.DOWNLOAD_DIR):
+        pass
+    if any(os.path.lexists(os.path.join(core.DOWNLOAD_DIR, name)) for name in names):
+        raise teddy_download_safety.OutputCollision('기존 로컬 출력 파일이 있어 중단했습니다.')
+    if teddy_storage._final_backend() != 'ssh':
+        raise teddy_download_safety.DownloadSafetyError('최종 SSH 저장소를 확인할 수 없습니다.')
+    try:
+        directory = teddy_storage._ssh_remote_path('missav')
+        quoted = shlex.quote(directory)
+        teddy_storage._ssh_run('test -d ' + quoted + ' && test ! -L ' + quoted + ' && test -r ' + quoted + ' && test -x ' + quoted)
+        for name in names:
+            if teddy_storage._ssh_remote_stat('missav/' + name) is not None:
+                raise teddy_download_safety.OutputCollision('기존 원격 출력 파일이 있어 중단했습니다.')
+    except teddy_download_safety.DownloadSafetyError:
+        raise
+    except Exception as exc:
+        raise teddy_download_safety.DownloadSafetyError('원격 출력 상태를 확인할 수 없습니다.') from exc
+
 def _download_video(task_id, url):
     try:
         _check_task_state(task_id)
@@ -413,6 +438,8 @@ def _download_video(task_id, url):
         print(f"[선택] {fmt.get('height')}p -> {variant_url}", flush=True)
         out_name = core._safe_filename(info)
         out_path = os.path.join(core.DOWNLOAD_DIR, out_name)
+        if (core.tasks.get(task_id) or {}).get('fresh_retry_of'):
+            _fresh_output_collision_guard(out_name)
         final_path = _download_hls_resumable(task_id, variant_url, headers, out_path)
         queued_task = core.tasks.get(task_id) or {}
         if queued_task.get('mp4_stage') == 'queued':

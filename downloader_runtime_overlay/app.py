@@ -371,6 +371,19 @@ def persist_retry_state_and_enqueue(task_id, previous_task, *, enqueue_download=
                     print('[Retry] owned temporary state file cleanup failed: %s' % type(cleanup_error).__name__, flush=True)
     return True
 
+
+def persist_fresh_task_and_enqueue(task_id, new_task):
+    """Insert a new task through the existing durable retry transaction."""
+    with queue_admission_lock:
+        if task_id in tasks or not isinstance(new_task, dict):
+            raise RuntimeError('fresh task identity unavailable')
+        tasks[task_id] = dict(new_task)
+        try:
+            return persist_retry_state_and_enqueue(task_id, {})
+        except BaseException:
+            tasks.pop(task_id, None)
+            raise
+
 def save_tasks():
     if STARTUP_HEALTH_ONLY:
         return False

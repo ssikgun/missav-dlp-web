@@ -6,6 +6,13 @@ import os
 import secrets
 import shutil
 import stat
+import json
+import uuid
+from urllib.parse import urlsplit
+
+import teddy_duplicates
+import teddy_ownership
+import teddy_routing
 
 from flask import jsonify, request, session
 
@@ -170,6 +177,66 @@ def install(core, mp4_queue_module=None, safety_module=None):
         response = jsonify({"token": token})
         response.headers["Cache-Control"] = "no-store"
         return response
+
+    @core.app.post("/api/tasks/<failed_id>/retry-fresh")
+    def retry_fresh(failed_id):
+        if session.get("teddy_authenticated") is not True:
+            return jsonify({"status": "error", "message": "인증이 필요합니다."}), 401
+        if not _csrf_ok():
+            return jsonify({"status": "error", "message": "요청 검증에 실패했습니다."}), 403
+        try:
+            if str(uuid.UUID(failed_id)) != failed_id:
+                raise ValueError()
+        except (ValueError, AttributeError):
+            return jsonify({"status": "error", "message": "잘못된 작업 ID입니다."}), 400
+        with teddy_duplicates._QUEUE_LOCK:
+            with core.queue_admission_lock:
+                old = core.tasks.get(failed_id)
+                if not isinstance(old, dict):
+                    return jsonify({"status": "error", "message": "작업이 없습니다."}), 404
+                if not str(old.get("status") or "").startswith("에러") or old.get("engine") != "custom-hls":
+                    return jsonify({"status": "error", "message": "실패한 HLS 작업이 아닙니다."}), 409
+                url = old.get("url")
+                dvd = teddy_ownership.dvd_id_from_supported_url(url) if isinstance(url, str) else None
+                try:
+                    parsed = urlsplit(url)
+                    safe_url = parsed.scheme in ('http', 'https') and parsed.hostname and parsed.username is None and parsed.password is None and parsed.port in (None, 80, 443) and not parsed.fragment
+                except (ValueError, TypeError):
+                    safe_url = False
+                if not dvd or not safe_url or url != url.strip():
+                    return jsonify({"status": "error", "message": "원본 식별을 확인할 수 없습니다."}), 409
+                try:
+                    raw, metadata = core._retry_state_read(core.TASKS_FILE)
+                    if metadata is None or json.loads(raw).get(failed_id) != old:
+                        raise ValueError("persisted task mismatch")
+                    if teddy_ownership.is_owned(dvd):
+                        return jsonify({"status": "owned", "message": "이미 보유 중입니다."}), 409
+                    key = teddy_duplicates.duplicate_key(url)
+                    for tid, other in core.tasks.items():
+                        if tid == failed_id:
+                            continue
+                        if not isinstance(other, dict):
+                            raise ValueError("invalid task")
+                        if other.get('fresh_retry_of') == failed_id:
+                            return jsonify({"status": "duplicate", "message": "새 작업이 이미 있습니다."}), 409
+                        if not teddy_duplicates._is_terminal(other) and teddy_duplicates.duplicate_key(other.get('url')) == key:
+                            return jsonify({"status": "duplicate", "message": "같은 작품 작업이 있습니다."}), 409
+                    _storage_capacity(core, safety_module)
+                    safety_module.ensure_download_start_space(core.DOWNLOAD_DIR)
+                    new_id = str(uuid.uuid4())
+                    if new_id in core.tasks or os.path.lexists(os.path.join(core.DOWNLOAD_DIR, f'.{new_id}.parts')):
+                        raise ValueError("new task collision")
+                    decision = teddy_routing.resolve(url, override='auto')
+                    task = {'url': url, 'status': '대기 중', 'progress': '0%', 'speed_bps': 0,
+                            'downloaded_bytes': 0, 'total_bytes_estimate': 0, 'fresh_retry_of': failed_id,
+                            'error_kind': 'safety',
+                            'network_override': 'auto', 'network_mode': decision['mode'],
+                            'network_route_source': decision['source'], 'network_site': decision['site'],
+                            'network_fallbacks': 0}
+                    core.persist_fresh_task_and_enqueue(new_id, task)
+                except Exception:
+                    return jsonify({"status": "error", "message": "안전한 작업 등록을 확인할 수 없습니다."}), 503
+                return jsonify({"status": "success", "task_id": new_id}), 200
 
     @core.app.post("/api/tasks/retry-failed")
     def retry_failed_tasks():

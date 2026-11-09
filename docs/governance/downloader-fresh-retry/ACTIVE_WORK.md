@@ -1,5 +1,11 @@
 # Downloader explicit fresh-identity HLS retry API — active work
 
+## 2026-11-09 — DLFR-001 fresh-ID API offline candidate validated
+
+At canonical 3c5999323767b313719946823b8a37b44d183e43, scope audit found app.py adds only a fresh-record transaction wrapper and teddy_entrypoint.py invokes its local/SSH collision guard only for fresh_retry_of tasks. The explicit authenticated CSRF action preserves the original failed task, reuses ownership, duplicate, storage and queue safeguards, and creates a new UUID. Existing retry and normal duplicate paths remain unchanged. Runtime overlay SHA manifest updates are limited to app.py, teddy_entrypoint.py and the previously approved admin hash; UI hashes unchanged.
+
+OFFLINE: final overlay manifest sha256sum -c PASS (10/10); both admin smokes PASS; fresh-ID Flask fixture PASS for authentication, CSRF, concurrent one-winner admission, ordinary duplicate refusal, queue failure rollback and preserved synthetic original; local collision and actual SSH-stat parser absent/present/error fixtures PASS; git diff --check PASS. These fixtures do not verify live NAS absence or 1,395 real fragments. BUILD=NOT_RUN, DEPLOY=NOT_RUN, DOWNLOAD=NOT_RUN. DLHLS-001 real trial remains independently gated; P08LIB UI HOLD remains. Production idle, source/output identity, capacity, SSH NAS absence, UI hash parity, rollback and maintenance-stop gates remain for a later approved release.
+
 ## 2026-11-09 — Teddy conditionally approved DLFR-001 option A (two exact SHA expectation updates)
 
 - **Explicit user decision:** Teddy answered `응 진행해` to option A. This is **conditional approval**, not blanket SHA rebaselining: inspect the isolated candidate's `app.py` and `teddy_entrypoint.py` diff first, confirm every change is a narrow DLFR-001-only API hook/output-collision safeguard that does not alter ordinary download/HLS/queue behavior. If unrelated generic engine behavior changed, do not modify its hash; stop and present the exact hunk and workstream conflict for Teddy to choose. No silent redesign outside the approved narrow API.
