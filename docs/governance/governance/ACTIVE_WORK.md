@@ -1,5 +1,11 @@
 # Governance workstream — active work
 
+## 2026-11-09 — DLFR-001 approved narrow API-only registration
+
+- Teddy approved registering a separate `downloader-fresh-retry / DLFR-001` workstream for an explicit authenticated fresh-identity retry API. Ordinary duplicate checks and same-ID retry remain unchanged, and real incident recovery continues separately under `DLHLS-001`.
+- This governance change adds only the new route plus v1.0.0 approved contract and self-only active record; existing shared `P08LIB-001` four-way UI task, `S11-WX011`, `DLSS-001`, `DLHLS-001`, common contract and validator remain unchanged. No UI/code/image/runtime/data change in registration.
+- Require all-workstream governance structural and `--workstream downloader-fresh-retry --task-id DLFR-001` PASS before implementation. No build or DLHLS new download GO yet.
+
 ## 2026-11-08 — DLHLS-001 narrow independent routing (user-approved)
 
 - Teddy explicitly approved changing GitHub routing to keep the shared `P08LIB-001` UI authorization intact while separately registering `DLHLS-001` for only the three 2026-11-07 HLS failed jobs.

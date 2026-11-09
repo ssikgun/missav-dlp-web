@@ -1,5 +1,10 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-09 — Separate DLFR-001 API-only registration approved; DLHLS trial remains gated
+
+- Teddy approved a narrow reusable fresh-identity retry **API** independent of existing held P08LIB UI. `DLFR-001` now owns only this API code/test/conditional release; `DLHLS-001` continues to own the three original failures and one separately gated SORA-489 trial. Normal UI duplicate and old retry are unchanged until a correctly authorized new API is actually released.
+- The latest CT108 output established saved-title candidate output absent locally and on SSH NAS, canonical holdings false, original 1,395 TS and failed tasks preserved, but fresh current source naming, required download/remux bytes and real process/thread idle remain unverified. Registration is documentation only; no source code, image, operational work, task mutation or download.
+
 ## 2026-11-09 — DLHLS-001 SORA-489 NAS SSH collision/holdings read-only PASS; fresh-ID path blocked
 
 - **Teddy CT108 completed read-only checks:** For the *saved-title candidate* output `[sora-489] <saved display title>.mp4`, local `/downloads` MP4 and TS did not exist. Running `teddy_storage._final_backend()` returned `ssh`; the canonical SSH completed-storage `missav/<candidate filename>.mp4` and `.ts` stat calls both returned **ABSENT** (`REMOTE_COLLISION_CHECK=PASS`). `teddy_ownership.is_owned('SORA-489')` returned **False** (`OWNERSHIP_CHECK=PASS`). `TASK_WRITE=0`, `NAS_WRITE=0`, `DOWNLOAD=NOT_RUN`. The earlier `FINAL_DIR_EXISTS=False` check of a local `/final/missav` path does **not** establish a NAS failure: this deployment's completion backend is SSH, not a local final-directory mount.

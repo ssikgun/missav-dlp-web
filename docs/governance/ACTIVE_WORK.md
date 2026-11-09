@@ -62,6 +62,17 @@ AREA_HINTS:
 - Only the three failed HLS downloads recorded on 2026-11-07 and their one guarded, separate-identity recovery trial.
 - This narrow incident route takes precedence over the generic downloader route for those jobs only. All other downloads, generic product code, shared queue changes, UI, Writer, Stage9 and Stage11 remain under existing workstream approval.
 
+## WORKSTREAM: downloader-fresh-retry
+
+STATUS: IN_PROGRESS
+TASK_ID: DLFR-001
+CONTRACT_PATH: docs/governance/downloader-fresh-retry/PROJECT_CONTRACT.md
+ACTIVE_WORK_PATH: docs/governance/downloader-fresh-retry/ACTIVE_WORK.md
+AREA_HINTS:
+- Only the explicitly requested failed custom-HLS **fresh-ID retry API**, its authenticated admission, duplicate/ownership/capacity checks, and API-only runtime release.
+- This narrow endpoint route takes precedence over generic downloader / P08LIB-001 solely for the new fresh-retry API. Ordinary /download and old retry, all other queue/HLS/UI, Writer, Stage9 and Stage11 behavior remain in their existing routes.
+- DLHLS-001 owns the three historical failed-job records and any real new-ID trial; this code-registration route does not authorize their download.
+
 ## WORKSTREAM: downloader-storage-safety
 
 STATUS: IN_PROGRESS

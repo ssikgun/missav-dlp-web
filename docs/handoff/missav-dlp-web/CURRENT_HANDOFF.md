@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-09 — DLFR-001 fresh-ID HLS retry API approved for independent registration
+
+- Teddy approved a small authenticated **API-only** new-ID retry of failed HLS jobs, preserving original error records, 1,395 TS fragments and protected resume-plan SHA. Existing `teddy_duplicates.py` normal enqueue blocks same title (409) and old retry uses original ID. New narrow `downloader-fresh-retry / DLFR-001` workstream is independent of the original three-job recovery `downloader-hls-recovery / DLHLS-001`, the A-method build prevention `DLSS-001`, and the held four-way P08LIB UI task.
+- SORA-489 saved-title candidate MP4/TS absent both locally and over real SSH NAS; canonical holdings lookup false. Last observed 36.53 GiB free, 4.89 GiB reserve, 31.64 GiB after reserve; current live source naming, exact HLS+remux required bytes, and actual worker/thread quiescence remain CONFIRM_NEEDED. Existing 3 failed jobs and 1,395 TS remain protected.
+- Registration changes governance documentation only. No product code/build/deploy/download yet; next validate new route and implement/test minimal authenticated fresh-ID API without changing ordinary UI, duplicate guard, old task data, Stage9/Writer/Stage11/NAS or UI image files. A build/cutover is conditional on CT108 A-method stop, exact UI image parity/rollback and independent DLHLS operator GO.
+
 ## 2026-11-09 — DLSS-001 original Compose with live Writer GID 988 validates and matches image
 
 - **Teddy's real CT108 read-only result:** Using the running container's verified supplemental group ID `988` as a **subprocess-only** `TEDDY_LIBRARY_DELETE_DISCOVERY_WRITER_GID` interpolation input, the exact original 13-file Compose chain under `--project-directory /opt/missav-dlp-web -p missav-dlp-web` returned `CONFIG_EXIT_CODE=0`, `COMPOSE_CONFIG=PASS`. The merged `missav-dlp-web` service had `GROUP_ADD_MATCH=True` and its configured image reference resolved locally to the **same current running image ID** (`IMAGE_MATCH=True`). No raw rendered configuration or environment values were printed; no `.env` or other config files were written.
