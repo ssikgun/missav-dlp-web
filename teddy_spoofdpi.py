@@ -63,9 +63,9 @@ class _BoundedDrain:
 
 
 def start_spoofdpi(popen, sleep, port, log):
-    """Preserve the original argv and two-second readiness observation window."""
+    """Run headlessly and preserve the two-second readiness observation window."""
     try:
-        proc = popen(["spoofdpi"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        proc = popen(["spoofdpi", "--no-tui"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     except FileNotFoundError:
         log("[System] SpoofDPI 진단: 바이너리를 찾을 수 없습니다 (FileNotFoundError).")
         return None
