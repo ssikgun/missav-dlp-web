@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-09 12:19:34 KST — DLFR-001 first implementation attempt blocked at new-ID atomic queue admission
+
+- Codex on `602534deb2f759a25f0f75763a0d34658e5f9fd9` confirmed `ROUTING=PASS` but `CODE=BLOCKED`, no code commit, no offline/auth/duplicate/original-protection/UI tests, and no Docker build/deploy/download. Isolated unfinished candidate: `/tmp/dlfr-001-candidate` (not deployable).
+- Source-root issue: `teddy_routing.enqueue_download` persists new job then queues separately; `persist_retry_state_and_enqueue` protects existing-ID rollback, not removal of a newly inserted ID. Next task is one minimal reused guarded transaction for new UUID insertion with rollback of memory/file/queue on save failure, queue failure and competing requests, followed by representative offline checks and current-title local/NAS collision protection.
+- All three failed records and 1,395 TS are still protected; this Codex run did not recount the TS. Existing UI hold, Stage9/Writer/Stage11 and DLSS A build-stop policy unchanged. No operational GO until verified code and separate live DLHLS safety gates.
+
 ## 2026-11-09 — DLFR-001 fresh-ID HLS retry API approved for independent registration
 
 - Teddy approved a small authenticated **API-only** new-ID retry of failed HLS jobs, preserving original error records, 1,395 TS fragments and protected resume-plan SHA. Existing `teddy_duplicates.py` normal enqueue blocks same title (409) and old retry uses original ID. New narrow `downloader-fresh-retry / DLFR-001` workstream is independent of the original three-job recovery `downloader-hls-recovery / DLHLS-001`, the A-method build prevention `DLSS-001`, and the held four-way P08LIB UI task.

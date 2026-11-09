@@ -1,5 +1,12 @@
 # Downloader explicit fresh-identity HLS retry API — active work
 
+## 2026-11-09 12:19:34 KST — DLFR-001 first Codex CODE BLOCKED; new-record transaction missing
+
+- **Teddy's Codex result on canonical `602534deb2f759a25f0f75763a0d34658e5f9fd9`:** `ROUTING=PASS` (two governance checks), `CODE=BLOCKED`; `OFFLINE_TEST/AUTH_CSRF/DUPLICATE_GUARD/ORIGINAL_DATA_PROTECTION/UI_ISOLATION=NOT_RUN`; `BUILD/DEPLOY/DOWNLOAD=NOT_RUN`; no new product code or GitHub commit. Candidate exists only as unproven isolated `/tmp/dlfr-001-candidate`. Prior actual CT108 count of 1,395 TS remains the last verified evidence; this Codex run did not recount them.
+- **Verified canonical implementation gap:** `teddy_routing.enqueue_download` creates a new UUID then calls `core.save_tasks()` separately from `core.download_queue.put()`; on a queue failure this is not a proven all-or-nothing new-record admission. `downloader_runtime_overlay/app.py:persist_retry_state_and_enqueue` includes verified on-disk backup/rollback and `_retry_queue_put` rollback for an **existing** task transition, but failure rollback mutates the existing task mapping and does **not** prove deletion of a newly inserted key. Do not reuse it unchanged for the new API or infer crash-safe new-record semantics from retry tests.
+- **Next minimal authorized code step:** Implement a specific new-UUID create+durable-state+queue transaction that reuses the existing file-safe staging/restore and checked queue insertion, but on failure restores the **exact old task mapping and disk snapshot**, including removing a newly inserted key. Check that failed save, failed queue, and concurrent same-parent requests leave no orphan task, queued item, original mutation or duplicate fresh child. Preserve existing `/download` and same-ID retry behavior, existing ownership/auth/CSRF/capacity checks, prior HLS plan guard and P08 UI HOLD. The current dynamically re-extracted title means saved-title NAS/local absence is evidence only; exact current output must remain guarded when metadata becomes known before media writing and publication.
+- **Operational status:** No real API call, code promotion, Docker image build, deployment, network trial or download GO. `DLFR-001 / IN_PROGRESS` approved contract unchanged. Next code run should produce an offline candidate and real tests, not consume a live trial or touch CT108.
+
 WORKSTREAM: downloader-fresh-retry
 TASK_ID: DLFR-001
 STATUS: IN_PROGRESS
