@@ -1,5 +1,12 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — DLHLS-001 SORA-489 read-only source/mirror diagnostics: proxy closed, direct SSL errors (NO RETRY)
+
+- **Teddy CT108 output:** `SPOOFDPI_SOCKET=CLOSED` on localhost:8080 inside new Downloader; exact persisted `missav123.com` source through local proxy returned `ConnectionError`, direct returned `SSLError`. One native configured fallback `missav.ai` gave the same proxy/direct error classes. `REQUEST_ATTEMPTS=4`, `SOURCE_PAGE=BLOCKED`, `MASTER_PLAYLIST=NOT_REQUESTED`, `RETRY_POST=NOT_RUN`, `DOWNLOAD=NOT_RUN`. No TS body, playlist, new job or source/data mutation by the probe.
+- **Interpretation:** Local proxy port not accepting connections; cause UNKNOWN (startup/binary/exit/config). Exact `curl_cffi` direct `SSLError` code/details were not recorded; do not assert network failure or downloader source defect. Previous probe was stricter than product source (required `seek` only versus native `seek OR m3u8`), but corrected probe still failed at transport. Source/size/ownership/full required+reserve gates remain unmet; `TRIAL_GO=BLOCKED`.
+- **Next read-only diagnostic:** Inspect actual `.settings.json` `spoofdpi_enabled` boolean, binary/process/listener state and only sanitized existing Docker SpoofDPI startup log categories plus curl_cffi version; no restart/binary installation, no new product code or additional upstream request until cause is clear. Hold original 3 jobs/1,395 TS.
+
+
 ## 2026-11-10 — DLHLS-001 SORA-489 exact-host metadata probe SOURCE_PAGE_BLOCKED (NO RETRY)
 
 - **Direct Teddy CT108 output:** bounded in-container `curl_cffi.requests.get` probe attempted saved `https://missav123.com/.../sora-489` first via existing local SpoofDPI HTTP proxy 127.0.0.1:8080 and then directly (both within Downloader runtime routing). It required HTTP 200, at most 2 MiB body, and a `seek` marker. Final `AssertionError: SOURCE_PAGE_BLOCKED` fired before any video UUID/master/variant playlist/segment HEAD request.
