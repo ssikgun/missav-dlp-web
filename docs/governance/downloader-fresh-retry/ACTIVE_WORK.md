@@ -1,5 +1,12 @@
 # Downloader explicit fresh-identity HLS retry API — active work
 
+## 2026-11-09 — DLSS-001 v1.0.2 fresh CT108 build-only data/space gate PASS (NO STOP/BUILD)
+
+- **Direct Teddy root@downloader read-only run:** staged PLAN.md SHA256 `5d1b338c924a41e5b19f3e280b63074c67dc66979380dab288e2d62657ae5789` and unchanged Dockerfile SHA256 `afe215bdf70d39676d6cf43043637768632b3b5c9f27a3011d50264e65dde887` verified. Exact old operating image `sha256:ebd164d631450660b79ca29141a3b8c317f71df443b2d209feec51a8a35c000a`, Downloader RUNNING, restart `unless-stopped`, docker top only main Python process.
+- **Actual data and capacity:** BUSY_TASKS=0, MP4_QUEUE=0, RESERVATION_RECORDS=0; protected TS `[1323,72,0]`=1395. Shared filesystem `/downloads` free=39,215,648,768 B, configured reserve=5,254,478,438 B, conservative proposed build budget=8,589,934,592 B (8 GiB), remainder after reserve and proposed budget=25,371,235,738 B (~23.63 GiB). `JOB_AND_SPACE_GATE=PASS`. A proposed budget is not a proven hard Docker limit; guard actual reserve during build and fail closed if violated.
+- **Builder:** one currently listed default `docker` Buildx driver v0.32.2, but listing builder instances does **not** prove no other active BuildKit request. Single-operator quiet window/no competing Docker build is awaiting Teddy's explicit confirmation. Likewise seven thread/delayed-retry negative proof is not claimed from task snapshot; v1.0.2 requires fresh pre-stop check followed by observed stopped process.
+- **Effective status:** `BUILD_ONLY_DATA_AND_SPACE_GATE=PASS`, `OPERATOR_OTHER_BUILD_QUIET=NOT_CONFIRMED`, `STOP/BUILD/DEPLOY/DOWNLOAD=NOT_RUN`, `OPERATIONAL_GO=NOT_YET`. No tag created and no Docker, UI, media, NAS, DB, Stage9, Writer or Gluetun/Selkies change. After operator quiet-window confirmation, use one guarded A maintenance stop/build with exact old-container rollback and positive daemon completion; candidate UI/manifest and detailed Compose promotion rollback remain post-build gates. DLHLS-001 live trial independent.
+
 ## 2026-11-09 — DLFR-001 release sequence aligned with Teddy-approved DLSS-001 v1.0.2 (NO BUILD)
 
 - Fresh-ID API source commit `97c811b86b3c9e52d5ea7f1b9ddbb90f0bc2bd0a` and DLFR v1.0.0 source/behavior contract are unchanged. This is **not** fresh retry live-trial approval. The staged exact-image-derived 6-file source remains unbuilt.
