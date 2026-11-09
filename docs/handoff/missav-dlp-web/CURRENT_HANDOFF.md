@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-09 — DLFR-001 image-only release preparation (NO BUILD)
+
+At canonical 57839ad839b5065ab0d5ebd3f496aca2075a939f, read-only Docker inspection found the running missav-dlp-web image sha256:ebd164d631450660b79ca29141a3b8c317f71df443b2d209feec51a8a35c000a. The three running /app Python files match the immediate pre-97c811b source hashes; the current ten-entry runtime SHA manifest passed and the four running UI hashes match the recorded baseline. /app is not a bind mount. The observed running process list contained the Python entrypoint but does not prove thread/worker idleness. Work and Docker root reported the same /dev/loop4 with 39220662272 available bytes; actual build peak, concurrent reservations and reserve sufficiency remain unverified.
+
+An unbuilt local proposal /tmp/dlfr-image-plan-57839 uses the exact base image and copies only the three approved Python files plus the final integrity manifest, with a manifest check and py_compile; four smoke fixtures are staged for separate review, not copied into the image. Dockerfile SHA256 34578d058055307531b4335b17f74df7140f745e9ae008d28ed6e2eb4258697e355ba73eec35b8; PLAN.md SHA256 36cd09aaeb45ea91c59ec973572efc258c91baac3d334686573144a9e09f5a5e. This staged proposal is not a built image or production validation. Candidate image UI parity and complete file/config comparison remain NOT_RUN.
+
+Current 13 Compose inputs are present as regular non-symlinks; rendering with observed GID 988 succeeded, image ID and group matched. Full environment/mount/network/port parity and rollback restoration were not tested: COMPOSE_PARITY=BLOCKED, ROLLBACK_READY=BLOCKED. Worker idle and peak build capacity are BLOCKED. BUILD=NOT_RUN, DEPLOY=NOT_RUN, DOWNLOAD=NOT_RUN. No service stopped or restarted and no NAS/DB/Jellyfin/TS operation performed; live TS count was not independently rechecked. Follow DLSS-001 A maintenance stop until positive daemon-side build completion only after fresh safety/rollback gates; raw unmanaged builds bypass the procedure. P08 UI remains HOLD; DLHLS recovery remains separately gated.
+
 ## 2026-11-09 — CT108 active image Python hashes exactly match pre-DLFR runtime overlay
 
 - **Teddy's direct read-only sha256sum from running missav-dlp-web:** /app/app.py = f2ffdc1542f1203e7c533bf0116d617bb9f7d2a9d9fb937455b75f17d640244e; /app/teddy_downloader_admin.py = 73984205a2340a05a930132bf248bb1a8c07125391167aa9d5e1c072f247cb31; /app/teddy_entrypoint.py = c36799eace49e3f6df7fbdce69524c6f9f5d31a8b4588d1d65f14993b44c1357. All three **exactly match old pre-DLFR canonical runtime manifest**. They do **not** match the approved fresh API release values.
