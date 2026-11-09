@@ -52,6 +52,17 @@ AREA_HINTS:
 - If another independent workstream is registered later, its contract governs the work assigned to it.
 - Classify by purpose and actual affected files/resources; do not route by file location alone.
 
+## WORKSTREAM: downloader-spoofdpi-startup
+
+STATUS: IN_PROGRESS
+TASK_ID: DLSPD-001
+CONTRACT_PATH: docs/governance/downloader-spoofdpi-startup/PROJECT_CONTRACT.md
+ACTIVE_WORK_PATH: docs/governance/downloader-spoofdpi-startup/ACTIVE_WORK.md
+AREA_HINTS:
+- Only the bundled SpoofDPI helper's noninteractive startup in Downloader, an exact headless argv change, and a bounded single-Downloader-image build and service-only release.
+- This specific startup-fix route takes precedence over generic downloader / P08LIB-001 only for the SpoofDPI startup module and this exact candidate release. Existing UI, ordinary download/HLS/queue behavior, DLFR-001 fresh retry API, DLHLS-001 incident trial, DLSS-001 safety, Writer, Stage9 and Stage11 retain their own scopes.
+- This task must not enqueue a new video download or retry the three held HLS jobs.
+
 ## WORKSTREAM: downloader-hls-recovery
 
 STATUS: IN_PROGRESS

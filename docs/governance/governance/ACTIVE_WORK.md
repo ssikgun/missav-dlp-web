@@ -1,5 +1,11 @@
 # Governance workstream — active work
 
+## 2026-11-10 — DLSPD-001 registration and conditional headless service release user-approved
+
+- Teddy explicitly approved the proposed dedicated SpoofDPI headless-start workstream and then said `실제 서비스 교체까지 승인할께`. Register independent `downloader-spoofdpi-startup / DLSPD-001` with v1.0.0 contract and self-only active task. This narrow precedence covers only `teddy_spoofdpi.py` headless argv, its offline smoke and conditional target-only runtime image replacement; leave current `P08LIB-001` UI HOLD and all other workstream task IDs/contracts intact.
+- The missing proxy has grounded `spoofdpi 1.5.5` exit 1 from inability to open `/dev/tty` and confirmed `--no-tui` support. Code/build/deploy must observe actual CT108 safety, source/UI isolation and rollback; no DLHLS-001 retry GO or other service change comes from this registration.
+- Registration is documentation-only at this checkpoint; code/image/service/data work **NOT_RUN**. Verify structural and `--workstream downloader-spoofdpi-startup --task-id DLSPD-001` governance before proceeding.
+
 ## 2026-11-09 — DLFR-001 approved narrow API-only registration
 
 - Teddy approved registering a separate `downloader-fresh-retry / DLFR-001` workstream for an explicit authenticated fresh-identity retry API. Ordinary duplicate checks and same-ID retry remain unchanged, and real incident recovery continues separately under `DLHLS-001`.
