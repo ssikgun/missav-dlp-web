@@ -1,5 +1,12 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-09 — Teddy approved one guarded SORA-489 live fresh-ID retry trial; preflight still required
+
+- **Direct user question/decision:** After `DLFR-001` API-only release `DEPLOY_APPLY=PASS` and read-only smoke `POST_DEPLOY_SMOKE=PASS`, Teddy asked whether the three original failures are retry-ready and said `재시도 시험 승인 할께`. Interpret within the approved `DLHLS-001 v1.0.0` scope as authorization to prepare **one** deliberate isolated zero-TS SORA-489 new-identity live trial, not simultaneous retry of all 3 jobs. The original 3 records, 1,395 TS and old playlist-plan SHA guards remain protected.
+- **Important gate:** Deployed fresh retry endpoint exists in `DLFR-001` source and offline tests passed, but its production authenticated/CSRF POST has **never been exercised**; sending it immediately enqueues a real download. SORA-489's saved `total_bytes_estimate=0` means required full download+MP4 space is **unknown**. Before any POST/network/write, freshly verify persisted source/current source identity, no collision/ownership on local+canonical SSH NAS, full required space plus unchanged reserve, idle workers/MP4, user request authorization and exact single-trial scope. An unquantified required size or uncertain source/worker must remain `TRIAL_GO=BLOCKED`, not be waived by the approval.
+- **Current execution:** `TRIAL_PREFLIGHT=NOT_RUN`, `RETRY_POST=NOT_RUN`, `DOWNLOAD=NOT_RUN`, `NAS_WRITE=NOT_RUN`. Next one bounded CT108 **read-only local** inventory of current job/plan/queue/reservation and capacity; then decide whether a separate bounded source/size viability probe can establish real required capacity. Do not re-run DLFR build/deploy, change UI/queue, or use old same-ID retry.
+
+
 ## 2026-11-09 — Separate DLFR-001 API-only registration approved; DLHLS trial remains gated
 
 - Teddy approved a narrow reusable fresh-identity retry **API** independent of existing held P08LIB UI. `DLFR-001` now owns only this API code/test/conditional release; `DLHLS-001` continues to own the three original failures and one separately gated SORA-489 trial. Normal UI duplicate and old retry are unchanged until a correctly authorized new API is actually released.
@@ -216,4 +223,4 @@ Safely investigate the three 2026-11-07 failed HLS jobs and prepare no more than
 
 ## NEXT_DECISION
 
-Confirm exact remote task route/readback, then only one new read-only CT108 capacity/worker/output preflight before the operator go/no-go decision on the zero-TS trial.
+One bounded SORA-489 zero-TS fresh-ID trial is operator-approved in principle after DLFR-001 code/API-only rollout, but is **not operationally cleared**. First run current CT108 read-only local failed-task/plan/queue/process/reserve and original-artifact inventory. Saved SORA-489 size estimate 0 is unknown; obtain reliable current upstream source/output identity, collision/ownership and full required download+MP4 bytes above reserve before any POST or network download. On any unknown material gate, record TRIAL_GO=BLOCKED without creating a new task. Do not retry the other two jobs, reuse old IDs, mix 1,395 original TS, or alter P08LIB UI. If all gates pass, one explicit authenticated/CSRF SORA-489 new-ID POST may be separately executed within Teddy's trial approval and immediately monitored; no other API/product change.
