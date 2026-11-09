@@ -1,5 +1,12 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — DLHLS-001 installed SpoofDPI v1.5.5 headless flag confirmed; implementation outside incident scope
+
+- **Teddy CT108 read-only output:** `spoofdpi --version` returned code 0 and `spoofdpi 1.5.5 0b49eaf (goreleaser)`; `--help` code 0 and contains both `--no-tui` and `--listen-addr` flags. Current running image `/app/teddy_spoofdpi.py` still invokes `popen(["spoofdpi"], ...)`. `INSPECTION=COMPLETE`, `SERVICE_RESTART=NOT_RUN`, `DOWNLOAD=NOT_RUN`.
+- **Confirmed resolution hypothesis:** Official CLI `--no-tui` can avoid the reproduced TUI `/dev/tty` startup failure with an argv-only change; actual corrected startup/listener/network recovery is **NOT TESTED** and is not yet product PASS.
+- **Governance guard:** `docs/governance/ACTIVE_WORK.md` explicitly says incident-only `DLHLS-001` cannot authorize generic source modifications or runtime deploy, and `docs/governance/downloader-hls-recovery/PROJECT_CONTRACT.md` requires separate user approval for new product code/build/deploy. Neither `DLFR-001` (fresh retry API only) nor held `P08LIB-001` UI authorizes this fix. Do not write/ship the patch until a separately approved routing/task contract is established. The 1-job trial stays `TRIAL_GO=BLOCKED` with all original 3 failures/1,395 TS protected.
+
+
 ## 2026-11-10 — DLHLS-001 SpoofDPI early-exit exact error: TUI requires /dev/tty (NO RETRY)
 
 - **Teddy CT108 stdout-only read-only result:** exactly one normal-startup SpoofDPI diagnostic has `exit_code=1` and bounded redacted `output=application failed to start failed to start tui: could not open a new TTY: open /dev/tty: no such device or address`. The Docker service has no controlling terminal; startup invokes `spoofdpi` with no arguments in `teddy_spoofdpi.py`. This establishes the specific immediate startup failure before any proxy listener is available.
