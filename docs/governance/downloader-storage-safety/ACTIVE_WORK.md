@@ -1,5 +1,12 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-09 — Teddy explicit GO for DLFR-001 image-only Downloader promotion (NOT YET EXECUTED)
+
+- **Operator decision:** Teddy explicitly replied `응 승인해` after receiving `FINAL_PREFLIGHT=PASS` evidence and a plan for one `missav-dlp-web`-only image recreation, rollback to exact old image and original 13 Compose inputs, no other service, no media mutation, no old HLS retries, and no P08LIB UI release.
+- **Authorized next action:** Stage a persistent narrow Compose image-only override under a distinct private backup/release directory, check exact old and new image IDs and fresh capacity, verify the full Compose model differs only in the target service image, and create a nonsecret pinned input manifest. After stage verification, one scoped Compose `up -d --no-deps` recreation may be executed with explicit old-image rollback procedure and immediate post-deploy health/UI/job-state checks. `--pull=never` and no Docker prune. Do not auto-roll back or restart other services on ambiguous failure.
+- **As of authorization message:** `STAGE=NOT_RUN`, `DEPLOY=NOT_RUN`, `DOWNLOAD=NOT_RUN`. Existing old container remains last observed stopped, candidate `sha256:b31b0b4dd106abf19d3394b5d703391a7ea522151ae61622ec53b6a1c7b2d7a4` is built and reviewed. Approval to deploy the API does **not** approve any `DLHLS-001` live trial.
+
+
 ## 2026-11-09 — DLFR-001 / DLSS-001 CT108 final pre-promotion read-only gate PASS (DEPLOY NOT RUN)
 
 - **Direct Teddy CT108 result:** `FINAL_PREFLIGHT=PASS`, `OLD_CONTAINER=STILL_STOPPED`, `DEPLOY=NOT_RUN`. Exact existing container/image and 13 Compose inputs stayed unchanged. `CONTAINER_NAME=PASS`, `COMMAND=PASS`, `ENTRYPOINT=PASS`, `DEPENDENCIES=PASS`, `NETWORK_ALIASES=PASS`, `OLD_IMAGE_RESTORE_SOURCE=PASS`, `DISK_RESERVE=PASS`; previous normalized environment, group GID 988, mount core (14), bind options (14), port bindings (1), network names (1), new/old inherited image runtime config, and four held-UI SHA baselines passed.
