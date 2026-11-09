@@ -1,5 +1,10 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-09 — DLSS-001 Writer numeric group 988 confirmed in live container
+
+- **Teddy's actual `root@downloader` read-only output:** `docker inspect missav-dlp-web` returned `HostConfig.GroupAdd=['988']`; `docker exec missav-dlp-web id -G` returned `0 988`, confirming that the **running** Downloader is already a member of supplemental numeric group 988. The original Writer-related mount `/run/teddy-library-discovery-writer => /run/teddy-library-discovery-writer` is present among six related mounts. The Writer socket inode's actual ownership and original Compose invocation environment were **not** independently inspected in this step.
+- **Focused next test:** Use only this observed nonsecret numeric GID as a subprocess-scoped `TEDDY_LIBRARY_DELETE_DISCOVERY_WRITER_GID=988` interpolation input for the original pinned 13-file `docker compose ... config -q`. Compare the resulting effective service metadata with the live container before any stop/promotion. Do not write an `.env` file, export a persistent shell variable, copy runtime secrets or replace unrelated environment inputs. `READ_ONLY=PASS`; `COMPOSE_RUNTIME_CONFIG=NOT_RUN`, `DOWNLOADER_STOP/BUILD/DEPLOY=NOT_RUN` until that verification.
+
 ## 2026-11-09 — DLSS-001 Compose structure PASS; Writer GID interpolation input missing
 
 - **Teddy's authentic CT108 read-only result:** With 13 pinned original Compose inputs and exact project/working-directory labels, `docker compose config --no-interpolate --no-env-resolution -q` returned `STRUCTURE_EXIT_CODE=0`, `STRUCTURE_CHECK=PASS`. Required interpolation variable *names* extracted from Compose text were exactly `['TEDDY_LIBRARY_DELETE_DISCOVERY_WRITER_GID']`; this required name was **not present in the current shell** and the default `/opt/missav-dlp-web/.env` file was **absent**. No environment values or secrets were printed. Original full `config -q` still remains `BLOCKED` until the exact input is grounded and reproduced.
