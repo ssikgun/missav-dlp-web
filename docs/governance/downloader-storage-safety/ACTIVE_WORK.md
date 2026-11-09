@@ -1,5 +1,14 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-09 — DLFR-001 / DLSS-001 CT108 candidate image build succeeded (NO PROMOTION)
+
+- **Evidence:** Teddy pasted direct CT108 `root@downloader` build output. Existing `missav-dlp-web` stayed exited with PID 0 and exact old image `sha256:ebd164d631450660b79ca29141a3b8c317f71df443b2d209feec51a8a35c000a`; guarded local base tag matched it. Pre-build PLAN/Dockerfile SHA checks matched `5d1b338c924a41e5b19f3e280b63074c67dc66979380dab288e2d62657ae5789` / `afe215bdf70d39676d6cf43043637768632b3b5c9f27a3011d50264e65dde887`; three Python overlays matched canonical pinned SHA values. Remaining manifest and two admin smoke files were present, regular, non-symlinks.
+- **Capacity at build start:** available 39,216,717,824 B; reserve 5,254,478,438 B; conservative temporary build budget 8,589,934,592 B; `CAPACITY=PASS`. No post-build capacity reading yet.
+- **Observed build:** one `DOCKER_BUILDKIT=1 docker build --pull=false --network=none` using the staged image-derived Dockerfile completed with BuildKit `#8 DONE` and CLI `BUILD_CLI=PASS`; local base resolve printed the exact old image digest, but log alone is not an absolute no-registry-contact proof. `sha256sum -c` 10/10, Python compilation, 8/8 admin synthetic smoke and Flask smoke all PASS in the candidate build. Created **candidate-only** `dlfr001-fresh-api-candidate:20261109-1709`, image ID `sha256:b31b0b4dd106abf19d3394b5d703391a7ea522151ae61622ec53b6a1c7b2d7a4`.
+- **Unchanged authorization:** `DEPLOY=NOT_RUN`, `DOWNLOAD=NOT_RUN`, `P08LIB-001 UI HOLD`, independent `DLHLS-001` incident GO not granted. Original stopped container and prior image kept; command did not request media/TS, NAS or DB writes. Old 1,395 TS is last-verified count, not re-counted after the build.
+- **NEXT read-only gate:** confirm daemon-side build completion/other-build quiet and current disk reserve; inspect candidate's four operating UI SHA baselines and runtime source manifest, compare exact old container/image and preserve existing stop. Then verify 13-file effective Compose/rollback parity before any separate service-only promotion decision. No automatic restart; on ambiguity keep old Downloader stopped.
+
+
 ## 2026-11-09 — DLSS-001 v1.0.2 fresh CT108 build-only data/space gate PASS (NO STOP/BUILD)
 
 - **Direct Teddy root@downloader read-only run:** staged PLAN.md SHA256 `5d1b338c924a41e5b19f3e280b63074c67dc66979380dab288e2d62657ae5789` and unchanged Dockerfile SHA256 `afe215bdf70d39676d6cf43043637768632b3b5c9f27a3011d50264e65dde887` verified. Exact old operating image `sha256:ebd164d631450660b79ca29141a3b8c317f71df443b2d209feec51a8a35c000a`, Downloader RUNNING, restart `unless-stopped`, docker top only main Python process.
