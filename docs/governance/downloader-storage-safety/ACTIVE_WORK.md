@@ -1,5 +1,13 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-09 — DLFR-001 API-only release post-deploy read-only smoke PASS (NO LIVE RETRY)
+
+- **Direct Teddy CT108 verification:** `TASK_COUNT=13`, `COMPLETED=10`, `PROTECTED_ERRORS=3`, `BUSY_TASKS=0`; original three failed jobs' parts directories had `PROTECTED_TS_COUNTS=[0,72,1323]`, `PROTECTED_TS_TOTAL=1395`, `TASK_AND_TS_STATE=PASS` (count/identity check, **not** content hash of every TS). No original HLS job was retried or resumed by this test.
+- **Service smoke:** authenticated-facing root `GET /` returned `HTTP_ROOT_STATUS=302` with redirect destination not inspected; `WEB_RESPONSE=PASS`, `HTTP_METHOD=GET_ONLY`, `NEW_IMAGE_RUNNING=PASS`, `POST_DEPLOY_SMOKE=PASS`, `FRESH_RETRY_LIVE_DOWNLOAD=NOT_RUN`. A 302 proves HTTP responsiveness, not actual authenticated fresh-ID API POST behavior. No healthcheck configured (`NO_HEALTHCHECK` observed after rollout).
+- **Outcome boundary:** Image build, approved API-only single-service promotion, runtime config/UI parity and no-write post-deploy smoke PASS. `DLFR-001` live endpoint behavior remains **not exercised in production**; representative pre-release synthetic/Flask tests are recorded separately. `DLHLS-001` retains exclusive independent GO for any one real SORA-489 recovery trial; original three errors/1,395 TS preserved by count, no NAS/media/Jellyfin action and no P08 UI promotion. Exact old image and private rollback manifest remain available at `/opt/missav-dlp-web/backups/dlfr001-api-release-b31b0b4d/`.
+- **NEXT:** No further API deployment or automatic retry. Return Downloader to ordinary use with the new API dormant; treat fresh-ID POST or SORA-489 download as a new separately gated DLHLS-001 operator decision. If follow-up read-only diagnostics become necessary, verify authenticated route without issuing a POST and keep data protection invariant.
+
+
 ## 2026-11-09 — DLFR-001 API-only Downloader service promotion applied PASS (POST-DEPLOY SMOKE PENDING)
 
 - **Direct Teddy CT108 output:** `PRE_DEPLOY_IDENTITY=PASS`, `OVERRIDE_INTEGRITY=PASS`, `IMAGE_ONLY_SCOPE=PASS`, `DISK_RESERVE=PASS`, `ROLLBACK_MANIFEST=PASS`, then one approved `docker compose ... -f <image-only-override> up --detach --no-deps --no-build --pull never --force-recreate --wait --wait-timeout 60 <Downloader service>`. `COMPOSE_UP=PASS`, `NEW_CONTAINER_RUNNING=PASS`, `RUNTIME_PARITY=PASS`, `OTHER_CONTAINER_IDENTITIES=PASS`, `DEPLOY_APPLY=PASS`, `DOWNLOAD_TEST=NOT_RUN`, `OLD_IMAGE_PRESERVED=PASS`.
