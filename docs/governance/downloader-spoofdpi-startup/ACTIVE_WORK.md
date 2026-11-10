@@ -1,5 +1,10 @@
 # Downloader SpoofDPI headless startup — active work
 
+## 2026-11-10 — DLSPD-001 Compose label chain corrected: 13 base + 1 DLFR override (NO DEPLOY)
+
+- **Teddy direct CT108 diagnostic:** A preliminary private override staging script stopped before writing at the incorrect `len(config_files)==13` assertion. The stopped **current** DLFR-origin container has project/service `missav-dlp-web`, working directory `/opt/missav-dlp-web` and **14** original Compose label paths. All 14 paths are regular, non-symlink valid files. Files 1–13 are preserved preexisting Compose inputs; file 14 is exactly `/opt/missav-dlp-web/backups/dlfr001-api-release-b31b0b4d/compose-image-only.yml`, and is last in the chain. Both proposed DLSPD `compose-image-only.yml` and `dlspd001-rollback-manifest.json` remained absent; `OLD_CONTAINER=STILL_STOPPED`, `DEPLOY=NOT_RUN`, `DOWNLOAD=NOT_RUN`.
+- **Corrected next step:** Derive the old effective Compose rendering from all labeled 14 files; stage a private new override by replacing only the exact old DLFR image tag in the verified 14th override; derive proposed rendering from files 1–13 plus the staged replacement override. Require structurally identical JSON config except the one service's image field, and record explicit old 14-file rollback chain/image identity. Keep current Downloader stopped until fresh all-pass, then separately apply one approved targeted service-only cutover; no media retries.
+
 ## 2026-11-10 — DLSPD-001 CT108 candidate image/UI/runtime parity PASS (NO DEPLOY)
 
 - **Teddy CT108 direct verification:** Original Downloader container remains stopped on image `sha256:b31b0b4dd106abf19d3394b5d703391a7ea522151ae61622ec53b6a1c7b2d7a4`; exact new candidate tag `dlspd001-headless-candidate:20261110` resolves to `sha256:7f115859edaa5eb9bd657f74c60741db5ac9d66fdb9667982e67bc7a0a95676f`. `OLD_CONTAINER=PASS`, `CANDIDATE_IDENTITY=PASS`.
