@@ -1,5 +1,11 @@
 # Governance workstream — active work
 
+## 2026-11-10 — P08LIB-001 approved read-only Library NFO identity classification correction (SOURCE ONLY; NO DEPLOY)
+
+- **Observed CT108 facts:** 275 NAS JAV owned-title folders, one recognized `DVD-ID.nfo` or `movie.nfo` each; current Library API showed `VALID=146`, `INVALID=129`, `ABSENT=0`, `UNKNOWN=0`. Read-only XML probe identified all 129 as `MISSING_ID`, without parse/root errors, and **all 129** carry a `<uniqueid>` whose text exactly matches the folder DVD-ID (`UNIQUEID_MATCH=129`, `UNIQUEID_OTHER=0`, `UNIQUEID_ABSENT=0`). This is a Library API strict-`<id>` false-positive, not proven NFO corruption. NAS/DB writes zero.
+- **Teddy explicitly approved (`응 승인해`) the narrow policy:** Preserve valid exact `<movie><id>DVD-ID</id>`; when `<id>` is absent, accept exact matching `<uniqueid>` identity only when values do not conflict. Reject mismatched/multiple conflicting IDs, unsafe/malformed XML, duplicate recognized NFOs, and unreadable/unknown inventory as before. Scope is the read-only `teddy_library_api.py` classifier and existing focused offline `teddy_library_api_smoke.py` fixtures. **No edits to NAS NFO, Stage9 creation/writer, media, DB, Jellyfin or existing UI template.**
+- **P08LIB-001 shared authorization:** governance,downloader,discovery-writer-safety,stage9-media remain task-id-aligned. This is one approved source/test addition alongside, but separate from, the previously held mobile CSS-only build/promotion approval; **no new build, service deployment, runtime replacement or broader UI release is authorized by this NFO decision**. Full existing smoke and eventual in-service visual/API validation remain pending; expected 275/0 display is not a production PASS until actually observed.
+
 ## 2026-11-10 — DLSPD-001 registration and conditional headless service release user-approved
 
 - Teddy explicitly approved the proposed dedicated SpoofDPI headless-start workstream and then said `실제 서비스 교체까지 승인할께`. Register independent `downloader-spoofdpi-startup / DLSPD-001` with v1.0.0 contract and self-only active task. This narrow precedence covers only `teddy_spoofdpi.py` headless argv, its offline smoke and conditional target-only runtime image replacement; leave current `P08LIB-001` UI HOLD and all other workstream task IDs/contracts intact.
