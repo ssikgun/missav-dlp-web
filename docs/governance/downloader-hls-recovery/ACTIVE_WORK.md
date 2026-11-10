@@ -1,5 +1,11 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — New SORA-489 task terminal COMPLETE; expected SSH NAS path stat absent (verification held)
+
+- **Teddy CT108 read-only verification output:** Job e36dac14-6db7-4b7b-9dba-825fd7560b5e exists among 14 tasks, reports NEW_STATUS=완료; provenance references failed original 4adb423e-5be0-4560-b113-3eef5df6f19b, route VPN and original error status are intact. The script entered NAS MP4 verification after checking saved filename had 2 POSIX components, parent missav, .mp4 extension and SSH final backend.
+- **Failure point:** Python AssertionError at line 48 of the provided verification code, corresponding to the conditional that teddy_storage._ssh_remote_stat(saved filename) is not None (given the preceding assertions). This suggests the **currently configured SSH final root does not have a regular file at the task's saved relative path**, despite persisted complete status; do not mistake completed job state for a presently verified NAS object. Possibilities such as later media relocation, unexpected filename/config/path or external removal are **unverified**. The check stopped before remote byte comparison and protected 1,395-TS recount; no writes, retries or downloads caused by diagnostic.
+- **Next least-intrusive action:** Read-only print of sanitized task saved filename/path, filesize, storage metadata, configured SSH final root and remote stat result; check known post-download mover provenance before concluding publication failure. Preserve the complete new job and all three original failures/TS; no retry, cleanup, relocation, redeploy or filesystem mutation until cause is clear.
+
 ## 2026-11-10 — Teddy reports SORA-489 new task MP4 conversion completed; final NAS verification pending
 
 - **Operator report:** Teddy confirmed that the new-ID SORA-489 (fresh task e36dac14-6db7-4b7b-9dba-825fd7560b5e, original 4adb423e-5be0-4560-b113-3eef5df6f19b) finished MP4 conversion after the authenticated one-task live retry. This is a directly stated user observation, **not yet independently verified** from on-disk task state, SSH NAS output, MP4 queue records or original TS inventory.
