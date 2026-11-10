@@ -1,5 +1,12 @@
 # Downloader SpoofDPI headless startup — active work
 
+## 2026-11-10 — DLSPD-001 CT108 guarded stop and one-image offline build PASS (NO DEPLOY)
+
+- **Direct Teddy CT108 checks:** `CONTAINER_IDENTITY=PASS`, staged source digest `4c47ddafe6dcb7c478a47ac711c7c3ef7afcad0cde6c6e176d5a49ac30a1792b` PASS, unused candidate tag PASS, `ACTIVE_DOWNLOAD_GATE=PASS` with 13 tasks/0 busy, 0 FFmpeg processes and 1,395 protected TS, unrelated Gluetun/Selkies container identities/state PASS, available bytes `41002524672` and reserve+build budget PASS. Local base `dlspd001-local-base:b31b0b4d` pinned exactly to current source image ID `sha256:b31b0b4dd106abf19d3394b5d703391a7ea522151ae61622ec53b6a1c7b2d7a4`.
+- **Maintenance stop:** Original running Downloader container `62ddcadf45be7a72f121c71802ddc10ada0beab849b7582568d2bee92147099c` stopped with `docker stop --timeout 45`; `DOWNLOADER_STOP=PASS`. Other containers left running. `OLD_CONTAINER=STILL_STOPPED` after build; no new download.
+- **Exactly one local-only candidate build:** `docker build --pull=false --network=none` with one-source overlay and Python syntax/SHA guard completed steps 1/3 base from the pinned current image, 2/3 COPY `teddy_spoofdpi.py`, 3/3 Python compile and `HEADLESS_SOURCE_HASH=PASS`. New tag `dlspd001-headless-candidate:20261110`, image ID `sha256:7f115859edaa5eb9bd657f74c60741db5ac9d66fdb9667982e67bc7a0a95676f`. `IMAGE_BUILD=PASS`, `DEPLOY=NOT_RUN`, `DOWNLOAD=NOT_RUN`. Build CLI output itself is not complete image runtime/UI/Compose parity or product PASS.
+- **Next:** Read-only candidate image runtime config, exact source and unchanged deployed API/UI hash comparison; stage separate private image-only Compose override with current API image rollback identity, compare effective Compose image-only delta, then single approved Downloader-only promotion. If any gate fails, keep original stopped and report; no blind retry/rollback, no P08 UI promotion or DLHLS new-ID POST.
+
 ## 2026-11-10 — DLSPD-001 isolated bridge headless listener PASS, production still unchanged
 
 - **Teddy CT108 evidence:** Disposable `docker run --rm -i --pull=never --network=bridge --cap-drop=ALL --security-opt=no-new-privileges` from exact current base image invoked `spoofdpi --no-tui`; inside isolated container `PROXY_LISTENER=OPEN`, `EARLY_EXIT_CODE=None`, `HEADLESS_BRIDGE_TEST=PASS`, `TEST_PROCESS_CLEANUP=PASS`. Original `missav-dlp-web` image and running state stayed unchanged at end; `DOWNLOADER=STILL_RUNNING`, `IMAGE_BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`, `DOWNLOAD=NOT_RUN`.
