@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-10
 
+- **DLDWS-001 Docker 패치·자막 연결 경계 정적 지도 완료(2026-11-11 08:05:11 KST Codex 보고):** 실제 Dockerfile 호출 패치 22/총 24개(원격에서 독립 수치 확인), 나머지 2개 직접 호출 없음. 최종 Overlay에서 사라지는 중간 변경과 살아남는 network/proxy/generic/JS/icon 변경을 구분했고, 다운로드 완료→Stage9 media, Stage11 생성→Stage12 발행/상태 경계를 정리. 상세 22개 매핑과 확인 불가 사항은 `docs/handoff/missav-dlp-web/DLDWS_STRUCTURE_AUDIT_20261111.md`에 저장. **실제 운영 동작·전체 기능 동등성 미검증, P04 후보는 아직 선정 전**. 다음 단계는 읽기 전용 위험도 평가와 1–3개 최소 통합 후보를 사용자에게 제안하는 것.
+
 - **DLDWS-001 전체 구조 감사 1단계 부분 완료 (2026-11-11 07:58:54 KST Codex 보고):** 원격/격리 체크아웃 SHA `915bc41a`·clean PASS, 추적 619개와 Python 424개(원격 트리 독립 재확인). Dockerfile 최종 Overlay COPY 뒤 부트스트랩 CMD, root/Overlay 5쌍의 서로 다른 역할과 기존 단일 원본 3개를 확인. **패치별 실제 변경 대상 전수 매핑·Stage9→Stage11→Stage12 경계·전체 런타임 사용 여부는 아직 미완료**. 현재 P04 통합 후보 없음, 코드/운영 변경 없음. 다음은 읽기 전용 누락 경로 추적과 안전성 우선순위 평가 후 1–3개 후보 제시.
 
 - **DLDWS-001 전체 코드 감사 재개 준비 PASS (Codex 보고 2026-11-10 17:59:05 KST):** 최신 `a2316bef857f20bbd8a95804acb00fce92b88bad`를 `/tmp/downloader-audit-a2316-1794301122`에 분리 체크아웃, HEAD 일치·작업 트리 깨끗함·공통 계약 1.0.1 및 Downloader/Writer `DLDWS-001` 공동 승인 확인했다고 보고. 원격 SHA는 2026-11-11 독립 재확인. **이전 로컬 오염으로 인한 BLOCKED는 이 격리 체크아웃 확보로 해소**; 단 전체 코드·빌드 구조 감사는 **아직 시작 전**. 다음: 격리 사본에서 읽기 전용 전수 조사 후 P04 최소 후보 1–3개 설계안 보고. 코드 변경·빌드·운영 배포 미승인.
