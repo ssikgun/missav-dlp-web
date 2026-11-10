@@ -1,5 +1,11 @@
 # Downloader SpoofDPI headless startup — active work
 
+## 2026-11-10 — DLSPD-001 isolated headless binary listener probe failed under restrictive sandbox (NO STOP/BUILD)
+
+- **Teddy CT108 result:** A disposable `docker run --rm -i --pull=never --network=none --cap-drop=ALL --security-opt=no-new-privileges` with the proven current image invoked `spoofdpi --no-tui` as a subprocess; `PROCESS_EXITED_EARLY=True`, `LOCAL_PROXY_LISTENER=CLOSED`, then `AssertionError: HEADLESS_PROXY_NOT_READY`. The script suppressed stdout/stderr so exit code/error cause unknown. Fail-closed: `HEADLESS_RUNTIME_TEST=NOT_PASS`; outer command stopped before post-test current-service identity check.
+- **Interpretation:** The disposable test network/capability restrictions differ from actual production Compose and could themselves cause early exit. This observation **does not prove** `--no-tui` is ineffective in real runtime; do not proceed with build or service stop until a bounded **same-isolation** sanitized stderr/exit-code diagnostic identifies the blocker, then decide proportional representative testing. No change to current Downloader, 3 jobs or TS was requested by this test.
+- **Current release state:** staged source `SOURCE_STAGE=PASS`; `DOWNLOADER_STOP=NOT_RUN`, `IMAGE_BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`, `DOWNLOAD=NOT_RUN`. Next isolated read-only diagnostic should suppress external network/real download and print only redacted failure details, then verify target still running. No retries.
+
 ## 2026-11-10 — DLSPD-001 CT108 private one-file source stage PASS (NO STOP/BUILD)
 
 - **Teddy CT108 operation:** Private staging directory `/opt/missav-dlp-web/backups/dlspd001-headless-tAZ957uv`, sourced by `docker cp` only from current running Downloader's `/app/teddy_spoofdpi.py`. Input source SHA256 `ba0a04d5ef952a1b388242154d50daf857a1347508ae39633292c6291d8534ac`; exact single call edit and docstring correction produced verified staged output SHA256 `4c47ddafe6dcb7c478a47ac711c7c3ef7afcad0cde6c6e176d5a49ac30a1792b`, byte-identical to GitHub `ca2e5236` source.
