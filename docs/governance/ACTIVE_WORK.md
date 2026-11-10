@@ -14,8 +14,8 @@ This file routes a request to its workstream contract and active task. It is not
 
 ## WORKSTREAM: governance
 
-STATUS: IN_PROGRESS
-TASK_ID: P08LIB-001
+STATUS: INACTIVE
+TASK_ID: NONE
 CONTRACT_PATH: docs/governance/PROJECT_CONTRACT.md
 ACTIVE_WORK_PATH: docs/governance/governance/ACTIVE_WORK.md
 AREA_HINTS:
@@ -35,7 +35,7 @@ AREA_HINTS:
 ## WORKSTREAM: downloader
 
 STATUS: IN_PROGRESS
-TASK_ID: P08LIB-001
+TASK_ID: DLDWS-001
 CONTRACT_PATH: docs/governance/downloader/PROJECT_CONTRACT.md
 ACTIVE_WORK_PATH: docs/governance/downloader/ACTIVE_WORK.md
 AREA_HINTS:
@@ -98,7 +98,7 @@ AREA_HINTS:
 ## WORKSTREAM: discovery-writer-safety
 
 STATUS: IN_PROGRESS
-TASK_ID: P08LIB-001
+TASK_ID: DLDWS-001
 CONTRACT_PATH: docs/governance/discovery-writer-safety/PROJECT_CONTRACT.md
 ACTIVE_WORK_PATH: docs/governance/discovery-writer-safety/ACTIVE_WORK.md
 AREA_HINTS:
@@ -110,7 +110,7 @@ AREA_HINTS:
 ## WORKSTREAM: stage9-media
 
 STATUS: IN_PROGRESS
-TASK_ID: P08LIB-001
+TASK_ID: STG9MEDIA-001
 CONTRACT_PATH: docs/governance/stage9-media/PROJECT_CONTRACT.md
 ACTIVE_WORK_PATH: docs/governance/stage9-media/ACTIVE_WORK.md
 AREA_HINTS:

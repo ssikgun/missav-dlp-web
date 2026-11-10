@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-10 — P08LIB-001 official closeout after final live P08 PASS (Teddy-approved)
+
+- **Final authenticated product evidence:** `P08_FINAL_READONLY=PASS`; `HTTP=200`, `TOTAL=275`, `SUMMARY_CARDS=5`, `STATUS_SECTIONS=3`, `STAGE12_METRICS=5`, `NFO_VALID=275`, `NFO_INVALID/ABSENT/UNKNOWN=0`; `POSTER_PRESENT=274`, `POSTER_ABSENT=1`, `POSTER_UNKNOWN=0`, `POSTER_SUM_MATCH=true`. Teddy separately verified unchanged PC layout and mobile single-column cards. Optional Stage9 job state remains `UNKNOWN` with web DB unmounted, by approved policy. One absent poster is a truthful NAS-local state, not P08 failure.
+- **Release preserved:** Pinned single-Downloader image `sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c`, prior image retained, rollback manifest `/opt/missav-dlp-web/backups/p08lib001-deploy-svoyarjp/rollback-manifest.json`; Stage9 timer and SpoofDPI runtime verified in preceding checkpoint; other containers unchanged.
+- **Official transition authorized:** Teddy said `응승인해` for completion, 4-workstream route restoration and canonical handoff/roadmap updates. Historic `P08LIB-001=COMPLETED`. From pre-P08 commit `c020a8a9bbf9ac05b34975894edb9dd5d630a275`, restored Governance `INACTIVE/NONE`, Downloader and Writer `DLDWS-001/IN_PROGRESS`, Stage9 `STG9MEDIA-001/IN_PROGRESS`. DLHLS/DLFR/DLSS/DLSPD/Stage11 retain independent authorization and status. This closeout edits only documentation: no code, Docker, NAS/DB/Jellyfin, download or media change.
+- **Next:** P04 duplicate-source consolidation proposal, read-only first; implementation and production rollout are not authorized by the roadmap entry.
+
 ## 2026-11-10 — P08LIB-001 two-file image deployed; NFO 275 valid and mobile one-column verified (CT108)
 
 - **Teddy-approved release executed:** After the earlier executor-only preflight block, actual CT108 isolated/source-pinned preflight and one **build-only** PASS. Candidate p08lib001-nfo-css:7676f9f-238bbe6e, image sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c, derived from preserved old image sha256:7f115859edaa5eb9bd657f74c60741db5ac9d66fdb9667982e67bc7a0a95676f, with **only** /app/teddy_library_api.py and /app/templates/teddy-library.css replaced from approved commit 7676f9f78d30d1d6a9a5bf63e9e9ca9768fbe204. Candidate file hashes match /tmp/p08-nfo-candidate-manifest.txt. Initial build-only restored the original container successfully; subsequent independent release preflight/Compose image-only parity/rollback PASS.

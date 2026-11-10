@@ -1,13 +1,17 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-07 KST (Teddy 승인: P08 라이브러리 UI를 P04 중복 코드 통합보다 먼저; P00 Stage9 완료 상태 유지)
+UPDATED_AT: 2026-11-10 KST (P08LIB-001 최종 PASS·공식 종료·이전 라우팅 복원 승인; 다음 P04 설계)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
-## 0. 최신 확인 결과 — 2026-11-07
+## 0. 최신 확인 결과 — 2026-11-10
+
+- **P08LIB-001 공식 종료 및 4영역 라우팅 복원 — Teddy 승인:** 인증된 실운영 GET `/api/library` HTTP 200, 전체 275건, NFO VALID 275 / INVALID·ABSENT·UNKNOWN 각 0, NAS 로컬 포스터 PRESENT 274 / ABSENT 1 / UNKNOWN 0, 총합 275 일치. 요약 카드 5개, 보유 상태 섹션 3개, 별도 Stage12 지표 5개, PC 기존 배치와 모바일 1열을 Teddy가 확인했고 `P08_FINAL_READONLY=PASS`. Stage9 작업 상태 `UNKNOWN`은 승인된 미연결 상태이고 포스터 1건 ABSENT는 실제 파일 유무 표시이므로 P08 실패가 아님. 이전 정상 배포 이미지 `sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c`와 기존 롤백 보존. 역사적 P08 작업 `COMPLETED`. 원래 승인 라우팅(기준 커밋 `c020a8a9bbf9ac05b34975894edb9dd5d630a275`): Governance `INACTIVE/NONE`, Downloader+Writer `DLDWS-001`, Stage9 `STG9MEDIA-001` 복원. DLHLS·DLFR·DLSS·DLSPD·Stage11 불변; 새 빌드·운영/미디어/DB 쓰기 없음. **다음 P04는 읽기 전용 후보 검토부터, 실제 구현은 별도 승인 필요.**
+
+### 2026-11-07 및 그 이전 기록 (작성 당시 상태로 보존)
 
 - **P08 CT108 Docker Compose single-service recreation returned success, postcheck CHECK_REQUIRED (2026-11-07):** Real command reached `LIVE_PREFLIGHT=PASS`, `DEPLOY_CONFIG_ONLY_IMAGE_CHANGED=PASS`, `ROLLBACK_PREPARED=PASS`, `COMPOSE_UP=PASS`, then `PHASE=APPLY_ATTEMPTED` / `AssertionError` / `DEPLOYMENT=CHECK_REQUIRED`. Rollback assets at `/opt/missav-dlp-web/backups/p08lib-deploy-20261107-b92t5ncp`; no automatic rollback. The exact failed assertion and current live image/health/other-service identity need a non-mutating check. **Do not repeat deploy script or rollback blindly.** Only after read-only evidence can rollout be marked PASS/FAILED and PC/mobile API/UI smoke attempted.
 
@@ -157,19 +161,19 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 2. 고정 우선순위 / 앞으로의 작업
 
-| 순번 | ID | 기능별 작업 | 현재 상태 (2026-11-06) | 다음 단계 / 완료 조건 / 승인 |
+| 순번 | ID | 기능별 작업 | 최신 상태 (2026-11-10) | 다음 단계 / 완료 조건 / 승인 |
 | --- | --- | --- | --- | --- |
 | 0 | P00 | **Stage9 포스터 자동화 완성 및 4개 작품 통합 시험** | **완료 — Stage9 메타데이터·포스터 운영 및 10건/10분 설정 PASS (11-06)** | 4개 기존 작품 이미지/NAS/Jellyfin 실증, 기존 이미지 54/54 보완, 신규 HUNTB 2건 NFO·포스터·Jellyfin 사용자 확인, 10건 제한 설정 및 첫 예약 실행 PASS. 실제 10건 동시 대기열 연속 처리와 신규 다운로드의 포스터 원본 부재→Fourhoi 폴백 사례는 NOT_RUN; 자연 발생 시 확인. 전체 260개 NFO의 독립 파일 완전성까지 증명한 것은 아님. 기존 파일·백업·기록 보존, 무단 재처리 금지. |
 | 1 | P01 | **미디어 자동화 잔여 항목 원인 확인** (과거 Stage9 Media) | **완료 — 조사 범위 한정** | 10-29 과거 DB 원인 분류 후 11-06 정확한 구형 포스터 상태 11행 조정 PASS. 현재 Stage9 전용 타이머는 10분 주기로 정상 active/waiting. 기존 exhausted=3, held_backoff=1 관찰값은 과거 상태이며 새 실패를 뜻하지 않음. 나머지 FAILED 상태의 임의 초기화·재시도·광역 정리는 미승인/보류. |
 | 2 | P02 | **루트/Overlay 중복 파일 5쌍의 읽기 전용 정밀 검수** | **완료 — 정적 소스·패치 비교 범위만 (2026-10-29)** | 5쌍 모두 분석: HTML은 최종 Overlay 기준 UI/패치 순서, 저장 코드는 no-overwrite·SHA-256, 엔트리포인트는 HLS/MP4, 부트스트랩은 보호된 게시·복구, 앱은 영속 상태·재시도 안전성 차이가 핵심. 실제 빌드 중간 산출물과 새 단일 원본의 byte-identical 동등성은 미검증이며 P04 구현·검증 승인 시 별도 확인. 소스·이미지·운영 변경 0. |
-| 3 | P03 | **NFO 작품번호 표시·Jellyfin 검색 및 신규 NFO 자동화** | **대표 제품 및 신규 자동화 PASS / 전체 260개 NFO 정합성 확인필요** | 기존 movie.nfo 129개 확인, 제목 보정 225건과 누락 NFO 3건 복구 PASS, MBRBI-015 대표 NFO/Jellyfin 검색 PASS, 신규 HUNTB-653·662 NFO/포스터/Jellyfin 사용자 확인 PASS. Stage9 10분 타이머는 현재 active, 10건 제한 예약 실행 PASS. 전체 보유작품 260개 NFO 실파일·필드 완전성은 별도 실측하지 않았음. 완료 NFO 재생성 금지. |
-| 4 | P08 | **파일 관리: 보유 라이브러리 요약·라이브러리 DB 현황 화면 개편** | **오프라인 후보 구현·대표 테스트 승인 / 실행 및 검증 대기** | 전체 작품·한국어 자막·NFO 메타데이터·NAS 로컬 포스터·용량 요약 및 자막/메타데이터/포스터 현황 섹션. 먼저 실제 운영 UI/Overlay와 데이터 집계의 읽기 전용 설계·영향 분석; 구현 범위·공유 workstream 승인·운영 배포는 별도 승인. P08 제품 검증 후 P04에서 최종 소스 통합. |
-| 5 | P04 | **검수로 확정된 중복만 단계적 단일 원본화** | **P08 이후 — 미착수 / 구현 승인 필요** | P08 UI 변경과 실사용 검증을 완료한 뒤 P02의 5쌍 중 최종 Docker 빌드·Overlay 패치 의존성과 코드 보호 경계를 읽기 전용으로 짧게 확인해 최소 대상·위험·격리 테스트·복구 계획을 제안. 우선 HTML 검토 제안이나 실제 제거·단일화는 확정 대상과 사용자 승인 후에만. DLDWS-001 공유 영향은 Downloader/Writer 계약 모두 확인. |
+| 3 | P03 | **NFO 작품번호 표시·Jellyfin 검색 및 신규 NFO 자동화** | **운영 NFO 집계 275/275 유효 (11-10)** | 실제 NAS 275 작품 인벤토리와 인증 API에서 유효 275, 오류·없음·확인 불가 각 0. `<uniqueid>` 129건의 잘못된 NFO 오류 판정은 코드만 교정하여 해결, NAS NFO 재생성 없음. 당시 260건 기록은 이력으로 보존. |
+| 4 | P08 | **파일 관리: 보유 라이브러리 요약·라이브러리 DB 현황 화면 개편** | **완료 — 최종 제품 검증 PASS (11-10)** | 실제 PC·모바일 배치, 요약 5/보유 상태 3/별도 Stage12 5, NFO 275, 포스터 274+1 일치. 공유 `P08LIB-001` 종료 및 기존 4영역 라우팅 복원 승인. Stage9 작업 DB 미연결 `UNKNOWN`은 승인된 정책. 추가 Docker/데이터 변경 없음. |
+| 5 | P04 | **검수로 확정된 중복만 단계적 단일 원본화** | **P08 이후 다음 순서 — 구현 미승인** | P02 5쌍 중 최종 Overlay/Docker 순서와 데이터 보호에 영향을 주지 않는 최소 후보를 먼저 읽기 전용으로 선정. 실제 코드 수정·빌드·배포는 관련 작업 ID와 별도 사용자 승인 후에만. |
 | 6 | P05 | **일반 다운로드/Discovery Writer 작업 DLDWS-001 종료 조건 점검** | **미착수 — 대표 운영 검증 PASS** | 이미 완료한 Docker 이미지 교체·FNS-267 실사용 성공을 재검증 없이 활용한다. 남은 계약상 미완료 조건과 Writer 소켓 안전성 이력만 정리하고 사용자 결정 후 종료 여부 판단. 현재 두 영역 모두 `IN_PROGRESS / DLDWS-001`. |
 | 7 | P06 | **한국어 자막 음성 인식/화자 근거 확인** (이전 Stage11) | **진행 중 — 별도 독립 작업** | 현재 `S11-WX011 / IN_PROGRESS`. 기존 S04/S08/S13 일본어 후보와 오디오를 사용자에게 비교 제시할 다음 결정이 남아 있음. S03/S11/S15 누락 의심, 일본어 정답/정확한 경계/화자 DER는 UNKNOWN. 계약에 따른 읽기 전용 범위만. |
 | 8 | P07 | **한국어 자동 자막 품질·게시 최종 완성** | **미착수/후속 승인 필요** | 외부 JA+ASR 증거, 누락 대화 회복, 자연스러운 Hermes 번역/문장·화자 경계와 Stage12 안전 게시까지 제품 품질 입증 필요. 설계 우선순위 충돌은 사용자 결정, 자막 생성·실행·게시는 별도 승인. |
 
-### P08 읽기 전용 코드 조사 결과 및 UI 개편 요구 (구현 미승인)
+### P08 초기 읽기 전용 조사 기록 (완료 전 이력)
 
 - **수정 영향 후보:** 최종 `downloader_runtime_overlay/templates/index.html`, 기존 `templates/teddy-library.js`, `templates/teddy-library.css`, `teddy_library_api.py`, 대응 smoke 테스트. Dockerfile COPY 순서상 root `templates/index.html`만 변경해서는 제품 HTML에 반영되지 않는다. 코드 수정 전에 최신 운영 이미지에서 최종 산출물·자산·설정 일치 여부 확인필요.
 - **기존 API 재사용:** `/api/library` 작품/KO/용량은 재사용 가능. NFO 유효성(NAS 파일·XML/작품 ID)과 NAS 로컬 Primary(정식 poster/cover 등) 존재는 아직 API 미제공. `cover_url`/Jellyfin 내부 Primary를 로컬 파일 완료로 착각하지 않는다. 읽기 전용 인벤토리 내 범위·시간·바이트 상한과 UNKNOWN 처리를 먼저 설계해야 한다.

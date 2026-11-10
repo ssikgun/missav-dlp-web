@@ -1,5 +1,11 @@
 # Stage9 Media workstream — active work
 
+## 2026-11-10 — P08LIB-001 FINAL PASS; Teddy-approved closeout and prior routing restored
+
+- **Final live user acceptance:** After the approved CT108 Downloader-only two-file release, Teddy verified PC layout unchanged and mobile library DB cards in a single column. Authenticated browser Console `GET /api/library` returned `HTTP=200`, `TOTAL=275`, five summary cards, three NAS holdings status sections and five separate Stage12 metrics. `NFO_COUNTS={VALID:275,INVALID:0,ABSENT:0,UNKNOWN:0}`; `POSTER_COUNTS={PRESENT:274,ABSENT:1,UNKNOWN:0}`; poster sum equals 275. Final `P08_FINAL_READONLY=PASS`. The one absent NAS-local Primary poster is an honest inventory result, not a P08 UI failure; the optional Stage9 job-state field remains approved `UNKNOWN` because the web container has no Stage9 DB mount.
+- **Prior release and protection evidence:** Pinned image `sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c` deployed to `missav-dlp-web` only; previous image and rollback manifest `/opt/missav-dlp-web/backups/p08lib001-deploy-svoyarjp/rollback-manifest.json` retained. SpoofDPI process and Stage9 timer normal, companion containers unchanged. No new product/source image build, runtime modification, NAS NFO/poster edit, DB/Jellyfin write, retry or cleanup is performed by this documentation-only closeout.
+- **Teddy's explicit closeout approval:** `응승인해` on 2026-11-10 approved P08 official completion, evidence updates, roadmap/handoff synchronization, and restoration of the four temporarily shared routes from pre-P08 commit `c020a8a9bbf9ac05b34975894edb9dd5d630a275`. `P08LIB-001=COMPLETED` (historical task); this workstream's current metadata below is restored to its prior independent task. All other workstreams including DLHLS-001, DLFR-001, DLSS-001, DLSPD-001, and S11-WX011 remain unchanged. P04 implementation is a future separately approved decision.
+
 ## 2026-11-10 — P08LIB-001 CT108 two-file build/deploy and live NFO/mobile checks PASS (FOLLOW-UP)
 
 - **Actual CT108 outcome:** One isolated, pinned-source build completed, image p08lib001-nfo-css:7676f9f-238bbe6e (sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c); only teddy_library_api.py and templates/teddy-library.css replaced on old base sha256:7f115859edaa5eb9bd657f74c60741db5ac9d66fdb9667982e67bc7a0a95676f. Build-only preserved/restored old container, then fresh gated Docker Compose image-only deployment succeeded, replacing only missav-dlp-web. New running container ID 6fe1841f2b66b43a8016a9483b6e0017d2c23c12c3b48c692937e3eff83e634f; image/hash, mounts/ports, other containers unchanged and Stage9 timer active/waiting PASS; python and SpoofDPI both running.
@@ -3106,10 +3112,10 @@ NEXT SINGLE CHECKPOINT: Separate bounded NAS read-only verification of the exact
 
 
 WORKSTREAM: stage9-media
-TASK_ID: P08LIB-001
+TASK_ID: STG9MEDIA-001
 STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.9
-REQUIRES_WORKSTREAMS: governance,downloader,discovery-writer-safety,stage9-media
+REQUIRES_WORKSTREAMS: stage9-media
 
 ## P03-H NAS DUAL-UID TWO TARGETS ABSENT / SOURCE VERIFIED PREFLIGHT PASS — 2026-11-02 KST
 
