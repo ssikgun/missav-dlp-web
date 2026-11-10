@@ -1,5 +1,10 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — DLHLS-001 SORA-489 declared peak bitrate 2.8 Mb/s, storage margin high (NO RETRY)
+
+- **Teddy CT108 read-only selected variant master check:** Three variant attributes: 640x360 `BANDWIDTH=800000` bps, 842x480 `1400000` bps, selected 1280x720 `2800000` bps. No `AVERAGE-BANDWIDTH` declared. Prior current variant `#EXTINF` sum `8469.2` seconds and 2,118 segments. Using the **advertised maximum segment bitrate** yields `DECLARED_PEAK_BASED_BYTES=2964220000` (~2.76 GiB) for the selected HLS stream at that duration, if publisher metadata is accurate. Runtime `FREE_BYTES=41002582016`, reserve `5254478438`, `HEADROOM_AFTER_RESERVE_BYTES=35748103578` (~33.3 GiB).
+- **Decision status:** This is a strongly favorable capacity signal, **not** an independently measured exact total of 2,118 TS segments or a proven peak working-disk ceiling including MP4 remux; `FULL_REQUIRED_BYTES=NOT_YET_CERTIFIED`. No TS, task, NAS or database change; `RETRY_POST=NOT_RUN`, `DOWNLOAD=NOT_RUN`. Do not perform thousands of per-segment HEADs by default (disproportionate GOV-008). Next inspect deployed fresh-ID API admission/size reservation semantics, derive a conservative bounded trial working budget using existing disk safety, and verify **current live HTML title → actual output filename**, local and canonical SSH NAS collision/ownership. If strict full-required gate remains unresolved, ask Teddy to decide a narrow explicitly bounded dynamic-capacity policy rather than silently waiving the approved contract.
+
 ## 2026-11-10 — DLHLS-001 SORA-489 current master+variant HLS metadata PASS, 2,118 TS (NO RETRY)
 
 - **Teddy CT108 bounded read-only VPN HLS metadata probe:** Saved SORA-489 failed custom-HLS task identity `4adb423e-5be0-4560-b113-3eef5df6f19b`, 13 tasks all idle, persisted VPN route and new runtime image PASS. Exact source HTML over VPN `SOURCE_HTTP=200`, `SOURCE_BYTES=243484`, video UUID extracted by approved custom extractor's `seek`-adjacent pattern. Constructed surrit.com current master `MASTER_HTTP=200` (315 bytes), `MASTER_PLAYLIST=PASS`, `AVAILABLE_VARIANTS=3`.
