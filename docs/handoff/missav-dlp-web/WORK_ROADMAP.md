@@ -1,13 +1,15 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-10 KST (P08LIB-001 최종 PASS·공식 종료·이전 라우팅 복원 승인; 다음 P04 설계)
+UPDATED_AT: 2026-11-11 KST (DLDWS-001 격리 감사 사전 점검 PASS; 전체 감사 본 작업 대기)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
 ## 0. 최신 확인 결과 — 2026-11-10
+
+- **DLDWS-001 전체 코드 감사 재개 준비 PASS (Codex 보고 2026-11-10 17:59:05 KST):** 최신 `a2316bef857f20bbd8a95804acb00fce92b88bad`를 `/tmp/downloader-audit-a2316-1794301122`에 분리 체크아웃, HEAD 일치·작업 트리 깨끗함·공통 계약 1.0.1 및 Downloader/Writer `DLDWS-001` 공동 승인 확인했다고 보고. 원격 SHA는 2026-11-11 독립 재확인. **이전 로컬 오염으로 인한 BLOCKED는 이 격리 체크아웃 확보로 해소**; 단 전체 코드·빌드 구조 감사는 **아직 시작 전**. 다음: 격리 사본에서 읽기 전용 전수 조사 후 P04 최소 후보 1–3개 설계안 보고. 코드 변경·빌드·운영 배포 미승인.
 
 - **DLDWS-001 전체 코드/구조 감사 착수 BLOCKED (2026-11-10 17:49:38 KST):** Teddy가 전달한 Codex 결과는 최신 원격 `65b2413d980ce8f9b1077481e46e8a83f64ccaf4`는 확인했지만 Codex 로컬 HEAD가 `587ed8c9`이고 추적 삭제 584개/수정 1개, 최신 객체 부재로 감사 불가라는 내용. 원격 HEAD는 독립 확인했고, 로컬 손상 여부·파일 목록은 Codex 보고 기준. 이번 시도에서 전체 파일 인벤토리, 새 중복 비교, Stage9/11/12 경계, 위험 우선순위, P04 후보는 모두 **미실시/판정 보류**. 기존 P02 5쌍 점검은 그대로 과거 완료 기록. **다음은 보호된 작업 트리를 보존한 새 격리 소스 사본으로 읽기 전용 감사 재개**; P04 코드 변경·빌드·배포 미승인.
 

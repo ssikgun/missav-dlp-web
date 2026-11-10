@@ -1,5 +1,12 @@
 # Downloader non-subtitle workstream — active work
 
+## DLDWS-001 ISOLATED AUDIT CHECKOUT PREFLIGHT PASS (Codex report 2026-11-10 17:59:05 KST)
+
+- **Reported result:** Teddy forwarded Codex's paused preflight report: `REPOSITORY_IDENTITY=PASS` (`ssikgun/missav-dlp-web`, `teddy-subtitle-stage11`); `REMOTE_SHA=PASS` and `LOCAL_HEAD_MATCH=PASS` at `a2316bef857f20bbd8a95804acb00fce92b88bad`; `ISOLATED_CHECKOUT=PASS` at `/tmp/downloader-audit-a2316-1794301122`; `WORKTREE_CLEAN=PASS`. `COMMON_CONTRACT=PASS` v1.0.1; `DLDWS_AUTHORIZATION=PASS` with Downloader and Writer Safety both `DLDWS-001 / IN_PROGRESS`, contracts v1.0.0 and approved read-only structure audit. GitHub branch HEAD `a2316bef857f20bbd8a95804acb00fce92b88bad` was independently read back on 2026-11-11 KST; isolated executor directory and status are Codex-reported, not independently mounted here.
+- **Safety and limits:** `AUDIT_PREFLIGHT=PASS`; `PROTECTED_WORKTREE_CHANGED=NO`, `PRODUCT_SOURCE_CHANGED=NO`, `PRODUCTION_CHANGED=NO` (Codex report). The earlier dirty-local-worktree BLOCKED checkpoint remains historical. **No repository-wide inventory, executable/runtime graph, renewed five-pair comparison, cross-stage interface review, risk classification, or P04 target selection has yet been performed in this attempt.**
+- **Next permitted action:** Continue the already approved `DLDWS-001` **read-only** whole-repository architecture audit using only the clean isolated checkout, with actual build order/final Overlay, duplication and static call/dependency map, protection of Downloader/Writer ownership and Stage9/11/12 interface boundaries. Report evidence, unknowns and 1–3 small P04 candidates for Teddy's later approval; do not edit product source, contracts or other workstreams or build/deploy/operate media systems. Update canonical milestones as evidence arrives, keeping source changes and design decisions separate.
+
+
 ## DLDWS-001 FULL-REPOSITORY STRUCTURE AUDIT PREFLIGHT BLOCKED (2026-11-10 17:49:38 KST)
 
 - **Evidence basis:** Teddy supplied Codex's 17:49:38 KST read-only report. The Codex executor reported local HEAD `587ed8c9f79bea2584b4b91b52293527ee9d9e38`, with 584 tracked deletions and one modification; the remote `teddy-subtitle-stage11` HEAD `65b2413d980ce8f9b1077481e46e8a83f64ccaf4` was visible but that commit object was not present in its local repository. GitHub HEAD `65b2413d980ce8f9b1077481e46e8a83f64ccaf4` was independently confirmed from the canonical remote. The dirty worktree was not modified.
