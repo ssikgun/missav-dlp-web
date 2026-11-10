@@ -1,5 +1,11 @@
 # Downloader SpoofDPI headless startup — active work
 
+## 2026-11-10 — DLSPD-001 CT108 candidate image/UI/runtime parity PASS (NO DEPLOY)
+
+- **Teddy CT108 direct verification:** Original Downloader container remains stopped on image `sha256:b31b0b4dd106abf19d3394b5d703391a7ea522151ae61622ec53b6a1c7b2d7a4`; exact new candidate tag `dlspd001-headless-candidate:20261110` resolves to `sha256:7f115859edaa5eb9bd657f74c60741db5ac9d66fdb9667982e67bc7a0a95676f`. `OLD_CONTAINER=PASS`, `CANDIDATE_IDENTITY=PASS`.
+- **Strict image preservation:** Old vs candidate Docker image runtime config fields `User, Env, WorkingDir, Entrypoint, Cmd, ExposedPorts, Volumes, Healthcheck, StopSignal, Shell, Labels` returned `CONFIG_DIFFERENCES=[]`, `RUNTIME_CONFIG=PASS`. An isolated non-network read-only, least-privileged `docker run --entrypoint python` verified exact SHA-256 of `app.py`, `teddy_entrypoint.py`, `teddy_downloader_admin.py`, all four protected HTML/CSS/JS files and only changed `teddy_spoofdpi.py` (digest `4c47ddafe6dcb7c478a47ac711c7c3ef7afcad0cde6c6e176d5a49ac30a1792b`). `HEADLESS_ARGV=PASS`, `SOURCE_AND_UI_HASHES=PASS`, `CANDIDATE_VERIFICATION=PASS`.
+- **Release status:** `OLD_CONTAINER=STILL_STOPPED`, `DEPLOY=NOT_RUN`, `DOWNLOAD=NOT_RUN`. Next prepare separate exact image-only Compose override from preserved previous DLFR override, verify original 13 Compose inputs, environment, effective rendered configuration with only image difference, preserve prior image/manual rollback; then only the previously approved targeted service cutover with process/listener, job/TS and other-service postchecks. Fail closed on any mismatch; no SORA-489 retry.
+
 ## 2026-11-10 — DLSPD-001 CT108 guarded stop and one-image offline build PASS (NO DEPLOY)
 
 - **Direct Teddy CT108 checks:** `CONTAINER_IDENTITY=PASS`, staged source digest `4c47ddafe6dcb7c478a47ac711c7c3ef7afcad0cde6c6e176d5a49ac30a1792b` PASS, unused candidate tag PASS, `ACTIVE_DOWNLOAD_GATE=PASS` with 13 tasks/0 busy, 0 FFmpeg processes and 1,395 protected TS, unrelated Gluetun/Selkies container identities/state PASS, available bytes `41002524672` and reserve+build budget PASS. Local base `dlspd001-local-base:b31b0b4d` pinned exactly to current source image ID `sha256:b31b0b4dd106abf19d3394b5d703391a7ea522151ae61622ec53b6a1c7b2d7a4`.
