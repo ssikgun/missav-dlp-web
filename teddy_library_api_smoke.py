@@ -86,7 +86,23 @@ def main():
         assert sidecars()[0] == "INVALID"
         (title/"movie.nfo").write_text("<movie><id>OTHER-123</id></movie>")
         assert sidecars()[0] == "INVALID"
-        (title/"movie.nfo").unlink()
+        # Legacy NFOs may use only an exact matching uniqueid.
+        legacy_nfo = title/"movie.nfo"
+        legacy_nfo.write_text("<movie><uniqueid type='dvd_id'>ABCD-123</uniqueid></movie>")
+        assert sidecars()[0] == "VALID"
+        legacy_nfo.write_text("<movie><uniqueid>ABCD-123</uniqueid></movie>")
+        assert sidecars()[0] == "VALID"
+        legacy_nfo.write_text("<movie><uniqueid>OTHER-123</uniqueid></movie>")
+        assert sidecars()[0] == "INVALID"
+        legacy_nfo.write_text("<movie><uniqueid>ABCD-123</uniqueid><uniqueid>OTHER-123</uniqueid></movie>")
+        assert sidecars()[0] == "INVALID"
+        legacy_nfo.write_text("<movie><id>ABCD-123</id><uniqueid type='dvd_id'>ABCD-123</uniqueid></movie>")
+        assert sidecars()[0] == "VALID"
+        legacy_nfo.write_text("<movie><id>ABCD-123</id><uniqueid type='dvd_id'>OTHER-123</uniqueid></movie>")
+        assert sidecars()[0] == "INVALID"
+        legacy_nfo.write_text("<movie><id>OTHER-123</id><uniqueid type='dvd_id'>ABCD-123</uniqueid></movie>")
+        assert sidecars()[0] == "INVALID"
+        legacy_nfo.unlink()
         # File presence does not require decoding or prove image integrity.
         def chunk(kind, data):
             return struct.pack(">I", len(data))+kind+data+struct.pack(">I", zlib.crc32(kind+data) & 0xffffffff)
