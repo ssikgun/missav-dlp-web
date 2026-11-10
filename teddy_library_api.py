@@ -312,7 +312,17 @@ def _sidecar_states(video, inventory, dvd):
                 if "<!DOCTYPE" in xml.upper() or "<!ENTITY" in xml.upper(): raise ValueError()
                 root = ET.fromstring(xml)
                 ids = [str(x.text or "").strip() for x in root.findall("id")]
-                if root.tag != "movie" or ids != [dvd]: raise ValueError()
+                uniqueid_nodes = root.findall("uniqueid")
+                uniqueids = [str(x.text or "").strip() for x in uniqueid_nodes]
+                dvd_uniqueids = [
+                    str(x.text or "").strip() for x in uniqueid_nodes
+                    if str(x.get("type") or "").strip().lower() in ("dvd_id", "dvd-id", "dvdid")
+                ]
+                if root.tag != "movie": raise ValueError()
+                if ids:
+                    if ids != [dvd] or any(x != dvd for x in dvd_uniqueids): raise ValueError()
+                elif not uniqueids or any(x != dvd for x in uniqueids):
+                    raise ValueError()
                 nfo = "VALID"
             except (ValueError, TypeError, ET.ParseError): nfo = "INVALID"
     poster = "UNKNOWN"
