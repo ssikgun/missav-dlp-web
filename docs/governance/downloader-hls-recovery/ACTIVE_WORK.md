@@ -1,5 +1,10 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — Teddy reports SORA-489 new task MP4 conversion completed; final NAS verification pending
+
+- **Operator report:** Teddy confirmed that the new-ID SORA-489 (fresh task e36dac14-6db7-4b7b-9dba-825fd7560b5e, original 4adb423e-5be0-4560-b113-3eef5df6f19b) finished MP4 conversion after the authenticated one-task live retry. This is a directly stated user observation, **not yet independently verified** from on-disk task state, SSH NAS output, MP4 queue records or original TS inventory.
+- **Next narrow read-only acceptance check:** Verify new job status and published filename, final SSH NAS MP4 existence and nonzero size, original SORA-489 old error record unchanged in terminal status, other two failed jobs still present and protected 1,395 TS fragments unchanged. Do not trigger another fresh retry, same-ID retry, cleanup, Jellyfin or unrelated task. Only then mark the single bounded DLHLS trial end-to-end PASS; other two incident jobs remain held.
+
 ## 2026-11-10 — DLHLS-001 one authenticated SORA-489 fresh-ID POST PASS; VPN download in progress
 
 - **Teddy authenticated browser-console output:** Corrected original URL suffix check gave TASK_GATE=PASS, SOURCE_IDENTITY=PASS, BUSY_TASKS=0, FRESH_RETRY_COUNT=0, AUTHENTICATION=PASS. Exactly one user-approved POST to /api/tasks/4adb423e-5be0-4560-b113-3eef5df6f19b/retry-fresh returned HTTP 200, status success and **new UUID e36dac14-6db7-4b7b-9dba-825fd7560b5e**. Subsequent live task GET showed ORIGINAL_PRESERVED=true, NEW_ID_PROVENANCE=true, NEW_ROUTE=vpn, RETRY_POST=COMPLETE. No repeat POST authorized or necessary.
