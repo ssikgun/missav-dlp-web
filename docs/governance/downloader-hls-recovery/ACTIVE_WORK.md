@@ -1,5 +1,10 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — DLHLS-001 local SpoofDPI transport restored by independently authorized DLSPD-001
+
+- **Teddy CT108 post-deploy evidence (DLSPD-001, separately authorized):** Corrected headless startup image `sha256:7f115859edaa5eb9bd657f74c60741db5ac9d66fdb9667982e67bc7a0a95676f` is running as container `f3df7dc330aa85d6395e269e0d723b1ae47515344f4c3b9ab399042cdb1f2158`. `SPOOFDPI_PROCESS_COUNT=1`, localhost HTTP proxy 127.0.0.1:8080 `SPOOFDPI_LISTENER=OPEN`; service runtime/source/UI/settings and other Gluetun/Selkies identities PASS, previous API-only image rollback retained. Original jobs remain 13 = 10 complete + 3 errors with 1,395 TS intact.
+- **Incident boundary:** The previously **closed** local SpoofDPI port is now verified open, removing one identified local transport blocker. Upstream SORA-489 page/master/variant/segment reachability, current source title/filename ownership, full download + MP4 capacity bound and SSH final destination still **UNPROVEN**. `DLSPD001_DEPLOY=PASS` is not `DLHLS_TRIAL_GO=PASS`; `RETRY_POST=NOT_RUN`, `DOWNLOAD_TEST=NOT_RUN`. Preserve all old job IDs/plans/TS; perform only a bounded, current read-only preflight under DLHLS-001 before any one-job trial. No automatic retries or old same-ID retry.
+
 ## 2026-11-10 — DLHLS-001 installed SpoofDPI v1.5.5 headless flag confirmed; implementation outside incident scope
 
 - **Teddy CT108 read-only output:** `spoofdpi --version` returned code 0 and `spoofdpi 1.5.5 0b49eaf (goreleaser)`; `--help` code 0 and contains both `--no-tui` and `--listen-addr` flags. Current running image `/app/teddy_spoofdpi.py` still invokes `popen(["spoofdpi"], ...)`. `INSPECTION=COMPLETE`, `SERVICE_RESTART=NOT_RUN`, `DOWNLOAD=NOT_RUN`.
