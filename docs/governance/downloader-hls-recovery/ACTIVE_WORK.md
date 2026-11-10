@@ -1,5 +1,11 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — DLHLS-001 SORA-489 current master+variant HLS metadata PASS, 2,118 TS (NO RETRY)
+
+- **Teddy CT108 bounded read-only VPN HLS metadata probe:** Saved SORA-489 failed custom-HLS task identity `4adb423e-5be0-4560-b113-3eef5df6f19b`, 13 tasks all idle, persisted VPN route and new runtime image PASS. Exact source HTML over VPN `SOURCE_HTTP=200`, `SOURCE_BYTES=243484`, video UUID extracted by approved custom extractor's `seek`-adjacent pattern. Constructed surrit.com current master `MASTER_HTTP=200` (315 bytes), `MASTER_PLAYLIST=PASS`, `AVAILABLE_VARIANTS=3`.
+- **Selected variant (saved app quality rule):** `SELECTED_HEIGHT=1280` (a parsed numeric quality label, **not** a verified vertical resolution); selected surrit.com variant `VARIANT_HTTP=200` (69,012 bytes), `VARIANT_PLAYLIST=PASS`, `SEGMENT_COUNT=2118`, summed `#EXTINF` duration `8469.2` seconds (~2h21m9s), `ENDLIST_PRESENT=True`, `BYTERANGE_PRESENT=False`. The check did not fetch any TS body or change original jobs/TS; `HLS_METADATA_PROBE=PASS`, `TASK_WRITE=0`, `RETRY_POST=NOT_RUN`, `DOWNLOAD=NOT_RUN`.
+- **Unresolved material gate:** No HLS segment Content-Length or reliable complete-size ceiling was measured; `FULL_REQUIRED_BYTES=UNKNOWN`, so duration and 2,118 segment count **do not prove** disk headroom after reserve+MP4 remux. Avoid 2,118 HEAD requests / broad probes without a proportionate reason. Next inspect whether master `BANDWIDTH`/average bitrate or variant metadata yields a defensible bounded required capacity, and verify current exact source-title and local+SSH NAS ownership/collision; if not provable under approved DLHLS-001 contract, hold the actual fresh-ID POST and offer Teddy an explicit narrowly scoped safety-design decision rather than silently waiving the gate.
+
 ## 2026-11-10 — DLHLS-001 SORA-489 exact source page PASS via saved VPN/Gluetun (NO RETRY)
 
 - **Teddy CT108 exact one-request VPN probe:** Pinned new production Downloader image and running container PASS; saved SORA-489 original failed job `4adb423e-5be0-4560-b113-3eef5df6f19b`, `custom-hls`, persisted `network_mode=vpn`, 13 tasks all idle unchanged. Used `teddy_routing.proxy_for_mode('vpn')` (Gluetun HTTP proxy) and `curl_cffi` `impersonate=chrome110` for **one** exact saved HTTPS source-page GET, no redirects, streamed ≤2 MiB HTML.
