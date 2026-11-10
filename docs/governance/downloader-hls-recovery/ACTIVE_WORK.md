@@ -1,5 +1,11 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — SORA-489 final task state and original 1,395 TS PASS; recorded NAS download path currently absent
+
+- **Teddy CT108 read-only output:** new task e36dac14-6db7-4b7b-9dba-825fd7560b5e has status 完료, MP4_STAGE=NONE, persisted output basename under missav/, recorded MP4 size **2,433,125,787 bytes** and storage folder missav. Original SORA-489 failed record remains in error state. There are exactly 3 original failed jobs with per-job TS counts [0, 72, 1323], sum 1395: **PROTECTED_TS_PASS=True**. The probe made no task or NAS writes, no retry POST and no download.
+- **Current NAS discrepancy:** the verified configured SSH final path is under /volume1/video/video2/downloads/missav/ with the title-bearing SORA-489 MP4 filename. teddy_storage._ssh_remote_stat(saved relative filename) returned None, so NAS_FILE_PRESENT_NOW=False. This means the exact saved *download* location is currently missing; it does NOT by itself establish that the completed file was deleted or never published. The published-source code path normally validates final remote size and SHA-256 before marking task 完료, but runtime publication evidence and any later media relocation remain unverified.
+- **Next proportional read-only check:** Search only the known NAS media-library subtree (e.g. /volume1/video/video2/JAV) for an MP4 matching DVD ID SORA-489, inspect sizes without moving or hashing multi-GB files. If found with exactly 2,433,125,787 bytes in the destination library, record as likely relocated file and ask operator whether automatic mover is expected before asserting full incident acceptance; if not found, inspect bounded transfer/mover logs/state. Keep original failure records and 1395 TS, no new retry or cleanup.
+
 ## 2026-11-10 — New SORA-489 task terminal COMPLETE; expected SSH NAS path stat absent (verification held)
 
 - **Teddy CT108 read-only verification output:** Job e36dac14-6db7-4b7b-9dba-825fd7560b5e exists among 14 tasks, reports NEW_STATUS=완료; provenance references failed original 4adb423e-5be0-4560-b113-3eef5df6f19b, route VPN and original error status are intact. The script entered NAS MP4 verification after checking saved filename had 2 POSIX components, parent missav, .mp4 extension and SSH final backend.
