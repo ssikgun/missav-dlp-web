@@ -1,5 +1,11 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — DLHLS-001 three legacy task DELETEs API PASS; host TS/NAS post-check PENDING
+
+- **Teddy's authenticated browser-console apply evidence:** The exact approved historical failed task IDs SORA-489 `4adb423e-5be0-4560-b113-3eef5df6f19b`, FJIN-104 `cba0fdda-7f00-460e-b722-fa3e8a78681e`, IPZZ-687 `be88eb5a-cecd-4aee-8637-d6e16141b394` each returned `*_LEGACY_DELETE=PASS`. Initial checks: `TASK_COUNT=16_PASS`, `ORIGINAL_ERRORS=3_PASS`, `NEW_COMPLETED=3_PASS`, `ACTIVE_TASKS=0`. Final authenticated API checks: `LEGACY_DELETE=PASS`, `REMAINING_TASKS=13`, `ALL_TASKS_COMPLETED=PASS`, `THREE_NEW_TASKS_PRESERVED=PASS`. User visually confirmed the three red failed rows disappeared from Downloader UI. Separate completed fresh retry jobs remain, and the browser task API does not target NAS files.
+- **Outstanding required post-apply host read-only verification:** `HOST_TS_REMOVAL=NOT_YET_VERIFIED` in browser result. Confirm the three exact old `/downloads/.<old_id>.parts` paths have actually been removed (including no symlink), all 13 jobs remain complete, three new child jobs preserve exact recorded sizes, and NAS JAV files remain accessible with previously verified exact sizes SORA 2,433,125,787; FJIN 4,054,226,198; IPZZ 4,297,433,296 bytes. Until host evidence, do **not** mark TS reclamation or full recovery final `PASS`.
+- **Previously verified backup:** `/opt/missav-dlp-web/backups/dlhls001-error-cleanup-8cx7lu7c` metadata-only audit. No additional deletes, retries, production deployments or Stage9/UI modifications authorized.
+
 ## 2026-11-10 — DLHLS-001 approved legacy cleanup preflight and private audit snapshot PASS (NO DELETE YET)
 
 - **Fresh direct Teddy CT108 read-only acceptance:** All 16 jobs terminal; three original HLS errors and their .parts: SORA-489 0 TS, FJIN-104 1,323 TS, IPZZ-687 72 TS, total **1,395**; exactly one separate completed fresh-ID child per original. Every final NAS JAV MP4 is present and **remote stat bytes exactly equal its completed task recorded filesize**: SORA **2,433,125,787**, FJIN **4,054,226,198**, IPZZ **4,297,433,296** bytes. `ALL_THREE_NAS_MP4=PASS`, `ORIGINAL_TS=1395_PASS`, `CLEANUP_PREFLIGHT=PASS`, `READY_FOR_DELETE=YES`.
