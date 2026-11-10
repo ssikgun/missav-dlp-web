@@ -1,5 +1,11 @@
 # Downloader SpoofDPI headless startup — active work
 
+## 2026-11-10 — DLSPD-001 isolated bridge headless listener PASS, production still unchanged
+
+- **Teddy CT108 evidence:** Disposable `docker run --rm -i --pull=never --network=bridge --cap-drop=ALL --security-opt=no-new-privileges` from exact current base image invoked `spoofdpi --no-tui`; inside isolated container `PROXY_LISTENER=OPEN`, `EARLY_EXIT_CODE=None`, `HEADLESS_BRIDGE_TEST=PASS`, `TEST_PROCESS_CLEANUP=PASS`. Original `missav-dlp-web` image and running state stayed unchanged at end; `DOWNLOADER=STILL_RUNNING`, `IMAGE_BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`, `DOWNLOAD=NOT_RUN`.
+- **Boundary:** Prior stricter `--network=none` + `--cap-drop=ALL` test failed exit1; its sanitized first 500 chars showed normal config-warning/HTTP-mode startup, but suppressed error tail, so specific cause not proven. Bridge result verifies the same installed binary and headless flag can establish localhost listener in a more representative isolated network. This is **not** production source-site reachability or HLS trial PASS.
+- **Next authorized action:** Fresh CT108 no-active-task/FFmpeg and space+reserve/other-service gate, then A-method stop only Downloader, one offline small image-from-current-base with only staged `teddy_spoofdpi.py`, verify exact source/UI/API/runtime config and preserve rollback, and separately apply image-only Compose to Downloader if all gates PASS. No original failed jobs/1,395 TS mutation or retry.
+
 ## 2026-11-10 — DLSPD-001 isolated headless binary listener probe failed under restrictive sandbox (NO STOP/BUILD)
 
 - **Teddy CT108 result:** A disposable `docker run --rm -i --pull=never --network=none --cap-drop=ALL --security-opt=no-new-privileges` with the proven current image invoked `spoofdpi --no-tui` as a subprocess; `PROCESS_EXITED_EARLY=True`, `LOCAL_PROXY_LISTENER=CLOSED`, then `AssertionError: HEADLESS_PROXY_NOT_READY`. The script suppressed stdout/stderr so exit code/error cause unknown. Fail-closed: `HEADLESS_RUNTIME_TEST=NOT_PASS`; outer command stopped before post-test current-service identity check.
