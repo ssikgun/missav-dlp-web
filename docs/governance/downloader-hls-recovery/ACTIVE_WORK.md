@@ -1,5 +1,10 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — DLHLS-001 title/collision probe test harness failed before SSH (NO WRITES)
+
+- **Teddy CT108 output:** Pinned Downloader running image and SORA-489 saved error task identity, 13 tasks all idle, zero existing fresh-ID retries PASS. Bounded source-page GET reached `CURRENT TITLE` phase; a stand-alone test used `InfoExtractor()` without the `YoutubeDL` downloader that production supplies. `InfoExtractor._og_search_title(html, default=None)` hit yt-dlp's missing/failed OpenGraph title path and raised `AttributeError: 'NoneType' object has no attribute '_format_err'`. This is a **diagnostic harness construction error**, not evidence of broken Downloader runtime extraction; whether source HTML has recognized `og:title` is unproven.
+- **Fail-before-write:** The test stopped before candidate basename, canonical holdings, local or SSH NAS file collision checks. No user task, TS, NAS, file or media write and no fresh retry POST. Next correct the read-only harness to initialize `InfoExtractor` with a real in-memory `yt_dlp.YoutubeDL` exactly as production and use the production `default=video_id` fallback; report whether filename came from metadata versus fallback and then test local+SSH `mp4`/`ts` absence and canonical ownership. No arbitrary filename guess.
+
 ## 2026-11-10 — DLHLS-001 fresh-ID API auto-route resolves to proven VPN (NO RETRY)
 
 - **Teddy CT108 read-only loaded route decision:** Exact deployed `/app/teddy_downloader_admin.py` SHA-256 `c15caa24a2e5e8cb869a86f33ba2432e0336fc50b977099ccc9620efaa2fbd0d` and fresh retry endpoint source `teddy_routing.resolve(url, override='auto')` PASS. Original SORA-489 failed task has saved `network_mode=vpn`; all 13 tasks idle, no existing child `fresh_retry_of`, original unchanged. Valid persisted `/downloads/.network-routing.json` loaded with the runtime's exact `teddy_routing._load` semantics. A new auto decision for exact saved URL yielded `FRESH_API_SELECTED_MODE=vpn`, `FRESH_API_ROUTE_SOURCE=learned`, `FRESH_API_ROUTE_FIXED=False`, `SAME_AS_PROVEN_VPN=YES`.
