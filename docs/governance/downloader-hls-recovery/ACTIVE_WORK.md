@@ -1,5 +1,11 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — DLHLS-001 SORA-489 exact source page PASS via saved VPN/Gluetun (NO RETRY)
+
+- **Teddy CT108 exact one-request VPN probe:** Pinned new production Downloader image and running container PASS; saved SORA-489 original failed job `4adb423e-5be0-4560-b113-3eef5df6f19b`, `custom-hls`, persisted `network_mode=vpn`, 13 tasks all idle unchanged. Used `teddy_routing.proxy_for_mode('vpn')` (Gluetun HTTP proxy) and `curl_cffi` `impersonate=chrome110` for **one** exact saved HTTPS source-page GET, no redirects, streamed ≤2 MiB HTML.
+- **Result:** `HTTP_STATUS=200`, `HTML_CONTENT_TYPE=True`, `HTML_BYTES_READ=243484`, `HTML_LIMIT_EXCEEDED=False`, `SEEK_MARKER=True`, `M3U8_MARKER=True`, `REQUEST_ERROR_CLASS=NONE`, `VPN_PAGE_SIGNAL=PASS`. This establishes the persisted task's VPN/Gluetun path can retrieve its current HTML source. Earlier isolated SpoofDPI-local route still returned `SSLError`; a running SpoofDPI listener does not establish its upstream HTTPS success.
+- **Still unproven:** Actual downloader extraction request-route selection, current video UUID and master/variant playlist accessibility, HLS exact complete segment bytes + MP4 peak capacity, updated title/filename and SSH ownership/collision, and full no-worker gates at enqueue. `MASTER_PLAYLIST=NOT_REQUESTED`, `TS_DOWNLOAD=NOT_RUN`, `RETRY_POST=NOT_RUN`, `DOWNLOAD=NOT_RUN`; `TRIAL_GO=BLOCKED` until all incident contract gates pass. No original failed job/TS or NAS mutation. Next inspect current pinned extraction routing code first; then proportional bounded metadata-only master/variant/size feasibility under VPN without POST.
+
 ## 2026-11-10 — DLHLS-001 SORA-489 local proxy restored but source HTTPS SSLError (NO RETRY)
 
 - **Teddy CT108 direct bounded read-only probe:** Saved SORA-489 task `4adb423e-5be0-4560-b113-3eef5df6f19b` was uniquely matched as failed `custom-hls`, persisted `network_mode=vpn`; all 13 tasks 10 completed/3 failed/0 busy. `FFMPEG_PROCESS_COUNT=0`, `WORKER_PREFLIGHT=PASS`. Free `41002856448` B, reserve `5254478438` B, after-reserve `35748378010` B. **Full download+MP4 required bytes still UNKNOWN**, so no trial GO.
