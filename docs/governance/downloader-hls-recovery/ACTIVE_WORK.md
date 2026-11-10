@@ -1,5 +1,11 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — Teddy authorizes remaining-two recovery planning; existing UI Retry is same-ID, not fresh-ID (NO POST)
+
+- **Operator message:** After SORA-489 single trial success, Teddy approved proceeding with a **recovery plan** for remaining failed FJIN-104 (72 protected TS) and IPZZ-687 (1323 protected TS), then asked whether the Web UI's current retry button can be clicked. No further live retry POST or alteration to existing errors has been observed or authorized as a completed operation.
+- **Authoritative branch source read-only check:** In templates/index.html the per-error card renders a button bound to retryTask(id); this JS POSTs to /api/tasks/<id>/retry, and app.py's retry_task sets **the same existing task ID** to queued/active. It is not the new-ID endpoint. The separately deployed teddy_downloader_admin.py defines authenticated CSRF-protected /api/tasks/<failed_id>/retry-fresh that creates a separate new UUID; the existing UI does not invoke it. The bulk 'all failed restart' button is a different multi-job route and must not be clicked for the protected incident.
+- **Decision:** Under DLHLS-001 v1.0.0, one approved SORA-489 live fresh-ID trial is already consumed. Do not click same-ID or bulk UI Retry for FJIN/IPZZ; their old playlist-plan TS must remain unchanged. Next: small read-only assessment of exact two records, already owned/complete output collision, route and their parts; then obtain explicit per-trial GO/approved scope expansion before any additional fresh-ID POST. A new UI control would affect held P08LIB-001 and requires separate UI workstream authorization, not an implicit incident fix.
+
 ## 2026-11-10 — DLHLS-001 SORA-489 new-ID single trial PASS through NAS media library (old 1,395 TS preserved)
 
 - **Teddy CT108 definitive read-only NAS lookup:** Using Downloader's configured read-only SSH access, restricted find of /volume1/video/video2/JAV (maxdepth=4, SORA-489 MP4 name) found exactly **one** media file at /volume1/video/video2/JAV/SORA/SORA-489/SORA-489.mp4. Remote stat size 2,433,125,787 bytes **exactly matches** the completed new Downloader job e36dac14-6db7-4b7b-9dba-825fd7560b5e persisted filesize. MATCH_COUNT=1, SIZE_MATCH=True, SEARCH=COMPLETE, NAS_WRITE=0, DOWNLOAD=NOT_RUN, RETRY_POST=NOT_RUN.
