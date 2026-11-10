@@ -1,5 +1,12 @@
 # Downloader SpoofDPI headless startup — active work
 
+## 2026-11-10 — DLSPD-001 production Downloader-only promotion and SpoofDPI listener PASS
+
+- **Teddy's exact CT108 apply output:** Previous stopped Downloader identity/rollback, three other running container states, disk reserve and image-only 14-file Compose rendering all PASS. `docker compose up --detach --no-deps --no-build --pull never --force-recreate --wait` on **only** `missav-dlp-web` returned `COMPOSE_UP_EXIT_CODE=0`, `COMPOSE_UP=PASS`, `DEPLOY_APPLY=PASS`.
+- **New runtime:** Container ID `f3df7dc330aa85d6395e269e0d723b1ae47515344f4c3b9ab399042cdb1f2158` is running pinned candidate ID `sha256:7f115859edaa5eb9bd657f74c60741db5ac9d66fdb9667982e67bc7a0a95676f`; original 13 Compose inputs + new override label chain PASS. Old vs new user/command/entrypoint/env, network/ports/restart/group/privilege/read-only settings and mount signatures PASS; all three Gluetun/Selkies container IDs and running state unchanged; previous image `sha256:b31b0b4dd106abf19d3394b5d703391a7ea522151ae61622ec53b6a1c7b2d7a4` still preserved. Rollback paths and SHA recorded at preceding checkpoint.
+- **Post-deploy read-only in-container check:** 13 original tasks = 10 completed + 3 protected errors + 0 busy; 1,395 protected TS unchanged. `SPOOFDPI_PROCESS_COUNT=1` and `SPOOFDPI_LISTENER=OPEN` (127.0.0.1:8080), `SPOOFDPI_RUNTIME=PASS`, `PROTECTED_DATA=PASS`; `DLSPD001_DEPLOY=PASS`, `DOWNLOADER=RUNNING`.
+- **Explicit boundary:** This proves local headless startup and listener, **not** source-site reachability, master playlist viability, complete HLS byte budget or any successful download. `DOWNLOAD_TEST=NOT_RUN`, `RETRY_POST=NOT_RUN`. The separate `DLHLS-001` SORA-489 incident trial remains gated and must not be posted until its own source/size/ownership/worker checks PASS. No held UI P08 promotion. Keep existing old image and rollback; no automatic cleanup.
+
 ## 2026-11-10 — DLSPD-001 targeted Compose promotion preflight PASS (NO DEPLOY)
 
 - **Teddy CT108 directly verified:** Current Downloader stays stopped on old API image ID `sha256:b31b0b4dd106abf19d3394b5d703391a7ea522151ae61622ec53b6a1c7b2d7a4`, old tag and new headless image `sha256:7f115859edaa5eb9bd657f74c60741db5ac9d66fdb9667982e67bc7a0a95676f` identities PASS. Exactly 13 original Compose paths + prior DLFR image override (14th) validated; prior override byte SHA256 `501344b65d7a36c0d3f180eeec2e406242519b94afbd55946584f8f97b890027` PASS.
