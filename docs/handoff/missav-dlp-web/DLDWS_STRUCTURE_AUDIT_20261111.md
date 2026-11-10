@@ -1,6 +1,6 @@
 # DLDWS-001 — Downloader build-patch and cross-stage interface static audit
 
-REPORT_STATUS: STATIC_SOURCE_MAPPING_COMPLETE_WITH_UNKNOWN
+REPORT_STATUS: STATIC_AUDIT_COMPLETE_WITH_RUNTIME_UNVERIFIED_AND_P04_PROPOSAL
 REPORT_TIME: 2026-11-11 08:05:11 KST (Teddy-provided Codex report)
 SOURCE_REPO: ssikgun/missav-dlp-web
 SOURCE_BRANCH: teddy-subtitle-stage11
@@ -79,3 +79,34 @@ Other effects: Dockerfile direct `sed` commands alter B proxy timing and I style
 - No new P04 candidate chosen; next deliverable is a risk- and effort-ranked 1–3 candidate plan **without code modification**, followed by Teddy's explicit decision.
 
 RESULT: STATIC_PATCH_MATRIX=REPORTED_COMPLETE; STATIC_INTERFACE_BOUNDARY=REPORTED; RUNTIME_VALIDATION=NOT_RUN; P04_CANDIDATES=NOT_SELECTED; PRODUCT_SOURCE_CHANGED=NO; PRODUCTION_CHANGED=NO; BUILD=NOT_RUN; DEPLOY=NOT_RUN.
+
+## Final structure/risk assessment and proposed P04 order (2026-11-11 08:34:56 KST)
+
+**Status:** final *static assessment* submitted by Codex; no actual image build, live source equivalence, systemd health, download, NAS or subtitle E2E was run. Canonical tree at `c6842e2e0482dda6d54843b7fce2118b1d20bbac`: 620 tracked paths / 424 Python files (independent GitHub tree check; added this audit Markdown after the prior count of 619). A complete per-file runtime-use proof is still unavailable; dynamic import/operational-only candidates remain UNKNOWN.
+
+### Risk/priority ordering
+
+| Group | Static assessment | Proposed treatment |
+|---|---|---|
+| Root/Overlay `teddy_storage.py` | Final Overlay has additional no-overwrite, SSH remote hash, interrupted publish/recovery protections; no Docker patch directly rewrites that module | **P04 candidate 1: small single-source consolidation**, no behavioral change; medium+ data-safety verification |
+| Final Overlay storage smoke gap | Docker's final Overlay phase validates hash/compile and selected UI/admin smoke, not all storage no-clobber behavior | **Conditional candidate 2**: reuse existing bounded synthetic storage collision/preservation check after final Overlay; only if inexpensive and existing coverage inadequate |
+| Root/Overlay `app.py`, `teddy_bootstrap.py`, `teddy_entrypoint.py`, `templates/index.html` | Heavy dependencies on patch chain, job safety, HLS/MP4 and UI assets | Defer: no safe small refactor selected on current evidence |
+| `teddy_generic.py`, `teddy_routing.py`, `teddy_downloader_admin.py` | Previously consolidated to root single-source | COMPLETE; do not repeat |
+| Subtitle interfaces | Stage11 generation and Stage12 state/publication/UI status are separated from Downloader/Stage9 media completion | Preserve ownership; any actual subtitle contract/UI expansion requires its own authorization |
+
+### Candidate 1: minimal byte-preserving storage single source
+
+Proposed product paths: `teddy_storage.py` and `downloader_runtime_overlay/teddy_storage.py` only **if** all static/early-build constraints permit. Goal: root storage bytes match currently effective final Overlay storage and redundant Overlay copy disappears, leaving final image's storage bytes and NAS protections unchanged. Actual Dockerfile/manifest edits are **not assumed unnecessary** until candidate inspection. The Dockerfile's **pre-Overlay** site-key smoke (line 71) and `TEDDY_FINAL_DIR` marker check (line 159) must still pass, as must final Overlay SHA manifest/compile and representative synthetic storage no-clobber/recovery checks. Existing runtime files, NAS media, partial fragments and state remain untouched. New image build/deployment are separately approved, never inferred from static equivalence.
+
+**CHECK_REQUIRED, not proven defect:** `downloader_runtime_overlay/teddy_storage.py` local/mounted crash-recovery branch in `_publish_pending_task_unlocked` accepts a present final destination when source has disappeared. In that branch an SSH-style inline hash comparison is not visible; upper caller and identity evidence may already constrain it. This is not automatically in scope to “fix” during byte-preserving deduplication and is not a claim of observed file corruption.
+
+### Candidate 2: conditional final-Overlay storage validation
+
+Only if the first candidate exposes a meaningful coverage gap, reuse an existing representative storage smoke (one collision+preservation scenario) at the final Overlay stage. Potential source paths are `Dockerfile` and one pre-existing smoke file, exact name to be verified; avoid new test tooling. If existing checks suffice or build cost is disproportionate (GOV-008), defer this option. No code changes approved yet.
+
+### Approval and unknowns
+
+- This report is an **approval request proposal**, not P04 task activation or source/build/deploy authorization. DLDWS-001 remains the currently approved read-only architecture-audit task under Downloader+Writer Safety. If proposed changes touch DLSS-001, Stage9, Stage11, Stage12 or another independently owned resource, obtain separate proper workstream authorization before action.
+- Actual production image source, current running systemd/Docker state, all dynamic patch usage, Stage9 task-to-completion mapping and real subtitle publication/Jellyfin recognition remain unverified.
+- Next: Teddy selects whether to authorize the smallest byte-preserving P04 source-candidate scope with focused offline checks; then record the exact task approval before any source edit. Builds and production deployments remain separate explicit gates.
+
