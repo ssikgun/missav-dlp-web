@@ -1,5 +1,10 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — DLHLS-001 fresh-ID API auto-route resolves to proven VPN (NO RETRY)
+
+- **Teddy CT108 read-only loaded route decision:** Exact deployed `/app/teddy_downloader_admin.py` SHA-256 `c15caa24a2e5e8cb869a86f33ba2432e0336fc50b977099ccc9620efaa2fbd0d` and fresh retry endpoint source `teddy_routing.resolve(url, override='auto')` PASS. Original SORA-489 failed task has saved `network_mode=vpn`; all 13 tasks idle, no existing child `fresh_retry_of`, original unchanged. Valid persisted `/downloads/.network-routing.json` loaded with the runtime's exact `teddy_routing._load` semantics. A new auto decision for exact saved URL yielded `FRESH_API_SELECTED_MODE=vpn`, `FRESH_API_ROUTE_SOURCE=learned`, `FRESH_API_ROUTE_FIXED=False`, `SAME_AS_PROVEN_VPN=YES`.
+- **Boundary:** Current persisted routing is favorable for a prospective one new-ID trial, but learned rules are mutable and the endpoint will re-resolve at POST time, so a fresh comparison is still needed at go/no-go. No task/file/NAS write, `RETRY_POST=NOT_RUN`, `DOWNLOAD=NOT_RUN`. Remaining gates: current HTML title to actual canonical output filename, local+SSH NAS collision and source ownership, and an explicitly defensible full HLS+MP4 working-space budget despite advertised 2.8Mbps not being an independently measured total. Never bypass reserve or automatically enqueue.
+
 ## 2026-11-10 — DLHLS-001 SORA-489 declared peak bitrate 2.8 Mb/s, storage margin high (NO RETRY)
 
 - **Teddy CT108 read-only selected variant master check:** Three variant attributes: 640x360 `BANDWIDTH=800000` bps, 842x480 `1400000` bps, selected 1280x720 `2800000` bps. No `AVERAGE-BANDWIDTH` declared. Prior current variant `#EXTINF` sum `8469.2` seconds and 2,118 segments. Using the **advertised maximum segment bitrate** yields `DECLARED_PEAK_BASED_BYTES=2964220000` (~2.76 GiB) for the selected HLS stream at that duration, if publisher metadata is accurate. Runtime `FREE_BYTES=41002582016`, reserve `5254478438`, `HEADROOM_AFTER_RESERVE_BYTES=35748103578` (~33.3 GiB).
