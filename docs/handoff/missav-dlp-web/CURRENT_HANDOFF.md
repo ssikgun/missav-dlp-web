@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-10 — P08LIB-001 two-file integration build and conditional deployment approved; preflight blocked
+
+- Teddy explicitly approved one image build based on the current image with only `teddy_library_api.py` NFO identity correction and `templates/teddy-library.css` mobile layout, and one Downloader-only replacement only after all DLSS A-method safety gates pass. No NAS/DB/Jellyfin writes, other service restarts, or data deletion. Actual PC/mobile and authenticated NFO API validation remain post-deployment checks.
+- At this checkpoint remote source was `b87fa0745af9cf5fd7c920daccad22b6501bb2d7`; two candidate SHA256 values match `/tmp/p08-nfo-candidate-manifest.txt`, and running image is `sha256:7f115859edaa5eb9bd657f74c60741db5ac9d66fdb9667982e67bc7a0a95676f`. Four-way authorization and structural governance checks PASS. Existing fresh-retry and SpoofDPI runtime file hashes match the previously verified source.
+- PREFLIGHT=BLOCKED: this executor cannot connect to the systemd system bus to verify Stage9 timer; worker/queued and delayed retry idleness, competing builds, exact Compose parity and rollback readiness have not been established. Do not infer idleness from process names. STOP/BUILD/DEPLOY/DOWNLOAD=NOT_RUN; BUILD_COUNT=0. Recheck all gates on actual CT108 before taking any operational action. Existing task IDs, protected checkout and production data remain unchanged.
+
+
 ## 2026-11-10 — P08LIB-001 isolated NFO regression and current-image integration verification (NO BUILD / NO DEPLOY)
 
 - Canonical source/remote SHA `7676f9f78d30d1d6a9a5bf63e9e9ca9768fbe204`, isolated clean clone `/tmp/p08-nfo-7676-review`; protected original checkout untouched. All-workstream structural governance and four-way selected `P08LIB-001` authorization PASS (governance/downloader/discovery-writer-safety/stage9-media).

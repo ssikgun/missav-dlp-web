@@ -1,5 +1,12 @@
 # Downloader non-subtitle workstream — active work
 
+## 2026-11-10 — P08LIB-001 two-file integration build and conditional deployment approved; preflight blocked
+
+- Teddy explicitly approved one image build based on the current image with only `teddy_library_api.py` NFO identity correction and `templates/teddy-library.css` mobile layout, and one Downloader-only replacement only after all DLSS A-method safety gates pass. No NAS/DB/Jellyfin writes, other service restarts, or data deletion. Actual PC/mobile and authenticated NFO API validation remain post-deployment checks.
+- At this checkpoint remote source was `b87fa0745af9cf5fd7c920daccad22b6501bb2d7`; two candidate SHA256 values match `/tmp/p08-nfo-candidate-manifest.txt`, and running image is `sha256:7f115859edaa5eb9bd657f74c60741db5ac9d66fdb9667982e67bc7a0a95676f`. Four-way authorization and structural governance checks PASS. Existing fresh-retry and SpoofDPI runtime file hashes match the previously verified source.
+- PREFLIGHT=BLOCKED: this executor cannot connect to the systemd system bus to verify Stage9 timer; worker/queued and delayed retry idleness, competing builds, exact Compose parity and rollback readiness have not been established. Do not infer idleness from process names. STOP/BUILD/DEPLOY/DOWNLOAD=NOT_RUN; BUILD_COUNT=0. Recheck all gates on actual CT108 before taking any operational action. Existing task IDs, protected checkout and production data remain unchanged.
+
+
 ## 2026-11-10 — P08LIB-001 approved read-only Library NFO identity classification correction (SOURCE ONLY; NO DEPLOY)
 
 - **Observed CT108 facts:** 275 NAS JAV owned-title folders, one recognized `DVD-ID.nfo` or `movie.nfo` each; current Library API showed `VALID=146`, `INVALID=129`, `ABSENT=0`, `UNKNOWN=0`. Read-only XML probe identified all 129 as `MISSING_ID`, without parse/root errors, and **all 129** carry a `<uniqueid>` whose text exactly matches the folder DVD-ID (`UNIQUEID_MATCH=129`, `UNIQUEID_OTHER=0`, `UNIQUEID_ABSENT=0`). This is a Library API strict-`<id>` false-positive, not proven NFO corruption. NAS/DB writes zero.
