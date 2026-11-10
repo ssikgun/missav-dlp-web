@@ -1,5 +1,11 @@
 # Downloader non-subtitle workstream — active work
 
+## 2026-11-10 — P08LIB-001 CT108 two-file build/deploy and live NFO/mobile checks PASS (FOLLOW-UP)
+
+- **Actual CT108 outcome:** One isolated, pinned-source build completed, image p08lib001-nfo-css:7676f9f-238bbe6e (sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c); only teddy_library_api.py and templates/teddy-library.css replaced on old base sha256:7f115859edaa5eb9bd657f74c60741db5ac9d66fdb9667982e67bc7a0a95676f. Build-only preserved/restored old container, then fresh gated Docker Compose image-only deployment succeeded, replacing only missav-dlp-web. New running container ID 6fe1841f2b66b43a8016a9483b6e0017d2c23c12c3b48c692937e3eff83e634f; image/hash, mounts/ports, other containers unchanged and Stage9 timer active/waiting PASS; python and SpoofDPI both running.
+- **User-observed product PASS:** Authenticated GET /api/library returned HTTP=200, TOTAL=275, NFO VALID=275, INVALID=0, ABSENT=0, UNKNOWN=0; previously 146/129. Teddy visually confirmed mobile cards are one column. No NAS NFO edits, DB or Jellyfin content writes; no download/retry initiated. Current desktop visual check NOT_YET_VERIFIED.
+- **Recovery:** Old image preserved; /opt/missav-dlp-web/backups/p08lib001-deploy-svoyarjp/rollback-manifest.json and SHA256 5bf49b3991aa1d4896227485329b304a0e2f8ab18bdaa7c4249d3ea8f7a1b78a image-only override retained. Shared P08LIB-001 remains IN_PROGRESS; this specific release and live product milestone PASS do not authorize further builds/deployments or settle other workstream goals. Earlier blocked/not-run entries are historical checkpoints, not current runtime status.
+
 ## 2026-11-10 — P08LIB-001 two-file integration build and conditional deployment approved; preflight blocked
 
 - Teddy explicitly approved one image build based on the current image with only `teddy_library_api.py` NFO identity correction and `templates/teddy-library.css` mobile layout, and one Downloader-only replacement only after all DLSS A-method safety gates pass. No NAS/DB/Jellyfin writes, other service restarts, or data deletion. Actual PC/mobile and authenticated NFO API validation remain post-deployment checks.
