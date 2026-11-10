@@ -1,5 +1,13 @@
 # Downloader non-subtitle workstream — active work
 
+## DLDWS-001 FULL-REPOSITORY STRUCTURE AUDIT PREFLIGHT BLOCKED (2026-11-10 17:49:38 KST)
+
+- **Evidence basis:** Teddy supplied Codex's 17:49:38 KST read-only report. The Codex executor reported local HEAD `587ed8c9f79bea2584b4b91b52293527ee9d9e38`, with 584 tracked deletions and one modification; the remote `teddy-subtitle-stage11` HEAD `65b2413d980ce8f9b1077481e46e8a83f64ccaf4` was visible but that commit object was not present in its local repository. GitHub HEAD `65b2413d980ce8f9b1077481e46e8a83f64ccaf4` was independently confirmed from the canonical remote. The dirty worktree was not modified.
+- **Result:** `WORKSTREAM_PREFLIGHT=BLOCKED`; `FILE_INVENTORY=NOT_RUN`, `RUNTIME_STRUCTURE=NOT_VERIFIED`, `DUPLICATE_AUDIT=NOT_RUN`, `CROSS_STAGE_BOUNDARY=SCOPE_BLOCKED`, `RISK_CLASSIFICATION=DEFERRED`, `P04_FIRST_CANDIDATE=DEFERRED`. The previous P02 static five-pair comparison is historical evidence, not a result of this attempted whole-repository audit. A prior FNS-267 single-item user-observed end-to-end PASS remains historical and does not satisfy this audit.
+- **Safe continuation:** Create an isolated, readable, clean checkout at the then-current verified `teddy-subtitle-stage11` remote SHA; do not repair/reset/stash/clean or delete anything in the protected dirty tree. Revalidate root `AGENTS.md`, common contract/router, Downloader and Writer `DLDWS-001` approvals, then resume only the user-approved static architectural audit. If the remote object cannot be obtained, stop again. Stage9/Stage11/Stage12 are interface/ownership-boundary observations only; P04 implementation still needs separate explicit approval.
+- **Change boundary:** This checkpoint only records a blocked result. `PRODUCT_SOURCE_CHANGED=NO`, `PRODUCTION_CHANGED=NO`, `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`, `MEDIA_WRITES=0`; contracts/router/task IDs unchanged.
+
+
 ## 2026-11-10 — P08LIB-001 FINAL PASS; Teddy-approved closeout and prior routing restored
 
 - **Final live user acceptance:** After the approved CT108 Downloader-only two-file release, Teddy verified PC layout unchanged and mobile library DB cards in a single column. Authenticated browser Console `GET /api/library` returned `HTTP=200`, `TOTAL=275`, five summary cards, three NAS holdings status sections and five separate Stage12 metrics. `NFO_COUNTS={VALID:275,INVALID:0,ABSENT:0,UNKNOWN:0}`; `POSTER_COUNTS={PRESENT:274,ABSENT:1,UNKNOWN:0}`; poster sum equals 275. Final `P08_FINAL_READONLY=PASS`. The one absent NAS-local Primary poster is an honest inventory result, not a P08 UI failure; the optional Stage9 job-state field remains approved `UNKNOWN` because the web container has no Stage9 DB mount.

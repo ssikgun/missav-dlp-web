@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-10
 
+- **DLDWS-001 전체 코드/구조 감사 착수 BLOCKED (2026-11-10 17:49:38 KST):** Teddy가 전달한 Codex 결과는 최신 원격 `65b2413d980ce8f9b1077481e46e8a83f64ccaf4`는 확인했지만 Codex 로컬 HEAD가 `587ed8c9`이고 추적 삭제 584개/수정 1개, 최신 객체 부재로 감사 불가라는 내용. 원격 HEAD는 독립 확인했고, 로컬 손상 여부·파일 목록은 Codex 보고 기준. 이번 시도에서 전체 파일 인벤토리, 새 중복 비교, Stage9/11/12 경계, 위험 우선순위, P04 후보는 모두 **미실시/판정 보류**. 기존 P02 5쌍 점검은 그대로 과거 완료 기록. **다음은 보호된 작업 트리를 보존한 새 격리 소스 사본으로 읽기 전용 감사 재개**; P04 코드 변경·빌드·배포 미승인.
+
 - **P08LIB-001 공식 종료 및 4영역 라우팅 복원 — Teddy 승인:** 인증된 실운영 GET `/api/library` HTTP 200, 전체 275건, NFO VALID 275 / INVALID·ABSENT·UNKNOWN 각 0, NAS 로컬 포스터 PRESENT 274 / ABSENT 1 / UNKNOWN 0, 총합 275 일치. 요약 카드 5개, 보유 상태 섹션 3개, 별도 Stage12 지표 5개, PC 기존 배치와 모바일 1열을 Teddy가 확인했고 `P08_FINAL_READONLY=PASS`. Stage9 작업 상태 `UNKNOWN`은 승인된 미연결 상태이고 포스터 1건 ABSENT는 실제 파일 유무 표시이므로 P08 실패가 아님. 이전 정상 배포 이미지 `sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c`와 기존 롤백 보존. 역사적 P08 작업 `COMPLETED`. 원래 승인 라우팅(기준 커밋 `c020a8a9bbf9ac05b34975894edb9dd5d630a275`): Governance `INACTIVE/NONE`, Downloader+Writer `DLDWS-001`, Stage9 `STG9MEDIA-001` 복원. DLHLS·DLFR·DLSS·DLSPD·Stage11 불변; 새 빌드·운영/미디어/DB 쓰기 없음. **다음 P04는 읽기 전용 후보 검토부터, 실제 구현은 별도 승인 필요.**
 
 ### 2026-11-07 및 그 이전 기록 (작성 당시 상태로 보존)

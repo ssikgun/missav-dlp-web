@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## DLDWS-001 FULL-REPOSITORY STRUCTURE AUDIT PREFLIGHT BLOCKED (2026-11-10 17:49:38 KST)
+
+- **Evidence basis:** Teddy supplied Codex's 17:49:38 KST read-only report. The Codex executor reported local HEAD `587ed8c9f79bea2584b4b91b52293527ee9d9e38`, with 584 tracked deletions and one modification; the remote `teddy-subtitle-stage11` HEAD `65b2413d980ce8f9b1077481e46e8a83f64ccaf4` was visible but that commit object was not present in its local repository. GitHub HEAD `65b2413d980ce8f9b1077481e46e8a83f64ccaf4` was independently confirmed from the canonical remote. The dirty worktree was not modified.
+- **Result:** `WORKSTREAM_PREFLIGHT=BLOCKED`; `FILE_INVENTORY=NOT_RUN`, `RUNTIME_STRUCTURE=NOT_VERIFIED`, `DUPLICATE_AUDIT=NOT_RUN`, `CROSS_STAGE_BOUNDARY=SCOPE_BLOCKED`, `RISK_CLASSIFICATION=DEFERRED`, `P04_FIRST_CANDIDATE=DEFERRED`. The previous P02 static five-pair comparison is historical evidence, not a result of this attempted whole-repository audit. A prior FNS-267 single-item user-observed end-to-end PASS remains historical and does not satisfy this audit.
+- **Safe continuation:** Create an isolated, readable, clean checkout at the then-current verified `teddy-subtitle-stage11` remote SHA; do not repair/reset/stash/clean or delete anything in the protected dirty tree. Revalidate root `AGENTS.md`, common contract/router, Downloader and Writer `DLDWS-001` approvals, then resume only the user-approved static architectural audit. If the remote object cannot be obtained, stop again. Stage9/Stage11/Stage12 are interface/ownership-boundary observations only; P04 implementation still needs separate explicit approval.
+- **Change boundary:** This checkpoint only records a blocked result. `PRODUCT_SOURCE_CHANGED=NO`, `PRODUCTION_CHANGED=NO`, `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`, `MEDIA_WRITES=0`; contracts/router/task IDs unchanged.
+
+
 ## 2026-11-10 — P08LIB-001 official closeout after final live P08 PASS (Teddy-approved)
 
 - **Final authenticated product evidence:** `P08_FINAL_READONLY=PASS`; `HTTP=200`, `TOTAL=275`, `SUMMARY_CARDS=5`, `STATUS_SECTIONS=3`, `STAGE12_METRICS=5`, `NFO_VALID=275`, `NFO_INVALID/ABSENT/UNKNOWN=0`; `POSTER_PRESENT=274`, `POSTER_ABSENT=1`, `POSTER_UNKNOWN=0`, `POSTER_SUM_MATCH=true`. Teddy separately verified unchanged PC layout and mobile single-column cards. Optional Stage9 job state remains `UNKNOWN` with web DB unmounted, by approved policy. One absent poster is a truthful NAS-local state, not P08 failure.
