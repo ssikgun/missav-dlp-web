@@ -1,5 +1,11 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — FJIN-104 Direct and VPN page viability PASS; no NAS collision (READ-ONLY, POST NEXT)
+
+- **Proportionate operator CT108 comparison:** Same persisted FJIN-104 source via curl_cffi with `trust_env=False` (no environment-proxy bleed) returned `DIRECT HTTP_STATUS=200, VIDEO_MARKER=True` and explicit Gluetun `VPN HTTP_STATUS=200, VIDEO_MARKER=True`. This proves page access and the HLS indicator on both routes, **not** complete HLS/MP4 download.
+- **Current no-collision/space:** NAS `/volume1/video/video2/JAV` exact DVD-ID MP4 lookup `NAS_MP4_MATCHES=0`, holdings `ALREADY_OWNED=False`, and `HEADROOM_BYTES=35745731994` after previously used `5,254,478,438`-byte reserve. The required final video size remains unknown and the running downloader's capacity/reserve gates remain applicable; never claim declared upper-size certification. Persisted 14 tasks, original 1,323 FJIN TS and no prior fresh child verified by earlier read-only gate.
+- **Approved next action:** Teddy already authorized one fresh-ID FJIN attempt then IPZZ sequentially under `DLHLS-001 v1.0.1`. The deployed `POST /api/tasks/<id>/retry-fresh` chooses `teddy_routing.resolve(...,override='auto')` = `direct` for FJIN; the normal `direct` path now has actual source-page success, so do **not** change saved routing rules, the API or Docker. Use a corrected strict browser source check against the observed exact slug `fjin-104-uncensored-leak`, auth/CSRF/new-ID provenance and idle admission checks; one POST only, then verify. If preconditions change, fail closed. `RETRY_POST=NOT_RUN`, `DOWNLOAD=NOT_RUN` as of this evidence.
+
 ## 2026-11-10 — FJIN-104 exact source slug and AUTO route discrepancy confirmed (READ-ONLY; NO POST)
 
 - **Current operator CT108:** Exact original failed ID `cba0fdda-7f00-460e-b722-fa3e8a78681e` is preserved with **1,323 TS**, 14 tasks all terminal, SORA fresh job complete, and zero FJIN fresh children. The earlier proposed FJIN preflight stopped at `assert route['mode']=='vpn'`; no TS mutation or retry POST occurred. Browser Console FJIN request also stopped before POST because its stricter-than-product `pathname.lastSegment == 'fjin-104'` check rejected a longer valid slug.
