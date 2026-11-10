@@ -1,5 +1,12 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — FJIN-104 exact source slug and AUTO route discrepancy confirmed (READ-ONLY; NO POST)
+
+- **Current operator CT108:** Exact original failed ID `cba0fdda-7f00-460e-b722-fa3e8a78681e` is preserved with **1,323 TS**, 14 tasks all terminal, SORA fresh job complete, and zero FJIN fresh children. The earlier proposed FJIN preflight stopped at `assert route['mode']=='vpn'`; no TS mutation or retry POST occurred. Browser Console FJIN request also stopped before POST because its stricter-than-product `pathname.lastSegment == 'fjin-104'` check rejected a longer valid slug.
+- **Actual saved URL identity:** `scheme=https`, `host=missav123.com`, last path segment `fjin-104-uncensored-leak`, and the **canonical** `teddy_ownership.dvd_id_from_supported_url` returns `FJIN-104`. The source ID did not change; the client-side exact-slug equality test was wrong.
+- **Route distinction:** Original failed task `SAVED_MODE=vpn`, while the approved API's new-job `teddy_routing.resolve(url,override='auto')` currently yields `AUTO_MODE=direct`, `ROUTE_SOURCE=default`, `ROUTE_FIXED=False`. This is a genuine different egress mode, not a missing task or proxy. `ALREADY_OWNED=False`, `EXISTING_FRESH_RETRIES=0`, `TASK_WRITE=0`, `RETRY_POST=NOT_RUN`, `DOWNLOAD=NOT_RUN`.
+- **Next bounded gate:** One source HTML GET using the exact saved URL via the AUTO-selected direct mode (optionally one VPN comparison) and a final NAS collision/space check. If direct can serve the source and ownership/no-overwrite gates pass, the already-approved one-new-ID FJIN trial can use the unchanged AUTO route, with explicit observation that it is Direct; if direct cannot serve source but saved VPN can, STOP and ask for operator choice before any API route-policy/source modification. No same-ID UI retry, broad route change or forced override by ad hoc state edits.
+
 ## 2026-11-10 — CT108 corrects FJIN/IPZZ protected fragment attribution (READ-ONLY; NO POST)
 
 - **First preflight stopped safely:** the old script asserted FJIN-104=72 TS but current data disagreed after successfully verifying all 14 tasks idle, SORA-489 fresh task COMPLETE and SORA old TS=0. No download or fresh retry POST occurred.
