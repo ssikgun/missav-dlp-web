@@ -1,5 +1,12 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — Teddy approves two additional individual new-ID trials: FJIN-104 then IPZZ-687 (NO POST YET)
+
+- **Explicit operator GO for expanded trial scope:** Teddy stated “응 진행 하자. 새 id 시도도 승인해.” This extends the prior SORA-489-only authorization to **one distinct new-ID attempt each** for existing failed FJIN-104 and IPZZ-687; neither attempt is shown executed yet. Contract `DLHLS-001` upgraded to **v1.0.1** based on that explicit approval; same task ID and workstream remain in force. GitHub contract commit `2d975842edb490abdeed820bad93c1f2393dbe11`.
+- **Known prior production evidence (not a fresh check):** Current candidate image `sha256:7f115859edaa5eb9bd657f74c60741db5ac9d66fdb9667982e67bc7a0a95676f` running; SORA-489 new UUID `e36dac14-6db7-4b7b-9dba-825fd7560b5e` recorded 완료 with matching 2,433,125,787-byte MP4 found in NAS JAV/SORA; original three failed records and 1,395 fragments ([0,72,1323]) protected at last read-only check. **All current states must be reconfirmed before each live POST.**
+- **Execution boundary:** Current read-only preflight for exact two old IDs, no conflicting download/remux, matching saved source and allowed VPN route, no duplicate fresh child, original .parts/protected TS, current source viability/title, destination/local/NAS no collision and justifiable per-item disk budget above reserve. Only after a GO for FJIN-104 use the authenticated CSRF-protected **/retry-fresh** API via the browser session, never the current Web UI same-ID or bulk Retry. Wait for its result/NAS publication and recheck safety before IPZZ-687. On any ambiguity, fail closed; no original TS reuse, overwrite, cleanup, deployment, UI edit or unrelated task write.
+- **State at this documentation commit:** `APPROVAL=GO_FOR_TWO_INDIVIDUAL_ATTEMPTS`; `FJIN_POST=NOT_RUN`; `IPZZ_POST=NOT_RUN`; `FJIN_CURRENT_GATE=NOT_YET`; `IPZZ_CURRENT_GATE=NOT_YET`.
+
 ## 2026-11-10 — Teddy authorizes remaining-two recovery planning; existing UI Retry is same-ID, not fresh-ID (NO POST)
 
 - **Operator message:** After SORA-489 single trial success, Teddy approved proceeding with a **recovery plan** for remaining failed FJIN-104 (72 protected TS) and IPZZ-687 (1323 protected TS), then asked whether the Web UI's current retry button can be clicked. No further live retry POST or alteration to existing errors has been observed or authorized as a completed operation.
@@ -332,7 +339,7 @@
 WORKSTREAM: downloader-hls-recovery
 TASK_ID: DLHLS-001
 STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.0
+CONTRACT_VERSION: 1.0.1
 REQUIRES_WORKSTREAMS: downloader-hls-recovery
 
 ## OBJECTIVE
