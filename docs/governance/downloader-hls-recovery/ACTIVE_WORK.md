@@ -1,5 +1,11 @@
 # Downloader HLS incident recovery — active work
 
+## 2026-11-10 — DLHLS-001 one authenticated SORA-489 fresh-ID POST PASS; VPN download in progress
+
+- **Teddy authenticated browser-console output:** Corrected original URL suffix check gave TASK_GATE=PASS, SOURCE_IDENTITY=PASS, BUSY_TASKS=0, FRESH_RETRY_COUNT=0, AUTHENTICATION=PASS. Exactly one user-approved POST to /api/tasks/4adb423e-5be0-4560-b113-3eef5df6f19b/retry-fresh returned HTTP 200, status success and **new UUID e36dac14-6db7-4b7b-9dba-825fd7560b5e**. Subsequent live task GET showed ORIGINAL_PRESERVED=true, NEW_ID_PROVENANCE=true, NEW_ROUTE=vpn, RETRY_POST=COMPLETE. No repeat POST authorized or necessary.
+- **Teddy Downloader UI screenshot:** Separate new SORA-489 task card shows active VPN transfer, approx 8% / 197.1 MB of dynamically estimated ~2.2 GB / 26.7 MB/s at capture. Original failed SORA-489 card remains visible with HLS playlist-plan mismatch error, and other held failed jobs are still visible. This establishes live **download progress**, NOT complete MP4/NAS publication or successful video playback. The reported full-byte figure is an evolving UI estimate.
+- **Protected behavior/next:** Intentional **new task + separate parts directory**, not same-ID retry; original SORA-489 had zero TS parts, while 72+1323 existing fragments belong to the other two held jobs and remain protected. Do not delete or resume the original, retry FJIN/IPZZ, or repeat fresh-ID POST. Next perform read-only verification on the **new** task until completed: MP4 queue/final status, local/SSH NAS final object, and original tasks/protected fragments unchanged. Completion and Jellyfin behavior are NOT YET VERIFIED.
+
 ## 2026-11-10 — First approved live-retry invocation blocked by authentication and over-strict browser URL guard (NO DOWNLOAD)
 
 - **Teddy CT108 host Python result:** Exact live image pin check `CONTAINER=PASS`. Username/password were requested locally with hidden input; initial HTTPS call failed `urllib.error.HTTPError: HTTP Error 401: Unauthorized` before the authenticated task/token/fresh-retry sequence. The 401's precise source (login credential/session, edge intermediary, or other) remains **unverified**. Do not assume a changed video source or disclose credentials; no fresh-ID POST was reached.
