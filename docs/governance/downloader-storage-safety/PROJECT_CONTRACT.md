@@ -42,7 +42,7 @@ Teddy explicitly approved option 2 on 2026-11-11: **one build-only test** of the
 
 ## Acceptance criteria
 
-- The router has `downloader-storage-safety / DLSS-001 / IN_PROGRESS`, this contract v1.0.2 APPROVED (Teddy's 2026-11-09 phased gate decision) and self-only active work; governance structural and explicit DLSS task preflight PASS while unrelated selected workstreams still reject the DLSS task ID.
+- The router has `downloader-storage-safety / DLSS-001 / IN_PROGRESS`, this contract v1.0.3 APPROVED (Teddy's 2026-11-11 one-time full-source build exception layered on the 2026-11-09 phased gate decision) and self-only active work; governance structural and explicit DLSS task preflight PASS while unrelated selected workstreams still reject the DLSS task ID.
 - CT108's Downloader-only maintenance stop prevents its download/remux from overlapping the one bounded image build; the pre-stop idle and post-stop no-process evidence, conservative capacity+reserve, independently confirmed daemon-side build end and manual old-container restart are recorded. Candidate image UI/manifest and full 13-file Compose/recreated-service rollback are distinct **post-build, pre-promotion** gates. Representative fail-closed checks and unmanaged-Docker bypass limitation are recorded; no unproven automatic lock/marker code is deployed.
 - Real deployment is reported separately from code/test/build evidence, preserving existing system state and unrelated workstreams. UI promotion remains HOLD unless independently authorized through its existing four-way task.
 
