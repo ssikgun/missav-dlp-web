@@ -2,9 +2,7 @@
 
 ## DLDWS-001 P04 STORAGE SINGLE-SOURCE OFFLINE CANDIDATE — TEDDY APPROVED (2026-11-11 KST)
 
-TASK_ID: DLDWS-001
-STATUS: IN_PROGRESS
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+- **Current route (unchanged):** `DLDWS-001 / IN_PROGRESS`; required workstreams `downloader,discovery-writer-safety`.
 USER_APPROVAL: Teddy replied "응 승인할께" to the explicit 2026-11-11 proposal for **only** P04's first `teddy_storage.py` single-source isolated candidate and offline representative checks; source promotion, Docker build and operational deployment were explicitly excluded.
 SOURCE_BASE_SHA: 858f4473534fa1c4e882df2ab30a340b69af2e66
 ALLOWED_PRODUCT_CANDIDATE_PATHS: `teddy_storage.py`; `downloader_runtime_overlay/teddy_storage.py` (duplicate removal only inside isolated candidate).
