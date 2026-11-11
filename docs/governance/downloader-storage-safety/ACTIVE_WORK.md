@@ -1,5 +1,11 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-11 — DLSS-001 one-time corrected-smoke full-source retest authorized (NO CT108 STOP/BUILD)
+
+- **Fresh user GO:** Teddy said `다음 작업 진행해` after the explicit proposal for a separately approved safe preflight and full Dockerfile retry. Contract v1.0.4 adds exactly one new build-only attempt, from source commit `41581f5bd0a3d6ee623687c73e223493b2dc7686` / tree `7b3b472c0514bd03542873f4af72385e7a3561d8` with the corrected single SpoofDPI smoke expectation (blob `d6fc8b35bfcae8f50d275deab17a7212a0898b39`); Dockerfile blob unchanged `5d835f3014418a952dc99eeee96ea76f328ee88f`. Compared with failed source `ed77ada`, all other product files unchanged; governance/handoff docs alone also advanced.
+- **Boundaries:** Reuse the precisely enumerated public Dockerfile dependency sources, clean tracked-only context, 12 GiB build allowance plus reserve, minimum 3 GiB available RAM, fresh idle/queue/process/builder/single-operator checks, Downloader-only A-method maintenance stop, independent BuildKit completion and explicit safe restart of the same original container. Prior one-shot attempt is consumed; new attempt also single-use. `STOP=NOT_RUN`, `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`, `DATA_WRITES=0`. Any unexpected source, runtime, dependency origin or safety gate fails closed.
+- **Next:** Obtain fresh CT108 read-only preflight from Teddy, confirm clean isolated snapshot identity, then only under all PASS execute one approved build and manual recovery; record direct output before making any deployment decision. No held P08 UI promotion or media retry.
+
 ## 2026-11-11 — DLSS-001 one-time canonical full Dockerfile BUILD=FAIL, original Downloader RESTORED (NO DEPLOY)
 
 - **One approved source-pinned build attempt:** Teddy on CT108 ran the guarded one-time full unchanged Dockerfile from exact product commit `ed77adaf5e86adee3b87566273a42beb09da2202` / tree `02ba20ac3ba76be3a0432e2b25a96164c0e26e2b`, isolated 615-file context `/tmp/dlss001-fullsource-U9u4yMAa/context`, tag `dlss001-fullsource-buildonly:ed77ada-20261111`. Pinned original container `6fe1841f2b66b43a8016a9483b6e0017d2c23c12c3b48c692937e3eff83e634f` and image `sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c` were verified; tasks/MP4 queue 0, no competing build/FFmpeg observed, reserve plus 12 GiB passed. Only Downloader was gracefully stopped; one-attempt marker saved. No media or other-service mutations initiated.
@@ -212,7 +218,7 @@ NO_GO: actual worker/delayed-retry/other builder idleness not proven, full capac
 WORKSTREAM: downloader-storage-safety
 TASK_ID: DLSS-001
 STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.3
+CONTRACT_VERSION: 1.0.4
 REQUIRES_WORKSTREAMS: downloader-storage-safety
 
 ## OBJECTIVE

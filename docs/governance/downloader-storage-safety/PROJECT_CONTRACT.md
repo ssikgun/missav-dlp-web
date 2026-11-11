@@ -1,6 +1,6 @@
 # Downloader build/download shared-storage safety contract
 
-CONTRACT_VERSION: 1.0.3
+CONTRACT_VERSION: 1.0.4
 PROJECT_CONTRACT_STATUS: APPROVED
 APPLIES_TO: Only Docker image build versus Downloader download/MP4-remux shared-filesystem contention prevention, now using Teddy-approved Downloader-only maintenance stop for each build and explicit verified restart (2026-11-09).
 
@@ -32,6 +32,14 @@ Teddy explicitly approved option 2 on 2026-11-11: **one build-only test** of the
 - **A-method remains mandatory:** after all pre-stop gates PASS, gracefully stop **only** `missav-dlp-web`, positively confirm no Downloader process, perform at most one source-pinned build with a unique build-only tag, verify BuildKit/daemon completion and remaining reserve, then explicitly restart the same unchanged old container if safe. Preserve all old images, 4 legacy MP4 stage files, jobs/TS, Stage9, Writer, Gluetun and Selkies. Never `prune`, rebuild on error, retry media, auto-restart, recreate services, or deploy the candidate under this approval.
 - **Evidence boundary:** `SOURCE_BUILD` can pass without `DEPLOY` or `PRODUCT` passing. Post-build compare exact image source/UI/API and manifest and the approved live P08 baseline before even proposing a separate promotion. P08LIB-001 was completed with user acceptance on 2026-11-10; its **already deployed approved UI** is the protection baseline, not a new UI promotion authorization. No service cutover is approved by this 2026-11-11 exception.
 
+## 2026-11-11 — DLSS-001 one-time corrected-smoke full-source retest — APPROVED (v1.0.4)
+
+- **New user GO:** After the prior one-time v1.0.3 build failed solely at the stale SpoofDPI admin-smoke assertion and was safely recovered, Teddy separately requested `다음 작업 진행해` immediately after the proposal to recheck build safety and retry the full canonical Dockerfile. This grants **one fresh build-only attempt**; the previous `ed77ada` attempt remains consumed and is not retroactively reauthorized.
+- **Exact new source pin:** `ssikgun/missav-dlp-web:teddy-subtitle-stage11` at commit `41581f5bd0a3d6ee623687c73e223493b2dc7686` / tree `7b3b472c0514bd03542873f4af72385e7a3561d8`, obtained as a clean tracked-files-only snapshot. Relative to prior `ed77adaf5e86adee3b87566273a42beb09da2202` only `teddy_downloader_admin_smoke.py` changes among product source (one expected `["spoofdpi", "--no-tui"]` assertion); Dockerfile and operating UI/API files remain identical. Test source blob `d6fc8b35bfcae8f50d275deab17a7212a0898b39`; Dockerfile blob `5d835f3014418a952dc99eeee96ea76f328ee88f`.
+- **Dependency exception:** Exactly the public sources enumerated in the preceding 2026-11-11 v1.0.3 one-time Dockerfile exception are allowed **for this one new attempt only**: original Docker Hub Python base, GHCR uv stage, Debian packages, pinned-path SpoofDPI upstream installer and its normal release dependencies, configured Python package index, and the exact GitHub source fetch. No additional endpoints, Dockerfile edits or version upgrades are authorized; unknown fetched origin is NO-GO.
+- **Same safety/operation boundary:** Recheck original running container/image identity and verified manual restart path, no active/pending/retrying jobs, MP4 queue/remux, concurrent build or FFmpeg, Docker shared-filesystem reserve + **12 GiB** temporary-build allowance, at least **3 GiB available RAM**, and a fresh single-operator maintenance window. Only after all pass, stop **only** `missav-dlp-web` gracefully; build once with a new unique build-only tag and `--pull=false`, from exact pinned clean source under normal isolated Docker build networking. Preserve log/build history and old image. Verify daemon-side terminal completion and remaining reserve independently; only then manually restart the **same original** container if safe. On unknown/failed build, keep it stopped pending independent safe-restart gates. No auto-retry, prune, Docker service recreate, candidate deployment, UI promotion, new downloads, failed-job retry or unrelated-service/data writes.
+- **Evidence boundary:** Current contract update is authorization/record only: `CT108_FRESH_PREFLIGHT=NOT_RUN`, `DOWNLOADER_STOP=NOT_RUN`, `BUILD_RETEST=NOT_RUN`, `DEPLOY=NOT_RUN`. A future technical Docker build PASS would not by itself authorize candidate promotion or prove product/operational success.
+
 ## Authorized implementation and operational scope
 
 - Teddy approved the distinct `DLSS-001` registration on 2026-11-09 after previously approving code change and conditional operational application to fix and prevent the shared-storage conflict.
@@ -42,7 +50,7 @@ Teddy explicitly approved option 2 on 2026-11-11: **one build-only test** of the
 
 ## Acceptance criteria
 
-- The router has `downloader-storage-safety / DLSS-001 / IN_PROGRESS`, this contract v1.0.3 APPROVED (Teddy's 2026-11-11 one-time full-source build exception layered on the 2026-11-09 phased gate decision) and self-only active work; governance structural and explicit DLSS task preflight PASS while unrelated selected workstreams still reject the DLSS task ID.
+- The router has `downloader-storage-safety / DLSS-001 / IN_PROGRESS`, this contract v1.0.4 APPROVED (fresh one-time corrected-smoke full-source retest) (Teddy's 2026-11-11 one-time full-source build exception layered on the 2026-11-09 phased gate decision) and self-only active work; governance structural and explicit DLSS task preflight PASS while unrelated selected workstreams still reject the DLSS task ID.
 - CT108's Downloader-only maintenance stop prevents its download/remux from overlapping the one bounded image build; the pre-stop idle and post-stop no-process evidence, conservative capacity+reserve, independently confirmed daemon-side build end and manual old-container restart are recorded. Candidate image UI/manifest and full 13-file Compose/recreated-service rollback are distinct **post-build, pre-promotion** gates. Representative fail-closed checks and unmanaged-Docker bypass limitation are recorded; no unproven automatic lock/marker code is deployed.
 - Real deployment is reported separately from code/test/build evidence, preserving existing system state and unrelated workstreams. UI promotion remains HOLD unless independently authorized through its existing four-way task.
 

@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-11 — DLSS-001 one-time corrected-smoke full-source retest authorized (NO CT108 STOP/BUILD)
+
+- **Fresh user GO:** Teddy said `다음 작업 진행해` after the explicit proposal for a separately approved safe preflight and full Dockerfile retry. Contract v1.0.4 adds exactly one new build-only attempt, from source commit `41581f5bd0a3d6ee623687c73e223493b2dc7686` / tree `7b3b472c0514bd03542873f4af72385e7a3561d8` with the corrected single SpoofDPI smoke expectation (blob `d6fc8b35bfcae8f50d275deab17a7212a0898b39`); Dockerfile blob unchanged `5d835f3014418a952dc99eeee96ea76f328ee88f`. Compared with failed source `ed77ada`, all other product files unchanged; governance/handoff docs alone also advanced.
+- **Boundaries:** Reuse the precisely enumerated public Dockerfile dependency sources, clean tracked-only context, 12 GiB build allowance plus reserve, minimum 3 GiB available RAM, fresh idle/queue/process/builder/single-operator checks, Downloader-only A-method maintenance stop, independent BuildKit completion and explicit safe restart of the same original container. Prior one-shot attempt is consumed; new attempt also single-use. `STOP=NOT_RUN`, `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`, `DATA_WRITES=0`. Any unexpected source, runtime, dependency origin or safety gate fails closed.
+- **Next:** Obtain fresh CT108 read-only preflight from Teddy, confirm clean isolated snapshot identity, then only under all PASS execute one approved build and manual recovery; record direct output before making any deployment decision. No held P08 UI promotion or media retry.
+
 ## 2026-11-11 — DLSPD-001 admin smoke expectation aligned with headless startup (SOURCE ONLY; NO BUILD)
 
 - **Teddy approval:** Promote the verified isolated one-line regression-smoke correction to the `teddy-subtitle-stage11` canonical source. DLSPD-001 contract v1.0.0 and workstream `IN_PROGRESS` remain unchanged.
