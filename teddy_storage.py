@@ -9,6 +9,8 @@ import shutil
 import uuid
 from urllib.parse import urlparse, quote
 
+import teddy_download_safety
+
 
 _SITE_ALIASES = {
     'youtube.com': 'youtube',
@@ -437,6 +439,29 @@ def _ssh_remote_stat(relative, config=None):
         ) from exc
 
 
+def _ssh_remote_sha256(relative, config=None):
+    """Return a verified regular remote file's SHA-256, failing closed otherwise."""
+    path = _ssh_remote_path(relative, config=config)
+    quoted = shlex.quote(path)
+    command = (
+        "if [ -f "
+        + quoted
+        + " ] && [ ! -L "
+        + quoted
+        + " ]; then sha256sum -- "
+        + quoted
+        + "; else printf "
+        + shlex.quote("__MISSING_OR_INVALID__")
+        + "; fi"
+    )
+    result = _ssh_run(command, config=config)
+    raw = str(result.stdout or "").strip()
+    match = re.fullmatch(r"([0-9a-fA-F]{64})\s+\*?.+", raw)
+    if not match:
+        raise PublishError("원격 파일 SHA-256을 확인할 수 없습니다: " + str(relative))
+    return match.group(1).lower()
+
+
 def _ssh_ensure_site_dir(site_key):
     key = _sanitize_folder(
         site_key
@@ -479,6 +504,7 @@ def _ssh_publish_completed_file(
     core,
     source_path,
     site_key,
+    expected_sha256=None,
 ):
     source = os.path.realpath(
         source_path
@@ -558,6 +584,23 @@ def _ssh_publish_completed_file(
     source_size = os.path.getsize(
         source
     )
+    source_sha256 = teddy_download_safety.sha256_file(source)
+    if expected_sha256 and source_sha256 != str(expected_sha256).lower():
+        raise PublishError("게시 전 로컬 원본 SHA-256이 저장된 증거와 다릅니다.")
+    expected_sha256 = source_sha256
+
+    existing_final = _ssh_remote_stat(relative)
+    if existing_final:
+        # An existing final path is always a collision. Even a matching hash
+        # does not prove that this invocation owns the existing NAS entry.
+        raise PublishError(
+            "기존 NAS 최종 경로를 덮어쓰거나 재사용하지 않습니다: "
+            + relative
+        )
+
+    # A regular partial may be resumed by rsync. Reject symlinks, directories,
+    # and other special entries before rsync can interact with that path.
+    _ssh_remote_stat(partial_relative)
 
     command = [
         "rsync",
@@ -606,8 +649,14 @@ def _ssh_publish_completed_file(
             "rsync 후 원격 파일 크기 검증에 실패했습니다."
         )
 
+    if _ssh_remote_sha256(partial_relative) != expected_sha256:
+        raise PublishError("rsync 후 원격 partial SHA-256 검증에 실패했습니다.")
+
+    # Exact-target hard-link creation is atomic and fails if any entry already
+    # occupies the final name. -T prevents ln from treating a racing directory
+    # as a destination directory and creating a child inside it.
     _ssh_run(
-        "mv -f "
+        "ln -T -- "
         + shlex.quote(partial_path)
         + " "
         + shlex.quote(final_path)
@@ -626,6 +675,11 @@ def _ssh_publish_completed_file(
             "원격 최종 파일 크기 검증에 실패했습니다."
         )
 
+    if _ssh_remote_sha256(relative) != expected_sha256:
+        raise PublishError("원격 최종 파일 SHA-256 검증에 실패했습니다.")
+
+    _ssh_run("rm " + shlex.quote(partial_path))
+
     # Local source is removed only after remote
     # transfer, size verification and final rename.
     os.remove(source)
@@ -639,10 +693,9 @@ def _ssh_publish_completed_file(
 def publish_completed_file(core, source_path, site_key):
     """Publish one fully finished local file to the completed-file root.
 
-    Same-filesystem deployments use os.replace directly.  Cross-filesystem
-    deployments (local NVMe -> NAS NFS) copy to a hidden partial file first and
-    only then rename inside the final filesystem.  The local source is removed
-    only after the final rename succeeds.
+    Same-filesystem deployments create the final name without clobbering.
+    Cross-filesystem deployments copy to a hidden partial file and create the
+    final name without replacement after size verification.
     """
     source = os.path.realpath(source_path)
     root = work_root(core)
@@ -666,8 +719,12 @@ def publish_completed_file(core, source_path, site_key):
 
     if same_filesystem:
         try:
-            os.replace(source, destination)
+            teddy_download_safety.atomic_publish_noclobber(source, destination)
             return destination
+        except teddy_download_safety.OutputCollision as exc:
+            raise PublishError(str(exc)) from exc
+        except teddy_download_safety.DownloadSafetyError as exc:
+            raise PublishError(f'완료 파일 확정 실패: {exc}') from exc
         except OSError as exc:
             raise PublishError(f'완료 파일 이동 실패: {exc}') from exc
 
@@ -679,8 +736,12 @@ def publish_completed_file(core, source_path, site_key):
         _copy_to_partial(source, partial)
         if os.path.getsize(partial) != os.path.getsize(source):
             raise PublishError('NAS 복사 후 파일 크기 검증에 실패했습니다.')
-        os.replace(partial, destination)
+        try:
+            os.link(partial, destination)
+        except FileExistsError as exc:
+            raise PublishError(f'기존 완료 파일을 덮어쓰지 않습니다: {destination}') from exc
         _fsync_directory(final_dir)
+        os.remove(partial)
         os.remove(source)
         return destination
     except PublishError:
@@ -782,6 +843,11 @@ def _publish_pending_task_ssh(core, task_id):
         )
     )
 
+    expected_hashes = task.get("local_result_sha256")
+    if not isinstance(expected_hashes, dict):
+        expected_hashes = {}
+        task["local_result_sha256"] = expected_hashes
+
     published_main = ""
     published_main_size = 0
     local_parents = set()
@@ -809,6 +875,16 @@ def _publish_pending_task_ssh(core, task_id):
         )
 
         if os.path.isfile(source):
+            local_sha256 = teddy_download_safety.sha256_file(source)
+            recorded_sha256 = expected_hashes.get(relative)
+            if recorded_sha256 and str(recorded_sha256).lower() != local_sha256:
+                raise PublishError(
+                    "로컬 완료 파일 SHA-256이 저장된 게시 증거와 다릅니다: "
+                    + str(relative)
+                )
+            if not recorded_sha256:
+                expected_hashes[relative] = local_sha256
+                core.save_tasks()
             (
                 published_relative,
                 published_size,
@@ -816,6 +892,7 @@ def _publish_pending_task_ssh(core, task_id):
                 core,
                 source,
                 site_key,
+                expected_sha256=local_sha256,
             )
         else:
             # Crash recovery:
@@ -828,6 +905,18 @@ def _publish_pending_task_ssh(core, task_id):
             if not remote_stat:
                 raise PublishError(
                     "로컬/원격 완료 파일을 찾을 수 없습니다: "
+                    + str(relative)
+                )
+
+            expected_sha256 = expected_hashes.get(relative)
+            if not expected_sha256:
+                raise PublishError(
+                    "재시작 복구에 필요한 검증된 SHA-256 증거가 없습니다: "
+                    + str(relative)
+                )
+            if _ssh_remote_sha256(remote_relative) != str(expected_sha256).lower():
+                raise PublishError(
+                    "재시작 복구 원격 파일 SHA-256 검증에 실패했습니다: "
                     + str(relative)
                 )
 
@@ -869,6 +958,10 @@ def _publish_pending_task_ssh(core, task_id):
     )
     task.pop(
         "local_result_paths",
+        None,
+    )
+    task.pop(
+        "local_result_sha256",
         None,
     )
     task.pop(
@@ -978,6 +1071,7 @@ def mark_publish_error(core, task_id, exc):
         task['status'] = f'에러: NAS 저장 실패: {message[:80]}'
         task['progress'] = '99%'
         task['speed_bps'] = 0
+        task['error_kind'] = 'storage'
         task['last_error_detail'] = f'완료 파일 게시 실패: {message}'[:1000]
         core.save_tasks()
     print(f'[Storage] 완료 파일 게시 실패: {message}', flush=True)

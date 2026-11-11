@@ -9,6 +9,10 @@ TASK_ID: DLDWS-001
 WORKSTREAMS: downloader,discovery-writer-safety
 EVIDENCE_SCOPE: read-only source/Dockerfile; no build or operating-state verification
 
+## P04 promotion checkpoint — 2026-11-11 09:21:38 KST
+
+The separate user-approved GitHub-only source promotion makes root `teddy_storage.py` byte-identical to the previous final Overlay source (`d678abce28a0545d7e9d47633f79cff729c18d7e9436b82c2c31c2921fe914f9`) and deletes **only** repository duplicate `downloader_runtime_overlay/teddy_storage.py`. Exact two-file product scope, approved by Teddy after the bounded offline candidate report; Dockerfile, final hash list, tests, production image and services unchanged. No Docker build/deploy or live NAS/DB write. Earlier synthetic offline checks are narrow evidence; image and runtime behavior, restart, SSH/NAS and cross-filesystem recovery still `UNKNOWN/NOT_RUN`. Paired DLDWS-001 `IN_PROGRESS` retained. Full approval and outcome in both ACTIVE_WORKs and CURRENT_HANDOFF; build requires separate DLSS-001 preflight and user approval.
+
 ## Evidence and safeguards
 
 - Codex reported isolated checkout `/tmp/downloader-audit-a2316-1794301122` fast-forwarded and clean at the source SHA; protected original worktree, product source and production unchanged. Common contract v1.0.1 and both DLDWS contracts v1.0.0 remain approved, DLDWS-001 IN_PROGRESS.
