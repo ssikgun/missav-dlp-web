@@ -1,10 +1,15 @@
 from pathlib import Path
+import hashlib
 
 
 BOOTSTRAP = Path('teddy_bootstrap.py')
+FINAL_BOOTSTRAP_SHA256 = 'b96850dbfaa585f5cf2abb3fdbe328030706fc159aba8875656fe2c775e433f3'
 
 
 def main():
+    if hashlib.sha256(BOOTSTRAP.read_bytes()).hexdigest() == FINAL_BOOTSTRAP_SHA256:
+        print('HLS recovery wrapper transport bridge: already final')
+        return
     text = BOOTSTRAP.read_text(encoding='utf-8')
 
     old_signature = 'def _fetch_segment_with_network_recovery(task_id, seg_url, headers):'

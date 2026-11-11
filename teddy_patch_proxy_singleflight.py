@@ -1,11 +1,15 @@
 from pathlib import Path
+import hashlib
 
 
 BOOTSTRAP = Path('teddy_bootstrap.py')
+FINAL_BOOTSTRAP_SHA256 = 'b96850dbfaa585f5cf2abb3fdbe328030706fc159aba8875656fe2c775e433f3'
 NETWORK_JS = Path('templates/teddy-network.js')
 
 
 def replace_once(path, old, new, label):
+    if path == BOOTSTRAP and hashlib.sha256(path.read_bytes()).hexdigest() == FINAL_BOOTSTRAP_SHA256:
+        return
     text = path.read_text(encoding='utf-8')
     count = text.count(old)
     if count != 1:

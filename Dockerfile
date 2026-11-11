@@ -159,7 +159,9 @@ RUN python teddy_subtitle_status_ui_smoke.py
 RUN grep -Fq "TEDDY_FINAL_DIR" teddy_storage.py && \
     grep -Fq "local_result_path" teddy_generic.py && \
     grep -Fq "local_result_path" teddy_entrypoint.py && \
-    grep -Fq "error_kind') == 'storage'" teddy_bootstrap.py && \
+    (grep -Fq "error_kind') == 'storage'" teddy_bootstrap.py || \
+     (echo 'b96850dbfaa585f5cf2abb3fdbe328030706fc159aba8875656fe2c775e433f3  teddy_bootstrap.py' | sha256sum -c - && \
+      grep -Fq "error_kind') in ('storage', 'safety')" teddy_bootstrap.py)) && \
     grep -Fq "Final directory:" teddy_bootstrap.py
 
 RUN python -m py_compile \

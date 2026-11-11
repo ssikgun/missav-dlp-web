@@ -1,12 +1,16 @@
 from pathlib import Path
+import hashlib
 
 import teddy_patch_mobile
 
 
 BOOTSTRAP = Path('teddy_bootstrap.py')
+FINAL_BOOTSTRAP_SHA256 = 'b96850dbfaa585f5cf2abb3fdbe328030706fc159aba8875656fe2c775e433f3'
 
 
 def replace_once(old, new, label):
+    if hashlib.sha256(BOOTSTRAP.read_bytes()).hexdigest() == FINAL_BOOTSTRAP_SHA256:
+        return
     text = BOOTSTRAP.read_text(encoding='utf-8')
     count = text.count(old)
     if count != 1:
