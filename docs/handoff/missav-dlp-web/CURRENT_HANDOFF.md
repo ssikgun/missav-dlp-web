@@ -1,5 +1,14 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## DLDWS-001 P04 BOOTSTRAP — CANONICAL SOURCE PROMOTED (2026-11-11 12:15 KST)
+
+- **Teddy's separate explicit approval:** "응 승인해" to promote the independently reviewed 14-path `teddy_bootstrap.py` patch to GitHub canonical product source only. No Docker build, deployment, runtime changes, production downloads or job/DB/NAS/Jellyfin writes approved.
+- **Preflight:** `ssikgun/missav-dlp-web:teddy-subtitle-stage11` parent HEAD `7891e6e0beefbe75fafa987e0e0758ac19a21e91`. Common contract `1.0.1 / APPROVED`, Downloader and Discovery Writer Safety `1.0.0 / APPROVED`, both `DLDWS-001 / IN_PROGRESS`. All 16 relevant canonical source blobs exactly matched the saved isolated baseline; patch SHA-256 `505b3b3ac1b0928127485a800b33fd6bdc72801b4f0ce700e61e03f5fc94c05a` and `git apply`/reverse/scope checks reconfirmed.
+- **Promoted canonical product commit:** `67c4b88ad3128aef0e568d7af99a1bc0f490bcd9`, guarded fast-forward from the exact parent HEAD. The GitHub commit was independently read back: **exactly 14 changed product paths**—`M teddy_bootstrap.py`, `D downloader_runtime_overlay/teddy_bootstrap.py`, `M` eleven agreed direct/indirect bootstrap patch-writer scripts, and `M Dockerfile` only for the narrow final-bootstrap storage/safety marker gate. Every one of 13 new GitHub blobs matched the local reviewed candidate SHA. No unrelated product file changed.
+- **Post-promotion verification:** Branch HEAD matched the new commit. Root bootstrap Git blob `eb59f4494e29727c87543193bb3f0ebffa193b07`, previous final Overlay byte-equivalent SHA-256 `b96850dbfaa585f5cf2abb3fdbe328030706fc159aba8875656fe2c775e433f3`. Dockerfile blob `e440602d3921f51a2c0acc6dcac90a55fb05dc4c`; `teddy_verify_build.py` blob `a153e1637ec6a97fc5dc0aabde2b2974f9704615` and `dldws001-source-sha256.txt` blob `21f58e79fba8b4f66461616f157d8646ada89fc5` unchanged.
+- **Boundaries and next step:** `BOOTSTRAP_SINGLE_SOURCE_CANONICAL=PASS`; `GITHUB_SOURCE_PROMOTION=COMPLETE`; `DOCKER_BUILD=NOT_RUN`; `DEPLOY=NOT_RUN`; `PRODUCT_RUNTIME=UNKNOWN`. Resume B plan **one pair at a time**: next `templates/index.html` read-only dependency/scope review requires fresh intent and route verification; no implementation candidate or build assumed. The final Docker build and release remain separately authorized decisions with a fresh DLSS-001 safety preflight.
+
+
 ## DLDWS-001 P04 BOOTSTRAP — INDEPENDENT PATCH RE-REVIEW PASS (2026-11-11 12:09 KST)
 
 - **Teddy's continuation:** "다음 단계" after the saved bootstrap isolated candidate. This authorizes **read-only independent patch verification**, not GitHub product-source promotion, image building or deployment.
