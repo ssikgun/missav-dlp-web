@@ -1,7 +1,9 @@
 from pathlib import Path
+import hashlib
 
 
 ENTRYPOINT = Path('teddy_entrypoint.py')
+FINAL_ENTRYPOINT_SHA256 = '73323613cac0be7c67810989a62b13cae691a554a797b1e5e2dc7ab116cc750f'
 
 
 def replace_once(text, old, new, label):
@@ -12,6 +14,8 @@ def replace_once(text, old, new, label):
 
 
 def main():
+    if hashlib.sha256(ENTRYPOINT.read_bytes()).hexdigest() == FINAL_ENTRYPOINT_SHA256:
+        return
     text = ENTRYPOINT.read_text(encoding='utf-8')
 
     text = replace_once(

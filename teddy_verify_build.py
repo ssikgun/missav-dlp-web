@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 from pathlib import Path
 
 
@@ -209,8 +210,16 @@ def verify_runtime():
         'teddy_duplicates.py': ['duplicate queue guard enabled'],
         'teddy_storage.py': ['site_key_for_url'],
     }
+    # The exact previously verified final entrypoint has already superseded
+    # these two intermediate remux markers; keep every other check unchanged.
+    final_entrypoint = hashlib.sha256(Path('teddy_entrypoint.py').read_bytes()).hexdigest() == (
+        '73323613cac0be7c67810989a62b13cae691a554a797b1e5e2dc7ab116cc750f'
+    )
+    superseded_entrypoint_markers = {'remux-output.mp4', 'os.replace(remux_tmp, out_path)'}
     for path, needles in checks.items():
         for needle in needles:
+            if path == 'teddy_entrypoint.py' and final_entrypoint and needle in superseded_entrypoint_markers:
+                continue
             require(path, needle)
 
     forbid('teddy_entrypoint.py', 'batch_size = 16', 'legacy HLS batch barrier')

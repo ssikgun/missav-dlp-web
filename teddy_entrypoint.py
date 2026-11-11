@@ -1,10 +1,19 @@
+if __name__ == '__main__':
+    raise SystemExit('Use teddy_bootstrap.py; direct entrypoint execution skips the installed download and FFmpeg safety guards.')
+
 import os
 import shutil
+import shlex
 import subprocess
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
 import app as core
+import teddy_hls_transport
+import teddy_storage
+import teddy_download_safety
+import teddy_mp4_queue
+import threading
 
 
 SEGMENT_TIMEOUT_SECONDS = 45
@@ -35,25 +44,44 @@ def _interruptible_sleep(task_id, seconds):
         time.sleep(min(0.5, remaining))
 
 
-def _fetch_segment(task_id, seg_url, headers):
+def _fetch_segment(task_id, seg_url, headers, transport_mode='per-worker', worker_count=None):
     last = None
     for attempt in range(SEGMENT_RETRY_ATTEMPTS):
         _check_task_state(task_id)
         target = core.IMPERSONATE_TARGETS[attempt % len(core.IMPERSONATE_TARGETS)]
         try:
-            response = core.cffi_requests.get(
+            response = teddy_hls_transport.get(
+                core,
+                task_id,
                 seg_url,
                 impersonate=target,
                 headers=headers,
                 timeout=SEGMENT_TIMEOUT_SECONDS,
+                transport_mode=transport_mode,
+                max_clients=worker_count,
             )
             if response.status_code == 200:
                 return response.content
             last = f'HTTP {response.status_code}'
+            # Per-worker mode drops only this worker's CONNECT/TLS path. Async-pool
+            # mode intentionally keeps the shared pool alive for unrelated in-flight
+            # requests; public-proxy rotation replaces it by proxy URL on next use.
+            teddy_hls_transport.invalidate(transport_mode)
         except (DownloadPaused, core.DownloadCancelled):
             raise
         except Exception as exc:
             last = str(exc)
+            teddy_hls_transport.invalidate(transport_mode)
+
+        # Preserve the cumulative VPN health observer from the reliability layer.
+        # VPN tasks use per-worker transport even when async-pool is requested.
+        observer = getattr(core, '_teddy_vpn_failure_observer', None)
+        if callable(observer):
+            try:
+                observer(task_id, os.path.basename(seg_url), last)
+            except Exception as observer_exc:
+                print(f'[VPN 자동복구] 오류 감지기 예외: {observer_exc}', flush=True)
+
         if attempt + 1 < SEGMENT_RETRY_ATTEMPTS:
             delay = SEGMENT_RETRY_BACKOFF[attempt + 1]
             print(
@@ -96,15 +124,43 @@ def _fetch_variant_playlist(task_id, variant_url, headers):
 
 
 def _download_hls_resumable(task_id, variant_url, headers, out_path):
-    parts_dir = os.path.join(core.DOWNLOAD_DIR, f'.{task_id}.parts')
+    # Capture persisted benchmark settings once per execution. Changing the UI while
+    # a download is active affects only the next HLS execution, so executor size,
+    # write strategy, and connection topology stay stable during one benchmark run.
+    worker_count = teddy_hls_transport.workers_from_settings(core.settings)
+    write_mode = teddy_hls_transport.write_mode_from_settings(core.settings)
+    transport_mode = teddy_hls_transport.transport_mode_for_task(core, task_id, core.settings)
+    pool_clients = teddy_hls_transport.pool_clients_from_settings(core.settings)
+    http_version = teddy_hls_transport.http_version_from_settings(core.settings)
+    root = os.path.realpath(core.DOWNLOAD_DIR)
+    out_path = os.path.abspath(out_path)
+    parts_dir = os.path.join(root, f'.{task_id}.parts')
+    ts_out = (out_path[:-4] if out_path.endswith('.mp4') else out_path) + '.ts'
+    if os.path.lexists(out_path) or os.path.lexists(ts_out):
+        raise teddy_download_safety.OutputCollision(
+            f'기존 완료 파일을 덮어쓰지 않습니다: {out_path}'
+        )
+    teddy_download_safety.ensure_download_start_space(root)
+    if os.path.islink(parts_dir):
+        raise teddy_download_safety.DownloadSafetyError(
+            f'HLS 조각 디렉터리가 심볼릭 링크여서 안전하게 열 수 없습니다: {parts_dir}'
+        )
     os.makedirs(parts_dir, exist_ok=True)
+    try:
+        if os.path.commonpath([root, os.path.realpath(parts_dir)]) != root:
+            raise teddy_download_safety.DownloadSafetyError(
+                f'HLS 조각 디렉터리가 작업 루트 밖을 가리킵니다: {parts_dir}'
+            )
+    except ValueError as exc:
+        raise teddy_download_safety.DownloadSafetyError(
+            f'HLS 조각 디렉터리 경계를 확인할 수 없습니다: {parts_dir}'
+        ) from exc
+    task = core.tasks.get(task_id)
+    if task:
+        task['hls_parts_path'] = os.path.relpath(parts_dir, root)
+        core.save_tasks()
     playlist_text = _fetch_variant_playlist(task_id, variant_url, headers)
-    base = variant_url.rsplit('/', 1)[0] + '/'
-    seg_urls = [
-        (segment if segment.startswith('http') else base + segment)
-        for segment in (line.strip() for line in playlist_text.splitlines())
-        if segment and not segment.startswith('#')
-    ]
+    plan_sha256, seg_urls = teddy_download_safety.hls_playlist_identity(variant_url, playlist_text)
     total = len(seg_urls)
     if total == 0:
         raise ValueError('세그먼트가 없습니다')
@@ -112,11 +168,29 @@ def _download_hls_resumable(task_id, variant_url, headers, out_path):
     def seg_path(index):
         return os.path.join(parts_dir, f'{index:05d}.ts')
 
-    pending = [
-        (index, url)
-        for index, url in enumerate(seg_urls)
-        if not (os.path.exists(seg_path(index)) and os.path.getsize(seg_path(index)) > 0)
-    ]
+    list_path = os.path.join(parts_dir, 'filelist.txt')
+    expected_filelist = ''.join(f"file '{seg_path(index)}'\n" for index in range(total))
+    with teddy_download_safety.StorageWriteTransaction(
+        root,
+        output_path=parts_dir,
+        required_bytes=len(expected_filelist.encode('utf-8')),
+        cancel_check=lambda: _check_task_state(task_id),
+    ):
+        _resume_manifest, reusable_segments = teddy_download_safety.prepare_hls_resume(
+            parts_dir,
+            task_id,
+            plan_sha256,
+            total,
+            expected_filelist,
+            seg_path,
+        )
+    manifest_lock = threading.Lock()
+
+    pending = []
+    for index, url in enumerate(seg_urls):
+        path = seg_path(index)
+        if index not in reusable_segments:
+            pending.append((index, url))
     done = total - len(pending)
     downloaded_bytes = sum(
         os.path.getsize(seg_path(index))
@@ -124,45 +198,166 @@ def _download_hls_resumable(task_id, variant_url, headers, out_path):
         if os.path.exists(seg_path(index)) and os.path.getsize(seg_path(index)) > 0
     )
     total_bytes_estimate = int(downloaded_bytes * total / done) if done else 0
-    print(f'[다운로드] 세그먼트 {total}개 (완료 {done} / 남음 {len(pending)})', flush=True)
+    print(
+        f'[다운로드] 세그먼트 {total}개 (완료 {done} / 남음 {len(pending)}) '
+        f'· continuous {worker_count} workers · transport={transport_mode} '
+        f'· pool={pool_clients} · http={http_version} · write={write_mode}',
+        flush=True,
+    )
     if task_id in core.tasks:
         core.tasks[task_id]['progress'] = f'{int(done * 100 / total)}%'
         core.tasks[task_id]['speed_bps'] = 0
         core.tasks[task_id]['downloaded_bytes'] = downloaded_bytes
         core.tasks[task_id]['total_bytes_estimate'] = total_bytes_estimate
+        core.tasks[task_id]['hls_workers'] = worker_count
+        core.tasks[task_id]['hls_write_mode'] = write_mode
+        core.tasks[task_id]['hls_transport_mode'] = transport_mode
+        core.tasks[task_id]['hls_pool_clients'] = pool_clients
+        core.tasks[task_id]['hls_http_version'] = http_version
+        core.tasks[task_id]['hls_http_version_actual'] = '?'
+        core.save_tasks()
 
-    def fetch_to_file(item):
-        index, url = item
-        data = _fetch_segment(task_id, url, headers)
+    def write_part(index, data):
         _check_task_state(task_id)
-        tmp = seg_path(index) + '.tmp'
-        with open(tmp, 'wb') as file_obj:
-            file_obj.write(data)
-        os.replace(tmp, seg_path(index))
+        target = seg_path(index)
+        if os.path.lexists(target):
+            raise teddy_download_safety.OutputCollision(
+                f'기존 세그먼트 파일을 덮어쓰지 않습니다: {target}'
+            )
+        tmp = target + f'.{os.getpid()}.{time.time_ns()}.tmp'
+        try:
+            with teddy_download_safety.StorageWriteTransaction(
+                root,
+                output_path=parts_dir,
+                required_bytes=len(data),
+                cancel_check=lambda: _check_task_state(task_id),
+            ) as storage_write:
+                with open(tmp, 'xb') as file_obj:
+                    written = file_obj.write(data)
+                    if written != len(data):
+                        raise OSError('HLS 세그먼트 임시 파일에 전체 데이터를 기록하지 못했습니다.')
+                    storage_write.consume_written(written)
+                    file_obj.flush()
+                    os.fsync(file_obj.fileno())
+                teddy_download_safety.atomic_publish_noclobber(tmp, target)
+                with manifest_lock:
+                    teddy_download_safety.record_hls_segment(
+                        parts_dir, task_id, plan_sha256, index, target,
+                    )
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
         return len(data)
 
+    def fetch_item(item):
+        index, url = item
+        data = _fetch_segment(
+            task_id,
+            url,
+            headers,
+            transport_mode=transport_mode,
+            worker_count=pool_clients,
+        )
+        _check_task_state(task_id)
+        if write_mode == 'parts':
+            # Production-safe path: preserve the proven behavior exactly, including
+            # worker-thread persistence before a segment is considered complete.
+            write_part(index, data)
+            return len(data)
+        # RAM benchmark: the network worker returns immediately with bytes. The
+        # coordinator refills that freed network slot before serially persisting the
+        # payload to the same .parts layout, isolating concurrent NAS file I/O while
+        # retaining completed-segment resume/crash recovery.
+        return index, data
+
     speed_samples = []
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        batch_size = 16
-        for start in range(0, len(pending), batch_size):
+    window_started = time.monotonic()
+    window_bytes = 0
+    last_speed = 0
+    pending_iter = iter(pending)
+    in_flight = {}
+    executor = ThreadPoolExecutor(max_workers=worker_count)
+
+    def submit_one():
+        try:
+            item = next(pending_iter)
+        except StopIteration:
+            return False
+        future = executor.submit(fetch_item, item)
+        in_flight[future] = item
+        return True
+
+    try:
+        for _ in range(min(worker_count, len(pending))):
+            submit_one()
+
+        while in_flight:
             _check_task_state(task_id)
-            batch = pending[start:start + batch_size]
-            batch_started = time.monotonic()
-            byte_counts = list(executor.map(fetch_to_file, batch))
-            elapsed = max(time.monotonic() - batch_started, 0.001)
-            batch_bytes = sum(byte_counts)
-            batch_speed = batch_bytes / elapsed
-            speed_samples.append(batch_speed)
-            speed_samples = speed_samples[-4:]
-            smoothed_speed = sum(speed_samples) / len(speed_samples)
-            done += len(batch)
-            downloaded_bytes += batch_bytes
-            total_bytes_estimate = int(downloaded_bytes * total / done) if done else 0
-            if task_id in core.tasks:
-                core.tasks[task_id]['progress'] = f'{int(min(done, total) * 100 / total)}%'
-                core.tasks[task_id]['speed_bps'] = int(smoothed_speed)
-                core.tasks[task_id]['downloaded_bytes'] = downloaded_bytes
-                core.tasks[task_id]['total_bytes_estimate'] = total_bytes_estimate
+            completed, _ = wait(tuple(in_flight), return_when=FIRST_COMPLETED)
+            for future in completed:
+                in_flight.pop(future, None)
+                result = future.result()
+                if write_mode == 'ram':
+                    index, data = result
+                    # Refill the free network slot before touching NAS storage.
+                    submit_one()
+                    write_part(index, data)
+                    byte_count = len(data)
+                else:
+                    byte_count = result
+
+                done += 1
+                downloaded_bytes += byte_count
+                window_bytes += byte_count
+
+                now = time.monotonic()
+                window_elapsed = max(now - window_started, 0.001)
+                should_sample = window_elapsed >= 1.0 or done >= total
+                if should_sample:
+                    sample_speed = window_bytes / window_elapsed
+                    speed_samples.append(sample_speed)
+                    speed_samples = speed_samples[-4:]
+                    last_speed = int(sum(speed_samples) / len(speed_samples))
+                    observer = getattr(core, '_teddy_proxy_transfer_observer', None)
+                    if observer:
+                        try:
+                            observer(task_id, window_bytes, window_elapsed)
+                        except Exception as exc:
+                            print(f'[Proxy 학습] 전송 샘플 기록 실패: {exc}', flush=True)
+                    window_started = now
+                    window_bytes = 0
+                elif window_elapsed >= 0.20:
+                    # Give the UI an early estimate without polluting learning with
+                    # sub-second samples.
+                    last_speed = int(window_bytes / window_elapsed)
+
+                total_bytes_estimate = int(downloaded_bytes * total / done) if done else 0
+                if task_id in core.tasks:
+                    core.tasks[task_id]['progress'] = f'{int(min(done, total) * 100 / total)}%'
+                    core.tasks[task_id]['speed_bps'] = max(0, int(last_speed))
+                    core.tasks[task_id]['downloaded_bytes'] = downloaded_bytes
+                    core.tasks[task_id]['total_bytes_estimate'] = total_bytes_estimate
+
+                # Existing parts mode refills after persistence; RAM mode already
+                # refilled immediately after the network future completed above.
+                if write_mode != 'ram':
+                    submit_one()
+    finally:
+        executor.shutdown(wait=True, cancel_futures=True)
+
+    # Flush any final sub-second transfer sample for UI/proxy learning.
+    if window_bytes > 0:
+        elapsed = max(time.monotonic() - window_started, 0.001)
+        if elapsed >= 0.20:
+            observer = getattr(core, '_teddy_proxy_transfer_observer', None)
+            if observer:
+                try:
+                    observer(task_id, window_bytes, elapsed)
+                except Exception as exc:
+                    print(f'[Proxy 학습] 최종 전송 샘플 기록 실패: {exc}', flush=True)
 
     _check_task_state(task_id)
     if task_id in core.tasks:
@@ -171,32 +366,16 @@ def _download_hls_resumable(task_id, variant_url, headers, out_path):
         core.tasks[task_id]['downloaded_bytes'] = downloaded_bytes
         core.tasks[task_id]['total_bytes_estimate'] = downloaded_bytes
 
-    list_path = os.path.join(parts_dir, 'filelist.txt')
-    with open(list_path, 'w', encoding='utf-8') as list_file:
-        for index in range(total):
-            list_file.write(f"file '{seg_path(index)}'\n")
-    print('[ffmpeg] mp4 리먹스 중...', flush=True)
-    proc = subprocess.run(
-        ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0',
-         '-i', list_path, '-c', 'copy', out_path],
-        capture_output=True,
-        text=True,
+    missing = [
+        index for index in range(total)
+        if not os.path.isfile(seg_path(index)) or os.path.getsize(seg_path(index)) <= 0
+    ]
+    if missing:
+        raise ValueError(f'완료되지 않은 HLS 세그먼트가 있습니다: {len(missing)}개')
+    teddy_mp4_queue.enqueue_hls(
+        core, task_id, root, parts_dir, list_path, out_path, plan_sha256, total,
     )
-    if proc.returncode == 0 and os.path.exists(out_path):
-        shutil.rmtree(parts_dir, ignore_errors=True)
-        return out_path
-    print(
-        f'[ffmpeg] concat 실패(코드 {proc.returncode}) → ts로 저장: '
-        f'{(proc.stderr or "")[:300]}',
-        flush=True,
-    )
-    ts_out = (out_path[:-4] if out_path.endswith('.mp4') else out_path) + '.ts'
-    with open(ts_out, 'wb') as output_file:
-        for index in range(total):
-            with open(seg_path(index), 'rb') as segment_file:
-                output_file.write(segment_file.read())
-    shutil.rmtree(parts_dir, ignore_errors=True)
-    return ts_out
+    return out_path
 
 
 def _store_info(task_id, info):
@@ -208,11 +387,40 @@ def _store_info(task_id, info):
     core.save_tasks()
 
 
+
+def _fresh_output_collision_guard(out_name):
+    """Fail closed before media writes for an explicit fresh-ID retry."""
+    if not isinstance(out_name, str) or os.path.basename(out_name) != out_name or not out_name.endswith('.mp4'):
+        raise teddy_download_safety.DownloadSafetyError('출력 이름을 확인할 수 없습니다.')
+    names = (out_name, out_name[:-4] + '.ts')
+    with os.scandir(core.DOWNLOAD_DIR):
+        pass
+    if any(os.path.lexists(os.path.join(core.DOWNLOAD_DIR, name)) for name in names):
+        raise teddy_download_safety.OutputCollision('기존 로컬 출력 파일이 있어 중단했습니다.')
+    if teddy_storage._final_backend() != 'ssh':
+        raise teddy_download_safety.DownloadSafetyError('최종 SSH 저장소를 확인할 수 없습니다.')
+    try:
+        directory = teddy_storage._ssh_remote_path('missav')
+        quoted = shlex.quote(directory)
+        teddy_storage._ssh_run('test -d ' + quoted + ' && test ! -L ' + quoted + ' && test -r ' + quoted + ' && test -x ' + quoted)
+        for name in names:
+            if teddy_storage._ssh_remote_stat('missav/' + name) is not None:
+                raise teddy_download_safety.OutputCollision('기존 원격 출력 파일이 있어 중단했습니다.')
+    except teddy_download_safety.DownloadSafetyError:
+        raise
+    except Exception as exc:
+        raise teddy_download_safety.DownloadSafetyError('원격 출력 상태를 확인할 수 없습니다.') from exc
+
 def _download_video(task_id, url):
     try:
         _check_task_state(task_id)
         with core.yt_dlp.YoutubeDL(
-            {'quiet': True, 'no_warnings': True, 'proxy': None},
+            {
+                'quiet': True,
+                'no_warnings': True,
+                'proxy': None,
+                'teddy_task_id': task_id,
+            },
             auto_init=False,
         ) as ydl:
             ydl.add_info_extractor(core.MyCustomMissAV())
@@ -230,28 +438,42 @@ def _download_video(task_id, url):
         print(f"[선택] {fmt.get('height')}p -> {variant_url}", flush=True)
         out_name = core._safe_filename(info)
         out_path = os.path.join(core.DOWNLOAD_DIR, out_name)
+        if (core.tasks.get(task_id) or {}).get('fresh_retry_of'):
+            _fresh_output_collision_guard(out_name)
         final_path = _download_hls_resumable(task_id, variant_url, headers, out_path)
+        queued_task = core.tasks.get(task_id) or {}
+        if queued_task.get('mp4_stage') == 'queued':
+            return
         if task_id not in core.tasks:
             return
-        out_name = os.path.basename(final_path)
-        core.tasks[task_id]['status'] = '완료'
-        core.tasks[task_id]['progress'] = '100%'
-        core.tasks[task_id]['speed_bps'] = 0
-        core.tasks[task_id]['filename'] = out_name
-        try:
-            final_size = os.path.getsize(final_path)
-            core.tasks[task_id]['filesize'] = final_size
-            core.tasks[task_id]['downloaded_bytes'] = final_size
-            core.tasks[task_id]['total_bytes_estimate'] = final_size
-        except OSError:
-            pass
-        core.save_tasks()
-        print(f'[완료] {out_name}', flush=True)
-    except DownloadPaused:
-        if task_id in core.tasks:
-            core.tasks[task_id]['status'] = '일시정지'
-            core.tasks[task_id]['speed_bps'] = 0
+        with teddy_download_safety.task_state_guard():
+            _check_task_state(task_id)
+            task = core.tasks.get(task_id)
+            if not task:
+                raise core.DownloadCancelled()
+            out_name = os.path.basename(final_path)
+            task['progress'] = '99%'
+            task['speed_bps'] = 0
+            task['filename'] = out_name
+            task['local_result_path'] = teddy_storage.relative_work_path(core, final_path)
+            task['local_result_paths'] = [task['local_result_path']]
+            try:
+                final_size = os.path.getsize(final_path)
+                task['filesize'] = final_size
+                task['downloaded_bytes'] = final_size
+                task['total_bytes_estimate'] = final_size
+            except OSError:
+                pass
             core.save_tasks()
+        print(f"[로컬 완료][custom-hls] {task['local_result_path']} -> publish pending", flush=True)
+        return {'status': 'local-complete'}
+    except DownloadPaused:
+        with teddy_download_safety.task_state_guard():
+            teddy_download_safety.complete_pause_request(core, task_id)
+            task = core.tasks.get(task_id)
+            if task:
+                task['speed_bps'] = 0
+                core.save_tasks()
         print(f'[Pause] 일시정지 완료: {url}', flush=True)
     except core.DownloadCancelled:
         if task_id in core.tasks:
@@ -259,9 +481,20 @@ def _download_video(task_id, url):
             core.tasks[task_id]['speed_bps'] = 0
             core.save_tasks()
     except Exception as exc:
+        task = core.tasks.get(task_id)
+        if task and task.get('status') in ('일시정지 요청 중', '일시정지'):
+            task['status'] = '일시정지'
+            task['speed_bps'] = 0
+            core.save_tasks()
+            print(f'[Pause] 추출 단계 일시정지 완료: {url}', flush=True)
+            return
         print(f'[Error] {url}: {exc}', flush=True)
         if task_id in core.tasks:
-            core.tasks[task_id]['status'] = f'에러: {str(exc)[:100]}'
+            kind = teddy_download_safety.failure_kind(exc)
+            prefix = '에러: 저장 공간/잠금 보호: ' if kind in ('storage', 'safety') else '에러: '
+            core.tasks[task_id]['status'] = f'{prefix}{str(exc)[:100]}'
+            core.tasks[task_id]['error_kind'] = kind
+            core.tasks[task_id]['last_error_detail'] = str(exc)[:1000]
             core.tasks[task_id]['speed_bps'] = 0
             core.save_tasks()
 
@@ -272,24 +505,43 @@ def _install_routes():
         task = core.tasks.get(task_id)
         if not task:
             return core.jsonify({'status': 'error', 'message': '작업 없음'}), 404
-        if task.get('status') != '다운로드 중':
-            return core.jsonify({'status': 'error', 'message': '다운로드 중인 작업만 일시정지할 수 있습니다.'}), 400
-        task['status'] = '일시정지 요청 중'
-        task['speed_bps'] = 0
-        core.save_tasks()
+        with teddy_download_safety.task_state_guard():
+            task = core.tasks.get(task_id)
+            if not task:
+                return core.jsonify({'status': 'error', 'message': '작업 없음'}), 404
+            if teddy_download_safety.final_publish_started(task_id):
+                return core.jsonify({'status': 'error', 'message': '최종 저장 검증이 시작되어 지금은 일시정지할 수 없습니다.'}), 409
+            if task.get('status') in ('MP4 변환 대기', 'MP4 저장 대기'):
+                teddy_mp4_queue.pause_task(core, task_id)
+                return core.jsonify({'status': 'success', 'message': 'MP4 대기 작업을 일시정지했습니다.'})
+            if task.get('status') not in ('다운로드 중', 'MP4 변환 중'):
+                return core.jsonify({'status': 'error', 'message': '진행 중인 작업만 일시정지할 수 있습니다.'}), 400
+            task['status'] = '일시정지 요청 중'
+            task['speed_bps'] = 0
+            core.save_tasks()
         print(f"[Pause] 요청: {task.get('url')}", flush=True)
         return core.jsonify({'status': 'success', 'message': '안전하게 일시정지하는 중입니다.'})
 
     @core.app.route('/api/tasks/<task_id>/resume', methods=['POST'])
     def teddy_resume_task(task_id):
-        with core.queue_admission_lock:
+        task = core.tasks.get(task_id)
+        if not task:
+            return core.jsonify({'status': 'error', 'message': '작업 없음'}), 404
+        with teddy_download_safety.task_state_guard():
             task = core.tasks.get(task_id)
             if not task:
                 return core.jsonify({'status': 'error', 'message': '작업 없음'}), 404
             if task.get('status') != '일시정지':
                 return core.jsonify({'status': 'error', 'message': '일시정지된 작업만 재개할 수 있습니다.'}), 400
+            with core.download_queue.mutex:
+                if task_id in core.download_queue.queue:
+                    return core.jsonify({'status': 'error', 'message': '이미 큐에 등록된 작업'}), 409
+            if teddy_mp4_queue.resume_task(core, task_id):
+                return core.jsonify({'status': 'success', 'message': 'MP4 단계 재개 대기 중'})
             task['status'] = '대기 중'
             task['speed_bps'] = 0
+            task.pop('error_kind', None)
+            task.pop('last_error_detail', None)
             core.save_tasks()
             core.download_queue.put(task_id)
         print(f"[Resume] 재개 큐 추가: {task.get('url')}", flush=True)
@@ -325,6 +577,53 @@ def _install_routes():
                 }), 409
             return original_delete(task_id)
         core.app.view_functions['delete_task'] = safe_delete_task
+
+    def safe_retry_task(task_id):
+        with core.queue_admission_lock:
+            task = core.tasks.get(task_id)
+            if not task:
+                return core.jsonify({'status': 'error', 'message': '작업 없음'}), 404
+            persist_and_enqueue = getattr(core, 'persist_retry_state_and_enqueue', None)
+            if not callable(persist_and_enqueue):
+                return core.jsonify({'status': 'error', 'message': '작업 상태 저장을 확인할 수 없어 재시도를 차단했습니다.'}), 503
+            current = task.get('status', '')
+            with core.download_queue.mutex:
+                if task_id in core.download_queue.queue:
+                    return core.jsonify({'status': 'error', 'message': '이미 큐에 등록된 작업'}), 409
+            if teddy_mp4_queue.has_task(core, task_id):
+                if teddy_mp4_queue.retry_task(core, task_id):
+                    return core.jsonify({'status': 'success', 'message': 'MP4 단계 재시도 대기 중'})
+            if current in ('다운로드 중', '대기 중', '일시정지 요청 중'):
+                return core.jsonify({'status': 'error', 'message': '이미 진행 중인 작업'}), 400
+            if current == '일시정지':
+                return core.jsonify({'status': 'error', 'message': '일시정지 작업은 재개 버튼을 사용하세요.'}), 400
+            try:
+                legacy_ts = teddy_mp4_queue.legacy_ts_retry_source(core, task_id)
+                if legacy_ts is not None:
+                    teddy_mp4_queue.enqueue_legacy_ts(core, task_id, legacy_ts)
+                    return core.jsonify({
+                        'status': 'success',
+                        'message': '기존 TS를 보존하고 MP4 전용 대기열에 등록했습니다.',
+                    })
+            except (teddy_download_safety.DownloadSafetyError, OSError) as exc:
+                return core.jsonify({'status': 'error', 'message': str(exc)}), 409
+            previous = dict(task)
+            task['status'] = '대기 중'
+            task['speed_bps'] = 0
+            task['retries'] = 0
+            task.pop('error_kind', None)
+            task.pop('last_error_detail', None)
+            try:
+                persist_and_enqueue(task_id, previous)
+            except Exception:
+                return core.jsonify({'status': 'error', 'message': '재시도 큐 등록에 실패했습니다.'}), 503
+            print(f"[Retry] 재시도 큐 추가: {task.get('url')}", flush=True)
+            return core.jsonify({'status': 'success', 'message': '재시도 대기 중'})
+
+    if 'retry_task' in core.app.view_functions:
+        core.app.view_functions['retry_task'] = safe_retry_task
+        core._teddy_safe_retry_task = safe_retry_task
+
 
 def install():
     core._fetch_segment = _fetch_segment

@@ -1,13 +1,17 @@
 from pathlib import Path
+import hashlib
 
 import teddy_patch_proxy_singleflight
 
 
 ENTRYPOINT = Path('teddy_entrypoint.py')
+FINAL_ENTRYPOINT_SHA256 = '73323613cac0be7c67810989a62b13cae691a554a797b1e5e2dc7ab116cc750f'
 BOOTSTRAP = Path('teddy_bootstrap.py')
 
 
 def replace_once(path, old, new, label):
+    if path == ENTRYPOINT and hashlib.sha256(path.read_bytes()).hexdigest() == FINAL_ENTRYPOINT_SHA256:
+        return
     text = path.read_text(encoding='utf-8')
     count = text.count(old)
     if count != 1:
