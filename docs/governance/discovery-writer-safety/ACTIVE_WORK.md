@@ -1,5 +1,13 @@
 # Discovery Writer Safety workstream — active work
 
+## 2026-11-11 — P05 / DLDWS-001 shared task formally COMPLETED (Teddy-approved)
+
+- **Decision and authority:** Teddy approved P05 closeout after read-only acceptance review, then explicitly approved a temporary Governance task for two-workstream and router closeout. `GOV-009` was activated at `9fa7abfd47ab5f3b1a0bacfbfe254ba1ce495a67` (canonical GitHub readback PASS). The historical `DLDWS-001` task is `COMPLETED`; current task metadata changes to `INACTIVE / NONE`.
+- **Scoped accepted evidence:** Existing FNS-267 download→MP4→NAS/Jellyfin and NFO/poster real user verification PASS on the historical image; Writer synthetic socket lifecycle/race safety tests and earlier Writer operation/listener evidence PASS within prior scopes; P04 five duplicate-pair source consolidation, full Dockerfile build, targeted single-container production promotion of `sha256:d0905b9116e14f21951da8ed6bef56a396fac442b80e2ef236370ffaba88e666` and new-image Python/SpoofDPI localhost listener plus internal/host HTTP 302 smoke PASS.
+- **Not tested in the new P04 image:** `NEW_IMAGE_REAL_DOWNLOAD=NOT_RUN`, `EXTERNAL_SPOOFDPI_FETCH=NOT_RUN`, `NEW_IMAGE_WRITER_CONNECTION=NOT_VERIFIED`, `ROLLBACK_EXECUTION=NOT_TESTED`. Historic E2E/synthetic PASS does not mean new-image E2E PASS. This closeout does not authorize or perform any new download, Writer socket change, NAS/DB/Jellyfin writes, data cleanup, build, restart or unrelated workstream change.
+- **Future scope:** Previous task evidence and all old backup/image protection remain. Future Downloader/Writer work requires a newly registered approved task ID. Independent `DLSS-001`, `DLSPD-001`, `DLFR-001`, `DLHLS-001`, `STG9MEDIA-001`, `S11-WX011` continue unchanged.
+
+
 ## 2026-11-11 — DLDWS-001 P04 post-deployment SpoofDPI and web smoke PASS (no media trial)
 
 - **Direct Teddy CT108 read-only verification:** After the approved targeted Docker release, the exact deployed container `5a0e80ca763140bdd0fd54a5c4e8f7c28c4de8d31c7669145a3fd7ee813be31c` remained running on image `sha256:d0905b9116e14f21951da8ed6bef56a396fac442b80e2ef236370ffaba88e666`; the prior image `sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c` remained available for recovery. `docker top` showed both Python and `spoofdpi`, including `PYTHON_AND_SPOOFDPI=PASS`.
@@ -529,10 +537,10 @@ Register a consistent shared task for P08 NFO/poster library-status UI and prepa
 After registration is verified, request explicitly scoped approval for offline P08 UI/API source implementation and representative smoke tests. Check actual deployed Docker UI and read-only Stage9 database availability before deciding status integration; ask separately for Docker deployment/live validation. At P08 closeout restore Governance INACTIVE/NONE, Downloader+Writer Safety DLDWS-001 pair, Stage9 STG9MEDIA-001; preserve Stage11 S11-WX011 throughout.
 
 WORKSTREAM: discovery-writer-safety
-TASK_ID: DLDWS-001
-STATUS: IN_PROGRESS
+TASK_ID: NONE
+STATUS: INACTIVE
 CONTRACT_VERSION: 1.0.0
-REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+REQUIRES_WORKSTREAMS: discovery-writer-safety
 
 ## DLDWS-001 FNS-267 POST-DEPLOY JELLYFIN AND MEDIA FILE CHECK — USER CONFIRMED (2026-10-29 KST)
 

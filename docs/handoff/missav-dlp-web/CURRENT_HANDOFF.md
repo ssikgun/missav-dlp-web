@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-11 — P05 approved closeout of shared DLDWS-001 (temporary GOV-009)
+
+- **Teddy authorization:** P05 completion and historical two-workstream DLDWS-001 closure approved after read-only review; subsequent temporary Governance task for router update approved and `GOV-009` activated at canonical commit `9fa7abfd47ab5f3b1a0bacfbfe254ba1ce495a67`. This is documentation-only work.
+- **Actual accepted evidence:** FNS-267 historical production download→MP4→NAS/Jellyfin plus poster/NFO verified; Writer prior isolated socket-safety/race and operation/listener evidence scoped PASS; P04 five-source-pair integration and Docker full build PASS, only Downloader newly deployed (`sha256:d0905b9116e14f21951da8ed6bef56a396fac442b80e2ef236370ffaba88e666`, container `5a0e80ca763140bdd0fd54a5c4e8f7c28c4de8d31c7669145a3fd7ee813be31c`) with Python/SpoofDPI 127.0.0.1:8080 listener and internal/host HTTP 302 smoke PASS. Prior image and recovery dir `/opt/missav-dlp-web/backups/dldws-p04-deploy-20261111-r4lyueow` preserved.
+- **Explicit nonclaims:** new-image real download/remux/NAS/Jellyfin NOT_RUN; external proxy fetch NOT_RUN; new-image Writer socket connectivity NOT_VERIFIED; actual rollback execution NOT_TESTED. No fresh Writer socket operation, media trial, data write, new build or service change occurred in P05.
+- **Governance/task result:** historical `DLDWS-001=COMPLETED`, current `downloader` and `discovery-writer-safety` `INACTIVE/NONE`; P04 and P05 roadmap marked completed in scoped sense. Temporary `GOV-009` still requires final self-closure and remote verification. Independent DLSS-001, DLSPD-001, DLFR-001, DLHLS-001, Stage9 STG9MEDIA-001 and Stage11 S11-WX011 retain own approval/status. Next roadmap P06 is Stage11 and does not inherit Downloader/Writer permission.
+
 ## 2026-11-11 — DLDWS-001 P04 post-deployment SpoofDPI and web smoke PASS (no media trial)
 
 - **Direct Teddy CT108 read-only verification:** After the approved targeted Docker release, the exact deployed container `5a0e80ca763140bdd0fd54a5c4e8f7c28c4de8d31c7669145a3fd7ee813be31c` remained running on image `sha256:d0905b9116e14f21951da8ed6bef56a396fac442b80e2ef236370ffaba88e666`; the prior image `sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c` remained available for recovery. `docker top` showed both Python and `spoofdpi`, including `PYTHON_AND_SPOOFDPI=PASS`.

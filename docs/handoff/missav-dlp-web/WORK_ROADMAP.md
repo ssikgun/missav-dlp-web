@@ -1,13 +1,15 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-11 17:51:47 KST (P04 단일 원본화·전체 Docker 빌드·운영 배포·기본 동작 점검 완료; 실다운로드/롤백 실행 미검증)
+UPDATED_AT: 2026-11-11 KST (P05 accepted and shared DLDWS-001 formally closed; untested new-image checks remain)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
 ## 0. 최신 확인 결과 — 2026-11-11
+
+- **P05 공동 DLDWS-001 공식 종료 (2026-11-11, GOV-009):** Teddy가 기존 FNS-267 실다운로드와 Writer 소켓 안전성 증거, P04 새 이미지 운영 배포·기본 동작 점검을 범위별 수용해 P05를 `완료`로 승인. 두 공유 workstream은 `INACTIVE/NONE`, `DLDWS-001`은 역사적 `COMPLETED`. 단 새 이미지 실제 다운로드/MP4/NAS/Jellyfin, 외부 SpoofDPI 통신, 최신 Writer 연결, 롤백 실행은 `NOT_RUN/NOT_VERIFIED`. 기타 DLSS/DLSPD/DLFR/DLHLS/Stage9/Stage11 독립 작업 및 제품/운영 데이터 불변.
 
 - **P04 단일 원본화·이미지 빌드·운영 배포·기본 기동 점검 완료 (2026-11-11, Teddy CT108 결과):** 기존 루트/Overlay 중복 5쌍을 최종 실행 내용 보존 기준으로 GitHub 정본에 통합했다(제품 기준 `41581f5bd0a3d6ee623687c73e223493b2dc7686`). 최초 전체 빌드의 오래된 SpoofDPI 테스트 기대값을 교정한 뒤 후속 승인 빌드가 끝났고(`downloader admin final synthetic smoke: 8 PASS / 0 FAIL`), 후보 이미지 `sha256:d0905b9116e14f21951da8ed6bef56a396fac442b80e2ef236370ffaba88e666`을 별도 승인으로 **Downloader 한 서비스에만** 운영 배포했다. 새 컨테이너 `5a0e80ca763140bdd0fd54a5c4e8f7c28c4de8d31c7669145a3fd7ee813be31c`의 Python·SpoofDPI 프로세스, 프록시 로컬 8080 리스너, 컨테이너/호스트 웹 HTTP 302, 작업 및 MP4 대기열 0, Stage9 타이머, Gluetun/Selkies 보존이 PASS. 복구 자료 `/opt/missav-dlp-web/backups/dldws-p04-deploy-20261111-r4lyueow`와 기존 이미지 보존. **P04 코드·구조·빌드·배포·기본 smoke 범위 완료**지만 외부 프록시 실제 통신, 신규 다운로드·MP4 변환·NAS/Jellyfin 통합 시험과 롤백 실행은 `NOT_RUN/NOT_TESTED`로 남는다. 양쪽 공동 `DLDWS-001`은 **P05 종료 조건 확인 전 `IN_PROGRESS` 유지**. 증거: 양쪽 `docs/governance/*/ACTIVE_WORK.md`, `CURRENT_HANDOFF.md`, 문서 커밋 `da22babf1735d9223c78d49ce58ae000a71eaa9f`, `dec9ce99c29ce48873c941ba0d136a65a09a279d`.
 
@@ -193,7 +195,7 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 | 3 | P03 | **NFO 작품번호 표시·Jellyfin 검색 및 신규 NFO 자동화** | **운영 NFO 집계 275/275 유효 (11-10)** | 실제 NAS 275 작품 인벤토리와 인증 API에서 유효 275, 오류·없음·확인 불가 각 0. `<uniqueid>` 129건의 잘못된 NFO 오류 판정은 코드만 교정하여 해결, NAS NFO 재생성 없음. 당시 260건 기록은 이력으로 보존. |
 | 4 | P08 | **파일 관리: 보유 라이브러리 요약·라이브러리 DB 현황 화면 개편** | **완료 — 최종 제품 검증 PASS (11-10)** | 실제 PC·모바일 배치, 요약 5/보유 상태 3/별도 Stage12 5, NFO 275, 포스터 274+1 일치. 공유 `P08LIB-001` 종료 및 기존 4영역 라우팅 복원 승인. Stage9 작업 DB 미연결 `UNKNOWN`은 승인된 정책. 추가 Docker/데이터 변경 없음. |
 | 5 | P04 | **검수로 확정된 중복만 단계적 단일 원본화** | **완료 — 5쌍 정본 통합·전체 Docker 빌드·운영 배포·기본 smoke PASS (11-11)** | 5쌍의 최종 실행 소스를 단일 원본화한 GitHub 정본 `41581f5bd0a3d6ee623687c73e223493b2dc7686`을 수정 없는 Dockerfile로 빌드해 이미지 `sha256:d0905b9116e14f21951da8ed6bef56a396fac442b80e2ef236370ffaba88e666` 생성. 별도 Teddy 승인에 따라 Downloader만 배포했고 새 컨테이너 `5a0e80ca763140bdd0fd54a5c4e8f7c28c4de8d31c7669145a3fd7ee813be31c` 실행, Python/SpoofDPI·로컬 8080 리스너·내부/호스트 HTTP 302·작업/MP4 큐 0·Stage9 타이머·타 서비스 보존 PASS. 기존 이미지와 복구 자료 보존. **실제 외부 프록시 접속·다운로드·변환·NAS/Jellyfin 및 롤백 실행은 NOT_RUN/NOT_TESTED**; P04 기본 검증 완료를 전체 제품 E2E PASS로 확장하지 않음. 공동 DLDWS-001 작업은 P05 종료 조건 점검 전까지 IN_PROGRESS. |
-| 6 | P05 | **일반 다운로드/Discovery Writer 작업 DLDWS-001 종료 조건 점검** | **다음 — 읽기 전용 종료 조건 대조 미착수** | P04 배포·기본 smoke 증거와 기존 FNS-267 다운로드 성공을 재사용하되, 과거 대표 성공을 이번 이미지의 실제 다운로드 성공으로 간주하지 않는다. Downloader/Discovery Writer Safety 계약 및 양쪽 `ACTIVE_WORK`에 기록된 DLDWS-001 완료 조건·Writer 소켓 안전성 검증 이력·미검증 항목을 **읽기 전용**으로 대조해 종료 가능/보류 근거를 보고한다. 실제 다운로드·Writer 운영 시험·NAS/DB 쓰기·작업 종료 상태 전환은 별도 사용자 결정/승인 전 실행하지 않는다. 양쪽 현재 `IN_PROGRESS / DLDWS-001` 유지. |
+| 6 | P05 | **일반 다운로드/Discovery Writer 작업 DLDWS-001 종료 조건 점검** | **완료 — 2026-11-11 Teddy 승인·공동 작업 공식 종료** | P04의 코드/전체 Docker 빌드/새 이미지 서비스 배포·기본 smoke, 과거 FNS-267 실다운로드→MP4→NAS/Jellyfin 및 Writer 기존 소켓 안전 근거를 검토·범위별 인정하여 종료 승인. 역사적 `DLDWS-001=COMPLETED`; 두 작업 영역 현재 `INACTIVE/NONE`. **새 P04 이미지 실다운로드·외부 프록시 통신·최신 Writer 실제 연결·롤백 실행은 NOT_RUN/NOT_VERIFIED**로 보존. 신규 코드/운영은 별도 승인 필요. |
 | 7 | P06 | **한국어 자막 음성 인식/화자 근거 확인** (이전 Stage11) | **진행 중 — 별도 독립 작업** | 현재 `S11-WX011 / IN_PROGRESS`. 기존 S04/S08/S13 일본어 후보와 오디오를 사용자에게 비교 제시할 다음 결정이 남아 있음. S03/S11/S15 누락 의심, 일본어 정답/정확한 경계/화자 DER는 UNKNOWN. 계약에 따른 읽기 전용 범위만. |
 | 8 | P07 | **한국어 자동 자막 품질·게시 최종 완성** | **미착수/후속 승인 필요** | 외부 JA+ASR 증거, 누락 대화 회복, 자연스러운 Hermes 번역/문장·화자 경계와 Stage12 안전 게시까지 제품 품질 입증 필요. 설계 우선순위 충돌은 사용자 결정, 자막 생성·실행·게시는 별도 승인. |
 

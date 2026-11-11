@@ -34,8 +34,8 @@ AREA_HINTS:
 
 ## WORKSTREAM: downloader
 
-STATUS: IN_PROGRESS
-TASK_ID: DLDWS-001
+STATUS: INACTIVE
+TASK_ID: NONE
 CONTRACT_PATH: docs/governance/downloader/PROJECT_CONTRACT.md
 ACTIVE_WORK_PATH: docs/governance/downloader/ACTIVE_WORK.md
 AREA_HINTS:
@@ -97,8 +97,8 @@ AREA_HINTS:
 
 ## WORKSTREAM: discovery-writer-safety
 
-STATUS: IN_PROGRESS
-TASK_ID: DLDWS-001
+STATUS: INACTIVE
+TASK_ID: NONE
 CONTRACT_PATH: docs/governance/discovery-writer-safety/PROJECT_CONTRACT.md
 ACTIVE_WORK_PATH: docs/governance/discovery-writer-safety/ACTIVE_WORK.md
 AREA_HINTS:
