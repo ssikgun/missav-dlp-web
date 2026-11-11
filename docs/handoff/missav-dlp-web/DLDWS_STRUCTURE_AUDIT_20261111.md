@@ -9,6 +9,14 @@ TASK_ID: DLDWS-001
 WORKSTREAMS: downloader,discovery-writer-safety
 EVIDENCE_SCOPE: read-only source/Dockerfile; no build or operating-state verification
 
+## Second duplicate-pair triage — 2026-11-11 09:33:26 KST
+
+GitHub read-only preflight: `b42c17806aaf57222c7e19033ca71dbf7e0928c7`, both `DLDWS-001` paired registrations active; no source/build/deploy writes. Remaining root/final Overlay pairs: app, bootstrap, entrypoint, HTML. Patch write targeting directly from Dockerfile static matrix: app 1 (`teddy_patch_extraction_pause.py`), bootstrap ~10, entrypoint ~6, HTML ~7 plus Dockerfile sed. Direct count is not a measure of hidden semantic risk.
+
+**Conditional next candidate:** app root/Overlay single-sourcing only after addressing the original app-specific extraction-pause patch anchor. Its old pending-pause recovery anchor exists once in old root and zero times in final Overlay. The extraction-pause patch also modifies entrypoint; any possible already-applied branch must keep this latter modification and all checks. Candidate review scope may require `app.py`, `downloader_runtime_overlay/app.py`, and `teddy_patch_extraction_pause.py` (not yet approved). Verify byte-identical final runtime app; existing task safety, MP4 queue, persistent/fresh retry, direct-execution guard; intermediate `teddy_verify_build.py` runtime/final checks, final hash list, and representative API/smoke without production. If equivalence or patch anchors cannot be demonstrated, mark BLOCKED and do not change source.
+
+User prefers batch build after separate candidates, **not** build-per-file; use offline candidate checks and re-run DLSS resource preflight immediately before a future separately approved image build. `REVIEW_ONLY=YES`; `PRODUCT_SOURCE_CHANGED=NO`; `PRODUCTION_CHANGED=NO`; `BUILD=NOT_RUN`; `DEPLOY=NOT_RUN`.
+
 ## P04 promotion checkpoint — 2026-11-11 09:21:38 KST
 
 - **GitHub post-push verification (2026-11-11 09:24:07 KST):** Product-source commit `eea42f508ea9c7b8aa349f0725eb9ff04ea40d92` fast-forwarded the selected branch. Independent remote tree/file readback: `HEAD_MATCH=PASS`, `teddy_storage.py` Git blob exactly equals old effective Overlay blob `6634614ed02f3ec58981d3a57ae44d86c2271cb2`, duplicate Overlay storage absent, Dockerfile and final storage hash manifest unchanged, five canonical documents present. GitHub Actions `Project Governance` run `42930979769` **SUCCESS**. **Product source promoted, not built or deployed**; `PRODUCTION_CHANGED=NO`, `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`.

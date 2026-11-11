@@ -1,13 +1,15 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-11 09:21:38 KST (P04 두 경로 정본 소스 승격; Docker 빌드/배포 미실시)
+UPDATED_AT: 2026-11-11 09:33:26 KST (P04 두 번째 후보 읽기 전용 검토; 코드/빌드/배포 변경 없음)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
 ## 0. 최신 확인 결과 — 2026-11-10
+
+- **P04 두 번째 중복 통합 후보 — 읽기 전용 검토 (2026-11-11 09:33:26 KST):** 최신 `b42c17806aaf`에서 남은 네 쌍 확인. `app.py`는 직접 빌드 패치가 한 개라 비교적 먼저 볼 수 있지만, `teddy_patch_extraction_pause.py`는 기존 root app의 일시정지 복구 앵커 1개를 요구하고 최종 Overlay에는 해당 옛 앵커가 없어 **단순 두 파일 교체로는 Docker 빌드가 실패할 수 있음**. 안전한 최소 후보는 app root/Overlay 정리와 **entrypoint 패치를 보존하면서** 해당 패치의 기적용 감지 조정이 필요한지 확인하는 별도 검토. 구현·삭제·빌드·배포 미승인. Teddy의 선호: 코드 정리 완료 후 필요할 때 이미지 1회 빌드, 각 변경은 오프라인 점검, 실제 빌드 직전에 DLSS 점검. 이 의견은 빌드 승인으로 간주하지 않음.
 
 - **GitHub post-push verification (2026-11-11 09:24:07 KST):** Product-source commit `eea42f508ea9c7b8aa349f0725eb9ff04ea40d92` fast-forwarded the selected branch. Independent remote tree/file readback: `HEAD_MATCH=PASS`, `teddy_storage.py` Git blob exactly equals old effective Overlay blob `6634614ed02f3ec58981d3a57ae44d86c2271cb2`, duplicate Overlay storage absent, Dockerfile and final storage hash manifest unchanged, five canonical documents present. GitHub Actions `Project Governance` run `42930979769` **SUCCESS**. **Product source promoted, not built or deployed**; `PRODUCTION_CHANGED=NO`, `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`.
 
