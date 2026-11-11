@@ -11,6 +11,8 @@ EVIDENCE_SCOPE: read-only source/Dockerfile; no build or operating-state verific
 
 ## P04 promotion checkpoint — 2026-11-11 09:21:38 KST
 
+- **GitHub post-push verification (2026-11-11 09:24:07 KST):** Product-source commit `eea42f508ea9c7b8aa349f0725eb9ff04ea40d92` fast-forwarded the selected branch. Independent remote tree/file readback: `HEAD_MATCH=PASS`, `teddy_storage.py` Git blob exactly equals old effective Overlay blob `6634614ed02f3ec58981d3a57ae44d86c2271cb2`, duplicate Overlay storage absent, Dockerfile and final storage hash manifest unchanged, five canonical documents present. GitHub Actions `Project Governance` run `42930979769` **SUCCESS**. **Product source promoted, not built or deployed**; `PRODUCTION_CHANGED=NO`, `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`.
+
 The separate user-approved GitHub-only source promotion makes root `teddy_storage.py` byte-identical to the previous final Overlay source (`d678abce28a0545d7e9d47633f79cff729c18d7e9436b82c2c31c2921fe914f9`) and deletes **only** repository duplicate `downloader_runtime_overlay/teddy_storage.py`. Exact two-file product scope, approved by Teddy after the bounded offline candidate report; Dockerfile, final hash list, tests, production image and services unchanged. No Docker build/deploy or live NAS/DB write. Earlier synthetic offline checks are narrow evidence; image and runtime behavior, restart, SSH/NAS and cross-filesystem recovery still `UNKNOWN/NOT_RUN`. Paired DLDWS-001 `IN_PROGRESS` retained. Full approval and outcome in both ACTIVE_WORKs and CURRENT_HANDOFF; build requires separate DLSS-001 preflight and user approval.
 
 ## Evidence and safeguards

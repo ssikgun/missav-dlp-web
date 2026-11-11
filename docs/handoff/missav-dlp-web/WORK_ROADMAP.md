@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-10
 
+- **GitHub post-push verification (2026-11-11 09:24:07 KST):** Product-source commit `eea42f508ea9c7b8aa349f0725eb9ff04ea40d92` fast-forwarded the selected branch. Independent remote tree/file readback: `HEAD_MATCH=PASS`, `teddy_storage.py` Git blob exactly equals old effective Overlay blob `6634614ed02f3ec58981d3a57ae44d86c2271cb2`, duplicate Overlay storage absent, Dockerfile and final storage hash manifest unchanged, five canonical documents present. GitHub Actions `Project Governance` run `42930979769` **SUCCESS**. **Product source promoted, not built or deployed**; `PRODUCTION_CHANGED=NO`, `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`.
+
 - **P04 저장 모듈 GitHub 정본 승격 승인·반영 (2026-11-11 09:21:38 KST):** Teddy가 오프라인 후보와 별도로 정확한 두 경로의 정본 소스 반영을 승인. `M teddy_storage.py`는 이전 최종 Overlay와 동일한 SHA-256 `d678abce28a0545d7e9d47633f79cff729c18d7e9436b82c2c31c2921fe914f9`; 중복 `D downloader_runtime_overlay/teddy_storage.py`는 저장소에서만 제거. Dockerfile·해시 목록·테스트·그 밖의 제품 파일 변경 없음. **소스 승격만 완료, 빌드·운영 배포·NAS 변경 없음**; 재시작 복구/SSH/NAS/타 파일시스템은 확인필요. 다음 별도 결정은 DLSS-001 안전 사전 점검을 전제로 제한된 Docker 빌드 승인. DLDWS-001 공동 IN_PROGRESS 유지.
 
 - **P04 저장 모듈 격리 후보 PASS(2026-11-11 09:12:05 KST):** 업로드 패치 `c27500b02459612036c90df66fdf219f76102ff90baae9c28a24eb5c241fdae1` 독립 SHA 확인 및 GitHub 정본 원문에 메모리상 적용해 정확히 `M teddy_storage.py` + `D downloader_runtime_overlay/teddy_storage.py` 두 경로만 검증. 후보 root SHA `d678abce28a0545d7e9d47633f79cff729c18d7e9436b82c2c31c2921fe914f9` = 기존 최종 Overlay = Docker manifest 저장 해시. Codex 오프라인 문법·사이트 분류·경로·합성 충돌/정상 게시 PASS(실행 독립 재검증 아님). SSH/NAS·재시작 복구·다른 파일시스템·실제 Docker 빌드/운영 미검증. **정본 제품 코드 승격·빌드·배포는 여전히 별도 승인 필요.**
