@@ -1,6 +1,6 @@
 # Downloader build/download shared-storage safety contract
 
-CONTRACT_VERSION: 1.0.2
+CONTRACT_VERSION: 1.0.3
 PROJECT_CONTRACT_STATUS: APPROVED
 APPLIES_TO: Only Docker image build versus Downloader download/MP4-remux shared-filesystem contention prevention, now using Teddy-approved Downloader-only maintenance stop for each build and explicit verified restart (2026-11-09).
 
@@ -21,6 +21,16 @@ APPLIES_TO: Only Docker image build versus Downloader download/MP4-remux shared-
 - Preserve existing clear hold/retry reasoning, existing download concurrency and globally single MP4 remux. Protect existing jobs, outputs and no-overwrite boundaries. Representative offline/read-only checks should validate stop-state/rollback/fail-closed behavior without doing a test production build.
 - Preserve existing tasks, .parts, all 1,395 last-verified TS fragments, resume plans, manifests, completed MP4/NFO/posters, backups, Docker images and rollback; no deletion, cleanup, pruning, overwriting or changed HLS plan SHA bypass.
 - Avoid broad infrastructure refactors; use representative offline tests for mutual exclusion and storage shortage, followed by small bounded production-read-only checks.
+
+## 2026-11-11 — DLSS-001 one-time canonical full Dockerfile dependency exception — APPROVED
+
+Teddy explicitly approved option 2 on 2026-11-11: **one build-only test** of the existing, unchanged full Dockerfile using a clean Git snapshot of `ssikgun/missav-dlp-web:teddy-subtitle-stage11` at exact product-source commit `ed77adaf5e86adee3b87566273a42beb09da2202` (tree `02ba20ac3ba76be3a0432e2b25a96164c0e26e2b`). This is a narrow exception to the preceding local-image-only / abort-on-any-remote-image wording **for this single source build only**. All later builds still require their own GO. It does not authorize Dockerfile, dependency list or product-source edits.
+
+- **Permitted public dependency fetching:** only the existing Dockerfile's required `python:3.10-slim` image from Docker Hub, `ghcr.io/astral-sh/uv:latest`, Debian package sources for the existing apt commands, the existing SpoofDPI installer at `raw.githubusercontent.com/xvzc/SpoofDPI/main/install.sh` and its normal GitHub release dependencies, and the configured Python package index for the existing `requirements.txt`. GitHub access for fetching the exact pinned public repository snapshot is also allowed. Record resolved base-image identities and any unexpected dependency source; do not silently follow unrelated endpoints. The unpinned image tags and mutable upstream installer are a reproducibility risk, **not** permission to modify their versions or script in this task.
+- **Build environment:** use a separate clean tracked-file-only source snapshot of that exact commit, reject any unexpected source ref/content change, do not include dirty checkouts, `.git`, secrets, NAS mounts, /downloads, private backups, media or runtime data in the Docker context. Use the existing Docker builder and its normal isolated build network for dependency stages; do not use host networking, proxy/VPN changes, production volumes, credentials or the running Downloader network. `--pull=false` still avoids forced refreshes but now narrowly permits required first-time base resolution; network access is not an unlimited source/network probe.
+- **Live safety:** this is a potentially larger *full Dockerfile* build, not the previously budgeted small image-derived overlay. Reconfirm no task/MP4/delayed retry/FFmpeg activity and no competing builder, original image/container restart path, at least the existing configured safety reserve **plus a conservative 12 GiB temporary-build allowance**, and sufficient free memory (the last snapshot had 4.4 GiB available and nearly full swap). Monitor disk reserve during the one build; on uncertain capacity, activity or daemon completion, fail closed with only Downloader stopped.
+- **A-method remains mandatory:** after all pre-stop gates PASS, gracefully stop **only** `missav-dlp-web`, positively confirm no Downloader process, perform at most one source-pinned build with a unique build-only tag, verify BuildKit/daemon completion and remaining reserve, then explicitly restart the same unchanged old container if safe. Preserve all old images, 4 legacy MP4 stage files, jobs/TS, Stage9, Writer, Gluetun and Selkies. Never `prune`, rebuild on error, retry media, auto-restart, recreate services, or deploy the candidate under this approval.
+- **Evidence boundary:** `SOURCE_BUILD` can pass without `DEPLOY` or `PRODUCT` passing. Post-build compare exact image source/UI/API and manifest and the approved live P08 baseline before even proposing a separate promotion. P08LIB-001 was completed with user acceptance on 2026-11-10; its **already deployed approved UI** is the protection baseline, not a new UI promotion authorization. No service cutover is approved by this 2026-11-11 exception.
 
 ## Authorized implementation and operational scope
 

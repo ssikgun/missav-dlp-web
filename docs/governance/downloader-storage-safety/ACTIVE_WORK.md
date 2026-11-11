@@ -1,5 +1,10 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-11 — DLSS-001 full-source Docker build dependency exception approved (NO STOP/BUILD)
+
+- **User GO:** Teddy replied `응 2번 승인` to a one-time **build-only** full unmodified Dockerfile from the exact `teddy-subtitle-stage11` product source ed77adaf5e86adee3b87566273a42beb09da2202. This replaces the former local-base-only limit **for this build alone**; controlled public base/dependency downloads are approved as specified by contract v1.0.3. No product code changes, service deployment, media retry or cleanup are authorized.
+- **Read-only baseline:** CT108 `downloader`, current running image `sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c`, task count 0 (Teddy cleared completed tasks after resolving the prior three errors), MP4 queue JSON 0, 4 unmodified legacy MP4 stage files (~6.91 GB, ~14.8 days old), Python + SpoofDPI only in container process list, Stage9 active/waiting. Docker 29.7.2, BuildKit v0.32.2 running, disk ~42 GiB free, memory 4.4 GiB available, swap ~1 GiB consumed. The `python:3.10-slim` and `ghcr.io/astral-sh/uv:latest` tags are absent in local Docker image store, but BuildKit layer reuse remains UNKNOWN. No build or service stop yet.
+- **Next gated operation:** Exact SHA clean tracked-only source context, controlled public dependency route, resource+reserve/12 GiB budget, original-container restart path, task/MP4/retry/process and builder quiet all must PASS on real CT108 **before** Downloader-only stop. Then exactly one build-only attempt, independently confirm daemon completion, explicitly restart unchanged original service if safe, verify candidate and protected P08 live UI baseline. Do not release candidate or modify other services/data. `DOWNLOADER_STOP=NOT_RUN`, `IMAGE_BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`.
 ## 2026-11-09 — DLFR-001 API-only release post-deploy read-only smoke PASS (NO LIVE RETRY)
 
 - **Direct Teddy CT108 verification:** `TASK_COUNT=13`, `COMPLETED=10`, `PROTECTED_ERRORS=3`, `BUSY_TASKS=0`; original three failed jobs' parts directories had `PROTECTED_TS_COUNTS=[0,72,1323]`, `PROTECTED_TS_TOTAL=1395`, `TASK_AND_TS_STATE=PASS` (count/identity check, **not** content hash of every TS). No original HLS job was retried or resumed by this test.
@@ -187,7 +192,7 @@ NO_GO: actual worker/delayed-retry/other builder idleness not proven, full capac
 WORKSTREAM: downloader-storage-safety
 TASK_ID: DLSS-001
 STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.2
+CONTRACT_VERSION: 1.0.3
 REQUIRES_WORKSTREAMS: downloader-storage-safety
 
 ## OBJECTIVE
@@ -222,4 +227,4 @@ Prevent Downloader storage-guard failures from overlapping Docker builds and dow
 
 ## NEXT_DECISION
 
-DLSS-001 v1.0.2 selected A-method maintenance stop, guarded one-time image build, independent BuildKit completion, source/UI/hash/Compose/rollback checks and approved target-only Downloader recreation have now been exercised and passed, with original 13-file Compose/image rollback inputs preserved. Downloader new runtime and post-deploy read-only job/TS/web smoke PASS; other containers stayed unchanged. No further build, lock-marker promotion, media retry or generic runtime change is authorized by this checkpoint. Any future Docker image build must independently repeat fresh no-active-work, capacity+reserve, rollback, quiet-builder and exact-UI scope gates, stop only Downloader for its duration and obtain applicable GO. The DLHLS-001 real trial remains separately gated and P08LIB-001 UI HOLD remains.
+DLSS-001 v1.0.2 selected A-method maintenance stop, guarded one-time image build, independent BuildKit completion, source/UI/hash/Compose/rollback checks and approved target-only Downloader recreation have now been exercised and passed, with original 13-file Compose/image rollback inputs preserved. Downloader new runtime and post-deploy read-only job/TS/web smoke PASS; other containers stayed unchanged. This prior 2026-11-09 checkpoint allowed no further build **until a new GO**. Teddy has since given the narrow 2026-11-11 one-time full-source build-only GO and contract v1.0.3 exception recorded above; current stop/build/deploy remain NOT_RUN until its fresh CT108 safety gates PASS. Future builds beyond this single approved attempt require new GO. The DLHLS-001 real trial remains separately gated and P08LIB-001 UI HOLD remains.

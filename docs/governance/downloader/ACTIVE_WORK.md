@@ -1,5 +1,10 @@
 # Downloader non-subtitle workstream — active work
 
+## 2026-11-11 — DLDWS-001 canonical single-source full Dockerfile BUILD-ONLY authorized (NO BUILD/DEPLOY)
+
+- **New separate user approval:** Teddy said `응 2번 승인` to one complete Dockerfile image build from exact `ssikgun/missav-dlp-web:teddy-subtitle-stage11` source commit `ed77adaf5e86adee3b87566273a42beb09da2202` (tree `02ba20ac3ba76be3a0432e2b25a96164c0e26e2b`), after the ten-path HTML single-source product promotion and read-only CT108 checks. This approval is **build-only**, not a second GitHub product edit or a new runtime UI/service promotion.
+- **Cross-workstream gates:** The distinct, self-only DLSS-001 contract v1.0.3 governs its one-time controlled public dependency fetching, full-build memory/disk allowance and Downloader-only stop/confirmed-completion/manual old-container restart. All shared `DLDWS-001` contract v1.0.0/active-task requirements remain unchanged in both `downloader` and `discovery-writer-safety`; preserve the already accepted P08 UI, Stage9/Writer/Stage11 and all media data. No real download, DB/NAS/Jellyfin write, cache prune or destructive operation.
+- **Status and decision:** The single-source GitHub tree and representative offline static checks are PASS; **full Dockerfile BUILD=NOT_RUN**, `DEPLOY=NOT_RUN`, runtime product PASS unknown. First verify isolated tracked-only checkout and exact source/contract, CT108 current work/builder idle, independent old-container restore, and 12 GiB temporary-build allowance plus unchanged configured reserve. If any gate fails, do not stop/build.
 ## DLDWS-001 P04 HTML — CANONICAL PRODUCT SOURCE PROMOTED (2026-11-11 12:40 KST)
 
 - **Separate Teddy approval:** After the completed 10-path isolated HTML candidate and saved patch, Teddy said "승인해" to the proposed separate GitHub canonical **product-source promotion**. This consent covers the reviewed product-source diff only. No Docker image build, production container/service cutover, download/retry, Stage9/Jellyfin, NAS, database, cleanup or rollback-image mutation was authorized.
