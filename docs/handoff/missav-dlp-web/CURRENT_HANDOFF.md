@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-11 — DLDWS-001 P04 post-deployment SpoofDPI and web smoke PASS (no media trial)
+
+- **Direct Teddy CT108 read-only verification:** After the approved targeted Docker release, the exact deployed container `5a0e80ca763140bdd0fd54a5c4e8f7c28c4de8d31c7669145a3fd7ee813be31c` remained running on image `sha256:d0905b9116e14f21951da8ed6bef56a396fac442b80e2ef236370ffaba88e666`; the prior image `sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c` remained available for recovery. `docker top` showed both Python and `spoofdpi`, including `PYTHON_AND_SPOOFDPI=PASS`.
+- **Listener and web:** The **new** container's SpoofDPI local TCP listener at `127.0.0.1:8080` was OPEN, internal `127.0.0.1:5000/` GET returned HTTP 302, and host `127.0.0.1:58000/` returned HTTP 302. Stage9 timer remained `active/waiting`. `P04_POST_DEPLOY_SMOKE=PASS`, `MUTATIONS=0` for this check.
+- **Completion boundary:** P04 five-pair canonical code/structure consolidation, full Dockerfile build, scoped image rollout and startup/HTTP/SpoofDPI-listener smoke are **PASS**. This is **not** proof of proxied external fetch, real download, remux, NAS/Jellyfin or rollback: `REAL_DOWNLOAD_TEST=NOT_RUN`, `ROLLBACK_EXECUTION=NOT_TESTED`; do not alter jobs, data, Stage9/11/12 or sidecars for this documentation update.
+
 ## 2026-11-11 — DLDWS-001 P04 canonical image targeted production deployment PASS (real download NOT RUN)
 
 - **Separate Teddy authorization:** After P04 five-pair canonical single-source promotion, corrected-smoke full Dockerfile build, and bounded image-content comparison, Teddy explicitly said `응 이제 운영 배포 승인 할께.` The authorized operation was a single `missav-dlp-web` image-only Compose cutover; it did not authorize media/NAS/DB/Jellyfin writes, failed-job retries, another build, image pruning, or any Stage9/11/12/Writer/sidecar modification.

@@ -1,5 +1,10 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-11 — DLSS-001 P04 deployed image runtime/SpoofDPI listener smoke PASS
+
+- **Operator direct CT108 read-only result:** New container `5a0e80ca763140bdd0fd54a5c4e8f7c28c4de8d31c7669145a3fd7ee813be31c` still running on expected `sha256:d0905b9116e14f21951da8ed6bef56a396fac442b80e2ef236370ffaba88e666`; old image `sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c` preserved. Python and SpoofDPI process names observed, local `127.0.0.1:8080` listener OPEN, in-container web port 5000 HTTP 302 and host port 58000 HTTP 302. Stage9 timer `active/waiting`. `P04_POST_DEPLOY_SMOKE=PASS`, `MUTATIONS=0`.
+- **Evidence boundary:** P04 code/build/targeted deployment/basic startup PASS; `REAL_DOWNLOAD_TEST=NOT_RUN`, external SpoofDPI proxy traffic NOT_TESTED, rollback execution NOT_TESTED. No new build, image pull, cleanup or protected media-state mutation is authorized by the smoke result.
+
 ## 2026-11-11 — DLSS-001 approved P04 image-only production rollout PASS (no new build)
 
 - **Fresh independent GO and scope:** Teddy separately approved the previously built P04 image for operation: `응 이제 운영 배포 승인 할께.` The original v1.0.4 build-only attempt had already finished; the production release was a separate one-service, one-image decision, not additional build, lock code, UI promotion, media retry or cleanup authority.
