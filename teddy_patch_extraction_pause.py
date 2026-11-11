@@ -1,4 +1,5 @@
 from pathlib import Path
+import hashlib
 
 
 APP = Path('app.py')
@@ -6,6 +7,11 @@ ENTRYPOINT = Path('teddy_entrypoint.py')
 
 
 def replace_once(path, old, new, label):
+    # Only the exact previously verified final app may bypass app rewrites.
+    if path == APP and hashlib.sha256(path.read_bytes()).hexdigest() == (
+        'fcbb1c4ed555825f63db82c8663ac69ecfecadfbb3b06d3e4ea83694642f4b69'
+    ):
+        return
     text = path.read_text(encoding='utf-8')
     count = text.count(old)
     if count != 1:
