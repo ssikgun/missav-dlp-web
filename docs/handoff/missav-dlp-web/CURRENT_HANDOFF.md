@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-11 — DLSPD-001 admin smoke expectation aligned with headless startup (SOURCE ONLY; NO BUILD)
+
+- **Teddy approval:** Promote the verified isolated one-line regression-smoke correction to the `teddy-subtitle-stage11` canonical source. DLSPD-001 contract v1.0.0 and workstream `IN_PROGRESS` remain unchanged.
+- **Exact source-only delta:** `teddy_downloader_admin_smoke.py` in `test_spoofdpi_diagnostics` changes the expected `popen` argument from `["spoofdpi"]` to the already-deployed `["spoofdpi", "--no-tui"]`. Git blob `bfe8b69f301648ee88cc0725a95c4342c8e5f5d6` -> `d6fc8b35bfcae8f50d275deab17a7212a0898b39`. `teddy_spoofdpi.py` and all other product source stay unchanged.
+- **Bounded offline evidence:** Previously stale expectation failure reproduced; exact modified `test_spoofdpi_diagnostics` function PASS including missing-binary, sanitized-early-exit and running-process paths. Git patch applied cleanly in isolated check, SHA-256 `48f847e2eaff8107534ca6edff3f520f799c90b6c26de8e171c416daf032b462`. Not a full Docker build or end-to-end product smoke.
+- **Boundary and next:** The earlier DLSS-001 one-time full-Dockerfile build failed on that stale test and its one-time authorization is consumed. This source-only promotion does not authorize or perform a second build, Docker stop, deployment, download/retry, cleanup, UI promotion, or production-data mutation. Original running Downloader recovery remains prior verified evidence; live status was not rechecked by this GitHub-only change. Obtain separate gated build approval if desired.
+
 ## 2026-11-11 — DLSS-001 one-time canonical full Dockerfile BUILD=FAIL, original Downloader RESTORED (NO DEPLOY)
 
 - **One approved source-pinned build attempt:** Teddy on CT108 ran the guarded one-time full unchanged Dockerfile from exact product commit `ed77adaf5e86adee3b87566273a42beb09da2202` / tree `02ba20ac3ba76be3a0432e2b25a96164c0e26e2b`, isolated 615-file context `/tmp/dlss001-fullsource-U9u4yMAa/context`, tag `dlss001-fullsource-buildonly:ed77ada-20261111`. Pinned original container `6fe1841f2b66b43a8016a9483b6e0017d2c23c12c3b48c692937e3eff83e634f` and image `sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c` were verified; tasks/MP4 queue 0, no competing build/FFmpeg observed, reserve plus 12 GiB passed. Only Downloader was gracefully stopped; one-attempt marker saved. No media or other-service mutations initiated.

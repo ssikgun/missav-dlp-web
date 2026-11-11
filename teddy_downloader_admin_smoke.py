@@ -219,7 +219,7 @@ def test_spoofdpi_diagnostics():
         port=8080,
         log=messages.append,
     )
-    assert result is not None and argv[0][0] == ["spoofdpi"]
+    assert result is not None and argv[0][0] == ["spoofdpi", "--no-tui"]
     diagnostic = messages[-1]
     assert "exit_code=7" in diagnostic and "[url-redacted]" in diagnostic
     assert "abc" not in diagnostic and "secret" not in diagnostic and "10.1.2.3" not in diagnostic and len(diagnostic) < 700

@@ -1,5 +1,13 @@
 # Downloader SpoofDPI headless startup — active work
 
+
+## 2026-11-11 — DLSPD-001 admin smoke expectation aligned with headless startup (SOURCE ONLY; NO BUILD)
+
+- **Teddy approval:** Promote the verified isolated one-line regression-smoke correction to the `teddy-subtitle-stage11` canonical source. DLSPD-001 contract v1.0.0 and workstream `IN_PROGRESS` remain unchanged.
+- **Exact source-only delta:** `teddy_downloader_admin_smoke.py` in `test_spoofdpi_diagnostics` changes the expected `popen` argument from `["spoofdpi"]` to the already-deployed `["spoofdpi", "--no-tui"]`. Git blob `bfe8b69f301648ee88cc0725a95c4342c8e5f5d6` -> `d6fc8b35bfcae8f50d275deab17a7212a0898b39`. `teddy_spoofdpi.py` and all other product source stay unchanged.
+- **Bounded offline evidence:** Previously stale expectation failure reproduced; exact modified `test_spoofdpi_diagnostics` function PASS including missing-binary, sanitized-early-exit and running-process paths. Git patch applied cleanly in isolated check, SHA-256 `48f847e2eaff8107534ca6edff3f520f799c90b6c26de8e171c416daf032b462`. Not a full Docker build or end-to-end product smoke.
+- **Boundary and next:** The earlier DLSS-001 one-time full-Dockerfile build failed on that stale test and its one-time authorization is consumed. This source-only promotion does not authorize or perform a second build, Docker stop, deployment, download/retry, cleanup, UI promotion, or production-data mutation. Original running Downloader recovery remains prior verified evidence; live status was not rechecked by this GitHub-only change. Obtain separate gated build approval if desired.
+
 ## 2026-11-10 — DLSPD-001 production Downloader-only promotion and SpoofDPI listener PASS
 
 - **Teddy's exact CT108 apply output:** Previous stopped Downloader identity/rollback, three other running container states, disk reserve and image-only 14-file Compose rendering all PASS. `docker compose up --detach --no-deps --no-build --pull never --force-recreate --wait` on **only** `missav-dlp-web` returned `COMPOSE_UP_EXIT_CODE=0`, `COMPOSE_UP=PASS`, `DEPLOY_APPLY=PASS`.
