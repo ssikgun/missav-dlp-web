@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-10
 
+- **P04 첫 소스 후보 격리 작업 승인(2026-11-11 Teddy "응 승인할께"):** 공동 `DLDWS-001` 하에서 `teddy_storage.py` root와 `downloader_runtime_overlay/teddy_storage.py` 정확히 두 경로만 대상으로 **오프라인 후보 작성·대표 검증** 승인. 최종 Overlay의 기존 실행 바이트를 root에 보존하고 후보에서만 중복 Overlay 파일 제거하는 방식의 가능성을 먼저 확인; 충돌·해시·복구·NAS 파일 보호 유지가 필수. Dockerfile/manifest/테스트 파일 변경, 정본 제품 코드 승격, 이미지 빌드 및 운영 배포 **미승인**. 후보 증거를 보고한 뒤 다음 단계 별도 선택.
+
 - **P04 1순위 후보 선정 제안(2026-11-11 08:34:56 KST Codex 정적 감사):** `teddy_storage.py` root/Overlay 1쌍을 **최종 Overlay 실행 바이트를 기준으로** 단일 원본화하는 최소 후보. Storage는 Docker의 직접 수정 패치 대상은 아니지만 NAS 파일 충돌·해시·복구 보호를 포함해 실제 동작의 무변경 검증이 필수. Dockerfile의 중간 storage smoke·경로 검사와 최종 manifest도 유지 필요. 기존 로컬 게시 복구 분기의 해시 동등성은 **확인필요**이지 결함 확정 아님. 후속 후보는 필요한 경우에만 기존 검사 재사용으로 최종 Overlay 파일 보존 smoke 1건. **P04 구현/빌드/배포 모두 미승인**. 상세 근거: `docs/handoff/missav-dlp-web/DLDWS_STRUCTURE_AUDIT_20261111.md`.
 
 - **DLDWS-001 Docker 패치·자막 연결 경계 정적 지도 완료(2026-11-11 08:05:11 KST Codex 보고):** 실제 Dockerfile 호출 패치 22/총 24개(원격에서 독립 수치 확인), 나머지 2개 직접 호출 없음. 최종 Overlay에서 사라지는 중간 변경과 살아남는 network/proxy/generic/JS/icon 변경을 구분했고, 다운로드 완료→Stage9 media, Stage11 생성→Stage12 발행/상태 경계를 정리. 상세 22개 매핑과 확인 불가 사항은 `docs/handoff/missav-dlp-web/DLDWS_STRUCTURE_AUDIT_20261111.md`에 저장. **실제 운영 동작·전체 기능 동등성 미검증, P04 후보는 아직 선정 전**. 다음 단계는 읽기 전용 위험도 평가와 1–3개 최소 통합 후보를 사용자에게 제안하는 것.
@@ -178,7 +180,7 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 | 2 | P02 | **루트/Overlay 중복 파일 5쌍의 읽기 전용 정밀 검수** | **완료 — 정적 소스·패치 비교 범위만 (2026-10-29)** | 5쌍 모두 분석: HTML은 최종 Overlay 기준 UI/패치 순서, 저장 코드는 no-overwrite·SHA-256, 엔트리포인트는 HLS/MP4, 부트스트랩은 보호된 게시·복구, 앱은 영속 상태·재시도 안전성 차이가 핵심. 실제 빌드 중간 산출물과 새 단일 원본의 byte-identical 동등성은 미검증이며 P04 구현·검증 승인 시 별도 확인. 소스·이미지·운영 변경 0. |
 | 3 | P03 | **NFO 작품번호 표시·Jellyfin 검색 및 신규 NFO 자동화** | **운영 NFO 집계 275/275 유효 (11-10)** | 실제 NAS 275 작품 인벤토리와 인증 API에서 유효 275, 오류·없음·확인 불가 각 0. `<uniqueid>` 129건의 잘못된 NFO 오류 판정은 코드만 교정하여 해결, NAS NFO 재생성 없음. 당시 260건 기록은 이력으로 보존. |
 | 4 | P08 | **파일 관리: 보유 라이브러리 요약·라이브러리 DB 현황 화면 개편** | **완료 — 최종 제품 검증 PASS (11-10)** | 실제 PC·모바일 배치, 요약 5/보유 상태 3/별도 Stage12 5, NFO 275, 포스터 274+1 일치. 공유 `P08LIB-001` 종료 및 기존 4영역 라우팅 복원 승인. Stage9 작업 DB 미연결 `UNKNOWN`은 승인된 정책. 추가 Docker/데이터 변경 없음. |
-| 5 | P04 | **검수로 확정된 중복만 단계적 단일 원본화** | **첫 후보 제안 — 구현 미승인** | 2026-11-11 DLDWS-001 정적 감사에서 `teddy_storage.py` root/Overlay 한 쌍을 최종 실행 바이트 보존 조건으로 1순위 제안. 저장 안전·Docker 중간 smoke·최종 manifest에 대한 최소 검증 범위와 별도 사용자 승인 이후에만 코드 수정. 빌드·배포도 별도 승인. |
+| 5 | P04 | **검수로 확정된 중복만 단계적 단일 원본화** | **첫 후보 오프라인 후보 작성·대표 검증 승인; 정본 승격/빌드/배포 미승인** | 2026-11-11 DLDWS-001 정적 감사에서 `teddy_storage.py` root/Overlay 한 쌍을 최종 실행 바이트 보존 조건으로 1순위 제안. 저장 안전·Docker 중간 smoke·최종 manifest에 대한 최소 검증 범위와 별도 사용자 승인 이후에만 코드 수정. 빌드·배포도 별도 승인. |
 | 6 | P05 | **일반 다운로드/Discovery Writer 작업 DLDWS-001 종료 조건 점검** | **미착수 — 대표 운영 검증 PASS** | 이미 완료한 Docker 이미지 교체·FNS-267 실사용 성공을 재검증 없이 활용한다. 남은 계약상 미완료 조건과 Writer 소켓 안전성 이력만 정리하고 사용자 결정 후 종료 여부 판단. 현재 두 영역 모두 `IN_PROGRESS / DLDWS-001`. |
 | 7 | P06 | **한국어 자막 음성 인식/화자 근거 확인** (이전 Stage11) | **진행 중 — 별도 독립 작업** | 현재 `S11-WX011 / IN_PROGRESS`. 기존 S04/S08/S13 일본어 후보와 오디오를 사용자에게 비교 제시할 다음 결정이 남아 있음. S03/S11/S15 누락 의심, 일본어 정답/정확한 경계/화자 DER는 UNKNOWN. 계약에 따른 읽기 전용 범위만. |
 | 8 | P07 | **한국어 자동 자막 품질·게시 최종 완성** | **미착수/후속 승인 필요** | 외부 JA+ASR 증거, 누락 대화 회복, 자연스러운 Hermes 번역/문장·화자 경계와 Stage12 안전 게시까지 제품 품질 입증 필요. 설계 우선순위 충돌은 사용자 결정, 자막 생성·실행·게시는 별도 승인. |

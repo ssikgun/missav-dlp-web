@@ -1,5 +1,28 @@
 # Discovery Writer Safety workstream — active work
 
+## DLDWS-001 P04 STORAGE SINGLE-SOURCE OFFLINE CANDIDATE — TEDDY APPROVED (2026-11-11 KST)
+
+TASK_ID: DLDWS-001
+STATUS: IN_PROGRESS
+REQUIRES_WORKSTREAMS: downloader,discovery-writer-safety
+USER_APPROVAL: Teddy replied "응 승인할께" to the explicit 2026-11-11 proposal for **only** P04's first `teddy_storage.py` single-source isolated candidate and offline representative checks; source promotion, Docker build and operational deployment were explicitly excluded.
+SOURCE_BASE_SHA: 858f4473534fa1c4e882df2ab30a340b69af2e66
+ALLOWED_PRODUCT_CANDIDATE_PATHS: `teddy_storage.py`; `downloader_runtime_overlay/teddy_storage.py` (duplicate removal only inside isolated candidate).
+AUTHORIZED_SCOPE:
+- First verify latest `ssikgun/missav-dlp-web:teddy-subtitle-stage11` HEAD, root AGENTS.md/common and both paired DLDWS contracts and task approvals; use a **new clean isolated candidate copy** pinned to the verified source, preserving both the old protected dirty tree and the clean audit checkpoint.
+- Read-only inspect two storage sources, final Overlay SHA manifest and Dockerfile early `site_key_for_url`/final-path marker checks; resolve feasibility and source/ownership/protection constraints before editing. Do not assume the root bytes can be replaced safely until these checks are understood.
+- If feasible, make the candidate root `teddy_storage.py` **byte-identical** to the presently effective final Overlay file, and remove only the redundant Overlay storage file **inside the isolated candidate**. Preserve the final effective runtime storage bytes, other Overlay files and manifest, and all existing collision, hash, crash-recovery, partial/resume, no-clobber safeguards.
+- Use existing bounded **offline synthetic** inspection/tests only, with temporary files and no real NAS, network, jobs, database or service access: verify candidate diff exactly two paths, early-build site classification and `TEDDY_FINAL_DIR` markers, final-source SHA/Overlay resolution, syntax/import assumptions and at most representative collision/preservation/recovery behavior. If existing fixtures are insufficient, report the gap before adding test code.
+- Produce a diff/patch, hash manifest and PASS/UNKNOWN/FAIL report for Teddy/ChatGPT review; **do not** fast-forward product source to canonical GitHub.
+PROHIBITED_SCOPE:
+- No changes to Dockerfile, `dldws001-source-sha256.txt`, tests or any third product path without separate approval. No live NAS/file cleanup, product behavior redesign, local crash-recovery hash policy fix, Stage9/11/12, Writer socket, DLSS-001, download queue/HLS/MP4, systemd, Docker build, production service, external source publication, protected worktree or GitHub product push.
+- Do not silently expand a simple deduplication into a general refactor or add test infrastructure disproportionate to this personal-use project (GOV-008).
+ACCEPTANCE_CRITERIA:
+- Candidate is only an isolated reversible two-path change, root bytes exactly equal prior final Overlay storage; final effective source/content and required checks preserved, any uncertainty reported. Technical offline PASS is **not** image build/production feature PASS. `PRODUCT_CANONICAL_CHANGED=NO`; `BUILD=NOT_RUN`; `DEPLOY=NOT_RUN`.
+NEXT_DECISION:
+- After Codex's evidence, Teddy separately decides whether to promote the exact reviewed candidate to GitHub canonical, and later whether to authorize an isolated build, then a guarded operating deployment. No approval inferred from this record for those stages.
+
+
 ## DLDWS-001 FULL STATIC STRUCTURE AUDIT — P04 STORAGE FIRST CANDIDATE (Codex report 2026-11-11 08:34:56 KST)
 
 - **Final read-only decision support:** Codex's static assessment at `c6842e2e0482dda6d54843b7fce2118b1d20bbac` proposes **`teddy_storage.py` root/Overlay single-source consolidation** as P04's smallest first candidate, **not an approved implementation**. The next choice belongs to Teddy. The conditional second candidate is reusing a minimal post-Overlay storage collision/preservation smoke only if existing checks are inadequate; do not create another test framework. Four other root/Overlay pairs remain high-dependency and are not selected.
