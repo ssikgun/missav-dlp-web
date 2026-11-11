@@ -1,5 +1,11 @@
 # Downloader shared-storage admission safety — active work
 
+## 2026-11-11 — DLSS-001 final CT108 pre-stop safety recheck PASS and operator single-build window confirmed (NO STOP/BUILD)
+
+- **Teddy's direct CT108 read-only verification:** Same pinned container `6fe1841f2b66b43a8016a9483b6e0017d2c23c12c3b48c692937e3eff83e634f` and image `sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c`; exact staged source tree and 615 files unchanged; task/MP4/disk recheck PASS, margin 24.37 GiB above reserve+12 GiB; Python/SpoofDPI only. No Docker/buildx/buildctl/FFmpeg client observed in process-name snapshot; RAM available 4.4 GiB, swap 1.0 GiB nearly exhausted, at least 3 GiB threshold PASS. Builder daemon-side inactivity is not proved by process absence alone.
+- **Operator declaration:** After being asked about other ongoing or scheduled CT108 Docker builds, Teddy replied `응 없어. 빌드 진행 하자.` This confirms the declared single-operator maintenance window and explicitly reaffirms the previously approved one-time full Dockerfile build-only GO. Neither success nor adequate peak memory is guaranteed.
+- **Next:** Last-moment fail-closed source/container/work/disk/memory check, stop **only** `missav-dlp-web`, single tagged full Dockerfile build from source commit `ed77adaf5e86adee3b87566273a42beb09da2202`, preserve logs and one-attempt marker, independently verify BuildKit/daemon completion before any **separate manual** restart of same original container. Candidate deployment, second build, jobs, other services, cache prune and data writes remain prohibited. `STOP=NOT_RUN`, `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN` as of this checkpoint.
+
 ## 2026-11-11 — DLSS-001 CT108 prebuild source snapshot and first live safety gate PASS (NO STOP/BUILD)
 
 - **Direct Teddy CT108 read-only output:** authentic host `downloader`; existing container `6fe1841f2b66b43a8016a9483b6e0017d2c23c12c3b48c692937e3eff83e634f`, unchanged running image `sha256:99e9223b558ac048d650b4613479f4923eb4ec34f3c6489e59a0f5ae9a10f07c`, `unless-stopped` restart and local image lookup PASS. `/var/lib/docker` and `/opt/missav-dlp-web/work` share `/dev/loop4`. Task count 0, MP4 queue JSON count 0, container processes Python and SpoofDPI only. Stage9 timer active/waiting. No runtime mutation.
