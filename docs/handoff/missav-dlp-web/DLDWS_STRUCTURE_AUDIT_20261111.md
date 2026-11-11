@@ -9,6 +9,10 @@ TASK_ID: DLDWS-001
 WORKSTREAMS: downloader,discovery-writer-safety
 EVIDENCE_SCOPE: read-only source/Dockerfile; no build or operating-state verification
 
+## Second app candidate authorization — 2026-11-11 09:38:44 KST
+
+Teddy approved **isolated offline candidate + bounded validation only**, after the 2026-11-11 09:33:26 static triage; common 1.0.1 and Downloader/Writer joint `DLDWS-001` remain unchanged. Exact allowed candidate paths: `app.py`, `downloader_runtime_overlay/app.py`, `teddy_patch_extraction_pause.py`. Previous final Overlay app bytes/manifest hash `fcbb1c4ed555825f63db82c8663ac69ecfecadfbb3b06d3e4ea83694642f4b69` must survive. A candidate may recognize that app pause changes are already applied **only if checked**, without skipping the same patch script's `teddy_entrypoint.py` modifications. Preserve direct-run guard, task persistence/fresh retries, safety/MP4 and user data; no behavior redesign. Fail closed on any extra source path, incomplete patch identity, smoke dependency, or risk. No GitHub product push, Docker build, deploy, NAS or DB writes; user will decide promotion after evidence. Deferred batched image build requires later separate approval and DLSS fresh preflight.
+
 ## Second duplicate-pair triage — 2026-11-11 09:33:26 KST
 
 GitHub read-only preflight: `b42c17806aaf57222c7e19033ca71dbf7e0928c7`, both `DLDWS-001` paired registrations active; no source/build/deploy writes. Remaining root/final Overlay pairs: app, bootstrap, entrypoint, HTML. Patch write targeting directly from Dockerfile static matrix: app 1 (`teddy_patch_extraction_pause.py`), bootstrap ~10, entrypoint ~6, HTML ~7 plus Dockerfile sed. Direct count is not a measure of hidden semantic risk.

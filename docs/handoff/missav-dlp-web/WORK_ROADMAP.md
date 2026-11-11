@@ -1,13 +1,15 @@
 # Teddy Downloader — 살아 있는 작업 로드맵 (WORK_ROADMAP)
 
 ROADMAP_VERSION: 2
-UPDATED_AT: 2026-11-11 09:33:26 KST (P04 두 번째 후보 읽기 전용 검토; 코드/빌드/배포 변경 없음)
+UPDATED_AT: 2026-11-11 09:38:44 KST (P04 app 후보 격리 검증만 승인; 제품/빌드/운영 불변)
 CANONICAL_REPO: ssikgun/missav-dlp-web
 CANONICAL_BRANCH: teddy-subtitle-stage11
 TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task authorization
 
 
 ## 0. 최신 확인 결과 — 2026-11-10
+
+- **P04 app.py 격리 후보 작성·오프라인 검증 승인 (2026-11-11 09:38:44 KST):** Teddy의 "응 진행해"는 두 번째 후보의 **격리본에서 최대 세 경로** `app.py`·`downloader_runtime_overlay/app.py`·`teddy_patch_extraction_pause.py` 검토/최소 수정 및 대표 오프라인 검증에만 해당. 기존 최종 Overlay app와 동일한 바이트 및 SHA, 기존 직접 실행 방지/재시도/안전 보호를 유지하고, 일시정지 패치의 **entrypoint 쪽 수정은 계속 수행**해야 함. 변경 범위가 늘거나 증명 불가하면 중단. GitHub 제품 코드 승격, Dockerfile/manifest 변경, 이미지 빌드, 운영 배포, NAS/DB 변경 미승인. 소스 기준 `f47080d8846d7c1d67915606b043908b21de6d3f`.
 
 - **P04 두 번째 중복 통합 후보 — 읽기 전용 검토 (2026-11-11 09:33:26 KST):** 최신 `b42c17806aaf`에서 남은 네 쌍 확인. `app.py`는 직접 빌드 패치가 한 개라 비교적 먼저 볼 수 있지만, `teddy_patch_extraction_pause.py`는 기존 root app의 일시정지 복구 앵커 1개를 요구하고 최종 Overlay에는 해당 옛 앵커가 없어 **단순 두 파일 교체로는 Docker 빌드가 실패할 수 있음**. 안전한 최소 후보는 app root/Overlay 정리와 **entrypoint 패치를 보존하면서** 해당 패치의 기적용 감지 조정이 필요한지 확인하는 별도 검토. 구현·삭제·빌드·배포 미승인. Teddy의 선호: 코드 정리 완료 후 필요할 때 이미지 1회 빌드, 각 변경은 오프라인 점검, 실제 빌드 직전에 DLSS 점검. 이 의견은 빌드 승인으로 간주하지 않음.
 
