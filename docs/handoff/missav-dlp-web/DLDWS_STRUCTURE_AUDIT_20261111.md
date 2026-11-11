@@ -115,3 +115,22 @@ Only if the first candidate exposes a meaningful coverage gap, reuse an existing
 Teddy answered **"응 승인할께"** to the explicit recommendation to proceed with **isolated source candidate and bounded offline validation only** for candidate 1 (`teddy_storage.py` root plus removal of its identical-behavior Overlay duplicate). This is now recorded under paired `DLDWS-001` ACTIVE_WORK authorization, without changing the common contract, routing or other workstreams. Candidate root contents must be exactly the former final Overlay bytes; inspect Dockerfile's early storage checks (site-key and final-dir marker) and final SHA manifest before doing even the isolated edit. Candidate patch must touch only the two product paths; any manifest/Dockerfile/test/source expansion requires fresh approval. Preserve existing local/SSH no-overwrite/hash/recovery semantics; the potential local recovered-destination hash gap remains CHECK_REQUIRED, not a defect fix authorization. No canonical product promotion, Docker build, operational deployment, NAS/DB/Jellyfin data edit, Stage9/11/12 action, or protected worktree mutation is approved.
 
 Next user gate: review candidate patch plus representative offline results; only afterward decide separate canonical product promotion, build and operating deployment permissions.
+
+## P04 isolated source candidate — Codex result and independent patch review (2026-11-11 09:12:05 KST)
+
+Candidate source HEAD: `b53bb3d41dea156fb05baf25e38151c5ef65756f`; isolated candidate `/tmp/dldws-p04-b53-candidate`. Codex delivered `/tmp/dldws-p04-b53-storage.patch` and `/tmp/dldws-p04-b53-hashes.txt`, supplied as ChatGPT attachments. Uploaded patch SHA-256 independently checked: `c27500b02459612036c90df66fdf219f76102ff90baae9c28a24eb5c241fdae1`; hash-list artifact SHA-256 `f79e80a0540032bcb904eb6ea84341ff5c3f637bbb8851a158bea627c90597ad`.
+
+| Property | Result |
+|---|---|
+| Exact paths | `M teddy_storage.py`, `D downloader_runtime_overlay/teddy_storage.py` |
+| Old root storage SHA-256 | `b45521a8fa8c325787f116be6b4b88cdbc6f708e47d30c35576600382972f74d` |
+| Previous Overlay and candidate root SHA-256 | `d678abce28a0545d7e9d47633f79cff729c18d7e9436b82c2c31c2921fe914f9` |
+| Manifest storage SHA-256 entry | `d678abce28a0545d7e9d47633f79cff729c18d7e9436b82c2c31c2921fe914f9`, unchanged |
+| Git patch structure | 2 paths; Overlay deletion 1,863 lines, root +101/-7 lines |
+| Independent patch replay | PASS — unified diff applied **in memory** to canonical GitHub source; candidate root equals previous Overlay byte-for-byte, deleted Overlay has empty result |
+| Offline reported checks | syntax/import/site classification (4)/final-dir selection, same-filesystem synthetic collision protection and normal publish, diff-check/reverse patch PASS |
+| Unknown | restart recovery, real SSH/NAS, cross-filesystem publish, actual Python 3.10 Docker build, running image and production behavior |
+
+The candidate implements **no intended behavior change**; final Dockerfile source resolution after removal should retain the root storage module, with the original manifest expected hash. This is a source-static result, **not** proof of build/runtime health. The crash-recovery existing-destination branch remains unchanged, with upper-layer identity constraints and hash gap `CHECK_REQUIRED`, not a verified vulnerability.
+
+`CANONICAL_PRODUCT_CHANGED=NO`, `PRODUCTION_CHANGED=NO`, `BUILD=NOT_RUN`, `DEPLOY=NOT_RUN`. Next decision: obtain separate Teddy authorization before any exact two-path GitHub product promotion; image build and operating deployment remain distinct later decisions.

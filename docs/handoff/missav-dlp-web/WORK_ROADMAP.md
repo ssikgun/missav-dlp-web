@@ -9,6 +9,8 @@ TRACKER_STATUS: ACTIVE — informational progress and priorities, NOT a task aut
 
 ## 0. 최신 확인 결과 — 2026-11-10
 
+- **P04 저장 모듈 격리 후보 PASS(2026-11-11 09:12:05 KST):** 업로드 패치 `c27500b02459612036c90df66fdf219f76102ff90baae9c28a24eb5c241fdae1` 독립 SHA 확인 및 GitHub 정본 원문에 메모리상 적용해 정확히 `M teddy_storage.py` + `D downloader_runtime_overlay/teddy_storage.py` 두 경로만 검증. 후보 root SHA `d678abce28a0545d7e9d47633f79cff729c18d7e9436b82c2c31c2921fe914f9` = 기존 최종 Overlay = Docker manifest 저장 해시. Codex 오프라인 문법·사이트 분류·경로·합성 충돌/정상 게시 PASS(실행 독립 재검증 아님). SSH/NAS·재시작 복구·다른 파일시스템·실제 Docker 빌드/운영 미검증. **정본 제품 코드 승격·빌드·배포는 여전히 별도 승인 필요.**
+
 - **P04 첫 소스 후보 격리 작업 승인(2026-11-11 Teddy "응 승인할께"):** 공동 `DLDWS-001` 하에서 `teddy_storage.py` root와 `downloader_runtime_overlay/teddy_storage.py` 정확히 두 경로만 대상으로 **오프라인 후보 작성·대표 검증** 승인. 최종 Overlay의 기존 실행 바이트를 root에 보존하고 후보에서만 중복 Overlay 파일 제거하는 방식의 가능성을 먼저 확인; 충돌·해시·복구·NAS 파일 보호 유지가 필수. Dockerfile/manifest/테스트 파일 변경, 정본 제품 코드 승격, 이미지 빌드 및 운영 배포 **미승인**. 후보 증거를 보고한 뒤 다음 단계 별도 선택.
 
 - **P04 1순위 후보 선정 제안(2026-11-11 08:34:56 KST Codex 정적 감사):** `teddy_storage.py` root/Overlay 1쌍을 **최종 Overlay 실행 바이트를 기준으로** 단일 원본화하는 최소 후보. Storage는 Docker의 직접 수정 패치 대상은 아니지만 NAS 파일 충돌·해시·복구 보호를 포함해 실제 동작의 무변경 검증이 필수. Dockerfile의 중간 storage smoke·경로 검사와 최종 manifest도 유지 필요. 기존 로컬 게시 복구 분기의 해시 동등성은 **확인필요**이지 결함 확정 아님. 후속 후보는 필요한 경우에만 기존 검사 재사용으로 최종 Overlay 파일 보존 smoke 1건. **P04 구현/빌드/배포 모두 미승인**. 상세 근거: `docs/handoff/missav-dlp-web/DLDWS_STRUCTURE_AUDIT_20261111.md`.
