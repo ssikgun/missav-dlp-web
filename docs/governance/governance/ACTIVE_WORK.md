@@ -1,5 +1,12 @@
 # Governance workstream — active work
 
+## 2026-11-11 — GOV-009 completed and deactivated after P05 closeout
+
+- **Approved work delivered:** Activated temporary GOV-009 on `teddy-subtitle-stage11` at `9fa7abfd47ab5f3b1a0bacfbfe254ba1ce495a67`. Paired `DLDWS-001` historical completion, two workstream `INACTIVE/NONE` metadata, router, P05 roadmap and CURRENT_HANDOFF were atomically committed and read back at `7866177fe6e756635758681116c08c6485cdea67`.
+- **Governance closure:** This commit returns Governance itself to `INACTIVE/NONE` after confirming the paired closeout; `GOV-009=COMPLETED` is historical. No other workstream ID/status/contract/route is changed from the P05 closeout commit.
+- **Limits:** Historical FNS-267/Writer/P04 results stay separately scoped; new-image real download, external proxy fetch, new-image Writer live connectivity and rollback execution remain untested. No source, Docker, service, storage, NAS, DB, Stage9, Stage11 or unrelated runtime mutation was authorized or performed by these documentation commits.
+
+
 ## 2026-11-11 — GOV-009 TEMPORARY ACTIVATION: P05 / DLDWS-001 paired closure (Teddy approved)
 
 - **User approval:** Following the P05 read-only completion review, Teddy approved closing P05 and both `DLDWS-001` workstreams, then separately approved a temporary Governance task to update the common routing registry and restore Governance to inactive. This approval is scoped to documentation and routing closeout; it does not approve further downloads or production validation.
@@ -315,8 +322,8 @@ Register a consistent shared task for P08 NFO/poster library-status UI and prepa
 After registration is verified, request explicitly scoped approval for offline P08 UI/API source implementation and representative smoke tests. Check actual deployed Docker UI and read-only Stage9 database availability before deciding status integration; ask separately for Docker deployment/live validation. At P08 closeout restore Governance INACTIVE/NONE, Downloader+Writer Safety DLDWS-001 pair, Stage9 STG9MEDIA-001; preserve Stage11 S11-WX011 throughout.
 
 WORKSTREAM: governance
-TASK_ID: GOV-009
-STATUS: IN_PROGRESS
+TASK_ID: NONE
+STATUS: INACTIVE
 CONTRACT_VERSION: 1.0.1
 REQUIRES_WORKSTREAMS: governance
 
