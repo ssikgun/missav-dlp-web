@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>MissAV Downloader</title>
+    <title>Downloader</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -130,10 +130,22 @@
         .url-bar button:hover { background: #2563eb; }
 
         /* --- Stats badges --- */
+        .download-summary-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 0 0 16px;
+        }
+        .download-summary-row > .teddy-network-panel { flex: 0 0 100%; }
         .stats {
             display: flex;
+            align-items: center;
             gap: 10px;
-            margin-bottom: 20px;
+            flex: 1 1 auto;
+            min-width: 0;
+            margin-bottom: 0;
             flex-wrap: wrap;
         }
         .stat-badge {
@@ -176,6 +188,20 @@
             margin-top: 4px;
         }
         .task-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+        /* --- Teddy thumbnail --- */
+        .task-thumb {
+            width: 112px;
+            aspect-ratio: 16 / 9;
+            object-fit: cover;
+            border-radius: 7px;
+            flex-shrink: 0;
+            background: #e2e8f0;
+            border: 1px solid #e2e8f0;
+        }
+        @media (max-width: 720px) {
+            .task-thumb { width: 84px; }
+        }
 
         /* --- Progress bar --- */
         .progress-wrap { margin-top: 10px; }
@@ -452,8 +478,6 @@
 
         .setting-actions {
             display: flex;
-            flex-wrap: wrap;
-            align-items: center;
             gap: 10px;
             margin-top: 32px;
             padding-top: 20px;
@@ -482,6 +506,7 @@
             transition: background 0.15s;
         }
         .btn-reset:hover { background: #e2e8f0; }
+
         .downloader-action-status {
             color: #64748b;
             font-size: 12px;
@@ -491,15 +516,24 @@
             display: flex;
             align-items: center;
             justify-content: flex-end;
+            flex: 0 1 auto;
             flex-wrap: wrap;
             gap: 8px;
-            margin: 10px 0;
+            margin: 0;
         }
         .download-bulk-actions .downloader-action-status { flex: 1 1 100%; }
+        .download-bulk-actions .downloader-action-status:empty { display: none; }
         @media (max-width: 720px) {
-            .setting-actions { align-items: stretch; }
-            .setting-actions > button { flex: 1 1 100%; }
-            .download-bulk-actions { justify-content: stretch; }
+            .download-summary-row {
+                align-items: stretch;
+                flex-direction: column;
+                gap: 10px;
+            }
+            .download-summary-row > .teddy-network-panel { flex: 0 0 auto; }
+            .download-bulk-actions {
+                justify-content: stretch;
+                width: 100%;
+            }
             .download-bulk-actions button {
                 width: 100%;
                 min-height: 44px;
@@ -612,11 +646,21 @@
     <link rel="stylesheet" href="/static/teddy-discovery.css">
     <link rel="stylesheet" href="/static/teddy-library.css">
     <link rel="stylesheet" href="/static/teddy-subtitle-status.css">
+<link rel="stylesheet" href="/static/teddy-browser.css"><link rel="stylesheet" href="/static/teddy-theme.css"><link rel="stylesheet" href="/static/teddy-network.css"><link rel="stylesheet" href="/static/teddy-logs.css"><link rel="stylesheet" href="/static/teddy-routing.css"><link rel="stylesheet" href="/static/teddy-mobile.css">    <link rel="manifest" href="/static/teddy-manifest.webmanifest">
+    <link rel="icon" href="/static/teddy-icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/teddy-icon-180.png">
+    <meta name="application-name" content="Teddy Downloader">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Teddy">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#0b74f1" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
 </head>
 <body>
     <!-- Sidebar -->
     <nav class="sidebar">
-        <div class="sidebar-logo">M</div>
+        <div class="sidebar-logo">D</div>
         <button class="sidebar-btn active" data-page="download" title="다운로드">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         </button>
@@ -625,6 +669,12 @@
         </button>
         <button class="sidebar-btn" data-page="library" title="파일 관리" aria-label="파일 관리">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        </button>
+        <button class="sidebar-btn" data-page="browser" title="브라우저">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 010 18"/><path d="M12 3a15 15 0 000 18"/></svg>
+        </button>
+        <button class="sidebar-btn" data-page="logs" title="로그">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
         </button>
         <div style="flex:1"></div>
         <button class="sidebar-btn" data-page="settings" title="설정">
@@ -637,25 +687,33 @@
         <!-- Download Page -->
         <div id="page-download" class="page active">
             <div class="page-title">다운로드</div>
-            <div class="page-subtitle">MissAV URL을 입력하면 서버에서 다운로드합니다</div>
+            <div class="page-subtitle">URL을 입력하면 서버에서 다운로드합니다</div>
             <div class="section-tabs download-tabs" role="tablist" aria-label="다운로드 보기">
                 <button class="section-tab active" type="button" data-download-view="tasks" aria-selected="true">다운로드 작업</button>
                 <button class="section-tab" type="button" data-download-view="preclean" aria-selected="false">정리 전 파일</button>
             </div>
             <section id="download-view-tasks" class="download-view active" data-download-panel="tasks">
             <form id="downloadForm" class="url-bar">
-                <input type="text" id="url" placeholder="https://missav01.com/ko/..." required>
+                <input type="text" id="url" placeholder="https://..." required>
+                <select id="downloadNetworkMode" class="teddy-route-select" title="이번 다운로드의 네트워크 경로">
+                    <option value="auto" selected>자동</option>
+                    <option value="direct">Direct</option>
+                    <option value="proxy">Proxy</option>
+                    <option value="vpn">VPN</option>
+                </select>
                 <button type="submit">추가</button>
             </form>
-            <div style="margin-top:10px;font-size:13px;line-height:1.5;color:#e0a244;">💡 <b>missav01.com</b> 주소를 사용하세요. 통신사가 다른 미러(missav.ws / .ai 등)를 SNI 차단하면 접속이 안 될 수 있습니다.</div>
+            <div class="teddy-route-hint" id="teddyRouteHint">자동 · 새 사이트는 Direct 우선 → 실패 시 무료 Proxy → 실패 시 VPN</div>
 
-            <div class="stats" id="stats"></div>
-            <div class="download-bulk-actions">
-                <button type="button" class="btn btn-ghost" id="retryFailedTasks" disabled>
-                    <span id="retryFailedLabel">↻ 실패 작업 모두 재시작</span>
-                    <span id="retryFailedCount">0</span>
-                </button>
-                <div class="downloader-action-status" id="bulkRetryStatus" role="status" aria-live="polite"></div>
+            <div class="download-summary-row" id="teddy-task-summary-row">
+                <div class="stats" id="stats"></div>
+                <div class="download-bulk-actions">
+                    <button type="button" class="btn btn-ghost" id="retryFailedTasks" disabled>
+                        <span id="retryFailedLabel">↻ 실패 작업 모두 재시작</span>
+                        <span id="retryFailedCount">0</span>
+                    </button>
+                    <div class="downloader-action-status" id="bulkRetryStatus" role="status" aria-live="polite"></div>
+                </div>
             </div>
             <div id="taskList"></div>
             </section>
@@ -688,7 +746,7 @@
             </div>
             <div class="section-tabs file-management-tabs" role="tablist" aria-label="파일 관리 보기">
                 <button class="section-tab active" type="button" data-file-management-view="library" aria-selected="true">보유 라이브러리</button>
-                <button class="section-tab" type="button" data-file-management-view="subtitle-status" aria-selected="false">자막 처리 현황</button>
+                <button class="section-tab" type="button" data-file-management-view="subtitle-status" aria-selected="false">라이브러리 DB 현황</button>
             </div>
             <section id="file-management-view-library" class="file-management-view active" data-file-management-panel="library">
             <div class="discovery-header library-header">
@@ -723,10 +781,12 @@
             </div>
             </section>
             <section id="file-management-view-subtitle-status" class="file-management-view" data-file-management-panel="subtitle-status" hidden>
-                <p class="subtitle-status-context">자막 생성 파이프라인의 작업 상태 · 라이브러리 보유 현황과 별도</p>
+                <h2>보유 작품 상태</h2>
+                <div id="libraryDbStatus" class="library-db-status" aria-live="polite">보유 현황을 확인하고 있습니다.</div>
+                <p class="subtitle-status-context">아래 수치는 Stage12 자막 생성 작업 기록으로, 위의 NAS 보유 작품 현황과 별도로 집계됩니다.</p>
                 <section class="subtitle-status-panel" id="subtitle-status-panel" aria-live="polite">
                     <div class="subtitle-status-head">
-                        <div class="subtitle-status-title">자막 처리 현황</div>
+                        <h2 class="subtitle-status-title">Stage12 자막 생성 작업</h2>
                         <span class="subtitle-status-badge" id="subtitle-status-badge">확인 중</span>
                     </div>
                     <div class="subtitle-status-current" id="subtitle-status-current">상태를 확인하고 있습니다.</div>
@@ -740,6 +800,18 @@
                     <div class="subtitle-status-foot" id="subtitle-status-foot">마지막 활동: 확인 중</div>
                 </section>
             </section>
+        </div>
+
+        <!-- Browser Page -->
+        <div id="page-browser" class="page">
+            <div class="teddy-browser-shell">
+                <iframe
+                    id="teddyBrowserFrame"
+                    class="teddy-browser-frame"
+                    title="VPN Browser"
+                    allow="clipboard-read; clipboard-write"
+                ></iframe>
+            </div>
         </div>
 
         <!-- Discovery Page -->
@@ -782,6 +854,23 @@
                     왼쪽 Discovery 메뉴를 열면 랭킹 데이터를 불러옵니다.
                 </div>
             </div>
+        </div>
+
+        <!-- Logs Page -->
+        <div id="page-logs" class="page">
+            <div class="teddy-log-header">
+                <div>
+                    <div class="page-title">로그</div>
+                    <div class="page-subtitle teddy-log-subtitle">앱의 최근 동작 로그를 표시합니다 · 컨테이너 재시작 시 웹 로그 버퍼는 초기화됩니다</div>
+                </div>
+                <div class="teddy-log-controls">
+                    <label class="teddy-log-autoscroll"><input type="checkbox" id="teddyLogAutoscroll" checked> 자동 스크롤</label>
+                    <button type="button" id="teddyLogRefresh">새로고침</button>
+                    <button type="button" id="teddyLogClear">화면 지우기</button>
+                </div>
+            </div>
+            <div class="teddy-log-status" id="teddyLogStatus">로그를 불러오는 중…</div>
+            <pre class="teddy-log-output" id="teddyLogOutput"></pre>
         </div>
 
         <!-- Settings Page -->
@@ -855,9 +944,9 @@
                     </select>
                 </div>
 
-                <div class="setting-group">
-                    <label class="setting-label">미러 도메인 목록</label>
-                    <div class="setting-desc">missav 미러 도메인 (줄바꿈으로 구분)</div>
+                <div class="setting-group" style="display:none">
+                    <label class="setting-label">사이트 미러 도메인 목록</label>
+                    <div class="setting-desc">사이트별 미러 도메인 (줄바꿈으로 구분)</div>
                     <textarea id="set-mirrors" class="setting-textarea" rows="7">missav.ai
 missav.ws
 missav.live
@@ -955,6 +1044,89 @@ missav01.com</textarea>
                     </div>
                 </div>
 
+                <div class="setting-group teddy-ytdlp-settings">
+                    <label class="setting-label">일반 사이트 yt-dlp 옵션</label>
+                    <div class="setting-desc">YouTube 등 일반 사이트에 적용됩니다. 플레이리스트와 로그인/쿠키 기능은 포함하지 않습니다. 작업이 시작될 때 선택값을 작업에 고정해 재개 시에도 같은 옵션을 유지합니다.</div>
+
+                    <div class="setting-group">
+                        <label class="setting-label">다운로드 종류</label>
+                        <select id="set-ytdlp-media-mode" class="setting-select">
+                            <option value="video">영상 + 음성</option>
+                            <option value="audio">오디오만</option>
+                        </select>
+                    </div>
+
+                    <div id="teddy-ytdlp-video-options">
+                        <div class="setting-group">
+                            <label class="setting-label">최대 화질</label>
+                            <select id="set-ytdlp-video-quality" class="setting-select">
+                                <option value="best">최고 화질</option>
+                                <option value="2160">2160p 이하</option>
+                                <option value="1440">1440p 이하</option>
+                                <option value="1080">1080p 이하</option>
+                                <option value="720">720p 이하</option>
+                                <option value="480">480p 이하</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-group">
+                            <label class="setting-label">영상 컨테이너</label>
+                            <select id="set-ytdlp-video-container" class="setting-select">
+                                <option value="mp4">MP4 · 호환성 권장</option>
+                                <option value="mkv">MKV · 코덱 호환 범위 넓음</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-group">
+                            <label class="setting-label">자막 파일</label>
+                            <div class="setting-desc">선택 언어의 일반 자막과 자동 생성 자막을 허용하며 영상과 별도 자막 파일로 저장합니다.</div>
+                            <select id="set-ytdlp-subtitles" class="setting-select">
+                                <option value="off">받지 않음</option>
+                                <option value="ko">한국어</option>
+                                <option value="en">영어</option>
+                                <option value="ko_en">한국어 + 영어</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="teddy-ytdlp-audio-options" style="display:none">
+                        <div class="setting-group">
+                            <label class="setting-label">오디오 형식</label>
+                            <select id="set-ytdlp-audio-format" class="setting-select">
+                                <option value="m4a">M4A · 기본</option>
+                                <option value="mp3">MP3 · 192 kbps</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-group teddy-routing-settings">
+                    <label class="setting-label">네트워크 라우팅</label>
+                    <div class="setting-desc">자동 모드는 저장된 성공 경로를 사용하고, 처음 보는 사이트는 Direct → 무료 Proxy → VPN 순으로 네트워크성 실패에만 다음 경로를 시도합니다. 성공한 경로는 자동 학습됩니다.</div>
+
+                    <div class="teddy-routing-summary">
+                        <strong>기본 정책</strong>
+                        <span>Direct 우선 → 무료 Proxy → VPN → 성공 경로 학습</span>
+                    </div>
+
+                    <div id="teddyProxyPoolMount"></div>
+
+                    <div class="teddy-routing-section-title">수동 사이트 규칙</div>
+                    <div id="teddyManualRules" class="teddy-routing-list"></div>
+                    <div class="teddy-routing-add">
+                        <input type="text" id="teddyRoutingTarget" class="setting-input-wide" placeholder="https://example.com/video 또는 example.com">
+                        <select id="teddyRoutingMode" class="setting-select">
+                            <option value="direct">Direct</option>
+                            <option value="proxy">Proxy</option>
+                            <option value="vpn">VPN</option>
+                        </select>
+                        <button type="button" id="teddyRoutingAdd">추가</button>
+                    </div>
+
+                    <div class="teddy-routing-section-title">자동 학습된 사이트</div>
+                    <div id="teddyLearnedRules" class="teddy-routing-list"></div>
+                </div>
+
                 <div class="setting-actions">
                     <button class="btn-save" id="saveSettings">저장</button>
                     <button class="btn-reset" id="resetSettings">기본값 복원</button>
@@ -967,7 +1139,7 @@ missav01.com</textarea>
     <div class="modal-overlay" id="videoModal">
         <div class="modal-content">
             <button class="modal-close" id="modalClose">&times;</button>
-            <video id="videoPlayer" controls></video>
+            <video id="videoPlayer" controls playsinline preload="metadata"></video>
         </div>
     </div>
 
@@ -985,6 +1157,16 @@ missav01.com</textarea>
     function formatDate(ts) {
         const d = new Date(ts * 1000);
         return d.toLocaleString('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+    }
+    function formatDuration(seconds) {
+        const s = Math.max(0, Math.round(Number(seconds) || 0));
+        if (!s) return '';
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const r = s % 60;
+        if (h) return h + '시간 ' + m + '분';
+        if (m) return m + '분 ' + r + '초';
+        return r + '초';
     }
     function showToast(msg, type) {
         const t = document.getElementById('toast');
@@ -1053,7 +1235,7 @@ missav01.com</textarea>
         fetch('/download', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ url })
+            body: new URLSearchParams({ url, network_mode: document.getElementById('downloadNetworkMode').value })
         })
         .then(r => r.json())
         .then(data => {
@@ -1064,76 +1246,225 @@ missav01.com</textarea>
     });
 
     // --- Tasks ---
+    const teddyTaskSamples = new Map();
+    let teddyTaskOrderKey = '';
+
+    function teddyEffectiveSpeed(id, task) {
+        const now = performance.now() / 1000;
+        const bytes = Number(task.downloaded_bytes) || 0;
+        const apiSpeed = Number(task.speed_bps) || 0;
+        const previous = teddyTaskSamples.get(id) || { time: now, bytes: bytes, speed: 0 };
+        let deltaSpeed = 0;
+        const elapsed = now - previous.time;
+        if (elapsed > 0.25 && bytes > previous.bytes) {
+            deltaSpeed = (bytes - previous.bytes) / elapsed;
+        }
+
+        let measured = apiSpeed || deltaSpeed || previous.speed || 0;
+        if (measured > 0 && previous.speed > 0 && measured !== previous.speed) {
+            measured = previous.speed * 0.65 + measured * 0.35;
+        }
+        teddyTaskSamples.set(id, { time: now, bytes: bytes, speed: measured });
+        return measured;
+    }
+
+    function teddyActionState(task) {
+        if (task.status === '다운로드 중') return 'downloading';
+        if (task.status === '일시정지 요청 중') return 'pausing';
+        if (task.status === '일시정지') return 'paused';
+        if (task.status.includes('대기')) return 'waiting';
+        if (task.status.includes('완료') && task.filename) return 'done:' + task.filename;
+        if (task.status.includes('에러') || task.status.includes('취소')) return 'retry';
+        return 'other';
+    }
+
+    function teddyActionsHtml(id, task) {
+        if (task.status === '다운로드 중') {
+            return '<button class="btn btn-primary" onclick="teddyPauseTask(\'' + id + '\')">Ⅱ 일시정지</button>';
+        }
+        if (task.status === '일시정지 요청 중') {
+            return '<button class="btn btn-ghost" disabled>일시정지 중…</button>';
+        }
+        if (task.status === '일시정지') {
+            return '<button class="btn btn-primary" onclick="teddyResumeTask(\'' + id + '\')">▶ 재개</button>' +
+                   '<button class="btn btn-danger" onclick="teddyDeleteTask(\'' + id + '\')">삭제</button>';
+        }
+        if (task.status.includes('대기')) {
+            return '<span class="btn stat-waiting" role="status">대기 중</span>' +
+                   '<button class="btn btn-ghost" onclick="teddyDeleteTask(\'' + id + '\')">삭제</button>';
+        }
+        if (task.status.includes('완료') && task.filename) {
+            return '<a class="btn btn-primary" href="/api/files/' + teddyEncodeFilePath(task.filename) + '/download" style="text-decoration:none">↓ 받기</a>' +
+                   '<button class="btn btn-danger" onclick="deleteTask(\'' + id + '\')">목록에서 삭제</button>';
+        }
+        if (task.status.includes('에러') || task.status.includes('취소')) {
+            return '<button class="btn btn-primary" onclick="retryTask(\'' + id + '\')">↻ 재시작</button>' +
+                   '<button class="btn btn-ghost" onclick="teddyDeleteTask(\'' + id + '\')">✕</button>';
+        }
+        return '<button class="btn btn-ghost" onclick="teddyDeleteTask(\'' + id + '\')">✕</button>';
+    }
+
+    function teddyCreateTaskCard(id) {
+        const card = document.createElement('div');
+        card.className = 'task-card';
+        card.dataset.taskId = id;
+        card.innerHTML =
+            '<div class="task-top">' +
+                '<img class="task-thumb" alt="" loading="lazy" style="display:none">' +
+                '<div style="flex:1;min-width:0">' +
+                    '<div class="task-title"></div>' +
+                    '<div class="task-meta"></div>' +
+                '</div>' +
+                '<div class="task-actions"></div>' +
+            '</div>' +
+            '<div class="progress-wrap" style="display:none">' +
+                '<div class="progress-bg"><div class="progress-fill" style="width:0%"></div></div>' +
+                '<div class="progress-text"></div>' +
+            '</div>';
+        return card;
+    }
+
+    function teddyUpdateTaskCard(id, task, card) {
+        const isDone = task.status.includes('완료');
+        const isError = task.status.includes('에러');
+        const nextClass = 'task-card' + (isDone ? ' done' : (isError ? ' error' : ''));
+        if (card.className !== nextClass) card.className = nextClass;
+
+        const title = card.querySelector('.task-title');
+        const nextTitle = task.display_title || task.filename || task.url || '';
+        if (title.textContent !== nextTitle) title.textContent = nextTitle;
+
+        const meta = card.querySelector('.task-meta');
+        const routeLabel = task.network_mode === 'vpn' ? 'VPN' : (task.network_mode === 'proxy' ? 'Proxy' : (task.network_mode === 'direct' ? 'Direct' : ''));
+        const statusText = isDone && task.filesize
+            ? formatSize(task.filesize) + ' · 완료'
+            : (task.status || '');
+        const proxySpeed = Number(task.network_proxy_speed_bps) || 0;
+        const proxyLearned = Number(task.network_proxy_learned_speed_bps) || 0;
+        const proxyDetail = task.network_mode === 'proxy'
+            ? (proxyLearned ? ' · 실사용 ' + formatSize(proxyLearned) + '/s'
+                            : (proxySpeed ? ' · 검사 ' + formatSize(proxySpeed) + '/s' : '')) +
+              (task.network_proxy_latency_ms ? ' · ' + task.network_proxy_latency_ms + 'ms' : '')
+            : '';
+        const nextMeta = routeLabel ? statusText + ' · ' + routeLabel + proxyDetail : statusText;
+        if (meta.textContent !== nextMeta) meta.textContent = nextMeta;
+
+        const thumb = card.querySelector('.task-thumb');
+        if (task.thumbnail_url) {
+            if (thumb.dataset.source !== task.thumbnail_url) {
+                thumb.dataset.source = task.thumbnail_url;
+                thumb.style.display = 'none';
+                thumb.onload = function() { thumb.style.display = 'block'; };
+                thumb.onerror = function() { thumb.style.display = 'none'; };
+                thumb.src = '/api/tasks/' + encodeURIComponent(id) + '/thumbnail';
+            }
+        } else if (thumb.style.display !== 'none') {
+            thumb.style.display = 'none';
+        }
+
+        const actions = card.querySelector('.task-actions');
+        const actionState = teddyActionState(task);
+        if (actions.dataset.state !== actionState) {
+            actions.dataset.state = actionState;
+            actions.innerHTML = teddyActionsHtml(id, task);
+        }
+
+        const progress = card.querySelector('.progress-wrap');
+        const showProgress = task.status === '다운로드 중' || task.status === '일시정지 요청 중' || task.status === '일시정지';
+        if (!showProgress) {
+            if (progress.style.display !== 'none') progress.style.display = 'none';
+            return;
+        }
+
+        if (progress.style.display === 'none') progress.style.display = '';
+        const pct = task.progress || '0%';
+        const fill = progress.querySelector('.progress-fill');
+        if (fill.style.width !== pct) fill.style.width = pct;
+
+        const downloaded = Number(task.downloaded_bytes) || 0;
+        const totalEstimate = Number(task.total_bytes_estimate) || 0;
+        const progressParts = [pct];
+        if (downloaded && totalEstimate) {
+            progressParts.push(formatSize(downloaded) + ' / 약 ' + formatSize(totalEstimate));
+        } else if (downloaded) {
+            progressParts.push(formatSize(downloaded));
+        }
+
+        if (task.status === '다운로드 중') {
+            const speed = teddyEffectiveSpeed(id, task);
+            if (speed > 0) {
+                progressParts.push('↓ ' + formatSize(speed) + '/s');
+                if (totalEstimate > downloaded) {
+                    const eta = formatDuration((totalEstimate - downloaded) / speed);
+                    if (eta) progressParts.push('남은 시간 약 ' + eta);
+                }
+            }
+        }
+
+        const progressText = progress.querySelector('.progress-text');
+        const nextProgressText = progressParts.join(' · ');
+        if (progressText.textContent !== nextProgressText) {
+            progressText.textContent = nextProgressText;
+        }
+    }
+
     function fetchTasks() {
         fetch('/api/tasks').then(r => r.json()).then(tasks => {
             const entries = Object.entries(tasks).reverse();
-            let downloading = 0, done = 0, waiting = 0, errors = 0;
-            entries.forEach(([, t]) => {
-                if (t.status.includes('다운로드')) downloading++;
-                else if (t.status.includes('완료')) done++;
-                else if (t.status.includes('대기')) waiting++;
-                else if (t.status.includes('에러')) errors++;
+            let downloading = 0, done = 0, waiting = 0, paused = 0, errors = 0;
+            entries.forEach(([, task]) => {
+                if (task.status === '다운로드 중' || task.status === '일시정지 요청 중') downloading++;
+                else if (task.status.includes('완료')) done++;
+                else if (task.status === '일시정지') paused++;
+                else if (task.status.includes('대기')) waiting++;
+                else if (task.status.includes('에러')) errors++;
             });
 
             const statsEl = document.getElementById('stats');
             let statsHtml = '';
-            if (downloading) statsHtml += '<span class="stat-badge stat-downloading">\u2193 진행 ' + downloading + '</span>';
-            if (done) statsHtml += '<span class="stat-badge stat-done">\u2713 완료 ' + done + '</span>';
-            if (waiting) statsHtml += '<span class="stat-badge stat-waiting">\u23f3 대기 ' + waiting + '</span>';
-            if (errors) statsHtml += '<span class="stat-badge stat-error">\u2715 에러 ' + errors + '</span>';
-            statsEl.innerHTML = statsHtml;
+            if (downloading) statsHtml += '<span class="stat-badge stat-downloading">↓ 진행 ' + downloading + '</span>';
+            if (paused) statsHtml += '<span class="stat-badge stat-waiting">Ⅱ 일시정지 ' + paused + '</span>';
+            if (done) statsHtml += '<span class="stat-badge stat-done">✓ 완료 ' + done + '</span>';
+            if (waiting) statsHtml += '<span class="stat-badge stat-waiting">⏳ 대기 ' + waiting + '</span>';
+            if (errors) statsHtml += '<span class="stat-badge stat-error">✕ 에러 ' + errors + '</span>';
+            if (statsEl.innerHTML !== statsHtml) statsEl.innerHTML = statsHtml;
 
             const listEl = document.getElementById('taskList');
             if (entries.length === 0) {
-                listEl.innerHTML = '<div class="empty">다운로드 목록이 비어있습니다</div>';
+                if (!listEl.querySelector('.empty')) {
+                    listEl.innerHTML = '<div class="empty">다운로드 목록이 비어있습니다</div>';
+                }
+                teddyTaskOrderKey = '';
                 return;
             }
-            listEl.innerHTML = entries.map(([id, t]) => {
-                let cls = '';
-                if (t.status.includes('완료')) cls = 'done';
-                else if (t.status.includes('에러')) cls = 'error';
 
-                let progressHtml = '';
-                if (t.status === '다운로드 중') {
-                    const pct = t.progress || '0%';
-                    progressHtml =
-                        '<div class="progress-wrap">' +
-                            '<div class="progress-bg"><div class="progress-fill" style="width:' + pct + '"></div></div>' +
-                            '<div class="progress-text">' + escapeHtml(pct) + '</div>' +
-                        '</div>';
+            const empty = listEl.querySelector('.empty');
+            if (empty) empty.remove();
+            const wanted = new Set(entries.map(([id]) => id));
+            listEl.querySelectorAll('.task-card[data-task-id]').forEach(card => {
+                if (!wanted.has(card.dataset.taskId)) {
+                    teddyTaskSamples.delete(card.dataset.taskId);
+                    card.remove();
                 }
+            });
 
-                let actions = '';
-                if (t.status === '다운로드 중') {
-                    actions = '<button class="btn btn-danger" onclick="deleteTask(\'' + id + '\')">취소</button>';
-                } else if (t.status.includes('완료') && t.filename) {
-                    actions =
-                        '<a class="btn btn-primary" href="/api/files/' + encodeURIComponent(t.filename) + '/download" style="text-decoration:none">\u2193 받기</a>' +
-                        '<button class="btn btn-ghost" onclick="deleteTask(\'' + id + '\')">\u2715</button>';
-                } else if (t.status.includes('\uc5d0\ub7ec') || t.status.includes('\ucde8\uc18c')) {
-                    actions =
-                        '<button class="btn btn-primary" onclick="retryTask(\'' + id + '\')">\u21bb \uc7ac\uc2dc\uc791</button>' +
-                        '<button class="btn btn-ghost" onclick="deleteTask(\'' + id + '\')">\u2715</button>';
-                } else {
-                    actions = '<button class="btn btn-ghost" onclick="deleteTask(\'' + id + '\')">\u2715</button>';
+            entries.forEach(([id, task]) => {
+                let card = listEl.querySelector('.task-card[data-task-id="' + id + '"]');
+                if (!card) {
+                    card = teddyCreateTaskCard(id);
+                    listEl.appendChild(card);
                 }
+                teddyUpdateTaskCard(id, task, card);
+            });
 
-                const titleText = escapeHtml(t.filename || t.url);
-                const metaText = t.status.includes('완료') && t.filesize
-                    ? formatSize(t.filesize) + ' \u00b7 완료'
-                    : escapeHtml(t.status);
-
-                return '<div class="task-card ' + cls + '">' +
-                    '<div class="task-top">' +
-                        '<div style="flex:1;min-width:0">' +
-                            '<div class="task-title">' + titleText + '</div>' +
-                            '<div class="task-meta">' + metaText + '</div>' +
-                        '</div>' +
-                        '<div class="task-actions">' + actions + '</div>' +
-                    '</div>' +
-                    progressHtml +
-                '</div>';
-            }).join('');
+            const nextOrderKey = entries.map(([id]) => id).join('|');
+            if (nextOrderKey !== teddyTaskOrderKey) {
+                entries.forEach(([id]) => {
+                    const card = listEl.querySelector('.task-card[data-task-id="' + id + '"]');
+                    if (card) listEl.appendChild(card);
+                });
+                teddyTaskOrderKey = nextOrderKey;
+            }
         });
     }
 
@@ -1147,6 +1478,10 @@ missav01.com</textarea>
 
     setInterval(fetchTasks, 1500);
     fetchTasks();
+
+    function teddyEncodeFilePath(name) {
+        return String(name || '').split('/').map(encodeURIComponent).join('/');
+    }
 
     // --- Files ---
     let allFiles = [];
@@ -1178,7 +1513,7 @@ missav01.com</textarea>
             return;
         }
         listEl.innerHTML = files.map(f => {
-            const encodedName = encodeURIComponent(f.name);
+            const encodedName = teddyEncodeFilePath(f.name);
             return '<div class="file-card">' +
                 '<div class="file-info">' +
                     '<div class="file-icon">\uD83C\uDFAC</div>' +
@@ -1188,7 +1523,7 @@ missav01.com</textarea>
                     '</div>' +
                 '</div>' +
                 '<div class="file-actions">' +
-                    '<button class="btn btn-preview" onclick="previewFile(\'' + encodedName + '\')">\u25b6 미리보기</button>' +
+                    '<button class="btn btn-preview" onclick="previewFile(\'' + encodedName + '\')">\u25b6 재생</button>' +
                     '<a class="btn btn-primary" href="/api/files/' + encodedName + '/download" style="text-decoration:none">\u2193 다운로드</a>' +
                     '<button class="btn btn-danger" onclick="deleteFile(\'' + encodedName + '\')">삭제</button>' +
                 '</div>' +
@@ -1200,7 +1535,7 @@ missav01.com</textarea>
     document.getElementById('fileSort').addEventListener('change', renderFiles);
 
     function deleteFile(name) {
-        if (!confirm('서버에서 파일을 삭제하시겠습니까?')) return;
+        if (!confirm('이 파일을 NAS에서 삭제할까요? 삭제 후 되돌릴 수 없습니다.')) return;
         fetch('/api/files/' + name, { method: 'DELETE' })
         .then(r => r.json())
         .then(data => {
@@ -1252,6 +1587,11 @@ missav01.com</textarea>
         filename_template: '[%(id)s] %(title).60s.%(ext)s',
         spoofdpi_enabled: true,
         video_quality: 'best',
+        yt_dlp_media_mode: 'video',
+        yt_dlp_video_quality: 'best',
+        yt_dlp_video_container: 'mp4',
+        yt_dlp_audio_format: 'm4a',
+        yt_dlp_subtitles: 'off',
         auto_retry: true,
         auto_retry_max: 30,
         discovery_download_preference: 'auto',
@@ -1268,6 +1608,11 @@ missav01.com</textarea>
             document.getElementById('set-auto-retry').checked = s.auto_retry !== false;
             document.getElementById('set-auto-retry-max').value = s.auto_retry_max || 30;
             document.getElementById('set-quality').value = s.video_quality || 'best';
+            document.getElementById('set-ytdlp-media-mode').value = s.yt_dlp_media_mode || 'video';
+            document.getElementById('set-ytdlp-video-quality').value = s.yt_dlp_video_quality || 'best';
+            document.getElementById('set-ytdlp-video-container').value = s.yt_dlp_video_container || 'mp4';
+            document.getElementById('set-ytdlp-audio-format').value = s.yt_dlp_audio_format || 'm4a';
+            document.getElementById('set-ytdlp-subtitles').value = s.yt_dlp_subtitles || 'off';
             document.getElementById('set-discovery-download-preference').value =
                 ['auto', 'missav', '123av'].includes(
                     s.discovery_download_preference
@@ -1278,6 +1623,7 @@ missav01.com</textarea>
             document.getElementById('set-cf-cookie').value = s.cf_cookie || '';
             document.getElementById('set-cf-ua').value = s.cf_user_agent || '';
             updateToggleText();
+            teddyUpdateYtDlpVisibility();
         });
     }
 
@@ -1290,6 +1636,13 @@ missav01.com</textarea>
 
     document.getElementById('set-spoofdpi').addEventListener('change', updateToggleText);
     document.getElementById('set-auto-retry').addEventListener('change', updateToggleText);
+
+    function teddyUpdateYtDlpVisibility() {
+        const audioOnly = document.getElementById('set-ytdlp-media-mode').value === 'audio';
+        document.getElementById('teddy-ytdlp-video-options').style.display = audioOnly ? 'none' : '';
+        document.getElementById('teddy-ytdlp-audio-options').style.display = audioOnly ? '' : 'none';
+    }
+    document.getElementById('set-ytdlp-media-mode').addEventListener('change', teddyUpdateYtDlpVisibility);
 
     const selkiesControlLabels = {
         desktop: '데스크톱',
@@ -1677,6 +2030,11 @@ missav01.com</textarea>
             discovery_download_preference:
                 document.getElementById('set-discovery-download-preference').value,
             video_quality: document.getElementById('set-quality').value,
+            yt_dlp_media_mode: document.getElementById('set-ytdlp-media-mode').value,
+            yt_dlp_video_quality: document.getElementById('set-ytdlp-video-quality').value,
+            yt_dlp_video_container: document.getElementById('set-ytdlp-video-container').value,
+            yt_dlp_audio_format: document.getElementById('set-ytdlp-audio-format').value,
+            yt_dlp_subtitles: document.getElementById('set-ytdlp-subtitles').value,
             mirrors: mirrors,
             cf_cookie: document.getElementById('set-cf-cookie').value.trim(),
             cf_user_agent: document.getElementById('set-cf-ua').value.trim()
@@ -1710,5 +2068,5 @@ missav01.com</textarea>
     <script src="/static/teddy-discovery.js"></script>
     <script src="/static/teddy-library.js"></script>
     <script src="/static/teddy-subtitle-status.js"></script>
-</body>
+<script src="/static/teddy-browser.js"></script><script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script><script src="/static/teddy-network.js"></script><script src="/static/teddy-logs.js"></script><script src="/static/teddy-routing.js"></script><script src="/static/teddy-proxy.js"></script><script src="/static/teddy-hls-benchmark.js"></script></body>
 </html>

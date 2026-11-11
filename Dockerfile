@@ -130,10 +130,14 @@ RUN grep -Fq 'id="set-ytdlp-media-mode"' templates/index.html && \
     grep -Fq 'id="set-ytdlp-subtitles"' templates/index.html
 
 # Static asset injection remains deterministic and idempotent inside the image build.
-RUN sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-theme.css"><link rel="stylesheet" href="/static/teddy-network.css"><link rel="stylesheet" href="/static/teddy-logs.css"><link rel="stylesheet" href="/static/teddy-routing.css"></head>#' templates/index.html && \
-    sed -i 's#</body>#<script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script><script src="/static/teddy-network.js"></script><script src="/static/teddy-logs.js"></script><script src="/static/teddy-routing.js"></script><script src="/static/teddy-proxy.js"></script><script src="/static/teddy-hls-benchmark.js"></script></body>#' templates/index.html && \
-    sed -i 's#<link rel="stylesheet" href="/static/teddy-mobile.css">##' templates/index.html && \
-    sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-mobile.css"></head>#' templates/index.html
+RUN if echo '84609dc23a2c3583bd099a6a2f0ed7e2301bb7645321e087b73595cb88326563  templates/index.html' | sha256sum -c - >/dev/null 2>&1; then \
+        echo 'single-source final HTML: legacy asset injection already present'; \
+    else \
+        sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-theme.css"><link rel="stylesheet" href="/static/teddy-network.css"><link rel="stylesheet" href="/static/teddy-logs.css"><link rel="stylesheet" href="/static/teddy-routing.css"></head>#' templates/index.html && \
+        sed -i 's#</body>#<script src="/static/teddy-reliability.js"></script><script src="/static/teddy-theme.js"></script><script src="/static/teddy-network.js"></script><script src="/static/teddy-logs.js"></script><script src="/static/teddy-routing.js"></script><script src="/static/teddy-proxy.js"></script><script src="/static/teddy-hls-benchmark.js"></script></body>#' templates/index.html && \
+        sed -i 's#<link rel="stylesheet" href="/static/teddy-mobile.css">##' templates/index.html && \
+        sed -i 's#</head>#<link rel="stylesheet" href="/static/teddy-mobile.css"></head>#' templates/index.html; \
+    fi
 RUN python -c "from pathlib import Path; t=Path('templates/index.html').read_text(); assert t.count('/static/teddy-mobile.css') == 1; assert t.rfind('/static/teddy-mobile.css') > t.rfind('/static/teddy-routing.css'); print('mobile stylesheet order: OK')"
 
 # PWA phase 1: installable/home-screen metadata only. Deliberately no service worker/offline cache.

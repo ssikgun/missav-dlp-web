@@ -1,4 +1,5 @@
 from pathlib import Path
+import hashlib
 import re
 
 
@@ -166,8 +167,20 @@ require('data-file-management-view="library"' in html and 'data-file-management-
         "File Management subtabs missing")
 require('GET' not in js, "unexpected Library method marker")
 
-# Docker's final HTML comes from the runtime overlay, not the root template.
-overlay = (root / "downloader_runtime_overlay/templates/index.html").read_text()
+# The legacy image has an Overlay HTML; the single-source image uses the root
+# only when it exactly matches the previously verified final HTML.
+overlay_path = root / "downloader_runtime_overlay/templates/index.html"
+require(not overlay_path.is_symlink(), "Overlay HTML must not be a symlink")
+if overlay_path.is_file():
+    overlay = overlay_path.read_text()
+else:
+    final_html_sha256 = "84609dc23a2c3583bd099a6a2f0ed7e2301bb7645321e087b73595cb88326563"
+    source_path = root / "templates/index.html"
+    require(source_path.is_file() and not source_path.is_symlink(),
+            "single-source HTML is missing or unsafe")
+    require(hashlib.sha256(source_path.read_bytes()).hexdigest() == final_html_sha256,
+            "missing Overlay HTML requires exact final root HTML SHA")
+    overlay = html
 for marker in ('data-page="library"', 'id="page-library"',
                'data-file-management-view="library"', '보유 라이브러리',
                'data-file-management-view="subtitle-status"', '라이브러리 DB 현황',

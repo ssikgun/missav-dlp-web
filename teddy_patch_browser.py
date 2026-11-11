@@ -1,12 +1,17 @@
+import hashlib
 from pathlib import Path
 
 
 INDEX = Path('templates/index.html')
 text = INDEX.read_text(encoding='utf-8')
+FINAL_INDEX_SHA256 = '84609dc23a2c3583bd099a6a2f0ed7e2301bb7645321e087b73595cb88326563'
+IS_FINAL_INDEX = hashlib.sha256(INDEX.read_bytes()).hexdigest() == FINAL_INDEX_SHA256
 
 
 def replace_once(old, new, label):
     global text
+    if IS_FINAL_INDEX:
+        return
     count = text.count(old)
     if count != 1:
         raise SystemExit(f'browser patch failed: {label}: expected 1 match, got {count}')
