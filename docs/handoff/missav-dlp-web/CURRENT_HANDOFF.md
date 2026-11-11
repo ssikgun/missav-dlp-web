@@ -1,5 +1,14 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## DLDWS-001 P04 BOOTSTRAP — INDEPENDENT PATCH RE-REVIEW PASS (2026-11-11 12:09 KST)
+
+- **Teddy's continuation:** "다음 단계" after the saved bootstrap isolated candidate. This authorizes **read-only independent patch verification**, not GitHub product-source promotion, image building or deployment.
+- **Fresh canonical preflight:** `ssikgun/missav-dlp-web:teddy-subtitle-stage11` HEAD `787823467739e72fcf80150c8a8f0881eb46def8` (previous checkpoint docs-only). Common contract `1.0.1 / APPROVED`; Downloader and Discovery Writer Safety contracts `1.0.0 / APPROVED`; both `DLDWS-001 / IN_PROGRESS`. Scratch cwd is not a repository; isolated source baseline checked against 16 GitHub blobs on the exact branch, all 16 PASS.
+- **Independent fresh replay:** Stored `dldws-p04-bootstrap-e8f3.patch` exact SHA-256 `505b3b3ac1b0928127485a800b33fd6bdc72801b4f0ce700e61e03f5fc94c05a`, replayed into a new, detached scratch-only worktree at `/workspace/scratch/856ce58465ee/dldws_bootstrap_replay_787823`. `git apply --check`, real isolated `git apply`, `git diff --check`, exact 14-path diff and `git diff --binary HEAD | sha256sum` all PASS (byte-identical to the saved patch). Root final bootstrap SHA-256 remains `b96850dbfaa585f5cf2abb3fdbe328030706fc159aba8875656fe2c775e433f3`.
+- **Independent source review:** Exact 11 writer edits are SHA-specific bootstrap recognition; existing entrypoint guards and nonbootstrap effects preserved. Dockerfile change is limited to accepting the old storage marker or the exact-final-SHA plus storage/safety marker. Re-run of bounded offline smoke PASS: 17/17 bootstrap markers, AST, 11 helpers, eight wrong-SHA fail-closed checks, representative old-root anchor transform, indirect proxy JS, indirect mobile call. Full Docker patch-chain and actual product behavior remain untested.
+- **Next required user decision:** The isolated 14-path patch is suitable for a **separately approved GitHub product-source-only promotion**, subject to a fresh branch lease/identical-file check at execution. **No product-source promotion is authorized by this continuation.** `BOOTSTRAP_INDEPENDENT_REVIEW=PASS`; `CANONICAL_PRODUCT_SOURCE_CHANGED=NO`; `DOCKER_BUILD=NOT_RUN`; `DEPLOY=NOT_RUN`; `PRODUCT_RUNTIME=UNKNOWN`.
+
+
 ## DLDWS-001 P04 BOOTSTRAP — ISOLATED CANDIDATE OFFLINE PASS (2026-11-11 12:05 KST)
 
 - **Explicit Teddy approval:** "응 승인해" for the previously specified at-most-14-product-path fresh isolated `teddy_bootstrap.py` candidate and bounded offline validation only. It does not approve GitHub product-source promotion, a Docker build, service deployment, production downloads, job/DB/NAS/Jellyfin writes, or other workstreams.
