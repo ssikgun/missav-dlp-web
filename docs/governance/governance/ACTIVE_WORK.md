@@ -1,5 +1,25 @@
 # Governance workstream — active work
 
+## 2026-11-11 — GOV-009 TEMPORARY ACTIVATION: P05 / DLDWS-001 paired closure (Teddy approved)
+
+- **User approval:** Following the P05 read-only completion review, Teddy approved closing P05 and both `DLDWS-001` workstreams, then separately approved a temporary Governance task to update the common routing registry and restore Governance to inactive. This approval is scoped to documentation and routing closeout; it does not approve further downloads or production validation.
+- **Objective:** Use `GOV-009 / IN_PROGRESS / REQUIRES_WORKSTREAMS: governance` only while updating paired Downloader and Discovery Writer Safety active-work states to `INACTIVE / NONE`, recording historical `DLDWS-001 / COMPLETED`, marking P05 complete in `WORK_ROADMAP.md`, and recording the closure in `CURRENT_HANDOFF.md`. After exact remote readback and allowed-scope review, return Governance to `INACTIVE / NONE` in the same branch through a separate closeout commit.
+
+### APPROVED_SCOPE
+
+- Change only `docs/governance/ACTIVE_WORK.md`, `docs/governance/governance/ACTIVE_WORK.md`, `docs/governance/downloader/ACTIVE_WORK.md`, `docs/governance/discovery-writer-safety/ACTIVE_WORK.md`, `docs/handoff/missav-dlp-web/WORK_ROADMAP.md`, and `docs/handoff/missav-dlp-web/CURRENT_HANDOFF.md`; preserve task history and all other workstreams without new task IDs.
+- Record FNS-267 as a **historical** representative downloaded/MP4/NAS/Jellyfin success and the 2026-11-11 P04 exact-image full Docker build, single-service production cutover and Python/SpoofDPI listener/HTTP/basic smoke as PASS. Explicitly retain `NEW_IMAGE_REAL_DOWNLOAD=NOT_RUN`, `EXTERNAL_PROXY_FETCH=NOT_RUN`, `ROLLBACK_EXECUTION=NOT_TESTED`, and `CURRENT_WRITER_NEW_IMAGE_INTEROPERABILITY=NOT_VERIFIED`; do not claim full current-image end-to-end product PASS.
+- Keep other registered workstreams, common/domain contracts, product source, tests, docker, runtime service and user data unchanged. Use normal non-force fast-forward, exact-branch GitHub readback and provenance for all commits.
+
+### PROHIBITED_SCOPE
+
+- No source/contract/test/validator edits, Docker build/deploy/restart, Writer socket/service mutation, Stage9/11/12 work, production download/retry/remux, NAS/DB/Jellyfin/queue writes, pruning, backup deletion, branch force push or unapproved workstream mutation.
+
+### ACCEPTANCE_CRITERIA AND NEXT_DECISION
+
+- Phase 1: this Governance task is active and router matches GOV-009, while both DLDWS-001 records remain IN_PROGRESS and every unrelated workstream is unchanged. Phase 2: paired DLDWS-001 active records and router both become INACTIVE/NONE, P05 roadmap and handoff state match, with untested boundaries preserved. Phase 3: GOV-009 returns INACTIVE/NONE, and all six authorized documents read back from a single branch after non-force pushes. If any mismatch or authorization conflict occurs, stop and report the exact blocker; never fabricate successful closure.
+
+
 ## 2026-11-10 — P08LIB-001 FINAL PASS; Teddy-approved closeout and prior routing restored
 
 - **Final live user acceptance:** After the approved CT108 Downloader-only two-file release, Teddy verified PC layout unchanged and mobile library DB cards in a single column. Authenticated browser Console `GET /api/library` returned `HTTP=200`, `TOTAL=275`, five summary cards, three NAS holdings status sections and five separate Stage12 metrics. `NFO_COUNTS={VALID:275,INVALID:0,ABSENT:0,UNKNOWN:0}`; `POSTER_COUNTS={PRESENT:274,ABSENT:1,UNKNOWN:0}`; poster sum equals 275. Final `P08_FINAL_READONLY=PASS`. The one absent NAS-local Primary poster is an honest inventory result, not a P08 UI failure; the optional Stage9 job-state field remains approved `UNKNOWN` because the web container has no Stage9 DB mount.
@@ -295,8 +315,8 @@ Register a consistent shared task for P08 NFO/poster library-status UI and prepa
 After registration is verified, request explicitly scoped approval for offline P08 UI/API source implementation and representative smoke tests. Check actual deployed Docker UI and read-only Stage9 database availability before deciding status integration; ask separately for Docker deployment/live validation. At P08 closeout restore Governance INACTIVE/NONE, Downloader+Writer Safety DLDWS-001 pair, Stage9 STG9MEDIA-001; preserve Stage11 S11-WX011 throughout.
 
 WORKSTREAM: governance
-TASK_ID: NONE
-STATUS: INACTIVE
+TASK_ID: GOV-009
+STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.1
 REQUIRES_WORKSTREAMS: governance
 
