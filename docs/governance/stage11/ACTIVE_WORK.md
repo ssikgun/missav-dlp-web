@@ -38,13 +38,13 @@ Produce a **non-operational, evidence-aware design proposal** for Stage11's auto
 
 ## ACCEPTANCE_CRITERIA
 
-1. Canonical `teddy-subtitle-stage11` router and this active file both show `S11-DESIGN001 / IN_PROGRESS`, common contract `1.0.1` and Stage11 design contract `1.0.0 / APPROVED` remain unchanged. The predecessor `S11-RISK001` file is archived at exact original blob SHA.
-2. Design document distinguishes verified implementation facts, *proposals*, recorded six-window risk observations, and `UNKNOWN / INCONCLUSIVE` quality conclusions.
-3. Candidate architecture covers both missing-dialogue discovery with **no ASR source cue** and conservative handling of **context-overlapping / potentially non-dialogue** hypotheses. It does not treat a risk flag as publication/repair approval.
-4. Source/cue/time/provenance ownership remains deterministic, semantic text belongs to Hermes within its contract, and the Stage12 no-overwrite publication boundary remains unchanged.
-5. Document more than one viable approach, risks of false exclusion and false insertion, and explicitly identify any user decision that blocks choosing a concrete product path.
-6. Supply a bounded future verification approach with clear abstentions but no invented thresholds or pretext that six selected samples represent full production accuracy.
-7. Zero runtime/model/source/translation/product/publication changes; historical `S11-RISK001` technical PASS does **not** become Stage11 product PASS.
+- Canonical `teddy-subtitle-stage11` router and this active file both show `S11-DESIGN001 / IN_PROGRESS`, common contract `1.0.1` and Stage11 design contract `1.0.0 / APPROVED` remain unchanged. The predecessor `S11-RISK001` file is archived at exact original blob SHA.
+- Design document distinguishes verified implementation facts, *proposals*, recorded six-window risk observations, and `UNKNOWN / INCONCLUSIVE` quality conclusions.
+- Candidate architecture covers both missing-dialogue discovery with **no ASR source cue** and conservative handling of **context-overlapping / potentially non-dialogue** hypotheses. It does not treat a risk flag as publication/repair approval.
+- Source/cue/time/provenance ownership remains deterministic, semantic text belongs to Hermes within its contract, and the Stage12 no-overwrite publication boundary remains unchanged.
+- Document more than one viable approach, risks of false exclusion and false insertion, and explicitly identify any user decision that blocks choosing a concrete product path.
+- Supply a bounded future verification approach with clear abstentions but no invented thresholds or pretext that six selected samples represent full production accuracy.
+- Zero runtime/model/source/translation/product/publication changes; historical `S11-RISK001` technical PASS does **not** become Stage11 product PASS.
 
 ## EVIDENCE
 
