@@ -108,6 +108,39 @@ These states are illustrative and **do not create production enum values, thresh
 3. When and under what evidence can a second hypothesis change trusted external Japanese source cues, given the unresolved **coverage-complete Japanese master versus Hermes whole-title primary translation** integration? The user must approve any architecture/authority conflict.
 4. How should an unresolved gap be reported without pretending it was recovered, silently inventing speech, or blocking unrelated Stage9 completion?
 
+## 4b. Prior-model evidence and bounded feasibility precheck (2026-11-12)
+
+**Authorization:** user approved preparing the next *small isolated B trial's scope and acceptance criteria*. The present `S11-DESIGN001` is **documentation-only**; model/audio execution has **not** been approved by that task.
+
+### Historical experiments — do not repeat as if new
+
+- **YAMNet Pilot A (2026-10-10): technical execution succeeded, trigger acceptance FAIL.** On 27 historically user-labeled clips, the predeclared frame-top-1 speech rule flagged **13/13 context-containing speech clips**, but **13/14 non-dialogue clips** were also flagged (including moans/music/no-dialogue); alternate predeclared mean-top-1 detected only **10/13** speech clips and still flagged **4/14** non-dialogue. There was no independently validated Japanese wording or exact core speech timing. These are **historical pilot-specific denominators**, not the WX011 16-window population. **Do not use YAMNet as a sole Japanese dialogue trigger** or retrofit thresholds to make its previous failure look like a pass.
+- **Pilot B Gemma 3n (2026-10-10): `BLOCKED_SAFE_STOP / MODEL_NOT_EVALUATED`.** Lacking compatible audio-capable runtime, access or suitable resources, **no inference occurred**. It offers no evidence of speech-detection quality. Do not substitute Gemma 4 or a text-only GGUF and call the previous pilot validated; current VM122 state must be checked separately before any later new execution.
+- **Core STT evaluation (2026-10-11):** historical Whisper hypotheses intersected 13/13 *user-labeled* candidate cores, Reazon localized tokens in 11/13, but **confirmed correct Japanese dialogue recoveries remained 0/13**. Multiple systems producing text does not demonstrate correct wording or ownership, and archived historical audio-to-WX011 PCM bridging remains unresolved when original archived WAVs are unavailable. Do not restart searches for the lost archive.
+- **Canonical current GPU worker output contract:** `process_request` invokes Silero internally, but its response contains `vad_region_count` and ASR segments; it **does not return each VAD region's beginning/end**. The persisted baseline ASR artifact schema contains segments, not independent VAD region geometry. Whether **other already-saved, source-hash-bound** VAD/acoustic observations exist for the relevant WX011 source is still **VERIFY_REQUIRED**. The no-VAD targeted method already exists but **cannot choose the missing interval by itself**.
+
+### B preflight outcomes, separated by evidence level
+
+| Proposed step | Read-only now? | Result / next boundary |
+| --- | --- | --- |
+| Reuse saved six-window WX011 WAV/manifest/WhisperX hashes and risk-selected reports | Yes; previous task already verified these, **do not repeat unchanged checks** | Technically pinned for six; source-core provenance outside that pinned bridge remains `NOT_PERFORMED` |
+| Review historical Pilot A score/protocol and Pilot B feasibility conclusions | Yes; canonical document evidence | `PASS / REVIEWED`; YAMNet sole trigger **REJECTED for current design**, Pilot B `MODEL_NOT_EVALUATED` |
+| Derive candidate-free **language** intervals from baseline ASR segment strings or VAD count alone | No, insufficient information | `UNRESOLVED` by current contracts; zero cue is not proof of silence or language |
+| Inventory existing independent acoustic region records attached to **the same verified audio source** | Future bounded **read-only** check | `VERIFY_REQUIRED`; no unrelated archive searches or guessing based on matching timestamps |
+| Run an independent trigger / no-VAD second ASR hypothesis on bounded archived audio | Requires separate approval for a **new isolated model/audio trial** | `NOT_RUN` now; no deployment or accepted text |
+| Insert, delete, translate, publish, or replace subtitles | Not within this design task | `NOT_AUTHORIZED` |
+
+### Proposed minimum future isolated trial (not executed)
+
+1. **Entry gate:** check current actual VM122 resource availability without changing running services; verify the exact pinned source/audio identity, original source/core mapping and saved output IDs. Missing identity => `VERIFY_REQUIRED` and stop for that sample; do not equate identical timestamp with identical waveform.
+2. **Small fixed probes:** use existing, user-selected **S03/S11/S15** suspected dialogue and **S04/S08/S13** suspected non-dialogue only as preliminary probes; the preceding six-case stored-evidence heuristic is already complete and **must not be rerun as a new accuracy test**. Any extra independent control set would need separately approved scope/verified existing private source identities; no broad scan or new arbitrary media inputs.
+3. **Trigger feasibility gate:** first determine if a speech-supporting signal **not derived solely from existing ASR text** can nominate the zero-cue interval. If only YAMNet's historical false-positive-prone rule or a count without region times is available, document `TRIGGER_NOT_VALIDATED`; do **not** invent speech windows from model output.
+4. **Optional bounded second inference**, *only after new task registration and explicit permission*: compare the existing VAD-first path with the already implemented targeted no-VAD path on strictly source-owned windows; retain both empty results and competing hypotheses with input/model/engine SHA and time provenance. Avoid running text generators on all blank audio and avoid changing the current worker/config.
+5. **Evaluation contract:** report separately (a) whether candidate-free regions were **nominated**, (b) whether second hypotheses were produced and bound to those regions, (c) non-dialogue false-alarm/unsupported-text examples, (d) CPU/GPU/time/resource cost, and (e) the frequency of `UNKNOWN/ABSTAIN` without claiming validated Japanese text. A **technical feasibility PASS** may be supported by correct provenance and bounded behavior; **Japanese text accuracy / full automatic subtitle quality remain `UNKNOWN / INCONCLUSIVE`** without independent references.
+6. **Safety gate:** no overwrites of frozen WAV/results, no external uploads, no source/cue/time identity shifts, no sample-specific production rules, no Japanese text promoted to a master/KO subtitle, no Stage12 publication. If evidence or compute budget is inadequate, stop safely rather than adjusting model thresholds ad hoc.
+
+**Next decision:** propose a separate, specifically scoped `B` feasibility task and have the user approve its source-bound audio work, model invocation and resource budget **before** any execution. The design review does **not** pre-authorize those operations. Source-of-truth/whole-title architecture decision remains open.
+
 ## 5. Important failure modes to decide against
 
 - **Zero-cue blind spot:** repeat-text quality scoring cannot find real dialogue that produced no ASR cue; a new audio-coverage observation would be needed. Silero may be involved, but cause is **not verified**.
