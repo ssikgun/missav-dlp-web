@@ -40,15 +40,73 @@ Conceptual information flow, **not implementation**:
 
 Candidate segment overlap must be represented as **temporal intersection of a broad context output**, not verified dialogue inside the short clip. A fully absent ASR cue must be represented as **absence of ASR evidence**, not absence of speech. User/Gemini reports stay separate from independent ground truth.
 
-## 4. Options for the user (not yet selected)
+## 4. Options and user-selected design priority (B)
 
 | Option | Concept | Benefit | Main downside / approval needed |
 | --- | --- | --- | --- |
-| **A. Observation-only risk sidecar** | Independently note evidence gaps and suspect context-only candidates; produce diagnostics without editing subtitles | Small, safe first step; reuse frozen code/provenance and avoid wrong deletion | Does **not** solve missed dialogue or false text in actual Korean subtitles; requires a subsequent decision to act |
-| **B. Bounded second-evidence path for suspicious gaps** | *Future* acquisition of an independent signal for candidate-free intervals, optional targeted no-VAD hypothesis in bounded audio regions, then proof of ownership/timing and conservative decision | Could address cases a cue-only repetition classifier cannot catch | New audio/model runs, cost, VAD and context false-positives, duplication risk; **not currently authorized**; no automatic text acceptance |
+| **A. Observation-only risk sidecar (supporting B only)** | Independently note evidence gaps and suspect context-only candidates; produce diagnostics without editing subtitles | Small, safe first step; reuse frozen code/provenance and avoid wrong deletion | Does **not** solve missed dialogue or false text in actual Korean subtitles; requires a subsequent decision to act |
+| **B. Bounded second-evidence path for suspicious gaps (USER-SELECTED DESIGN PRIORITY)** | *Future* acquisition of an independent signal for candidate-free intervals, optional targeted no-VAD hypothesis in bounded audio regions, then proof of ownership/timing and conservative decision | Could address cases a cue-only repetition classifier cannot catch | New audio/model runs, cost, VAD and context false-positives, duplication risk; **not currently authorized**; no automatic text acceptance |
 | **C. Risk-conditioned insertion/suppression in real subtitle output** | Only after a separate, validated source-of-truth policy and semantic ownership test would a confirmed case affect the Japanese/KO text path | Could improve final visible subtitles rather than only logs | Highest false insertion/deletion and semantic spill risk; **requires new design choices, testing, thresholds/acceptance approval, product implementation and release authorization** |
 
-**Non-binding sequencing proposal:** A → independently validate if B is viable → decide whether C is safe. This ordering is a suggestion, **not an approved implementation roadmap**. Do **not** auto-enable no-VAD model calls or suppress text merely because a segment overlaps silence/music reported in six chosen clips.
+**User clarification (2026-11-12): B is the primary Stage11 improvement direction.** A is a protective diagnostics/abstention feature **within** B, not the destination. C is a future controlled integration/publishing outcome after separate evidence, architecture, implementation and release approval. The user has approved prioritizing **B for design discussion**, not performing B's audio/model inference now. Do **not** auto-enable no-VAD model calls or suppress text merely because a segment overlaps silence/music reported in six chosen clips.
+
+## 4a. B-primary design: candidate-free speech discovery and bounded evidence
+
+**Status: PROPOSED DESIGN ONLY. The user selected B as the objective, NOT authorization to execute B.**
+
+### Core distinction
+
+**Discovery** must identify a possibly spoken interval even when first-pass ASR emits **zero segments**. The currently implemented ASR source-quality classifier inspects only **existing segments**, and the existing targeted second-evidence planner selects only `REQUIRE_SECOND_EVIDENCE` *source cues*. A zero-cue interval therefore cannot enter the current planner; simply invoking its present API again, changing text filters, or lowering a fixed VAD setting **does not solve the zero-cue discovery problem**. Why S11/S15 originally lacked candidates is **unverified**; do not assign blame to Silero, WhisperX, Demucs, source mapping or an acoustic condition without new evidence.
+
+**Verification** then uses an explicitly bounded, source-owned audio interval to request a separate hypothesis (where separately authorized), never assuming the response is a Japanese fact. **Acceptance** of dialogue into the Japanese/KO path is an entirely different, higher-authority question for later user decision.
+
+### Candidate-free interval discovery — alternatives within B
+
+| Candidate discovery signal | Could detect absent ASR cues? | Limitation / treatment |
+| --- | --- | --- |
+| Trusted external Japanese cue mapped to source audio with no matching ASR cue | Only for speech already represented in validated external text | External JA may be incomplete, misaligned or itself non-dialogue; cannot prove coverage of totally missing dialogue |
+| Retained acoustic speech-region observations, computed independently of ASR candidate *text* and mapped to the audio source | Potentially, **if** they contain the missed interval | If the same first-pass VAD omitted the region, its stored output alone is insufficient; voice activity includes noises and vocalizations |
+| Bounded candidate-free audio gaps inferred from accepted source coverage / first-pass intervals | Can **nominate** unexamined portions of audio even if no ASR text exists | Absence of text is not evidence of speech; without another acoustic/linguistic signal, blindly checking every gap can waste resources or generate fabricated dialogue |
+| Separate local-only acoustic/speech-likelihood observation not tied to initial ASR cue creation (new future evidence) | May supply a truly independent trigger where the first VAD was blind | Model choice, compute cost, independence, false-alarm behavior, privacy and implementation are **VERIFY_REQUIRED**, not selected or authorized |
+
+**Proposed feasibility ordering:** First check which *already retained* source-coverage/VAD metadata exist for a target and whether each signal would nominate candidate-free intervals. If all signals depend on the same missed region, document a **detection blind spot** rather than claiming the issue is solved; a future, independently approved bounded audio-based trigger would be needed. Do **not** use the prior hand-picked six cases' listening classifications as an automatic production trigger.
+
+### B evidence lifecycle (conceptual only; no current execution)
+
+1. **Establish source ownership**: verified video/audio source identity, core/time mapping, immutable existing external-JA and ASR source indexes. Invalid provenance means `INCONCLUSIVE`, no new candidate.
+2. **Nominate gap**: a specific independent-ish observation says `SPEECH_POSSIBLE_WITHOUT_ASR_CUE`, or the system records only `UNOBSERVED_GAP` if there is no speech-supporting signal. Keep these states distinct. Do not infer silence from no ASR text.
+3. **Bound and deduplicate**: future offline caller defines a deterministic, source-anchored region with conservative limits and a stable interval ID. Trim to accepted source bounds, avoid duplicate re-requests/overlap with existing accepted cue ownership; preserve ability to abstain. **No numeric window sizes, thresholds or retry limits are approved here.**
+4. **Request second evidence** (new future task only): prefer reusing the implemented `process_targeted_request` no-Silero bounded transcription interface if independent feasibility evidence supports it. Its existence does not verify quality or authorize an inference. Alternative models are not automatically selected.
+5. **Bind hypothesis, not truth**: keep source hash, interval/core/time offsets, runtime/model version, ASR result hash, origin and contradictory evidence. Require precise ownership before any hypothesis can be considered; support speech-present/no-text, no-candidate, non-lexical and conflict outcomes without synthesizing Japanese words.
+6. **Conservative cross-check**: compare accepted external-JA evidence and existing original ASR with a bounded second hypothesis, avoiding a context-wide sentence crossing a tiny interval. A second model's agreement is still **not independent Japanese ground truth**. If ambiguous, no text insertion/deletion.
+7. **Defer Japanese/KO integration**: only a later approved authority policy may create/reassign source cues and decide whether to repair a Japanese master before Hermes's whole-title/partitioned translation. Hermes cannot own source time/cue IDs or Stage12 publishing. No automatically recovered text reaches CLEAN/Stage12 under this design review.
+
+### Safe result states (example, unimplemented)
+
+| Future risk outcome | Interpretation | Current permitted action |
+| --- | --- | --- |
+| `GAP_UNOBSERVED` | No ASR cue, no independently supported speech signal | Record only; cannot assert no dialogue or trigger unbounded transcription |
+| `SPEECH_POSSIBLE_NO_CUE` | Separate observation indicates possible speech despite no ASR cue | Record a bounded follow-up candidate **only after future authorization**; not Japanese source truth |
+| `SECOND_HYPOTHESIS_ONLY` | Bounded recheck offers a Japanese text candidate or remains empty | Hold as hypothesis; requires provenance and decision evidence |
+| `CONTEXT_ONLY_NON_DIALOGUE_RISK` | Broad candidate crosses interval reported as music/non-lexical | Preserve candidate context ownership, do not attribute or delete spoken text automatically |
+| `EVIDENCE_CONFLICT_OR_UNKNOWN` | Model/text/acoustic reports disagree or provenance is missing | Abstain, preserve existing approved sources and publication protections |
+
+These states are illustrative and **do not create production enum values, thresholds or authority**. A sidecar/A-style risk record is used for traceability **inside B**, not a replacement for dialogue-recovery work.
+
+### Minimum future B feasibility test — another user approval required
+
+- Validate the installed, actual Stage11 source-to-audio identity and pinned prior artifacts before comparing any new output; source-core input provenance recheck is still `NOT_PERFORMED`.
+- Predeclare a tiny, bounded trial with **both expected-speech and expected-non-dialogue controls**. Previously saved S03/S11/S15 and S04/S08/S13 can be exploratory probes only; they are **not** independent accuracy ground truth. Do not select arbitrary new user files or expand the frozen WX011 set in this design task.
+- Compare **normal-ASR, candidate-free nomination, and proposed bounded no-VAD** outputs separately. Record additional calls, time/CPU/GPU cost and unsupported hypotheses without publishing subtitles. User/Gemini labels remain suggestive, not independent Japanese references.
+- **Feasibility reporting**: Could an evidence source nominate zero-cue gaps? Did bounded second evidence produce audio-source-bound hypotheses? Were non-dialogue spans conservatively rejected or abstained? Did provenance/no-overwrite pass? Note failures and unknown Japanese accuracy; do not convert technical PASS into product PASS.
+- If credible independent speech/transcript labels cannot be obtained, explicitly report `PRODUCT_QUALITY=INCONCLUSIVE` and avoid inventing a false-dialogue detection rate or deploying automatic acceptance/suppression. Do not repeatedly rerun the same six model tests merely to manufacture confidence.
+
+### Future design-approval questions (not answered here)
+
+1. What **independent speech-supporting trigger** is available to nominate candidate-free audio regions without scanning the entire title with a heavy model?
+2. What is the acceptable bound on additional audio work/compute and privacy exposure for everyday unattended operation? **Numerical values are not approved.**
+3. When and under what evidence can a second hypothesis change trusted external Japanese source cues, given the unresolved **coverage-complete Japanese master versus Hermes whole-title primary translation** integration? The user must approve any architecture/authority conflict.
+4. How should an unresolved gap be reported without pretending it was recovered, silently inventing speech, or blocking unrelated Stage9 completion?
 
 ## 5. Important failure modes to decide against
 
@@ -77,6 +135,6 @@ These are **not automatically reconciled** by this memo. The user must approve t
 
 ## 8. Next design decision
 
-For design review, a proportionate first choice is whether to **record risks only (A)** or pursue a new separately approved **audio-evidence acquisition protocol (B)**. Converting evidence into automatic subtitle repair/filtering (C) must remain blocked until the user chooses how it interacts with Japanese-master versus whole-title-primary translation and a credible reference/validation method exists.
+**B is already the user-selected design priority** (2026-11-12), so do not re-present A vs B as an unresolved target choice. Next, review the proposed zero-cue discovery sources and bounded B gates in section 4a, then prepare a **separately scoped proposal** for isolated audio-evidence feasibility validation with model execution clearly disclosed for explicit user approval. The crucial unresolved decision remains what evidence can justify automatic Japanese source repair and how the approved coverage-complete-JA goal integrates with whole-title Hermes translation; no product architecture or thresholds are selected here. A is only a conservative support function; C, operational integration, publication and any actual audio/model run remain unauthorized.
 
 **Status:** `PROPOSAL_ONLY`; no product code, model inference, audio transfer, deployed settings, thresholds, published subtitles or external systems were changed to produce this document. `STAGE11_PRODUCT_QUALITY=INCONCLUSIVE`.
