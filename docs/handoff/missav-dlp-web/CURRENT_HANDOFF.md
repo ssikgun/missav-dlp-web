@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 exact original-JA private retention PASS (2026-11-16)
+
+- User-executed CT108 source identity `TITLE_SOURCE_DB=PASS`; one canonical Stage11 HTTPS checkout exactly `4d53045b18799b77406ce339fa4465dfd6ce549b`. SubtitleCat search `6` candidates; one original JA SRT exactly matched previously recorded SHA-256 `d25c3489f1b80fe423345a7d75fd8eee1992b933ee1b33379d5677aa1adf665b`, `48274` bytes, `705` cues, `7090` to `8350050` ms. The five remaining candidate detail pages had no original JA. `JA_PARSE=PASS`.
+- A fresh owner-private CT108 staging directory (0700) now contains `DLDSS-557.original.ja.srt` plus a source manifest (0600 each), with verified hash/readback: `PRIVATE_JA_STAGED=PASS`, `RESULT=PRIVATE_JA_STAGED_PASS`. Specific private path remains in user terminal, not repository. `NAS_WRITES=0`, `DATABASE_WRITES=0`, `SERVICE_CHANGES=0`.
+- Still `JA_AUDIO_ALIGNMENT=NOT_TESTED`, `FULL_TITLE_ASR=NOT_RUN`, `KO_GENERATION=NOT_RUN`. This is original-SRT byte/syntax identity only, not matching dialogue or full MP4 duration evidence. **Next:** read-only actual NAS video duration/size/mtime versus SRT range, then source-bound baseline and exclusive title-lock plan; no production or Stage12 change. See Stage11 `S11-MVP001` active file.
+
+
+
 ## S11-MVP001 CT108→VM122 int8 diagnostic HTTP end-to-end PASS (2026-11-16)
 
 - User-executed, exactly one **1-second synthetic silent** numeric-only ASR diagnostic from CT108 canonical `RemoteFasterWhisperASR` over temporary loopback SSH tunnel to VM122 opt-in `large-v3/cuda/int8_float16` ephemeral worker. Both isolated checkouts pinned at source commit `1fb0873d839c86fa382910f12b1a60ebd763de02`. `CANONICAL_SOURCE=PASS`, `VM122_WORKER_READY=PASS`, `SSH_FORWARD=PASS`, `CT108_INT8_RUNTIME_PROFILE=PASS`, `CT108_WHISPER_HTTP=PASS`, `NUMERIC_SEGMENTS=1`, `REAL_MEDIA_USED=NO`, overall `RESULT=PASS`.
