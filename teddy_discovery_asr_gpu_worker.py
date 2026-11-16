@@ -931,9 +931,11 @@ class Stage11ASRRequestHandler(BaseHTTPRequestHandler):
 
         schema_header = self.headers.get("X-Stage11-ASR-Schema-Version")
         sample_rate_header = self.headers.get("X-Stage11-ASR-Sample-Rate")
-        expected_profile = self.server.worker._wire_profile
+        # The real HTTP server requires FasterWhisperGPUWorker; existing
+        # isolated HTTP-handler smokes also inject legacy worker doubles.
+        expected_profile = getattr(self.server.worker, "_wire_profile", None)
         requested_profile = self.headers.get("X-Stage11-ASR-Runtime-Profile")
-        if expected_profile is not None and requested_profile != expected_profile:
+        if requested_profile != expected_profile:
             _error_response(self, status=400)
             return
         if schema_header != str(REMOTE_ASR_SCHEMA_VERSION):
