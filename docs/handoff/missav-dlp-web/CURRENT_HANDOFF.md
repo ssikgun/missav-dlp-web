@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 DLDSS-557 video-duration metadata check PASS (2026-11-16)
+
+- User-executed CT108 → NAS read-only diagnostic first identified missing NAS `ffprobe` (not a media corruption finding); used existing `ffmpeg` to read MP4 duration after exact source size/mtime check. `VIDEO_DURATION_MS=8474740` (02:21:14.740), original `JA_LAST_MS=8350050` (02:19:10.050), `DIFFERENCE_MS=124690` (02:04.690); `NAS_SOURCE_SNAPSHOT=PASS`, `JA_END_WITHIN_VIDEO=PASS`, `RESULT=READ_ONLY_DURATION_PASS`. Metadata time bounds only, `JA_AUDIO_ALIGNMENT=NOT_TESTED` and media decoding/content match not proven.
+- No NAS/DB writes, Qwen/service or Stage12 changes; `FULL_TITLE_ASR=NOT_RUN` and KO MVP `NOT_RUN`. Next: inspect existing source/audio/baseline input path and one-title private guarded full-length ASR plan; keep original JA in private CT108 staging and continue no-overwrite. See Stage11 `S11-MVP001` active work.
+
+
 ## S11-MVP001 exact original-JA private retention PASS (2026-11-16)
 
 - User-executed CT108 source identity `TITLE_SOURCE_DB=PASS`; one canonical Stage11 HTTPS checkout exactly `4d53045b18799b77406ce339fa4465dfd6ce549b`. SubtitleCat search `6` candidates; one original JA SRT exactly matched previously recorded SHA-256 `d25c3489f1b80fe423345a7d75fd8eee1992b933ee1b33379d5677aa1adf665b`, `48274` bytes, `705` cues, `7090` to `8350050` ms. The five remaining candidate detail pages had no original JA. `JA_PARSE=PASS`.
