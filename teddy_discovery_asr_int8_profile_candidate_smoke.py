@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -22,9 +23,13 @@ from teddy_discovery_asr_audio import ASRAudioChunk, ASR_AUDIO_SAMPLE_RATE
 from teddy_discovery_asr_gpu_worker import (
     FasterWhisperGPUWorker,
     _serialize_response_body,
+    Stage11ASRRequestHandler,
 )
 from teddy_discovery_asr_remote import (
     REMOTE_ASR_MAX_RESPONSE_BYTES,
+    REMOTE_ASR_CONTENT_TYPE,
+    REMOTE_ASR_PATH,
+    REMOTE_ASR_SCHEMA_VERSION,
     RemoteASRHTTPResponse,
     RemoteASRProtocolError,
     RemoteFasterWhisperASR,
@@ -176,6 +181,59 @@ def main():
         )
         expect(RemoteASRProtocolError, lambda rejected=rejected:
             rejected.transcribe_chunk(chunk))
+
+    # The live server only accepts a real GPU worker. Invoke its HTTP
+    # handler against the actual opt-in worker with synthetic request bytes:
+    # mismatched headers must be rejected before VAD/model loading.
+    class FakeHTTPHandler:
+        path = REMOTE_ASR_PATH
+
+        def __init__(self, server_worker, profile_header):
+            self.server = SimpleNamespace(worker=server_worker)
+            self.headers = {
+                "Content-Type": REMOTE_ASR_CONTENT_TYPE,
+                "Content-Length": str(len(raw)),
+                "X-Stage11-ASR-Schema-Version": str(REMOTE_ASR_SCHEMA_VERSION),
+                "X-Stage11-ASR-Sample-Rate": str(ASR_AUDIO_SAMPLE_RATE),
+            }
+            if profile_header is not None:
+                self.headers["X-Stage11-ASR-Runtime-Profile"] = profile_header
+            self.rfile = io.BytesIO(raw)
+            self.wfile = io.BytesIO()
+            self.status = None
+
+        def send_response(self, status):
+            self.status = status
+
+        def send_header(self, name, value):
+            pass
+
+        def end_headers(self):
+            pass
+
+    isolated = FasterWhisperGPUWorker(
+        model_factory=FakeFactory(),
+        runtime_identity=identity,
+        model_path=local_path,
+    )
+    for bad_profile in (None, "REMOTE_GPU_LARGE_V3", "UNKNOWN"):
+        handler = FakeHTTPHandler(isolated, bad_profile)
+        Stage11ASRRequestHandler.do_POST(handler)
+        assert handler.status == 400
+        assert isolated._model is None
+
+    wrong_legacy = FakeHTTPHandler(default_worker, identity.profile)
+    Stage11ASRRequestHandler.do_POST(wrong_legacy)
+    assert wrong_legacy.status == 400
+
+    # The accepted header can reach a synthetic handler function; still no
+    # audio processing or real model initialization.
+    isolated.process_request = lambda body, schema_version, sample_rate: b'{"mock":true}'
+    matching = FakeHTTPHandler(isolated, identity.profile)
+    Stage11ASRRequestHandler.do_POST(matching)
+    assert matching.status == 200
+    assert matching.wfile.getvalue() == b'{"mock":true}'
+    assert isolated._model is None
 
     print("STAGE11_ASR_INT8_PROFILE_CANDIDATE_SMOKE=PASS")
     print("GPU_MODEL_LOAD=0")
