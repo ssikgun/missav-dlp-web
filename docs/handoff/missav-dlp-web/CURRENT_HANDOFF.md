@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 CT108→VM122 int8 diagnostic HTTP end-to-end PASS (2026-11-16)
+
+- User-executed, exactly one **1-second synthetic silent** numeric-only ASR diagnostic from CT108 canonical `RemoteFasterWhisperASR` over temporary loopback SSH tunnel to VM122 opt-in `large-v3/cuda/int8_float16` ephemeral worker. Both isolated checkouts pinned at source commit `1fb0873d839c86fa382910f12b1a60ebd763de02`. `CANONICAL_SOURCE=PASS`, `VM122_WORKER_READY=PASS`, `SSH_FORWARD=PASS`, `CT108_INT8_RUNTIME_PROFILE=PASS`, `CT108_WHISPER_HTTP=PASS`, `NUMERIC_SEGMENTS=1`, `REAL_MEDIA_USED=NO`, overall `RESULT=PASS`.
+- Cleanup and ownership: `VM122_WORKER_CLOSED=PASS`, `CT108_FORWARD_CLOSED=PASS`, `QWEN_PID_PRESERVED=PASS`; `NAS_WRITES=0`, `PRODUCTION_SERVICE_CHANGES=0`, `STAGE12_PUBLICATION=NOT_RUN`. This closes **synthetic client/network/runtime-profile** connection feasibility only, not actual dialogue correctness, Qwen latency/whole-film throughput, source-aligned ASR or KO quality; no production ASR default/wiring/deploy.
+- **Next gate:** `DLDSS-557` source-bound baseline/accepted Japanese, 705-cue SRT alignment and exclusive title lock before one private Normal Mode MVP. `FULL_TITLE_ASR=NOT_RUN`, `MVP_RUN=NOT_RUN`, `NAS_JA_SIDECAR=NOT_WRITTEN`. Relevant Stage11 active task `S11-MVP001 / IN_PROGRESS` and contracts unchanged. See `docs/governance/stage11/ACTIVE_WORK.md` for exact conditions.
+
+
 ## S11-MVP001 user-verified operational bridge checkpoint (2026-11-16)
 
 - **Canonical routing:** `ssikgun/missav-dlp-web`, `teddy-subtitle-stage11` source commit `26147b25635d9977537f8594e6f201e160b06add`; Stage11 `S11-MVP001 / IN_PROGRESS`, common contract `1.0.1`, Stage11 contract `1.0.0`. No shared/Stage11 contract or Stage12 product-scope change. Precise ongoing Stage11 state and guard conditions are in `docs/governance/stage11/ACTIVE_WORK.md`.
