@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 isolated ASR script audit SAFE_STOP (2026-11-16)
+
+- Downloader Codex inspected SHA-pinned temporary candidate `prepare_dldss557_baseline.py`, `SHA256=2ac93fb73186af00802d0ffd7d2f3eb956c5e7d7a7c8f0d91070407740dfb53d`, source checkout `1e7d8fa4f40c8cdb37a6fdc65c58b9f3163a7602`. Report: `CANDIDATE_SHA=PASS`, `SOURCE_IDENTITY=PASS`, `BASELINE_NO_OVERWRITE=PASS`, **`LOCK_AND_CLEANUP=FAIL`**, `RUNTIME_VALUES=확인필요`, `FULL_TITLE_900S=UNKNOWN`, `READY_FOR_APPROVAL=NO`; no real execution, deployment or product changes.
+- Gaps: live shared title-lock directory not established; media transfer timeout unset; SSH tunnel and remotely-owned GPU worker teardown not fully confirmed; final persistence failure can leave a valid baseline despite reported error. User's Codex audit did not attach candidate source bytes. Existing source reader supports finite copy timeout and temporary launcher has 900s max runtime; current one-shot ASR has no checkpoint. Next **only** minimal isolated candidate lifecycle correction and read-only resolution of actual runtime values, then decide 900s full-title nonresumable risk. No automatic 900s extension, SSH/GPU/AAC retests, NAS writes or `--execute`. See Stage11 active record.
+
+
 ## S11-MVP001 Downloader Codex isolated baseline candidate (2026-11-16, reported only)
 
 - Initial accidental Hermes Codex task SAFE_STOP without modifications; corrected run in Downloader Codex reported origin `ssikgun/missav-dlp-web`, clean isolated `teddy-subtitle-stage11` checkout pinned at `1e7d8fa4f40c8cdb37a6fdc65c58b9f3163a7602`, common/Stage11 contracts `1.0.1/1.0.0` approved, `S11-MVP001 / IN_PROGRESS`. One temporary script `prepare_dldss557_baseline.py` outside repo, SHA-256 `2ac93fb73186af00802d0ffd7d2f3eb956c5e7d7a7c8f0d91070407740dfb53d`, syntax PASS **as reported by Codex**; actual script has **not been independently reviewed** and no execution occurred.
