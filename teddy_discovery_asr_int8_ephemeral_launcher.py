@@ -1,23 +1,28 @@
 """Opt-in, localhost-only Stage11 int8 ASR worker; never autostarts.
 
-Candidate only. Live use requires separate user authorization and an explicitly
-chosen free-VRAM floor. No model downloads, Qwen control, or media operations.
+Candidate only. Live use requires separate approval and explicitly selected
+start/runtime VRAM floors and time limit. No downloads or Qwen control.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import multiprocessing
 from pathlib import Path
 import re
 import signal
 import subprocess
+import time
 import urllib.request
 
 
 MODEL_REPOSITORY = "models--Systran--faster-whisper-large-v3"
 EXPECTED_QWEN_ID = "qwen3.6-35b-a3b"
 WHISPER_PORT = 8091
+MAX_RUNTIME_SECONDS = 900
+MONITOR_INTERVAL_SECONDS = 2
+STOP_GRACE_SECONDS = 5
 
 
 class LaunchSafetyError(Exception):
@@ -97,18 +102,94 @@ def run_server(server) -> None:
         signal.signal(signal.SIGTERM, previous_term)
 
 
+def _serve_child(model_path: str) -> None:
+    """Private child only. Parent owns Qwen/VRAM monitoring and termination."""
+    from teddy_discovery_asr import REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY
+    from teddy_discovery_asr_gpu_worker import (
+        FasterWhisperGPUWorker, Stage11ASRHTTPServer,
+    )
+
+    worker = FasterWhisperGPUWorker(
+        runtime_identity=REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY,
+        model_path=model_path,
+    )
+    server = Stage11ASRHTTPServer(("127.0.0.1", WHISPER_PORT), worker)
+    print("WORKER=LISTENING_LOOPBACK INT8_FLOAT16=OPT_IN", flush=True)
+    run_server(server)
+    print("WORKER=STOPPED", flush=True)
+
+
+def _stop_owned_child(child) -> None:
+    """Never signal any process other than the exact child we started."""
+    if child.pid is None:
+        return
+    if child.is_alive():
+        child.terminate()
+    child.join(timeout=STOP_GRACE_SECONDS)
+    if child.is_alive():
+        child.kill()
+        child.join(timeout=STOP_GRACE_SECONDS)
+    if child.is_alive():
+        raise LaunchSafetyError("WORKER_STOP_UNVERIFIED")
+
+
+def supervise_worker(model_path: str, *, runtime_min_free_vram_mib: int,
+                     max_runtime_seconds: int) -> None:
+    """Monitor Qwen/VRAM/time while ASR runs in its own stoppable process."""
+    context = multiprocessing.get_context("spawn")
+    child = context.Process(target=_serve_child, args=(model_path,), daemon=True)
+
+    def request_stop(_signum, _frame):
+        raise LaunchSafetyError("OPERATOR_STOP")
+
+    previous_int = signal.signal(signal.SIGINT, request_stop)
+    previous_term = signal.signal(signal.SIGTERM, request_stop)
+    try:
+        child.start()
+        started_at = time.monotonic()
+        while True:
+            if not child.is_alive():
+                raise LaunchSafetyError("WORKER_EXITED")
+            if time.monotonic() - started_at >= max_runtime_seconds:
+                raise LaunchSafetyError("RUNTIME_LIMIT")
+            try:
+                checked_qwen_identity()
+            except LaunchSafetyError as exc:
+                raise LaunchSafetyError("QWEN_HEALTH_LOST") from exc
+            try:
+                checked_free_vram(runtime_min_free_vram_mib)
+            except LaunchSafetyError as exc:
+                raise LaunchSafetyError("GPU_HEADROOM_LOST") from exc
+            time.sleep(MONITOR_INTERVAL_SECONDS)
+    finally:
+        try:
+            _stop_owned_child(child)
+        finally:
+            signal.signal(signal.SIGINT, previous_int)
+            signal.signal(signal.SIGTERM, previous_term)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Stage11 isolated int8 worker candidate")
     parser.add_argument("mode", choices=("check", "serve"))
     parser.add_argument("--cache-root", required=True)
     parser.add_argument("--snapshot", required=True)
     parser.add_argument("--min-free-vram-mib", type=int, required=True)
+    parser.add_argument("--runtime-min-free-vram-mib", type=int)
+    parser.add_argument("--max-runtime-seconds", type=int)
     parser.add_argument("--live-approved", action="store_true")
     args = parser.parse_args(argv)
 
     try:
-        if args.mode == "serve" and not args.live_approved:
-            raise LaunchSafetyError("LIVE_NOT_APPROVED")
+        if args.mode == "serve":
+            if not args.live_approved:
+                raise LaunchSafetyError("LIVE_NOT_APPROVED")
+            if (args.runtime_min_free_vram_mib is None
+                    or args.runtime_min_free_vram_mib <= 0):
+                raise LaunchSafetyError("RUNTIME_VRAM_FLOOR_NOT_SELECTED")
+            if (args.max_runtime_seconds is None
+                    or not 1 <= args.max_runtime_seconds <= MAX_RUNTIME_SECONDS):
+                raise LaunchSafetyError("RUNTIME_LIMIT_NOT_SELECTED")
         model = verified_snapshot(args.cache_root, args.snapshot)
         checked_qwen_identity()
         free_mib = checked_free_vram(args.min_free_vram_mib)
@@ -117,24 +198,14 @@ def main(argv: list[str] | None = None) -> int:
             print("MODEL_LOADS=0 SERVICE_CHANGES=0")
             return 0
 
-        # No import or CUDA initialization occurs in check mode. The actual
-        # Whisper weights are still loaded lazily on the first ASR request.
-        from teddy_discovery_asr import REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY
-        from teddy_discovery_asr_gpu_worker import (
-            FasterWhisperGPUWorker, Stage11ASRHTTPServer,
+        supervise_worker(
+            str(model),
+            runtime_min_free_vram_mib=args.runtime_min_free_vram_mib,
+            max_runtime_seconds=args.max_runtime_seconds,
         )
-
-        worker = FasterWhisperGPUWorker(
-            runtime_identity=REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY,
-            model_path=str(model),
-        )
-        server = Stage11ASRHTTPServer(("127.0.0.1", WHISPER_PORT), worker)
-        print("WORKER=LISTENING_LOOPBACK INT8_FLOAT16=OPT_IN", flush=True)
-        run_server(server)
-        print("WORKER=STOPPED", flush=True)
         return 0
     except (LaunchSafetyError, OSError) as exc:
-        reason = str(exc) if isinstance(exc, LaunchSafetyError) else "LISTENER_UNAVAILABLE"
+        reason = str(exc) if isinstance(exc, LaunchSafetyError) else "WORKER_UNAVAILABLE"
         print(f"RESULT=SAFE_STOP_{reason}")
         return 2
 
