@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 lifecycle v2 isolated candidate STATIC PASS, live NO-GO (2026-11-16)
+
+- Codex reported second distinct temporary candidate `prepare_dldss557_baseline_lifecycle_v2.py`, SHA `684493c461bd40bb6382d9115e041c05a6825ec55f0a13a620d0b3fdb9b4fa07`; source checkout frozen `1e7d8fa4f40c8cdb37a6fdc65c58b9f3163a7602`, original candidate preserved. Targeted static `LOCK_PATH/COPY_TIMEOUT/TUNNEL_CLEANUP/REMOTE_WORKER_CLEANUP/BASELINE_FILE_STATE=PASS` for normal connected paths; **runtime behavior NOT_TESTED**, SSH-disconnect/early temp cleanup UNKNOWN, actual systemd bus properties not checked. Effective title lock configured on-disk as `/opt/missav-dlp-web/title-locks` (root:root 0750); candidate fails closed on runtime mismatch.
+- `RUNTIME_VALUES=확인필요`, `FULL_TITLE_900S=UNKNOWN`, `READY_FOR_APPROVAL=NO`. Source transfer timeout 900s occurs separately before unchanged max-900s worker. No checkpoint/restart, no source media/GPU/SSH live action, no production writes/deployment. Next: focused CT108/VM122 runtime-value closure from actual deployment (do not invent VRAM floors) and explicit operator decision about a potentially wasted one-shot whole-title 900s attempt or separately scoped checkpoint design. Full details in Stage11 active work.
+
+
 ## S11-MVP001 isolated ASR script audit SAFE_STOP (2026-11-16)
 
 - Downloader Codex inspected SHA-pinned temporary candidate `prepare_dldss557_baseline.py`, `SHA256=2ac93fb73186af00802d0ffd7d2f3eb956c5e7d7a7c8f0d91070407740dfb53d`, source checkout `1e7d8fa4f40c8cdb37a6fdc65c58b9f3163a7602`. Report: `CANDIDATE_SHA=PASS`, `SOURCE_IDENTITY=PASS`, `BASELINE_NO_OVERWRITE=PASS`, **`LOCK_AND_CLEANUP=FAIL`**, `RUNTIME_VALUES=확인필요`, `FULL_TITLE_900S=UNKNOWN`, `READY_FOR_APPROVAL=NO`; no real execution, deployment or product changes.
