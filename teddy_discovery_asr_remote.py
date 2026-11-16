@@ -27,6 +27,8 @@ from teddy_discovery_asr import (
     ASRValidationError,
     ASRWord,
     REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY,
+    REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY,
+    ASRRuntimeIdentity,
     MAX_ASR_SEGMENTS,
 )
 from teddy_discovery_asr_audio import (
@@ -447,6 +449,7 @@ class RemoteFasterWhisperASR:
         transport=None,
         max_response_bytes: int = REMOTE_ASR_MAX_RESPONSE_BYTES,
         engine_version: str = REMOTE_ASR_DEFAULT_ENGINE_VERSION,
+        runtime_identity: ASRRuntimeIdentity = REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY,
     ):
         if transport is not None and not callable(transport):
             raise ASRValidationError("transport must be callable")
@@ -462,8 +465,13 @@ class RemoteFasterWhisperASR:
         self.max_response_bytes = _validate_max_response_bytes(
             max_response_bytes
         )
+        if type(runtime_identity) is not ASRRuntimeIdentity or runtime_identity not in (
+            REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY,
+            REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY,
+        ):
+            raise ASRValidationError("unsupported remote GPU runtime identity")
         self.engine_version = _validate_engine_version(engine_version)
-        self.runtime_identity = REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY
+        self.runtime_identity = runtime_identity
         self._transport = transport or _default_transport
 
     def _serialize_chunk(self, chunk: ASRAudioChunk) -> bytes:
@@ -516,10 +524,18 @@ class RemoteFasterWhisperASR:
             "vad_region_count",
             "segments",
         }
+        if self.runtime_identity == REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY:
+            required.add("runtime_profile")
         if not isinstance(decoded, dict) or set(decoded) != required:
             raise RemoteASRProtocolError(
                 "remote ASR response has an invalid top-level shape"
             )
+
+        if (
+            self.runtime_identity == REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY
+            and decoded["runtime_profile"] != self.runtime_identity.profile
+        ):
+            raise RemoteASRProtocolError("remote ASR runtime profile mismatch")
 
         schema_version = _require_response_int(
             decoded["schema_version"],
@@ -636,10 +652,18 @@ class RemoteFasterWhisperASR:
             "schema_version", "engine_version", "input_sha256",
             "sample_rate", "sample_count", "segment_count", "segments",
         }
+        if self.runtime_identity == REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY:
+            required.add("runtime_profile")
         if not isinstance(decoded, dict) or set(decoded) != required:
             raise RemoteASRProtocolError(
                 "remote ASR diagnostic response has an invalid top-level shape"
             )
+        if (
+            self.runtime_identity == REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY
+            and decoded["runtime_profile"] != self.runtime_identity.profile
+        ):
+            raise RemoteASRProtocolError("remote ASR runtime profile mismatch")
+
         if _require_response_int(
             decoded["schema_version"],
             field_name="remote ASR diagnostic schema_version",
@@ -765,6 +789,8 @@ class RemoteFasterWhisperASR:
             "X-Stage11-ASR-Schema-Version": str(REMOTE_ASR_SCHEMA_VERSION),
             "X-Stage11-ASR-Sample-Rate": str(ASR_AUDIO_SAMPLE_RATE),
         }
+        if self.runtime_identity == REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY:
+            headers["X-Stage11-ASR-Runtime-Profile"] = self.runtime_identity.profile
         try:
             response = self._transport(
                 endpoint_url,
@@ -827,6 +853,8 @@ class RemoteFasterWhisperASR:
             "X-Stage11-ASR-Schema-Version": str(REMOTE_ASR_SCHEMA_VERSION),
             "X-Stage11-ASR-Sample-Rate": str(ASR_AUDIO_SAMPLE_RATE),
         }
+        if self.runtime_identity == REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY:
+            headers["X-Stage11-ASR-Runtime-Profile"] = self.runtime_identity.profile
         try:
             response = self._transport(
                 _endpoint_from_base_url(
