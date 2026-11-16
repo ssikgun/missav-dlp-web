@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import PurePosixPath
 import hashlib
 import io
 import json
@@ -23,6 +24,8 @@ from teddy_discovery_asr import (
     ASRValidationError,
     ASRWord,
     REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY,
+    REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY,
+    ASRRuntimeIdentity,
     MAX_ASR_SEGMENTS,
     _normalize_transcript_text,
 )
@@ -493,6 +496,8 @@ class FasterWhisperGPUWorker:
         vad_options_factory=None,
         engine_version: str = GPU_ASR_ENGINE_VERSION,
         max_response_bytes: int = REMOTE_ASR_MAX_RESPONSE_BYTES,
+        runtime_identity: ASRRuntimeIdentity = GPU_ASR_RUNTIME_IDENTITY,
+        model_path: str | None = None,
     ):
         if model_factory is not None and not callable(model_factory):
             raise ASRValidationError("model_factory must be callable")
@@ -511,9 +516,31 @@ class FasterWhisperGPUWorker:
                 "max_response_bytes exceeds the worker response bound"
             )
 
+        if type(runtime_identity) is not ASRRuntimeIdentity or runtime_identity not in (
+            GPU_ASR_RUNTIME_IDENTITY,
+            REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY,
+        ):
+            raise ASRValidationError("unsupported GPU worker runtime identity")
+        if runtime_identity == REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY:
+            if (
+                type(model_path) is not str
+                or not model_path.startswith("/")
+                or PurePosixPath(model_path).parts == ("/",)
+                or any(ord(ch) < 32 or ord(ch) == 127 for ch in model_path)
+            ):
+                raise ASRValidationError("int8_float16 requires a private absolute model path")
+        elif model_path is not None:
+            raise ASRValidationError("the default float16 worker does not accept a model override")
+
         self.engine_version = _validate_engine_version(engine_version)
         self.max_response_bytes = max_response_bytes
-        self.runtime_identity = GPU_ASR_RUNTIME_IDENTITY
+        self.runtime_identity = runtime_identity
+        self._model_reference = model_path if model_path is not None else GPU_ASR_MODEL
+        self._wire_profile = (
+            runtime_identity.profile
+            if runtime_identity == REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY
+            else None
+        )
         self._model_factory = model_factory or _default_model_factory
         self._vad_getter = vad_getter or _default_vad_getter
         self._vad_options_factory = (
@@ -524,11 +551,14 @@ class FasterWhisperGPUWorker:
     def _get_model(self):
         if self._model is None:
             try:
-                self._model = self._model_factory(
-                    GPU_ASR_MODEL,
-                    device=GPU_ASR_DEVICE,
-                    compute_type=GPU_ASR_COMPUTE_TYPE,
-                )
+                options = {
+                    "device": GPU_ASR_DEVICE,
+                    "compute_type": self.runtime_identity.compute_type,
+                }
+                if self._wire_profile is not None:
+                    # Explicit local snapshot: no implicit model download.
+                    options["local_files_only"] = True
+                self._model = self._model_factory(self._model_reference, **options)
             except Exception as error:
                 raise GPUASRRuntimeError(
                     "GPU faster-whisper model could not be created"
@@ -665,6 +695,7 @@ class FasterWhisperGPUWorker:
             vad_region_count=len(regions),
             segments=tuple(aggregated),
             max_response_bytes=self.max_response_bytes,
+            runtime_profile=self._wire_profile,
         )
 
     def process_targeted_request(
@@ -698,6 +729,7 @@ class FasterWhisperGPUWorker:
             vad_region_count=0,
             segments=segments,
             max_response_bytes=self.max_response_bytes,
+            runtime_profile=self._wire_profile,
         )
 
     def process_targeted_diagnostic_request(
@@ -735,6 +767,7 @@ class FasterWhisperGPUWorker:
             sample_count=sample_count,
             segments=numeric_segments,
             max_response_bytes=self.max_response_bytes,
+            runtime_profile=self._wire_profile,
         )
 
 
@@ -746,6 +779,7 @@ def _serialize_response_body(
     vad_region_count: int,
     segments: tuple[ASRSegment, ...],
     max_response_bytes: int,
+    runtime_profile: str | None = None,
 ) -> bytes:
     response = {
         "schema_version": REMOTE_ASR_SCHEMA_VERSION,
@@ -771,6 +805,8 @@ def _serialize_response_body(
             for segment in segments
         ],
     }
+    if runtime_profile is not None:
+        response["runtime_profile"] = runtime_profile
     try:
         response_body = json.dumps(
             response,
@@ -793,6 +829,7 @@ def _serialize_targeted_diagnostic_response_body(
     sample_count: int,
     segments: list[dict[str, int | float]],
     max_response_bytes: int,
+    runtime_profile: str | None = None,
 ) -> bytes:
     """Serialize the isolated opt-in response; transcript fields cannot enter."""
 
@@ -805,6 +842,8 @@ def _serialize_targeted_diagnostic_response_body(
         "segment_count": len(segments),
         "segments": segments,
     }
+    if runtime_profile is not None:
+        response["runtime_profile"] = runtime_profile
     try:
         response_body = json.dumps(
             response,
@@ -892,6 +931,11 @@ class Stage11ASRRequestHandler(BaseHTTPRequestHandler):
 
         schema_header = self.headers.get("X-Stage11-ASR-Schema-Version")
         sample_rate_header = self.headers.get("X-Stage11-ASR-Sample-Rate")
+        expected_profile = self.server.worker._wire_profile
+        requested_profile = self.headers.get("X-Stage11-ASR-Runtime-Profile")
+        if expected_profile is not None and requested_profile != expected_profile:
+            _error_response(self, status=400)
+            return
         if schema_header != str(REMOTE_ASR_SCHEMA_VERSION):
             _error_response(self, status=400)
             return
