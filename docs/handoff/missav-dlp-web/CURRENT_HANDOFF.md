@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 one-title CT108 temporary storage space PASS (2026-11-16)
+
+- CT108 user-executed read-only `DLDSS-557` Discovery holding size estimate `SOURCE_SIZE_MIB=4893`. Existing `/var/tmp/teddy-stage11-asr-production` filesystem free `AVAILABLE_MIB=41976`, required source+reserve `REQUIRED_MIB=8989`, reserve `4096` MiB. `TEMP_SPACE=PASS`, `RESULT=READ_ONLY_ASR_SPACE_PASS`; no media copy, ASR, file creation, queue or NAS write.
+- This proves only current disk-space arithmetic, not mount/permission, source audio decoding, GPU throughput, or whole-title ASR (still `NOT_RUN`). Next bounded read-only probe: NAS MP4 audio streams and CT108 temp filesystem/ownership. Temp worker 900-second ceiling needs a separate, guarded source-bound full-title inference plan; keep Qwen and production unchanged. See Stage11 active `S11-MVP001` for detailed status.
+
+
 ## S11-MVP001 DLDSS-557 video-duration metadata check PASS (2026-11-16)
 
 - User-executed CT108 → NAS read-only diagnostic first identified missing NAS `ffprobe` (not a media corruption finding); used existing `ffmpeg` to read MP4 duration after exact source size/mtime check. `VIDEO_DURATION_MS=8474740` (02:21:14.740), original `JA_LAST_MS=8350050` (02:19:10.050), `DIFFERENCE_MS=124690` (02:04.690); `NAS_SOURCE_SNAPSHOT=PASS`, `JA_END_WITHIN_VIDEO=PASS`, `RESULT=READ_ONLY_DURATION_PASS`. Metadata time bounds only, `JA_AUDIO_ALIGNMENT=NOT_TESTED` and media decoding/content match not proven.
