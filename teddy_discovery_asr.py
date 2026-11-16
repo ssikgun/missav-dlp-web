@@ -24,6 +24,7 @@ MAX_ASR_SEGMENT_TEXT_CHARS = 16_384
 
 ASR_RUNTIME_PROFILE_LOCAL_CPU_MEDIUM = "LOCAL_CPU_MEDIUM"
 ASR_RUNTIME_PROFILE_REMOTE_GPU_LARGE_V3 = "REMOTE_GPU_LARGE_V3"
+ASR_RUNTIME_PROFILE_REMOTE_GPU_LARGE_V3_INT8_FLOAT16 = "REMOTE_GPU_LARGE_V3_INT8_FLOAT16"
 
 
 class ASRError(Exception):
@@ -108,6 +109,14 @@ _APPROVED_RUNTIME_PROFILES = {
         None,
         1,
     ): ASR_RUNTIME_PROFILE_REMOTE_GPU_LARGE_V3,
+    (
+        "faster-whisper",
+        "large-v3",
+        "cuda",
+        "int8_float16",
+        None,
+        1,
+    ): ASR_RUNTIME_PROFILE_REMOTE_GPU_LARGE_V3_INT8_FLOAT16,
 }
 
 
@@ -125,6 +134,15 @@ REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY = ASRRuntimeIdentity(
     model="large-v3",
     device="cuda",
     compute_type="float16",
+    cpu_threads=None,
+    num_workers=1,
+)
+
+REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY = ASRRuntimeIdentity(
+    engine="faster-whisper",
+    model="large-v3",
+    device="cuda",
+    compute_type="int8_float16",
     cpu_threads=None,
     num_workers=1,
 )
@@ -456,7 +474,9 @@ __all__ = [
     "MAX_ASR_SEGMENTS",
     "ASR_RUNTIME_PROFILE_LOCAL_CPU_MEDIUM",
     "ASR_RUNTIME_PROFILE_REMOTE_GPU_LARGE_V3",
+    "ASR_RUNTIME_PROFILE_REMOTE_GPU_LARGE_V3_INT8_FLOAT16",
     "LOCAL_CPU_MEDIUM_RUNTIME_IDENTITY",
     "REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY",
+    "REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY",
     "validate_canonical_video",
 ]
