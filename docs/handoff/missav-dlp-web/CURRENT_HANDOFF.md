@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 stop redundant checks after isolated AAC ffmpeg test SAFE_STOP (2026-11-16)
+
+- User called out excessive repetition of Stage11 historical tests; follow GOV-008 and prioritize real one-title completion over more codec/disk/SSH smoke scripts. Ad-hoc NAS 5-second ffmpeg `-xerror` decode printed `DIAGNOSTIC=AUDIO_DECODE_FAILED`, `RESULT=SAFE_STOP_AUDIO_DECODE_FAILED`; stderr/exit cause was suppressed and **remains UNKNOWN**. This does not prove MP4 corruption or a failure of the actual PyAV Stage11 transcriber. No output, model run, NAS or service change.
+- Historical private KO for `FNS-247` and `JUR-750` passed with *reused* source-bound baselines; separate six short CUDA int8 inferences and one real synthetic CT108↔VM122 int8 HTTP test passed. `DLDSS-557` uniquely still needs its own source-bound baseline and accepted JA/audio alignment. Next is a concise existing-code-based one-title ASR plan with truthful int8 profile, 900s worker cap, title lock, private no-overwrite output, Qwen preservation; no more generic preliminary probes. `FULL_TITLE_ASR=NOT_RUN`, `KO_GENERATION=NOT_RUN`. See Stage11 `S11-MVP001` active record.
+
+
 ## S11-MVP001 NAS AAC audio and CT108 temporary-media filesystem PASS (2026-11-16)
 
 - User-executed one-title read-only CT108: existing ASR temp root `/var/tmp/teddy-stage11-asr-production` owner UID 0, directory mode `0700`, disk-backed `ext4` `TEMP_FILESYSTEM=PASS`. NAS exact `DLDSS-557` source size/mtime matched Discovery snapshot; `AUDIO_STREAM_COUNT=1`, `AUDIO_CODECS=aac`, `NAS_AUDIO_STATUS=AUDIO_STREAM_PASS`, `NAS_SOURCE_SNAPSHOT=PASS`, final `RESULT=READ_ONLY_AUDIO_STORAGE_PASS`.
