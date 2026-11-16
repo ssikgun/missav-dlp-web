@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 Downloader Codex isolated baseline candidate (2026-11-16, reported only)
+
+- Initial accidental Hermes Codex task SAFE_STOP without modifications; corrected run in Downloader Codex reported origin `ssikgun/missav-dlp-web`, clean isolated `teddy-subtitle-stage11` checkout pinned at `1e7d8fa4f40c8cdb37a6fdc65c58b9f3163a7602`, common/Stage11 contracts `1.0.1/1.0.0` approved, `S11-MVP001 / IN_PROGRESS`. One temporary script `prepare_dldss557_baseline.py` outside repo, SHA-256 `2ac93fb73186af00802d0ffd7d2f3eb956c5e7d7a7c8f0d91070407740dfb53d`, syntax PASS **as reported by Codex**; actual script has **not been independently reviewed** and no execution occurred.
+- Intended reuse of existing Stage11 media source guard, full-title PyAV transcriber, explicit int8 remote ASR, shared lock, Qwen/GPU-monitored 900s temporary worker, and private non-overwrite baseline. Need exact script audit and fill already-supported VM122 source/model/SSH/VRAM values, plus decide 900s full-title feasibility before any live run. Never treat syntax PASS as runtime approval. Whole-title baseline and KO subtitle `NOT_RUN`; no NAS/DB/Jellyfin/Stage12 writes or production source deployment. Keep candidate code pin separate from any newer docs-only HEAD.
+
+
 ## S11-MVP001 stop redundant checks after isolated AAC ffmpeg test SAFE_STOP (2026-11-16)
 
 - User called out excessive repetition of Stage11 historical tests; follow GOV-008 and prioritize real one-title completion over more codec/disk/SSH smoke scripts. Ad-hoc NAS 5-second ffmpeg `-xerror` decode printed `DIAGNOSTIC=AUDIO_DECODE_FAILED`, `RESULT=SAFE_STOP_AUDIO_DECODE_FAILED`; stderr/exit cause was suppressed and **remains UNKNOWN**. This does not prove MP4 corruption or a failure of the actual PyAV Stage11 transcriber. No output, model run, NAS or service change.
