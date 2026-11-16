@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 NAS AAC audio and CT108 temporary-media filesystem PASS (2026-11-16)
+
+- User-executed one-title read-only CT108: existing ASR temp root `/var/tmp/teddy-stage11-asr-production` owner UID 0, directory mode `0700`, disk-backed `ext4` `TEMP_FILESYSTEM=PASS`. NAS exact `DLDSS-557` source size/mtime matched Discovery snapshot; `AUDIO_STREAM_COUNT=1`, `AUDIO_CODECS=aac`, `NAS_AUDIO_STATUS=AUDIO_STREAM_PASS`, `NAS_SOURCE_SNAPSHOT=PASS`, final `RESULT=READ_ONLY_AUDIO_STORAGE_PASS`.
+- No video copy, ASR request, output files, NAS or DB mutations. AAC stream found in metadata only; actual decoding and full-title transcript/JA alignment remain `NOT_TESTED`. Next: bounded read-only audio decode and explicit protected one-title ASR plan. Opt-in worker runtime cap 900s must not be silently extended; protect Qwen, shared title lock, private artifact and Stage12/no-overwrite boundaries. See `S11-MVP001` active work.
+
+
 ## S11-MVP001 one-title CT108 temporary storage space PASS (2026-11-16)
 
 - CT108 user-executed read-only `DLDSS-557` Discovery holding size estimate `SOURCE_SIZE_MIB=4893`. Existing `/var/tmp/teddy-stage11-asr-production` filesystem free `AVAILABLE_MIB=41976`, required source+reserve `REQUIRED_MIB=8989`, reserve `4096` MiB. `TEMP_SPACE=PASS`, `RESULT=READ_ONLY_ASR_SPACE_PASS`; no media copy, ASR, file creation, queue or NAS write.
