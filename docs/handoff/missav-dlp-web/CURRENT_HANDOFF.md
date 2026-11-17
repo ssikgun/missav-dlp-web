@@ -1,5 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 Normal Mode integration v2 package — local patch validation PASS, CT108 suite NOT_RUN (2026-11-17)
+
+- Preserved the original package and built `stage11_normal_mode_integration_candidate_20261117_v2.zip` (SHA-256 `911bb1fd832cc73be0f99602fc467297a1546c5289bc8991c139987d8901d817`). The regenerated fifth patch fixes the two reported context errors; all five patches strictly applied in an isolated frozen-source archive and only the expected four Stage11 files differed. Existing four alignment patches and smoke files remained byte-identical.
+- CT108 offline validator was not run because this executor has PID 1 `codex`, not the required `systemd`. No model inference, private title data, live service, NAS, Stage12, or production operation occurred; canonical product source remained unchanged. `CT108_OFFLINE=NOT_RUN`; next is one run of the packaged validator on actual CT108. Details and hashes are in Stage11 `ACTIVE_WORK.md`.
+
 ## S11-MVP001 lifecycle v2 isolated candidate STATIC PASS, live NO-GO (2026-11-16)
 
 - Codex reported second distinct temporary candidate `prepare_dldss557_baseline_lifecycle_v2.py`, SHA `684493c461bd40bb6382d9115e041c05a6825ec55f0a13a620d0b3fdb9b4fa07`; source checkout frozen `1e7d8fa4f40c8cdb37a6fdc65c58b9f3163a7602`, original candidate preserved. Targeted static `LOCK_PATH/COPY_TIMEOUT/TUNNEL_CLEANUP/REMOTE_WORKER_CLEANUP/BASELINE_FILE_STATE=PASS` for normal connected paths; **runtime behavior NOT_TESTED**, SSH-disconnect/early temp cleanup UNKNOWN, actual systemd bus properties not checked. Effective title lock configured on-disk as `/opt/missav-dlp-web/title-locks` (root:root 0750); candidate fails closed on runtime mismatch.
