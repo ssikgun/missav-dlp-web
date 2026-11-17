@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 DLDSS-557 private KO one-shot launcher prepared; live run NOT_RUN (2026-11-17)
+
+- The authorized one-time private Korean Normal Mode run was not started because this executor had PID 1 `codex`, not CT108 `systemd`; the wrapper's environment gate returned `NOT_CT108_SYSTEMD`. `TITLE_LOCK=NOT_RUN`, `NORMAL_MODE_CALL_COUNT=0`, `NAS_WRITES=0`.
+- A single-use, source/candidate-SHA-pinned CT108 launcher passed syntax and static one-call/no-delete checks (SHA-256 `86570159cc1885a4074387315b3e4adcb3670f22694b4fe2da3436b967aa503f`). It requires existing private JA/ASR input files and a `0700` private output parent, then performs current read-only source/Stage12/NAS checks, acquires the configured shared title lock, invokes existing isolated Normal Mode once, validates its existing completion path, and releases the lock. No ASR, Hermes translation, SRT, NAS/Stage12/Jellyfin/DB write or service change occurred.
+- Next is one execution on actual CT108 only, using the already retained private inputs. Any failed gate or invocation stops without retry. No private paths, prompts or subtitle content were recorded here. Product quality remains `NOT_VERIFIED`.
+
 ## S11-MVP001 Normal Mode v3 smoke correction — targeted PASS, CT108 full suite NOT_RUN (2026-11-17)
 
 - Corrected only the synthetic source-snapshot test expectation to the existing `ASRArtifactValidationError`; the frozen source validator and all five patches are unchanged. The modified target smoke passed locally with synthetic inputs. v3 ZIP SHA-256: `4b9c5b438b7ff6d05aea57458c58f551b4af2c504fdd81be04027a7843a2a4ad`; validator SHA-256: `8864835af968a5f6ee23e54883782650115ed133a47de5ef0cbfc1be6b40ee3f`.
