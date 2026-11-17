@@ -1,5 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 Normal Mode v3 smoke correction — targeted PASS, CT108 full suite NOT_RUN (2026-11-17)
+
+- Corrected only the synthetic source-snapshot test expectation to the existing `ASRArtifactValidationError`; the frozen source validator and all five patches are unchanged. The modified target smoke passed locally with synthetic inputs. v3 ZIP SHA-256: `4b9c5b438b7ff6d05aea57458c58f551b4af2c504fdd81be04027a7843a2a4ad`; validator SHA-256: `8864835af968a5f6ee23e54883782650115ed133a47de5ef0cbfc1be6b40ee3f`.
+- The complete CT108 suite remains `NOT_RUN`: current executor PID 1 is `codex`, not `systemd`. No model inference, private title data or production operation occurred; product source was not modified. Next is one bundled validator run on actual CT108. Details are in Stage11 `ACTIVE_WORK.md`.
+
 ## S11-MVP001 Normal Mode integration v2 package — local patch validation PASS, CT108 suite NOT_RUN (2026-11-17)
 
 - Preserved the original package and built `stage11_normal_mode_integration_candidate_20261117_v2.zip` (SHA-256 `911bb1fd832cc73be0f99602fc467297a1546c5289bc8991c139987d8901d817`). The regenerated fifth patch fixes the two reported context errors; all five patches strictly applied in an isolated frozen-source archive and only the expected four Stage11 files differed. Existing four alignment patches and smoke files remained byte-identical.
