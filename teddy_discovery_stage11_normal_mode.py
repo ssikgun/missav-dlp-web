@@ -22,6 +22,11 @@ from collections import Counter
 
 import teddy_discovery_stage11_controller as controller
 from teddy_discovery_alignment_acceptance import AlignmentAcceptancePolicy
+from teddy_discovery_alignment import (
+    MAX_AFFINE_CONSENSUS_DUAL_FIT_PAIR_VISITS,
+    MAX_AFFINE_CONSENSUS_DUAL_NEW_SLOPES,
+    MAX_AFFINE_CONSENSUS_SLOPE_CACHE_ENTRIES,
+)
 from teddy_discovery_stage11_deployment import SSHRemoteHermesBridge, Stage11DeploymentTransportError
 from teddy_discovery_asr import ASRError
 from teddy_discovery_stage11_live_adapters import _align_external_payload
@@ -46,6 +51,12 @@ from teddy_discovery_subtitle_text import SubtitleCue, MAX_SUBTITLE_BYTES
 
 PROOF_NAME = 'normal-mode-proof-v1.json'
 SOURCE_NAME = 'normal-mode-source-v1.json'
+DUAL_BUDGET_PROVENANCE = {
+    'mode': 'isolated-dual-fit-v1',
+    'pair_visits': MAX_AFFINE_CONSENSUS_DUAL_FIT_PAIR_VISITS,
+    'new_exact_slopes': MAX_AFFINE_CONSENSUS_DUAL_NEW_SLOPES,
+    'cache_entries': MAX_AFFINE_CONSENSUS_SLOPE_CACHE_ENTRIES,
+}
 USER_INTERVENTION = 0
 AUTO_INSERT = False
 MAX_NATIVE_PROMPT_BYTES = 128000
@@ -472,7 +483,14 @@ def reconstruct(directory, baseline):
     if sha(raw)!=source['external_sha256']: raise controller.Stage11ControllerArtifactError('external JA changed')
     candidate=SubtitleCandidate.validated_external_text(source['source_id'],dvd_id=baseline.source_snapshot.dvd_id,language='ja',text_format='srt')
     payload=ExternalSubtitlePayload.from_bytes(dvd_id=baseline.source_snapshot.dvd_id,candidate=candidate,payload=raw)
-    app=_align_external_payload(payload,baseline.source_snapshot.dvd_id,baseline,AlignmentAcceptancePolicy(**source['acceptance_policy']),1000)
+    budget=source.get('alignment_budget')
+    dual=budget is not None
+    if dual and (type(budget) is not dict or wire(budget)!=wire(DUAL_BUDGET_PROVENANCE)):
+        raise controller.Stage11ControllerArtifactError('alignment budget provenance mismatch')
+    app=_align_external_payload(
+        payload,baseline.source_snapshot.dvd_id,baseline,
+        AlignmentAcceptancePolicy(**source['acceptance_policy']),1000,
+        **({'_dual_resource_budget': True} if dual else {}))
     if app.decision.verdict!='ACCEPT_HYBRID' or wire(asdict(app.alignment))!=wire(source['alignment']):
         raise controller.Stage11ControllerArtifactError('accepted alignment changed')
     from teddy_discovery_subtitle_v2_orchestrator import SubtitleV2RouteDecision
@@ -489,6 +507,15 @@ def validate_normal_completion(report_path, clean_path, baseline_path, *, title,
     report=controller._parse_report(report_raw)
     proof_raw=controller._read_private_file(directory/PROOF_NAME,max_bytes=16*1024*1024)
     proof=json.loads(proof_raw)
+    source_replay=json.loads(controller._read_private_file(directory/SOURCE_NAME,max_bytes=16*1024*1024))
+    source_budget=source_replay.get('alignment_budget')
+    proof_budget=proof.get('alignment_budget')
+    if ((source_budget is None)!=(proof_budget is None)
+        or (source_budget is not None and
+            (type(source_budget) is not dict or wire(source_budget)!=wire(DUAL_BUDGET_PROVENANCE)))
+        or (proof_budget is not None and
+            (type(proof_budget) is not dict or wire(proof_budget)!=wire(DUAL_BUDGET_PROVENANCE)))):
+        raise controller.Stage11ControllerArtifactError('dual alignment budget proof mismatch')
     targeted_reused_hint=None
     if proof.get('quality_review')=='HYBRID_REVIEWED_CLEAN_V1':
         review_evidence=proof.get('review_evidence')
@@ -517,6 +544,8 @@ def validate_normal_completion(report_path, clean_path, baseline_path, *, title,
     clean_raw=controller._read_private_file(clean_path,max_bytes=MAX_SUBTITLE_BYTES)
     expected_proof=_normal_proof(package_raw,result_raw,result,source_quality,
                                   playback,evidence,artifact.sha256)
+    if source_budget is not None:
+        expected_proof['alignment_budget']=DUAL_BUDGET_PROVENANCE
     expected_proof_raw=wire(expected_proof)
     expected_report=_normal_report(
         title,baseline_path,baseline_raw,report.get('baseline_reused'),
@@ -543,8 +572,15 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
                              baseline_transcriber, external_ja_attempt, first_pass_runner,
                              acceptance_policy, holding_resolver=None,
                              hybrid_review_runner=None, hybrid_targeted_runner=None,
+                             alignment_budget_profile=None,
                              **unused):
     title=controller._canonical_title(title)
+    if alignment_budget_profile not in (None, DUAL_BUDGET_PROVENANCE['mode']):
+        raise controller.Stage11ControllerValidationError('unsupported alignment budget profile')
+    if (alignment_budget_profile is not None
+            and getattr(external_ja_attempt, '_stage11_alignment_budget_profile', None)
+            != alignment_budget_profile):
+        raise controller.Stage11ControllerValidationError('alignment budget callback provenance mismatch')
     root=controller._validate_root(artifact_root,field_name='artifact_root')
     staging=controller._validate_root(stateful_staging_root,field_name='stateful_staging_root')
     directory=controller._title_directory(root,title)
@@ -573,6 +609,8 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
         app=route.alignment_application; payload=app.bundle.external_ja_payload
         source={'external_sha256':payload.sha256,'source_id':payload.candidate.external_source_id,
             'acceptance_policy':asdict(acceptance_policy),'alignment':asdict(app.alignment),'claim_token':claim_token}
+        if alignment_budget_profile is not None:
+            source['alignment_budget']=DUAL_BUDGET_PROVENANCE
         store(directory/'normal-external-ja.srt',payload.payload)
         source_raw=wire(source); store(directory/SOURCE_NAME,source_raw)
         preparation,boundary=prepare_normal(route,sha(raw),claim_token)
@@ -591,6 +629,8 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
             raw_asr_context=raw_asr_context)
         proof=_normal_proof(package_raw,result_raw,first,source_quality,
                             playback,evidence,artifact.sha256)
+        if alignment_budget_profile is not None:
+            proof['alignment_budget']=DUAL_BUDGET_PROVENANCE
         proof_raw=wire(proof)
         store(clean_path,artifact.payload)
         store(directory/PROOF_NAME,proof_raw)

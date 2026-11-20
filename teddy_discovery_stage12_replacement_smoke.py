@@ -15,7 +15,11 @@ from teddy_discovery_stage12_rollout import Stage12RolloutStateStore
 from teddy_discovery_stage12_replacement import (
     Stage12Replacement, ReplacementAuthorization, AUTHORIZATION_MODE,
 )
-from teddy_discovery_subtitle_replace import replacement_worker, ReplacementWitness, SubtitleReplacementMutator
+from teddy_discovery_stage12_replacement_cli import run_one_replacement
+from teddy_discovery_subtitle_replace import (
+    replacement_worker, ReplacementWitness, SubtitleReplacementMutator,
+    expected_replacement_backup_relative,
+)
 from teddy_discovery_subtitle_publish import _validated_artifact, SubtitleSSHMutator, SubtitlePublishCollisionError
 from teddy_discovery_subtitle_publish_smoke import _ssh, LocalScriptRunner
 from teddy_discovery_subtitle import derive_target_ko_relative
@@ -93,6 +97,9 @@ class Fixture:
     def reconcile(self,*args,**kwargs):
         return self.nas.reconcile(*args,**kwargs)
 
+    def inspect_backup(self,*args,**kwargs):
+        return self.nas.inspect_backup(*args,**kwargs)
+
     def recognize(self,dvd,video,destination):
         self.jellyfin_calls+=1
         assert dvd==self.record.dvd_id and video==self.video and destination==self.destination
@@ -164,6 +171,36 @@ def main():
             assert f.events()==f.original_events
 
     with tempfile.TemporaryDirectory() as raw:
+        calls=[]
+        class Owner:
+            def run(self,dvd_id,**kwargs):
+                calls.append((dvd_id,kwargs))
+                if not kwargs['execute']:
+                    return SimpleNamespace(witness=SimpleNamespace(sha256='a'*64))
+                return {'phase':'COMPLETED'}
+        class AcquiredLock:
+            status='ACQUIRED'
+            def __enter__(self): return self
+            def __exit__(self,*_args): return False
+        base=dict(dvd_id='RPL-101',expected_old_sha256='a'*64,
+                  expected_new_sha256='b'*64,candidate_root=Path(raw),
+                  approval_note='one explicit synthetic replacement')
+        preflight=run_one_replacement(**base,execute=False,owner=Owner())
+        assert preflight=={'phase':'PREFLIGHT','nas_sha256':'a'*64}
+        assert len(calls)==1 and calls[0][1]['execute'] is False
+        with patch('teddy_discovery_stage12_replacement_cli.configured_lock_dir',
+                   return_value=Path(raw)/'locks'), \
+             patch('teddy_discovery_stage12_replacement_cli.try_acquire_title_lock',
+                   return_value=AcquiredLock()):
+            final=run_one_replacement(**base,execute=True,owner=Owner())
+        assert final=={'phase':'COMPLETED'}
+        assert len(calls)==2 and calls[1][1]['execute'] is True
+        reject(lambda:run_one_replacement(**{**base,'expected_new_sha256':'a'*64},
+                                          execute=False,owner=Owner()))
+        assert len(calls)==2
+        print('PASS=EXPLICIT_ONE_TITLE_REPLACEMENT_CLI_GATE')
+
+    with tempfile.TemporaryDirectory() as raw:
         f=Fixture(Path(raw))
         db_before=f.store.state_path.read_bytes()
         preflight=f.run()
@@ -173,12 +210,20 @@ def main():
         final=f.run(execute=True)
         assert final['phase']=='COMPLETED' and f.nas_calls==f.jellyfin_calls==1
         assert f.target.read_bytes()==f.artifact.payload
+        backup_relative=final['backup_relative']
+        backup_path=f.target.parent/Path(backup_relative).name
+        assert backup_path.is_file() and backup_path.read_bytes()==f.old_bytes
+        assert backup_path.name.startswith('.') and not backup_path.name.endswith('.srt')
+        assert final['backup_sha256']==f.old
         assert f.store.effective_publication(f.record.dvd_id).artifact_sha256==f.new
         assert f.store.get(f.record.dvd_id)==f.initial_state and f.events()==f.original_events
         history=f.history()
         assert [e['phase'] for e in history]==['INTENT_RECORDED','NAS_PENDING','NAS_REPLACED','JELLYFIN_PENDING','COMPLETED']
         assert [e['sequence'] for e in history]==list(range(1,6))
         assert all(e['operator_approved'] and e['plan']['old_sha256']==f.old for e in history)
+        assert all(e['backup_relative']==backup_relative and e['backup_sha256']==f.old
+                   for e in history[2:])
+        assert f.store.read_replacement_original(f.record.dvd_id)==f.initial_state
         assert f.run(execute=True)==final and f.history()==history and f.nas_calls==1 and f.jellyfin_calls==1
         print('PASS=ATOMIC_COMPLETION_HISTORY_AND_IDEMPOTENCE')
         # No weakening of the existing differing-final collision contract.
@@ -211,10 +256,15 @@ def main():
         reject(lambda:f.run(execute=True))
         assert f.history()[-1]['phase']=='FAILED_RETRYABLE'
         assert f.history()[-1]['effective_sha256']==f.new
+        backup_relative=f.history()[-1]['backup_relative']
+        backup_path=f.target.parent/Path(backup_relative).name
+        assert backup_path.read_bytes()==f.old_bytes
+        assert f.history()[-1]['backup_sha256']==f.old
         assert f.store.effective_publication(f.record.dvd_id).artifact_sha256==f.new
         f.jelly_fail=False
         f.run(execute=True)
         assert f.nas_calls==1 and f.jellyfin_calls==2
+        assert backup_path.read_bytes()==f.old_bytes
         print('PASS=JELLYFIN_PENDING_AND_ONLY_RETRY')
     with tempfile.TemporaryDirectory() as raw:
         f=Fixture(Path(raw)); f.corrupt_post=True
@@ -223,6 +273,18 @@ def main():
         reject(lambda:f.run(execute=True))
         assert f.nas_calls==1
         print('PASS=POST_WRITE_MISMATCH_FAIL_CLOSED')
+
+    with tempfile.TemporaryDirectory() as raw:
+        f=Fixture(Path(raw)); checked=f.run()
+        backup_relative=expected_replacement_backup_relative(
+            f.destination,checked.plan['operation_id'])
+        conflict=f.target.parent/Path(backup_relative).name
+        conflict.write_bytes(b'pre-existing conflicting bytes')
+        reject(lambda:f.run(execute=True))
+        assert f.target.read_bytes()==f.old_bytes
+        assert conflict.read_bytes()==b'pre-existing conflicting bytes'
+        assert f.jellyfin_calls==0 and f.history()[-1]['phase']=='FAILED_RETRYABLE'
+        print('PASS=BACKUP_PATH_COLLISION_PRESERVED')
 
     with tempfile.TemporaryDirectory() as raw:
         f=Fixture(Path(raw)); operation='b'*64
@@ -237,9 +299,12 @@ def main():
         assert len(backups)==1 and backups[0].read_bytes()==f.old_bytes
         result=replacement_worker(str(f.library),f.video.relative_path,f.destination,
             'reconcile',f.old,f.new,operation,f.artifact.payload)
-        assert result=={'sha256':f.new,'replaced':False} and not backups[0].exists()
+        assert result=={'sha256':f.new,'replaced':False,
+                        'backup_relative':str(Path(f.destination).parent/backups[0].name),
+                        'backup_sha256':f.old}
+        assert backups[0].exists() and backups[0].read_bytes()==f.old_bytes
         assert f.target.read_bytes()==f.artifact.payload
-        print('PASS=NATIVE_EXCHANGE_CRASH_BACKUP_RECONCILIATION')
+        print('PASS=NATIVE_EXCHANGE_CRASH_BACKUP_RECONCILIATION_AND_RETENTION')
     with tempfile.TemporaryDirectory() as raw:
         f=Fixture(Path(raw))
         def crash(point):

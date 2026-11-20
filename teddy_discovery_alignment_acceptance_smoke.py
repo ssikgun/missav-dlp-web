@@ -28,6 +28,7 @@ from teddy_discovery_alignment_acceptance import (
     SCALE_BELOW_POLICY,
     UNRESOLVED,
     decide_alignment_acceptance,
+    select_affine_consensus_from_candidates,
 )
 from teddy_discovery_hybrid_evidence import (
     ALIGNMENT_PROVENANCE_ASR_ONLY,
@@ -137,6 +138,30 @@ def main():
         and math.isclose(accepted.scale, 1.5, abs_tol=1e-12),
         "CLEAR_ACCEPT_HYBRID",
     )
+    exact_candidates=tuple(
+        timed_candidate(index,x,y)
+        for index,(x,y) in enumerate(zip(
+            (500,1_500,2_500,3_500),(850,2_350,3_850,5_350),strict=True))
+    )
+    legacy_selection=select_affine_consensus_from_candidates(
+        exact_candidates,exact_policy,residual_threshold_ms=1,
+        minimum_scale=exact_policy.minimum_scale,
+        maximum_scale=exact_policy.maximum_scale)
+    dual_selection=select_affine_consensus_from_candidates(
+        exact_candidates,exact_policy,residual_threshold_ms=1,
+        minimum_scale=exact_policy.minimum_scale,
+        maximum_scale=exact_policy.maximum_scale,
+        _dual_resource_budget=True)
+    require(legacy_selection==dual_selection
+            and legacy_selection[0].alignment==exact_alignment
+            and legacy_selection[1]==accepted,
+            "DUAL_BUDGET_PRESERVES_ACCEPTED_ALIGNMENT")
+    expect_raises(AlignmentAcceptanceValidationError,
+        lambda:select_affine_consensus_from_candidates(
+            exact_candidates,exact_policy,residual_threshold_ms=1,
+            minimum_scale=exact_policy.minimum_scale,
+            maximum_scale=exact_policy.maximum_scale,_dual_resource_budget=1),
+        "DUAL_BUDGET_REQUIRES_EXACT_BOOLEAN")
 
     insufficient_anchors = decide_alignment_acceptance(
         exact_alignment,

@@ -12,7 +12,9 @@ import re
 from teddy_discovery_ko_srt import generate_korean_srt
 from teddy_discovery_subtitle import derive_target_ko_relative
 from teddy_discovery_subtitle_text import parse_subtitle_bytes, MAX_SUBTITLE_BYTES
-from teddy_discovery_subtitle_replace import ReplacementWitness
+from teddy_discovery_subtitle_replace import (
+    ReplacementWitness, expected_replacement_backup_relative,
+)
 from teddy_discovery_stage12_rollout import (
     _preflight_artifact_bundle, _safe_artifact_root, _record_video,
     _read_local_regular, _validate_reconciliation_evidence,
@@ -26,6 +28,31 @@ FINGERPRINT_FIELDS = ('holding_identity','media_path_identity','source_size_byte
 
 class ReplacementError(ValueError):
     """Replacement rejected without exposing model or transport output."""
+
+
+def validate_backup_evidence(plan, backup_relative, backup_sha256):
+    expected = expected_replacement_backup_relative(
+        plan['destination_relative'], plan['operation_id'])
+    if backup_relative != expected or backup_sha256 != plan['old_sha256']:
+        raise ReplacementError('replacement backup identity is detached')
+    return {'backup_relative': expected, 'backup_sha256': plan['old_sha256']}
+
+
+def _backup_from_event(plan, event, *, required=False):
+    relative = event.get('backup_relative')
+    digest = event.get('backup_sha256')
+    if relative is None and digest is None:
+        if required:
+            raise ReplacementError('replacement backup evidence is required')
+        return None
+    return validate_backup_evidence(plan, relative, digest)
+
+
+def _backup_from_transport(plan, result):
+    if type(result) is not dict:
+        raise ReplacementError('replacement transport backup witness is invalid')
+    return validate_backup_evidence(
+        plan, result.get('backup_relative'), result.get('backup_sha256'))
 
 
 class UnexpectedNASState(ReplacementError):
@@ -161,6 +188,22 @@ class Stage12Replacement:
             raise UnexpectedNASState(plan,witness.sha256)
         if previous is not None and previous['effective_sha256'] == expected_new_sha256 and witness.sha256 != expected_new_sha256:
             raise UnexpectedNASState(plan,witness.sha256)
+        if previous is not None:
+            required_backup = (
+                previous['phase'] in {'NAS_REPLACED', 'JELLYFIN_PENDING'}
+                or (previous['phase'] == 'FAILED_RETRYABLE'
+                    and previous['effective_sha256'] == expected_new_sha256)
+            )
+            backup = _backup_from_event(plan, previous, required=required_backup)
+            if backup is not None:
+                inspector = getattr(self.nas, 'inspect_backup', None)
+                if not callable(inspector):
+                    raise ReplacementError('replacement backup inspection is unavailable')
+                observed = inspector(
+                    video, destination, expected_old_sha256=expected_old_sha256,
+                    operation_id=plan['operation_id'])
+                if observed != backup:
+                    raise ReplacementError('replacement backup readback differs')
         return ReplacementPreflight(plan,artifact,video,witness,previous)
 
     def run(self, dvd_id, *, execute=False, checkpoint=None, **kwargs):
@@ -183,6 +226,7 @@ class Stage12Replacement:
                 raise
             plan = checked.plan
             last = checked.previous_event
+            backup = _backup_from_event(plan, last) if last is not None else None
             if last and last['phase'] == 'COMPLETED':
                 return last
             sequence = len(self.store.replacement_history(dvd_id))
@@ -201,13 +245,14 @@ class Stage12Replacement:
             if last['phase'] == 'NAS_PENDING':
                 try:
                     if checked.witness.sha256 == plan['old_sha256']:
-                        self.nas.replace(checked.video,checked.artifact,expected_old_sha256=plan['old_sha256'],
+                        transport_result = self.nas.replace(checked.video,checked.artifact,expected_old_sha256=plan['old_sha256'],
                                          expected_new_sha256=plan['new_sha256'],operation_id=plan['operation_id'],
                                          source_witness=checked.witness)
                     else:
-                        self.nas.reconcile(checked.video,checked.artifact,expected_old_sha256=plan['old_sha256'],
+                        transport_result = self.nas.reconcile(checked.video,checked.artifact,expected_old_sha256=plan['old_sha256'],
                                            expected_new_sha256=plan['new_sha256'],operation_id=plan['operation_id'],
                                            source_witness=checked.witness)
+                    backup = _backup_from_transport(plan, transport_result)
                     if checkpoint:
                         checkpoint('after_nas_replace')
                     witness = self.nas.inspect(checked.video,plan['destination_relative'])
@@ -216,16 +261,18 @@ class Stage12Replacement:
                     witness.__post_init__()
                     if (witness.sha256 != plan['new_sha256'] or witness.source_size_bytes != checked.witness.source_size_bytes
                             or witness.source_mtime_ns != checked.witness.source_mtime_ns):
-                        append('FAILED_TERMINAL',nas_sha256=witness.sha256)
+                        append('FAILED_TERMINAL',nas_sha256=witness.sha256,
+                               **(backup or {}))
                         raise ReplacementError('post-replacement NAS witness differs')
-                    append('NAS_REPLACED',nas_sha256=plan['new_sha256'])
+                    append('NAS_REPLACED',nas_sha256=plan['new_sha256'],**backup)
                 except ReplacementError:
                     raise
                 except Exception as error:
-                    append('FAILED_RETRYABLE')
+                    append('FAILED_RETRYABLE',**(backup or {}))
                     raise ReplacementError('NAS replacement pending reconciliation') from error
             if last['phase'] in {'NAS_REPLACED','FAILED_RETRYABLE'}:
-                append('JELLYFIN_PENDING',nas_sha256=plan['new_sha256'])
+                backup = backup or _backup_from_event(plan,last,required=True)
+                append('JELLYFIN_PENDING',nas_sha256=plan['new_sha256'],**backup)
             try:
                 recognition = self.jellyfin_recognizer(dvd_id,checked.video,plan['destination_relative'])
                 if type(recognition) is not Stage12JellyfinRecognition:
@@ -254,6 +301,7 @@ class Stage12Replacement:
                     raise ReplacementError('NAS changed during Jellyfin verification')
             except Exception as error:
                 if last['phase'] != 'FAILED_TERMINAL':
-                    append('FAILED_RETRYABLE',nas_sha256=plan['new_sha256'])
+                    append('FAILED_RETRYABLE',nas_sha256=plan['new_sha256'],**(backup or {}))
                 raise ReplacementError('Jellyfin replacement verification pending') from error
-            return append('COMPLETED',nas_sha256=plan['new_sha256'],jellyfin_evidence=evidence)
+            return append('COMPLETED',nas_sha256=plan['new_sha256'],
+                          jellyfin_evidence=evidence,**(backup or {}))

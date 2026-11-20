@@ -260,7 +260,9 @@ def _candidate_failures(outcomes):
 
 
 def _align_external_payload(payload, title, asr_result, acceptance_policy,
-                            residual_threshold_ms):
+                            residual_threshold_ms, *, _dual_resource_budget=False):
+    if type(_dual_resource_budget) is not bool:
+        raise AlignmentValidationError("dual resource budget must be boolean")
     try:
         bundle = HybridEvidenceBundle.from_external_ja_and_asr(
             dvd_id=title, external_ja_payload=payload, asr_result=asr_result,
@@ -286,6 +288,7 @@ def _align_external_payload(payload, title, asr_result, acceptance_policy,
             residual_threshold_ms=residual_threshold_ms,
             minimum_scale=MIN_AFFINE_CONSENSUS_SCALE,
             maximum_scale=MAX_AFFINE_CONSENSUS_SCALE,
+            **({"_dual_resource_budget": True} if _dual_resource_budget else {}),
         )
         if selection is None:
             raise _NoExternalConsensus(

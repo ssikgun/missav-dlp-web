@@ -62,6 +62,11 @@ MAX_AFFINE_CONSENSUS_PATHS_EVALUATED: Final[int] = 65_536
 # identity storage and computation remain bounded by the work caps above/below.
 MAX_AFFINE_CONSENSUS_UNIQUE_CHAINS: Final[int] = 2_048
 MAX_AFFINE_CONSENSUS_FIT_PAIR_EVALUATIONS: Final[int] = 16_777_216
+# The dual-fit profile is an explicit opt-in. Its total pair-visit ceiling is
+# separate from the unchanged default fit-pair ceiling.
+MAX_AFFINE_CONSENSUS_SLOPE_CACHE_ENTRIES: Final[int] = 65_536
+MAX_AFFINE_CONSENSUS_DUAL_FIT_PAIR_VISITS: Final[int] = 33_554_432
+MAX_AFFINE_CONSENSUS_DUAL_NEW_SLOPES: Final[int] = 65_536
 MAX_AFFINE_CONSENSUS_PAIR_COMPARISONS: Final[int] = (
     MAX_ANCHOR_CANDIDATES * (MAX_ANCHOR_CANDIDATES - 1) // 2
 )
@@ -1037,6 +1042,8 @@ def infer_robust_affine_alignment(
     anchors: tuple[MonotonicAnchorCandidate, ...],
     *,
     residual_threshold_ms: int,
+    _slope_cache: dict[tuple[int, int, int, int], Fraction] | None = None,
+    _new_slope_budget: list[int] | None = None,
 ) -> RobustAffineAlignment:
     """Infer midpoint evidence with a deterministic Theil-Sen-style fit.
 
@@ -1081,9 +1088,25 @@ def infer_robust_affine_alignment(
             if external_delta_x2 == 0:
                 continue
             asr_delta_x2 = right_asr_x2 - left_asr_x2
-            pairwise_slopes.append(
-                Fraction(asr_delta_x2, external_delta_x2)
+            pair_key = (
+                left_external_x2, left_asr_x2,
+                right_external_x2, right_asr_x2,
             )
+            cached_slope = (
+                _slope_cache.get(pair_key) if _slope_cache is not None else None
+            )
+            if cached_slope is None:
+                if _new_slope_budget is not None:
+                    if _new_slope_budget[0] >= MAX_AFFINE_CONSENSUS_DUAL_NEW_SLOPES:
+                        raise AlignmentLimitError(
+                            "affine-consensus dual exact slope construction exceeds its fixed bound"
+                        )
+                    _new_slope_budget[0] += 1
+                cached_slope = Fraction(asr_delta_x2, external_delta_x2)
+                if (_slope_cache is not None
+                        and len(_slope_cache) < MAX_AFFINE_CONSENSUS_SLOPE_CACHE_ENTRIES):
+                    _slope_cache[pair_key] = cached_slope
+            pairwise_slopes.append(cached_slope)
 
     if not pairwise_slopes:
         raise AlignmentValidationError(
@@ -1238,7 +1261,12 @@ def _maximum_monotonic_consensus_paths(
     path_limit = MAX_AFFINE_CONSENSUS_CHAINS_PER_HYPOTHESIS
 
     def merge(left, right):
-        work_counter[0] += 1 + len(left[1]) + len(right[1])
+        # Different/empty chain lengths do not inspect endpoint sets.
+        work_units = (
+            1 if left[0] != right[0] or left[0] == 0
+            else 1 + len(left[1]) + len(right[1])
+        )
+        work_counter[0] += work_units
         if work_counter[0] > MAX_AFFINE_CONSENSUS_DP_OPERATIONS:
             raise AlignmentLimitError(
                 "affine-consensus dynamic-program work exceeds its fixed bound"
@@ -1348,6 +1376,7 @@ def iter_unique_affine_consensus_anchor_chains(
     residual_threshold_ms: int,
     minimum_scale: float,
     maximum_scale: float,
+    _dual_resource_budget: bool = False,
 ) -> Iterator[tuple[MonotonicAnchorCandidate, ...]]:
     """Yield unique maximum consensus chains within the existing work bounds.
 
@@ -1360,6 +1389,8 @@ def iter_unique_affine_consensus_anchor_chains(
     failures invalidate earlier provisional results. No candidate is synthesized.
     """
 
+    if type(_dual_resource_budget) is not bool:
+        raise AlignmentValidationError("dual resource budget must be boolean")
     residual_threshold_ms = _require_exact_positive_int(
         residual_threshold_ms,
         field_name="residual_threshold_ms",
@@ -1505,7 +1536,12 @@ def iter_unique_affine_consensus_anchor_chains(
             # this set can never exceed MAX_AFFINE_CONSENSUS_PATHS_EVALUATED.
             seen_chains.add(identity_key)
             fit_pair_evaluations += len(anchors) * (len(anchors) - 1) // 2
-            if fit_pair_evaluations > MAX_AFFINE_CONSENSUS_FIT_PAIR_EVALUATIONS:
+            if _dual_resource_budget:
+                if fit_pair_evaluations > MAX_AFFINE_CONSENSUS_DUAL_FIT_PAIR_VISITS:
+                    raise AlignmentLimitError(
+                        "affine-consensus dual pair visits exceed their fixed bound"
+                    )
+            elif fit_pair_evaluations > MAX_AFFINE_CONSENSUS_FIT_PAIR_EVALUATIONS:
                 raise AlignmentLimitError(
                     "affine-consensus fit work exceeds its fixed pairwise bound"
                 )
@@ -1567,11 +1603,14 @@ __all__ = [
     "MAX_AFFINE_ANCHORS",
     "MAX_AFFINE_CONSENSUS_CANDIDATE_EVALUATIONS",
     "MAX_AFFINE_CONSENSUS_CHAINS_PER_HYPOTHESIS",
+    "MAX_AFFINE_CONSENSUS_DUAL_FIT_PAIR_VISITS",
+    "MAX_AFFINE_CONSENSUS_DUAL_NEW_SLOPES",
     "MAX_AFFINE_CONSENSUS_DP_OPERATIONS",
     "MAX_AFFINE_CONSENSUS_FIT_PAIR_EVALUATIONS",
     "MAX_AFFINE_CONSENSUS_HYPOTHESES",
     "MAX_AFFINE_CONSENSUS_PAIR_COMPARISONS",
     "MAX_AFFINE_CONSENSUS_PATHS_EVALUATED",
+    "MAX_AFFINE_CONSENSUS_SLOPE_CACHE_ENTRIES",
     "MAX_AFFINE_CONSENSUS_UNIQUE_CHAINS",
     "MIN_AFFINE_CONSENSUS_SCALE",
     "MAX_LEXICAL_PAIR_COMPARISONS",

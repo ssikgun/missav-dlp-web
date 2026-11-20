@@ -25,7 +25,34 @@ canonical SRT plus mechanical report and source/identity proof; Stage12 owns
 publication. The legacy diagnostic/review APIs remain callable for offline
 forensics and are outside normal operation.
 
-Deploy an exact committed revision with:
+Prepare a permanent, clean release from the canonical GitHub branch without
+changing `current`, installing units, or enabling the timer:
+
+```sh
+bash deploy/stage11-normal/deploy.sh prepare COMMIT_SHA
+```
+
+The release is independently cloned under the deployment's permanent
+`releases/` directory, checked out at the exact SHA, checked for a clean
+worktree and canonical origin, and passed through the existing read-only
+Stage12 preflight. A conflicting or incomplete preparation directory is kept
+for inspection and blocks replacement.
+
+After a separate operator decision, switch `current` and install the unit
+files while requiring the timer to remain disabled and inactive:
+
+```sh
+bash deploy/stage11-normal/deploy.sh switch-current COMMIT_SHA
+```
+
+Timer activation is a separate explicit command:
+
+```sh
+bash deploy/stage11-normal/deploy.sh activate-timer COMMIT_SHA
+```
+
+The legacy one-command deployment remains available and performs all three
+steps in order, including timer activation:
 
 ```sh
 bash deploy/stage11-normal/deploy.sh COMMIT_SHA

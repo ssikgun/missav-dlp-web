@@ -385,6 +385,111 @@ class NormalSmoke(unittest.TestCase):
             targeted_source_count=0,targeted_window_count=0)
         self.assertEqual(validated.clean_sha256,result.clean_sha256)
 
+    def test_dual_budget_proof_is_opt_in_and_source_bound(self):
+        callback=lambda *_args:self.route.alignment_application
+        callback._stage11_alignment_budget_profile=normal.DUAL_BUDGET_PROVENANCE['mode']
+        result=self.run_title(
+            external_ja_attempt=callback,
+            alignment_budget_profile=normal.DUAL_BUDGET_PROVENANCE['mode'])
+        directory=result.report_path.parent
+        source_path=directory/normal.SOURCE_NAME
+        proof_path=directory/normal.PROOF_NAME
+        source=json.loads(source_path.read_bytes())
+        proof=json.loads(proof_path.read_bytes())
+        self.assertEqual(source['alignment_budget'],normal.DUAL_BUDGET_PROVENANCE)
+        self.assertEqual(proof['alignment_budget'],normal.DUAL_BUDGET_PROVENANCE)
+        self.assertEqual(result.clean_sha256,normal.validate_normal_completion(
+            result.report_path,result.clean_path,
+            directory/normal.controller.BASELINE_ASR_FILENAME,
+            title=result.title).clean_sha256)
+        source['alignment_budget']['new_exact_slopes']+=1
+        source_path.write_bytes(normal.wire(source))
+        with self.assertRaises(normal.controller.Stage11ControllerArtifactError):
+            normal.validate_normal_completion(
+                result.report_path,result.clean_path,
+                directory/normal.controller.BASELINE_ASR_FILENAME,
+                title=result.title)
+
+    def test_explicit_single_title_regeneration_reuses_bound_inputs(self):
+        import teddy_discovery_stage11_regeneration as regeneration
+        root=Path(self.temp.name)/'regen'
+        root.mkdir(mode=0o700)
+        baseline_path=root/'baseline-asr-v1.json'
+        baseline_raw=normal.controller.serialize_asr_result(self.baseline)
+        baseline_path.write_bytes(baseline_raw); baseline_path.chmod(0o600)
+        ja_path=root/'retained-ja.srt'
+        ja_raw=self.route.alignment_application.bundle.external_ja_payload.payload
+        ja_path.write_bytes(ja_raw); ja_path.chmod(0o600)
+        verified=[]
+
+        class Dependencies:
+            remote_bridge=object()
+            def controller_kwargs(_self):
+                return {
+                    'holding_resolver':lambda _title:fixture._holding(self.baseline),
+                    'targeted_runner':lambda *_args:self.fail('unexpected targeted runner'),
+                    'asr_review_runner':lambda *_args:self.fail('unexpected ASR review'),
+                    'hybrid_review_runner':self.review,
+                    'hybrid_targeted_runner':self.targeted,
+                }
+            def capture_external_ja_attempt(_self,callback): return callback
+            def capture_first_pass_runner(_self,_callback): return self.first
+
+        class AcquiredLock:
+            status=regeneration.ACQUIRED
+            def __enter__(self): return self
+            def __exit__(self,*_args): return False
+
+        dependencies=Dependencies()
+        with patch.object(regeneration,'configured_lock_dir',return_value=root/'locks'), \
+             patch.object(regeneration,'try_acquire_title_lock',return_value=AcquiredLock()):
+            result=regeneration.regenerate_one_title(
+                self.baseline.source_snapshot.dvd_id,
+                run_root=root/'new-private-output',
+                baseline_path=baseline_path,
+                baseline_sha256=normal.sha(baseline_raw),
+                japanese_srt_path=ja_path,
+                japanese_srt_sha256=normal.sha(ja_raw),
+                japanese_srt_source_id=(
+                    self.route.alignment_application.bundle.external_ja_payload
+                    .candidate.external_source_id),
+                dependencies=dependencies,
+                acceptance_policy=policy_with(),
+                source_verifier=lambda video,snapshot:verified.append((video,snapshot)),
+                claim_token=1)
+        self.assertEqual(len(verified),2)
+        self.assertEqual(result.title,self.baseline.source_snapshot.dvd_id)
+        self.assertIs(json.loads(result.report_path.read_bytes())['publication_performed'],False)
+        self.assertEqual(result.route,'HYBRID')
+        self.assertEqual(json.loads((result.report_path.parent/normal.SOURCE_NAME).read_bytes())['source_id'],
+            self.route.alignment_application.bundle.external_ja_payload.candidate.external_source_id)
+        self.assertTrue(result.clean_path.is_file())
+        self.assertEqual((self.first_calls,self.review_calls,self.targeted_calls),(1,1,0))
+        self.assertTrue((root/'new-private-output'/'artifacts'/result.title/
+                         normal.controller.CLEAN_SRT_FILENAME).is_file())
+
+        self.triage_actions=(review.REPAIR,review.KEEP,review.KEEP,review.KEEP)
+        with patch.object(regeneration,'configured_lock_dir',return_value=root/'locks'), \
+             patch.object(regeneration,'try_acquire_title_lock',return_value=AcquiredLock()):
+            with self.assertRaises(normal.controller.Stage11ControllerValidationError):
+                regeneration.regenerate_one_title(
+                    self.baseline.source_snapshot.dvd_id,
+                    run_root=root/'targeted-needed-output',
+                    baseline_path=baseline_path,
+                    baseline_sha256=normal.sha(baseline_raw),
+                    japanese_srt_path=ja_path,
+                    japanese_srt_sha256=normal.sha(ja_raw),
+                    japanese_srt_source_id=(
+                        self.route.alignment_application.bundle.external_ja_payload
+                        .candidate.external_source_id),
+                    dependencies=dependencies,
+                    acceptance_policy=policy_with(),
+                    source_verifier=lambda video,snapshot:verified.append((video,snapshot)),
+                    claim_token=2)
+        self.assertEqual(self.targeted_calls,0)
+        self.assertFalse((root/'targeted-needed-output'/'artifacts'/result.title/
+                          normal.controller.CLEAN_SRT_FILENAME).exists())
+
     def test_native_validation_is_bounded_and_preserves_raw_evidence(self):
         calls=[]
         class Bridge:

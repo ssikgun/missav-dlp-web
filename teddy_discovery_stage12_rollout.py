@@ -1936,6 +1936,8 @@ class Stage12RolloutStateStore:
     def append_replacement(self, plan: Mapping[str, object], phase: str, *,
                            expected_sequence: int, nas_sha256: str | None = None,
                            jellyfin_evidence: Stage12PublicationReconciliationEvidence | None = None,
+                           backup_relative: str | None = None,
+                           backup_sha256: str | None = None,
                            authorization=None) -> dict[str, object]:
         """Native transactional API. Only append; never update publication history.
 
@@ -1943,7 +1945,9 @@ class Stage12RolloutStateStore:
         Event sequence CAS also rejects stale/competing journal mutations.
         """
         from dataclasses import replace
-        from teddy_discovery_stage12_replacement import validate_authorization, validate_plan
+        from teddy_discovery_stage12_replacement import (
+            validate_authorization, validate_plan, validate_backup_evidence,
+        )
         plan = validate_plan(plan)
         validate_authorization(authorization, plan['dvd_id'], plan['old_sha256'], plan['new_sha256'])
         transitions = {
@@ -1981,6 +1985,31 @@ class Stage12RolloutStateStore:
             if phase not in transitions.get(previous_phase, set()):
                 raise Stage12RolloutValidationError('invalid replacement phase transition')
             effective_sha = last['effective_sha256'] if last else state.artifact_sha256
+            prior_backup = None
+            if same and last is not None and (last.get('backup_relative') is not None
+                                               or last.get('backup_sha256') is not None):
+                prior_backup = validate_backup_evidence(
+                    plan, last.get('backup_relative'), last.get('backup_sha256'))
+            if prior_backup is not None:
+                if backup_relative is None and backup_sha256 is None:
+                    backup_relative = prior_backup['backup_relative']
+                    backup_sha256 = prior_backup['backup_sha256']
+                elif (backup_relative != prior_backup['backup_relative']
+                      or backup_sha256 != prior_backup['backup_sha256']):
+                    raise Stage12RolloutValidationError('replacement backup provenance changed')
+            requires_backup = (
+                phase in {'NAS_REPLACED', 'JELLYFIN_PENDING', 'COMPLETED'}
+                or (phase == 'FAILED_RETRYABLE' and effective_sha == plan['new_sha256'])
+                or prior_backup is not None
+            )
+            backup = None
+            if backup_relative is not None or backup_sha256 is not None:
+                try:
+                    backup = validate_backup_evidence(plan, backup_relative, backup_sha256)
+                except Exception as error:
+                    raise Stage12RolloutValidationError('replacement backup evidence is invalid') from error
+            elif requires_backup:
+                raise Stage12RolloutValidationError('replacement backup evidence is required')
             if not same and effective_sha != plan['old_sha256']:
                 raise Stage12RolloutValidationError('replacement old SHA differs from effective publication')
             expected_fingerprint = {key: getattr(state, key) for key in (
@@ -2006,6 +2035,8 @@ class Stage12RolloutStateStore:
                          sequence=len(events)+1, phase=phase, plan=plan,
                          operator_approved=True, source_fingerprint=expected_fingerprint,
                          nas_sha256=nas_sha256, jellyfin_verification=jellyfin,
+                         backup_relative=(backup['backup_relative'] if backup else None),
+                         backup_sha256=(backup['backup_sha256'] if backup else None),
                          effective_sha256=effective_sha, timestamp=timestamp,
                          completed_at=timestamp if phase == 'COMPLETED' else None)
             connection.execute(

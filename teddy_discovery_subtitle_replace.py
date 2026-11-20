@@ -5,6 +5,7 @@ import json
 import re
 import shlex
 import subprocess
+from pathlib import PurePosixPath
 
 from teddy_discovery_subtitle import derive_target_ko_relative
 from teddy_discovery_subtitle_publish import (
@@ -27,14 +28,27 @@ class ReplacementWitness:
             raise SubtitlePublishValidationError('invalid replacement source witness')
 
 
+def expected_replacement_backup_relative(target_relative, operation_id):
+    target = PurePosixPath(target_relative)
+    if (type(target_relative) is not str or not target_relative or target.is_absolute()
+            or '..' in target.parts or type(operation_id) is not str
+            or re.fullmatch('[0-9a-f]{64}', operation_id) is None):
+        raise SubtitlePublishValidationError('invalid replacement backup identity')
+    name = '.' + target.name + '.replacement-' + operation_id
+    if name.endswith('.srt'):
+        raise SubtitlePublishValidationError('replacement backup must not be a subtitle')
+    return str(target.parent / name)
+
+
 def replacement_worker(root, video_relative, target_relative, action, old_sha, new_sha,
                        operation_id, payload, checkpoint=None, expected_source_size=None, expected_source_mtime=None):
     """Linux native atomic exchange; displaced bytes stay private until verified.
 
     This function is self-contained so the SSH bridge executes the same code.
-    A process crash leaves the displaced old file at the operation's temp name.
-    Retry verifies that backup before cleanup. A detected exchange race is
-    rolled back only while both exchanged inode identities remain unchanged.
+    A process crash or completed exchange leaves the displaced old file at the
+    operation's hidden backup name. Retries verify and retain that backup; it is
+    never automatically removed. A detected exchange race is rolled back only
+    while both exchanged inode identities remain unchanged.
     """
     import ctypes
     import fcntl
@@ -106,7 +120,7 @@ def replacement_worker(root, video_relative, target_relative, action, old_sha, n
             or '..' in video.parts or '..' in target.parts or video.parent != target.parent
             or target.name != video.parent.name + '.ko.srt'):
         fail()
-    if action not in ('inspect', 'replace', 'reconcile'):
+    if action not in ('inspect', 'inspect-backup', 'replace', 'reconcile'):
         fail()
     parent = directory(str(root_parts / target.parent))
     lock_fd = None
@@ -140,6 +154,20 @@ def replacement_worker(root, video_relative, target_relative, action, old_sha, n
         if action == 'inspect':
             return dict(sha256=digest(current), source_size_bytes=video_info.st_size,
                         source_mtime_ns=video_info.st_mtime_ns)
+        if action == 'inspect-backup':
+            if (type(old_sha) is not str or re.fullmatch('[0-9a-f]{64}', old_sha) is None
+                    or type(operation_id) is not str
+                    or re.fullmatch('[0-9a-f]{64}', operation_id) is None):
+                fail()
+            temp = '.' + target.name + '.replacement-' + operation_id
+            backup, backup_info = read(temp, parent, 8 * 1024 * 1024)
+            if (digest(backup) != old_sha or backup_info.st_uid != os.geteuid()
+                    or stat.S_IMODE(backup_info.st_mode) != 0o600):
+                fail()
+            relative = str(target.parent / temp)
+            if PurePosixPath(relative).name.endswith('.srt'):
+                fail()
+            return dict(backup_relative=relative, backup_sha256=old_sha)
         if (any(re.fullmatch('[0-9a-f]{64}', v or '') is None for v in (old_sha, new_sha, operation_id))
                 or old_sha == new_sha or type(payload) is not bytes
                 or not 0 < len(payload) <= 8 * 1024 * 1024 or digest(payload) != new_sha):
@@ -175,6 +203,26 @@ def replacement_worker(root, video_relative, target_relative, action, old_sha, n
         validate_lock(True)
         current, old_info = read(target.name, parent, 8 * 1024 * 1024)
         temp = '.' + target.name + '.replacement-' + operation_id
+        backup_relative = str(target.parent / temp)
+        def verified_backup():
+            backup, backup_info = read(temp, parent, 8 * 1024 * 1024)
+            if (digest(backup) != old_sha or backup_info.st_uid != os.geteuid()
+                    or backup_info.st_mode & 0o022
+                    or PurePosixPath(backup_relative).name.endswith('.srt')):
+                fail()
+            if stat.S_IMODE(backup_info.st_mode) != 0o600:
+                backup_fd = safe_fd(temp, parent)
+                try:
+                    if key(os.fstat(backup_fd)) != key(backup_info):
+                        fail()
+                    os.fchmod(backup_fd, 0o600)
+                    os.fsync(backup_fd)
+                finally:
+                    os.close(backup_fd)
+                backup_after, backup_info = read(temp, parent, 8 * 1024 * 1024)
+                if backup_after != backup or stat.S_IMODE(backup_info.st_mode) != 0o600:
+                    fail()
+            return dict(backup_relative=backup_relative, backup_sha256=old_sha)
         def finish_permissions(expected_inode, old_mode):
             descriptor = safe_fd(target.name, parent)
             try:
@@ -187,26 +235,19 @@ def replacement_worker(root, video_relative, target_relative, action, old_sha, n
             finally:
                 os.close(descriptor)
         if digest(current) == new_sha:
-            try:
-                backup, backup_info = read(temp, parent, 8 * 1024 * 1024)
-            except FileNotFoundError:
-                backup_info = None
-            else:
-                if digest(backup) != old_sha:
-                    fail()
+            backup_evidence = verified_backup()
+            backup, backup_info = read(temp, parent, 8 * 1024 * 1024)
             verify_parent_and_video()
             finish_permissions(old_info.st_ino, backup_info.st_mode if backup_info else old_info.st_mode)
             final_check, _ = read(target.name,parent,8 * 1024 * 1024)
             if final_check != payload:
                 fail()
-            if backup_info is not None:
-                backup_check, backup_now = read(temp,parent,8 * 1024 * 1024)
-                if backup_check != backup or backup_now.st_ino != backup_info.st_ino:
-                    fail()
-                os.unlink(temp, dir_fd=parent)
+            backup_check, backup_now = read(temp,parent,8 * 1024 * 1024)
+            if backup_check != backup or backup_now.st_ino != backup_info.st_ino:
+                fail()
             os.fsync(parent)
             verify_parent_and_video()
-            return dict(sha256=new_sha, replaced=False)
+            return dict(sha256=new_sha, replaced=False, **backup_evidence)
         if action == 'reconcile':
             fail()
         if digest(current) != old_sha:
@@ -273,13 +314,12 @@ def replacement_worker(root, video_relative, target_relative, action, old_sha, n
         if final != payload or digest(final) != new_sha:
             fail()
         verify_parent_and_video()
+        backup_evidence = verified_backup()
         backup_check, backup_info = read(temp, parent, 8 * 1024 * 1024)
         if backup_check != current or backup_info.st_ino != old_info.st_ino:
             fail()
-        os.unlink(temp, dir_fd=parent)
-        temp = None
         os.fsync(parent)
-        return dict(sha256=new_sha, replaced=True)
+        return dict(sha256=new_sha, replaced=True, **backup_evidence)
     finally:
         # Never discard displaced old bytes after an unverified exchange.
         if temp is not None and created and not exchanged:
@@ -339,6 +379,22 @@ print(json.dumps(result,sort_keys=True,separators=(",",":")))
             raise SubtitlePublishValidationError('detached replacement witness')
         return ReplacementWitness(**value)
 
+    def inspect_backup(self, video, destination, *, expected_old_sha256, operation_id):
+        if destination != derive_target_ko_relative(video):
+            raise SubtitlePublishValidationError('noncanonical replacement destination')
+        if (type(expected_old_sha256) is not str
+                or re.fullmatch('[0-9a-f]{64}', expected_old_sha256) is None):
+            raise SubtitlePublishValidationError('invalid expected backup SHA')
+        expected_relative = expected_replacement_backup_relative(destination, operation_id)
+        value = self._invoke(video, 'inspect-backup', expected_old_sha256,
+                             operation_id=operation_id)
+        if (type(value) is not dict
+                or set(value) != {'backup_relative', 'backup_sha256'}
+                or value['backup_relative'] != expected_relative
+                or value['backup_sha256'] != expected_old_sha256):
+            raise SubtitlePublishValidationError('replacement backup witness is detached')
+        return value
+
     def replace(self, video, artifact, *, expected_old_sha256, expected_new_sha256, operation_id, source_witness):
         if type(source_witness) is not ReplacementWitness or source_witness.sha256 != expected_old_sha256:
             raise SubtitlePublishValidationError('replacement requires exact source/old SHA witness')
@@ -350,8 +406,13 @@ print(json.dumps(result,sort_keys=True,separators=(",",":")))
                for v in (expected_old_sha256, expected_new_sha256, operation_id)):
             raise SubtitlePublishValidationError('replacement requires exact old/new operation identity')
         value = self._invoke(video, 'replace', expected_old_sha256, expected_new_sha256, operation_id, validated[0], source_witness)
-        if (type(value) is not dict or set(value) != {'sha256','replaced'}
-                or value['sha256'] != expected_new_sha256 or type(value['replaced']) is not bool):
+        expected_backup = expected_replacement_backup_relative(
+            derive_target_ko_relative(video), operation_id)
+        if (type(value) is not dict
+                or set(value) != {'sha256','replaced','backup_relative','backup_sha256'}
+                or value['sha256'] != expected_new_sha256 or type(value['replaced']) is not bool
+                or value['backup_relative'] != expected_backup
+                or value['backup_sha256'] != expected_old_sha256):
             raise SubtitlePublishValidationError('replacement read-back invalid')
         return value
 
@@ -366,6 +427,10 @@ print(json.dumps(result,sort_keys=True,separators=(",",":")))
             raise SubtitlePublishValidationError('replacement reconciliation identity invalid')
         source_witness.__post_init__()
         value = self._invoke(video,'reconcile',expected_old_sha256,expected_new_sha256,operation_id,validated[0],source_witness)
-        if value != {'sha256':expected_new_sha256,'replaced':False}:
+        expected_backup = expected_replacement_backup_relative(
+            derive_target_ko_relative(video), operation_id)
+        if value != {'sha256':expected_new_sha256,'replaced':False,
+                     'backup_relative':expected_backup,
+                     'backup_sha256':expected_old_sha256}:
             raise SubtitlePublishValidationError('replacement reconciliation witness invalid')
         return value

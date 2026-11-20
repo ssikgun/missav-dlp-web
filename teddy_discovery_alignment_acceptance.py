@@ -578,6 +578,7 @@ def select_affine_consensus_from_candidates(
     residual_threshold_ms: int,
     minimum_scale: float,
     maximum_scale: float,
+    _dual_resource_budget: bool = False,
 ) -> tuple[AffineConsensusAlignment, AlignmentAcceptanceDecision] | None:
     """Exhaust bounded chains, retaining only the best fit and its tie state.
 
@@ -585,21 +586,31 @@ def select_affine_consensus_from_candidates(
     even after an accepted provisional best; ambiguity is decided only after
     exhaustion, since a later better rank clears earlier equal-rank ties.
     """
+    if type(_dual_resource_budget) is not bool:
+        raise AlignmentAcceptanceValidationError("dual resource budget must be boolean")
     validated_policy = _validated_policy(policy)
     best = None
     best_rank = None
     best_identity = None
     ambiguous = False
+    slope_cache: dict[tuple[int, int, int, int], Fraction] | None = (
+        {} if _dual_resource_budget else None
+    )
+    generator_kwargs = {"_dual_resource_budget": True} if _dual_resource_budget else {}
+    fit_kwargs = ({"_new_slope_budget": [0]} if _dual_resource_budget else {})
     for anchors in iter_unique_affine_consensus_anchor_chains(
         candidates,
         residual_threshold_ms=residual_threshold_ms,
         minimum_scale=minimum_scale,
         maximum_scale=maximum_scale,
+        **generator_kwargs,
     ):
         alternative = AffineConsensusAlignment(
             anchors=anchors,
             alignment=infer_robust_affine_alignment(
                 anchors, residual_threshold_ms=residual_threshold_ms,
+                _slope_cache=slope_cache,
+                **fit_kwargs,
             ),
         )
         decision = decide_alignment_acceptance(alternative.alignment, validated_policy)
