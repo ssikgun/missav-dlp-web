@@ -1005,3 +1005,9 @@ Provision and independently verify the owner-private targeted-worker config and 
 ### Remaining operational gate
 
 On actual CT108, independently confirm the current VM122 repository SHA/clean state, SSH key and known_hosts, virtualenv, model cache/snapshot, and worker JSON ownership/path before provisioning the 0600 configuration. Then pass the new read-only deploy preflight. No service/timer activation or real ASR/model execution is authorized by this implementation result; timer state was not queried in the Codex sandbox and the timer unit itself is unchanged.
+
+## 2026-11-21 — Permanent Stage11 release preparation authorized
+
+- Under `S11-MVP001 / IN_PROGRESS`, the user authorized the existing `deploy/stage11-normal/deploy.sh prepare` action and its Stage12 bulk preflight for product commit `29b8be26a10e3e5dbab7802f09995ab108a40a6f` on `teddy-subtitle-stage11`. Verify the existing rollout DB schema read-only first and stop if any required table or index is missing. Keep current, runtime.env, Stage9, Downloader, and the inactive Stage11 service and disabled/inactive timer as they are. This authorization covers release preparation only.
+- User-reported actual CT108 evidence: `CT108_SAFETY=PASS`, `CANONICAL_SOURCE=PASS`, `VM122_READ_ONLY_PREFLIGHT=PASS`, `CONFIG_PROVISIONING=PASS`, `CONFIG_PERMISSIONS=0600`, `MODEL_EXECUTION=0`, `WORKER_STARTED=NO`, `DEPLOY=NOT_RUN`, `TIMER_CHANGED=NO`. This supersedes the earlier pending config-provisioning status. Runtime values and credentials are excluded.
+- Codex PID 1 was `codex`. The actual CT108 schema check, release preparation and Stage12 bulk preflight were not run by Codex. No operating state was changed and no model or publication was run.
