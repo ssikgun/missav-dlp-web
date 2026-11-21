@@ -432,10 +432,16 @@ def process_identity(pid):
 def expected_command(payload):
     command = payload.get("command")
     if (type(command) is not list or not command
-            or any(type(item) is not str or not item or
-                   any(ord(ch) < 32 or ord(ch) == 127 for ch in item)
-                   for item in command)):
+            or any(type(item) is not str or not item for item in command)):
         stop(27)
+    query_indexes = [i for i, item in enumerate(command) if item == "-q"]
+    if len(query_indexes) != 1 or query_indexes[0] + 1 >= len(command):
+        stop(30)
+    query_index = query_indexes[0] + 1
+    for index, item in enumerate(command):
+        if any(ord(ch) == 127 or (ord(ch) < 32 and not (
+                index == query_index and ch == "\n")) for ch in item):
+            stop(27)
     settings = payload.get("hermes_execution_settings")
     if type(settings) is not dict:
         stop(28)
@@ -476,10 +482,7 @@ def expected_command(payload):
             or option("--reasoning") != values.get("reasoning_effort")
             or option("--resume") != SESSION):
         stop(29)
-    query_indexes = [i for i, item in enumerate(command) if item == "-q"]
-    if len(query_indexes) != 1 or query_indexes[0] + 1 >= len(command):
-        stop(30)
-    query = command[query_indexes[0] + 1]
+    query = command[query_index]
     if INPUT_NAME not in query or RESULT_NAME not in query or TASK not in query:
         stop(30)
     timeout_env = payload.get("timeout_environment")
@@ -536,7 +539,16 @@ def start():
                 "review_execution_session_id", "request_sha256",
                 "supervisor_script"}:
             stop(35)
-        command, command_sha, settings, timeout_env, timeout = expected_command(payload)
+        try:
+            command, command_sha, settings, timeout_env, timeout = expected_command(payload)
+        except SystemExit as error:
+            exit_code = error.code if type(error.code) is int and 0 < error.code < 256 else 27
+            print(json.dumps({
+                "state": "START_VALIDATION_FAILED",
+                "failure_stage": "COMMAND_VALIDATION",
+                "exit_code": exit_code,
+            }, separators=(",", ":")), flush=True)
+            raise
         supervisor_script = payload.get("supervisor_script")
         if (type(supervisor_script) is not str or not supervisor_script
                 or len(supervisor_script) > 128 * 1024):
@@ -1477,15 +1489,31 @@ class SSHRemoteHermesBridge:
             raise Stage11DeploymentTransportError(
                 "CT120 SSH transport failed"
             ) from error
-        if getattr(completed, "returncode", None) != 0:
-            raise Stage11DeploymentTransportError(
-                "CT120 native command failed"
-            )
         output = getattr(completed, "stdout", b"")
         if capture and type(output) is not bytes:
             raise Stage11DeploymentTransportError(
                 "CT120 captured output is not bytes"
             )
+        if getattr(completed, "returncode", None) != 0:
+            error = Stage11DeploymentTransportError(
+                "CT120 native command failed"
+            )
+            if capture:
+                try:
+                    diagnostic = json.loads(output.decode("ascii"))
+                except (UnicodeError, ValueError, json.JSONDecodeError):
+                    diagnostic = None
+                if (type(diagnostic) is dict
+                        and set(diagnostic) == {
+                            "state", "failure_stage", "exit_code",
+                        }
+                        and diagnostic.get("state") == "START_VALIDATION_FAILED"
+                        and diagnostic.get("failure_stage") == "COMMAND_VALIDATION"
+                        and type(diagnostic.get("exit_code")) is int
+                        and 27 <= diagnostic["exit_code"] <= 34):
+                    error.safe_failure_stage = "COMMAND_VALIDATION"
+                    error.safe_exit_code = diagnostic["exit_code"]
+            raise error
         return output if capture else b""
 
     def _python(
@@ -2048,9 +2076,17 @@ finally:
                     result_payload=result_payload,
                 )
             if state in {"NOT_STARTED", "SUPERVISOR_LOST"}:
+                failure_stage = getattr(start_error, "safe_failure_stage", None)
+                exit_code = getattr(start_error, "safe_exit_code", None)
+                diagnostic = (
+                    f"; start_failure_stage={failure_stage}; start_exit_code={exit_code}"
+                    if failure_stage == "COMMAND_VALIDATION"
+                    and type(exit_code) is int and 27 <= exit_code <= 34
+                    else ""
+                )
                 raise Stage11DeploymentTransportError(
                     "CT120 review execution state is not owned or verifiable; session="
-                    + session_id
+                    + session_id + diagnostic
                 ) from start_error
             time.sleep(min(
                 QUALITY_REVIEW_STATUS_POLL_SECONDS,

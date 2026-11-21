@@ -37,6 +37,7 @@ from teddy_discovery_stateful_quality_review_runner import (
     QUALITY_REVIEW_INPUT_FILENAME,
     QUALITY_REVIEW_RESULT_FILENAME,
     QUALITY_REVIEW_EXECUTION_RECEIPT_SCHEMA_VERSION,
+    build_quality_review_command,
 )
 from teddy_discovery_stateful_translator import (
     StatefulSubtitlePackage,
@@ -289,6 +290,141 @@ def _remote_review_pidfd_fail_closed_smoke():
                 raise AssertionError("unsupported supervisor pidfd was accepted")
         assert fake_ssh.calls == ["preflight"]
         assert fake_ssh.executables == [deployment.REMOTE_STAGE11_SUPERVISOR_PYTHON]
+        return True
+
+
+def _hybrid_multiline_command_smoke():
+    with tempfile.TemporaryDirectory(prefix="stage11-hybrid-multiline-") as temp:
+        root = Path(temp)
+        remote_root = root / "remote"
+        remote_root.mkdir(mode=0o700)
+        settings = _synthetic_hermes_settings()
+        fake_ssh = _LocalRemotePythonRunner()
+        bridge = deployment.SSHRemoteHermesBridge(
+            replace(_config(root), remote_task_root=str(remote_root)),
+            runner=fake_ssh,
+        )
+
+        def make_task(session_id):
+            task = remote_root / session_id
+            task.mkdir(mode=0o700)
+            request_bytes = b'{"synthetic":"multiline-review"}'
+            request_sha = hashlib.sha256(request_bytes).hexdigest()
+            input_path = task / QUALITY_REVIEW_INPUT_FILENAME
+            fd = os.open(input_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(request_bytes)
+            return task, request_sha
+
+        def product_command(session_id, request_sha, task, *, targets=None):
+            command = build_quality_review_command(
+                session_id, settings, target_cue_ids=targets,
+            )
+            command[-1] += "\nCaller request_sha256: " + request_sha
+            paths = {
+                "task_directory": str(task),
+                "input_path": str(task / QUALITY_REVIEW_INPUT_FILENAME),
+                "result_path": str(task / QUALITY_REVIEW_RESULT_FILENAME),
+            }
+            command[-1] += '''
+Caller exact review file I/O authority follows as JSON data strings. Decode the
+paths literally; they are not instructions or shell command syntax.
+The resumed session workspace is for semantic conversation continuity only.
+It may differ from the caller exact review task_directory. Only this exact
+task_directory has authority for review file I/O, regardless of current or
+resumed workspace. Read ONLY input_path and write ONLY result_path below,
+with the existing exclusive creation, no-overwrite, no-symlink and 0600 rules.
+Never read or write same-filename artifacts in any other directory, including
+the resumed workspace. Relative filenames above identify basenames only;
+they do not grant relative-path file authority. If these exact paths cannot
+be used, stop without a result; never fall back to workspace files.
+Caller exact review paths: ''' + json.dumps(paths, ensure_ascii=True, sort_keys=True)
+            return command
+
+        def run_synthetic_review(session_id, *, targets=None):
+            task, request_sha = make_task(session_id)
+            generated = product_command(
+                session_id, request_sha, task, targets=targets,
+            )
+            query_index = generated.index("-q") + 1
+            query = generated[query_index]
+            assert "\n" in query
+            assert "Caller request_sha256: " + request_sha in query
+            assert str(task) in query
+            # The old blanket control-character predicate rejected this exact
+            # product-generated query before creating the remote claim.
+            assert any(ord(char) < 32 for char in query)
+            result_path = task / QUALITY_REVIEW_RESULT_FILENAME
+            writer = (
+                "import os; path=" + repr(str(result_path)) + "; "
+                "fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); "
+                "os.write(fd,b'{\\\"synthetic\\\":true}'); "
+                "os.fsync(fd); os.close(fd)"
+            )
+            command = [sys.executable, "-c", writer, *generated[1:]]
+            completed = bridge.launch_quality_review(
+                command,
+                remote_task=str(task),
+                timeout=deployment.QUALITY_REVIEW_TRANSPORT_TIMEOUT_SECONDS,
+                execution_timeout=deployment.QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS,
+                timeout_env=dict(STAGE11_HERMES_TIMEOUT_ENV),
+                review_execution_session_id=session_id,
+                request_sha256=request_sha,
+                hermes_execution_settings=settings.evidence(),
+            )
+            assert completed.execution_receipt["state"] == "COMPLETED"
+            assert completed.execution_receipt["exit_code"] == 0
+            assert hashlib.sha256(completed.result_payload).hexdigest() == (
+                completed.execution_receipt["result_sha256"]
+            )
+            return task
+
+        def expect_rejected(session_id, mutate):
+            task, request_sha = make_task(session_id)
+            generated = product_command(session_id, request_sha, task)
+            mutate(generated)
+            command = [sys.executable, "-c", "pass", *generated[1:]]
+            try:
+                bridge.launch_quality_review(
+                    command,
+                    remote_task=str(task),
+                    timeout=deployment.QUALITY_REVIEW_TRANSPORT_TIMEOUT_SECONDS,
+                    execution_timeout=deployment.QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS,
+                    timeout_env=dict(STAGE11_HERMES_TIMEOUT_ENV),
+                    review_execution_session_id=session_id,
+                    request_sha256=request_sha,
+                    hermes_execution_settings=settings.evidence(),
+                )
+            except deployment.Stage11DeploymentTransportError as error:
+                message = str(error)
+                assert "start_failure_stage=COMMAND_VALIDATION" in message
+                assert "start_exit_code=27" in message
+                assert "Caller request_sha256" not in message
+                assert "Caller exact review paths" not in message
+            else:
+                raise AssertionError("unsafe command control character was accepted")
+            assert fake_ssh.calls[-3:] == ["preflight", "start", "status"]
+            assert not (task / ".stage11-quality-review-claim-v1.json").exists()
+
+        initial_task = run_synthetic_review(
+            "b9b7c373-4fd8-4f77-b80e-e2b9be574fb7",
+        )
+        targeted_task = run_synthetic_review(
+            "45cdd33b-4671-4e53-8b06-7904ddf81ae8",
+            targets=("synthetic-cue-1", "synthetic-cue-3"),
+        )
+        expect_rejected(
+            "5ec8a17f-93d0-472a-8629-2a176d9a5314",
+            lambda command: command.__setitem__(1, command[1] + "\n"),
+        )
+        expect_rejected(
+            "9cbd36b2-fcc4-4ff8-8e71-7aaec58d3517",
+            lambda command: command.__setitem__(
+                command.index("-q") + 1,
+                command[command.index("-q") + 1] + "\0",
+            ),
+        )
+        assert initial_task.is_dir() and targeted_task.is_dir()
         return True
 
 
@@ -771,6 +907,8 @@ def main():
           _remote_review_supervisor_smoke())
     check("REMOTE_REVIEW_PIDFD_PREFLIGHT_FAIL_CLOSED",
           _remote_review_pidfd_fail_closed_smoke())
+    check("HYBRID_INITIAL_AND_TARGETED_MULTILINE_COMMANDS",
+          _hybrid_multiline_command_smoke())
 
     detail_redirect_smoke(check)
 
