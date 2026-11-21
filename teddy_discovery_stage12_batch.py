@@ -751,6 +751,7 @@ class Stage12BatchRunner:
         ],
         retry_authorization: Stage12ExplicitRetryAuthorization | None = None,
         title_lock_dir: str | Path | None = None,
+        reuse_existing_completion: bool = False,
     ):
         if not isinstance(store, Stage12RolloutStateStore):
             raise Stage12BatchSystemicError("invalid rollout state store")
@@ -815,6 +816,9 @@ class Stage12BatchRunner:
         self.controller_runner = controller_runner
         self.jellyfin_recognizer = jellyfin_recognizer
         self.retry_authorization = retry_authorization
+        self.reuse_existing_completion = reuse_existing_completion
+        if reuse_existing_completion and retry_authorization is not None:
+            raise Stage12BatchSystemicError("existing completion cannot use retry mode")
         self.title_lock_dir = (
             title_lock_dir if title_lock_dir is not None else configured_lock_dir()
         )
@@ -1069,6 +1073,14 @@ class Stage12BatchRunner:
                 jellyfin_recognition="NOT_RUN",
             )
 
+        retained = None
+        if self.reuse_existing_completion:
+            retained = self.controller_runner(dvd_id)
+            if (not isinstance(retained, Stage11ControllerResult)
+                    or retained.title != dvd_id
+                    or not retained.clean_reused or not retained.report_reused):
+                raise Stage12BatchSystemicError("existing completion was not verified")
+
         running = self.store.transition(
             dvd_id,
             STATE_RUNNING,
@@ -1101,7 +1113,7 @@ class Stage12BatchRunner:
             },
         )
         try:
-            controller_result = self.controller_runner(dvd_id)
+            controller_result = retained if retained is not None else self.controller_runner(dvd_id)
         except Stage11DeploymentTransportError as error:
             return self._fail_title(
                 running,
@@ -1198,6 +1210,7 @@ class Stage12BatchRunner:
             expected_from=STATE_RUNNING,
             reason="STAGE12_ARTIFACTS_VALIDATED",
             provenance={
+                **({"existing_completion_reused": True} if retained is not None else {}),
                 "operation": "STAGE12_SERIAL_BATCH",
                 "stage11_result": "PASS",
                 "route": controller_result.route,
@@ -1350,6 +1363,7 @@ class Stage12BatchRunner:
             expected_from=STATE_GENERATED,
             reason="STAGE12_PUBLICATION_AND_JELLYFIN_VERIFIED",
             provenance={
+                **({"existing_completion_reused": True} if retained is not None else {}),
                 "operation": "STAGE12_SERIAL_BATCH",
                 "publication_performed": True,
                 "atomic_install": True,
@@ -1383,6 +1397,8 @@ class Stage12BatchRunner:
             raise Stage12BatchSystemicError(
                 "explicit retry requires exactly its one authorized title"
             )
+        if self.reuse_existing_completion and (selection.batch_size != 1 or len(selection.dvd_ids) != 1):
+            raise Stage12BatchSystemicError("existing completion requires exactly one title")
         titles = tuple(
             self._run_one(dvd_id)
             for dvd_id in selection.dvd_ids

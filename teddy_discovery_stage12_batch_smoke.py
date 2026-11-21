@@ -1398,6 +1398,33 @@ def main():
             "PUBLISHED_RERUN_REJECTED",
         )
 
+
+    with TemporaryDirectory(prefix="stage12-retained-smoke-") as temp:
+        root = Path(temp) / "artifacts"
+        root.mkdir()
+        store = Stage12RolloutStateStore(Path(temp) / "state.sqlite3")
+        store.initialize_from_inventory(report)
+        nas = FakeNAS(records)
+        publisher = FakePublisher(nas)
+        runner = make_runner(root, records[:2], store, controller_calls=[],
+                             nas=nas, publisher=publisher)
+        load_fixture = runner.controller_runner
+        runner.reuse_existing_completion = True
+
+        def load_retained(title):
+            require(store.get(title).status == STATE_PENDING, "VALIDATE_BEFORE_RUNNING")
+            return replace(load_fixture(title), clean_reused=True, report_reused=True)
+
+        runner.controller_runner = load_retained
+        expect_raises(Stage12BatchSystemicError,
+                      lambda: runner.run(Stage12BatchSelection(2, ("AAA-001", "AAA-002"))),
+                      "RETAINED_REJECTS_MULTI_TITLE")
+        result = runner.run(Stage12BatchSelection(1, ("AAA-001",))).titles[0]
+        require(result.final_state == STATE_PUBLISHED
+                and publisher.calls == ["AAA-001"]
+                and store.get("AAA-002").status == STATE_PENDING,
+                "RETAINED_PUBLISHES_EXACT_TITLE")
+
     print("STAGE12_BATCH_SMOKE=PASS")
 
 
