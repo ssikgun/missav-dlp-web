@@ -131,6 +131,7 @@ class Stage11DeploymentTransportError(Stage11DeploymentError):
 QUALITY_REVIEW_CLEANUP_GRACE_SECONDS = 30.0
 QUALITY_REVIEW_STATUS_POLL_SECONDS = 10
 QUALITY_REVIEW_REMOTE_CALL_TIMEOUT_SECONDS = 30
+REMOTE_STAGE11_SUPERVISOR_PYTHON = "/usr/bin/python3"
 
 
 # This standard-library-only program runs on CT120.  A detached supervisor
@@ -167,6 +168,23 @@ def digest(data):
 def encode(value):
     return json.dumps(value, ensure_ascii=True, sort_keys=True,
                       separators=(",", ":"), allow_nan=False).encode("ascii")
+
+def pidfd_supported():
+    if not hasattr(os, "pidfd_open") or not hasattr(signal, "pidfd_send_signal"):
+        return False
+    descriptor = None
+    try:
+        descriptor = os.pidfd_open(os.getpid(), 0)
+        signal.pidfd_send_signal(descriptor, 0, None, 0)
+        return True
+    except (OSError, TypeError, ValueError):
+        return False
+    finally:
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
 
 def check_identity():
     try:
@@ -500,6 +518,9 @@ def receipt_base(*, state, request_sha, command_sha, settings, timeout,
     }
 
 def start():
+    if not pidfd_supported():
+        print(json.dumps({"state": "PIDFD_UNAVAILABLE"}, separators=(",", ":")))
+        return
     fd = open_task()
     try:
         raw = sys.stdin.buffer.read(1024 * 1024 + 1)
@@ -747,7 +768,10 @@ def status():
         os.close(fd)
 
 check_identity()
-if ACTION == "start":
+if ACTION == "preflight":
+    state = "PIDFD_SUPPORTED" if pidfd_supported() else "PIDFD_UNAVAILABLE"
+    print(json.dumps({"state": state}, separators=(",", ":")))
+elif ACTION == "start":
     start()
 elif ACTION == "supervise":
     supervisor()
@@ -1757,6 +1781,36 @@ finally:
         # remote dialogue contents to CT108.
         return [None] * count
 
+    def _require_remote_supervisor_pidfd(
+        self, *, remote_task: str, session_id: str, request_sha256: str,
+    ) -> None:
+        """Prove the selected system Python can safely signal through pidfds."""
+        raw = self._python(
+            _REMOTE_QUALITY_REVIEW_EXECUTION_SCRIPT,
+            "preflight", remote_task, session_id, request_sha256,
+            capture=True,
+            timeout=QUALITY_REVIEW_REMOTE_CALL_TIMEOUT_SECONDS,
+            python_executable=REMOTE_STAGE11_SUPERVISOR_PYTHON,
+        )
+        try:
+            value = json.loads(raw.decode("ascii"))
+        except (UnicodeError, ValueError, json.JSONDecodeError) as error:
+            raise Stage11DeploymentTransportError(
+                "CT120 supervisor Python pidfd preflight response is malformed"
+            ) from error
+        if type(value) is not dict or set(value) != {"state"}:
+            raise Stage11DeploymentTransportError(
+                "CT120 supervisor Python pidfd preflight response is invalid"
+            )
+        if value["state"] == "PIDFD_UNAVAILABLE":
+            raise Stage11DeploymentValidationError(
+                "CT120 /usr/bin/python3 lacks working pidfd_open/pidfd_send_signal support"
+            )
+        if value["state"] != "PIDFD_SUPPORTED":
+            raise Stage11DeploymentTransportError(
+                "CT120 supervisor Python pidfd preflight state is invalid"
+            )
+
     def read_quality_review_execution(
         self,
         *,
@@ -1804,7 +1858,7 @@ finally:
                 *arguments,
                 capture=True,
                 timeout=timeout_seconds,
-                python_executable=REMOTE_HERMES_PYTHON,
+                python_executable=REMOTE_STAGE11_SUPERVISOR_PYTHON,
             )
             value = json.loads(raw.decode("ascii"))
         except (UnicodeError, ValueError, json.JSONDecodeError) as error:
@@ -1896,6 +1950,11 @@ finally:
             json.dumps(command, ensure_ascii=True, sort_keys=True,
                        separators=(",", ":"), allow_nan=False).encode("ascii")
         ).hexdigest()
+        self._require_remote_supervisor_pidfd(
+            remote_task=remote_task,
+            session_id=session_id,
+            request_sha256=request_sha256,
+        )
         intent = {
             "command": command,
             "command_sha256": command_sha,
@@ -1916,6 +1975,7 @@ finally:
             )
         deadline = time.monotonic() + timeout
         start_error = None
+        start = None
         try:
             raw = self._python(
                 _REMOTE_QUALITY_REVIEW_EXECUTION_SCRIPT,
@@ -1923,19 +1983,23 @@ finally:
                 input_payload=intent_payload,
                 capture=True,
                 timeout=QUALITY_REVIEW_REMOTE_CALL_TIMEOUT_SECONDS,
-                python_executable=REMOTE_HERMES_PYTHON,
+                python_executable=REMOTE_STAGE11_SUPERVISOR_PYTHON,
             )
             start = json.loads(raw.decode("ascii"))
-            if type(start) is not dict or start.get("state") not in {
-                "START_ACCEPTED", "CLAIM_EXISTS", "START_FAILED",
-            }:
-                raise Stage11DeploymentTransportError(
-                    "CT120 review start response is invalid"
-                )
         except Exception as error:
             # A lost SSH response is not permission to start a second remote
             # process.  Continue with read-only status checks for this UUID.
             start_error = error
+        if type(start) is dict and start.get("state") == "PIDFD_UNAVAILABLE":
+            raise Stage11DeploymentValidationError(
+                "CT120 /usr/bin/python3 lacks working pidfd_open/pidfd_send_signal support"
+            )
+        if type(start) is dict and start.get("state") not in {
+            "START_ACCEPTED", "CLAIM_EXISTS", "START_FAILED",
+        }:
+            start_error = Stage11DeploymentTransportError(
+                "CT120 review start response is invalid"
+            )
 
         while time.monotonic() < deadline:
             remaining = deadline - time.monotonic()

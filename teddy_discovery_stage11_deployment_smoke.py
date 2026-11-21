@@ -71,6 +71,7 @@ class _LocalRemotePythonRunner:
 
     def __init__(self):
         self.calls = []
+        self.executables = []
         self.lose_next_start_response = False
 
     def __call__(self, argv, **kwargs):
@@ -79,6 +80,7 @@ class _LocalRemotePythonRunner:
         if len(parts) < 3 or parts[1] != "-c":
             raise AssertionError("unexpected synthetic SSH command")
         self.calls.append(parts[3] if len(parts) > 3 else "probe")
+        self.executables.append(parts[0])
         with patch.object(subprocess, "Popen", _REAL_SUBPROCESS_POPEN):
             completed = _REAL_SUBPROCESS_RUN(
                 [sys.executable, *parts[1:]],
@@ -183,6 +185,14 @@ def _remote_review_supervisor_smoke():
         )
         normal = run_case(session_id=normal_id, child_code=normal_code,
                           expect_state="COMPLETED")
+        assert fake_ssh.calls[:2] == ["preflight", "start"]
+        assert all(
+            executable == deployment.REMOTE_STAGE11_SUPERVISOR_PYTHON
+            for action, executable in zip(fake_ssh.calls, fake_ssh.executables)
+            if action in {"preflight", "start", "status"}
+        )
+        assert deployment.REMOTE_STAGE11_SUPERVISOR_PYTHON == "/usr/bin/python3"
+        assert deployment.REMOTE_HERMES_PYTHON != deployment.REMOTE_STAGE11_SUPERVISOR_PYTHON
 
         sleeper = _REAL_SUBPROCESS_POPEN(
             [sys.executable, "-c", "import time; time.sleep(30)"],
@@ -244,6 +254,42 @@ def _remote_review_supervisor_smoke():
             sleeper.wait(timeout=5)
         return (normal["cleanup_confirmed"] and timed["cleanup_confirmed"]
                 and not unidentified["cleanup_confirmed"])
+
+
+def _remote_review_pidfd_fail_closed_smoke():
+    with tempfile.TemporaryDirectory(prefix="stage11-review-pidfd-") as temp:
+        root = Path(temp)
+        remote_root = root / "remote"
+        remote_root.mkdir(mode=0o700)
+        fake_ssh = _LocalRemotePythonRunner()
+        bridge = deployment.SSHRemoteHermesBridge(
+            replace(_config(root), remote_task_root=str(remote_root)),
+            runner=fake_ssh,
+        )
+        unsupported_script = deployment._REMOTE_QUALITY_REVIEW_EXECUTION_SCRIPT.replace(
+            "def pidfd_supported():\n",
+            "def pidfd_supported():\n    return False\n",
+            1,
+        )
+        session_id = "c5181944-bceb-4cf5-9c8b-a8d4ed73881a"
+        with patch.object(
+            deployment,
+            "_REMOTE_QUALITY_REVIEW_EXECUTION_SCRIPT",
+            unsupported_script,
+        ):
+            try:
+                bridge._require_remote_supervisor_pidfd(
+                    remote_task=str(remote_root / session_id),
+                    session_id=session_id,
+                    request_sha256="a" * 64,
+                )
+            except deployment.Stage11DeploymentValidationError as error:
+                assert "pidfd_open/pidfd_send_signal" in str(error)
+            else:
+                raise AssertionError("unsupported supervisor pidfd was accepted")
+        assert fake_ssh.calls == ["preflight"]
+        assert fake_ssh.executables == [deployment.REMOTE_STAGE11_SUPERVISOR_PYTHON]
+        return True
 
 
 def _synthetic_hermes_settings():
@@ -723,6 +769,8 @@ def main():
 
     check("REMOTE_REVIEW_SUPERVISOR_NORMAL_AND_TIMEOUT_CLEANUP",
           _remote_review_supervisor_smoke())
+    check("REMOTE_REVIEW_PIDFD_PREFLIGHT_FAIL_CLOSED",
+          _remote_review_pidfd_fail_closed_smoke())
 
     detail_redirect_smoke(check)
 
