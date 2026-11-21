@@ -1,8 +1,8 @@
-"""Lazy, bounded VM122 worker lifecycle for targeted Stage11 ASR.
+"""Lazy, bounded VM122 worker lifecycle for Stage11 ASR.
 
-The worker is started only when a targeted request is made. Callers must open
-one session around source preparation and targeted inference so the 900-second
-worker lifetime is not spent copying media. Runtime paths are read from one
+The worker is started only when the first ASR chunk is submitted. Callers open
+one session around source preparation and inference so the bounded worker
+lifetime is not spent copying media. Runtime paths are read from one
 owner-private permanent configuration file; no temporary candidate checkout is
 imported or executed.
 """
@@ -250,9 +250,11 @@ class BoundedASRWorkerLifecycle:
     """SSH/tunnel operations copied from the verified lifecycle, parameterized."""
 
     def __init__(self, config: BoundedASRWorkerConfig, *, popen=subprocess.Popen,
+                 runner=subprocess.run,
                  clock=time.monotonic, sleep=time.sleep, socket_factory=socket.socket):
         self.config = config
         self._popen = popen
+        self._runner = runner
         self._clock = clock
         self._sleep = sleep
         self._socket_factory = socket_factory
@@ -370,6 +372,55 @@ class BoundedASRWorkerLifecycle:
             raise
         return session
 
+    def read_only_preflight(self) -> None:
+        """Verify remote source/runtime/model files without starting a worker."""
+        c = self.config
+        launcher = str(
+            Path(c.remote_repo_root)
+            / "teddy_discovery_asr_int8_ephemeral_launcher.py"
+        )
+        verify_snapshot = (
+            "import sys; from teddy_discovery_asr_int8_ephemeral_launcher "
+            "import verified_snapshot; "
+            "verified_snapshot(sys.argv[1], sys.argv[2])"
+        )
+        python_check = " ".join((
+            shlex.quote(c.remote_python), "-B", "-c", shlex.quote(verify_snapshot),
+            shlex.quote(c.model_cache_root), shlex.quote(c.model_snapshot),
+        ))
+        remote = " ".join((
+            "set -eu;",
+            "cd -- " + shlex.quote(c.remote_repo_root) + ";",
+            "test \"$(git rev-parse --show-toplevel)\" = "
+            + shlex.quote(c.remote_repo_root) + ";",
+            "test \"$(git branch --show-current)\" = "
+            + shlex.quote(CANONICAL_BRANCH) + ";",
+            "test \"$(git rev-parse HEAD)\" = "
+            + shlex.quote(c.remote_source_sha) + ";",
+            "test \"$(git remote get-url origin)\" = "
+            + shlex.quote(CANONICAL_ORIGIN) + ";",
+            "test -z \"$(git status --porcelain)\";",
+            "test -x " + shlex.quote(c.remote_python) + ";",
+            "test -f " + shlex.quote(launcher) + ";",
+            python_check + ";",
+            "printf '%s\\n' STAGE11_ASR_PREFLIGHT=PASS",
+        ))
+        command = self._ssh_base()
+        command.append(remote)
+        try:
+            result = self._runner(
+                command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, timeout=30, check=False,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            raise BoundedASRWorkerError(
+                "VM122_ASR_PREFLIGHT_UNAVAILABLE"
+            ) from error
+        if (getattr(result, "returncode", None) != 0
+                or "STAGE11_ASR_PREFLIGHT=PASS" not in
+                str(getattr(result, "stdout", "")).splitlines()):
+            raise BoundedASRWorkerError("VM122_ASR_PREFLIGHT_FAILED")
+
 
 class BoundedTargetedASRSession:
     def __init__(self, *, client, lifecycle: BoundedASRWorkerLifecycle):
@@ -408,10 +459,21 @@ class BoundedTargetedASRSession:
             self._state = "START_FAILED"
             raise
 
-    def transcribe_targeted_chunk(self, chunk):
+    def _transcribe(self, method: str, chunk):
         self._start()
         self.request_count += 1
-        return self._client.transcribe_targeted_chunk(chunk)
+        callback = getattr(self._client, method, None)
+        if not callable(callback):
+            raise BoundedASRWorkerError("ASR_REQUEST_METHOD_UNAVAILABLE")
+        return callback(chunk)
+
+    def transcribe_chunk(self, chunk):
+        """Submit one full-title baseline chunk through the owned worker."""
+        return self._transcribe("transcribe_chunk", chunk)
+
+    def transcribe_targeted_chunk(self, chunk):
+        """Submit one HYBRID targeted chunk through the owned worker."""
+        return self._transcribe("transcribe_targeted_chunk", chunk)
 
     def _cleanup(self) -> bool:
         if self._cleanup_attempted:
@@ -464,6 +526,16 @@ class BoundedTargetedASRTransport:
         self._lifecycle_factory = lifecycle_factory
         self.runtime_identity = REMOTE_GPU_LARGE_V3_INT8_FLOAT16_RUNTIME_IDENTITY
         self.engine_version = "1.2.1"
+
+    def read_only_preflight(self) -> None:
+        """Check local identity and remote execution files without ASR/model use."""
+        config = BoundedASRWorkerConfig.load(self.config_path)
+        _validate_local_ssh_file(config.ssh_key, private_key=True)
+        _validate_local_ssh_file(config.known_hosts, private_key=False)
+        if not shutil.which("ssh"):
+            raise BoundedASRWorkerError("SSH_CLIENT_UNAVAILABLE")
+        lifecycle = self._lifecycle_factory(config)
+        lifecycle.read_only_preflight()
 
     @contextmanager
     def session(self):

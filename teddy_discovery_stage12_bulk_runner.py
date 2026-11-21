@@ -448,7 +448,7 @@ fi
 def network_probe() -> None:
     endpoints = (
         ("CT120", CT120_HOST, 22),
-        ("VM122", "192.168.1.134", 8091),
+        ("VM122", "192.168.1.134", 22),
         ("NAS", NAS["nas_host"], 22),
         ("JELLYFIN", "192.168.1.205", 8096),
         ("SUBTITLECAT_PROXY", "127.0.0.1", 58888),
@@ -476,6 +476,24 @@ def network_probe() -> None:
             "required connectivity failed: "
             + ",".join(failures)
         )
+
+
+def on_demand_asr_preflight() -> None:
+    """Verify the idle worker's configuration and source without starting it."""
+    from teddy_discovery_asr_bounded_worker import BoundedTargetedASRTransport
+
+    transport = BoundedTargetedASRTransport()
+    try:
+        transport.read_only_preflight()
+    except Exception as error:
+        # Expose only the fixed error type/code, never SSH output or paths.
+        code = getattr(error, "code", "ASR_WORKER_PREFLIGHT_FAILED")
+        if not isinstance(code, str) or not code.isascii() or not code.replace("_", "").isalnum():
+            code = "ASR_WORKER_PREFLIGHT_FAILED"
+        emit("ON_DEMAND_ASR_PREFLIGHT", "FAIL_" + code)
+        raise Stage12BulkRunnerError("on-demand ASR worker preflight failed") from error
+    emit("ON_DEMAND_ASR_PREFLIGHT", "PASS")
+    emit("WHISPER_WORKER_IDLE_EXPECTED", "YES")
 
 
 def contract_check() -> None:
@@ -1331,6 +1349,7 @@ def run_preflight(
     inspect_runtime_directories()
     inspect_remote_root()
     network_probe()
+    on_demand_asr_preflight()
 
     store = Stage12RolloutStateStore(
         ROLLOUT_DB

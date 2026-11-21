@@ -493,6 +493,94 @@ class NormalSmoke(unittest.TestCase):
         self.assertFalse((root/'targeted-needed-output'/'artifacts'/result.title/
                           normal.controller.CLEAN_SRT_FILENAME).exists())
 
+    def test_regeneration_reacquires_missing_or_detached_historical_inputs(self):
+        import teddy_discovery_stage11_regeneration as regeneration
+        root=Path(self.temp.name)/'regen-acquire'
+        root.mkdir(mode=0o700)
+        acquired={'baseline':0,'japanese':0}
+        verified=[]
+
+        class Dependencies:
+            remote_bridge=object()
+            fail_external=False
+            def controller_kwargs(_self):
+                def baseline(_video):
+                    acquired['baseline']+=1
+                    return self.baseline
+                def external(_video,_baseline):
+                    acquired['japanese']+=1
+                    if _self.fail_external:
+                        raise RuntimeError('synthetic subtitle acquisition failure')
+                    return self.route.alignment_application
+                return {
+                    'holding_resolver':lambda _title:fixture._holding(self.baseline),
+                    'baseline_transcriber':baseline,
+                    'external_ja_attempt':external,
+                    'targeted_runner':lambda *_args:self.fail('unbounded targeted ASR used'),
+                    'asr_review_runner':lambda *_args:self.fail('unexpected ASR review'),
+                    'hybrid_review_runner':self.review,
+                    'hybrid_targeted_runner':self.targeted,
+                }
+            def capture_external_ja_attempt(_self,callback): return callback
+            def capture_first_pass_runner(_self,_callback): return self.first
+
+        class AcquiredLock:
+            status=regeneration.ACQUIRED
+            def __enter__(self): return self
+            def __exit__(self,*_args): return False
+
+        old_ko=root/'existing-ko.srt'
+        old_ko.write_bytes(b'preserved-existing-korean')
+        old_ko.chmod(0o600)
+        rollout=root/'rollout-state.sqlite3'
+        rollout.write_bytes(b'unchanged-state')
+        rollout.chmod(0o600)
+        old_ko_before=old_ko.read_bytes(); rollout_before=rollout.read_bytes()
+        stale=replace(self.baseline,source_snapshot=replace(
+            self.baseline.source_snapshot,
+            source_size=self.baseline.source_snapshot.source_size+1))
+        stale_raw=normal.controller.serialize_asr_result(stale)
+        stale_path=root/'stale-baseline.json'
+        stale_path.write_bytes(stale_raw); stale_path.chmod(0o600)
+        absent_ja=root/'missing-ja.srt'
+        ja_raw=self.route.alignment_application.bundle.external_ja_payload.payload
+        with patch.object(regeneration,'configured_lock_dir',return_value=root/'locks'), \
+             patch.object(regeneration,'try_acquire_title_lock',return_value=AcquiredLock()):
+            result=regeneration.regenerate_one_title(
+                self.baseline.source_snapshot.dvd_id,
+                run_root=root/'private-run',
+                baseline_path=stale_path,
+                baseline_sha256=normal.sha(stale_raw),
+                japanese_srt_path=absent_ja,
+                japanese_srt_sha256=normal.sha(ja_raw),
+                japanese_srt_source_id=(
+                    self.route.alignment_application.bundle.external_ja_payload
+                    .candidate.external_source_id),
+                dependencies=Dependencies(),
+                acceptance_policy=policy_with(),
+                source_verifier=lambda video,snapshot:verified.append((video,snapshot)),
+                claim_token=11)
+        self.assertEqual(acquired,{'baseline':1,'japanese':1})
+        self.assertEqual(result.route,'HYBRID')
+        self.assertTrue(result.clean_path.is_file())
+        self.assertEqual(len(verified),2)
+        self.assertEqual(old_ko.read_bytes(),old_ko_before)
+        self.assertEqual(rollout.read_bytes(),rollout_before)
+        self.assertEqual((self.first_calls,self.review_calls,self.targeted_calls),(1,1,0))
+        dependencies=Dependencies(); dependencies.fail_external=True
+        with patch.object(regeneration,'configured_lock_dir',return_value=root/'locks'), \
+             patch.object(regeneration,'try_acquire_title_lock',return_value=AcquiredLock()):
+            with self.assertRaises(normal.controller.Stage11ControllerValidationError):
+                regeneration.regenerate_one_title(
+                    self.baseline.source_snapshot.dvd_id,
+                    run_root=root/'failed-private-run',
+                    dependencies=dependencies,
+                    acceptance_policy=policy_with(),
+                    source_verifier=lambda video,snapshot:verified.append((video,snapshot)),
+                    claim_token=12)
+        self.assertEqual(old_ko.read_bytes(),old_ko_before)
+        self.assertEqual(rollout.read_bytes(),rollout_before)
+
     def test_native_validation_is_bounded_and_preserves_raw_evidence(self):
         calls=[]
         class Bridge:
@@ -619,6 +707,112 @@ class NormalSmoke(unittest.TestCase):
         self.assertLess(events.index('media_temp_cleanup'),events.index('worker_stop'))
         self.assertLess(events.index('worker_stop'),events.index('tunnel_stop'))
 
+    def test_full_title_worker_is_lazy_and_stops_after_copy_on_success_and_failure(self):
+        snapshot=self.baseline.source_snapshot
+        video=SimpleNamespace(video_format='mp4',dvd_id=snapshot.dvd_id)
+        config=SimpleNamespace(ssh_key='/unused/key',known_hosts='/unused/hosts')
+
+        def execute(*,fail=False):
+            events=[]
+            class Client:
+                runtime_identity=self.baseline.runtime_identity
+                engine_version=self.baseline.engine_version
+                def transcribe_chunk(_self,_chunk):
+                    events.append('asr_request')
+                    if fail: raise RuntimeError('synthetic request failure')
+                    return self.baseline.segments
+            class Worker:
+                def stop(_self):
+                    events.append('worker_stop')
+                    return True
+            class Lifecycle:
+                def __init__(_self,_config): pass
+                def start_tunnel(_self):
+                    events.append('tunnel_start')
+                    return object()
+                def start_worker(_self):
+                    events.append('worker_start')
+                    return Worker()
+                def _stop_process(_self,_process):
+                    events.append('tunnel_stop')
+                    return True
+            class Source:
+                @contextmanager
+                def copy_to_temp(_self,*_args,**_kwargs):
+                    events.append('media_copy_start')
+                    events.append('media_copy_complete')
+                    try:
+                        yield object()
+                    finally:
+                        events.append('media_cleanup')
+            class FakeFullTitleTranscriber:
+                def __init__(_self,*,source_provider,whisper,**_kwargs):
+                    _self.source_provider=source_provider
+                    _self.whisper=whisper
+                def __call__(_self,_video):
+                    with _self.source_provider.copy_to_temp(_video):
+                        _self.whisper.transcribe_chunk(object())
+                    return self.baseline
+
+            transport=bounded_worker.BoundedTargetedASRTransport(
+                client_factory=lambda _config:Client(), lifecycle_factory=Lifecycle)
+            with patch.object(bounded_worker.BoundedASRWorkerConfig,'load',return_value=config), \
+                 patch.object(bounded_worker,'_validate_local_ssh_file'), \
+                 patch.object(live_adapters,'_snapshot',return_value=(video,snapshot)), \
+                 patch.object(live_adapters,'FullTitleASRTranscriber',FakeFullTitleTranscriber):
+                adapter=live_adapters.build_baseline_adapter(
+                    holding_resolver=lambda _title:None,source_provider=Source(),
+                    whisper=transport)
+                if fail:
+                    with self.assertRaisesRegex(RuntimeError,'synthetic request failure'):
+                        adapter(video)
+                else:
+                    self.assertEqual(adapter(video),self.baseline)
+            self.assertLess(events.index('media_copy_complete'),events.index('tunnel_start'))
+            self.assertLess(events.index('tunnel_start'),events.index('worker_start'))
+            self.assertLess(events.index('worker_start'),events.index('asr_request'))
+            self.assertLess(events.index('media_cleanup'),events.index('worker_stop'))
+            self.assertLess(events.index('worker_stop'),events.index('tunnel_stop'))
+            return events
+
+        execute()
+        execute(fail=True)
+
+    def test_idle_worker_preflight_is_read_only_and_checks_source_snapshot(self):
+        config=SimpleNamespace(
+            remote_repo_root='/home/teddy/stage11-worker',
+            remote_source_sha='1e7d8fa4f40c8cdb37a6fdc65c58b9f3163a7602',
+            ssh_key='/root/.ssh/stage11',
+            known_hosts='/root/.ssh/known_hosts-stage11',
+            remote_python='/opt/stage11-venv/bin/python',
+            model_cache_root='/home/teddy/.cache/huggingface/hub',
+            model_snapshot='/home/teddy/.cache/huggingface/hub/models--Systran--faster-whisper-large-v3/snapshots/'+'a'*40,
+        )
+        calls=[]
+        def runner(command,**kwargs):
+            calls.append((command,kwargs))
+            return SimpleNamespace(returncode=0,stdout='STAGE11_ASR_PREFLIGHT=PASS\n',stderr='private synthetic detail')
+        def forbidden_popen(*_args,**_kwargs):
+            raise AssertionError('read-only preflight must not start a worker')
+        lifecycle=lambda value:bounded_worker.BoundedASRWorkerLifecycle(
+            value,runner=runner,popen=forbidden_popen)
+        transport=bounded_worker.BoundedTargetedASRTransport(
+            client_factory=lambda _config:None,lifecycle_factory=lifecycle)
+        with patch.object(bounded_worker.BoundedASRWorkerConfig,'load',return_value=config), \
+             patch.object(bounded_worker,'_validate_local_ssh_file'), \
+             patch.object(bounded_worker.shutil,'which',return_value='/usr/bin/ssh'):
+            transport.read_only_preflight()
+        self.assertEqual(len(calls),1)
+        command,kwargs=calls[0]
+        remote=command[-1]
+        self.assertEqual(kwargs['timeout'],30)
+        self.assertIn('git status --porcelain',remote)
+        self.assertIn(config.remote_source_sha,remote)
+        self.assertIn("-B -c",remote)
+        self.assertIn('verified_snapshot',remote)
+        self.assertNotIn(' serve ',remote)
+        self.assertNotIn('8091',remote)
+
     def test_targeted_worker_failures_cleanup_only_owned_sessions(self):
         config=SimpleNamespace(ssh_key='/unused/key',known_hosts='/unused/hosts')
         events=[]
@@ -683,6 +877,9 @@ class NormalSmoke(unittest.TestCase):
         self.assertEqual(transport.request_timeout_seconds,900)
         explicit=object()
         self.assertIs(deployment._build_targeted_asr_transport(config,explicit),explicit)
+        full_title, targeted=deployment._build_asr_transports(config)
+        self.assertIs(full_title,targeted)
+        self.assertIsInstance(full_title,bounded_worker.BoundedTargetedASRTransport)
 
     def test_regeneration_exposes_only_bounded_hybrid_targeted_runner(self):
         class Live:

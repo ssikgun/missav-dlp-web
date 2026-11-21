@@ -30,7 +30,6 @@ from teddy_discovery_alignment_application import (
 )
 from teddy_discovery_asr_artifact import serialize_asr_result
 from teddy_discovery_asr_audio import iter_audio_chunks
-from teddy_discovery_asr_remote import RemoteFasterWhisperASR
 from teddy_discovery_asr_source import (
     ASRMediaSourceReader,
     ASR_MEDIA_TEMP_RESERVE_BYTES,
@@ -1567,6 +1566,21 @@ def _build_targeted_asr_transport(config, override=None):
     )
 
 
+def _build_asr_transports(config, *, whisper=None, targeted_transport=None):
+    """Share one lazy worker transport for production full-title and targeted ASR."""
+    live_whisper = whisper
+    if live_whisper is None:
+        live_whisper = _build_targeted_asr_transport(config)
+    if targeted_transport is not None:
+        live_targeted = targeted_transport
+    elif (getattr(live_whisper, "bounded_worker_lifecycle", False) is True
+          and callable(getattr(live_whisper, "session", None))):
+        live_targeted = live_whisper
+    else:
+        live_targeted = _build_targeted_asr_transport(config)
+    return live_whisper, live_targeted
+
+
 def build_stage11_deployment_dependencies(
     config: Stage11DeploymentConfig,
     *,
@@ -1624,13 +1638,8 @@ def build_stage11_deployment_dependencies(
             require_disk_backed=True,
             reserve_bytes=config.asr_media_temp_reserve_bytes,
         )
-    live_whisper = whisper
-    if live_whisper is None:
-        live_whisper = RemoteFasterWhisperASR(
-            base_url=config.asr_base_url,
-            request_timeout_seconds=config.request_timeout_seconds,
-        )
-    live_targeted = _build_targeted_asr_transport(config, targeted_transport)
+    live_whisper, live_targeted = _build_asr_transports(
+        config, whisper=whisper, targeted_transport=targeted_transport)
     live_discovery = discovery
     if live_discovery is None:
         live_discovery = SubtitleCatDiscovery(

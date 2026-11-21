@@ -131,12 +131,15 @@ def build_baseline_adapter(*, holding_resolver, source_provider, whisper,
                                     canonical_video.dvd_id)
         if video != canonical_video:
             raise Stage11LiveAdapterError("baseline holding detached")
-        return FullTitleASRTranscriber(
-            source_provider=source_provider, whisper=whisper,
-            max_media_bytes=snapshot.source_size,
-            expected_source_snapshot=snapshot,
-            audio_chunk_iterator=audio_chunk_iterator,
-        )(video)
+        session_factory = getattr(whisper, "session", None)
+        session = session_factory() if callable(session_factory) else nullcontext(whisper)
+        with session as active_whisper:
+            return FullTitleASRTranscriber(
+                source_provider=source_provider, whisper=active_whisper,
+                max_media_bytes=snapshot.source_size,
+                expected_source_snapshot=snapshot,
+                audio_chunk_iterator=audio_chunk_iterator,
+            )(video)
     return baseline
 
 

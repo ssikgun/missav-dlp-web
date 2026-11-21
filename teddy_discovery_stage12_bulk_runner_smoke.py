@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import time
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from teddy_discovery_stage12_bulk_runner import (
     HeartbeatWriter,
     Stage12BulkRunnerError,
     configured_batch_size,
     eligible_pending_ids,
+    network_probe,
+    on_demand_asr_preflight,
 )
 
 
@@ -43,6 +47,26 @@ def state(
 
 
 def main():
+    probed=[]
+    def connect(address,*,timeout):
+        probed.append(address)
+        return nullcontext()
+    with patch("teddy_discovery_stage12_bulk_runner.socket.create_connection",
+               side_effect=connect):
+        network_probe()
+    assert ("192.168.1.134",22) in probed
+    assert ("192.168.1.134",8091) not in probed
+    preflight_events=[]
+    class IdleTransport:
+        def read_only_preflight(self): preflight_events.append("READ_ONLY_REMOTE_CHECK")
+    with patch("teddy_discovery_asr_bounded_worker.BoundedTargetedASRTransport",
+               return_value=IdleTransport()), \
+         patch("teddy_discovery_stage12_bulk_runner.emit",
+               side_effect=lambda key,value:preflight_events.append((key,value))):
+        on_demand_asr_preflight()
+    assert "READ_ONLY_REMOTE_CHECK" in preflight_events
+    assert ("WHISPER_WORKER_IDLE_EXPECTED","YES") in preflight_events
+
     store = FakeStore(
         (
             state("AAA-001", "PENDING"),
