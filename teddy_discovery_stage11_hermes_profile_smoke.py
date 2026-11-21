@@ -93,12 +93,19 @@ def main():
             "'default': 'synthetic-model'}, 'agent': {'reasoning_effort': 'high'}}\n",
             encoding="utf-8",
         )
-        timeout_reads = "\n".join(
-            f"VALUE_{index} = os.getenv({name!r})"
-            for index, name in enumerate(STAGE11_HERMES_TIMEOUT_ENV_NAMES)
+        (source / "run_agent.py").write_text(
+            f"import os\nAPI_STALE = os.getenv({STAGE11_HERMES_TIMEOUT_ENV_NAMES[0]!r})\n",
+            encoding="utf-8",
         )
-        (source / "agent" / "__init__.py").write_text(
-            "import os\n" + timeout_reads + "\n", encoding="utf-8"
+        helpers = source / "agent" / "chat_completion_helpers.py"
+        helper_calls = "\n".join(
+            f"VALUE_{index} = _env_float({name!r}, 1)"
+            for index, name in enumerate(STAGE11_HERMES_TIMEOUT_ENV_NAMES[1:])
+        )
+        helpers.write_text(
+            "def _env_float(name, default): return default\n"
+            + helper_calls + "\n",
+            encoding="utf-8",
         )
         dist = source / "hermes_agent-1.2.3.dist-info"
         dist.mkdir(mode=0o700)
@@ -127,11 +134,14 @@ def main():
         missing_source = root / "missing-timeout-source"
         import shutil
         shutil.copytree(source, missing_source)
-        agent_init = missing_source / "agent" / "__init__.py"
-        agent_init.write_text(
-            agent_init.read_text(encoding="utf-8").replace(
-                f"os.getenv({STAGE11_HERMES_TIMEOUT_ENV_NAMES[0]!r})", "os.getenv('OTHER')"
-            ), encoding="utf-8",
+        helper_copy = missing_source / "agent" / "chat_completion_helpers.py"
+        helper_copy.write_text(
+            helper_copy.read_text(encoding="utf-8").replace(
+                f"_env_float({STAGE11_HERMES_TIMEOUT_ENV_NAMES[1]!r}, 1)",
+                "_env_float('OTHER', 1)",
+            ) + "\n# " + STAGE11_HERMES_TIMEOUT_ENV_NAMES[1] + "\n"
+            + repr(STAGE11_HERMES_TIMEOUT_ENV_NAMES[1]) + "\n",
+            encoding="utf-8",
         )
         unsupported = _remote_probe(missing_source, config)
         assert unsupported.returncode != 0, "unsupported timeout env was not rejected"

@@ -226,36 +226,54 @@ try:
         if spec is None or not spec.submodule_search_locations:
             raise SystemExit(28)
         package_roots.extend(Path(item) for item in spec.submodule_search_locations)
-    allowed_calls = {'getenv', 'env_int', 'env_float', 'env_bool',
-                     'env_seconds', 'get_env_int', 'get_env_float',
-                     'get_env_bool'}
-    supported = set()
-    for root in package_roots:
-        for path in root.rglob('*.py'):
-            try:
-                if path.stat().st_size > 2 * 1024 * 1024:
-                    continue
-                tree = ast.parse(path.read_text(encoding='utf-8'))
-            except (OSError, UnicodeError, SyntaxError):
-                continue
-            for node in ast.walk(tree):
-                if not isinstance(node, ast.Call):
-                    continue
-                fn = node.func.attr if isinstance(node.func, ast.Attribute) else (
-                    node.func.id if isinstance(node.func, ast.Name) else '')
-                if fn not in allowed_calls and not (
-                    isinstance(node.func, ast.Attribute) and node.func.attr == 'get'
-                    and isinstance(node.func.value, ast.Attribute)
-                    and node.func.value.attr == 'environ'):
-                    continue
-                for arg in node.args:
-                    if isinstance(arg, ast.Constant) and type(arg.value) is str:
-                        if arg.value in timeout_names:
-                            supported.add(arg.value)
-            if len(supported) == len(timeout_names):
-                break
-        if len(supported) == len(timeout_names):
-            break
+    if (source_root / 'agent').resolve() not in {
+            root.resolve() for root in package_roots}:
+        raise SystemExit(28)
+    max_source_bytes = 2 * 1024 * 1024
+
+    def read_source_tree(path):
+        info = os.lstat(path)
+        if (stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode)
+                or info.st_size > max_source_bytes):
+            raise SystemExit(28)
+        source_bytes = path.read_bytes()
+        if len(source_bytes) != info.st_size:
+            raise SystemExit(28)
+        return ast.parse(source_bytes.decode('utf-8'))
+
+    # Hermes 0.20 reads the API stale-call setting in run_agent.py via
+    # os.getenv(), outside the agent package tree. Inspect that exact file.
+    run_agent_tree = read_source_tree(source_root / 'run_agent.py')
+    api_stale_name = timeout_names[0]
+    api_stale_read = any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == 'getenv'
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == 'os'
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and type(node.args[0].value) is str
+        and node.args[0].value == api_stale_name
+        for node in ast.walk(run_agent_tree)
+    )
+
+    # The remaining Hermes 0.20 timeout settings are read by _env_float()
+    # in the installed agent helper. Do not accept comments or bare strings.
+    helper_path = source_root / 'agent' / 'chat_completion_helpers.py'
+    helper_tree = read_source_tree(helper_path)
+    helper_reads = {
+        node.args[0].value
+        for node in ast.walk(helper_tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == '_env_float'
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and type(node.args[0].value) is str
+    }
+    supported = {api_stale_name} if api_stale_read else set()
+    supported.update(set(timeout_names[1:]) & helper_reads)
     if supported != set(timeout_names):
         raise SystemExit(29)
     print(json.dumps({
