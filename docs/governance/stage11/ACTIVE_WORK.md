@@ -1031,3 +1031,9 @@ On actual CT108, independently confirm the current VM122 repository SHA/clean st
 - User-reported HSODA-104 preflight: existing subtitle and source video PASS. Existing subtitle SHA-256: `09ad0c4588a52f5eb4d4ef3f48050524cac4b9edad474755ae3a89b500dcfa76`.
 - The user approved one HSODA-104 private subtitle generation trial using full-title Whisper ASR, automatic Japanese subtitle acquisition, Hermes translation, and targeted ASR only for isolated passages where needed. Reuse the prepared permanent release at `29b8be26a10e3e5dbab7802f09995ab108a40a6f`. Exclude the existing Korean subtitle from generation inputs.
 - Existing subtitle replacement, NAS publication, Jellyfin writes, Stage12 DB changes, and automatic timer activation remain unapproved for HSODA-104. This documentation update did not execute the trial.
+
+## 2026-11-21 — Model independent Whisper launch guard
+
+- Under `S11-MVP001 / IN_PROGRESS`, user approved Stage11 dynamic local LLM identity detection. User-reported HSODA-104 stopped at `SAFE_STOP_QWEN_IDENTITY_MISMATCH` after successful idle preflight, media copy and temp cleanup. Follow-up reported Gemma `gemma4-12b-v2` on port 8082 and 3417 MiB free, also below the independent 3500 MiB start gate. No residual worker, 8091 listener or CT108 18091 tunnel was reported.
+- Launcher verifies one current model ID and monitors that same identity. Model changes or an invalid API response stop only the owned ASR worker. CT108 reports allowlisted stop codes and keeps unverified cleanup a failure. GPU floors 3500/1500 MiB, 900-second worker/request limits and two-second observation interval are unchanged.
+- Offline launcher and Stage11 Normal Mode smoke passed with synthetic API/GPU/process responses. No actual model, service change, deployment, retry or publication. Apply later with separately pinned CT108 and VM122 checkouts as described in the Stage11 deployment README.

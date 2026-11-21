@@ -153,6 +153,17 @@ def _validate_local_ssh_file(path_text: str, *, private_key: bool) -> None:
         raise BoundedASRWorkerError("SSH_KNOWN_HOSTS_PERMISSIONS_INVALID")
 
 
+_REMOTE_FAILURE_CODES = frozenset({
+    "LOCAL_LLM_API_UNVERIFIED", "LOCAL_LLM_MODEL_CHANGED",
+    "GPU_HEADROOM_INSUFFICIENT", "GPU_HEADROOM_LOST",
+    "GPU_STATUS_UNVERIFIED", "GPU_COUNT_UNEXPECTED",
+    "WORKER_START_FAILED", "WORKER_UNAVAILABLE", "WORKER_EXITED",
+    "WORKER_STOP_UNVERIFIED", "RUNTIME_LIMIT",
+    # Older pinned launchers can still report these during rollback.
+    "QWEN_IDENTITY_MISMATCH", "QWEN_API_UNVERIFIED", "QWEN_HEALTH_LOST",
+})
+
+
 class WorkerSession:
     """Own one SSH PTY and require the existing remote SAFE_STOP evidence."""
 
@@ -162,10 +173,14 @@ class WorkerSession:
         self.messages: queue.Queue[str] = queue.Queue()
         self.remote_supervisor_pid: int | None = None
         self.remote_identity_valid = True
+        self.remote_failure: str | None = None
         self.reader = threading.Thread(target=self._read, daemon=True)
         self.reader.start()
 
     def _record(self, line: str) -> None:
+        prefix = "RESULT=SAFE_STOP_"
+        if line.startswith(prefix) and line[len(prefix):] in _REMOTE_FAILURE_CODES:
+            self.remote_failure = line[len(prefix):]
         if line.startswith("REMOTE_SUPERVISOR_PID="):
             raw = line.partition("=")[2]
             if not raw.isascii() or not raw.isdigit() or int(raw) <= 0:
@@ -242,6 +257,7 @@ class WorkerSession:
             and "REMOTE_SOURCE=PASS" in combined
             and self.process.returncode == 2
             and "WORKER_STOP_UNVERIFIED" not in combined
+            and self.remote_failure != "WORKER_STOP_UNVERIFIED"
             and any(line.startswith("RESULT=SAFE_STOP_") for line in self.lines)
         )
 
@@ -365,10 +381,15 @@ class BoundedASRWorkerLifecycle:
         try:
             session.wait_ready()
         except BaseException as error:
-            if not session.stop():
+            stopped = session.stop()
+            reason = session.remote_failure
+            if not stopped:
+                detail = f"_{reason}" if reason else ""
                 raise BoundedASRWorkerError(
-                    "VM122_WORKER_CLEANUP_UNVERIFIED"
+                    "VM122_WORKER_CLEANUP_UNVERIFIED" + detail
                 ) from error
+            if reason and isinstance(error, BoundedASRWorkerError):
+                raise BoundedASRWorkerError("VM122_REMOTE_" + reason) from error
             raise
         return session
 
@@ -431,6 +452,7 @@ class BoundedTargetedASRSession:
         self._worker: WorkerSession | None = None
         self._cleanup_attempted = False
         self._cleanup_ok: bool | None = None
+        self._remote_failure: str | None = None
         self.request_count = 0
         self.runtime_identity = client.runtime_identity
         self.engine_version = client.engine_version
@@ -488,6 +510,7 @@ class BoundedTargetedASRSession:
                 worker_ok = worker.stop() is True
             except BaseException:
                 worker_ok = False
+            self._remote_failure = worker.remote_failure if isinstance(worker, WorkerSession) else None
         if tunnel is not None:
             try:
                 tunnel_ok = self._lifecycle._stop_process(tunnel) is True
@@ -505,7 +528,16 @@ class BoundedTargetedASRSession:
         raise BoundedASRWorkerError("WORKER_OR_TUNNEL_CLEANUP_UNVERIFIED")
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
+        try:
+            self.close()
+        except BoundedASRWorkerError as error:
+            if self._remote_failure:
+                raise BoundedASRWorkerError(
+                    f"WORKER_OR_TUNNEL_CLEANUP_UNVERIFIED_{self._remote_failure}"
+                ) from error
+            raise
+        if self._remote_failure:
+            raise BoundedASRWorkerError("VM122_REMOTE_" + self._remote_failure) from exc_value
         return False
 
 

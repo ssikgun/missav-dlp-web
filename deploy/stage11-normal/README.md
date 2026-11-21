@@ -105,7 +105,7 @@ JSON keys are `remote_repo_root`, `remote_source_sha`, `ssh_key`,
 The deployment preflight checks VM122 SSH on port 22, validates this local
 configuration and SSH identity, then uses the configured virtualenv for a
 read-only repository and model-snapshot check. It does not require a listener on
-8091, start a worker, load a model, query GPU/Qwen, or create files. It reports
+8091, start a worker, load a model, query GPU or the local LLM API, or create files. It reports
 that the idle worker is expected. NAS, Hermes, Jellyfin, and SubtitleCat
 connectivity checks remain in place.
 
@@ -124,3 +124,42 @@ still stop the run. Existing Korean subtitles are never inputs. The ordinary
 new-holding queue continues to acquire baseline ASR and external Japanese
 evidence through the same Normal Mode path. Existing published/history rows
 are not automatically re-enqueued for regeneration.
+
+### Update both ends of the on-demand worker
+
+The VM122 launcher reads the single active model ID from local port 8082 and
+checks that it stays stable for the owned worker's lifetime. A model change or an
+unverifiable API response stops that worker. Model names do not affect eligibility.
+
+1. Prepare a new independent VM122 checkout under the worker user's home.
+   Use the canonical origin and branch `teddy-subtitle-stage11`, keep that
+   branch checked out, and verify the approved exact HEAD, repository root
+   and clean state. Retain the previous checkout and configuration.
+2. On VM122, from that checkout, use the existing configured virtualenv and
+   run the command below with the verified configuration values. Run this
+   readiness check before copying a full video. It checks current VRAM and
+   model identity without starting Whisper. Release preparation uses a
+   different idle preflight and does not require this point-in-time VRAM gate.
+
+   ```bash
+   "$remote_python" -B teddy_discovery_asr_int8_ephemeral_launcher.py check \
+     --cache-root "$model_cache_root" --snapshot "$model_snapshot" \
+     --min-free-vram-mib 3500
+   ```
+
+3. In an approved CT108 maintenance window with no Stage11 work active, retain
+   a private 0600 copy of the current worker JSON. Stage an owner-private 0600
+   replacement in the same directory with only `remote_repo_root` and
+   `remote_source_sha` updated to the verified VM122 checkout and commit.
+   Validate it with `BoundedASRWorkerConfig.load` and
+   `BoundedTargetedASRTransport.read_only_preflight()` using the staged path,
+   then atomically install the validated file. Keep SSH, Python, and model
+   snapshot settings from the existing verified configuration.
+4. From a clean checkout pinned to the approved new SHA, check the existing
+   rollout DB schema read-only before invoking
+   `bash deploy/stage11-normal/deploy.sh prepare "$approved_sha"`. The
+   prepare action leaves current and the timer in place. Verify the prepared
+   HEAD and Stage12 preflight log.
+5. If preparation fails, restore the saved JSON atomically so it again points
+   to the old VM122 checkout and SHA. Keep the existing CT108 release
+   `29b8be26a10e3e5dbab7802f09995ab108a40a6f` and both VM122 checkouts.
