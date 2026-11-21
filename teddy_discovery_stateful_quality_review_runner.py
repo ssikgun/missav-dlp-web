@@ -19,6 +19,7 @@ from collections.abc import Callable
 from teddy_discovery_quality_review_session import (
     QualityReviewSessionError,
     ensure_fresh_review_execution_session,
+    validate_canonical_review_execution_session_id,
 )
 from teddy_discovery_stateful_quality_review import (
     MAX_REVIEW_BYTES, QualityReviewRequest, QualityReviewResult,
@@ -30,6 +31,10 @@ from teddy_discovery_stateful_quality_review import (
 from teddy_discovery_stateful_translator import (
     build_stateful_translator_command, STATEFUL_TRANSLATOR_QUERY_FLAG,
     STATEFUL_TRANSLATOR_TASK_DIRECTORY_MODE, STATEFUL_TRANSLATOR_PRIVATE_FILE_MODE,
+)
+from teddy_discovery_stage11_hermes_profile import (
+    HermesExecutionSettings,
+    timeout_environment,
 )
 
 QUALITY_REVIEW_INPUT_FILENAME = 'stage11-quality-review-input.json'
@@ -274,9 +279,16 @@ class QualityReviewRunnerError(RuntimeError):
     """Invocation or private staging failed closed."""
 
 
-def build_quality_review_command(review_execution_session_id: str, *, target_cue_ids=None) -> list[str]:
+def build_quality_review_command(
+    review_execution_session_id: str,
+    hermes_settings: HermesExecutionSettings,
+    *,
+    target_cue_ids=None,
+) -> list[str]:
     """Reuse canonical UUID validation and all native first-pass command constants."""
-    command = build_stateful_translator_command(review_execution_session_id)
+    command = build_stateful_translator_command(
+        review_execution_session_id, hermes_settings
+    )
     index = command.index(STATEFUL_TRANSLATOR_QUERY_FLAG)
     command[index + 1] = QUALITY_REVIEW_QUERY
     if target_cue_ids is not None:
@@ -305,9 +317,14 @@ Caller target cue IDs: ''' + json.dumps(target_cue_ids, ensure_ascii=True)
     return command
 
 
-def build_asr_quality_review_command(review_execution_session_id: str) -> list[str]:
+def build_asr_quality_review_command(
+    review_execution_session_id: str,
+    hermes_settings: HermesExecutionSettings,
+) -> list[str]:
     """Build the native resume command with the pure ASR-only review prompt."""
-    command = build_stateful_translator_command(review_execution_session_id)
+    command = build_stateful_translator_command(
+        review_execution_session_id, hermes_settings
+    )
     index = command.index(STATEFUL_TRANSLATOR_QUERY_FLAG)
     command[index + 1] = ASR_ONLY_QUALITY_REVIEW_QUERY
     return command
@@ -333,7 +350,14 @@ def _validate_review_execution_session(
     review_execution_session_id: str,
 ) -> None:
     del request  # Source provenance is intentionally independent of execution ID.
-    build_quality_review_command(review_execution_session_id)
+    try:
+        validate_canonical_review_execution_session_id(
+            review_execution_session_id
+        )
+    except QualityReviewSessionError as error:
+        raise QualityReviewRunnerError(
+            'review execution session identity is invalid'
+        ) from error
 
 
 def _prepare_review_execution_session(
@@ -473,11 +497,12 @@ def read_quality_review_result(
     )
 
 
-def _launch(command, *, cwd, timeout):
+def _launch(command, *, cwd, timeout, env):
     # A pinned directory FD avoids path replacement between validation and exec.
     return subprocess.run(command, cwd=f'/proc/self/fd/{cwd}', pass_fds=(cwd,),
                           stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                          stderr=subprocess.DEVNULL, timeout=timeout, check=False)
+                          stderr=subprocess.DEVNULL, timeout=timeout, check=False,
+                          env=env)
 
 
 def _exact_task_directory(fd: int) -> Path:
@@ -501,6 +526,7 @@ def run_quality_review(
     fresh_review_session: bool = False,
     fresh_session_db: object | None = None,
     expected_profile_name: str | None = None,
+    hermes_settings: HermesExecutionSettings | None = None,
     launcher: Callable = _launch,
     timeout: int = 600,
     target_cue_ids: tuple[str, ...] | None = None,
@@ -515,6 +541,10 @@ def run_quality_review(
     """
     if type(timeout) is not int or timeout <= 0:
         raise QualityReviewRunnerError('timeout must be a positive integer')
+    if type(hermes_settings) is not HermesExecutionSettings:
+        raise QualityReviewRunnerError(
+            'resolved Stage11 Hermes profile settings are required'
+        )
     request = parse_review_request(request_payload, **originals)
     if target_cue_ids is not None:
         validate_review_target_ids(request, target_cue_ids)
@@ -534,7 +564,9 @@ def run_quality_review(
         review_execution_session_id=execution_session,
         **originals,
     )
-    command = build_quality_review_command(execution_session, target_cue_ids=target_cue_ids)
+    command = build_quality_review_command(
+        execution_session, hermes_settings, target_cue_ids=target_cue_ids
+    )
     command[-1] += '\nCaller request_sha256: ' + review_request_sha256(request)
     with _directory(task_directory) as fd:
         _absent(fd, QUALITY_REVIEW_RESULT_FILENAME)
@@ -561,7 +593,12 @@ they do not grant relative-path file authority. If these exact paths cannot
 be used, stop without a result; never fall back to workspace files.
 Caller exact review paths: ''' + json.dumps(paths, ensure_ascii=True, sort_keys=True)
         try:
-            completed = launcher(command, cwd=fd, timeout=timeout)
+            completed = launcher(
+                command,
+                cwd=fd,
+                timeout=timeout,
+                env=timeout_environment(os.environ),
+            )
         except (OSError, subprocess.SubprocessError) as error:
             raise QualityReviewRunnerError('review invocation failed') from error
         returncode = getattr(completed, 'returncode', None)

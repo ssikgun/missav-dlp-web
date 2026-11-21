@@ -41,8 +41,15 @@ from teddy_discovery_stateful_translator import (
     serialize_stateful_package, serialize_stateful_model_input, serialize_stateful_result,
     parse_stateful_result, stateful_session_id_for_package,
     bind_stateful_model_input_generation_key,
-    STATEFUL_TRANSLATOR_EXECUTABLE, STATEFUL_TRANSLATOR_PROVIDER,
-    STATEFUL_TRANSLATOR_MODEL, STATEFUL_TRANSLATOR_REASONING,
+    STATEFUL_TRANSLATOR_EXECUTABLE,
+)
+from teddy_discovery_stage11_hermes_profile import (
+    HermesExecutionSettings,
+    HermesProfileSettingsError,
+    STAGE11_HERMES_PROFILE_DIR,
+    STAGE11_HERMES_TIMEOUT_ENV,
+    legacy_receipt_matches,
+    validate_settings_evidence,
 )
 from teddy_discovery_subtitle import SubtitleCandidate
 from teddy_discovery_subtitle_external import ExternalSubtitlePayload
@@ -63,16 +70,26 @@ MAX_NATIVE_PROMPT_BYTES = 128000
 MAX_VALIDATION_ATTEMPTS = 2  # Existing native semantic validation retry bound.
 NATIVE_ABSOLUTE_TIMEOUT = 3600
 NATIVE_INACTIVITY_TIMEOUT = 600
+NATIVE_SETTINGS_FILENAME = 'stage11-hermes-execution-settings-v1.json'
 TIRITH_WARNING = ('  ⚠ tirith security scanner enabled but not available '
                   '— command scanning will use pattern matching only\r\n').encode()
 # Byte-identical to the previously verified canary277 tool-free profile. No auth.
-NATIVE_CONFIG = {"agent":{"disabled_toolsets":["all","memory"],"environment_probe":False,
-    "intent_ack_continuation":False,"reasoning_effort":"xhigh","tool_use_enforcement":False},
+NATIVE_CONFIG_BASE = {"agent":{"disabled_toolsets":["all","memory"],"environment_probe":False,
+    "intent_ack_continuation":False,"tool_use_enforcement":False},
     "compression":{"enabled":False},"context":{"engine":"compressor"},
     "display":{"interface":"cli","streaming":False},"fallback_providers":[],"mcp_servers":{},
     "memory":{"memory_enabled":False,"provider":"","user_profile_enabled":False},
-    "model":{"default":"gpt-5.6-luna","provider":"openai-codex"},
+    "model":{},
     "platform_toolsets":{"cli":[]},"plugins":{"enabled":[]},"terminal":{"cwd":".","env_type":"local"}}
+
+
+def native_config_for(settings):
+    if type(settings) is not HermesExecutionSettings:
+        raise HermesProfileSettingsError("resolved Stage11 Hermes settings are required")
+    config = json.loads(wire(NATIVE_CONFIG_BASE))
+    config['agent']['reasoning_effort'] = settings.reasoning_effort
+    config['model'] = {'default': settings.model, 'provider': settings.provider}
+    return config
 
 
 def wire(value):
@@ -119,8 +136,13 @@ check=subprocess.run(base+['prompt-size','--json'],cwd=task,env=env,capture_outp
 assert check.returncode==0 and json.loads(check.stdout)['tools']['count']==0,'native tools must be zero'
 command=base+['chat','-Q','--ignore-rules','--provider',req['provider'],'--model',req['model'],
               '--reasoning',req['reasoning'],'--max-turns','1','-q',prompt.decode()]
+model_env=dict(env); model_env.update(req['timeout_env'])
+assert model_env['HERMES_API_CALL_STALE_TIMEOUT']=='480'
+assert model_env['HERMES_CODEX_TTFB_TIMEOUT_SECONDS']=='300'
+assert model_env['HERMES_CODEX_TTFB_MAX_SECONDS']=='300'
+assert model_env['HERMES_CODEX_EVENT_STALE_TIMEOUT_SECONDS']=='300'
 started=time.monotonic(); last=started; reason=None
-proc=subprocess.Popen(command,cwd=task,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
+proc=subprocess.Popen(command,cwd=task,env=model_env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
 streams={'stdout':bytearray(),'stderr':bytearray()}
 selector=selectors.DefaultSelector()
 for name,s in (('stdout',proc.stdout),('stderr',proc.stderr)):
@@ -146,8 +168,50 @@ assert hashlib.sha256((task/'prompt.txt').read_bytes()).hexdigest()==req['prompt
 for p in (root,profile): assert not any((p/'skills').iterdir())
 print(json.dumps({'stdout':base64.b64encode(streams['stdout']).decode(),
     'stderr':base64.b64encode(streams['stderr']).decode(),'returncode':rc,
-    'timeout_reason':reason,'tools_count':0,'elapsed_seconds':time.monotonic()-started,'remote_root':str(root)}))
+    'timeout_reason':reason,'tools_count':0,'elapsed_seconds':time.monotonic()-started,
+    'timeout_env':req['timeout_env'],'remote_root':str(root)}))
 '''
+
+
+def _bind_staging_hermes_settings(directory, settings):
+    """Bind incomplete first-pass artifacts to one immutable model snapshot."""
+    if type(settings) is not HermesExecutionSettings:
+        raise controller.Stage11ControllerValidationError(
+            'resolved Stage11 Hermes settings are required')
+    path = directory / NATIVE_SETTINGS_FILENAME
+    expected = wire(settings.evidence())
+    exists = path.exists() or path.is_symlink()
+    if exists:
+        try:
+            persisted = json.loads(controller._read_private_file(path, max_bytes=65536))
+            validate_settings_evidence(persisted)
+        except Exception as error:
+            raise controller.Stage11ControllerArtifactError(
+                'staged Hermes settings binding is invalid') from error
+        if wire(persisted) != expected:
+            raise controller.Stage11ControllerArtifactError(
+                'unfinished Hermes result belongs to different profile settings')
+
+    receipt_paths = sorted(directory.glob('*-attempt-*.receipt.json'))
+    for receipt_path in receipt_paths:
+        try:
+            receipt = json.loads(controller._read_private_file(
+                receipt_path, max_bytes=1024 * 1024))
+        except Exception as error:
+            raise controller.Stage11ControllerArtifactError(
+                'staged Hermes attempt receipt is invalid') from error
+        if not legacy_receipt_matches(receipt, settings):
+            raise controller.Stage11ControllerArtifactError(
+                'unfinished Hermes attempt uses different profile settings')
+
+    has_result = (directory / 'stage11-semantic-result.json').exists()
+    has_parts = any(directory.glob('part-*.json'))
+    if not exists:
+        if (has_result or has_parts) and not receipt_paths:
+            raise controller.Stage11ControllerArtifactError(
+                'unfinished Hermes output has no verifiable model receipt')
+        store(path, expected)
+    return settings.evidence()
 
 
 def native_prompt(query, package, *, part_ids=None):
@@ -180,7 +244,10 @@ class NativeNormalFirstPass:
     def __init__(self, bridge):
         self.bridge = bridge
 
-    def invoke(self, prompt, directory, label, validator):
+    def invoke(self, prompt, directory, label, validator, *, hermes_settings):
+        if type(hermes_settings) is not HermesExecutionSettings:
+            raise controller.Stage11ControllerValidationError(
+                'resolved Stage11 Hermes settings are required')
         if len(prompt) > MAX_NATIVE_PROMPT_BYTES:
             raise controller.Stage11ControllerValidationError('native prompt exceeds established byte bound')
         last_error = None
@@ -192,23 +259,29 @@ class NativeNormalFirstPass:
                 stdout = controller._read_private_file(prefix.with_suffix('.stdout'),max_bytes=16*1024*1024)
             else:
                 request = {'root':'/tmp/stage11-normal-hermes-'+uuid.uuid4().hex,
-                    'source_profile':'/home/teddy/.hermes/profiles/subtitle-translator',
-                    'config':base64.b64encode(wire(NATIVE_CONFIG)).decode(),
+                    'source_profile':STAGE11_HERMES_PROFILE_DIR,
+                    'config':base64.b64encode(wire(native_config_for(hermes_settings))).decode(),
                     'prompt':base64.b64encode(prompt).decode(),'prompt_sha256':sha(prompt),
-                    'executable':STATEFUL_TRANSLATOR_EXECUTABLE,'provider':STATEFUL_TRANSLATOR_PROVIDER,
-                    'model':STATEFUL_TRANSLATOR_MODEL,'reasoning':STATEFUL_TRANSLATOR_REASONING}
+                    'executable':STATEFUL_TRANSLATOR_EXECUTABLE,
+                    'provider':hermes_settings.provider,
+                    'model':hermes_settings.model,
+                    'reasoning':hermes_settings.reasoning_effort,
+                    'timeout_env':dict(STAGE11_HERMES_TIMEOUT_ENV)}
                 store(prefix.with_suffix('.prompt.txt'),prompt)
                 raw = self.bridge._python(REMOTE_NATIVE,input_payload=wire(request),capture=True,timeout=NATIVE_ABSOLUTE_TIMEOUT+90)
                 receipt=json.loads(raw)
                 stdout=base64.b64decode(receipt.pop('stdout'),validate=True)
                 stderr=base64.b64decode(receipt.pop('stderr'),validate=True)
+                applied_timeout_env=receipt.pop('timeout_env',None)
                 store(prefix.with_suffix('.stdout'),stdout or b'\n')
                 store(prefix.with_suffix('.stderr'),stderr or b'\n')
                 runtime=re.findall(rb'^session_id: (\d{8}_\d{6}_[a-f0-9]{6})\s*$',stderr,re.M)
                 receipt.update(prompt_sha256=sha(prompt),stdout_sha256=sha(stdout),stderr_sha256=sha(stderr),
                     runtime_session_id=runtime[0].decode() if len(runtime)==1 else None,
-                    provider=STATEFUL_TRANSLATOR_PROVIDER,model=STATEFUL_TRANSLATOR_MODEL,
-                    reasoning=STATEFUL_TRANSLATOR_REASONING,attempt=attempt)
+                    provider=hermes_settings.provider,model=hermes_settings.model,
+                    reasoning=hermes_settings.reasoning_effort,attempt=attempt,
+                    hermes_execution_settings=hermes_settings.evidence(),
+                    timeout_environment_applied=applied_timeout_env)
                 store(receipt_path,wire(receipt))
             if receipt['prompt_sha256']!=sha(prompt) or receipt['stdout_sha256']!=sha(stdout):
                 raise controller.Stage11ControllerArtifactError('native receipt detached from prompt/output')
@@ -216,6 +289,11 @@ class NativeNormalFirstPass:
                 raise controller.Stage11ControllerError('native Hermes execution failed: '+str(receipt['timeout_reason'] or receipt['returncode']))
             if receipt['tools_count']!=0 or receipt['runtime_session_id'] is None:
                 raise controller.Stage11ControllerArtifactError('native execution provenance invalid')
+            if not legacy_receipt_matches(receipt, hermes_settings):
+                raise controller.Stage11ControllerArtifactError('native Hermes execution settings differ')
+            if ('timeout_environment_applied' in receipt
+                    and receipt['timeout_environment_applied'] != dict(STAGE11_HERMES_TIMEOUT_ENV)):
+                raise controller.Stage11ControllerArtifactError('native Hermes timeout environment differs')
             clean=stdout[len(TIRITH_WARNING):] if stdout.startswith(TIRITH_WARNING) else stdout
             try:
                 return validator(clean)
@@ -225,8 +303,13 @@ class NativeNormalFirstPass:
                     'reason':str(error),'attempt':attempt,'user_intervention':0}))
         raise controller.Stage11ControllerValidationError('bounded native output validation retries exhausted') from last_error
 
-    def __call__(self, package, *, route, staging_root, boundary_evidence, **unused):
+    def __call__(self, package, *, route, staging_root, boundary_evidence,
+                 hermes_settings=None, **unused):
+        if type(hermes_settings) is not HermesExecutionSettings:
+            raise controller.Stage11ControllerValidationError(
+                'resolved Stage11 Hermes settings are required')
         directory=controller._title_directory(Path(staging_root),package.dvd_id)
+        _bind_staging_hermes_settings(directory, hermes_settings)
         raw=serialize_stateful_package(package)
         store(directory/'stage11-authoritative-input.json',raw)
         store(directory/'stage11-semantic-input.json',serialize_stateful_model_input(package))
@@ -239,7 +322,8 @@ class NativeNormalFirstPass:
         result=None
         if len(prompt)<=MAX_NATIVE_PROMPT_BYTES:
             try:
-                result=self.invoke(prompt,directory,'whole-title',validator)
+                result=self.invoke(prompt,directory,'whole-title',validator,
+                                   hermes_settings=hermes_settings)
             except controller.Stage11ControllerError as error:
                 store(directory/'whole-title-fallback.json',wire({'policy':'EXISTING_FIXED_64',
                     'reason':str(error),'error_type':type(error).__name__,'user_intervention':0}))
@@ -251,7 +335,8 @@ class NativeNormalFirstPass:
                 query=build_stateful_part_query(package,model,part.part_index,boundary_evidence=boundary_evidence)
                 prompt=native_prompt(query,package,part_ids=part.cue_ids)
                 validated=self.invoke(prompt,directory,f'part-{part.part_index:04d}',
-                    lambda data,part=part:parse_stateful_part(data,part,plan))
+                    lambda data,part=part:parse_stateful_part(data,part,plan),
+                    hermes_settings=hermes_settings)
                 store(directory/part.canonical_filename,serialize_stateful_part(validated))
                 parts.append(validated)
             result=assemble_stateful_result(directory,package,plan)
@@ -417,7 +502,7 @@ def normal_materialization(preparation, result, review_request, review_result,
 
 
 def _normal_proof(package_raw, result_raw, first, source_quality, playback,
-                  review_evidence, clean_sha256):
+                  review_evidence, clean_sha256, hermes_execution_settings=None):
     covered = {index for cue in playback for index in cue.source_indexes}
     # Source quality carries exact source text; omitted indexes are sufficient
     # proof for the established metadata omission report.
@@ -438,13 +523,16 @@ def _normal_proof(package_raw, result_raw, first, source_quality, playback,
         'metadata_omissions': metadata_omissions,
         'playback': [asdict(cue) for cue in playback],
     }
+    if hermes_execution_settings is not None:
+        proof['hermes_execution_settings'] = validate_settings_evidence(
+            hermes_execution_settings)
     return proof
 
 
 def _normal_report(title, baseline_path, baseline_raw, baseline_reused,
                    outcome, alignment, baseline, clean_path, artifact,
                    review_evidence):
-    return {
+    report = {
         'title': title, 'route': 'HYBRID',
         'baseline_artifact_path': str(baseline_path),
         'baseline_sha256': sha(baseline_raw),
@@ -475,6 +563,7 @@ def _normal_report(title, baseline_path, baseline_raw, baseline_reused,
         'clean_sha256': artifact.sha256,
         'publication_performed': False,
     }
+    return report
 
 
 def reconstruct(directory, baseline):
@@ -507,6 +596,13 @@ def validate_normal_completion(report_path, clean_path, baseline_path, *, title,
     report=controller._parse_report(report_raw)
     proof_raw=controller._read_private_file(directory/PROOF_NAME,max_bytes=16*1024*1024)
     proof=json.loads(proof_raw)
+    proof_settings = proof.get('hermes_execution_settings')
+    if proof_settings is not None:
+        try:
+            proof_settings = validate_settings_evidence(proof_settings)
+        except HermesProfileSettingsError as error:
+            raise controller.Stage11ControllerArtifactError(
+                'Hermes execution settings proof is invalid') from error
     source_replay=json.loads(controller._read_private_file(directory/SOURCE_NAME,max_bytes=16*1024*1024))
     source_budget=source_replay.get('alignment_budget')
     proof_budget=proof.get('alignment_budget')
@@ -543,7 +639,8 @@ def validate_normal_completion(report_path, clean_path, baseline_path, *, title,
         raw_asr_context=raw_asr_context)
     clean_raw=controller._read_private_file(clean_path,max_bytes=MAX_SUBTITLE_BYTES)
     expected_proof=_normal_proof(package_raw,result_raw,result,source_quality,
-                                  playback,evidence,artifact.sha256)
+                                  playback,evidence,artifact.sha256,
+                                  hermes_execution_settings=proof_settings)
     if source_budget is not None:
         expected_proof['alignment_budget']=DUAL_BUDGET_PROVENANCE
     expected_proof_raw=wire(expected_proof)
@@ -562,6 +659,25 @@ def validate_normal_completion(report_path, clean_path, baseline_path, *, title,
         or proof['quality_review']!='HYBRID_REVIEWED_CLEAN_V1'
         or clean.artifact!=artifact):
         raise controller.Stage11ControllerArtifactError('normal completion proof invalid')
+    if proof_settings is not None and staging_root is not None:
+        binding_path = (Path(staging_root) / title
+                        / NATIVE_SETTINGS_FILENAME)
+        try:
+            binding = json.loads(controller._read_private_file(
+                binding_path, max_bytes=65536))
+            validate_settings_evidence(binding)
+        except Exception as error:
+            raise controller.Stage11ControllerArtifactError(
+                'staged Hermes settings binding is missing or invalid') from error
+        if binding != proof_settings:
+            raise controller.Stage11ControllerArtifactError(
+                'staged Hermes settings differ from completion proof')
+    elif staging_root is not None:
+        binding_path = (Path(staging_root) / title
+                        / NATIVE_SETTINGS_FILENAME)
+        if binding_path.exists() or binding_path.is_symlink():
+            raise controller.Stage11ControllerArtifactError(
+                'legacy completion is detached from staged Hermes settings')
     targeted_reused=(report['targeted_reused']
                      if type(report['targeted_reused']) is bool else None)
     return controller.Stage11ControllerResult(title,'HYBRID',clean_path,sha(clean_raw),report_path,sha(report_raw),
@@ -573,6 +689,7 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
                              acceptance_policy, holding_resolver=None,
                              hybrid_review_runner=None, hybrid_targeted_runner=None,
                              alignment_budget_profile=None,
+                             hermes_settings=None, hermes_settings_resolver=None,
                              **unused):
     title=controller._canonical_title(title)
     if alignment_budget_profile not in (None, DUAL_BUDGET_PROVENANCE['mode']):
@@ -583,18 +700,37 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
         raise controller.Stage11ControllerValidationError('alignment budget callback provenance mismatch')
     root=controller._validate_root(artifact_root,field_name='artifact_root')
     staging=controller._validate_root(stateful_staging_root,field_name='stateful_staging_root')
+    candidate_directory = root / title
+    candidate_report = candidate_directory / controller.MECHANICAL_REPORT_FILENAME
+    has_report = candidate_report.exists() or candidate_report.is_symlink()
+    if not has_report and hermes_settings is None:
+        if callable(hermes_settings_resolver):
+            try:
+                hermes_settings = hermes_settings_resolver()
+            except Exception as error:
+                raise Stage11DeploymentTransportError(
+                    'Stage11 Hermes profile preflight failed') from error
+    if hermes_settings is not None and type(hermes_settings) is not HermesExecutionSettings:
+        raise controller.Stage11ControllerValidationError(
+            'Stage11 Hermes settings snapshot is invalid')
     directory=controller._title_directory(root,title)
+    report_path=directory/controller.MECHANICAL_REPORT_FILENAME
+    clean_path=directory/controller.CLEAN_SRT_FILENAME
     try:
+        if hermes_settings is not None:
+            _bind_staging_hermes_settings(
+                controller._title_directory(staging, title), hermes_settings)
         video,snapshot=controller._resolve_holding(title,holding_resolver)
         if video.video_format != 'mp4':
             raise controller.Stage11ControllerValidationError('normal mode requires canonical MP4 input')
         baseline_path=directory/controller.BASELINE_ASR_FILENAME
         baseline,raw,reused=controller._dispatch_baseline(baseline_path,canonical_video=video,source_snapshot=snapshot,
             baseline_transcriber=baseline_transcriber,allow_create=not (directory/controller.MECHANICAL_REPORT_FILENAME).exists())
-        report_path=directory/controller.MECHANICAL_REPORT_FILENAME; clean_path=directory/controller.CLEAN_SRT_FILENAME
         if report_path.exists():
             if not (directory/PROOF_NAME).exists(): raise controller.Stage11ControllerArtifactError('legacy completion requires separate normal artifact root')
-            return validate_normal_completion(report_path,clean_path,baseline_path,title=title)
+            return validate_normal_completion(
+                report_path, clean_path, baseline_path,
+                title=title, staging_root=staging)
         external_diagnostic={}
         try:
             route,outcome,alignment=controller._select_route(
@@ -616,19 +752,32 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
         preparation,boundary=prepare_normal(route,sha(raw),claim_token)
         package=preparation.package; package_raw=serialize_stateful_package(package)
         store(directory/'normal-package.json',package_raw)
-        first=first_pass_runner(package,route='HYBRID',staging_root=staging,boundary_evidence=boundary)
+        first_pass_kwargs = {'route':'HYBRID','staging_root':staging,
+                             'boundary_evidence':boundary}
+        if hermes_settings is not None:
+            first_pass_kwargs['hermes_settings'] = hermes_settings
+        first=first_pass_runner(package,**first_pass_kwargs)
         first=validate_normal_translation(serialize_stateful_result(first),package,boundary)
         result_raw=serialize_stateful_result(first); store(directory/'normal-result.json',result_raw)
+        review_runner = hybrid_review_runner
+        if hermes_settings is not None and callable(hybrid_review_runner):
+            def review_runner_with_pinned_settings(request, **review_kwargs):
+                return hybrid_review_runner(
+                    request, hermes_settings=hermes_settings, **review_kwargs)
+            review_runner = review_runner_with_pinned_settings
         source_quality,review_request,review_result,raw_asr_context,evidence = _normal_review_evidence(
             directory,preparation,first,baseline,sha(raw),staging,
-            hybrid_review_runner=hybrid_review_runner,
+            hybrid_review_runner=review_runner,
             hybrid_targeted_runner=hybrid_targeted_runner,
             create_missing=True)
         artifact,playback,clean=normal_materialization(
             preparation,first,review_request,review_result,source_quality,
             raw_asr_context=raw_asr_context)
         proof=_normal_proof(package_raw,result_raw,first,source_quality,
-                            playback,evidence,artifact.sha256)
+                            playback,evidence,artifact.sha256,
+                            hermes_execution_settings=(
+                                hermes_settings.evidence()
+                                if hermes_settings is not None else None))
         if alignment_budget_profile is not None:
             proof['alignment_budget']=DUAL_BUDGET_PROVENANCE
         proof_raw=wire(proof)
@@ -665,6 +814,7 @@ def main():
     failed=False
     for index,title in enumerate(args.dvd_id):
         kwargs=dependencies.controller_kwargs()
+        kwargs['hermes_settings_resolver']=dependencies.resolve_hermes_settings
         kwargs['first_pass_runner']=dependencies.capture_first_pass_runner(first_pass)
         if args.baseline_root:
             def cached(video):

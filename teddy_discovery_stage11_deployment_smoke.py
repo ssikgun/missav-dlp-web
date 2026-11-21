@@ -21,7 +21,7 @@ import teddy_discovery_stage11_live_adapters_smoke as live_fixture
 import teddy_discovery_subtitle_v2_pipeline_smoke as v2_fixture
 import teddy_discovery_stateful_quality_review as review
 from teddy_discovery_alignment_acceptance import AlignmentAcceptancePolicy
-from teddy_discovery_asr_remote import RemoteFasterWhisperASR
+from teddy_discovery_asr_bounded_worker import BoundedTargetedASRTransport
 from teddy_discovery_asr_source import ASRMediaSourceReader
 from teddy_discovery_asr_source_quality import classify_asr_result_source_quality
 from teddy_discovery_stateful_asr_quality_review import (
@@ -50,6 +50,20 @@ from teddy_discovery_subtitlecat_discovery import (
 from teddy_discovery_quality_review_session import (
     ensure_fresh_review_execution_session,
 )
+from teddy_discovery_stage11_hermes_profile import (
+    HermesExecutionSettings,
+    STAGE11_HERMES_TIMEOUT_ENV,
+    STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+)
+
+
+def _synthetic_hermes_settings():
+    return HermesExecutionSettings(
+        profile_name="subtitle-translator", provider="synthetic-provider",
+        model="synthetic-model", reasoning_effort="high",
+        hermes_version="synthetic-1", config_sha256="0" * 64,
+        timeout_env_supported=STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+    )
 
 
 class FakeRemoteBridge:
@@ -64,6 +78,9 @@ class FakeRemoteBridge:
         self.stateful_session_calls = []
         self.launch_calls = []
         self.review_payload_to_result = None
+
+    def resolve_stage11_hermes_settings(self):
+        return _synthetic_hermes_settings()
 
     def ensure_task(self, remote_task):
         self.ensure_task_calls.append(remote_task)
@@ -133,8 +150,8 @@ class FakeRemoteBridge:
             )
         return []
 
-    def launch_quality_review(self, command, *, remote_task, timeout):
-        self.launch_calls.append((command, remote_task, timeout))
+    def launch_quality_review(self, command, *, remote_task, timeout, timeout_env):
+        self.launch_calls.append((command, remote_task, timeout, timeout_env))
         if self.review_payload_to_result is None:
             raise AssertionError("fake Hybrid result callback was not installed")
         input_path = remote_task + "/" + QUALITY_REVIEW_INPUT_FILENAME
@@ -653,9 +670,9 @@ def main():
             },
         )
         check(
-            "VM122_TIMEOUT_IS_EXPLICIT",
-            isinstance(default_asr.whisper, RemoteFasterWhisperASR)
-            and default_asr.whisper.request_timeout_seconds == 1200,
+            "VM122_REQUEST_TIMEOUT_RETAINS_900S_CAP",
+            isinstance(default_asr.whisper, BoundedTargetedASRTransport)
+            and default_asr.whisper.request_timeout_seconds == 900,
         )
         production_source_deps = deployment.build_stage11_deployment_dependencies(
             _config(root),
@@ -743,6 +760,8 @@ def main():
             and hybrid_bridge.launch_calls[0][1].startswith(
                 "/srv/hermes/stage11/"
             )
+            and hybrid_bridge.launch_calls[0][3]
+            == dict(STAGE11_HERMES_TIMEOUT_ENV)
             and any(
                 path.endswith("/stage11-quality-review-input.json")
                 for path in hybrid_bridge.files

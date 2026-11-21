@@ -37,6 +37,7 @@ from teddy_discovery_stateful_policy import (
     bind_stateful_policy_generation_key,
     resolve_stateful_semantic_policy,
 )
+from teddy_discovery_stage11_hermes_profile import HermesExecutionSettings
 
 
 STATEFUL_TRANSLATOR_SCHEMA_VERSION: Final[int] = 1
@@ -70,9 +71,6 @@ STATEFUL_TRANSLATOR_QUIET_FLAG: Final[str] = "-Q"
 STATEFUL_TRANSLATOR_PASS_SESSION_ID_FLAG: Final[str] = "--pass-session-id"
 STATEFUL_TRANSLATOR_RESUME_FLAG: Final[str] = "--resume"
 STATEFUL_TRANSLATOR_QUERY_FLAG: Final[str] = "-q"
-STATEFUL_TRANSLATOR_PROVIDER: Final[str] = "openai-codex"
-STATEFUL_TRANSLATOR_MODEL: Final[str] = "gpt-5.6-luna"
-STATEFUL_TRANSLATOR_REASONING: Final[str] = "xhigh"
 
 STATEFUL_TRANSLATOR_TASK_DIRECTORY_MODE: Final[int] = 0o700
 STATEFUL_TRANSLATOR_PRIVATE_FILE_MODE: Final[int] = 0o600
@@ -1075,10 +1073,17 @@ class StatefulTranslatorSessionPremintAdapter:
         return premint_stateful_session(self._session_db, package)
 
 
-def build_stateful_translator_command(session_id: str) -> list[str]:
-    """Build the native CT120 command without invoking it."""
+def build_stateful_translator_command(
+    session_id: str,
+    settings: HermesExecutionSettings,
+) -> list[str]:
+    """Build a native command from the pinned Stage11 profile snapshot."""
 
     session_id = _validate_session_id(session_id)
+    if type(settings) is not HermesExecutionSettings:
+        raise StatefulTranslatorValidationError(
+            "resolved Stage11 Hermes profile settings are required"
+        )
     return [
         STATEFUL_TRANSLATOR_EXECUTABLE,
         "--profile",
@@ -1089,11 +1094,11 @@ def build_stateful_translator_command(session_id: str) -> list[str]:
         STATEFUL_TRANSLATOR_RESUME_FLAG,
         session_id,
         "--provider",
-        STATEFUL_TRANSLATOR_PROVIDER,
+        settings.provider,
         "--model",
-        STATEFUL_TRANSLATOR_MODEL,
+        settings.model,
         "--reasoning",
-        STATEFUL_TRANSLATOR_REASONING,
+        settings.reasoning_effort,
         "-t",
         "file,terminal",
         STATEFUL_TRANSLATOR_QUERY_FLAG,
@@ -1419,17 +1424,14 @@ __all__ = [
     "STATEFUL_TRANSLATOR_MAX_IDENTIFIER_CHARS",
     "STATEFUL_TRANSLATOR_MAX_PACKAGE_BYTES",
     "STATEFUL_TRANSLATOR_MAX_RESULT_BYTES",
-    "STATEFUL_TRANSLATOR_MODEL",
     "STATEFUL_TRANSLATOR_MODEL_INPUT_VERSION",
     "STATEFUL_TRANSLATOR_PASS_SESSION_ID_FLAG",
     "STATEFUL_TRANSLATOR_PRIVATE_FILE_MODE",
     "STATEFUL_TRANSLATOR_PROFILE",
-    "STATEFUL_TRANSLATOR_PROVIDER",
     "STATEFUL_TRANSLATOR_QUERY",
     "STATEFUL_TRANSLATOR_PRIMARY_TRANSLATION_INSTRUCTION",
     "STATEFUL_TRANSLATOR_SEMANTIC_REPETITION_INSTRUCTION",
     "STATEFUL_TRANSLATOR_QUERY_FLAG",
-    "STATEFUL_TRANSLATOR_REASONING",
     "STATEFUL_TRANSLATOR_RESULT_FILENAME",
     "STATEFUL_TRANSLATOR_RESUME_FLAG",
     "STATEFUL_TRANSLATOR_SCHEMA_VERSION",

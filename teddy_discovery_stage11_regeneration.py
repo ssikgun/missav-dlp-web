@@ -186,6 +186,7 @@ def regenerate_one_title(
 
     with attempt:
         kwargs = dependencies.controller_kwargs()
+        kwargs["hermes_settings_resolver"] = dependencies.resolve_hermes_settings
         resolver = kwargs["holding_resolver"]
         video, snapshot = controller._resolve_holding(title, resolver)
         if video.video_format != "mp4":

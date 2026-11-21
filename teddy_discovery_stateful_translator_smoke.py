@@ -21,13 +21,10 @@ from teddy_discovery_stateful_translator import (
     STATEFUL_TRANSLATOR_INPUT_FILENAME,
     STATEFUL_TRANSLATOR_MAX_PACKAGE_BYTES,
     STATEFUL_TRANSLATOR_MAX_RESULT_BYTES,
-    STATEFUL_TRANSLATOR_MODEL,
     STATEFUL_TRANSLATOR_PASS_SESSION_ID_FLAG,
     STATEFUL_TRANSLATOR_PRIVATE_FILE_MODE,
     STATEFUL_TRANSLATOR_PROFILE,
-    STATEFUL_TRANSLATOR_PROVIDER,
     STATEFUL_TRANSLATOR_QUERY,
-    STATEFUL_TRANSLATOR_REASONING,
     STATEFUL_TRANSLATOR_RESULT_FILENAME,
     STATEFUL_TRANSLATOR_SESSION_SOURCE,
     STATEFUL_TRANSLATOR_TASK_DIRECTORY_MODE,
@@ -53,6 +50,10 @@ from teddy_discovery_stateful_translator import (
     stateful_staging_paths,
     validate_stateful_result,
     write_stateful_input,
+)
+from teddy_discovery_stage11_hermes_profile import (
+    HermesExecutionSettings,
+    STAGE11_HERMES_TIMEOUT_ENV_NAMES,
 )
 
 
@@ -341,7 +342,16 @@ def main():
         "SESSION_PREMINT_RETURNED_ID_MISMATCH_REJECTED",
     )
 
-    command = build_stateful_translator_command(session_id)
+    settings = HermesExecutionSettings(
+        profile_name="subtitle-translator",
+        provider="synthetic-provider",
+        model="synthetic-model",
+        reasoning_effort="high",
+        hermes_version="synthetic-1",
+        config_sha256="0" * 64,
+        timeout_env_supported=STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+    )
+    command = build_stateful_translator_command(session_id, settings)
     command_text = " ".join(command)
     chat_index = command.index("chat")
     pass_session_id_index = command.index(
@@ -359,11 +369,11 @@ def main():
         and "--resume" in command
         and session_id in command
         and "--provider" in command
-        and STATEFUL_TRANSLATOR_PROVIDER in command
+        and settings.provider in command
         and "--model" in command
-        and STATEFUL_TRANSLATOR_MODEL in command
+        and settings.model in command
         and "--reasoning" in command
-        and STATEFUL_TRANSLATOR_REASONING in command
+        and settings.reasoning_effort in command
         and "-q" in command
         and command[-1] == STATEFUL_TRANSLATOR_QUERY
         and "-z" not in command

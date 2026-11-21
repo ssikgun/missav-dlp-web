@@ -7,6 +7,10 @@ import tempfile
 import numpy as np
 
 import teddy_discovery_stage11_live_adapters as adapters
+from teddy_discovery_stage11_hermes_profile import (
+    HermesExecutionSettings,
+    STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+)
 import teddy_discovery_stage11_controller_smoke as fixture
 from teddy_discovery_stage11_controller import run_one_title_stage11
 from teddy_discovery_asr import ASRSegment, REMOTE_GPU_LARGE_V3_RUNTIME_IDENTITY
@@ -509,7 +513,7 @@ def main():
                 state['fresh_asr_session_id'] = sid
                 calls.append(('fresh', sid))
 
-            def launcher(command, *, cwd, timeout):
+            def launcher(command, *, cwd, timeout, env):
                 directory = Path('/proc/self/fd') / str(cwd)
                 payload = (directory / QUALITY_REVIEW_INPUT_FILENAME).read_bytes()
                 # Originals captured by the provider are independent of the wire.
@@ -538,6 +542,11 @@ def main():
                 asr_review_options=dict(remote_task_for_session=lambda sid: '/offline/'+sid,
                     runner_options=dict(executor=asr_executor,
                         fresh_session_preparer=prepare_asr_session)),
+                hermes_settings_resolver=lambda: HermesExecutionSettings(
+                    profile_name='subtitle-translator', provider='synthetic-provider',
+                    model='synthetic-model', reasoning_effort='high',
+                    hermes_version='synthetic-1', config_sha256='0' * 64,
+                    timeout_env_supported=STAGE11_HERMES_TIMEOUT_ENV_NAMES),
                 hybrid_review_options=dict(originals_provider=get_originals,
                     runner_options=dict(launcher=launcher, fresh_session_db=sessions,
                         expected_profile_name='subtitle-translator')))

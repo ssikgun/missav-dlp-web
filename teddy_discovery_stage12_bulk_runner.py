@@ -1793,6 +1793,9 @@ def run_live(
                     run_one_title_normal_mode, NativeNormalFirstPass,
                 )
                 normal_kwargs = dict(controller_kwargs)
+                normal_kwargs["hermes_settings_resolver"] = (
+                    dependencies.resolve_hermes_settings
+                )
                 normal_kwargs["first_pass_runner"] = dependencies.capture_first_pass_runner(
                     NativeNormalFirstPass(dependencies.remote_bridge)
                 )

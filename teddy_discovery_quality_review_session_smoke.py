@@ -22,6 +22,10 @@ from teddy_discovery_quality_review_session import (
     ensure_fresh_review_execution_session,
     new_review_execution_session_id,
 )
+from teddy_discovery_stage11_hermes_profile import (
+    HermesExecutionSettings,
+    STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+)
 
 
 class FakeNativeSessionDB:
@@ -94,6 +98,12 @@ def _hybrid_fixture():
 
 
 def main():
+    hermes_settings = HermesExecutionSettings(
+        profile_name="subtitle-translator", provider="synthetic-provider",
+        model="synthetic-model", reasoning_effort="high",
+        hermes_version="synthetic-1", config_sha256="0" * 64,
+        timeout_env_supported=STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+    )
     passed = failed = 0
 
     def check(name, callback):
@@ -203,8 +213,8 @@ def main():
         task.chmod(0o700)
         launch_observed = {}
 
-        def launch(command, *, cwd, timeout):
-            del cwd, timeout
+        def launch(command, *, cwd, timeout, env):
+            del cwd, timeout, env
             launch_observed["session_id"] = command[command.index("--resume") + 1]
             target = task / runner.QUALITY_REVIEW_RESULT_FILENAME
             target.write_bytes(result_payload)
@@ -218,6 +228,7 @@ def main():
             fresh_review_session=True,
             fresh_session_db=hybrid_db,
             expected_profile_name="subtitle-translator",
+            hermes_settings=hermes_settings,
             launcher=launch,
             **originals,
         )

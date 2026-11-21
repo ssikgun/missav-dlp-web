@@ -33,6 +33,10 @@ from teddy_discovery_targeted_asr_artifact import TargetedASRArtifact
 from teddy_discovery_targeted_hybrid_evidence import TargetedASRWindowEvidence
 from teddy_discovery_subtitle_v2_orchestrator import project_affine_timestamp_ms
 from teddy_discovery_subtitle_text import parse_subtitle_bytes
+from teddy_discovery_stage11_hermes_profile import (
+    HermesExecutionSettings,
+    STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+)
 from teddy_discovery_asr import ASRSegment
 from teddy_discovery_asr_audio import ASRAudioChunk
 from teddy_discovery_asr_source import ASRLocalMediaSource
@@ -129,7 +133,13 @@ def execute(artifacts, staging, runtime):
 
 def main():
     sid = str(uuid.uuid4())
-    command = build_stateful_translator_command(sid)
+    hermes_settings = HermesExecutionSettings(
+        profile_name="subtitle-translator", provider="synthetic-provider",
+        model="synthetic-model", reasoning_effort="high",
+        hermes_version="synthetic-1", config_sha256="0" * 64,
+        timeout_env_supported=STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+    )
+    command = build_stateful_translator_command(sid, hermes_settings)
     check('primary exact file,terminal toolset; skill tools inaccessible', command.count('-t') == 1
           and command[command.index('-t') + 1] == 'file,terminal'
           and set(command[command.index('-t') + 1].split(',')) == {'file', 'terminal'})
@@ -177,7 +187,8 @@ def main():
         reject('target result rejects wrong translation session', lambda: review.validate_review_result(
             replace(raw_target, source_translation_session_id='wrong-session'), runtime.last_hybrid_request, target_cue_ids=targets))
         reject('non-REPAIR replacement prohibited', lambda: replace(raw_target.cues[1], replacement_ko='추가'))
-        query = runner.build_quality_review_command(sid, target_cue_ids=targets)[-1]
+        query = runner.build_quality_review_command(
+            sid, hermes_settings, target_cue_ids=targets)[-1]
         check('final prompt requires full context but only target decisions and conservative evidence',
               'Read the entire title' in query and 'decisions ONLY' in query
               and 'OMIT requires sufficient proof' in query and 'Empty,' in query
@@ -236,13 +247,14 @@ def main():
         target_result = review.QualityReviewResult(request.schema_version, review.review_request_sha256(request),
                                                    (decision(one[0], 'KEEP'),))
         native_dir = Path(root) / 'target-native'; native_dir.mkdir(mode=0o700)
-        def launch(command, *, cwd, timeout):
+        def launch(command, *, cwd, timeout, env):
             path = Path('/proc/self/fd/' + str(cwd)).resolve() / runner.QUALITY_REVIEW_RESULT_FILENAME
             path.write_bytes(review.serialize_review_result(target_result, request, target_cue_ids=one))
             path.chmod(0o600)
             return SimpleNamespace(returncode=0)
         native = runner.run_quality_review(native_dir, review.serialize_review_request(request),
-            review_execution_session_id=sid, launcher=launch, target_cue_ids=one, **originals)
+            review_execution_session_id=sid, hermes_settings=hermes_settings,
+            launcher=launch, target_cue_ids=one, **originals)
         check('native target-only runner binds fresh execution/source provenance', len(native.cues) == 1
               and native.source_translation_session_id == request.source_translation_session_id
               and native.review_execution_session_id == sid)
@@ -263,7 +275,8 @@ def main():
             return registry.originals_provider(value)
         native_adapter = build_hybrid_review_adapter(originals_provider=provide_originals,
             runner_options=dict(launcher=launch, fresh_session_db=FakeNativeSessionDB(),
-                                expected_profile_name='subtitle-translator'))
+                                expected_profile_name='subtitle-translator'),
+            hermes_settings_resolver=lambda: hermes_settings)
         native = native_adapter(request, staging_root=staging, target_cue_ids=targets,
                                 targeted_asr_artifact=artifact)
         check('live final review adapter rebuilds evidence from artifact and binds native session',

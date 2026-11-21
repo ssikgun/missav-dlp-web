@@ -29,6 +29,11 @@ from teddy_discovery_asr import ASRSegment
 from teddy_discovery_hybrid_evidence import HybridCueIdentity
 from teddy_discovery_targeted_asr_artifact import TargetedASRArtifact
 from teddy_discovery_targeted_hybrid_evidence import TargetedASRWindowEvidence
+from teddy_discovery_stage11_hermes_profile import (
+    HermesExecutionSettings,
+    STAGE11_HERMES_TIMEOUT_ENV,
+    STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+)
 
 
 class NormalSmoke(unittest.TestCase):
@@ -38,6 +43,11 @@ class NormalSmoke(unittest.TestCase):
         for p in (self.artifacts,self.staging): p.mkdir(mode=0o700)
         self.route=fixture.fixture.accepted_hybrid_route()
         self.baseline=self.route.alignment_application.bundle.asr_result
+        self.hermes_settings=HermesExecutionSettings(
+            profile_name='subtitle-translator', provider='synthetic-provider',
+            model='synthetic-model', reasoning_effort='high',
+            hermes_version='synthetic-1', config_sha256='0'*64,
+            timeout_env_supported=STAGE11_HERMES_TIMEOUT_ENV_NAMES)
         self.first_calls=0; self.review_calls=0; self.targeted_calls=0
         self.triage_actions=None
         self.align=patch.object(normal,'_align_external_payload',return_value=self.route.alignment_application)
@@ -48,12 +58,16 @@ class NormalSmoke(unittest.TestCase):
 
     def first(self, package, *, boundary_evidence, **unused):
         self.first_calls+=1
+        if 'hermes_settings' in unused:
+            self.assertEqual(unused['hermes_settings'],self.hermes_settings)
         return StatefulAbsorptionResult(package.schema_version,package.dvd_id,package.generation_key,
             package.claim_token,normal.stateful_session_id_for_package(package),
             tuple(StatefulCueOutput(c.cue_id,None,'검증용 번역 '+str(i),None) for i,c in enumerate(package.cues)),boundary_evidence)
 
-    def review(self, request, *, staging_root, target_cue_ids=None,
+    def review(self, request, *, staging_root, hermes_settings=None, target_cue_ids=None,
                targeted_asr_artifact=None):
+        if hermes_settings is not None:
+            self.assertEqual(hermes_settings, self.hermes_settings)
         self.review_calls+=1
         ids=(tuple(c.cue_id for c in request.cues) if target_cue_ids is None
              else target_cue_ids)
@@ -93,7 +107,8 @@ class NormalSmoke(unittest.TestCase):
             holding_resolver=lambda _:fixture._holding(self.baseline),baseline_transcriber=lambda _:self.baseline,
             external_ja_attempt=lambda *_:self.route.alignment_application,first_pass_runner=self.first,
             acceptance_policy=policy_with(),targeted_runner=lambda *_:self.fail('optional STT ran'),
-            hybrid_review_runner=self.review,hybrid_targeted_runner=self.targeted)
+            hybrid_review_runner=self.review,hybrid_targeted_runner=self.targeted,
+            hermes_settings=self.hermes_settings)
         kwargs.update(overrides)
         return normal.run_one_title_normal_mode(self.baseline.source_snapshot.dvd_id,**kwargs)
 
@@ -106,6 +121,9 @@ class NormalSmoke(unittest.TestCase):
         self.assertFalse(proof['automatic_insertion'])
         self.assertEqual(proof['ambiguous_policy'],'EXTERNAL_JA_AND_PRIMARY_KO')
         self.assertEqual(proof['quality_review'],'HYBRID_REVIEWED_CLEAN_V1')
+        self.assertEqual(proof['hermes_execution_settings'],
+                         self.hermes_settings.evidence())
+        self.assertNotIn('hermes_execution_settings',report)
         evidence=proof['review_evidence']
         self.assertEqual(evidence['targeted_source_count'],0)
         self.assertEqual(evidence['targeted_window_count'],0)
@@ -124,6 +142,14 @@ class NormalSmoke(unittest.TestCase):
         repeated=self.run_title(first_pass_runner=lambda *_a,**_k:self.fail('resume called Hermes'))
         self.assertEqual(repeated.clean_sha256,result.clean_sha256)
         self.assertEqual((self.review_calls,self.targeted_calls),(1,0))
+
+    def test_historical_completion_without_hermes_settings_remains_valid(self):
+        result=self.run_title(hermes_settings=None)
+        proof=json.loads((result.report_path.parent/normal.PROOF_NAME).read_bytes())
+        report=json.loads(result.report_path.read_bytes())
+        self.assertNotIn('hermes_execution_settings',proof)
+        self.assertNotIn('hermes_execution_settings',report)
+        self.assertEqual(result.title,self.baseline.source_snapshot.dvd_id)
 
     def test_suspect_only_targeted_asr_is_bound_to_original_and_repair(self):
         self.triage_actions=(review.REPAIR,review.KEEP,review.KEEP,review.KEEP)
@@ -205,10 +231,12 @@ class NormalSmoke(unittest.TestCase):
             first_boundary['value']=kwargs.get('boundary_evidence')
             return self.first(package,**kwargs)
         def review_with_retained_originals(request, *, staging_root,
+                                           hermes_settings=None,
                                            target_cue_ids=None,
                                            targeted_asr_artifact=None):
             retained.update(registry.originals_provider(request))
             return self.review(request,staging_root=staging_root,
+                hermes_settings=hermes_settings,
                 target_cue_ids=target_cue_ids,
                 targeted_asr_artifact=targeted_asr_artifact)
         live=SimpleNamespace(
@@ -223,7 +251,8 @@ class NormalSmoke(unittest.TestCase):
         )
         dependencies=Stage11DeploymentDependencies(
             config=object(),source_provider=None,whisper=None,targeted_transport=None,
-            discovery=None,provider=None,remote_bridge=object(),
+            discovery=None,provider=None,remote_bridge=SimpleNamespace(
+                resolve_stage11_hermes_settings=lambda:self.hermes_settings),
             remote_task_for_session=lambda *_args:None,prepare_remote=lambda *_args:None,
             originals_provider=registry.originals_provider,live=live,
             _first_pass_capture=registry.capture_first_pass,
@@ -427,6 +456,7 @@ class NormalSmoke(unittest.TestCase):
 
         class Dependencies:
             remote_bridge=object()
+            resolve_hermes_settings=lambda _self:self.hermes_settings
             def controller_kwargs(_self):
                 return {
                     'holding_resolver':lambda _title:fixture._holding(self.baseline),
@@ -503,6 +533,7 @@ class NormalSmoke(unittest.TestCase):
         class Dependencies:
             remote_bridge=object()
             fail_external=False
+            resolve_hermes_settings=lambda _self:self.hermes_settings
             def controller_kwargs(_self):
                 def baseline(_video):
                     acquired['baseline']+=1
@@ -588,11 +619,14 @@ class NormalSmoke(unittest.TestCase):
                 calls.append(kwargs)
                 return normal.wire({'stdout':base64.b64encode(b'bad JSON').decode(),
                     'stderr':base64.b64encode(b'session_id: 20261012_120000_abcdef\n').decode(),
-                    'returncode':0,'timeout_reason':None,'tools_count':0,'elapsed_seconds':1,'remote_root':'test'})
+                    'returncode':0,'timeout_reason':None,'tools_count':0,
+                    'elapsed_seconds':1,'remote_root':'test',
+                    'timeout_env':dict(STAGE11_HERMES_TIMEOUT_ENV)})
         directory=self.staging/'fixture'; directory.mkdir(mode=0o700)
         runner=normal.NativeNormalFirstPass(Bridge())
         with self.assertRaises(normal.controller.Stage11ControllerValidationError):
-            runner.invoke(b'test',directory,'bad',lambda raw:json.loads(raw))
+            runner.invoke(b'test',directory,'bad',lambda raw:json.loads(raw),
+                          hermes_settings=self.hermes_settings)
         self.assertEqual(len(calls),normal.MAX_VALIDATION_ATTEMPTS)
         self.assertEqual(len(list(directory.glob('*.validation-error.json'))),2)
 
@@ -618,7 +652,7 @@ class NormalSmoke(unittest.TestCase):
         package=prep.package
         plan=normal.build_stateful_part_plan(package,normal.serialize_stateful_model_input(package),boundary_evidence=boundary)
         class Native(normal.NativeNormalFirstPass):
-            def invoke(self,prompt,directory,label,validator):
+            def invoke(self,prompt,directory,label,validator,*,hermes_settings):
                 if label=='whole-title': raise normal.controller.Stage11ControllerValidationError('synthetic truncated response')
                 expected=plan.parts[0]
                 output=StatefulSemanticPart(part_schema_version=1,session_id=plan.session_id,
@@ -627,7 +661,8 @@ class NormalSmoke(unittest.TestCase):
                     cues=tuple(StatefulCueOutput(c.cue_id,None,'부분 번역',None) for c in package.cues),
                     max_cues_per_part=plan.max_cues_per_part,source_cues=package.cues)
                 return validator(serialize_stateful_part(output))
-        first=Native(None)(package,route='HYBRID',staging_root=self.staging,boundary_evidence=boundary)
+        first=Native(None)(package,route='HYBRID',staging_root=self.staging,
+                           boundary_evidence=boundary,hermes_settings=self.hermes_settings)
         self.assertEqual(tuple(c.cue_id for c in first.cues),tuple(c.cue_id for c in package.cues))
         self.assertEqual(first.session_id,normal.stateful_session_id_for_package(package))
         self.assertTrue((self.staging/package.dvd_id/'whole-title-fallback.json').is_file())
@@ -648,7 +683,9 @@ class NormalSmoke(unittest.TestCase):
                     'returncode':1,'timeout_reason':'INACTIVITY_TIMEOUT','tools_count':0,'elapsed_seconds':600,'remote_root':'test'})
         directory=self.staging/'fixture'; directory.mkdir(mode=0o700)
         with self.assertRaises(normal.controller.Stage11ControllerError):
-            normal.NativeNormalFirstPass(Bridge()).invoke(b'test',directory,'timeout',lambda raw:json.loads(raw))
+            normal.NativeNormalFirstPass(Bridge()).invoke(
+                b'test',directory,'timeout',lambda raw:json.loads(raw),
+                hermes_settings=self.hermes_settings)
         self.assertEqual(len(list(directory.glob('*.receipt.json'))),1)
 
     def test_targeted_worker_starts_only_after_local_media_is_ready(self):

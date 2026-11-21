@@ -28,6 +28,10 @@ from teddy_discovery_stateful_asr_quality_review import (
 from teddy_discovery_stateful_asr_quality_review_clean import (
     materialize_stateful_asr_quality_review_clean,
 )
+from teddy_discovery_stage11_hermes_profile import (
+    HermesExecutionSettings,
+    STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+)
 from teddy_discovery_stateful_quality_review import (
     QualityReviewResult,
     QualityReviewResultCue,
@@ -233,8 +237,14 @@ def main():
     assert "stt_ja" in ASR_ONLY_QUALITY_REVIEW_QUERY
     assert "before_context" in ASR_ONLY_QUALITY_REVIEW_QUERY
     assert "prefilter_provenance" in ASR_ONLY_QUALITY_REVIEW_QUERY
-    assert build_quality_review_command(result.session_id)[-1] == QUALITY_REVIEW_QUERY
-    assert build_asr_quality_review_command(result.session_id)[-1] == ASR_ONLY_QUALITY_REVIEW_QUERY
+    hermes_settings = HermesExecutionSettings(
+        profile_name="subtitle-translator", provider="synthetic-provider",
+        model="synthetic-model", reasoning_effort="high",
+        hermes_version="synthetic-1", config_sha256="0" * 64,
+        timeout_env_supported=STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+    )
+    assert build_quality_review_command(result.session_id, hermes_settings)[-1] == QUALITY_REVIEW_QUERY
+    assert build_asr_quality_review_command(result.session_id, hermes_settings)[-1] == ASR_ONLY_QUALITY_REVIEW_QUERY
 
     print("STATEFUL_ASR_QUALITY_REVIEW_SMOKE_PASS")
     print("ASR_REVIEW_REQUEST_CUES=4")

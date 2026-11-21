@@ -72,6 +72,15 @@ from teddy_discovery_stateful_translator import (
     stateful_session_id_for_package,
     validate_stateful_result,
 )
+from teddy_discovery_stage11_hermes_profile import (
+    HermesProfileSettingsError,
+    REMOTE_PROFILE_SETTINGS_PROBE,
+    STAGE11_HERMES_CONFIG_PATH,
+    STAGE11_HERMES_PROFILE,
+    STAGE11_HERMES_TIMEOUT_ENV,
+    STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+    settings_from_probe,
+)
 from teddy_discovery_subtitle_external import (
     ExternalSubtitleTransport,
     ExternalSubtitleTransportError,
@@ -835,6 +844,27 @@ class SSHRemoteHermesBridge:
             timeout=timeout,
         )
 
+    def resolve_stage11_hermes_settings(self):
+        """Read the active Stage11 profile and runtime timeout support only."""
+        try:
+            raw = self._python(
+                REMOTE_PROFILE_SETTINGS_PROBE,
+                STAGE11_HERMES_CONFIG_PATH,
+                REMOTE_HERMES_SOURCE,
+                STAGE11_HERMES_PROFILE,
+                *STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+                capture=True,
+                timeout=30,
+                python_executable=REMOTE_HERMES_PYTHON,
+            )
+            return settings_from_probe(raw)
+        except (HermesProfileSettingsError, Stage11DeploymentError):
+            raise
+        except Exception as error:
+            raise Stage11DeploymentTransportError(
+                "Stage11 Hermes profile read-only preflight failed"
+            ) from error
+
     def ensure_task(self, remote_task: str) -> None:
         remote_task = validate_stateful_remote_task_path(remote_task)
         script = """
@@ -1093,6 +1123,7 @@ finally:
         *,
         remote_task: str,
         timeout: int | float,
+        timeout_env: Mapping[str, str],
     ) -> SimpleNamespace:
         remote_task = validate_stateful_remote_task_path(remote_task)
         if type(command) is not list or not command or not all(
@@ -1101,14 +1132,23 @@ finally:
             raise Stage11DeploymentValidationError(
                 "native review command is malformed"
             )
+        if (type(timeout_env) is not dict
+                or timeout_env != dict(STAGE11_HERMES_TIMEOUT_ENV)):
+            raise Stage11DeploymentValidationError(
+                "Stage11 Hermes timeout environment differs"
+            )
         encoded = base64.b64encode(
             json.dumps(command, ensure_ascii=True, separators=(",", ":")).encode(
                 "utf-8"
             )
         ).decode("ascii")
+        timeout_payload = json.dumps(
+            dict(STAGE11_HERMES_TIMEOUT_ENV), sort_keys=True,
+            separators=(",", ":"),
+        )
         script = """
 import base64, json, os, stat, subprocess, sys
-task, encoded = sys.argv[1], sys.argv[2]
+task, encoded, timeout_payload = sys.argv[1], sys.argv[2], sys.argv[3]
 info = os.lstat(task)
 if (stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode)
         or info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700):
@@ -1116,7 +1156,14 @@ if (stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode)
 command = json.loads(base64.b64decode(encoded).decode("utf-8"))
 if type(command) is not list or not all(type(item) is str for item in command):
     raise SystemExit(3)
-completed = subprocess.run(command, cwd=task, stdin=subprocess.DEVNULL,
+timeout_env = json.loads(timeout_payload)
+if (type(timeout_env) is not dict or
+        any(type(key) is not str or type(value) is not str
+            for key, value in timeout_env.items())):
+    raise SystemExit(4)
+env = os.environ.copy()
+env.update(timeout_env)
+completed = subprocess.run(command, cwd=task, env=env, stdin=subprocess.DEVNULL,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                            check=False)
 if completed.returncode != 0:
@@ -1126,6 +1173,7 @@ if completed.returncode != 0:
             script,
             remote_task,
             encoded,
+            timeout_payload,
             timeout=timeout,
         )
         return SimpleNamespace(returncode=0)
@@ -1236,10 +1284,17 @@ def _hybrid_launcher_factory(
             "remote bridge lacks Hybrid review methods"
         )
 
-    def launcher(command, *, cwd, timeout):
+    def launcher(command, *, cwd, timeout, env):
         if type(cwd) is not int or cwd < 0:
             raise Stage11DeploymentValidationError(
                 "Hybrid launcher received an invalid pinned directory"
+            )
+        if not isinstance(env, Mapping) or any(
+            env.get(key) != value
+            for key, value in STAGE11_HERMES_TIMEOUT_ENV.items()
+        ):
+            raise Stage11DeploymentValidationError(
+                "Hybrid launcher lacks the approved Stage11 timeout values"
             )
         if type(command) is not list or not all(type(item) is str for item in command):
             raise Stage11DeploymentValidationError(
@@ -1282,7 +1337,12 @@ def _hybrid_launcher_factory(
             raise Stage11DeploymentValidationError(
                 "Hybrid query retained local file authority"
             )
-        launch(remote_command, remote_task=remote_task, timeout=timeout)
+        launch(
+            remote_command,
+            remote_task=remote_task,
+            timeout=timeout,
+            timeout_env=dict(STAGE11_HERMES_TIMEOUT_ENV),
+        )
         result_payload = read_regular(remote_result, max_bytes=16 * 1024 * 1024)
         _private_local_write_at(cwd, QUALITY_REVIEW_RESULT_FILENAME, result_payload)
         return SimpleNamespace(returncode=0)
@@ -1345,6 +1405,7 @@ class _HybridOriginalRegistry:
             staging_root,
             semantic_policy=None,
             boundary_evidence=None,
+            hermes_settings=None,
         ):
             callback_kwargs = {
                 "route": route,
@@ -1354,6 +1415,8 @@ class _HybridOriginalRegistry:
                 callback_kwargs["semantic_policy"] = semantic_policy
             if boundary_evidence is not None:
                 callback_kwargs["boundary_evidence"] = boundary_evidence
+            if hermes_settings is not None:
+                callback_kwargs["hermes_settings"] = hermes_settings
             result = callback(package, **callback_kwargs)
             if route == V2_ROUTE_HYBRID:
                 try:
@@ -1523,6 +1586,15 @@ class Stage11DeploymentDependencies:
     live: Stage11LiveDependencies
     _first_pass_capture: Callable
     _external_capture: Callable
+
+    def resolve_hermes_settings(self):
+        """Resolve one read-only profile/runtime snapshot from the Hermes host."""
+        resolver = getattr(self.remote_bridge, "resolve_stage11_hermes_settings", None)
+        if not callable(resolver):
+            raise Stage11DeploymentValidationError(
+                "Stage11 Hermes profile resolver is unavailable"
+            )
+        return resolver()
 
     def controller_kwargs(self) -> dict[str, Callable]:
         """Return only the existing controller-facing callable contract."""
@@ -1747,6 +1819,7 @@ def build_stage11_deployment_dependencies(
             "remote_task_for_session": remote_task_for_session,
             "runner_options": asr_native_options,
         },
+        hermes_settings_resolver=bridge.resolve_stage11_hermes_settings,
         hybrid_review_options={
             "originals_provider": originals_registry.originals_provider,
             "runner_options": hybrid_native_options,

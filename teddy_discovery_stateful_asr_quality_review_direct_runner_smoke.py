@@ -40,6 +40,11 @@ from teddy_discovery_stateful_translator import (
     stateful_session_id_for_package,
 )
 from teddy_discovery_subtitle_v2_pipeline_smoke import asr_result
+from teddy_discovery_stage11_hermes_profile import (
+    HermesExecutionSettings,
+    STAGE11_HERMES_TIMEOUT_ENV,
+    STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+)
 
 
 def _fixture():
@@ -127,6 +132,12 @@ def _fixture():
 
 def main():
     request, request_payload, result_payload = _fixture()
+    hermes_settings = HermesExecutionSettings(
+        profile_name="subtitle-translator", provider="synthetic-provider",
+        model="synthetic-model", reasoning_effort="high",
+        hermes_version="synthetic-1", config_sha256="0" * 64,
+        timeout_env_supported=STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+    )
     passed = failed = 0
 
     def check(name, callback):
@@ -155,6 +166,7 @@ def main():
     remote_task = "/home/teddy/stage11-quality-review-smoke"
     query = direct.build_direct_asr_quality_review_command(
         review_execution_session_id,
+        hermes_settings=hermes_settings,
         input_sha256="b" * 64,
         request_sha256=asr_quality_review_request_sha256(request),
         remote_task=remote_task,
@@ -219,7 +231,7 @@ def main():
         )
         direct._remote_run_hermes(
             ["ssh"], stage_task, ["/home/teddy/.local/bin/hermes", "-q", "query"],
-            timeout=7,
+            timeout_env=dict(STAGE11_HERMES_TIMEOUT_ENV), timeout=7,
         )
         readback = direct._remote_read_result(["ssh"], stage_task, timeout=7)
     check(
@@ -344,6 +356,7 @@ def main():
                 remote_task=remote_task,
                 timeout=31,
                 executor=fake_executor,
+                hermes_settings=hermes_settings,
             )
         check("valid ASR-only request and all four actions", lambda: (
             execution.cue_count == 4
@@ -375,6 +388,7 @@ def main():
             executor=fresh_executor,
             fresh_review_session=True,
             fresh_session_preparer=fresh_session_preparer,
+            hermes_settings=hermes_settings,
         )
         check(
             "fresh pre-create precedes same-ID resume command execution",
@@ -397,6 +411,7 @@ def main():
                 review_execution_session_id,
                 remote_task=remote_task,
                 executor=fake_executor,
+                hermes_settings=hermes_settings,
             ),
         )
         check("existing final artifact remains unchanged", lambda: output_path.read_bytes() == expected_payload)
@@ -412,6 +427,7 @@ def main():
                 review_execution_session_id,
                 remote_task=remote_task,
                 executor=fake_executor,
+                hermes_settings=hermes_settings,
             ),
         )
         check(
@@ -423,6 +439,7 @@ def main():
                 remote_task=remote_task,
                 timeout=31,
                 executor=fake_executor,
+                hermes_settings=hermes_settings,
             ),
         )
         check(
@@ -434,6 +451,7 @@ def main():
                 remote_task=remote_task,
                 timeout=31,
                 executor=fake_executor,
+                hermes_settings=hermes_settings,
             ).source_translation_session_id == source_translation_session_id,
         )
         reject(
@@ -444,6 +462,7 @@ def main():
                 "not a session",
                 remote_task=remote_task,
                 executor=fake_executor,
+                hermes_settings=hermes_settings,
             ),
         )
 
@@ -480,6 +499,7 @@ def main():
                     review_execution_session_id,
                     remote_task=remote_task,
                     executor=lambda *args: raw,
+                    hermes_settings=hermes_settings,
                 ),
             )
             check(name + " leaves no final artifact", lambda target=target: not target.exists())

@@ -152,6 +152,21 @@ def _config(proxy_url):
 
 
 class _NoOpBridge:
+    def resolve_stage11_hermes_settings(self):
+        from teddy_discovery_stage11_hermes_profile import (
+            HermesExecutionSettings,
+            STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+        )
+        return HermesExecutionSettings(
+            profile_name="subtitle-translator",
+            provider="synthetic-provider",
+            model="synthetic-model",
+            reasoning_effort="high",
+            hermes_version="synthetic-1",
+            config_sha256="0" * 64,
+            timeout_env_supported=STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+        )
+
     def ensure_task(self, remote_task):
         del remote_task
 
@@ -177,8 +192,9 @@ class _NoOpBridge:
         del session_id, include_inactive
         return []
 
-    def launch_quality_review(self, command, *, remote_task, timeout):
-        del command, remote_task, timeout
+    def launch_quality_review(self, command, *, remote_task, timeout,
+                              timeout_env):
+        del command, remote_task, timeout, timeout_env
         return SimpleNamespace(returncode=0)
 
 

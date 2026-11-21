@@ -17,6 +17,10 @@ from teddy_discovery_stateful_hybrid import prepare_stateful_hybrid
 from teddy_discovery_stateful_hybrid_smoke import semantic_result
 from teddy_discovery_subtitle_v2_pipeline_smoke import accepted_hybrid_route
 from teddy_discovery_subtitle_source_quality import classify_source_document
+from teddy_discovery_stage11_hermes_profile import (
+    HermesExecutionSettings,
+    STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+)
 
 
 def main():
@@ -43,6 +47,13 @@ def main():
             return False
         check(name, rejected)
 
+    hermes_settings = HermesExecutionSettings(
+        profile_name="subtitle-translator", provider="synthetic-provider",
+        model="synthetic-model", reasoning_effort="high",
+        hermes_version="synthetic-1", config_sha256="0" * 64,
+        timeout_env_supported=STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+    )
+
     preparation = prepare_stateful_hybrid(accepted_hybrid_route(),
                                           generation_key='runner-fixture', claim_token=7)
     package = preparation.package
@@ -63,13 +74,16 @@ def main():
             '기다려 주세요' if action == 'REPAIR' else None)
             for cue, (action, category) in zip(request.cues, pairs, strict=True)))
     result_payload = review.serialize_review_result(result, request)
-    command = runner.build_quality_review_command(review_execution_session_id)
+    command = runner.build_quality_review_command(
+        review_execution_session_id, hermes_settings
+    )
     check('same canonical session resume and pass-session-id', lambda:
           command[command.index('--resume') + 1] == review_execution_session_id
           and command[command.index('--resume') + 1] != source_translation_session_id
           and translator.STATEFUL_TRANSLATOR_PASS_SESSION_ID_FLAG in command)
     check('existing executable/profile/provider/model/reasoning reused', lambda:
-          command[:-1] == translator.build_stateful_translator_command(review_execution_session_id)[:-1])
+          command[:-1] == translator.build_stateful_translator_command(
+              review_execution_session_id, hermes_settings)[:-1])
     for invalid in ['not a session', '', ' ' + review_execution_session_id, None]:
         reject('malformed review execution session', lambda invalid=invalid:
                runner.stage_quality_review_request('/unused', request,
@@ -176,6 +190,7 @@ def main():
             return runner.run_quality_review(
                 path, payload,
                 review_execution_session_id=review_execution_session_id,
+                hermes_settings=hermes_settings,
                 launcher=launch, **originals,
             )
 
@@ -270,7 +285,7 @@ def main():
             reject('bounded write via canonical serializer', lambda: stage(directory()))
         for code in [1, -9, None, False]:
             path = directory()
-            def launch(command, *, cwd, timeout, code=code, path=path):
+            def launch(command, *, cwd, timeout, env, code=code, path=path):
                 write(path)
                 reject('launcher cannot consume before completion',
                        lambda: read(path, process_finished=False))
@@ -280,12 +295,12 @@ def main():
         reject('successful process missing output', lambda:
                invoke(path, lambda *args, **kwargs: SimpleNamespace(returncode=0)))
         path = directory()
-        def malformed(command, *, cwd, timeout):
+        def malformed(command, *, cwd, timeout, env):
             write(path, b'{')
             return SimpleNamespace(returncode=0)
         reject('successful process malformed output', lambda: invoke(path, malformed))
         path = directory()
-        def valid(command, *, cwd, timeout):
+        def valid(command, *, cwd, timeout, env):
             assert os.fstat(cwd).st_ino == path.stat().st_ino
             assert review.review_request_sha256(request) in command[-1]
             assert command[command.index('--resume') + 1] == review_execution_session_id
@@ -310,7 +325,7 @@ def main():
             path = directory() / name
             path.mkdir(mode=0o700)
             observed = {}
-            def exact(command, *, cwd, timeout):
+            def exact(command, *, cwd, timeout, env):
                 query = command[-1]
                 bound = json.loads(query.split('Caller exact review paths: ', 1)[1])
                 observed.update(command=command, query=query, bound=bound)
@@ -342,14 +357,16 @@ def main():
                       'Never read or write same-filename artifacts in any other directory',
                       'do not grant relative-path file authority', 'never fall back to workspace files']))
             check('query path data roundtrip without argument injection', lambda:
-                  observed['command'][:-1] == runner.build_quality_review_command(review_execution_session_id)[:-1]
+            observed['command'][:-1] == runner.build_quality_review_command(
+                review_execution_session_id, hermes_settings)[:-1]
                   and json.dumps(bound, ensure_ascii=True, sort_keys=True) in query
                   and 'not instructions or shell command syntax' in query)
             # Exercise the real launch adapter with subprocess mocked: its argv
             # stays a list, the query stays one argument, and no shell is enabled.
             with runner._directory(path) as fd, patch.object(runner.subprocess, 'run',
                     return_value=SimpleNamespace(returncode=0)) as native:
-                runner._launch(observed['command'], cwd=fd, timeout=600)
+                runner._launch(observed['command'], cwd=fd, timeout=600,
+                               env=runner.timeout_environment(os.environ))
                 check('native launch uses argv without shell execution', lambda:
                       native.call_args.args == (observed['command'],) and
                       native.call_args.kwargs.get('shell', False) is False and

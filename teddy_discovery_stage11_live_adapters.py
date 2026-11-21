@@ -694,13 +694,31 @@ def build_first_pass_adapter(*, remote, ssh_key, known_hosts,
     return first_pass
 
 
-def build_asr_review_adapter(*, remote_task_for_session, runner_options):
+def build_asr_review_adapter(
+    *, remote_task_for_session, runner_options, hermes_settings_resolver
+):
     """runner_options are native connection/executor inputs owned by the caller."""
     options = dict(runner_options)
     if {"fresh_review_session", "remote_task"} & options.keys():
         raise Stage11LiveAdapterError("review task/fresh mode is adapter-owned")
 
+    if not callable(hermes_settings_resolver):
+        raise Stage11LiveAdapterError(
+            "Stage11 Hermes profile resolver is required for ASR review"
+        )
+
     def asr_review(review_request, *, staging_root):
+        from teddy_discovery_stage11_hermes_profile import HermesExecutionSettings
+        try:
+            hermes_settings = hermes_settings_resolver()
+        except Exception as error:
+            raise Stage11LiveAdapterError(
+                "Stage11 Hermes profile preflight failed for ASR review"
+            ) from error
+        if type(hermes_settings) is not HermesExecutionSettings:
+            raise Stage11LiveAdapterError(
+                "resolved Stage11 Hermes settings are invalid"
+            )
         raw = serialize_asr_quality_review_request(review_request)
         session = new_review_execution_session_id()
         directory = create_stateful_staging_directory(staging_root, session)
@@ -712,7 +730,7 @@ def build_asr_review_adapter(*, remote_task_for_session, runner_options):
         run_asr_quality_review(
             input_path, output_path, session,
             remote_task=remote_task_for_session(session),
-            fresh_review_session=True, **options,
+            fresh_review_session=True, hermes_settings=hermes_settings, **options,
         )
         return parse_asr_quality_review_result(
             _read_local_input(output_path), review_request,
@@ -720,14 +738,33 @@ def build_asr_review_adapter(*, remote_task_for_session, runner_options):
     return asr_review
 
 
-def build_hybrid_review_adapter(*, originals_provider, runner_options):
+def build_hybrid_review_adapter(
+    *, originals_provider, runner_options, hermes_settings_resolver
+):
     """Supply exact caller originals to the native parser's trust boundary."""
     options = dict(runner_options)
     if {"fresh_review_session", "review_execution_session_id", "session_id", "target_cue_ids"} & options.keys():
         raise Stage11LiveAdapterError("review execution identity is adapter-owned")
 
-    def hybrid_review(review_request, *, staging_root, target_cue_ids=None,
-                      targeted_asr_artifact=None):
+    if not callable(hermes_settings_resolver):
+        raise Stage11LiveAdapterError(
+            "Stage11 Hermes profile resolver is required for Hybrid review"
+        )
+
+    def hybrid_review(review_request, *, staging_root, hermes_settings=None,
+                      target_cue_ids=None, targeted_asr_artifact=None):
+        from teddy_discovery_stage11_hermes_profile import HermesExecutionSettings
+        if hermes_settings is None:
+            try:
+                hermes_settings = hermes_settings_resolver()
+            except Exception as error:
+                raise Stage11LiveAdapterError(
+                    "Stage11 Hermes profile preflight failed for Hybrid review"
+                ) from error
+        if type(hermes_settings) is not HermesExecutionSettings:
+            raise Stage11LiveAdapterError(
+                "resolved Stage11 Hermes settings are required for review"
+            )
         raw = serialize_review_request(review_request)
         if target_cue_ids is None:
             if targeted_asr_artifact is not None:
@@ -748,7 +785,7 @@ def build_hybrid_review_adapter(*, originals_provider, runner_options):
         result = run_quality_review(
             directory, raw, review_execution_session_id=session,
             fresh_review_session=True, **options, **originals,
-            target_cue_ids=target_cue_ids,
+            target_cue_ids=target_cue_ids, hermes_settings=hermes_settings,
         )
         parsed = read_quality_review_result(
             directory, review_request, process_finished=True, returncode=0,
@@ -777,6 +814,7 @@ def build_stage11_live_dependencies(*, source_provider, whisper, targeted_transp
                                     discovery, provider, acceptance_policy,
                                     residual_threshold_ms, first_pass_options,
                                     asr_review_options, hybrid_review_options,
+                                    hermes_settings_resolver,
                                     holding_resolver=None,
                                     audio_chunk_iterator=iter_audio_chunks):
     resolver = holding_resolver if holding_resolver is not None else build_holding_resolver()
@@ -791,8 +829,14 @@ def build_stage11_live_dependencies(*, source_provider, whisper, targeted_transp
                                targeted_transport=targeted_transport,
                                audio_chunk_iterator=audio_chunk_iterator),
         build_first_pass_adapter(**first_pass_options),
-        build_asr_review_adapter(**asr_review_options),
-        build_hybrid_review_adapter(**hybrid_review_options),
+        build_asr_review_adapter(
+            hermes_settings_resolver=hermes_settings_resolver,
+            **asr_review_options,
+        ),
+        build_hybrid_review_adapter(
+            hermes_settings_resolver=hermes_settings_resolver,
+            **hybrid_review_options,
+        ),
         build_targeted_adapter(holding_resolver=resolver, source_provider=source_provider,
                                targeted_transport=targeted_transport, hybrid_suspects=True,
                                audio_chunk_iterator=audio_chunk_iterator),

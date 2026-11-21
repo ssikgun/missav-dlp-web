@@ -48,6 +48,16 @@ from teddy_discovery_stateful_quality_review_runner import (
 from teddy_discovery_stateful_translator import (
     STATEFUL_TRANSLATOR_PRIVATE_FILE_MODE,
 )
+from teddy_discovery_stage11_hermes_profile import (
+    HermesExecutionSettings,
+    HermesProfileSettingsError,
+    REMOTE_PROFILE_SETTINGS_PROBE,
+    STAGE11_HERMES_CONFIG_PATH,
+    STAGE11_HERMES_PROFILE,
+    STAGE11_HERMES_TIMEOUT_ENV,
+    STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+    settings_from_probe,
+)
 
 
 DEFAULT_REMOTE_HOST = "192.168.1.230"
@@ -59,10 +69,8 @@ REMOTE_HERMES_HOSTNAME = "hermes-lxc-slack"
 REMOTE_HERMES_EXECUTABLE = "/home/teddy/.local/bin/hermes"
 REMOTE_HERMES_PYTHON = "/home/teddy/.hermes/hermes-agent/venv/bin/python"
 REMOTE_HERMES_SOURCE = "/home/teddy/.hermes/hermes-agent"
-REMOTE_HERMES_PROFILE = (
-    "/home/teddy/.hermes/profiles/subtitle-translator/config.yaml"
-)
-REMOTE_HERMES_PROFILE_NAME = "subtitle-translator"
+REMOTE_HERMES_PROFILE = STAGE11_HERMES_CONFIG_PATH
+REMOTE_HERMES_PROFILE_NAME = STAGE11_HERMES_PROFILE
 REMOTE_CONNECT_TIMEOUT = 10
 
 
@@ -189,6 +197,7 @@ def prepare_asr_quality_review_execution(
     input_path: object,
     output_path: object,
     review_execution_session_id: str,
+    hermes_settings: HermesExecutionSettings,
 ) -> tuple[ASRQualityReviewRequest, bytes, str, Path, Path]:
     """Perform all local checks before any remote transport is attempted."""
 
@@ -200,7 +209,13 @@ def prepare_asr_quality_review_execution(
     input_sha256 = hashlib.sha256(payload).hexdigest()
     try:
         request = parse_asr_quality_review_request_structure(payload)
-        command = build_asr_quality_review_command(review_execution_session_id)
+        if type(hermes_settings) is not HermesExecutionSettings:
+            raise ASRQualityReviewDirectRunnerError(
+                "resolved Stage11 Hermes profile settings are required"
+            )
+        command = build_asr_quality_review_command(
+            review_execution_session_id, hermes_settings
+        )
     except Exception as error:
         raise ASRQualityReviewDirectRunnerError(
             "ASR-only review input or session validation failed"
@@ -215,6 +230,7 @@ def prepare_asr_quality_review_execution(
 def build_direct_asr_quality_review_command(
     review_execution_session_id: str,
     *,
+    hermes_settings: HermesExecutionSettings,
     input_sha256: str,
     request_sha256: str,
     remote_task: str,
@@ -231,7 +247,9 @@ def build_direct_asr_quality_review_command(
             raise ASRQualityReviewDirectRunnerError(
                 f"invalid {name} SHA256"
             ) from error
-    command = build_asr_quality_review_command(review_execution_session_id)
+    command = build_asr_quality_review_command(
+        review_execution_session_id, hermes_settings
+    )
     query_index = command.index("-q") + 1
     paths = {
         "task_directory": remote_task,
@@ -353,6 +371,40 @@ if os.path.lexists(task):
         REMOTE_HERMES_SOURCE,
     )
     _ssh_run(base, _remote_shell_command(script, remote_task), timeout=timeout)
+
+
+def resolve_remote_hermes_settings(
+    *,
+    remote_host: str = DEFAULT_REMOTE_HOST,
+    remote_user: str = DEFAULT_REMOTE_USER,
+    ssh_key: str = DEFAULT_SSH_KEY,
+    known_hosts: str = DEFAULT_KNOWN_HOSTS,
+) -> HermesExecutionSettings:
+    """Read the profile/runtime snapshot over the existing pinned SSH path."""
+    base = _ssh_base(
+        remote_host=remote_host,
+        remote_user=remote_user,
+        ssh_key=ssh_key,
+        known_hosts=known_hosts,
+    )
+    command = _remote_shell_command(
+        REMOTE_PROFILE_SETTINGS_PROBE,
+        STAGE11_HERMES_CONFIG_PATH,
+        REMOTE_HERMES_SOURCE,
+        STAGE11_HERMES_PROFILE,
+        *STAGE11_HERMES_TIMEOUT_ENV_NAMES,
+        python_executable=REMOTE_HERMES_PYTHON,
+    )
+    try:
+        return settings_from_probe(
+            _ssh_run(base, command, capture=True, timeout=30)
+        )
+    except (HermesProfileSettingsError, ASRQualityReviewDirectRunnerError):
+        raise
+    except Exception as error:
+        raise ASRQualityReviewDirectRunnerError(
+            "Stage11 Hermes profile preflight failed"
+        ) from error
 
 
 def _remote_prepare_fresh_session(
@@ -491,8 +543,13 @@ def _remote_run_hermes(
     remote_task: str,
     command: list[str],
     *,
+    timeout_env: dict[str, str],
     timeout: int,
 ) -> None:
+    if timeout_env != dict(STAGE11_HERMES_TIMEOUT_ENV):
+        raise ASRQualityReviewDirectRunnerError(
+            "Stage11 Hermes timeout policy differs"
+        )
     command_payload = base64.b64encode(
         json.dumps(command, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
     ).decode("ascii")
@@ -500,14 +557,20 @@ def _remote_run_hermes(
 import base64, json, os, subprocess, sys
 task, encoded = sys.argv[1], sys.argv[2]
 command = json.loads(base64.b64decode(encoded).decode("utf-8"))
+timeout_env = json.loads(sys.argv[3])
 if type(command) is not list or not all(type(item) is str for item in command):
     raise SystemExit(2)
+if type(timeout_env) is not dict or any(type(k) is not str or type(v) is not str for k, v in timeout_env.items()):
+    raise SystemExit(3)
+env = os.environ.copy()
+env.update(timeout_env)
 completed = subprocess.run(
     command,
     cwd=task,
     stdin=subprocess.DEVNULL,
     stdout=subprocess.DEVNULL,
     stderr=subprocess.DEVNULL,
+    env=env,
     check=False,
 )
 if completed.returncode != 0:
@@ -515,7 +578,10 @@ if completed.returncode != 0:
 """
     _ssh_run(
         base,
-        _remote_shell_command(script, remote_task, command_payload),
+        _remote_shell_command(
+            script, remote_task, command_payload,
+            json.dumps(timeout_env, sort_keys=True, separators=(",", ":")),
+        ),
         timeout=timeout,
     )
 
@@ -562,6 +628,7 @@ def _execute_remote_asr_quality_review(
     known_hosts: str,
     timeout: int,
     fresh_review_session: bool,
+    hermes_settings: HermesExecutionSettings,
 ) -> bytes:
     remote_task = _remote_task_path(remote_task)
     base = _ssh_base(
@@ -573,6 +640,7 @@ def _execute_remote_asr_quality_review(
     request_sha256 = asr_quality_review_request_sha256(request)
     command = build_direct_asr_quality_review_command(
         review_execution_session_id,
+        hermes_settings=hermes_settings,
         input_sha256=input_sha256,
         request_sha256=request_sha256,
         remote_task=remote_task,
@@ -586,7 +654,10 @@ def _execute_remote_asr_quality_review(
     _remote_write_input(
         base, remote_task, input_payload, input_sha256, timeout=timeout
     )
-    _remote_run_hermes(base, remote_task, command, timeout=timeout)
+    _remote_run_hermes(
+        base, remote_task, command,
+        timeout_env=dict(STAGE11_HERMES_TIMEOUT_ENV), timeout=timeout,
+    )
     return _remote_read_result(base, remote_task, timeout=timeout)
 
 
@@ -646,6 +717,7 @@ def run_asr_quality_review(
     executor: Callable | None = None,
     fresh_review_session: bool = False,
     fresh_session_preparer: Callable[[str], object] | None = None,
+    hermes_settings: HermesExecutionSettings | None = None,
 ) -> ASRQualityReviewExecution:
     """Run one explicit resume or fresh-session ASR-only review."""
 
@@ -659,9 +731,23 @@ def run_asr_quality_review(
         raise ASRQualityReviewDirectRunnerError(
             "fresh-session preparer requires fresh review-session mode"
         )
+    if hermes_settings is None:
+        if executor is not None:
+            raise ASRQualityReviewDirectRunnerError(
+                "injected transport requires resolved Hermes profile settings"
+            )
+        hermes_settings = resolve_remote_hermes_settings(
+            remote_host=remote_host, remote_user=remote_user,
+            ssh_key=ssh_key, known_hosts=known_hosts,
+        )
+    if type(hermes_settings) is not HermesExecutionSettings:
+        raise ASRQualityReviewDirectRunnerError(
+            "resolved Stage11 Hermes profile settings are invalid"
+        )
     request, input_payload, input_sha256, _, output_file = (
         prepare_asr_quality_review_execution(
-            input_path, output_path, review_execution_session_id
+            input_path, output_path, review_execution_session_id,
+            hermes_settings,
         )
     )
     remote_task = _remote_task_path(remote_task)
@@ -678,6 +764,7 @@ def run_asr_quality_review(
             known_hosts=known_hosts,
             timeout=timeout,
             fresh_review_session=fresh_review_session,
+            hermes_settings=hermes_settings,
         )
     else:
         if fresh_review_session:
