@@ -11,7 +11,7 @@ stage11_lock_dir='/opt/missav-dlp-web/title-locks'
 stage11_action='deploy'
 if [[ "${1:-}" == 'prepare' || "${1:-}" == 'switch-current' || "${1:-}" == 'activate-timer' ]]; then
   stage11_action="$1"
-  stage11_revision="${2:?Usage: deploy.sh {prepare|switch-current|activate-timer} COMMIT_SHA}"
+  stage11_revision="${2:?Missing COMMIT_SHA}"
   [[ "$#" -eq 2 ]]
 else
   stage11_revision="${1:?Usage: deploy.sh COMMIT_SHA}"
