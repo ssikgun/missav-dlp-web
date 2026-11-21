@@ -211,6 +211,10 @@ class Stage11DeploymentConfig:
     subtitlecat_proxy_url: str | None = None
     asr_media_temp_root: str = "/var/tmp/teddy-stage11-asr-production"
     asr_media_temp_reserve_bytes: int = ASR_MEDIA_TEMP_RESERVE_BYTES
+    targeted_asr_worker_config_path: str = (
+        "/opt/missav-dlp-web/discovery/stage11-normal-deployment/"
+        "targeted-asr-worker.json"
+    )
 
     def __post_init__(self):
         for name in ("nas_host", "nas_user", "remote_host", "remote_user"):
@@ -238,6 +242,14 @@ class Stage11DeploymentConfig:
             _absolute_path(
                 self.asr_media_temp_root,
                 field_name="asr_media_temp_root",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "targeted_asr_worker_config_path",
+            _absolute_path(
+                self.targeted_asr_worker_config_path,
+                field_name="targeted_asr_worker_config_path",
             ),
         )
         if (
@@ -1527,6 +1539,14 @@ class Stage11DeploymentDependencies:
             "hybrid_targeted_runner": self.live.hybrid_targeted_runner,
         }
 
+    @property
+    def bounded_hybrid_targeted_runner(self) -> Callable | None:
+        """Expose only the hybrid callback backed by an owned worker lifecycle."""
+        runner = self.live.hybrid_targeted_runner
+        if getattr(runner, "bounded_worker_lifecycle", False) is True:
+            return runner
+        return None
+
     def capture_first_pass_runner(self, callback: Callable) -> Callable:
         """Retain Normal's native result at the existing HYBRID trust boundary."""
         return self._first_pass_capture(callback)
@@ -1534,6 +1554,17 @@ class Stage11DeploymentDependencies:
     def capture_external_ja_attempt(self, callback: Callable) -> Callable:
         """Retain Normal's accepted external JA application for review replay."""
         return self._external_capture(callback)
+
+
+def _build_targeted_asr_transport(config, override=None):
+    if override is not None:
+        return override
+    from teddy_discovery_asr_bounded_worker import BoundedTargetedASRTransport
+
+    return BoundedTargetedASRTransport(
+        config_path=config.targeted_asr_worker_config_path,
+        request_timeout_seconds=min(float(config.request_timeout_seconds), 900.0),
+    )
 
 
 def build_stage11_deployment_dependencies(
@@ -1599,7 +1630,7 @@ def build_stage11_deployment_dependencies(
             base_url=config.asr_base_url,
             request_timeout_seconds=config.request_timeout_seconds,
         )
-    live_targeted = live_whisper if targeted_transport is None else targeted_transport
+    live_targeted = _build_targeted_asr_transport(config, targeted_transport)
     live_discovery = discovery
     if live_discovery is None:
         live_discovery = SubtitleCatDiscovery(

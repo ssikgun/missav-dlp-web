@@ -73,3 +73,37 @@ bash deploy/stage11-normal/rollback.sh BACKUP_DIRECTORY
 Rollback restores the prior unit/release/timer state. It retains generated
 artifacts and queue history, and never edits existing subtitles. Web,
 completion, writer and GPU Worker units are outside this deployment.
+
+## Targeted Whisper worker lifecycle
+
+Normal Mode and the one-title regeneration dependencies use the same bounded
+transport for **targeted** speech evidence. The adapter verifies the current
+source snapshot, copies the media into its protected temporary area, then
+starts the SSH tunnel and VM122 worker only when the first targeted ASR request
+is made. The worker and owned tunnel are cleaned up after the targeted pass and
+temporary-media context exit. An unverified remote stop is a failure, not a
+successful cleanup. The existing start/runtime GPU floors are 3,500/1,500 MiB
+and the worker lifetime and individual request are capped at 900 seconds; the
+Whisper model/runtime profile is unchanged.
+
+The process reads its worker connection values from the permanent, private
+configuration file
+`/opt/missav-dlp-web/discovery/stage11-normal-deployment/targeted-asr-worker.json`.
+It must be owned by the service's effective user and mode `0600`, in a
+non-symlinked directory chain that is not group- or world-writable. Its exact
+JSON keys are `remote_repo_root`, `remote_source_sha`, `ssh_key`,
+`known_hosts`, `remote_python`, `model_cache_root`, and `model_snapshot`.
+The remote repository identity is checked against the canonical Stage11 branch,
+origin, configured commit and a clean worktree before the launcher starts.
+No configuration file or secret is created or shipped by this source change;
+targeted ASR stops safely until an operator provisions and verifies this file.
+
+This bounded lifecycle covers **targeted** evidence calls. The existing
+full-title baseline transcriber remains on its separately configured ASR
+endpoint and is not converted to this 900-second ephemeral worker by this
+change. One-title regeneration still requires an existing source-bound ASR
+artifact and Japanese subtitle; it stops before creating its output root when
+either input is missing or mismatched. The ordinary new-holding queue continues
+to acquire its baseline and Japanese source through the existing Normal Mode
+path. Existing published/history rows are not automatically re-enqueued for
+regeneration.

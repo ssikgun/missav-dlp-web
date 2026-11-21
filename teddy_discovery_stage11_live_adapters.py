@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from collections.abc import Callable, Mapping
+from contextlib import nullcontext
 import os
 from pathlib import Path
 import re
@@ -147,24 +148,30 @@ def build_targeted_adapter(*, holding_resolver, source_provider, targeted_transp
         video, current = _snapshot(holding_resolver(snapshot.dvd_id), snapshot.dvd_id)
         if current != snapshot:
             raise Stage11LiveAdapterError("targeted holding snapshot detached")
-        with source_provider.copy_to_temp(
-            video, max_media_bytes=snapshot.source_size,
-        ) as local_source:
-            if local_source.source_snapshot != snapshot:
-                raise Stage11LiveAdapterError("targeted local source detached")
-            if hybrid_suspects:
-                return run_targeted_hybrid_windows(
-                    source_quality_decisions, local_source=local_source,
-                    targeted_transport=targeted_transport,
+        session_factory = getattr(targeted_transport, "session", None)
+        session = session_factory() if callable(session_factory) else nullcontext(targeted_transport)
+        with session as active_transport:
+            with source_provider.copy_to_temp(
+                video, max_media_bytes=snapshot.source_size,
+            ) as local_source:
+                if local_source.source_snapshot != snapshot:
+                    raise Stage11LiveAdapterError("targeted local source detached")
+                if hybrid_suspects:
+                    return run_targeted_hybrid_windows(
+                        source_quality_decisions, local_source=local_source,
+                        targeted_transport=active_transport,
+                        audio_chunk_iterator=audio_chunk_iterator,
+                    )
+                execution = run_targeted_second_evidence_v1_from_local_source(
+                    asr_result, source_quality_decisions, local_source=local_source,
+                    targeted_transport=active_transport,
                     audio_chunk_iterator=audio_chunk_iterator,
                 )
-            execution = run_targeted_second_evidence_v1_from_local_source(
-                asr_result, source_quality_decisions, local_source=local_source,
-                targeted_transport=targeted_transport,
-                audio_chunk_iterator=audio_chunk_iterator,
-            )
-            execution.__post_init__()
-            return execution
+                execution.__post_init__()
+                return execution
+    targeted.bounded_worker_lifecycle = (
+        getattr(targeted_transport, "bounded_worker_lifecycle", False) is True
+    )
     return targeted
 
 

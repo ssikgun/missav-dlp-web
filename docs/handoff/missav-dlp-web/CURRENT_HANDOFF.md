@@ -18207,3 +18207,11 @@ Provide an explicitly authorized execution environment with access to the alread
 ### Remaining operational gates
 
 Before live regeneration, configure and verify the bounded delayed Whisper lifecycle if targeted ASR may be requested; then authorize one exact title and private output identity. Before a replacement, separately authorize the exact old/new SHA pair. Automatic restoration on replacement failure would require a separate implementation decision. Production deployment and timer activation remain unperformed and require their own approval.
+
+## 2026-11-21 — S11-MVP001 bounded targeted Whisper connection
+
+The user-approved isolated implementation connects a reusable lazy bounded worker to both one-title regeneration dependencies and the ordinary new-holding Normal Mode dependency factory. It starts only when targeted ASR is first requested, after protected media copy and source-snapshot validation; it keeps the existing 3,500/1,500 MiB GPU floors, 900-second worker limit, SSH identity checks, and conservative remote stop evidence. Synthetic Normal Mode smoke passed 25 tests; compile and diff checks passed. The broader deployment smoke was unavailable because this environment lacks `numpy` (no installation attempted).
+
+The permanent owner-private runtime config is documented but was not created or verified, and VM122 was not contacted. Therefore this is source/offline integration only: no real worker/model/media, service/timer, deployment, database, NAS, or Jellyfin operation occurred. `MODEL_EXECUTION=0`; `PRODUCTION_CHANGED=NO`; `DEPLOY=NOT_RUN`.
+
+The ordinary new-holding path keeps its existing baseline-ASR and external-JA acquisition. One-title regeneration still requires cached source-bound ASR and Japanese subtitle artifacts and fails closed before output creation if either is absent. Existing published/history entries are not auto-requeued; adding historical input reacquisition is a separate scope decision.

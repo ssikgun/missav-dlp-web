@@ -4,6 +4,7 @@ Synthetic transport fixtures are never presented as live translation evidence.
 """
 import base64
 from dataclasses import replace
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import stat
@@ -16,6 +17,8 @@ from unittest.mock import patch
 import teddy_discovery_stage11_normal_mode as normal
 import teddy_discovery_stage11_controller_smoke as fixture
 import teddy_discovery_stage11_live_adapters as live_adapters
+import teddy_discovery_asr_bounded_worker as bounded_worker
+import teddy_discovery_stage11_deployment as deployment
 import teddy_discovery_stateful_quality_review as review
 from teddy_discovery_alignment_acceptance_smoke import policy_with
 from teddy_discovery_stateful_translator import StatefulAbsorptionResult, StatefulCueOutput
@@ -559,6 +562,147 @@ class NormalSmoke(unittest.TestCase):
         with self.assertRaises(normal.controller.Stage11ControllerError):
             normal.NativeNormalFirstPass(Bridge()).invoke(b'test',directory,'timeout',lambda raw:json.loads(raw))
         self.assertEqual(len(list(directory.glob('*.receipt.json'))),1)
+
+    def test_targeted_worker_starts_only_after_local_media_is_ready(self):
+        events=[]
+        config=SimpleNamespace(ssh_key='/unused/key',known_hosts='/unused/hosts')
+        class Client:
+            runtime_identity=self.baseline.runtime_identity
+            engine_version=self.baseline.engine_version
+            def transcribe_targeted_chunk(_self,_chunk):
+                events.append('http_request')
+                return 'synthetic-response'
+        class Worker:
+            def stop(_self):
+                events.append('worker_stop')
+                return True
+        class Lifecycle:
+            def __init__(_self,_config): pass
+            def start_tunnel(_self):
+                events.append('tunnel_start')
+                return object()
+            def start_worker(_self):
+                events.append('worker_start')
+                return Worker()
+            def _stop_process(_self,_process):
+                events.append('tunnel_stop')
+                return True
+        transport=bounded_worker.BoundedTargetedASRTransport(
+            client_factory=lambda _config:Client(), lifecycle_factory=Lifecycle)
+        snapshot=self.baseline.source_snapshot
+        video=SimpleNamespace(video_format='mp4')
+        local=SimpleNamespace(source_snapshot=snapshot)
+        class Source:
+            @contextmanager
+            def copy_to_temp(_self,*_args,**_kwargs):
+                events.append('media_copy_start')
+                events.append('media_copy_complete')
+                try:
+                    yield local
+                finally:
+                    events.append('media_temp_cleanup')
+        def fake_hybrid(_decisions,*,local_source,targeted_transport,**_kwargs):
+            self.assertIs(local_source,local)
+            return targeted_transport.transcribe_targeted_chunk(object())
+        with patch.object(bounded_worker.BoundedASRWorkerConfig,'load',
+                          side_effect=lambda *_a,**_k:events.append('config_read') or config), \
+             patch.object(bounded_worker,'_validate_local_ssh_file'), \
+             patch.object(live_adapters,'_snapshot',return_value=(video,snapshot)), \
+             patch.object(live_adapters,'run_targeted_hybrid_windows',side_effect=fake_hybrid):
+            runner=live_adapters.build_targeted_adapter(
+                holding_resolver=lambda _title:None,source_provider=Source(),
+                targeted_transport=transport,hybrid_suspects=True)
+            self.assertEqual(runner(self.baseline,()),'synthetic-response')
+        self.assertLess(events.index('media_copy_complete'),events.index('tunnel_start'))
+        self.assertLess(events.index('tunnel_start'),events.index('worker_start'))
+        self.assertLess(events.index('worker_start'),events.index('http_request'))
+        self.assertLess(events.index('media_temp_cleanup'),events.index('worker_stop'))
+        self.assertLess(events.index('worker_stop'),events.index('tunnel_stop'))
+
+    def test_targeted_worker_failures_cleanup_only_owned_sessions(self):
+        config=SimpleNamespace(ssh_key='/unused/key',known_hosts='/unused/hosts')
+        events=[]
+        class Client:
+            runtime_identity=self.baseline.runtime_identity
+            engine_version=self.baseline.engine_version
+            def transcribe_targeted_chunk(_self,_chunk):
+                raise RuntimeError('synthetic HTTP failure')
+        class Worker:
+            def __init__(_self,ok): _self.ok=ok
+            def stop(_self):
+                events.append('worker_stop')
+                return _self.ok
+        class Lifecycle:
+            fail_start=False
+            stop_worker_ok=True
+            def __init__(_self,_config): pass
+            def start_tunnel(_self):
+                events.append('tunnel_start')
+                return object()
+            def start_worker(_self):
+                events.append('worker_start')
+                if _self.fail_start:
+                    raise bounded_worker.BoundedASRWorkerError('VM122_WORKER_START_FAILED')
+                return Worker(_self.stop_worker_ok)
+            def _stop_process(_self,_process):
+                events.append('tunnel_stop')
+                return True
+        lifecycle_holder=[]
+        def lifecycle_factory(config_value):
+            value=Lifecycle(config_value); lifecycle_holder.append(value); return value
+        with patch.object(bounded_worker.BoundedASRWorkerConfig,'load',return_value=config), \
+             patch.object(bounded_worker,'_validate_local_ssh_file'):
+            transport=bounded_worker.BoundedTargetedASRTransport(
+                client_factory=lambda _config:Client(),lifecycle_factory=lifecycle_factory)
+            lifecycle_holder.clear()
+            failed_start=lifecycle_factory(config); failed_start.fail_start=True
+            transport._lifecycle_factory=lambda _config:failed_start
+            with transport.session() as active:
+                with self.assertRaises(bounded_worker.BoundedASRWorkerError):
+                    active.transcribe_targeted_chunk(object())
+            self.assertIn('tunnel_stop',events)
+            self.assertNotIn('worker_stop',events)
+
+            events.clear()
+            failed_cleanup=lifecycle_factory(config); failed_cleanup.stop_worker_ok=False
+            transport._lifecycle_factory=lambda _config:failed_cleanup
+            with self.assertRaisesRegex(bounded_worker.BoundedASRWorkerError,
+                                        'WORKER_OR_TUNNEL_CLEANUP_UNVERIFIED'):
+                with transport.session() as active:
+                    active.transcribe_targeted_chunk(object())
+            self.assertIn('worker_stop',events)
+            self.assertIn('tunnel_stop',events)
+
+    def test_normal_dependency_uses_bounded_targeted_transport_by_default(self):
+        config=SimpleNamespace(
+            targeted_asr_worker_config_path=bounded_worker.CONFIG_PATH,
+            request_timeout_seconds=1200,
+        )
+        transport=deployment._build_targeted_asr_transport(config)
+        self.assertIsInstance(transport,bounded_worker.BoundedTargetedASRTransport)
+        self.assertEqual(transport.request_timeout_seconds,900)
+        explicit=object()
+        self.assertIs(deployment._build_targeted_asr_transport(config,explicit),explicit)
+
+    def test_regeneration_exposes_only_bounded_hybrid_targeted_runner(self):
+        class Live:
+            def __init__(self,runner): self.hybrid_targeted_runner=runner
+        runner=lambda *_args,**_kwargs: None
+        runner.bounded_worker_lifecycle=True
+        values=dict(
+            config=object(),source_provider=object(),whisper=object(),
+            targeted_transport=object(),discovery=object(),provider=object(),
+            remote_bridge=object(),remote_task_for_session=lambda *_a:None,
+            prepare_remote=lambda *_a:None,originals_provider=lambda *_a:None,
+            live=Live(runner),_first_pass_capture=lambda value:value,
+            _external_capture=lambda value:value,
+        )
+        dependencies=deployment.Stage11DeploymentDependencies(**values)
+        self.assertIs(dependencies.bounded_hybrid_targeted_runner,runner)
+        unbounded=lambda *_args,**_kwargs: None
+        dependencies=deployment.Stage11DeploymentDependencies(
+            **dict(values,live=Live(unbounded)))
+        self.assertIsNone(dependencies.bounded_hybrid_targeted_runner)
 
 
 if __name__=='__main__': unittest.main()
