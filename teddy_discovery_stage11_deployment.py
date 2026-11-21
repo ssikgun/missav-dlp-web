@@ -9,7 +9,6 @@ only through the returned injected callables.
 
 from __future__ import annotations
 
-import base64
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 import hashlib
@@ -20,6 +19,7 @@ from pathlib import Path, PurePosixPath
 import shlex
 import stat
 import subprocess
+import time
 from types import SimpleNamespace
 from urllib import error as urllib_error
 from urllib import request as urllib_request
@@ -60,6 +60,9 @@ from teddy_discovery_stateful_quality_review import (
 from teddy_discovery_stateful_quality_review_runner import (
     QUALITY_REVIEW_INPUT_FILENAME,
     QUALITY_REVIEW_RESULT_FILENAME,
+    QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS,
+    QUALITY_REVIEW_TRANSPORT_TIMEOUT_SECONDS,
+    validate_remote_execution_receipt,
 )
 from teddy_discovery_stateful_hybrid import prepare_stateful_hybrid
 from teddy_discovery_stateful_translator import (
@@ -80,6 +83,7 @@ from teddy_discovery_stage11_hermes_profile import (
     STAGE11_HERMES_TIMEOUT_ENV,
     STAGE11_HERMES_TIMEOUT_ENV_NAMES,
     settings_from_probe,
+    validate_settings_evidence,
 )
 from teddy_discovery_subtitle_external import (
     ExternalSubtitleTransport,
@@ -122,6 +126,642 @@ class Stage11DeploymentValidationError(Stage11DeploymentError):
 
 class Stage11DeploymentTransportError(Stage11DeploymentError):
     """A narrow process or network transport boundary failed."""
+
+
+QUALITY_REVIEW_CLEANUP_GRACE_SECONDS = 30.0
+QUALITY_REVIEW_STATUS_POLL_SECONDS = 10
+QUALITY_REVIEW_REMOTE_CALL_TIMEOUT_SECONDS = 30
+
+
+# This standard-library-only program runs on CT120.  A detached supervisor
+# owns one review CLI process group, writes an immutable completion receipt,
+# and survives loss of the initiating SSH connection.  Its status action is
+# strictly read-only.  The script deliberately emits no command, path, or
+# Hermes output data.
+_REMOTE_QUALITY_REVIEW_EXECUTION_SCRIPT_TEMPLATE = r'''import hashlib, json, os, signal, stat, subprocess, sys, time, uuid
+ACTION, TASK, SESSION, REQUEST_SHA = sys.argv[1:5]
+COMMAND_SHA = sys.argv[5] if len(sys.argv) > 5 else ""
+INPUT_NAME = "stage11-quality-review-input.json"
+RESULT_NAME = "stage11-quality-review-result.json"
+COMMAND_NAME = ".stage11-quality-review-command-v1.json"
+CLAIM_NAME = ".stage11-quality-review-claim-v1.json"
+MANAGER_NAME = ".stage11-quality-review-manager-v1.json"
+CHILD_NAME = ".stage11-quality-review-child-v1.json"
+RECEIPT_NAME = "stage11-quality-review-execution-v1.json"
+APPROVED_TIMEOUT_ENV = {
+    "HERMES_API_CALL_STALE_TIMEOUT": "480",
+    "HERMES_CODEX_TTFB_TIMEOUT_SECONDS": "300",
+    "HERMES_CODEX_TTFB_MAX_SECONDS": "300",
+    "HERMES_CODEX_EVENT_STALE_TIMEOUT_SECONDS": "300",
+}
+EXECUTION_LIMIT = __EXECUTION_LIMIT__
+CLEANUP_GRACE = __CLEANUP_GRACE__
+RECEIPT_SCHEMA = 1
+
+def stop(code):
+    raise SystemExit(code)
+
+def digest(data):
+    return hashlib.sha256(data).hexdigest()
+
+def encode(value):
+    return json.dumps(value, ensure_ascii=True, sort_keys=True,
+                      separators=(",", ":"), allow_nan=False).encode("ascii")
+
+def check_identity():
+    try:
+        uuid.UUID(SESSION)
+        if str(uuid.UUID(SESSION)) != SESSION:
+            stop(20)
+    except (ValueError, AttributeError):
+        stop(20)
+    if (len(REQUEST_SHA) != 64 or
+            any(ch not in "0123456789abcdef" for ch in REQUEST_SHA)):
+        stop(21)
+
+def open_task():
+    try:
+        info = os.lstat(TASK)
+        if (stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode)
+                or info.st_uid != os.geteuid()
+                or stat.S_IMODE(info.st_mode) != 0o700):
+            stop(22)
+        return os.open(TASK, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError:
+        stop(22)
+
+def read_private(fd, name, bound):
+    try:
+        handle = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                         dir_fd=fd)
+        with os.fdopen(handle, "rb") as stream:
+            info = os.fstat(stream.fileno())
+            if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                    or info.st_uid != os.geteuid()
+                    or stat.S_IMODE(info.st_mode) != 0o600
+                    or not 0 < info.st_size <= bound):
+                stop(23)
+            data = stream.read(bound + 1)
+            if len(data) != info.st_size or len(data) > bound:
+                stop(23)
+            return data
+    except OSError:
+        stop(23)
+
+def read_json(fd, name, bound):
+    try:
+        value = json.loads(read_private(fd, name, bound).decode("ascii"))
+    except (ValueError, UnicodeError):
+        stop(24)
+    if type(value) is not dict:
+        stop(24)
+    return value
+
+def absent(fd, name):
+    try:
+        os.stat(name, dir_fd=fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return True
+    except OSError:
+        stop(25)
+    return False
+
+def write_once(fd, name, data):
+    handle = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                     0o600, dir_fd=fd)
+    try:
+        os.fchmod(handle, 0o600)
+        with os.fdopen(handle, "wb") as stream:
+            handle = None
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+    finally:
+        if handle is not None:
+            os.close(handle)
+    os.fsync(fd)
+
+def write_final(fd, receipt):
+    data = encode(receipt)
+    temporary = ".stage11-review-receipt-" + str(os.getpid()) + "-" + uuid.uuid4().hex + ".tmp"
+    write_once(fd, temporary, data)
+    try:
+        os.link(temporary, RECEIPT_NAME, src_dir_fd=fd, dst_dir_fd=fd,
+                follow_symlinks=False)
+        os.fsync(fd)
+    finally:
+        try:
+            os.unlink(temporary, dir_fd=fd)
+            os.fsync(fd)
+        except FileNotFoundError:
+            pass
+
+def proc_info(pid):
+    base = "/proc/" + str(pid)
+    try:
+        raw = open(base + "/stat", "rb").read()
+        end = raw.rfind(b")")
+        if end < 0:
+            return None
+        fields = raw[end + 2:].split()
+        status = open(base + "/status", "rb").read().splitlines()
+        uid_line = next(line for line in status if line.startswith(b"Uid:"))
+        uid = int(uid_line.split()[2])
+        cmdline = open(base + "/cmdline", "rb").read()
+        cwd = os.readlink(base + "/cwd")
+        return {
+            "pid": pid,
+            "state": fields[0].decode("ascii"),
+            "pgrp": int(fields[2]), "session": int(fields[3]),
+            "start_ticks": int(fields[19]), "uid": uid,
+            "cmdline_sha256": digest(cmdline), "cwd": cwd,
+        }
+    except (OSError, StopIteration, ValueError, IndexError):
+        return None
+
+def group_members(pgrp, session, uid):
+    members = []
+    try:
+        pids = [int(item) for item in os.listdir("/proc") if item.isdigit()]
+    except OSError:
+        return None
+    for pid in pids:
+        info = proc_info(pid)
+        if info is None or info["pgrp"] != pgrp:
+            continue
+        if info["session"] != session or info["uid"] != uid:
+            return None
+        if info["state"] != "Z":
+            members.append({
+                "pid": pid, "start_ticks": info["start_ticks"],
+                "uid": info["uid"], "pgrp": info["pgrp"],
+                "session": info["session"],
+            })
+    return members
+
+def signal_owned_members(members, pgrp, session, uid, sig):
+    if not hasattr(os, "pidfd_open") or not hasattr(signal, "pidfd_send_signal"):
+        return False
+    for member in members:
+        pid = member["pid"]
+        descriptor = None
+        try:
+            descriptor = os.pidfd_open(pid, 0)
+            current = proc_info(pid)
+            if current is None:
+                continue
+            if any(current.get(key) != member.get(key) for key in
+                    ("pid", "start_ticks", "uid", "pgrp", "session")):
+                return False
+            if (current["pgrp"] != pgrp or current["session"] != session
+                    or current["uid"] != uid):
+                return False
+            signal.pidfd_send_signal(descriptor, sig, None, 0)
+        except ProcessLookupError:
+            continue
+        except OSError:
+            return False
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
+    return True
+
+def verify_child(info, expected):
+    return bool(info and all(info.get(key) == expected.get(key) for key in
+        ("pid", "start_ticks", "uid", "pgrp", "session", "cmdline_sha256", "cwd")))
+
+def cleanup_group(process, identity):
+    pid, pgrp, session, uid = (identity["pid"], identity["pgrp"],
+                               identity["session"], identity["uid"])
+    current = proc_info(pid)
+    if current is not None and not verify_child(current, identity):
+        return False
+    members = group_members(pgrp, session, uid)
+    if members is None:
+        return False
+    if members:
+        if not signal_owned_members(members, pgrp, session, uid, signal.SIGTERM):
+            return False
+    deadline = time.monotonic() + CLEANUP_GRACE
+    while time.monotonic() < deadline:
+        if process.poll() is None:
+            try:
+                process.wait(timeout=min(0.1, max(0.01, deadline-time.monotonic())))
+            except subprocess.TimeoutExpired:
+                pass
+        members = group_members(pgrp, session, uid)
+        if members == []:
+            break
+        if members is None:
+            return False
+        time.sleep(0.05)
+    members = group_members(pgrp, session, uid)
+    if members is None:
+        return False
+    if members:
+        if not signal_owned_members(members, pgrp, session, uid, signal.SIGKILL):
+            return False
+        deadline = time.monotonic() + CLEANUP_GRACE
+        while time.monotonic() < deadline:
+            if process.poll() is None:
+                try:
+                    process.wait(timeout=min(0.1, max(0.01, deadline-time.monotonic())))
+                except subprocess.TimeoutExpired:
+                    pass
+            members = group_members(pgrp, session, uid)
+            if members == []:
+                break
+            if members is None:
+                return False
+            time.sleep(0.05)
+    try:
+        if process.poll() is None:
+            process.wait(timeout=max(0.01, CLEANUP_GRACE))
+    except subprocess.TimeoutExpired:
+        return False
+    return group_members(pgrp, session, uid) == [] and process.returncode is not None
+
+def stop_direct_child_without_group_identity(process):
+    # Popen owns this exact child even when /proc identity capture fails. Stop
+    # that child only, but never claim its whole session was cleaned: without
+    # verified pgrp/session identity, descendants cannot be safely enumerated.
+    try:
+        if process.poll() is None:
+            process.terminate()
+        process.wait(timeout=CLEANUP_GRACE)
+        return True
+    except subprocess.TimeoutExpired:
+        try:
+            process.kill()
+            process.wait(timeout=CLEANUP_GRACE)
+            return True
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+    except OSError:
+        return False
+
+def process_identity(pid):
+    info = proc_info(pid)
+    if info is None:
+        stop(26)
+    return {
+        "pid": pid, "start_ticks": info["start_ticks"],
+        "uid": info["uid"], "pgrp": info["pgrp"],
+        "session": info["session"],
+        "cmdline_sha256": info["cmdline_sha256"], "cwd": info["cwd"],
+    }
+
+def expected_command(payload):
+    command = payload.get("command")
+    if (type(command) is not list or not command
+            or any(type(item) is not str or not item or
+                   any(ord(ch) < 32 or ord(ch) == 127 for ch in item)
+                   for item in command)):
+        stop(27)
+    settings = payload.get("hermes_execution_settings")
+    if type(settings) is not dict:
+        stop(28)
+    expected_fields = {"profile_name", "hermes_version", "profile_config_sha256",
+        "profile_values", "invocation_values", "timeout_environment",
+        "timeout_environment_supported"}
+    if set(settings) != expected_fields:
+        stop(28)
+    safe_text = lambda item: type(item) is str and 0 < len(item) <= 256 and all(
+        32 < ord(ch) < 127 for ch in item)
+    for name in ("profile_name", "hermes_version"):
+        if not safe_text(settings.get(name)):
+            stop(28)
+    if (type(settings.get("profile_config_sha256")) is not str
+            or len(settings["profile_config_sha256"]) != 64
+            or any(ch not in "0123456789abcdef" for ch in settings["profile_config_sha256"])):
+        stop(28)
+    values = settings.get("invocation_values")
+    if type(values) is not dict or set(values) != {"provider", "model", "reasoning_effort"}:
+        stop(28)
+    if (settings.get("profile_values") != values
+            or settings.get("timeout_environment") != APPROVED_TIMEOUT_ENV
+            or settings.get("timeout_environment_supported") != list(APPROVED_TIMEOUT_ENV)):
+        stop(28)
+    if any(not safe_text(values.get(name)) for name in values):
+        stop(28)
+    def option(name):
+        try:
+            index = command.index(name)
+            if index + 1 >= len(command) or command.count(name) != 1:
+                stop(29)
+            return command[index + 1]
+        except ValueError:
+            stop(29)
+    if (option("--profile") != settings.get("profile_name")
+            or option("--provider") != values.get("provider")
+            or option("--model") != values.get("model")
+            or option("--reasoning") != values.get("reasoning_effort")
+            or option("--resume") != SESSION):
+        stop(29)
+    query_indexes = [i for i, item in enumerate(command) if item == "-q"]
+    if len(query_indexes) != 1 or query_indexes[0] + 1 >= len(command):
+        stop(30)
+    query = command[query_indexes[0] + 1]
+    if INPUT_NAME not in query or RESULT_NAME not in query or TASK not in query:
+        stop(30)
+    timeout_env = payload.get("timeout_environment")
+    if type(timeout_env) is not dict or timeout_env != APPROVED_TIMEOUT_ENV:
+        stop(31)
+    timeout = payload.get("timeout_seconds")
+    if type(timeout) is not int or timeout != EXECUTION_LIMIT or timeout <= 0:
+        stop(32)
+    if payload.get("review_execution_session_id") != SESSION:
+        stop(33)
+    if payload.get("request_sha256") != REQUEST_SHA:
+        stop(33)
+    command_sha = digest(encode(command))
+    if payload.get("command_sha256") != command_sha:
+        stop(34)
+    return command, command_sha, settings, timeout_env, timeout
+
+def receipt_base(*, state, request_sha, command_sha, settings, timeout,
+                 timed_out, reason, exit_code, elapsed, cleanup, manager,
+                 child, result_sha):
+    return {
+        "schema_version": RECEIPT_SCHEMA, "state": state,
+        "review_execution_session_id": SESSION,
+        "request_sha256": request_sha,
+        "hermes_execution_settings": settings,
+        "command_sha256": command_sha, "timeout_seconds": timeout,
+        "timed_out": timed_out, "termination_reason": reason,
+        "exit_code": exit_code, "elapsed_seconds": elapsed,
+        "cleanup_confirmed": cleanup,
+        "supervisor_pid": manager.get("pid") if manager else None,
+        "supervisor_start_ticks": manager.get("start_ticks") if manager else None,
+        "child_pid": child.get("pid") if child else None,
+        "child_start_ticks": child.get("start_ticks") if child else None,
+        "child_process_group_id": child.get("pgrp") if child else None,
+        "result_sha256": result_sha,
+    }
+
+def start():
+    fd = open_task()
+    try:
+        raw = sys.stdin.buffer.read(1024 * 1024 + 1)
+        if not 0 < len(raw) <= 1024 * 1024:
+            stop(35)
+        try:
+            payload = json.loads(raw.decode("ascii"))
+        except (ValueError, UnicodeError):
+            stop(35)
+        if type(payload) is not dict or set(payload) != {
+                "command", "command_sha256", "hermes_execution_settings",
+                "timeout_environment", "timeout_seconds",
+                "review_execution_session_id", "request_sha256",
+                "supervisor_script"}:
+            stop(35)
+        command, command_sha, settings, timeout_env, timeout = expected_command(payload)
+        supervisor_script = payload.get("supervisor_script")
+        if (type(supervisor_script) is not str or not supervisor_script
+                or len(supervisor_script) > 128 * 1024):
+            stop(35)
+        manager_argv = [sys.executable, "-c", supervisor_script, "supervise",
+                        TASK, SESSION, REQUEST_SHA, command_sha]
+        manager_argv_sha = digest(b"\0".join(os.fsencode(item) for item in manager_argv) + b"\0")
+        source = read_private(fd, INPUT_NAME, 16 * 1024 * 1024)
+        if digest(source) != REQUEST_SHA:
+            stop(36)
+        if not absent(fd, RESULT_NAME):
+            stop(37)
+        claim = {
+            "schema_version": RECEIPT_SCHEMA,
+            "review_execution_session_id": SESSION,
+            "request_sha256": REQUEST_SHA, "command_sha256": command_sha,
+            "hermes_execution_settings": settings,
+            "timeout_seconds": timeout,
+            "manager_argv_sha256": manager_argv_sha,
+        }
+        command_record = {
+            "review_execution_session_id": SESSION,
+            "request_sha256": REQUEST_SHA, "command_sha256": command_sha,
+            "command": command, "hermes_execution_settings": settings,
+            "timeout_environment": timeout_env, "timeout_seconds": timeout,
+        }
+        if not absent(fd, CLAIM_NAME):
+            prior = read_json(fd, CLAIM_NAME, 1024 * 1024)
+            if prior != claim:
+                stop(38)
+            if absent(fd, COMMAND_NAME):
+                stop(38)
+            if read_json(fd, COMMAND_NAME, 1024 * 1024) != command_record:
+                stop(38)
+            print(json.dumps({"state": "CLAIM_EXISTS"}, separators=(",", ":")))
+            return
+        if not absent(fd, COMMAND_NAME) or not absent(fd, MANAGER_NAME) or not absent(fd, RECEIPT_NAME):
+            stop(38)
+        write_once(fd, COMMAND_NAME, encode(command_record))
+        write_once(fd, CLAIM_NAME, encode(claim))
+        argv = [sys.executable, "-c", supervisor_script, "supervise", TASK, SESSION,
+                REQUEST_SHA, command_sha]
+        try:
+            subprocess.Popen(argv, cwd=TASK, env=os.environ.copy(),
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, close_fds=True, start_new_session=True)
+        except OSError:
+            manager = None
+            receipt = receipt_base(state="START_FAILED", request_sha=REQUEST_SHA,
+                command_sha=command_sha, settings=settings, timeout=timeout,
+                timed_out=False, reason="START_FAILED", exit_code=None,
+                elapsed=0.0, cleanup=True, manager=manager, child=None, result_sha=None)
+            write_final(fd, receipt)
+            print(json.dumps({"state": "START_FAILED"}, separators=(",", ":")))
+            return
+        print(json.dumps({"state": "START_ACCEPTED"}, separators=(",", ":")))
+    finally:
+        os.close(fd)
+
+def supervisor():
+    fd = open_task()
+    started = time.monotonic()
+    manager = None
+    child = None
+    process = None
+    claim = {}
+    command_record = {}
+    returncode = None
+    timed_out = False
+    cleanup = True
+    result_sha = None
+    state = "SUPERVISOR_ERROR"
+    reason = "SUPERVISOR_ERROR"
+    try:
+        claim = read_json(fd, CLAIM_NAME, 1024 * 1024)
+        command_record = read_json(fd, COMMAND_NAME, 1024 * 1024)
+        if (claim.get("review_execution_session_id") != SESSION
+                or claim.get("request_sha256") != REQUEST_SHA
+                or claim.get("command_sha256") != COMMAND_SHA
+                or command_record.get("review_execution_session_id") != SESSION
+                or command_record.get("request_sha256") != REQUEST_SHA
+                or command_record.get("command_sha256") != COMMAND_SHA):
+            stop(39)
+        command, command_sha, settings, timeout_env, timeout = expected_command(command_record)
+        if command_sha != COMMAND_SHA or claim != {
+            "schema_version": RECEIPT_SCHEMA,
+            "review_execution_session_id": SESSION,
+            "request_sha256": REQUEST_SHA, "command_sha256": command_sha,
+            "hermes_execution_settings": settings,
+            "timeout_seconds": timeout,
+            "manager_argv_sha256": claim.get("manager_argv_sha256"),
+        }:
+            stop(40)
+        source = read_private(fd, INPUT_NAME, 16 * 1024 * 1024)
+        if digest(source) != REQUEST_SHA or not absent(fd, RESULT_NAME):
+            stop(41)
+        manager = process_identity(os.getpid())
+        if manager["pgrp"] != manager["pid"] or manager["session"] != manager["pid"] or manager["cwd"] != TASK:
+            stop(42)
+        manager_record = {
+            "pid": manager["pid"], "start_ticks": manager["start_ticks"],
+            "uid": manager["uid"], "pgrp": manager["pgrp"],
+            "session": manager["session"],
+            "cmdline_sha256": manager["cmdline_sha256"],
+            "review_execution_session_id": SESSION,
+            "request_sha256": REQUEST_SHA, "command_sha256": COMMAND_SHA,
+            "manager_argv_sha256": claim.get("manager_argv_sha256"),
+        }
+        current_cmdline = open("/proc/self/cmdline", "rb").read()
+        if digest(current_cmdline) != claim.get("manager_argv_sha256"):
+            stop(42)
+        write_once(fd, MANAGER_NAME, encode(manager_record))
+        env = os.environ.copy()
+        env.update(timeout_env)
+        try:
+            process = subprocess.Popen(command, cwd=TASK, env=env,
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, close_fds=True, start_new_session=True)
+        except OSError:
+            state, reason, cleanup = "START_FAILED", "START_FAILED", True
+        else:
+            child = process_identity(process.pid)
+            if (child["pid"] != child["pgrp"] or child["session"] != child["pid"]
+                    or child["cwd"] != TASK):
+                cleanup = False
+                state, reason = "CLEANUP_UNVERIFIED", "CLEANUP_UNVERIFIED"
+            else:
+                write_once(fd, CHILD_NAME, encode(child))
+                try:
+                    process.wait(timeout=timeout)
+                except subprocess.TimeoutExpired:
+                    timed_out = True
+                    reason = "REMOTE_EXECUTION_TIMEOUT"
+                returncode = process.returncode
+                cleanup = cleanup_group(process, child)
+                returncode = process.returncode
+                if not cleanup:
+                    state, reason = "CLEANUP_UNVERIFIED", (
+                        "REMOTE_EXECUTION_TIMEOUT" if timed_out else "CLEANUP_UNVERIFIED")
+                elif timed_out:
+                    state, reason = "TIMED_OUT", "REMOTE_EXECUTION_TIMEOUT"
+                elif returncode != 0:
+                    state, reason = "FAILED", "CHILD_EXIT_NONZERO"
+                else:
+                    try:
+                        result = read_private(fd, RESULT_NAME, 16 * 1024 * 1024)
+                        result_sha = digest(result)
+                        state, reason = "COMPLETED", "NORMAL_EXIT"
+                    except SystemExit:
+                        state, reason, result_sha = "FAILED", "RESULT_INVALID", None
+        if process is not None:
+            returncode = process.returncode
+    except BaseException:
+        if process is not None:
+            if child is not None:
+                cleanup = cleanup_group(process, child)
+            else:
+                stop_direct_child_without_group_identity(process)
+                # Direct-child reaping does not prove the isolated process
+                # group has no descendants; the receipt must remain UNKNOWN.
+                cleanup = False
+            returncode = process.returncode
+        if not cleanup:
+            state, reason = "CLEANUP_UNVERIFIED", "CLEANUP_UNVERIFIED"
+        else:
+            state, reason = "SUPERVISOR_ERROR", "SUPERVISOR_ERROR"
+    elapsed = max(0.0, time.monotonic() - started)
+    settings = command_record.get("hermes_execution_settings")
+    timeout = command_record.get("timeout_seconds")
+    if (type(settings) is dict and type(timeout) is int
+            and COMMAND_SHA and len(COMMAND_SHA) == 64):
+        receipt = receipt_base(state=state, request_sha=REQUEST_SHA,
+            command_sha=COMMAND_SHA, settings=settings, timeout=timeout,
+            timed_out=timed_out, reason=reason, exit_code=returncode,
+            elapsed=elapsed, cleanup=cleanup, manager=manager, child=child,
+            result_sha=result_sha if state == "COMPLETED" else None)
+        write_final(fd, receipt)
+    os.close(fd)
+
+def status():
+    fd = open_task()
+    try:
+        if absent(fd, CLAIM_NAME):
+            print(json.dumps({"state": "NOT_STARTED"}, separators=(",", ":")))
+            return
+        claim = read_json(fd, CLAIM_NAME, 1024 * 1024)
+        if (claim.get("review_execution_session_id") != SESSION
+                or claim.get("request_sha256") != REQUEST_SHA):
+            stop(43)
+        command_record = read_json(fd, COMMAND_NAME, 1024 * 1024)
+        command, command_sha, settings, timeout_env, timeout = expected_command(command_record)
+        if (claim.get("command_sha256") != command_sha
+                or command_record.get("command_sha256") != command_sha):
+            stop(44)
+        if COMMAND_SHA and COMMAND_SHA != command_sha:
+            stop(44)
+        if not absent(fd, RECEIPT_NAME):
+            receipt = read_json(fd, RECEIPT_NAME, 1024 * 1024)
+            if (receipt.get("review_execution_session_id") != SESSION
+                    or receipt.get("request_sha256") != REQUEST_SHA
+                    or receipt.get("command_sha256") != command_sha
+                    or receipt.get("hermes_execution_settings") != settings):
+                stop(45)
+            if receipt.get("state") == "COMPLETED":
+                result = read_private(fd, RESULT_NAME, 16 * 1024 * 1024)
+                if digest(result) != receipt.get("result_sha256"):
+                    stop(46)
+            print(json.dumps({"state": receipt.get("state"), "receipt": receipt},
+                             ensure_ascii=True, sort_keys=True, separators=(",", ":")))
+            return
+        if absent(fd, MANAGER_NAME):
+            print(json.dumps({"state": "STARTING"}, separators=(",", ":")))
+            return
+        manager = read_json(fd, MANAGER_NAME, 65536)
+        pid = manager.get("pid")
+        info = proc_info(pid) if type(pid) is int and pid > 0 else None
+        alive = bool(info and info.get("start_ticks") == manager.get("start_ticks")
+            and info.get("uid") == manager.get("uid") == os.geteuid()
+            and info.get("pgrp") == info.get("session") == pid
+            and info.get("cmdline_sha256") == claim.get("manager_argv_sha256")
+            and manager.get("cmdline_sha256") == claim.get("manager_argv_sha256")
+            and manager.get("review_execution_session_id") == SESSION
+            and manager.get("request_sha256") == REQUEST_SHA
+            and manager.get("command_sha256") == command_sha
+            and manager.get("manager_argv_sha256") == claim.get("manager_argv_sha256"))
+        state = "RUNNING" if alive else "SUPERVISOR_LOST"
+        print(json.dumps({"state": state}, separators=(",", ":")))
+    finally:
+        os.close(fd)
+
+check_identity()
+if ACTION == "start":
+    start()
+elif ACTION == "supervise":
+    supervisor()
+elif ACTION == "status":
+    status()
+else:
+    stop(47)
+'''
+
+_REMOTE_QUALITY_REVIEW_EXECUTION_SCRIPT = (
+    _REMOTE_QUALITY_REVIEW_EXECUTION_SCRIPT_TEMPLATE
+    .replace("__EXECUTION_LIMIT__", str(QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS))
+    .replace("__CLEANUP_GRACE__", str(QUALITY_REVIEW_CLEANUP_GRACE_SECONDS))
+)
 
 
 def _as_text(value: object, *, field_name: str) -> str:
@@ -1117,15 +1757,112 @@ finally:
         # remote dialogue contents to CT108.
         return [None] * count
 
+    def read_quality_review_execution(
+        self,
+        *,
+        remote_task: str,
+        review_execution_session_id: str,
+        request_sha256: str,
+        hermes_execution_settings: Mapping[str, object],
+        command_sha256: str | None = None,
+        timeout_seconds: int | float = QUALITY_REVIEW_REMOTE_CALL_TIMEOUT_SECONDS,
+    ) -> dict[str, object]:
+        """Read the state of one already-claimed remote review; never starts it."""
+        remote_task = validate_stateful_remote_task_path(remote_task)
+        session_id = _require_session_id(review_execution_session_id)
+        if (type(request_sha256) is not str or len(request_sha256) != 64
+                or any(item not in "0123456789abcdef" for item in request_sha256)):
+            raise Stage11DeploymentValidationError(
+                "review request digest is invalid"
+            )
+        try:
+            settings = validate_settings_evidence(dict(hermes_execution_settings))
+        except Exception as error:
+            raise Stage11DeploymentValidationError(
+                "pinned Hermes settings evidence is invalid"
+            ) from error
+        if command_sha256 is not None and (
+            type(command_sha256) is not str or len(command_sha256) != 64
+            or any(item not in "0123456789abcdef" for item in command_sha256)
+        ):
+            raise Stage11DeploymentValidationError(
+                "review command digest is invalid"
+            )
+        if (isinstance(timeout_seconds, bool)
+                or not isinstance(timeout_seconds, (int, float))
+                or not math.isfinite(timeout_seconds)
+                or timeout_seconds <= 0):
+            raise Stage11DeploymentValidationError(
+                "review status transport timeout is invalid"
+            )
+        arguments = ["status", remote_task, session_id, request_sha256]
+        if command_sha256 is not None:
+            arguments.append(command_sha256)
+        try:
+            raw = self._python(
+                _REMOTE_QUALITY_REVIEW_EXECUTION_SCRIPT,
+                *arguments,
+                capture=True,
+                timeout=timeout_seconds,
+                python_executable=REMOTE_HERMES_PYTHON,
+            )
+            value = json.loads(raw.decode("ascii"))
+        except (UnicodeError, ValueError, json.JSONDecodeError) as error:
+            raise Stage11DeploymentTransportError(
+                "CT120 review status response is malformed"
+            ) from error
+        if type(value) is not dict or value.get("state") not in {
+            "NOT_STARTED", "STARTING", "RUNNING", "SUPERVISOR_LOST",
+            "COMPLETED", "FAILED", "TIMED_OUT", "CLEANUP_UNVERIFIED",
+            "START_FAILED", "SUPERVISOR_ERROR",
+        }:
+            raise Stage11DeploymentTransportError(
+                "CT120 review status is invalid"
+            )
+        receipt = value.get("receipt")
+        if value["state"] in {
+            "COMPLETED", "FAILED", "TIMED_OUT", "CLEANUP_UNVERIFIED",
+            "START_FAILED", "SUPERVISOR_ERROR",
+        }:
+            if type(receipt) is not dict:
+                raise Stage11DeploymentTransportError(
+                    "CT120 terminal review status lacks a receipt"
+                )
+            try:
+                validate_remote_execution_receipt(
+                    receipt,
+                    review_execution_session_id=session_id,
+                    request_sha256=request_sha256,
+                    hermes_execution_settings=settings,
+                )
+            except Exception as error:
+                raise Stage11DeploymentTransportError(
+                    "CT120 review completion receipt is invalid"
+                ) from error
+            if receipt["state"] != value["state"]:
+                raise Stage11DeploymentTransportError(
+                    "CT120 review status and receipt differ"
+                )
+        elif receipt is not None:
+            raise Stage11DeploymentTransportError(
+                "nonterminal review status has an unexpected receipt"
+            )
+        return value
+
     def launch_quality_review(
         self,
         command: list[str],
         *,
         remote_task: str,
         timeout: int | float,
+        execution_timeout: int,
         timeout_env: Mapping[str, str],
+        review_execution_session_id: str,
+        request_sha256: str,
+        hermes_execution_settings: Mapping[str, object],
     ) -> SimpleNamespace:
         remote_task = validate_stateful_remote_task_path(remote_task)
+        session_id = _require_session_id(review_execution_session_id)
         if type(command) is not list or not command or not all(
             type(item) is str and item for item in command
         ):
@@ -1137,46 +1874,128 @@ finally:
             raise Stage11DeploymentValidationError(
                 "Stage11 Hermes timeout environment differs"
             )
-        encoded = base64.b64encode(
-            json.dumps(command, ensure_ascii=True, separators=(",", ":")).encode(
-                "utf-8"
+        if (type(timeout) is not int
+                or timeout != QUALITY_REVIEW_TRANSPORT_TIMEOUT_SECONDS
+                or type(execution_timeout) is not int
+                or execution_timeout != QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS):
+            raise Stage11DeploymentValidationError(
+                "remote review execution and transport bounds differ"
             )
-        ).decode("ascii")
-        timeout_payload = json.dumps(
-            dict(STAGE11_HERMES_TIMEOUT_ENV), sort_keys=True,
-            separators=(",", ":"),
-        )
-        script = """
-import base64, json, os, stat, subprocess, sys
-task, encoded, timeout_payload = sys.argv[1], sys.argv[2], sys.argv[3]
-info = os.lstat(task)
-if (stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode)
-        or info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700):
-    raise SystemExit(2)
-command = json.loads(base64.b64decode(encoded).decode("utf-8"))
-if type(command) is not list or not all(type(item) is str for item in command):
-    raise SystemExit(3)
-timeout_env = json.loads(timeout_payload)
-if (type(timeout_env) is not dict or
-        any(type(key) is not str or type(value) is not str
-            for key, value in timeout_env.items())):
-    raise SystemExit(4)
-env = os.environ.copy()
-env.update(timeout_env)
-completed = subprocess.run(command, cwd=task, env=env, stdin=subprocess.DEVNULL,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                           check=False)
-if completed.returncode != 0:
-    raise SystemExit(completed.returncode if completed.returncode > 0 else 1)
-"""
-        self._python(
-            script,
-            remote_task,
-            encoded,
-            timeout_payload,
-            timeout=timeout,
-        )
-        return SimpleNamespace(returncode=0)
+        if (type(request_sha256) is not str or len(request_sha256) != 64
+                or any(item not in "0123456789abcdef" for item in request_sha256)):
+            raise Stage11DeploymentValidationError(
+                "review request digest is invalid"
+            )
+        try:
+            settings = validate_settings_evidence(dict(hermes_execution_settings))
+        except Exception as error:
+            raise Stage11DeploymentValidationError(
+                "pinned Hermes settings evidence is invalid"
+            ) from error
+        command_sha = hashlib.sha256(
+            json.dumps(command, ensure_ascii=True, sort_keys=True,
+                       separators=(",", ":"), allow_nan=False).encode("ascii")
+        ).hexdigest()
+        intent = {
+            "command": command,
+            "command_sha256": command_sha,
+            "hermes_execution_settings": settings,
+            "timeout_environment": dict(timeout_env),
+            "timeout_seconds": execution_timeout,
+            "review_execution_session_id": session_id,
+            "request_sha256": request_sha256,
+            "supervisor_script": _REMOTE_QUALITY_REVIEW_EXECUTION_SCRIPT,
+        }
+        intent_payload = json.dumps(
+            intent, ensure_ascii=True, sort_keys=True,
+            separators=(",", ":"), allow_nan=False,
+        ).encode("ascii")
+        if len(intent_payload) > 1024 * 1024:
+            raise Stage11DeploymentValidationError(
+                "remote review command exceeds the bounded intent size"
+            )
+        deadline = time.monotonic() + timeout
+        start_error = None
+        try:
+            raw = self._python(
+                _REMOTE_QUALITY_REVIEW_EXECUTION_SCRIPT,
+                "start", remote_task, session_id, request_sha256,
+                input_payload=intent_payload,
+                capture=True,
+                timeout=QUALITY_REVIEW_REMOTE_CALL_TIMEOUT_SECONDS,
+                python_executable=REMOTE_HERMES_PYTHON,
+            )
+            start = json.loads(raw.decode("ascii"))
+            if type(start) is not dict or start.get("state") not in {
+                "START_ACCEPTED", "CLAIM_EXISTS", "START_FAILED",
+            }:
+                raise Stage11DeploymentTransportError(
+                    "CT120 review start response is invalid"
+                )
+        except Exception as error:
+            # A lost SSH response is not permission to start a second remote
+            # process.  Continue with read-only status checks for this UUID.
+            start_error = error
+
+        while time.monotonic() < deadline:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            try:
+                status = self.read_quality_review_execution(
+                    remote_task=remote_task,
+                    review_execution_session_id=session_id,
+                    request_sha256=request_sha256,
+                    hermes_execution_settings=settings,
+                    command_sha256=command_sha,
+                    timeout_seconds=min(
+                        QUALITY_REVIEW_REMOTE_CALL_TIMEOUT_SECONDS,
+                        remaining,
+                    ),
+                )
+            except Stage11DeploymentTransportError:
+                time.sleep(min(
+                    QUALITY_REVIEW_STATUS_POLL_SECONDS,
+                    max(0.0, deadline - time.monotonic()),
+                ))
+                continue
+            state = status["state"]
+            if state in {
+                "COMPLETED", "FAILED", "TIMED_OUT", "CLEANUP_UNVERIFIED",
+                "START_FAILED", "SUPERVISOR_ERROR",
+            }:
+                receipt = status["receipt"]
+                if state != "COMPLETED":
+                    return SimpleNamespace(
+                        returncode=receipt["exit_code"],
+                        execution_receipt=receipt,
+                    )
+                result_payload = self.read_regular(
+                    remote_task + "/" + QUALITY_REVIEW_RESULT_FILENAME,
+                    max_bytes=16 * 1024 * 1024,
+                )
+                if hashlib.sha256(result_payload).hexdigest() != receipt["result_sha256"]:
+                    raise Stage11DeploymentTransportError(
+                        "CT120 review result changed after its completion receipt"
+                    )
+                return SimpleNamespace(
+                    returncode=receipt["exit_code"],
+                    execution_receipt=receipt,
+                    result_payload=result_payload,
+                )
+            if state in {"NOT_STARTED", "SUPERVISOR_LOST"}:
+                raise Stage11DeploymentTransportError(
+                    "CT120 review execution state is not owned or verifiable; session="
+                    + session_id
+                ) from start_error
+            time.sleep(min(
+                QUALITY_REVIEW_STATUS_POLL_SECONDS,
+                max(0.0, deadline - time.monotonic()),
+            ))
+        raise Stage11DeploymentTransportError(
+            "CT120 review completion was not verified before the transport bound; session="
+            + session_id
+        ) from start_error
 
 
 class RemoteNativeSessionDB:
@@ -1284,7 +2103,17 @@ def _hybrid_launcher_factory(
             "remote bridge lacks Hybrid review methods"
         )
 
-    def launcher(command, *, cwd, timeout, env):
+    def launcher(
+        command,
+        *,
+        cwd,
+        timeout,
+        execution_timeout,
+        env,
+        review_execution_session_id,
+        request_sha256,
+        hermes_execution_settings,
+    ):
         if type(cwd) is not int or cwd < 0:
             raise Stage11DeploymentValidationError(
                 "Hybrid launcher received an invalid pinned directory"
@@ -1326,6 +2155,22 @@ def _hybrid_launcher_factory(
             QUALITY_REVIEW_INPUT_FILENAME,
             max_bytes=16 * 1024 * 1024,
         )
+        if hashlib.sha256(payload).hexdigest() != request_sha256:
+            raise Stage11DeploymentValidationError(
+                "Hybrid review request digest differs from staged input"
+            )
+        if session_id != review_execution_session_id:
+            raise Stage11DeploymentValidationError(
+                "Hybrid review execution session differs from command"
+            )
+        try:
+            settings = validate_settings_evidence(
+                dict(hermes_execution_settings)
+            )
+        except Exception as error:
+            raise Stage11DeploymentValidationError(
+                "Hybrid review settings evidence is invalid"
+            ) from error
         remote_task = remote_task_for_session(session_id)
         remote_input = remote_task + "/" + QUALITY_REVIEW_INPUT_FILENAME
         remote_result = remote_task + "/" + QUALITY_REVIEW_RESULT_FILENAME
@@ -1337,15 +2182,45 @@ def _hybrid_launcher_factory(
             raise Stage11DeploymentValidationError(
                 "Hybrid query retained local file authority"
             )
-        launch(
+        completed = launch(
             remote_command,
             remote_task=remote_task,
             timeout=timeout,
+            execution_timeout=execution_timeout,
             timeout_env=dict(STAGE11_HERMES_TIMEOUT_ENV),
+            review_execution_session_id=session_id,
+            request_sha256=request_sha256,
+            hermes_execution_settings=settings,
         )
-        result_payload = read_regular(remote_result, max_bytes=16 * 1024 * 1024)
+        receipt = getattr(completed, "execution_receipt", None)
+        if receipt is None:
+            raise Stage11DeploymentTransportError(
+                "CT120 review completion receipt is missing"
+            )
+        try:
+            validate_remote_execution_receipt(
+                receipt,
+                review_execution_session_id=session_id,
+                request_sha256=request_sha256,
+                hermes_execution_settings=settings,
+            )
+        except Exception as error:
+            raise Stage11DeploymentTransportError(
+                "CT120 review completion receipt is invalid"
+            ) from error
+        if receipt["state"] != "COMPLETED":
+            return completed
+        result_payload = getattr(completed, "result_payload", None)
+        if type(result_payload) is not bytes:
+            result_payload = read_regular(
+                remote_result, max_bytes=16 * 1024 * 1024
+            )
+        if hashlib.sha256(result_payload).hexdigest() != receipt["result_sha256"]:
+            raise Stage11DeploymentTransportError(
+                "CT120 review result differs from completion receipt"
+            )
         _private_local_write_at(cwd, QUALITY_REVIEW_RESULT_FILENAME, result_payload)
-        return SimpleNamespace(returncode=0)
+        return completed
 
     return launcher
 

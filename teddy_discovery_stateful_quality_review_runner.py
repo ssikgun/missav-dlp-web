@@ -9,9 +9,12 @@ database; fresh mode receives an already-open native SessionDB explicitly.
 from __future__ import annotations
 
 from contextlib import contextmanager
+import hashlib
 import json
+import math
 import os
 from pathlib import Path
+import re
 import stat
 import subprocess
 from collections.abc import Callable
@@ -35,10 +38,15 @@ from teddy_discovery_stateful_translator import (
 from teddy_discovery_stage11_hermes_profile import (
     HermesExecutionSettings,
     timeout_environment,
+    validate_settings_evidence,
 )
 
 QUALITY_REVIEW_INPUT_FILENAME = 'stage11-quality-review-input.json'
 QUALITY_REVIEW_RESULT_FILENAME = 'stage11-quality-review-result.json'
+QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME = 'stage11-quality-review-execution-v1.json'
+QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS = 3600
+QUALITY_REVIEW_TRANSPORT_TIMEOUT_SECONDS = 3900
+QUALITY_REVIEW_EXECUTION_RECEIPT_SCHEMA_VERSION = 1
 QUALITY_REVIEW_QUERY = f"""Perform a second full-title semantic review in the
 current subtitle-translator review execution session. Read the ENTIRE
 {QUALITY_REVIEW_INPUT_FILENAME} JSON. Its source_translation_session_id (or
@@ -497,12 +505,182 @@ def read_quality_review_result(
     )
 
 
-def _launch(command, *, cwd, timeout, env):
+def _launch(command, *, cwd, timeout, execution_timeout, env, **unused):
     # A pinned directory FD avoids path replacement between validation and exec.
     return subprocess.run(command, cwd=f'/proc/self/fd/{cwd}', pass_fds=(cwd,),
                           stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                          stderr=subprocess.DEVNULL, timeout=timeout, check=False,
+                          stderr=subprocess.DEVNULL, timeout=execution_timeout, check=False,
                           env=env)
+
+
+def validate_remote_execution_receipt(
+    value: object,
+    *,
+    review_execution_session_id: str,
+    request_sha256: str,
+    hermes_execution_settings: dict[str, object],
+) -> dict[str, object]:
+    """Validate supervisor-authored completion evidence before result use."""
+    fields = {
+        'schema_version', 'state', 'review_execution_session_id',
+        'request_sha256', 'hermes_execution_settings', 'command_sha256',
+        'timeout_seconds', 'timed_out', 'termination_reason', 'exit_code',
+        'elapsed_seconds', 'cleanup_confirmed', 'supervisor_pid',
+        'supervisor_start_ticks', 'child_pid', 'child_start_ticks',
+        'child_process_group_id', 'result_sha256',
+    }
+    if type(value) is not dict or set(value) != fields:
+        raise QualityReviewRunnerError('remote review completion receipt fields differ')
+    try:
+        validate_canonical_review_execution_session_id(
+            review_execution_session_id
+        )
+        expected_settings = validate_settings_evidence(
+            hermes_execution_settings
+        )
+    except Exception as error:
+        raise QualityReviewRunnerError('expected review execution identity is invalid') from error
+    for key, expected in (
+        ('schema_version', QUALITY_REVIEW_EXECUTION_RECEIPT_SCHEMA_VERSION),
+        ('review_execution_session_id', review_execution_session_id),
+        ('request_sha256', request_sha256),
+        ('hermes_execution_settings', expected_settings),
+        ('timeout_seconds', QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS),
+    ):
+        if value[key] != expected or type(value[key]) is not type(expected):
+            raise QualityReviewRunnerError(
+                'remote review completion receipt identity differs'
+            )
+    digest_re = re.compile(r'^[0-9a-f]{64}$')
+    for name in ('request_sha256', 'command_sha256'):
+        if type(value[name]) is not str or not digest_re.fullmatch(value[name]):
+            raise QualityReviewRunnerError(
+                'remote review completion receipt digest is invalid'
+            )
+    if type(value['timed_out']) is not bool or type(value['cleanup_confirmed']) is not bool:
+        raise QualityReviewRunnerError(
+            'remote review completion receipt flags are invalid'
+        )
+    if (type(value['elapsed_seconds']) not in (int, float)
+            or type(value['elapsed_seconds']) is bool
+            or not math.isfinite(value['elapsed_seconds'])
+            or value['elapsed_seconds'] < 0):
+        raise QualityReviewRunnerError(
+            'remote review completion elapsed time is invalid'
+        )
+    for name in ('supervisor_pid', 'supervisor_start_ticks', 'child_pid',
+                 'child_start_ticks', 'child_process_group_id'):
+        item = value[name]
+        if item is not None and (type(item) is not int or item <= 0):
+            raise QualityReviewRunnerError(
+                'remote review process identity is invalid'
+            )
+    exit_code = value['exit_code']
+    if exit_code is not None and type(exit_code) is not int:
+        raise QualityReviewRunnerError(
+            'remote review exit code is invalid'
+        )
+    result_sha = value['result_sha256']
+    if result_sha is not None and (
+        type(result_sha) is not str or not digest_re.fullmatch(result_sha)
+    ):
+        raise QualityReviewRunnerError(
+            'remote review result digest is invalid'
+        )
+    states = {
+        'COMPLETED', 'FAILED', 'TIMED_OUT', 'CLEANUP_UNVERIFIED',
+        'START_FAILED', 'SUPERVISOR_ERROR',
+    }
+    reasons = {
+        'NORMAL_EXIT', 'REMOTE_EXECUTION_TIMEOUT', 'START_FAILED',
+        'SUPERVISOR_ERROR', 'CHILD_EXIT_NONZERO', 'RESULT_INVALID',
+        'CLEANUP_UNVERIFIED',
+    }
+    if value['state'] not in states or value['termination_reason'] not in reasons:
+        raise QualityReviewRunnerError(
+            'remote review completion state is invalid'
+        )
+    if value['state'] == 'COMPLETED':
+        if (value['timed_out'] or not value['cleanup_confirmed']
+                or exit_code != 0 or result_sha is None
+                or value['termination_reason'] != 'NORMAL_EXIT'):
+            raise QualityReviewRunnerError(
+                'remote review success lacks complete execution evidence'
+            )
+    elif result_sha is not None:
+        raise QualityReviewRunnerError(
+            'unsuccessful remote review cannot attest a result digest'
+        )
+    if value['state'] == 'TIMED_OUT' and (
+            not value['timed_out'] or not value['cleanup_confirmed']
+            or value['termination_reason'] != 'REMOTE_EXECUTION_TIMEOUT'
+            or exit_code is None):
+        raise QualityReviewRunnerError(
+            'remote review timeout cleanup evidence is invalid'
+        )
+    if value['state'] == 'CLEANUP_UNVERIFIED' and value['cleanup_confirmed']:
+        raise QualityReviewRunnerError(
+            'unverified cleanup cannot be marked confirmed'
+        )
+    if value['state'] == 'CLEANUP_UNVERIFIED' and value['result_sha256'] is not None:
+        raise QualityReviewRunnerError(
+            'unverified execution cannot attest a result digest'
+        )
+    if value['state'] == 'FAILED':
+        if (not value['cleanup_confirmed'] or exit_code is None
+                or value['termination_reason'] not in {
+                    'CHILD_EXIT_NONZERO', 'RESULT_INVALID'
+                }
+                or (value['termination_reason'] == 'CHILD_EXIT_NONZERO'
+                    and exit_code == 0)
+                or (value['termination_reason'] == 'RESULT_INVALID'
+                    and exit_code != 0)):
+            raise QualityReviewRunnerError(
+                'failed review receipt lacks a consistent process result'
+            )
+    if value['state'] == 'START_FAILED' and (
+            value['termination_reason'] != 'START_FAILED'
+            or value['exit_code'] is not None
+            or not value['cleanup_confirmed']):
+        raise QualityReviewRunnerError(
+            'review start failure receipt is inconsistent'
+        )
+    if value['state'] == 'SUPERVISOR_ERROR' and (
+            value['termination_reason'] != 'SUPERVISOR_ERROR'
+            or not value['cleanup_confirmed']):
+        raise QualityReviewRunnerError(
+            'review supervisor error receipt is inconsistent'
+        )
+    if value['state'] == 'CLEANUP_UNVERIFIED' and value['termination_reason'] not in {
+            'REMOTE_EXECUTION_TIMEOUT', 'CLEANUP_UNVERIFIED'}:
+        raise QualityReviewRunnerError(
+            'review cleanup failure reason is inconsistent'
+        )
+    if ((value['supervisor_pid'] is None) != (value['supervisor_start_ticks'] is None)
+            or (value['child_pid'] is None) != (value['child_start_ticks'] is None)
+            or (value['child_pid'] is None) != (value['child_process_group_id'] is None)):
+        raise QualityReviewRunnerError(
+            'review process identity fields are incomplete'
+        )
+    return value
+
+
+def _write_execution_receipt(fd: int, value: dict[str, object]) -> None:
+    payload = json.dumps(value, ensure_ascii=True, sort_keys=True,
+                         separators=(',', ':'), allow_nan=False).encode('ascii')
+    _absent(fd, QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME)
+    handle = os.open(
+        QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+        STATEFUL_TRANSLATOR_PRIVATE_FILE_MODE,
+        dir_fd=fd,
+    )
+    with os.fdopen(handle, 'wb') as stream:
+        os.fchmod(stream.fileno(), STATEFUL_TRANSLATOR_PRIVATE_FILE_MODE)
+        stream.write(payload)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.fsync(fd)
 
 
 def _exact_task_directory(fd: int) -> Path:
@@ -528,19 +706,30 @@ def run_quality_review(
     expected_profile_name: str | None = None,
     hermes_settings: HermesExecutionSettings | None = None,
     launcher: Callable = _launch,
-    timeout: int = 600,
+    timeout: int = QUALITY_REVIEW_TRANSPORT_TIMEOUT_SECONDS,
+    require_remote_completion_receipt: bool = False,
     target_cue_ids: tuple[str, ...] | None = None,
     **originals,
 ) -> QualityReviewResult:
     """Stage and perform one explicit resume or native fresh-session review.
 
-    The injected launcher receives (command, cwd=<pinned directory fd>, timeout).
-    Only trusted synchronous launchers may assert a completed integer returncode.
+    The launcher receives separate remote execution and transport limits plus
+    caller-held session, request digest, and pinned Hermes settings. Product
+    Hybrid calls require the supervisor's final completion receipt.
     Fresh mode requires a caller-provided profile-local native SessionDB; resume
     mode never opens or mutates a session database.
     """
     if type(timeout) is not int or timeout <= 0:
         raise QualityReviewRunnerError('timeout must be a positive integer')
+    if type(require_remote_completion_receipt) is not bool:
+        raise QualityReviewRunnerError(
+            'remote completion receipt requirement must be boolean'
+        )
+    if (require_remote_completion_receipt
+            and timeout != QUALITY_REVIEW_TRANSPORT_TIMEOUT_SECONDS):
+        raise QualityReviewRunnerError(
+            'remote review transport timeout differs from the approved bound'
+        )
     if type(hermes_settings) is not HermesExecutionSettings:
         raise QualityReviewRunnerError(
             'resolved Stage11 Hermes profile settings are required'
@@ -574,6 +763,7 @@ def run_quality_review(
             raise QualityReviewRunnerError('staged input changed before launch')
         identity = os.fstat(fd)
         task_directory = _exact_task_directory(fd)
+        _absent(fd, QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME)
         paths = {
             'task_directory': str(task_directory),
             'input_path': str(task_directory / QUALITY_REVIEW_INPUT_FILENAME),
@@ -597,10 +787,42 @@ Caller exact review paths: ''' + json.dumps(paths, ensure_ascii=True, sort_keys=
                 command,
                 cwd=fd,
                 timeout=timeout,
+                execution_timeout=QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS,
                 env=timeout_environment(os.environ),
+                review_execution_session_id=execution_session,
+                request_sha256=review_request_sha256(request),
+                hermes_execution_settings=hermes_settings.evidence(),
             )
         except (OSError, subprocess.SubprocessError) as error:
             raise QualityReviewRunnerError('review invocation failed') from error
+        receipt = getattr(completed, 'execution_receipt', None)
+        if receipt is not None:
+            receipt = validate_remote_execution_receipt(
+                receipt,
+                review_execution_session_id=execution_session,
+                request_sha256=review_request_sha256(request),
+                hermes_execution_settings=hermes_settings.evidence(),
+            )
+            _write_execution_receipt(fd, receipt)
+            reported_returncode = getattr(completed, 'returncode', None)
+            if (type(reported_returncode) is not type(receipt['exit_code'])
+                    or reported_returncode != receipt['exit_code']):
+                raise QualityReviewRunnerError(
+                    'launcher exit status differs from remote execution receipt'
+                )
+            if receipt['state'] != 'COMPLETED':
+                raise QualityReviewRunnerError(
+                    'remote review process did not complete successfully'
+                )
+            result_bytes = _read(fd, QUALITY_REVIEW_RESULT_FILENAME)
+            if hashlib.sha256(result_bytes).hexdigest() != receipt['result_sha256']:
+                raise QualityReviewRunnerError(
+                    'remote review result differs from its completion receipt'
+                )
+        elif require_remote_completion_receipt:
+            raise QualityReviewRunnerError(
+                'remote review completion receipt is missing'
+            )
         returncode = getattr(completed, 'returncode', None)
         if type(returncode) is not int or returncode != 0:
             raise QualityReviewRunnerError('review process did not complete successfully')

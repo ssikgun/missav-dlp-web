@@ -743,7 +743,9 @@ def build_hybrid_review_adapter(
 ):
     """Supply exact caller originals to the native parser's trust boundary."""
     options = dict(runner_options)
-    if {"fresh_review_session", "review_execution_session_id", "session_id", "target_cue_ids"} & options.keys():
+    if {"fresh_review_session", "review_execution_session_id", "session_id",
+            "target_cue_ids", "timeout", "execution_timeout",
+            "require_remote_completion_receipt"} & options.keys():
         raise Stage11LiveAdapterError("review execution identity is adapter-owned")
 
     if not callable(hermes_settings_resolver):
@@ -786,6 +788,7 @@ def build_hybrid_review_adapter(
             directory, raw, review_execution_session_id=session,
             fresh_review_session=True, **options, **originals,
             target_cue_ids=target_cue_ids, hermes_settings=hermes_settings,
+            require_remote_completion_receipt=True,
         )
         parsed = read_quality_review_result(
             directory, review_request, process_finished=True, returncode=0,

@@ -1,5 +1,6 @@
 """Synthetic temporary-file tests: every real subprocess entrypoint is blocked."""
 from dataclasses import asdict
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -186,12 +187,12 @@ def main():
             return runner.read_quality_review_result(path, request,
                 **dict(dict(process_finished=True, returncode=0), **kwargs))
 
-        def invoke(path, launch):
+        def invoke(path, launch, **run_options):
             return runner.run_quality_review(
                 path, payload,
                 review_execution_session_id=review_execution_session_id,
                 hermes_settings=hermes_settings,
-                launcher=launch, **originals,
+                launcher=launch, **run_options, **originals,
             )
 
         path = directory()
@@ -285,7 +286,11 @@ def main():
             reject('bounded write via canonical serializer', lambda: stage(directory()))
         for code in [1, -9, None, False]:
             path = directory()
-            def launch(command, *, cwd, timeout, env, code=code, path=path):
+            def launch(command, *, cwd, timeout, execution_timeout, env,
+                       review_execution_session_id, request_sha256,
+                       hermes_execution_settings, code=code, path=path):
+                assert timeout == runner.QUALITY_REVIEW_TRANSPORT_TIMEOUT_SECONDS
+                assert execution_timeout == runner.QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS
                 write(path)
                 reject('launcher cannot consume before completion',
                        lambda: read(path, process_finished=False))
@@ -295,16 +300,21 @@ def main():
         reject('successful process missing output', lambda:
                invoke(path, lambda *args, **kwargs: SimpleNamespace(returncode=0)))
         path = directory()
-        def malformed(command, *, cwd, timeout, env):
+        def malformed(command, *, cwd, timeout, execution_timeout, env,
+                      review_execution_session_id, request_sha256,
+                      hermes_execution_settings):
             write(path, b'{')
             return SimpleNamespace(returncode=0)
         reject('successful process malformed output', lambda: invoke(path, malformed))
         path = directory()
-        def valid(command, *, cwd, timeout, env):
+        def valid(command, *, cwd, timeout, execution_timeout, env,
+                  review_execution_session_id, request_sha256,
+                  hermes_execution_settings):
             assert os.fstat(cwd).st_ino == path.stat().st_ino
             assert review.review_request_sha256(request) in command[-1]
             assert command[command.index('--resume') + 1] == review_execution_session_id
-            assert timeout == 600
+            assert timeout == runner.QUALITY_REVIEW_TRANSPORT_TIMEOUT_SECONDS
+            assert execution_timeout == runner.QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS
             write(path)
             return SimpleNamespace(returncode=0)
         bound_result = review.bind_review_execution_provenance(
@@ -314,6 +324,58 @@ def main():
             check('valid synthetic full review PASS', lambda: invoke(path, valid) == bound_result)
             check('caller exact request final canonical parser', lambda:
                   parser.call_count == 1 and parser.call_args.args == (result_payload, request))
+
+        def completion_receipt(*, result_sha256=None, state='COMPLETED',
+                               returncode=0, cleanup=True, timed_out=False,
+                               reason='NORMAL_EXIT'):
+            command_sha = hashlib.sha256(
+                json.dumps(command, ensure_ascii=True, sort_keys=True,
+                           separators=(',', ':')).encode('ascii')
+            ).hexdigest()
+            return {
+                'schema_version': runner.QUALITY_REVIEW_EXECUTION_RECEIPT_SCHEMA_VERSION,
+                'state': state,
+                'review_execution_session_id': review_execution_session_id,
+                'request_sha256': review.review_request_sha256(request),
+                'hermes_execution_settings': hermes_settings.evidence(),
+                'command_sha256': command_sha,
+                'timeout_seconds': runner.QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS,
+                'timed_out': timed_out, 'termination_reason': reason,
+                'exit_code': returncode, 'elapsed_seconds': 1.25,
+                'cleanup_confirmed': cleanup,
+                'supervisor_pid': 101, 'supervisor_start_ticks': 1001,
+                'child_pid': 102, 'child_start_ticks': 1002,
+                'child_process_group_id': 102,
+                'result_sha256': (hashlib.sha256(result_payload).hexdigest()
+                                  if result_sha256 is None else result_sha256),
+            }
+
+        path = directory()
+        def receipt_valid(command, *, cwd, timeout, execution_timeout, env,
+                          review_execution_session_id, request_sha256,
+                          hermes_execution_settings):
+            write(path)
+            return SimpleNamespace(returncode=0,
+                execution_receipt=completion_receipt())
+        check('remote receipt required and retained', lambda:
+              invoke(path, receipt_valid, require_remote_completion_receipt=True)
+              == bound_result
+              and (path / runner.QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME).is_file())
+
+        path = directory()
+        reject('remote receipt missing fails closed', lambda:
+               invoke(path, valid, require_remote_completion_receipt=True))
+
+        path = directory()
+        def receipt_hash_mismatch(command, *, cwd, timeout, execution_timeout, env,
+                                  review_execution_session_id, request_sha256,
+                                  hermes_execution_settings):
+            write(path)
+            return SimpleNamespace(returncode=0, execution_receipt=
+                completion_receipt(result_sha256='f' * 64))
+        reject('remote result hash mismatch fails closed', lambda:
+               invoke(path, receipt_hash_mismatch,
+                      require_remote_completion_receipt=True))
 
         # Coexisting same-name artifacts must never become the I/O authority.
         workspace = directory()
@@ -325,7 +387,9 @@ def main():
             path = directory() / name
             path.mkdir(mode=0o700)
             observed = {}
-            def exact(command, *, cwd, timeout, env):
+            def exact(command, *, cwd, timeout, execution_timeout, env,
+                      review_execution_session_id, request_sha256,
+                      hermes_execution_settings):
                 query = command[-1]
                 bound = json.loads(query.split('Caller exact review paths: ', 1)[1])
                 observed.update(command=command, query=query, bound=bound)
@@ -365,7 +429,9 @@ def main():
             # stays a list, the query stays one argument, and no shell is enabled.
             with runner._directory(path) as fd, patch.object(runner.subprocess, 'run',
                     return_value=SimpleNamespace(returncode=0)) as native:
-                runner._launch(observed['command'], cwd=fd, timeout=600,
+                runner._launch(observed['command'], cwd=fd,
+                               timeout=runner.QUALITY_REVIEW_TRANSPORT_TIMEOUT_SECONDS,
+                               execution_timeout=runner.QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS,
                                env=runner.timeout_environment(os.environ))
                 check('native launch uses argv without shell execution', lambda:
                       native.call_args.args == (observed['command'],) and

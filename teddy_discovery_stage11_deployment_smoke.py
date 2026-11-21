@@ -8,8 +8,13 @@ smoke cannot send Hermes/Whisper requests or create a remote session.
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
 import json
+import os
 from pathlib import Path
+import shlex
+import subprocess
+import sys
 from types import SimpleNamespace
 from unittest.mock import patch
 import tempfile
@@ -31,6 +36,7 @@ from teddy_discovery_stateful_asr_quality_review import (
 from teddy_discovery_stateful_quality_review_runner import (
     QUALITY_REVIEW_INPUT_FILENAME,
     QUALITY_REVIEW_RESULT_FILENAME,
+    QUALITY_REVIEW_EXECUTION_RECEIPT_SCHEMA_VERSION,
 )
 from teddy_discovery_stateful_translator import (
     StatefulSubtitlePackage,
@@ -55,6 +61,189 @@ from teddy_discovery_stage11_hermes_profile import (
     STAGE11_HERMES_TIMEOUT_ENV,
     STAGE11_HERMES_TIMEOUT_ENV_NAMES,
 )
+
+_REAL_SUBPROCESS_RUN = subprocess.run
+_REAL_SUBPROCESS_POPEN = subprocess.Popen
+
+
+class _LocalRemotePythonRunner:
+    """Execute only the bridge's stdlib remote scripts against local temp files."""
+
+    def __init__(self):
+        self.calls = []
+        self.lose_next_start_response = False
+
+    def __call__(self, argv, **kwargs):
+        remote_command = argv[-1]
+        parts = shlex.split(remote_command)
+        if len(parts) < 3 or parts[1] != "-c":
+            raise AssertionError("unexpected synthetic SSH command")
+        self.calls.append(parts[3] if len(parts) > 3 else "probe")
+        with patch.object(subprocess, "Popen", _REAL_SUBPROCESS_POPEN):
+            completed = _REAL_SUBPROCESS_RUN(
+                [sys.executable, *parts[1:]],
+                input=kwargs.get("input"),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+                timeout=kwargs.get("timeout"),
+            )
+        if parts[3] == "start" and self.lose_next_start_response:
+            self.lose_next_start_response = False
+            raise subprocess.TimeoutExpired(argv, kwargs.get("timeout"))
+        return completed
+
+
+def _remote_review_supervisor_smoke():
+    """Exercise one normal and one short-timeout synthetic remote child."""
+    with tempfile.TemporaryDirectory(prefix="stage11-review-supervisor-") as temp:
+        root = Path(temp)
+        remote_root = root / "remote"
+        remote_root.mkdir(mode=0o700)
+        settings = _synthetic_hermes_settings()
+        fake_ssh = _LocalRemotePythonRunner()
+        # The remote claim/manager starts, then the initiating SSH response is
+        # lost. The bridge must recover the same execution by read-only status.
+        fake_ssh.lose_next_start_response = True
+        config = replace(_config(root), remote_task_root=str(remote_root))
+        bridge = deployment.SSHRemoteHermesBridge(config, runner=fake_ssh)
+
+        def run_case(*, session_id, child_code, expect_state, extra_args=()):
+            task = remote_root / session_id
+            task.mkdir(mode=0o700)
+            request_bytes = b'{"synthetic":"review-request"}'
+            request_sha = hashlib.sha256(request_bytes).hexdigest()
+            input_path = task / QUALITY_REVIEW_INPUT_FILENAME
+            fd = os.open(input_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(request_bytes)
+            result_path = task / QUALITY_REVIEW_RESULT_FILENAME
+            query = ("Read " + str(input_path) + " and write " + str(result_path))
+            command = [
+                sys.executable, "-c", child_code, str(result_path), *extra_args,
+                "--profile", settings.profile_name,
+                "--provider", settings.provider,
+                "--model", settings.model,
+                "--reasoning", settings.reasoning_effort,
+                "--resume", session_id,
+                "-q", query,
+            ]
+            completed = bridge.launch_quality_review(
+                command,
+                remote_task=str(task),
+                timeout=deployment.QUALITY_REVIEW_TRANSPORT_TIMEOUT_SECONDS,
+                execution_timeout=deployment.QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS,
+                timeout_env=dict(STAGE11_HERMES_TIMEOUT_ENV),
+                review_execution_session_id=session_id,
+                request_sha256=request_sha,
+                hermes_execution_settings=settings.evidence(),
+            )
+            receipt = completed.execution_receipt
+            assert receipt["state"] == expect_state, receipt
+            after = bridge.read_quality_review_execution(
+                remote_task=str(task),
+                review_execution_session_id=session_id,
+                request_sha256=request_sha,
+                hermes_execution_settings=settings.evidence(),
+            )
+            assert after["state"] == expect_state
+            assert after["receipt"] == receipt
+            before_pid = receipt["child_pid"]
+            # A second start call with this execution identity may only read
+            # the existing claim/receipt; it must not launch another child.
+            again = bridge.launch_quality_review(
+                command,
+                remote_task=str(task),
+                timeout=deployment.QUALITY_REVIEW_TRANSPORT_TIMEOUT_SECONDS,
+                execution_timeout=deployment.QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS,
+                timeout_env=dict(STAGE11_HERMES_TIMEOUT_ENV),
+                review_execution_session_id=session_id,
+                request_sha256=request_sha,
+                hermes_execution_settings=settings.evidence(),
+            )
+            assert again.execution_receipt["child_pid"] == before_pid
+            assert again.execution_receipt == receipt
+            if expect_state == "COMPLETED":
+                assert hashlib.sha256(completed.result_payload).hexdigest() == receipt["result_sha256"]
+                assert result_path.stat().st_mode & 0o777 == 0o600
+            else:
+                assert not result_path.exists()
+                assert type(receipt["exit_code"]) is int
+                if expect_state == "TIMED_OUT":
+                    assert receipt["timed_out"] and receipt["cleanup_confirmed"]
+                elif expect_state == "CLEANUP_UNVERIFIED":
+                    assert not receipt["timed_out"] and not receipt["cleanup_confirmed"]
+                    assert receipt["child_pid"] is None
+            return receipt
+
+        normal_id = "d3514846-64a1-4438-9e9d-0e34e6d7bc31"
+        normal_code = (
+            "import os,sys; fd=os.open(sys.argv[1], os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600); "
+            "os.write(fd,b'{\\\"synthetic\\\":true}'); os.fsync(fd); os.close(fd)"
+        )
+        normal = run_case(session_id=normal_id, child_code=normal_code,
+                          expect_state="COMPLETED")
+
+        sleeper = _REAL_SUBPROCESS_POPEN(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        try:
+            timeout_id = "26365df8-1224-45bc-81cb-8d01a240d07c"
+            timeout_code = (
+                "import subprocess,sys,time; "
+                "subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)']); "
+                "time.sleep(30)"
+            )
+            with patch.object(deployment, "_REMOTE_QUALITY_REVIEW_EXECUTION_SCRIPT",
+                    deployment._REMOTE_QUALITY_REVIEW_EXECUTION_SCRIPT.replace(
+                        "EXECUTION_LIMIT = 3600", "EXECUTION_LIMIT = 1"
+                    ).replace("CLEANUP_GRACE = 30.0", "CLEANUP_GRACE = 0.2")), \
+                 patch.object(deployment, "QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS", 1), \
+                 patch.object(deployment, "QUALITY_REVIEW_TRANSPORT_TIMEOUT_SECONDS", 8), \
+                 patch.object(deployment, "QUALITY_REVIEW_STATUS_POLL_SECONDS", 0.02), \
+                 patch("teddy_discovery_stateful_quality_review_runner.QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS", 1):
+                timed = run_case(session_id=timeout_id, child_code=timeout_code,
+                                 expect_state="TIMED_OUT")
+            assert sleeper.poll() is None
+
+            identity_id = "4cf55c2c-a39a-4e70-8df2-4e3c330840b8"
+            pid_path = root / "unidentified-child.pid"
+            identity_code = (
+                "import os,sys,time; "
+                "open(sys.argv[2],'w').write(str(os.getpid())); time.sleep(30)"
+            )
+            wait_for_pidfile = (
+                "child = None\n            deadline = time.monotonic() + 3\n"
+                "            while not os.path.exists(" + repr(str(pid_path)) + ") and time.monotonic() < deadline:\n"
+                "                time.sleep(0.01)\n            stop(26)"
+            )
+            fail_identity_script = deployment._REMOTE_QUALITY_REVIEW_EXECUTION_SCRIPT.replace(
+                "child = process_identity(process.pid)",
+                wait_for_pidfile,
+            )
+            with patch.object(deployment, "_REMOTE_QUALITY_REVIEW_EXECUTION_SCRIPT",
+                              fail_identity_script):
+                unidentified = run_case(
+                    session_id=identity_id,
+                    child_code=identity_code,
+                    extra_args=(str(pid_path),),
+                    expect_state="CLEANUP_UNVERIFIED",
+                )
+            child_pid = int(pid_path.read_text(encoding="ascii"))
+            try:
+                os.kill(child_pid, 0)
+            except ProcessLookupError:
+                pass
+            else:
+                raise AssertionError("unidentified owned child was not reaped")
+        finally:
+            sleeper.terminate()
+            sleeper.wait(timeout=5)
+        return (normal["cleanup_confirmed"] and timed["cleanup_confirmed"]
+                and not unidentified["cleanup_confirmed"])
 
 
 def _synthetic_hermes_settings():
@@ -150,17 +339,47 @@ class FakeRemoteBridge:
             )
         return []
 
-    def launch_quality_review(self, command, *, remote_task, timeout, timeout_env):
-        self.launch_calls.append((command, remote_task, timeout, timeout_env))
+    def launch_quality_review(
+        self, command, *, remote_task, timeout, execution_timeout,
+        timeout_env, review_execution_session_id, request_sha256,
+        hermes_execution_settings,
+    ):
+        self.launch_calls.append((
+            command, remote_task, timeout, execution_timeout, timeout_env,
+            review_execution_session_id, request_sha256,
+            hermes_execution_settings,
+        ))
         if self.review_payload_to_result is None:
             raise AssertionError("fake Hybrid result callback was not installed")
         input_path = remote_task + "/" + QUALITY_REVIEW_INPUT_FILENAME
         output_path = remote_task + "/" + QUALITY_REVIEW_RESULT_FILENAME
-        self.files[output_path] = self.review_payload_to_result(
+        result_payload = self.review_payload_to_result(
             self.files[input_path],
-            review_session=command[command.index("--resume") + 1],
+            review_session=review_execution_session_id,
         )
-        return SimpleNamespace(returncode=0)
+        self.files[output_path] = result_payload
+        command_sha = hashlib.sha256(
+            json.dumps(command, ensure_ascii=True, sort_keys=True,
+                       separators=(",", ":")).encode("ascii")
+        ).hexdigest()
+        receipt = {
+            "schema_version": QUALITY_REVIEW_EXECUTION_RECEIPT_SCHEMA_VERSION,
+            "state": "COMPLETED",
+            "review_execution_session_id": review_execution_session_id,
+            "request_sha256": request_sha256,
+            "hermes_execution_settings": hermes_execution_settings,
+            "command_sha256": command_sha,
+            "timeout_seconds": execution_timeout,
+            "timed_out": False, "termination_reason": "NORMAL_EXIT",
+            "exit_code": 0, "elapsed_seconds": 0.25,
+            "cleanup_confirmed": True,
+            "supervisor_pid": 101, "supervisor_start_ticks": 1001,
+            "child_pid": 102, "child_start_ticks": 1002,
+            "child_process_group_id": 102,
+            "result_sha256": hashlib.sha256(result_payload).hexdigest(),
+        }
+        return SimpleNamespace(returncode=0, execution_receipt=receipt,
+                               result_payload=result_payload)
 
 
 class Discovery:
@@ -502,6 +721,9 @@ def main():
         passed += 1
         print("PASS=" + label)
 
+    check("REMOTE_REVIEW_SUPERVISOR_NORMAL_AND_TIMEOUT_CLEANUP",
+          _remote_review_supervisor_smoke())
+
     detail_redirect_smoke(check)
 
     with tempfile.TemporaryDirectory(prefix="stage11-deployment-smoke-") as raw:
@@ -760,8 +982,14 @@ def main():
             and hybrid_bridge.launch_calls[0][1].startswith(
                 "/srv/hermes/stage11/"
             )
-            and hybrid_bridge.launch_calls[0][3]
+            and hybrid_bridge.launch_calls[0][4]
             == dict(STAGE11_HERMES_TIMEOUT_ENV)
+            and hybrid_bridge.launch_calls[0][2]
+            == deployment.QUALITY_REVIEW_TRANSPORT_TIMEOUT_SECONDS
+            and hybrid_bridge.launch_calls[0][3]
+            == deployment.QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS
+            and hybrid_bridge.launch_calls[0][5]
+            == hybrid_bridge.launch_calls[0][0][hybrid_bridge.launch_calls[0][0].index("--resume") + 1]
             and any(
                 path.endswith("/stage11-quality-review-input.json")
                 for path in hybrid_bridge.files
