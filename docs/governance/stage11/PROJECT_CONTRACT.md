@@ -1,6 +1,6 @@
 # Stage11 subtitle design contract
 
-CONTRACT_VERSION: 1.0.0
+CONTRACT_VERSION: 2.0.0
 PROJECT_CONTRACT_STATUS: APPROVED
 APPLIES_TO: Stage11 subtitle acquisition/generation and its Stage12 publication boundary only
 
@@ -30,7 +30,7 @@ These are goals, not claims that the current product meets them. Unagreed numeri
 | Deterministic code | Stable identity and source indexes, accepted timestamps, structural/evidence validation, materialization, and publication. |
 | Whisper/ASR | Audio and speech evidence. ASR output is a hypothesis, not ground truth. |
 | Hermes | Evidence-based semantic interpretation, Korean translation, and justified source-text repair/recovery. It does not own cue identity/order, timestamps, routing, or publication. |
-| External Japanese | Trusted text evidence when validated; it does not automatically define complete speech coverage. |
+| External Japanese | Optional validated comparison evidence; neither semantic accuracy nor complete speech coverage is presumed. |
 
 - Preserve uncertainty. Do not invent dialogue to fill a gap; do not omit uncertain dialogue merely to make output cleaner. Unsupported or conflicting decisions remain conservative.
 - Never use external Korean subtitles as translation truth.
@@ -39,21 +39,30 @@ These are goals, not claims that the current product meets them. Unagreed numeri
 - Do not add title-, DVD-, cue-, phrase-, or sample-specific production exceptions or silently weaken validation limits.
 - Model execution, ASR, service/queue changes, deployment, NAS/Jellyfin writes, and publication require explicit authorization in the Stage11 active task.
 
-## Design record and conflict handling
+## Approved architecture — ASR-FIRST HYBRID V2 (2026-11-22)
 
-### APPROVED_GOAL: coverage-complete Japanese evidence
+User explicitly approved the design and reuse plan recorded in f40d39a680fbd85139012428fce9631ed9c1ae4f. V2 supersedes the external-JA-centered architecture and places evidence-supported JA master before primary translation. Original product goals, role boundaries and data protections remain. Design approval does not authorize production changes or model execution.
 
-The 2026-10-02 handoff records this future direction:
+### Approved fixed topology and boundaries
+1. Preserve Stage9 independence, source identity, original audio, optional validated external JA acquisition and original bytes. External availability/failed alignment is not itself a generation blocker; explicit evidence mode retained.
+2. Reuse source-bound full-title local Whisper large-v3 and cached baseline. ASR is a candidate timeline/evidence set, not ground truth. Preserve word timings and available confidence/VAD evidence; raw confidence availability/schema requires inspection, not assumptions.
+3. Align usable external JA to the video timeline with existing affine implementation, compare both sources symmetrically including ASR-only and external-only candidates and disagreements. Do not overwrite one source wholesale, blindly union transcripts, or count agreement of correlated STT as proof. No accepted external JA -> explicit ASR-first path with equal quality safeguards. This approved V2 policy supersedes the legacy Normal Mode accepted-HYBRID requirement in the target architecture; legacy execution remains unchanged until validated migration.
+4. Hermes identifies semantic discrepancies and evidence-supported decisions; deterministic code owns identity, accepted source-supported timing, provenance, structural validation. Selectively recheck suspected windows using existing targeted ASR, including gaps detected from audio evidence independent of existing cue list. Demucs only as optional additional evidence for suitable noisy windows, not default replacement or a new mandatory full-title stage. Reuse WX007/WX010/WX011 artifacts if available: historical comparisons inconclusive for transcript accuracy; no automatic adoption of WhisperX, new model or blanket preprocessing.
+5. Preserve independently supported speaker turns and sentence boundaries before primary translation. Existing pyannote CPU feasibility only; global speaker consistency, turn accuracy and within-cue utility unproven. Do not guess identities/sex/relationships; unknown/overlap retained, no forced splitting.
+6. Materialize source-bound JA master with explicit accepted, rejected and uncertain candidate decisions, stable cue/source identities and timestamps; retain original external JA and raw ASR separately. Preserve plausible dialogue conservatively, no promotion of unsupported synthetic speech. Material unresolved evidence must not silently be called quality PASS; approved bounded fallback or title-level hold, no mandatory manual per-title action. Policy/acceptance specifics need user decision; no flip of AUTO_INSERT alone.
+7. Reuse whole-title Hermes primary translation if feasible, existing context-preserving partition fallback, dynamic profile, native runner, stage-local receipt reuse. Input is JA master, not a new fixed-64 translation architecture. Reuse targeted review and CLEAN materializer with necessary schema/ownership adaptations. No blanket rewriting, forced casual speech, or LLM ownership of timestamps.
+8. Reuse existing Stage12 validator, no-overwrite publication, title isolation/locks, queue, timer, NAS/Jellyfin path. Keep original external JA, self-generated JA master and final KO distinct (local comparison and NAS original-sidecar requirement preserved, naming/location/lifecycle decision outstanding). Resolve current Git metadata issue before activation. Stage9 unaffected.
 
-`external JA + automatic ASR evidence -> repaired/coverage-complete JA master -> Hermes -> Korean`
+### Change discipline
 
-The Japanese master is a future product/design goal for joining useful external-JA evidence with supported speech missing from it. The canonical source does not establish this as a completed normal-mode feature.
+- Reuse verified components and evidence; only implement missing core functionality and necessary interfaces. No redundant test or model rerun absent a concrete regression.
+- One objective and exit condition at a time. Start with one representative failure and control; enlarge testing only to resolve a material risk. Stop inconclusive test expansion, report evidence, blocker and one next decision. Local defects do not authorize architecture changes.
+- No unsupported insertion, deletion, time/identity invention or mandatory per-title human review. No invented numeric quality thresholds; distinguish structural validation from product quality. Material unresolved evidence requires bounded recovery or explicit terminal/quality outcome; details not yet agreed need user decision at relevant gate.
+- Only user approval changes architecture, priorities, acceptance or operational scope. Historical checkpoints do not authorize work. Preserve Model Switch inference hold until explicit release.
 
-### PROPOSED_DESIGN: whole-title primary translation
+## Historical design and implementation evidence
 
-The 2026-10-07 direction reset prefers a whole-title Hermes primary translation when stable, with bounded partitioning as fallback. Boundary, speaker, and semantic-ownership rules belong in the primary translation; the handoff rejects broad temporal re-review as the production solution because it caused semantic drift in the cited experiment.
-
-This implementation direction does not erase the coverage-complete Japanese-master goal or authorize an AI session to decide how the two directions are combined. If priorities or architecture conflict, leave the conflict open and ask the user to choose before dependent work.
+The 2026-10-02 JA-master goal and 2026-10-07 whole-title translation direction are retained as history; V2 resolves their ordering as JA master before primary translation.
 
 ### IMPLEMENTED and candidate-only evidence
 
@@ -68,7 +77,7 @@ This implementation direction does not erase the coverage-complete Japanese-mast
 - Complete automatic recovery of missing dialogue, natural cue/sentence boundaries, speaker separation, line-break quality, and final product quality have not passed their required evidence review.
 - P2-N's isolated structural PASS and P2-O's structural comparison do not establish subtitle product-quality PASS or authorize replacement/publication.
 - No numerical acceptance thresholds for remaining semantic-quality goals are approved. Keep them `UNRESOLVED` until the user approves evidence and criteria.
-- The priority and integration between the coverage-complete Japanese-master goal and the whole-title primary-translation direction remain a user decision if they conflict in implementation.
+- V2 ordering is approved above; future architecture conflicts require user approval. V2 implementation and product quality remain unverified.
 
 ## Workstream state
 
