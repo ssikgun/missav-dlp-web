@@ -6,6 +6,55 @@ STATUS: IN_PROGRESS
 CONTRACT_VERSION: 1.0.0
 REQUIRES_WORKSTREAMS: stage11
 
+
+## CURRENT ROADMAP — 2026-11-22 (read this before historical checkpoints)
+
+**Purpose:** restore a single goal-driven Stage11 plan at the user's request. This is a documentation/status refresh, not a contract change or authorization to run a new implementation, model, deployment or publication. S11-MVP001 remains IN_PROGRESS; common 1.0.1 and Stage11 1.0.0 remain APPROVED. Earlier dated NEXT entries are history, not alternative current work orders. Preserve the original frozen P0 → P1 → P2 → P3 → P4 order recorded in 6335158cccfb7d8427aef6ff485e7cf4404e7eff, without silently reopening completed subwork or changing design priorities.
+
+### R0 — original acceptance goal ledger (contract, not new requirements)
+
+| Contract goal | Current evidence / gap |
+| --- | --- |
+| 1 Natural comprehensible Korean | Two title-specific practical comprehension reports; not general semantic PASS |
+| 2 External JA + real audio/ASR | HYBRID route/alignment and real-title trials evidenced; broad source-mode behavior not fully verified |
+| 3 Recover supported missing dialogue | UNRESOLVED; supplemental auto insertion OFF |
+| 4 Avoid breaks, duplicate meaning, context spill | Absorption and semantic review implemented; real-output regression/quality not closed |
+| 5 Natural utterance/sentence boundaries | Partial; quality unresolved |
+| 6 Speaker separation and line breaks | Unresolved; historical 91fe641 and current user report |
+| 7 Conservative omission/hallucination/mistranslation/context checks | HYBRID triage, targeted ASR and final review exercised; semantic effectiveness not universally proven |
+| 8 Unattended normal operation | INCOMPLETE; current promotion/timer held; multiple-title queue/recovery evidence outstanding |
+| 9 Traceability | Source/receipt and stage-local resume evidenced on real title; retain protections |
+| 10 Safe Stage12 delivery | Single-title DLDSS-557 PUBLISHED/Jellyfin recognition evidenced; broader automation not proven |
+
+### Completed technical baseline — do not redo without a concrete regression
+
+- Real-title external JA, bounded full-title and targeted Whisper, accepted HYBRID alignment, native first pass with whole-title preference/partition fallback, HYBRID triage and final review, deterministic CLEAN and validation, source-bound receipt reuse, dynamic per-stage Hermes profile and failure-stage resume have working evidence. Code integration b8099bcca842b7e0d4cf1a0b79927f91ba082860 prepared on CT108; Normal Mode 31/31; HSODA-104 final-only resume PASS (554.6 seconds, xhigh, no repeated first pass/triage/ASR). User reports practical comprehension but speaker mixing. DLDSS-557 single-title retained completion publication and Jellyfin recognition reported PASS. No second publication or repeated generation needed simply to prove these same capabilities.
+- Timeout: one successful xhigh call with unchanged timeout policy, not proof of permanent root-cause resolution. Keep current policy and profile independence; revisit only on concrete failure or stability evidence. Do not start a new model benchmark/timeout tuning project.
+- Prepared release is not the active current. Last actual operator gate: current/runtime.env unchanged, timer inactive/disabled. Current live state must be verified when relevant. Do not assume runtime from Git.
+- Old 2026-10-12 audit (91fe641ea9b437d282737e472c30d57232381a2d) found 134 historical ASR_ONLY reports, 96 targeted ASR, and no multiline in two compared outputs. Historical counts are not today's queue inventory.
+
+### Remaining roadmap, in original priority order
+
+| Phase | Status | Remaining work / exit condition |
+| --- | --- | --- |
+| P0 Operations blocker | PARTIAL / closure evidence needed | First reuse existing records to establish whether the historical DANDYA queue failure/stranded RUNNING and title-vs-system exception boundary are resolved. If no current blocker, do not reopen development solely for an old error. Verify idle/consistent state; actual automatic failure isolation and restart behavior are finally confirmed in P3. If an actual blocker remains, fix only that blocker before P2. |
+| P1 ASR_ONLY / HYBRID routing | PARTIAL | Real HYBRID succeeded, but historical 134 ASR_ONLY cause distribution and general selection are not established by two titles. Review existing reports and current routing, distinguish missing/rejected JA, alignment and selector/transport failures; avoid redundant full sweeps or inference. Preserve explicit route outcomes; no forced HYBRID or silent fallback. Resolve missing-JA behavior only within approved policy; report any design conflict. Exit: evidence-based routing/availability behavior across representative cases, historical gaps explicitly marked if non-verifiable. |
+| P2.1 Speaker/line breaks | NEXT QUALITY TARGET | Read-only compare representative affected retained cues, original JA turns, ASR text/timing, primary result, absorption, review and CLEAN; locate loss vs lack of speaker evidence. Recover existing historical implementation where relevant. Speaker-aware primary-translation direction remains authoritative; prefer minimal evidence-supported preservation, not punctuation guessing, indiscriminate late semantic rewriting or automatic adoption of a new diarization model. Agree targeted fix/test scope after diagnosis. Exit: affected representative cues display separate supported turns, no invented labels/boundaries, existing translation/timing/IDs protected, general regression check. |
+| P2.2 Sentence/utterance boundaries and context | PENDING | Reuse absorption, timing and review; check split sentences, merging across speakers, duplicate meaning and context shifts with retained samples; fix only demonstrated gaps. Exit: representative evidence-backed boundary improvements without lost meaning or invented timestamp/ownership. |
+| P2.3 Semantic review / practical comprehension | PARTIAL | Check material mistranslations, omissions, hallucinations and context errors; reuse existing targeted ASR/review and prior evidence. Test representative regressions including historical FNS failures only when retained evidence is available. No broad retranslation merely for cosmetic changes. Exit: practical quality assessed separately from structural PASS; unresolved cases explicitly recorded, no mandatory per-title human operation. |
+| P3.1 Delivery and rollout readiness | PENDING | After quality work, preserve approved no-overwrite Stage12 ownership; verify the 2026-11-12 separate original-JA sidecar requirement (validated original saved beside video, distinct from KO, filename/provenance/collision policy needs decision). Reuse existing DLDSS publication evidence; plan a separately approved exact release + private-to-published validation for a representative new/held title. No overwrite of existing subtitles. |
+| P3.2 Unattended normal operation | PENDING | With explicit operational approval, promote exact validated release, enable normal timer and observe a small representative set of actual new queue outcomes through safe publication/Jellyfin, including failure isolation/resume and no-repeat/lock behavior, source-mode outcomes, operational resource safeguards with VM122 model coexistence, and API stability. User intervention zero in ordinary operation. Exit: actual new PUBLISHED, consistent state, safe recovery and no regressions to other workstreams; not merely manually generated SRT. |
+| P4 Supported missing-dialogue recovery | DEFERRED / UNRESOLVED | Original contract goal remains. Historical P4 optional research is not a blocker to baseline HYBRID operation, not permission to declare full product-goal completion. Supplemental insertion OFF until independent evidence supports it; distinguish actual speech from hallucination/ambiguous candidates. Reuse existing experiments, pursue coverage-complete Japanese evidence only after a separate explicit design decision if it conflicts with whole-title primary translation. No mandatory user listening in ordinary operation. |
+
+### Single next gate and change discipline
+
+- **NEXT_DECISION:** authorize one bounded read-only roadmap closure inventory using existing P0/P1 records and the retained HSODA-104 speaker/line-break chain (P2.1 diagnosis; no P2 implementation until actual P0/P1 blockers, if any, are resolved or user explicitly chooses otherwise). Do not repeat completed preflights, synthetic labs, prior title generation or broad ASR experiments merely because the roadmap was refreshed. Report P0/P1 closure evidence or precise blockers and P2.1 evidence availability; propose one focused next implementation only after diagnosis. If a known P0/P1 blocker exists, it takes priority. This roadmap does not authorize media inference, code edits, releases or NAS/queue writes.
+- Work on one gated objective at a time. Log incidental failures as blocking or nonblocking; only a blocker that prevents the selected objective or threatens data safety interrupts it. On blocker resolution return to the same roadmap item, preserving prior accepted output. No unapproved goal/architecture/priority change: surface alternatives for user decision.
+- Each checkpoint reports roadmap ID, actual result, evidence, remaining exit criterion, single next task. Maintain this current ledger as status changes; append supporting history without making old NEXT notes compete with the current gate. Avoid numeric overall progress percentages or invented acceptance thresholds. Distinguish IMPLEMENTED, real tested, title-specific practical acceptance, and operational/product completion. New changes or inference require existing applicable authorization. Protect private data and independent Stage9/downloader services.
+- Development review/test by the user is optional evaluation, not a required per-title operational action. No product-quality PASS from a successful SRT generation or a single title alone. The user may decide an acceptable baseline release while deferred quality goals remain openly tracked; this is not permission to erase those goals.
+
+---
+
 ## 2026-11-17 operational checkpoint — isolated DLDSS-557 ASR diagnostic work
 
 DOCUMENTARY_STATUS: RECORDED; this note does not approve live execution, production writes, or a change of Stage11 design.
