@@ -500,6 +500,7 @@ def _review_stage_execution_evidence(*, staging_root, stage, request, result,
         QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME,
         QUALITY_REVIEW_EXECUTION_RECEIPT_SCHEMA_VERSION,
         QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS,
+        read_quality_review_result,
         QUALITY_REVIEW_RESULT_FILENAME,
         validate_remote_execution_receipt,
     )
@@ -561,13 +562,23 @@ def _review_stage_execution_evidence(*, staging_root, stage, request, result,
         task_result = result_raw
     if embedded is None:
         try:
-            parsed_task_result = controller.parse_review_result(
-                task_result, request, target_cue_ids=target_cue_ids)
+            parsed_task_result = read_quality_review_result(
+                task_directory,
+                request,
+                process_finished=True,
+                returncode=checked['exit_code'],
+                review_execution_session_id=session_id,
+                target_cue_ids=target_cue_ids,
+            )
         except Exception as error:
             raise controller.Stage11ControllerArtifactError(
                 'remote review result is invalid') from error
-        if (parsed_task_result != result
-                or sha(task_result) != checked['result_sha256']):
+        task_result_after = controller._read_private_file(
+            task_directory / QUALITY_REVIEW_RESULT_FILENAME,
+            max_bytes=controller.MAX_REVIEW_BYTES)
+        if (task_result_after != task_result
+                or sha(task_result_after) != checked['result_sha256']
+                or parsed_task_result != result):
             raise controller.Stage11ControllerArtifactError(
                 'review result is detached from its completed execution receipt')
     calculated = {

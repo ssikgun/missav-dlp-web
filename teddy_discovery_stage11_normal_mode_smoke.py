@@ -119,6 +119,12 @@ class NormalSmoke(unittest.TestCase):
         session=result.review_execution_session_id
         task=Path(staging_root)/session
         task.mkdir(mode=0o700,parents=True,exist_ok=True)
+        input_path=task/runner.QUALITY_REVIEW_INPUT_FILENAME
+        input_raw=runner.serialize_review_request(request)
+        if input_path.exists():
+            self.assertEqual(input_path.read_bytes(),input_raw)
+        else:
+            normal.store(input_path,input_raw)
         result_digest=(None if failed else normal.sha(result_raw))
         receipt={
             'schema_version':runner.QUALITY_REVIEW_EXECUTION_RECEIPT_SCHEMA_VERSION,
@@ -150,6 +156,73 @@ class NormalSmoke(unittest.TestCase):
         normal.store(task/runner.QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME,
                      receipt_raw)
         return task/runner.QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME,receipt_raw
+
+    def test_receipt_readback_binds_provenance_for_triage_and_final_review(self):
+        import teddy_discovery_stateful_quality_review_runner as runner
+
+        initial=self.run_title()
+        directory=initial.report_path.parent
+        preparation,boundary=normal.reconstruct(directory,self.baseline)
+        first=normal.parse_stateful_result(
+            normal.controller._read_private_file(
+                directory/'normal-result.json',max_bytes=16*1024*1024),
+            preparation.package,boundary_evidence=boundary)
+        source_quality=normal.classify_source_document(
+            preparation.route_decision.alignment_application.bundle
+            .external_ja_document)
+        request=review.build_review_request(
+            preparation=preparation,package=preparation.package,
+            result=first,source_quality=source_quality)
+
+        cases=(
+            ('hybrid_triage',None,None),
+            ('hybrid_final_target',(request.cues[0].cue_id,),object()),
+        )
+        for stage,target_cue_ids,targeted_artifact in cases:
+            bound_result=self.review(
+                request,staging_root=self.staging,
+                hermes_settings=self.hermes_settings,
+                target_cue_ids=target_cue_ids,
+                targeted_asr_artifact=targeted_artifact)
+            raw_result=replace(
+                bound_result,source_translation_session_id=None,
+                review_execution_session_id=None)
+            raw_result_bytes=review.serialize_review_result(
+                raw_result,request,target_cue_ids=target_cue_ids)
+            result_path=self.artifacts/(stage+'.json')
+            normal.store(
+                result_path,
+                review.serialize_review_result(
+                    bound_result,request,target_cue_ids=target_cue_ids))
+            self._write_review_execution_receipt(
+                self.staging,bound_result,request,raw_result_bytes,
+                self.hermes_settings,target_cue_ids=target_cue_ids)
+
+            evidence=normal._review_stage_execution_evidence(
+                staging_root=self.staging,stage=stage,request=request,
+                result=bound_result,result_path=result_path,
+                target_cue_ids=target_cue_ids)
+            self.assertEqual(evidence['remote_result_sha256'],
+                             normal.sha(raw_result_bytes))
+            self.assertEqual(evidence['result_sha256'],
+                             normal.sha(result_path.read_bytes()))
+
+            task_result_path=(self.staging/
+                bound_result.review_execution_session_id/
+                runner.QUALITY_REVIEW_RESULT_FILENAME)
+            original_raw=task_result_path.read_bytes()
+            changed=replace(raw_result,cues=(replace(
+                raw_result.cues[0],reason='tampered synthetic result'),
+                *raw_result.cues[1:]))
+            task_result_path.write_bytes(review.serialize_review_result(
+                changed,request,target_cue_ids=target_cue_ids))
+            with self.assertRaises(
+                    normal.controller.Stage11ControllerArtifactError):
+                normal._review_stage_execution_evidence(
+                    staging_root=self.staging,stage=stage,request=request,
+                    result=bound_result,result_path=result_path,
+                    target_cue_ids=target_cue_ids)
+            task_result_path.write_bytes(original_raw)
 
     def _write_native_first_pass_receipt(self, package, staging_root,
                                          boundary_evidence, settings):
