@@ -1480,7 +1480,8 @@ def _require_clean_artifact(value: object) -> GeneratedKoreanSRT:
 def _run_hybrid_suspect_review(*, directory, preparation, first_pass, source_quality,
                                targeted_artifact, asr_result, baseline_sha256,
                                hybrid_review_runner, hybrid_targeted_runner, staging_root,
-                               create_missing=True):
+                               create_missing=True, review_receipt_validator=None,
+                               embedded_execution_evidence=None):
     """Add post-first-pass triage/evidence/adjudication to existing HYBRID."""
     originals = dict(preparation=preparation, package=preparation.package, result=first_pass,
                      source_quality=source_quality, targeted_second_evidence_artifact=targeted_artifact)
@@ -1497,6 +1498,13 @@ def _run_hybrid_suspect_review(*, directory, preparation, first_pass, source_qua
     else:
         triage_raw = _read_private_file(triage_path, max_bytes=MAX_REVIEW_BYTES)
         triage = parse_review_result(triage_raw, triage_request)
+    if callable(review_receipt_validator):
+        review_receipt_validator(
+            stage='hybrid_triage', request=triage_request, result=triage,
+            result_path=triage_path, target_cue_ids=None,
+            staging_root=staging_root,
+            embedded_execution_evidence=embedded_execution_evidence,
+        )
     targets = select_suspect_cue_ids(triage_request, triage)
     request = triage_request
     evidence = None
@@ -1560,6 +1568,13 @@ def _run_hybrid_suspect_review(*, directory, preparation, first_pass, source_qua
         else:
             final = parse_review_result(_read_private_file(final_path, max_bytes=MAX_REVIEW_BYTES),
                                         request, target_cue_ids=targets)
+        if callable(review_receipt_validator):
+            review_receipt_validator(
+                stage='hybrid_final_target', request=request, result=final,
+                result_path=final_path, target_cue_ids=targets,
+                staging_root=staging_root,
+                embedded_execution_evidence=embedded_execution_evidence,
+            )
     else:
         unexpected = tuple(
             directory / name for name in (

@@ -8,7 +8,9 @@ Existing Korean subtitles are deliberately not an input to this module.
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
 import hashlib
+import json
 import os
 from pathlib import Path
 import stat
@@ -20,6 +22,9 @@ from teddy_discovery_subtitle import SubtitleCandidate
 from teddy_discovery_subtitle_external import (
     ExternalSubtitleError,
     ExternalSubtitlePayload,
+)
+from teddy_discovery_quality_review_session import (
+    validate_canonical_review_execution_session_id,
 )
 from teddy_title_exclusion import ACQUIRED, configured_lock_dir, try_acquire_title_lock
 
@@ -154,6 +159,86 @@ def _create_fresh_run_root(value: Path) -> tuple[Path, Path, Path]:
     return root, artifacts, staging
 
 
+def _open_existing_run_root(value: Path, dvd_id: str) -> tuple[Path, Path, Path]:
+    root = _absolute_path(value, "run root")
+    _check_directory_chain(root, private=True)
+    artifacts, staging = root / "artifacts", root / "staging"
+    _check_directory_chain(artifacts, private=True)
+    _check_directory_chain(staging, private=True)
+    try:
+        root_names = {item.name for item in root.iterdir()}
+        artifact_names = {item.name for item in artifacts.iterdir()}
+        staging_entries = tuple(staging.iterdir())
+        staging_names = {item.name for item in staging_entries}
+        if (root_names != {"artifacts", "staging"}
+                or artifact_names != {dvd_id}
+                or dvd_id not in staging_names):
+            raise RegenerationError("existing private run root is not bound to this title")
+    except OSError as error:
+        raise RegenerationError("existing private run root cannot be inspected") from error
+    for item in staging_entries:
+        if item.name != dvd_id:
+            try:
+                validate_canonical_review_execution_session_id(item.name)
+            except Exception as error:
+                raise RegenerationError(
+                    "existing staging directory has an unknown entry") from error
+        _check_directory_chain(item, private=True)
+    artifact_title = artifacts / dvd_id
+    staging_title = staging / dvd_id
+    _check_directory_chain(artifact_title, private=True)
+    _check_directory_chain(staging_title, private=True)
+    return root, artifacts, staging
+
+
+def _read_resume_inputs(artifacts: Path, title: str, snapshot, claim_token,
+                        acceptance_policy, alignment_budget_profile):
+    directory = artifacts / title
+    baseline_path = directory / controller.BASELINE_ASR_FILENAME
+    japanese_path = directory / "normal-external-ja.srt"
+    source_path = directory / normal.SOURCE_NAME
+    required = (
+        baseline_path, japanese_path, source_path,
+        directory / "normal-package.json", directory / "normal-result.json",
+    )
+    for path in required:
+        controller._read_private_file(path, max_bytes=(
+            controller.MAX_ASR_ARTIFACT_BYTES
+            if path == baseline_path else
+            normal.MAX_SUBTITLE_BYTES if path == japanese_path else
+            16 * 1024 * 1024))
+    try:
+        source = json.loads(controller._read_private_file(
+            source_path, max_bytes=16 * 1024 * 1024))
+    except Exception as error:
+        raise RegenerationError("existing source binding is invalid") from error
+    if (type(source) is not dict
+            or source.get("claim_token") != claim_token
+            or source.get("acceptance_policy") != asdict(acceptance_policy)):
+        raise RegenerationError("existing run identity or acceptance policy differs")
+    expected_budget = (normal.DUAL_BUDGET_PROVENANCE
+                       if alignment_budget_profile is not None else None)
+    if source.get("alignment_budget") != expected_budget:
+        raise RegenerationError("existing alignment budget differs")
+    baseline_raw = controller._read_private_file(
+        baseline_path, max_bytes=controller.MAX_ASR_ARTIFACT_BYTES)
+    baseline = _read_cached_baseline(
+        baseline_path, sha256(baseline_raw), snapshot)
+    if baseline is None:
+        raise RegenerationError("existing source-bound ASR cannot be reused")
+    ja_raw = controller._read_private_file(
+        japanese_path, max_bytes=normal.MAX_SUBTITLE_BYTES)
+    if (type(source.get("external_sha256")) is not str
+            or source["external_sha256"] != sha256(ja_raw)
+            or type(source.get("source_id")) is not str):
+        raise RegenerationError("existing Japanese subtitle is detached from its source")
+    japanese = _read_cached_japanese(
+        title, japanese_path, source["external_sha256"], source["source_id"])
+    if japanese is None:
+        raise RegenerationError("existing Japanese subtitle cannot be reused")
+    return baseline, japanese
+
+
 def regenerate_one_title(
     dvd_id: str,
     *,
@@ -168,6 +253,7 @@ def regenerate_one_title(
     source_verifier,
     claim_token: int,
     alignment_budget_profile: str | None = None,
+    resume_existing: bool = False,
 ):
     """Generate one new private result under the shared title lock.
 
@@ -175,6 +261,13 @@ def regenerate_one_title(
     source-fingerprint check. This path does not seed or mutate Stage12 state.
     """
     title = controller._canonical_title(dvd_id)
+    if type(resume_existing) is not bool:
+        raise RegenerationError("existing-run resume mode must be boolean")
+    if resume_existing and any(value is not None for value in (
+            baseline_path, baseline_sha256, japanese_srt_path,
+            japanese_srt_sha256, japanese_srt_source_id)):
+        raise RegenerationError(
+            "resume uses only the input artifacts bound to its existing run root")
     if not callable(source_verifier):
         raise RegenerationError("source verifier is required")
     if alignment_budget_profile not in (None, normal.DUAL_BUDGET_PROVENANCE["mode"]):
@@ -192,13 +285,28 @@ def regenerate_one_title(
         if video.video_format != "mp4":
             raise RegenerationError("canonical MP4 source is required")
         source_verifier(video, snapshot)
-        baseline_cache = _read_cached_baseline(
-            baseline_path, baseline_sha256, snapshot)
-        japanese_cache = _read_cached_japanese(
-            title, japanese_srt_path, japanese_srt_sha256,
-            japanese_srt_source_id)
-
-        root, artifacts, staging = _create_fresh_run_root(Path(run_root))
+        if resume_existing:
+            root, artifacts, staging = _open_existing_run_root(
+                Path(run_root), title)
+            baseline_cache, japanese_cache = _read_resume_inputs(
+                artifacts, title, snapshot, claim_token, acceptance_policy,
+                alignment_budget_profile)
+            stage_directory = staging / title
+            for name in (
+                    normal.NATIVE_SETTINGS_FILENAME,
+                    "stage11-authoritative-input.json",
+                    "stage11-semantic-input.json",
+                    "stage11-boundary-evidence-v1.json",
+                    "stage11-semantic-result.json"):
+                controller._read_private_file(
+                    stage_directory / name, max_bytes=16 * 1024 * 1024)
+        else:
+            baseline_cache = _read_cached_baseline(
+                baseline_path, baseline_sha256, snapshot)
+            japanese_cache = _read_cached_japanese(
+                title, japanese_srt_path, japanese_srt_sha256,
+                japanese_srt_source_id)
+            root, artifacts, staging = _create_fresh_run_root(Path(run_root))
 
         if baseline_cache is not None:
             baseline, baseline_raw = baseline_cache
@@ -232,8 +340,12 @@ def regenerate_one_title(
             if alignment_budget_profile is not None:
                 kwargs["external_ja_attempt"]._stage11_alignment_budget_profile = alignment_budget_profile
 
-        # Never route targeted evidence through an unbounded callback.
+        # Missing targeted evidence may be acquired only by the existing
+        # bounded worker. Existing artifacts are source/window validated and
+        # reused before that callback can be invoked.
         kwargs["hybrid_targeted_runner"] = _bounded_targeted_runner(dependencies)
+        if resume_existing and not callable(kwargs.get("hybrid_review_runner")):
+            raise RegenerationError("resume requires the existing HYBRID review adapter")
         first_pass = normal.NativeNormalFirstPass(dependencies.remote_bridge)
         kwargs["first_pass_runner"] = dependencies.capture_first_pass_runner(first_pass)
 
@@ -244,6 +356,7 @@ def regenerate_one_title(
             claim_token=claim_token,
             acceptance_policy=acceptance_policy,
             alignment_budget_profile=alignment_budget_profile,
+            resume_existing=resume_existing,
             **kwargs,
         )
         if result.title != title or result.route != "HYBRID":
@@ -264,6 +377,8 @@ def build_parser():
     parser.add_argument("--external-ja-source-id")
     parser.add_argument("--alignment-budget-profile", choices=(
         normal.DUAL_BUDGET_PROVENANCE["mode"],))
+    parser.add_argument("--resume-existing", action="store_true",
+                        help="Resume only a validated private run root; never reacquire model inputs.")
     parser.add_argument("--execute", action="store_true",
                         help="Run one private Normal Mode regeneration; requires the operator token.")
     return parser
@@ -279,6 +394,11 @@ def main(argv=None) -> int:
     if any(value is not None for value in ja_values) and not all(
             value is not None for value in ja_values):
         parser.error("Japanese subtitle path, SHA256, and source ID must be supplied together")
+    if args.resume_existing and any(value is not None for value in (
+            args.baseline_asr, args.baseline_asr_sha256,
+            args.external_ja, args.external_ja_sha256,
+            args.external_ja_source_id)):
+        parser.error("--resume-existing uses only inputs inside the existing run root")
     if not args.execute or os.environ.get(EXECUTE_ENV) != EXECUTE_VALUE:
         print("STAGE11_REGENERATION=BLOCKED_EXECUTE_AUTHORIZATION", flush=True)
         return 2
@@ -312,6 +432,7 @@ def main(argv=None) -> int:
         source_verifier=verify_source,
         claim_token=bulk.CLAIM_TOKEN,
         alignment_budget_profile=args.alignment_budget_profile,
+        resume_existing=args.resume_existing,
     )
     print("STAGE11_REGENERATION=PRIVATE_CLEAN_VALIDATED", flush=True)
     print("DVD_ID=" + result.title, flush=True)

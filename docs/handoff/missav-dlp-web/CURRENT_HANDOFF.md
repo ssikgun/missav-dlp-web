@@ -18379,3 +18379,10 @@ Changed paths: `teddy_discovery_asr_bounded_worker.py`, `teddy_discovery_stage11
 ## 2026-11-22 — user approved continuation after successful HYBRID triage
 
 - User requested proceeding with the proposed bounded suspect-window Whisper analysis and final Hermes adjudication, followed by private CLEAN SRT generation. Reuse verified baseline, external JA, 204-cue first pass and successful triage; no repeat first pass/full-title ASR/triage, no automatic retry, no production changes or publication. Existing GPU and worker lifetime/cleanup policy remains unchanged. Before execution, validate saved triage against reconstructed canonical request and completed execution receipt, including the raw result digest, bound execution provenance and exact retained canonical result; determine target/window counts. Canonical controller has a native existing-triage branch, but safe integration with a fresh private regeneration root remains to be verified. Actual current runtime and GPU safety gates are pending; no inference or new runtime result in this approval checkpoint. S11-MVP001 IN_PROGRESS; product quality NOT_VERIFIED. Documentation only.
+
+
+## 2026-11-22 — stage-level resume implementation promoted to canonical source
+
+- User-approved integration of the five exact candidate files was applied from candidate base `ba57a8eccf81ad2d74ac2eaf5f4d23a4b92ca7b5` onto clean canonical HEAD `75fc6d42014addb00b5f20111582f8e2523e7864`. The intervening canonical diff was limited to Stage11 `ACTIVE_WORK.md`; all candidate SHA-256 values matched and the product files were copied unchanged.
+- Reused offline validation evidence: Normal Mode 30/30, Hermes profile 8/8, deployment 54/54, Python compile and diff check PASS. No unchanged suites were repeated. This integration is source-only and does not establish live resume behavior or product quality.
+- Model Switch completion and API ID `qwen3.5-9b` are user-reported, not independently verified here; GPU concurrent-load validation remains NOT_VERIFIED. No Hermes/Whisper/model run, deployment, current/timer/service change, Stage12/NAS/Jellyfin/DB write, or publication occurred. S11-MVP001 remains IN_PROGRESS.

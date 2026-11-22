@@ -104,6 +104,19 @@ def store(path, raw):
     return controller._install_or_reuse(path, raw, max_bytes=16 * 1024 * 1024)
 
 
+def _settings_object_from_evidence(value):
+    evidence = validate_settings_evidence(value)
+    values = evidence['profile_values']
+    return HermesExecutionSettings(
+        profile_name=evidence['profile_name'],
+        provider=values['provider'], model=values['model'],
+        reasoning_effort=values['reasoning_effort'],
+        hermes_version=evidence['hermes_version'],
+        config_sha256=evidence['profile_config_sha256'],
+        timeout_env_supported=tuple(evidence['timeout_environment_supported']),
+    )
+
+
 # Reuses the established fresh chat -Q/stdout transport and isolated config/auth
 # lifecycle. Unlike the obsolete UUID --resume path, no session DB is preminted.
 REMOTE_NATIVE = r'''
@@ -174,7 +187,7 @@ print(json.dumps({'stdout':base64.b64encode(streams['stdout']).decode(),
 
 
 def _bind_staging_hermes_settings(directory, settings):
-    """Bind incomplete first-pass artifacts to one immutable model snapshot."""
+    """Bind first-pass attempts to their own immutable settings snapshot."""
     if type(settings) is not HermesExecutionSettings:
         raise controller.Stage11ControllerValidationError(
             'resolved Stage11 Hermes settings are required')
@@ -188,11 +201,16 @@ def _bind_staging_hermes_settings(directory, settings):
         except Exception as error:
             raise controller.Stage11ControllerArtifactError(
                 'staged Hermes settings binding is invalid') from error
-        if wire(persisted) != expected:
-            raise controller.Stage11ControllerArtifactError(
-                'unfinished Hermes result belongs to different profile settings')
+        bound_settings = _settings_object_from_evidence(persisted)
+    else:
+        bound_settings = settings
 
     receipt_paths = sorted(directory.glob('*-attempt-*.receipt.json'))
+    has_other_artifacts = any(
+        item.name != NATIVE_SETTINGS_FILENAME for item in directory.iterdir())
+    if not exists and has_other_artifacts:
+        raise controller.Stage11ControllerArtifactError(
+            'existing first-pass artifacts have no settings binding')
     for receipt_path in receipt_paths:
         try:
             receipt = json.loads(controller._read_private_file(
@@ -200,18 +218,14 @@ def _bind_staging_hermes_settings(directory, settings):
         except Exception as error:
             raise controller.Stage11ControllerArtifactError(
                 'staged Hermes attempt receipt is invalid') from error
-        if not legacy_receipt_matches(receipt, settings):
+        if not legacy_receipt_matches(receipt, bound_settings):
             raise controller.Stage11ControllerArtifactError(
-                'unfinished Hermes attempt uses different profile settings')
+                'first-pass attempt differs from its bound profile settings')
 
-    has_result = (directory / 'stage11-semantic-result.json').exists()
-    has_parts = any(directory.glob('part-*.json'))
     if not exists:
-        if (has_result or has_parts) and not receipt_paths:
-            raise controller.Stage11ControllerArtifactError(
-                'unfinished Hermes output has no verifiable model receipt')
         store(path, expected)
-    return settings.evidence()
+        return settings.evidence()
+    return bound_settings.evidence()
 
 
 def native_prompt(query, package, *, part_ids=None):
@@ -243,21 +257,37 @@ def native_prompt(query, package, *, part_ids=None):
 class NativeNormalFirstPass:
     def __init__(self, bridge):
         self.bridge = bridge
+        self._verified_attempts = []
 
-    def invoke(self, prompt, directory, label, validator, *, hermes_settings):
+    def invoke(self, prompt, directory, label, validator, *, hermes_settings,
+               reuse_only=False):
         if type(hermes_settings) is not HermesExecutionSettings:
             raise controller.Stage11ControllerValidationError(
                 'resolved Stage11 Hermes settings are required')
+        if type(reuse_only) is not bool:
+            raise controller.Stage11ControllerValidationError(
+                'first-pass reuse mode is invalid')
         if len(prompt) > MAX_NATIVE_PROMPT_BYTES:
             raise controller.Stage11ControllerValidationError('native prompt exceeds established byte bound')
         last_error = None
         for attempt in range(1, MAX_VALIDATION_ATTEMPTS + 1):
             prefix = directory / f'{label}-attempt-{attempt}'
             receipt_path = prefix.with_suffix('.receipt.json')
+            prompt_path = prefix.with_suffix('.prompt.txt')
             if receipt_path.exists():
-                receipt = json.loads(controller._read_private_file(receipt_path,max_bytes=1024*1024))
+                receipt_raw = controller._read_private_file(receipt_path,max_bytes=1024*1024)
+                receipt = json.loads(receipt_raw)
+                stored_prompt = controller._read_private_file(
+                    prompt_path, max_bytes=MAX_NATIVE_PROMPT_BYTES)
+                if stored_prompt != prompt:
+                    raise controller.Stage11ControllerArtifactError(
+                        'native receipt is detached from its stored prompt')
                 stdout = controller._read_private_file(prefix.with_suffix('.stdout'),max_bytes=16*1024*1024)
+                stderr = controller._read_private_file(prefix.with_suffix('.stderr'),max_bytes=16*1024*1024)
             else:
+                if reuse_only:
+                    raise controller.Stage11ControllerArtifactError(
+                        'completed first-pass output lacks an execution receipt')
                 request = {'root':'/tmp/stage11-normal-hermes-'+uuid.uuid4().hex,
                     'source_profile':STAGE11_HERMES_PROFILE_DIR,
                     'config':base64.b64encode(wire(native_config_for(hermes_settings))).decode(),
@@ -267,7 +297,7 @@ class NativeNormalFirstPass:
                     'model':hermes_settings.model,
                     'reasoning':hermes_settings.reasoning_effort,
                     'timeout_env':dict(STAGE11_HERMES_TIMEOUT_ENV)}
-                store(prefix.with_suffix('.prompt.txt'),prompt)
+                store(prompt_path,prompt)
                 raw = self.bridge._python(REMOTE_NATIVE,input_payload=wire(request),capture=True,timeout=NATIVE_ABSOLUTE_TIMEOUT+90)
                 receipt=json.loads(raw)
                 stdout=base64.b64decode(receipt.pop('stdout'),validate=True)
@@ -282,51 +312,121 @@ class NativeNormalFirstPass:
                     reasoning=hermes_settings.reasoning_effort,attempt=attempt,
                     hermes_execution_settings=hermes_settings.evidence(),
                     timeout_environment_applied=applied_timeout_env)
-                store(receipt_path,wire(receipt))
+                receipt_raw = wire(receipt)
+                store(receipt_path,receipt_raw)
             if receipt['prompt_sha256']!=sha(prompt) or receipt['stdout_sha256']!=sha(stdout):
                 raise controller.Stage11ControllerArtifactError('native receipt detached from prompt/output')
-            if receipt['returncode']!=0 or receipt['timeout_reason'] is not None:
-                raise controller.Stage11ControllerError('native Hermes execution failed: '+str(receipt['timeout_reason'] or receipt['returncode']))
-            if receipt['tools_count']!=0 or receipt['runtime_session_id'] is None:
-                raise controller.Stage11ControllerArtifactError('native execution provenance invalid')
+            if receipt.get('stderr_sha256') != sha(stderr):
+                raise controller.Stage11ControllerArtifactError(
+                    'native receipt detached from execution diagnostics')
+            runtime_ids = re.findall(
+                rb'^session_id: (\d{8}_\d{6}_[a-f0-9]{6})\s*$', stderr, re.M)
+            runtime_matches = (
+                len(runtime_ids) == 1
+                and receipt.get('runtime_session_id') == runtime_ids[0].decode())
+            runtime_failed_without_session = (
+                receipt.get('returncode') != 0
+                and len(runtime_ids) == 0
+                and receipt.get('runtime_session_id') is None)
+            if (type(receipt.get('attempt')) is not int
+                    or receipt['attempt'] != attempt
+                    or not (runtime_matches or runtime_failed_without_session)):
+                raise controller.Stage11ControllerArtifactError(
+                    'native receipt execution identity differs')
             if not legacy_receipt_matches(receipt, hermes_settings):
                 raise controller.Stage11ControllerArtifactError('native Hermes execution settings differ')
             if ('timeout_environment_applied' in receipt
                     and receipt['timeout_environment_applied'] != dict(STAGE11_HERMES_TIMEOUT_ENV)):
                 raise controller.Stage11ControllerArtifactError('native Hermes timeout environment differs')
+            self._verified_attempts.append({
+                'label': label,
+                'attempt': receipt.get('attempt'),
+                'receipt_sha256': sha(receipt_raw),
+                'prompt_sha256': receipt['prompt_sha256'],
+                'stdout_sha256': receipt['stdout_sha256'],
+                'stderr_sha256': receipt['stderr_sha256'],
+                'runtime_session_id_sha256': (
+                    sha(receipt['runtime_session_id'].encode())
+                    if type(receipt.get('runtime_session_id')) is str else None),
+                'returncode': receipt.get('returncode'),
+                'timeout_reason': receipt.get('timeout_reason'),
+                'tools_count': receipt.get('tools_count'),
+            })
+            if receipt['returncode']!=0 or receipt['timeout_reason'] is not None:
+                raise controller.Stage11ControllerError('native Hermes execution failed: '+str(receipt['timeout_reason'] or receipt['returncode']))
+            if receipt['tools_count']!=0 or receipt['runtime_session_id'] is None:
+                raise controller.Stage11ControllerArtifactError('native execution provenance invalid')
             clean=stdout[len(TIRITH_WARNING):] if stdout.startswith(TIRITH_WARNING) else stdout
             try:
                 return validator(clean)
             except ValueError as error:
                 last_error=error
-                store(prefix.with_suffix('.validation-error.json'),wire({'error_type':type(error).__name__,
-                    'reason':str(error),'attempt':attempt,'user_intervention':0}))
+                if not reuse_only:
+                    store(prefix.with_suffix('.validation-error.json'),wire({'error_type':type(error).__name__,
+                        'reason':str(error),'attempt':attempt,'user_intervention':0}))
         raise controller.Stage11ControllerValidationError('bounded native output validation retries exhausted') from last_error
 
     def __call__(self, package, *, route, staging_root, boundary_evidence,
-                 hermes_settings=None, **unused):
+                 hermes_settings=None, resume_only=False, **unused):
         if type(hermes_settings) is not HermesExecutionSettings:
             raise controller.Stage11ControllerValidationError(
                 'resolved Stage11 Hermes settings are required')
-        directory=controller._title_directory(Path(staging_root),package.dvd_id)
-        _bind_staging_hermes_settings(directory, hermes_settings)
-        raw=serialize_stateful_package(package)
-        store(directory/'stage11-authoritative-input.json',raw)
-        store(directory/'stage11-semantic-input.json',serialize_stateful_model_input(package))
-        store(directory/'stage11-boundary-evidence-v1.json',serialize_stateful_boundary_evidence(boundary_evidence))
+        if type(resume_only) is not bool:
+            raise controller.Stage11ControllerValidationError(
+                'first-pass resume mode is invalid')
+        stage_root = Path(staging_root)
+        stage_directory = stage_root / package.dvd_id
+        if resume_only and (stage_directory.is_symlink() or not stage_directory.is_dir()):
+            raise controller.Stage11ControllerArtifactError(
+                'existing first-pass staging directory is unavailable')
+        directory=controller._title_directory(stage_root,package.dvd_id)
+        bound_evidence = _bind_staging_hermes_settings(directory, hermes_settings)
+        bound_settings = _settings_object_from_evidence(bound_evidence)
         result_path=directory/'stage11-semantic-result.json'
+        cached_result = result_path.exists() or result_path.is_symlink()
+        if resume_only and not cached_result:
+            raise controller.Stage11ControllerArtifactError(
+                'resume requires a completed first-pass result')
+        if not cached_result and wire(bound_evidence) != wire(hermes_settings.evidence()):
+            raise controller.Stage11ControllerArtifactError(
+                'incomplete first-pass stage belongs to different profile settings')
+        raw=serialize_stateful_package(package)
+        expected_inputs = {
+            'stage11-authoritative-input.json': raw,
+            'stage11-semantic-input.json': serialize_stateful_model_input(package),
+            'stage11-boundary-evidence-v1.json': serialize_stateful_boundary_evidence(boundary_evidence),
+        }
+        for name, expected in expected_inputs.items():
+            path = directory / name
+            if cached_result or resume_only:
+                if controller._read_private_file(path, max_bytes=16*1024*1024) != expected:
+                    raise controller.Stage11ControllerArtifactError(
+                        'cached first-pass input is detached')
+            else:
+                store(path, expected)
         validator=lambda data:validate_normal_translation(data,package,boundary_evidence)
-        if result_path.exists():
-            return validator(controller._read_private_file(result_path,max_bytes=16*1024*1024))
+        self._verified_attempts = []
+        cached_raw = (controller._read_private_file(result_path,max_bytes=16*1024*1024)
+                      if cached_result else None)
         prompt=native_prompt(build_stateful_whole_title_query(package,boundary_evidence=boundary_evidence),package)
         result=None
         if len(prompt)<=MAX_NATIVE_PROMPT_BYTES:
             try:
+                invoke_options = {'hermes_settings':
+                                  (bound_settings if cached_result else hermes_settings)}
+                if cached_result or resume_only:
+                    invoke_options['reuse_only'] = True
                 result=self.invoke(prompt,directory,'whole-title',validator,
-                                   hermes_settings=hermes_settings)
+                                   **invoke_options)
             except controller.Stage11ControllerError as error:
-                store(directory/'whole-title-fallback.json',wire({'policy':'EXISTING_FIXED_64',
-                    'reason':str(error),'error_type':type(error).__name__,'user_intervention':0}))
+                fallback_path = directory/'whole-title-fallback.json'
+                if cached_result or resume_only:
+                    if not fallback_path.exists():
+                        raise controller.Stage11ControllerArtifactError(
+                            'cached fixed-part result lacks its fallback record') from error
+                else:
+                    store(fallback_path,wire({'policy':'EXISTING_FIXED_64',
+                        'reason':str(error),'error_type':type(error).__name__,'user_intervention':0}))
         if result is None:
             model=serialize_stateful_model_input(package)
             plan=build_stateful_part_plan(package,model,boundary_evidence=boundary_evidence)
@@ -334,14 +434,32 @@ class NativeNormalFirstPass:
             for part in plan.parts:
                 query=build_stateful_part_query(package,model,part.part_index,boundary_evidence=boundary_evidence)
                 prompt=native_prompt(query,package,part_ids=part.cue_ids)
+                invoke_options = {'hermes_settings':
+                                  (bound_settings if cached_result else hermes_settings)}
+                if cached_result or resume_only:
+                    invoke_options['reuse_only'] = True
                 validated=self.invoke(prompt,directory,f'part-{part.part_index:04d}',
                     lambda data,part=part:parse_stateful_part(data,part,plan),
-                    hermes_settings=hermes_settings)
-                store(directory/part.canonical_filename,serialize_stateful_part(validated))
+                    **invoke_options)
+                part_raw=serialize_stateful_part(validated)
+                part_path=directory/part.canonical_filename
+                if cached_result or resume_only:
+                    if controller._read_private_file(part_path,max_bytes=16*1024*1024) != part_raw:
+                        raise controller.Stage11ControllerArtifactError(
+                            'cached first-pass part differs from its execution receipt')
+                else:
+                    store(part_path,part_raw)
                 parts.append(validated)
             result=assemble_stateful_result(directory,package,plan)
-        store(result_path,serialize_stateful_result(result))
-        return validator(serialize_stateful_result(result))
+        result_raw = serialize_stateful_result(result)
+        result = validator(result_raw)
+        if cached_result or resume_only:
+            if cached_raw != result_raw:
+                raise controller.Stage11ControllerArtifactError(
+                    'cached first-pass result differs from its execution receipts')
+            return result
+        store(result_path,result_raw)
+        return result
 
 
 def prepare_normal(route, baseline_sha, claim_token):
@@ -375,10 +493,105 @@ def _require_review_provenance(result, *, source_session_id, label):
             label + ' execution session ID is invalid') from error
 
 
+def _review_stage_execution_evidence(*, staging_root, stage, request, result,
+                                    result_path, target_cue_ids=None,
+                                    embedded_execution_evidence=None):
+    from teddy_discovery_stateful_quality_review_runner import (
+        QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME,
+        QUALITY_REVIEW_EXECUTION_RECEIPT_SCHEMA_VERSION,
+        QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS,
+        QUALITY_REVIEW_RESULT_FILENAME,
+        validate_remote_execution_receipt,
+    )
+    session_id = result.review_execution_session_id
+    if type(session_id) is not str:
+        raise controller.Stage11ControllerArtifactError(
+            'review execution session is missing')
+    task_directory = Path(staging_root) / session_id
+    result_raw = controller._read_private_file(
+        result_path, max_bytes=controller.MAX_REVIEW_BYTES)
+    expected_result = controller.serialize_review_result(
+        result, request, target_cue_ids=target_cue_ids)
+    if result_raw != expected_result:
+        raise controller.Stage11ControllerArtifactError(
+            'review result differs from its canonical serialization')
+    embedded = (embedded_execution_evidence or {}).get(stage)
+    if embedded is not None:
+        if type(embedded) is not dict:
+            raise controller.Stage11ControllerArtifactError(
+                'embedded review execution evidence is invalid')
+        receipt = embedded.get('completion_receipt')
+        if type(receipt) is not dict:
+            raise controller.Stage11ControllerArtifactError(
+                'embedded review completion receipt is missing')
+        receipt_raw = json.dumps(
+            receipt, ensure_ascii=True, sort_keys=True,
+            separators=(',', ':'), allow_nan=False).encode('ascii')
+        if sha(receipt_raw) != embedded.get('completion_receipt_sha256'):
+            raise controller.Stage11ControllerArtifactError(
+                'embedded review completion receipt digest differs')
+    else:
+        receipt_path = task_directory / QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME
+        receipt_raw = controller._read_private_file(
+            receipt_path, max_bytes=1024 * 1024)
+    try:
+        if embedded is None:
+            receipt = json.loads(receipt_raw)
+        settings = validate_settings_evidence(
+            receipt['hermes_execution_settings'])
+        checked = validate_remote_execution_receipt(
+            receipt,
+            review_execution_session_id=session_id,
+            request_sha256=controller.review_request_sha256(request),
+            hermes_execution_settings=settings,
+        )
+    except Exception as error:
+        raise controller.Stage11ControllerArtifactError(
+            'review execution receipt is invalid') from error
+    if (checked['schema_version'] != QUALITY_REVIEW_EXECUTION_RECEIPT_SCHEMA_VERSION
+            or checked['timeout_seconds'] != QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS
+            or checked['state'] != 'COMPLETED'):
+        raise controller.Stage11ControllerArtifactError(
+            'review execution receipt is not a completed approved execution')
+    if embedded is None:
+        task_result = controller._read_private_file(
+            task_directory / QUALITY_REVIEW_RESULT_FILENAME,
+            max_bytes=controller.MAX_REVIEW_BYTES)
+    else:
+        task_result = result_raw
+    if embedded is None:
+        try:
+            parsed_task_result = controller.parse_review_result(
+                task_result, request, target_cue_ids=target_cue_ids)
+        except Exception as error:
+            raise controller.Stage11ControllerArtifactError(
+                'remote review result is invalid') from error
+        if (parsed_task_result != result
+                or sha(task_result) != checked['result_sha256']):
+            raise controller.Stage11ControllerArtifactError(
+                'review result is detached from its completed execution receipt')
+    calculated = {
+        'hermes_execution_settings': settings,
+        'completion_receipt': checked,
+        'completion_receipt_sha256': sha(receipt_raw),
+        'request_sha256': controller.review_request_sha256(request),
+        'result_sha256': sha(result_raw),
+        'remote_result_sha256': checked['result_sha256'],
+        'review_execution_session_id_sha256': sha(session_id.encode()),
+    }
+    if embedded is not None and embedded != calculated:
+        raise controller.Stage11ControllerArtifactError(
+            'embedded review execution evidence differs from validated result')
+    return calculated
+
+
 def _normal_review_evidence(directory, preparation, first, baseline, baseline_sha256,
                             staging_root, *, hybrid_review_runner=None,
                             hybrid_targeted_runner=None, create_missing=True,
-                            targeted_reused_hint=None):
+                            targeted_reused_hint=None,
+                            require_execution_receipts=False,
+                            first_pass_execution_evidence=None,
+                            embedded_execution_evidence=None):
     document = preparation.route_decision.alignment_application.bundle.external_ja_document
     source_quality = classify_source_document(document)
     originals = dict(preparation=preparation, package=preparation.package,
@@ -386,6 +599,11 @@ def _normal_review_evidence(directory, preparation, first, baseline, baseline_sh
     triage_request = controller.build_review_request(**originals)
     targeted_path = directory / 'hybrid-suspect-asr-v1.json'
     targeted_existed = targeted_path.exists() or targeted_path.is_symlink()
+    review_execution_by_stage = {}
+    def validate_review_receipt(**receipt_kwargs):
+        item = _review_stage_execution_evidence(**receipt_kwargs)
+        review_execution_by_stage[receipt_kwargs['stage']] = item
+        return item
     request, merged, context = controller._run_hybrid_suspect_review(
         directory=directory, preparation=preparation, first_pass=first,
         source_quality=source_quality, targeted_artifact=None,
@@ -393,6 +611,9 @@ def _normal_review_evidence(directory, preparation, first, baseline, baseline_sh
         hybrid_review_runner=hybrid_review_runner,
         hybrid_targeted_runner=hybrid_targeted_runner,
         staging_root=staging_root, create_missing=create_missing,
+        review_receipt_validator=(
+            validate_review_receipt if require_execution_receipts else None),
+        embedded_execution_evidence=embedded_execution_evidence,
     )
 
     triage_raw = controller._read_private_file(
@@ -477,7 +698,113 @@ def _normal_review_evidence(directory, preparation, first, baseline, baseline_sh
         'reviewed_action_counts': dict(sorted(Counter(
             cue.action for cue in merged.cues).items())),
     }
-    return source_quality, request, merged, context, evidence
+    execution_by_stage = None
+    if require_execution_receipts:
+        if type(first_pass_execution_evidence) is not dict:
+            raise controller.Stage11ControllerArtifactError(
+                'first-pass execution evidence is required')
+        execution_by_stage = {'first_pass': first_pass_execution_evidence}
+        if 'hybrid_triage' not in review_execution_by_stage:
+            raise controller.Stage11ControllerArtifactError(
+                'HYBRID review execution evidence is incomplete')
+        execution_by_stage.update(review_execution_by_stage)
+    return source_quality, request, merged, context, evidence, execution_by_stage
+
+
+def _native_first_pass_execution_evidence(staging_root, package, boundary,
+                                          expected_result):
+    directory = Path(staging_root) / package.dvd_id
+    try:
+        settings = json.loads(controller._read_private_file(
+            directory / NATIVE_SETTINGS_FILENAME, max_bytes=65536))
+        validate_settings_evidence(settings)
+    except Exception as error:
+        raise controller.Stage11ControllerArtifactError(
+            'first-pass settings evidence is missing or invalid') from error
+    runner = NativeNormalFirstPass(None)
+    replayed = runner(
+        package, route='HYBRID', staging_root=staging_root,
+        boundary_evidence=boundary,
+        hermes_settings=_settings_object_from_evidence(settings),
+        resume_only=True,
+    )
+    result_raw = serialize_stateful_result(replayed)
+    if result_raw != serialize_stateful_result(expected_result):
+        raise controller.Stage11ControllerArtifactError(
+            'first-pass result differs from its recorded execution')
+    if not runner._verified_attempts:
+        raise controller.Stage11ControllerArtifactError(
+            'first-pass result has no completed execution attempts')
+    return {
+        'hermes_execution_settings': validate_settings_evidence(settings),
+        'attempts': runner._verified_attempts,
+        'result_sha256': sha(result_raw),
+        'source_translation_session_id_sha256': sha(replayed.session_id.encode()),
+    }
+
+
+def _validate_embedded_native_execution_evidence(value, result_raw, result):
+    fields = {
+        'hermes_execution_settings', 'attempts', 'result_sha256',
+        'source_translation_session_id_sha256',
+    }
+    if type(value) is not dict or set(value) != fields:
+        raise controller.Stage11ControllerArtifactError(
+            'first-pass execution proof fields differ')
+    try:
+        validate_settings_evidence(value['hermes_execution_settings'])
+    except HermesProfileSettingsError as error:
+        raise controller.Stage11ControllerArtifactError(
+            'first-pass execution settings proof is invalid') from error
+    if (value['result_sha256'] != sha(result_raw)
+            or value['source_translation_session_id_sha256']
+            != sha(result.session_id.encode())):
+        raise controller.Stage11ControllerArtifactError(
+            'first-pass execution proof is detached from its result')
+    attempts = value['attempts']
+    if type(attempts) is not list or not attempts:
+        raise controller.Stage11ControllerArtifactError(
+            'first-pass execution attempts are missing')
+    digest_re = re.compile(r'^[0-9a-f]{64}$')
+    successful = False
+    for item in attempts:
+        expected = {
+            'label', 'attempt', 'receipt_sha256', 'prompt_sha256',
+            'stdout_sha256', 'stderr_sha256',
+            'runtime_session_id_sha256', 'returncode', 'timeout_reason',
+            'tools_count',
+        }
+        if type(item) is not dict or set(item) != expected:
+            raise controller.Stage11ControllerArtifactError(
+                'first-pass attempt proof fields differ')
+        if (type(item['label']) is not str
+                or re.fullmatch(r'(?:whole-title|part-[0-9]{4})', item['label']) is None
+                or type(item['attempt']) is not int or item['attempt'] < 1
+                or type(item['returncode']) is not int
+                or type(item['tools_count']) is not int):
+            raise controller.Stage11ControllerArtifactError(
+                'first-pass attempt proof values are invalid')
+        for name in ('receipt_sha256', 'prompt_sha256', 'stdout_sha256',
+                     'stderr_sha256'):
+            if type(item[name]) is not str or digest_re.fullmatch(item[name]) is None:
+                raise controller.Stage11ControllerArtifactError(
+                    'first-pass attempt proof digest is invalid')
+        session_digest = item['runtime_session_id_sha256']
+        if session_digest is not None and (
+                type(session_digest) is not str
+                or digest_re.fullmatch(session_digest) is None):
+            raise controller.Stage11ControllerArtifactError(
+                'first-pass attempt session proof is invalid')
+        if item['timeout_reason'] is not None and type(item['timeout_reason']) is not str:
+            raise controller.Stage11ControllerArtifactError(
+                'first-pass attempt timeout proof is invalid')
+        if (item['returncode'] == 0 and item['timeout_reason'] is None
+                and item['tools_count'] == 0 and session_digest is not None):
+            successful = True
+    if not successful:
+        raise controller.Stage11ControllerArtifactError(
+            'first-pass has no successful execution receipt')
+    return value
 
 
 def normal_materialization(preparation, result, review_request, review_result,
@@ -502,7 +829,8 @@ def normal_materialization(preparation, result, review_request, review_result,
 
 
 def _normal_proof(package_raw, result_raw, first, source_quality, playback,
-                  review_evidence, clean_sha256, hermes_execution_settings=None):
+                  review_evidence, clean_sha256, hermes_execution_settings=None,
+                  hermes_execution_by_stage=None):
     covered = {index for cue in playback for index in cue.source_indexes}
     # Source quality carries exact source text; omitted indexes are sufficient
     # proof for the established metadata omission report.
@@ -523,7 +851,12 @@ def _normal_proof(package_raw, result_raw, first, source_quality, playback,
         'metadata_omissions': metadata_omissions,
         'playback': [asdict(cue) for cue in playback],
     }
-    if hermes_execution_settings is not None:
+    if hermes_execution_by_stage is not None:
+        if hermes_execution_settings is not None:
+            raise controller.Stage11ControllerArtifactError(
+                'mixed-stage and legacy Hermes proof cannot coexist')
+        proof['hermes_execution_by_stage'] = hermes_execution_by_stage
+    elif hermes_execution_settings is not None:
         proof['hermes_execution_settings'] = validate_settings_evidence(
             hermes_execution_settings)
     return proof
@@ -597,6 +930,10 @@ def validate_normal_completion(report_path, clean_path, baseline_path, *, title,
     proof_raw=controller._read_private_file(directory/PROOF_NAME,max_bytes=16*1024*1024)
     proof=json.loads(proof_raw)
     proof_settings = proof.get('hermes_execution_settings')
+    proof_stage_execution = proof.get('hermes_execution_by_stage')
+    if proof_stage_execution is not None and proof_settings is not None:
+        raise controller.Stage11ControllerArtifactError(
+            'legacy and stage-bound Hermes proofs cannot coexist')
     if proof_settings is not None:
         try:
             proof_settings = validate_settings_evidence(proof_settings)
@@ -630,17 +967,39 @@ def validate_normal_completion(report_path, clean_path, baseline_path, *, title,
     result_raw=controller._read_private_file(directory/'normal-result.json',max_bytes=16*1024*1024)
     if package_raw!=serialize_stateful_package(package): raise controller.Stage11ControllerArtifactError('normal package detached')
     result=validate_normal_translation(result_raw,package,boundary)
-    source_quality, review_request, review_result, raw_asr_context, evidence = _normal_review_evidence(
+    first_pass_execution = None
+    if proof_stage_execution is not None:
+        if type(proof_stage_execution) is not dict or set(proof_stage_execution) not in (
+                {'first_pass', 'hybrid_triage'},
+                {'first_pass', 'hybrid_triage', 'hybrid_final_target'}):
+            raise controller.Stage11ControllerArtifactError(
+                'stage-bound Hermes proof stages differ')
+        first_pass_execution = _validate_embedded_native_execution_evidence(
+            proof_stage_execution['first_pass'], result_raw, result)
+        if staging_root is not None:
+            actual_first_pass_execution = _native_first_pass_execution_evidence(
+                staging_root, package, boundary, result)
+            if actual_first_pass_execution != first_pass_execution:
+                raise controller.Stage11ControllerArtifactError(
+                    'first-pass staging receipts differ from completion proof')
+    source_quality, review_request, review_result, raw_asr_context, evidence, execution_by_stage = _normal_review_evidence(
         directory, preparation, result, baseline, sha(baseline_raw),
         staging_root or directory, create_missing=False,
-        targeted_reused_hint=targeted_reused_hint)
+        targeted_reused_hint=targeted_reused_hint,
+        require_execution_receipts=proof_stage_execution is not None,
+        first_pass_execution_evidence=first_pass_execution,
+        embedded_execution_evidence=proof_stage_execution)
+    if proof_stage_execution is not None and execution_by_stage != proof_stage_execution:
+        raise controller.Stage11ControllerArtifactError(
+            'review stage receipts differ from completion proof')
     artifact,playback,clean=normal_materialization(
         preparation,result,review_request,review_result,source_quality,
         raw_asr_context=raw_asr_context)
     clean_raw=controller._read_private_file(clean_path,max_bytes=MAX_SUBTITLE_BYTES)
     expected_proof=_normal_proof(package_raw,result_raw,result,source_quality,
                                   playback,evidence,artifact.sha256,
-                                  hermes_execution_settings=proof_settings)
+                                  hermes_execution_settings=proof_settings,
+                                  hermes_execution_by_stage=execution_by_stage)
     if source_budget is not None:
         expected_proof['alignment_budget']=DUAL_BUDGET_PROVENANCE
     expected_proof_raw=wire(expected_proof)
@@ -659,7 +1018,11 @@ def validate_normal_completion(report_path, clean_path, baseline_path, *, title,
         or proof['quality_review']!='HYBRID_REVIEWED_CLEAN_V1'
         or clean.artifact!=artifact):
         raise controller.Stage11ControllerArtifactError('normal completion proof invalid')
-    if proof_settings is not None and staging_root is not None:
+    if proof_stage_execution is not None:
+        # The first-pass settings binding and receipts were compared to the
+        # stage proof above; review stages have their own execution evidence.
+        pass
+    elif proof_settings is not None and staging_root is not None:
         binding_path = (Path(staging_root) / title
                         / NATIVE_SETTINGS_FILENAME)
         try:
@@ -690,8 +1053,12 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
                              hybrid_review_runner=None, hybrid_targeted_runner=None,
                              alignment_budget_profile=None,
                              hermes_settings=None, hermes_settings_resolver=None,
+                             resume_existing=False,
                              **unused):
     title=controller._canonical_title(title)
+    if type(resume_existing) is not bool:
+        raise controller.Stage11ControllerValidationError(
+            'existing-run resume mode must be boolean')
     if alignment_budget_profile not in (None, DUAL_BUDGET_PROVENANCE['mode']):
         raise controller.Stage11ControllerValidationError('unsupported alignment budget profile')
     if (alignment_budget_profile is not None
@@ -753,23 +1120,30 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
         package=preparation.package; package_raw=serialize_stateful_package(package)
         store(directory/'normal-package.json',package_raw)
         first_pass_kwargs = {'route':'HYBRID','staging_root':staging,
-                             'boundary_evidence':boundary}
+                             'boundary_evidence':boundary,
+                             'resume_only':resume_existing}
         if hermes_settings is not None:
             first_pass_kwargs['hermes_settings'] = hermes_settings
         first=first_pass_runner(package,**first_pass_kwargs)
         first=validate_normal_translation(serialize_stateful_result(first),package,boundary)
         result_raw=serialize_stateful_result(first); store(directory/'normal-result.json',result_raw)
+        first_pass_execution = (
+            _native_first_pass_execution_evidence(
+                staging, package, boundary, first)
+            if resume_existing else None)
         review_runner = hybrid_review_runner
         if hermes_settings is not None and callable(hybrid_review_runner):
             def review_runner_with_pinned_settings(request, **review_kwargs):
                 return hybrid_review_runner(
                     request, hermes_settings=hermes_settings, **review_kwargs)
             review_runner = review_runner_with_pinned_settings
-        source_quality,review_request,review_result,raw_asr_context,evidence = _normal_review_evidence(
+        source_quality,review_request,review_result,raw_asr_context,evidence,execution_by_stage = _normal_review_evidence(
             directory,preparation,first,baseline,sha(raw),staging,
             hybrid_review_runner=review_runner,
             hybrid_targeted_runner=hybrid_targeted_runner,
-            create_missing=True)
+            create_missing=True,
+            require_execution_receipts=resume_existing,
+            first_pass_execution_evidence=first_pass_execution)
         artifact,playback,clean=normal_materialization(
             preparation,first,review_request,review_result,source_quality,
             raw_asr_context=raw_asr_context)
@@ -777,7 +1151,9 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
                             playback,evidence,artifact.sha256,
                             hermes_execution_settings=(
                                 hermes_settings.evidence()
-                                if hermes_settings is not None else None))
+                                if hermes_settings is not None
+                                and not resume_existing else None),
+                            hermes_execution_by_stage=execution_by_stage)
         if alignment_budget_profile is not None:
             proof['alignment_budget']=DUAL_BUDGET_PROVENANCE
         proof_raw=wire(proof)

@@ -112,6 +112,98 @@ class NormalSmoke(unittest.TestCase):
         kwargs.update(overrides)
         return normal.run_one_title_normal_mode(self.baseline.source_snapshot.dvd_id,**kwargs)
 
+    def _write_review_execution_receipt(self, staging_root, result, request,
+                                        result_raw, settings, *, target_cue_ids=None,
+                                        failed=False):
+        import teddy_discovery_stateful_quality_review_runner as runner
+        session=result.review_execution_session_id
+        task=Path(staging_root)/session
+        task.mkdir(mode=0o700,parents=True,exist_ok=True)
+        result_digest=(None if failed else normal.sha(result_raw))
+        receipt={
+            'schema_version':runner.QUALITY_REVIEW_EXECUTION_RECEIPT_SCHEMA_VERSION,
+            'state':'FAILED' if failed else 'COMPLETED',
+            'review_execution_session_id':session,
+            'request_sha256':review.review_request_sha256(request),
+            'hermes_execution_settings':settings.evidence(),
+            'command_sha256':'a'*64,
+            'timeout_seconds':runner.QUALITY_REVIEW_REMOTE_EXECUTION_TIMEOUT_SECONDS,
+            'timed_out':False,
+            'termination_reason':'CHILD_EXIT_NONZERO' if failed else 'NORMAL_EXIT',
+            'exit_code':1 if failed else 0,
+            'elapsed_seconds':0.125,
+            'cleanup_confirmed':True,
+            'supervisor_pid':101,
+            'supervisor_start_ticks':1001,
+            'child_pid':102,
+            'child_start_ticks':1002,
+            'child_process_group_id':102,
+            'result_sha256':result_digest,
+        }
+        runner.validate_remote_execution_receipt(
+            receipt,review_execution_session_id=session,
+            request_sha256=review.review_request_sha256(request),
+            hermes_execution_settings=settings.evidence())
+        if not failed:
+            normal.store(task/runner.QUALITY_REVIEW_RESULT_FILENAME,result_raw)
+        receipt_raw=normal.wire(receipt)
+        normal.store(task/runner.QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME,
+                     receipt_raw)
+        return task/runner.QUALITY_REVIEW_EXECUTION_RECEIPT_FILENAME,receipt_raw
+
+    def _write_native_first_pass_receipt(self, package, staging_root,
+                                         boundary_evidence, settings):
+        result=self.first(package,boundary_evidence=boundary_evidence)
+        directory=Path(staging_root)/package.dvd_id
+        normal.store(directory/'stage11-authoritative-input.json',
+                     normal.serialize_stateful_package(package))
+        normal.store(directory/'stage11-semantic-input.json',
+                     normal.serialize_stateful_model_input(package))
+        normal.store(directory/'stage11-boundary-evidence-v1.json',
+                     normal.serialize_stateful_boundary_evidence(boundary_evidence))
+        result_raw=normal.serialize_stateful_result(result)
+        normal.store(directory/'stage11-semantic-result.json',result_raw)
+        query=normal.build_stateful_whole_title_query(
+            package,boundary_evidence=boundary_evidence)
+        prompt=normal.native_prompt(query,package)
+        stderr=b'session_id: 20261122_120000_a1b2c3\n'
+        prefix=directory/'whole-title-attempt-1'
+        normal.store(prefix.with_suffix('.prompt.txt'),prompt)
+        normal.store(prefix.with_suffix('.stdout'),result_raw)
+        normal.store(prefix.with_suffix('.stderr'),stderr)
+        receipt={
+            'provider':settings.provider,'model':settings.model,
+            'reasoning':settings.reasoning_effort,'attempt':1,
+            'prompt_sha256':normal.sha(prompt),
+            'stdout_sha256':normal.sha(result_raw),
+            'stderr_sha256':normal.sha(stderr),
+            'runtime_session_id':'20261122_120000_a1b2c3',
+            'returncode':0,'timeout_reason':None,'tools_count':0,
+            'elapsed_seconds':0.25,'remote_root':'synthetic-offline',
+            'hermes_execution_settings':settings.evidence(),
+            'timeout_environment_applied':dict(normal.STAGE11_HERMES_TIMEOUT_ENV),
+        }
+        normal.store(prefix.with_suffix('.receipt.json'),normal.wire(receipt))
+        return result
+
+    def _resume_review_fixture(self, current_settings):
+        def run(request, *, staging_root, hermes_settings=None,
+                target_cue_ids=None, targeted_asr_artifact=None):
+            result=self.review(
+                request,staging_root=staging_root,
+                hermes_settings=hermes_settings,
+                target_cue_ids=target_cue_ids,
+                targeted_asr_artifact=targeted_asr_artifact)
+            run.session_ids.append(result.review_execution_session_id)
+            raw=review.serialize_review_result(
+                result,request,target_cue_ids=target_cue_ids)
+            self._write_review_execution_receipt(
+                staging_root,result,request,raw,current_settings,
+                target_cue_ids=target_cue_ids)
+            return result
+        run.session_ids=[]
+        return run
+
     def test_hybrid_reviewed_clean_completes_and_replays_without_models(self):
         baseline_formats=[]
         result=self.run_title(baseline_transcriber=lambda video: baseline_formats.append(video.video_format) or self.baseline)
@@ -142,6 +234,165 @@ class NormalSmoke(unittest.TestCase):
         repeated=self.run_title(first_pass_runner=lambda *_a,**_k:self.fail('resume called Hermes'))
         self.assertEqual(repeated.clean_sha256,result.clean_sha256)
         self.assertEqual((self.review_calls,self.targeted_calls),(1,0))
+
+    def test_profile_change_resume_reuses_receipted_stages_and_runs_only_missing_review(self):
+        import teddy_discovery_stage11_regeneration as regeneration
+        import teddy_discovery_stateful_quality_review_runner as runner
+
+        old_settings=replace(
+            self.hermes_settings,model='synthetic-model-before-change',
+            reasoning_effort='max',config_sha256='1'*64)
+        current_settings=replace(
+            self.hermes_settings,model='synthetic-model-current',
+            reasoning_effort='xhigh',config_sha256='2'*64)
+        self.triage_actions=(review.REPAIR,review.KEEP,review.KEEP,review.KEEP)
+        self.hermes_settings=old_settings
+        initial=self.run_title(
+            first_pass_runner=lambda package,**kwargs:
+                self._write_native_first_pass_receipt(
+                    package,kwargs['staging_root'],kwargs['boundary_evidence'],
+                    kwargs['hermes_settings']))
+        directory=initial.report_path.parent
+        preparation,boundary=normal.reconstruct(directory,self.baseline)
+        first=normal.parse_stateful_result(
+            normal.controller._read_private_file(
+                directory/'normal-result.json',max_bytes=16*1024*1024),
+            preparation.package,boundary_evidence=boundary)
+        source_quality=normal.classify_source_document(
+            preparation.route_decision.alignment_application.bundle.external_ja_document)
+        triage_request=review.build_review_request(
+            preparation=preparation,package=preparation.package,
+            result=first,source_quality=source_quality)
+        triage_raw=(directory/'hybrid-triage-v1.json').read_bytes()
+        triage=normal.controller.parse_review_result(triage_raw,triage_request)
+        triage_receipt_path,triage_receipt_raw=self._write_review_execution_receipt(
+            self.staging,triage,triage_request,triage_raw,old_settings)
+
+        targets=normal.controller.select_suspect_cue_ids(triage_request,triage)
+        targeted=normal.controller.parse_targeted_asr_artifact_bytes(
+            (directory/'hybrid-suspect-asr-v1.json').read_bytes())
+        raw_context=normal.controller.build_full_window_raw_asr_context(
+            targeted,preparation=preparation)
+        target_request=review.build_review_request(
+            preparation=preparation,package=preparation.package,result=first,
+            source_quality=source_quality,raw_asr_context=raw_context)
+        old_final_raw=(directory/'hybrid-final-target-v1.json').read_bytes()
+        old_final=normal.controller.parse_review_result(
+            old_final_raw,target_request,target_cue_ids=targets)
+        failed_record_path,failed_record_raw=self._write_review_execution_receipt(
+            self.staging,old_final,target_request,old_final_raw,old_settings,
+            target_cue_ids=targets,failed=True)
+
+        # Model a prior terminal failure for the missing final review. Its
+        # receipt remains under that old session while a new session is used.
+        (directory/'hybrid-final-target-v1.json').unlink()
+        for name in ('hybrid-final-request-v1.json','hybrid-final-review-v1.json',
+                     normal.PROOF_NAME,normal.controller.MECHANICAL_REPORT_FILENAME,
+                     normal.controller.CLEAN_SRT_FILENAME):
+            (directory/name).unlink()
+        preserved_paths=(
+            directory/normal.controller.BASELINE_ASR_FILENAME,
+            directory/'normal-external-ja.srt',directory/normal.SOURCE_NAME,
+            directory/'normal-package.json',directory/'normal-result.json',
+            directory/'hybrid-triage-v1.json',
+            directory/'hybrid-suspect-asr-v1.json',
+            directory/'hybrid-suspect-context-v1.json',
+            self.staging/self.baseline.source_snapshot.dvd_id/
+                normal.NATIVE_SETTINGS_FILENAME,
+            self.staging/self.baseline.source_snapshot.dvd_id/
+                'stage11-semantic-result.json',
+        )
+        preserved_bytes={path:path.read_bytes() for path in preserved_paths}
+
+        self.hermes_settings=current_settings
+        new_review=self._resume_review_fixture(current_settings)
+
+        class AcquiredLock:
+            status=regeneration.ACQUIRED
+            def __enter__(_self): return _self
+            def __exit__(_self,*_args): return False
+
+        class Dependencies:
+            remote_bridge=None
+            bounded_hybrid_targeted_runner=lambda *_args,**_kwargs: self.fail(
+                'completed targeted ASR must not repeat')
+            def controller_kwargs(_self):
+                return {
+                    'holding_resolver':lambda _title:fixture._holding(self.baseline),
+                    'baseline_transcriber':lambda _video:self.fail(
+                        'completed full-title ASR must not repeat'),
+                    'external_ja_attempt':lambda *_args:self.fail(
+                        'retained Japanese subtitle must be reused'),
+                    'hybrid_review_runner':new_review,
+                    'hybrid_targeted_runner':self.targeted,
+                }
+            def resolve_hermes_settings(_self): return current_settings
+            def capture_external_ja_attempt(_self,callback): return callback
+            def capture_first_pass_runner(_self,callback): return callback
+
+        dependencies=Dependencies()
+        def resume_once():
+            with patch.object(regeneration,'configured_lock_dir',return_value=Path(self.temp.name)/'locks'), \
+                 patch.object(regeneration,'try_acquire_title_lock',return_value=AcquiredLock()):
+                return regeneration.regenerate_one_title(
+                    self.baseline.source_snapshot.dvd_id,
+                    run_root=self.temp.name,dependencies=dependencies,
+                    acceptance_policy=policy_with(),
+                    source_verifier=lambda _video,_snapshot:None,
+                    claim_token=1,resume_existing=True)
+
+        native_result_path=(self.staging/self.baseline.source_snapshot.dvd_id/
+                            'stage11-semantic-result.json')
+        native_result_raw=native_result_path.read_bytes()
+        native_result_path.write_bytes(b'{}')
+        with self.assertRaises(normal.controller.Stage11ControllerArtifactError):
+            resume_once()
+        native_result_path.write_bytes(native_result_raw)
+        self.assertEqual(new_review.session_ids,[])
+        self.assertEqual((self.first_calls,self.review_calls,self.targeted_calls),(1,2,1))
+
+        # A failed receipt is never accepted as a successful prior stage; it
+        # is preserved while the valid triage receipt is restored for retry.
+        triage_receipt_path.unlink()
+        _,failed_triage_receipt=self._write_review_execution_receipt(
+            self.staging,triage,triage_request,triage_raw,old_settings,failed=True)
+        with self.assertRaises(normal.controller.Stage11ControllerArtifactError):
+            resume_once()
+        self.assertEqual(triage_receipt_path.read_bytes(),failed_triage_receipt)
+        self.assertEqual(new_review.session_ids,[])
+        self.assertEqual(failed_record_path.read_bytes(),failed_record_raw)
+        self.assertEqual((self.first_calls,self.review_calls,self.targeted_calls),(1,2,1))
+
+        # Restore the synthetic successful triage receipt. The failed final
+        # review receipt remains untouched as an audit record.
+        triage_receipt_path.unlink()
+        normal.store(triage_receipt_path,triage_receipt_raw)
+        result=resume_once()
+
+        proof=json.loads((result.report_path.parent/normal.PROOF_NAME).read_bytes())
+        stages=proof['hermes_execution_by_stage']
+        self.assertEqual(set(stages),{'first_pass','hybrid_triage','hybrid_final_target'})
+        self.assertEqual(
+            stages['first_pass']['hermes_execution_settings'],old_settings.evidence())
+        self.assertEqual(
+            stages['hybrid_triage']['hermes_execution_settings'],old_settings.evidence())
+        self.assertEqual(
+            stages['hybrid_final_target']['hermes_execution_settings'],
+            current_settings.evidence())
+        self.assertEqual(len(new_review.session_ids),1)
+        self.assertNotEqual(
+            new_review.session_ids[0],old_final.review_execution_session_id)
+        self.assertEqual(failed_record_path.read_bytes(),failed_record_raw)
+        self.assertEqual({path:path.read_bytes() for path in preserved_paths},
+                         preserved_bytes)
+        self.assertEqual((self.first_calls,self.review_calls,self.targeted_calls),(1,3,1))
+        # Stage12's existing no-staging-root completion path can validate the
+        # self-contained per-stage proof without changing the public result.
+        replay=normal.validate_normal_completion(
+            result.report_path,result.clean_path,
+            result.report_path.parent/normal.controller.BASELINE_ASR_FILENAME,
+            title=result.title)
+        self.assertEqual(replay.clean_sha256,result.clean_sha256)
 
     def test_historical_completion_without_hermes_settings_remains_valid(self):
         result=self.run_title(hermes_settings=None)
@@ -188,9 +439,14 @@ class NormalSmoke(unittest.TestCase):
         registry=_HybridOriginalRegistry()
         registry.capture_external(lambda _video,_asr:self.route.alignment_application)(
             self.route.canonical_video,self.baseline)
-        callback=registry.capture_first_pass(self.first)
+        forwarded=[]
+        def first_pass_with_resume_flag(package, *, boundary_evidence,
+                                        resume_only=False, **kwargs):
+            forwarded.append(resume_only)
+            return self.first(package,boundary_evidence=boundary_evidence,**kwargs)
+        callback=registry.capture_first_pass(first_pass_with_resume_flag)
         first=callback(preparation.package,route='HYBRID',staging_root=self.staging,
-                       boundary_evidence=boundary)
+                       boundary_evidence=boundary,resume_only=True)
         source_quality=normal.classify_source_document(
             self.route.alignment_application.bundle.external_ja_document)
         request=review.build_review_request(
@@ -200,6 +456,7 @@ class NormalSmoke(unittest.TestCase):
         self.assertEqual(retained['package'],preparation.package)
         self.assertEqual(retained['result'],first)
         self.assertEqual(retained['preparation'].package,preparation.package)
+        self.assertEqual(forwarded,[True])
 
     def test_normal_cli_captures_native_and_local_ja_for_review(self):
         from teddy_discovery_stage11_deployment import (

@@ -2381,6 +2381,7 @@ class _HybridOriginalRegistry:
             semantic_policy=None,
             boundary_evidence=None,
             hermes_settings=None,
+            resume_only=False,
         ):
             callback_kwargs = {
                 "route": route,
@@ -2392,6 +2393,8 @@ class _HybridOriginalRegistry:
                 callback_kwargs["boundary_evidence"] = boundary_evidence
             if hermes_settings is not None:
                 callback_kwargs["hermes_settings"] = hermes_settings
+            if resume_only:
+                callback_kwargs["resume_only"] = True
             result = callback(package, **callback_kwargs)
             if route == V2_ROUTE_HYBRID:
                 try:
