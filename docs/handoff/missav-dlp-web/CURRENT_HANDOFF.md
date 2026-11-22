@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 V2-B JA Master source review and canonical promotion (2026-11-22)
+
+- Canonical `teddy-subtitle-stage11` parent was `96c536ed42b83c85d7625935592486581eecefc1`; common contract `1.0.1` and Stage11 contract `2.0.0` were approved, with `S11-MVP001 / IN_PROGRESS`. The two isolated candidate files matched their approved SHA-256 values and were promoted byte-for-byte: `teddy_discovery_stage11_ja_master.py` (`fe5b15d9c05fa4d5a389b6778b3df59ce821c3d81b9c38c2cde5ab9cdf088201`) and `teddy_discovery_stage11_ja_master_smoke.py` (`9676e3d2f7e7289a54cfb140ee5a7ba6aa04d0d36da6f6c6841c9ebf9dea29f0`).
+- Source review confirmed that the JA Master module retains source-backed ASR-only and external-JA-only candidates, represents uncertainty explicitly, validates candidate identity/decision coverage, and uses accepted alignment evidence without extrapolating outside anchor coverage. It has no model, filesystem-output, Normal Mode, AUTO_INSERT, or publication side effect. Previously reported source regressions and offline smoke were reused; tests were not repeated because the reviewed bytes were unchanged.
+- V2-B source integration is promoted, while semantic accept/exclude criteria and fractional-to-integer subtitle timing remain unresolved. No cue should be materialized absent explicit validated decisions. Do not start V2-C or integrate with Normal Mode until separately authorized. `PRODUCT_QUALITY=NOT_VERIFIED`; model executions `0`; production writes `0`; deployment/publication `NOT_RUN`.
+
 ## S11-MVP001 DLDSS-557 private KO one-shot launcher prepared; live run NOT_RUN (2026-11-17)
 
 - The authorized one-time private Korean Normal Mode run was not started because this executor had PID 1 `codex`, not CT108 `systemd`; the wrapper's environment gate returned `NOT_CT108_SYSTEMD`. `TITLE_LOCK=NOT_RUN`, `NORMAL_MODE_CALL_COUNT=0`, `NAS_WRITES=0`.
