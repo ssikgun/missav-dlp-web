@@ -3,11 +3,45 @@
 WORKSTREAM: stage11
 TASK_ID: S11-MVP001
 STATUS: IN_PROGRESS
-CONTRACT_VERSION: 1.0.0
+CONTRACT_VERSION: 2.0.0
 REQUIRES_WORKSTREAMS: stage11
 
 
-## CURRENT ROADMAP — 2026-11-22 (read this before historical checkpoints)
+## CURRENT ROADMAP — ASR-FIRST HYBRID V2 / APPROVED 2026-11-22
+
+Single authoritative current plan. User explicitly approved the V2 proposal in f40d39a680fbd85139012428fce9631ed9c1ae4f. Stage11 contract 2.0.0 supersedes the earlier input architecture and P0–P4 ordering. Common contract 1.0.1 and S11-MVP001 / IN_PROGRESS remain unchanged. All prior roadmap sections, approvals and NEXT notes below are historical evidence, not competing instructions. Existing production behavior unchanged.
+
+### Current execution gate
+
+- MODEL_SWITCH_TEST_WINDOW=READY (previous operator snapshot, conditional on unchanged runtime). Manual hold remains: no new Whisper, Hermes, pyannote, Demucs or other model execution until explicit Model Switch completion/release, no service/timer/current/queue/DB/NAS/Jellyfin modifications. Previous CT108 25 pending / 0 running / 0 generated, inactive service and disabled timer; VM122 only LLM GPU job, ASR idle; CT120 matches 0 / unknown 0. This is not a live guarantee or automated interlock.
+- **CURRENT NEXT TASK: V2-A READ_ONLY_SOURCE_CHAIN_DIAGNOSIS / AUTHORIZED_NOT_RUN.** Reuse retained HSODA-104 external JA 204 cues, baseline ASR 270 segments, primary 204, targeted review 24 and private CLEAN 204 (SHA 835fa7a97f0116d6eae14f8e6759a00fa12f5b8e821adb76042fcfd05b8000d1). Examine small representative regression candidates (suspected omission near 42:42, closing narrative near 02:01:31, and preserved/control case) through aligned JA, baseline ASR, primary, triage and final. Determine missing source vs translation/review vs alignment vs unknown. Inspect existing source/provenance artifacts only; no ASR, pyannote, Hermes, new audio extraction, installation, product code edit or operational write. If actual artifacts inaccessible, report precise blocker; use one operator-run read-only check rather than repeating sandbox attempts. Exit: specific evidence-based minimum JA-master/evidence-routing gap and interface changes; one next implementation proposal. Read-only inspection may occur during hold; all model execution/operations remain blocked.
+- V2-B onward requires specific active implementation/execution authorization. Do not treat architecture approval as blanket permission to run models or publish.
+
+### Fixed sequence
+
+| Phase | Status | Exit condition |
+| --- | --- | --- |
+| V2-0 Design and reuse | APPROVED | Contract 2.0.0 and current roadmap fixed |
+| V2-A Source diagnosis | CURRENT / NOT_RUN | Locate representative regression causes and minimum interface gap |
+| V2-B JA master / evidence integration | PENDING | ASR-first evidence reconciliation incl external absent/rejected, source-backed accepted/excluded/uncertain decisions, timing/provenance, small offline regression; quality policy explicit |
+| V2-C Speaker / utterance boundaries | PENDING | Reuse prior evidence; preserve supported turns and unknown/overlap; no compulsory Demucs/WhisperX or inconclusive research loop |
+| V2-D Hermes translation / review adaptation | PENDING | Existing whole-title/fallback and dynamic profile/receipts/review/CLEAN on JA master; private comparison with retained baseline and independent evidence where available |
+| V2-E Private end-to-end quality | PENDING | Representative external-JA available and absent cases; actual dialogue/false additions/meaning/timing/turn quality, not just structural PASS; no mandatory per-title manual operation |
+| V2-F Delivery and unattended operation | PENDING | Resolve current Git metadata, local comparison/NAS original JA retention details; separately authorized release/activation, actual representative queue success/failure isolation/resume and safe PUBLISHED/Jellyfin; zero ordinary user intervention |
+
+### Reuse and new work
+
+- Reuse Stage9 unchanged; SubtitleCat acquisition, affine alignment, full-title and targeted large-v3 worker, resource safeguards, cached evidence, native Hermes whole-title/partition runner, dynamic profile, receipt/proof/stage-local resume, existing review/absorption/CLEAN, Stage12 queue/lock/no-overwrite/NAS/Jellyfin. Adapt schema/ownership/proofs where necessary, not wholesale rewrite. b8099bc prepared release and DLDSS-557 single-title publication evidence remain usable, not broad operational PASS.
+- New minimum core: source-bound ASR-first candidate coverage, symmetric comparison with optional aligned JA, conservative evidence recovery/uncertainty, JA master and supported speaker/boundary integration. Legacy AUTO_INSERT=False remains until validated migration; do not just flip flag.
+- HSODA-104 old/new 265/204 cues with suspected omissions and context regressions; not verified reference truth. CPU pyannote trial complete technical feasibility, quality UNKNOWN; no repeat. Historical Demucs/WhisperX tests inconclusive; optional selective use only where justified. Historical ASR_ONLY cause distribution and failure isolation/restart not closed; fix actual blockers and verify operations in V2-F.
+- Preserve original external JA for local comparison and beside NAS video, distinct from self-generated JA master and KO. Exact location/naming/lifecycle confirmation required. Current Git metadata unavailable; resolve before activation.
+- One objective/exit condition at a time. Fix local blockers and return to the current task. Reuse completed evidence; one representative failure/control first; expand only for material risk. Stop repeated tests without new decision-relevant information. Report evidence, remaining gap and one next decision. No invented thresholds; no new architecture/model, priority shift or deployment without user approval. No technical PASS substituted for product quality.
+
+## Historical record — previous roadmap superseded by V2
+
+All following checkpoints, proposal labels and NEXT instructions are historical only. They cannot override the approved V2 contract or current gate.
+
+### Previous roadmap — 2026-11-22 (read this before historical checkpoints)
 
 **Purpose:** restore a single goal-driven Stage11 plan at the user's request. This is a documentation/status refresh, not a contract change or authorization to run a new implementation, model, deployment or publication. S11-MVP001 remains IN_PROGRESS; common 1.0.1 and Stage11 1.0.0 remain APPROVED. Earlier dated NEXT entries are history, not alternative current work orders. Preserve the original frozen P0 → P1 → P2 → P3 → P4 order recorded in 6335158cccfb7d8427aef6ff485e7cf4404e7eff, without silently reopening completed subwork or changing design priorities.
 
@@ -1397,3 +1431,7 @@ User requested one stable end-to-end design, explicit reuse inventory and a stop
 - Change discipline: one objective/exit condition at a time. Completed technical checks reused unless concrete regression. Start with one representative failure and one control; add a focused check only for a material unresolved risk. If test work repeats without new decision-relevant evidence, stop expansion and report scope, evidence, blocker, trade-off and one next decision. Distinguish local defects, optional quality uncertainty and genuine core blockers. No new architecture/task/model because an individual test failed. Record proposal/approval and actual changes in canonical contract/active roadmap; no hidden priorities from old handoff. User decides conflict, deployment and design change. No numerical quality thresholds invented; compare omissions/false additions/meaning/boundaries against independently supported reference where available, not SRT count or old KO as truth. No mandatory per-title listening in operation. Technical PASS does not satisfy product goal; retain unresolved quality honestly.
 
 Approval would require resolving source authority/ASR-only acceptance, JA-master plus whole-title interface, moving coverage work before downstream speaker/formatting, and conservative uncertainty/terminal behavior. Until then original roadmap and temporary hold are unchanged. No code/deployment/inference performed.
+
+## 2026-11-22 — V2 user approval
+
+User expressly approved ASR-FIRST HYBRID V2. Contract 2.0.0 and top roadmap supersede prior design/order. No runtime or product change. Model Switch hold retained. V2-A read-only first; subsequent work scoped separately.
