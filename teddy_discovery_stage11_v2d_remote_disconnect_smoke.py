@@ -76,16 +76,20 @@ def main():
     stub = root / "fake-hermes"
     parent = None
     child_pid = None
+    grandchild_pid = None
     try:
         profile = root / "synthetic" / "profiles" / "subtitle-translator"
         profile.mkdir(parents=True)
         (profile / "auth.json").write_text('{"synthetic":true}')
         pidfile = root / "remote" / "fake-child-pid"
+        grandchild_file = root / "remote" / "fake-grandchild-pid"
         stub.write_text("""#!/usr/bin/env python3
-import json, os, pathlib, sys, time
+import json, os, pathlib, subprocess, sys, time
 if 'prompt-size' in sys.argv:
     print(json.dumps({'tools': {'count': 0}}))
 else:
+    grandchild = subprocess.Popen([sys.executable, '-B', '-c', 'import time;time.sleep(120)'])
+    pathlib.Path(os.environ['HERMES_HOME'], 'fake-grandchild-pid').write_text(str(grandchild.pid))
     pathlib.Path(os.environ['HERMES_HOME'], 'fake-child-pid').write_text(str(os.getpid()))
     time.sleep(120)
 """)
@@ -97,6 +101,7 @@ else:
             "prompt": base64.b64encode(prompt).decode("ascii"),
             "prompt_sha256": hashlib.sha256(prompt).hexdigest(),
             "executable": str(stub),
+            "v2d_guard": True,
             "provider": "synthetic", "model": "synthetic", "reasoning": "synthetic",
             "timeout_env": {
                 "HERMES_API_CALL_STALE_TIMEOUT": "480",
@@ -120,19 +125,28 @@ else:
         if not pidfile.is_file():
             raise RuntimeError("fake child did not start")
         child_pid = int(pidfile.read_text())
+        grandchild_pid = int(grandchild_file.read_text())
+        if os.getpgid(grandchild_pid) != child_pid:
+            raise RuntimeError("synthetic descendant is outside child process group")
         if not owned_fake_group(child_pid, stub, root):
             raise RuntimeError("synthetic child ownership not verified")
         print("FAKE_NATIVE_CHILD_STARTED=PASS", flush=True)
+        print("FAKE_NATIVE_DESCENDANT_STARTED=PASS", flush=True)
         os.kill(parent.pid, signal.SIGKILL)
         parent.wait(timeout=5)
-        time.sleep(0.5)
-        orphan = living(child_pid)
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            if not living(child_pid) and not living(grandchild_pid):
+                break
+            time.sleep(0.05)
+        orphan = living(child_pid) or living(grandchild_pid)
         print("REMOTE_PARENT_LOSS_SIMULATED=PASS", flush=True)
         print("ORPHAN_CHILD_SURVIVED=" + ("YES" if orphan else "NO"), flush=True)
         print("REMOTE_DISCONNECT_HARD_STOP=" + ("NOT_VERIFIED" if orphan else "PASS"), flush=True)
+        print("FAKE_DESCENDANT_SURVIVED=" + ("YES" if living(grandchild_pid) else "NO"), flush=True)
         print("REAL_MODEL_CALLS=0", flush=True)
         print("PRODUCTION_WRITES=0", flush=True)
-        return 0
+        return 1 if orphan else 0
     except Exception as error:
         print("SYNTHETIC_CHECK=FAILED", flush=True)
         print("ERROR_TYPE=" + type(error).__name__, flush=True)
@@ -153,7 +167,18 @@ else:
                       flush=True)
             else:
                 print("SYNTHETIC_CHILD_CLEANUP=BLOCKED_IDENTITY", flush=True)
-        if child_pid is None or not living(child_pid):
+        if grandchild_pid is not None and living(grandchild_pid):
+            try:
+                proc = Path('/proc') / str(grandchild_pid)
+                command = (proc / 'cmdline').read_bytes()
+                uid = next(x for x in (proc / 'status').read_text().splitlines() if x.startswith('Uid:'))
+                if (child_pid is not None and os.getpgid(grandchild_pid) == child_pid
+                        and int(uid.split()[1]) == os.geteuid()
+                        and b'time.sleep(120)' in command):
+                    os.kill(grandchild_pid, signal.SIGKILL)
+            except (FileNotFoundError, ProcessLookupError, OSError, StopIteration):
+                pass
+        if (child_pid is None or not living(child_pid)) and (grandchild_pid is None or not living(grandchild_pid)):
             shutil.rmtree(root)
 
 
