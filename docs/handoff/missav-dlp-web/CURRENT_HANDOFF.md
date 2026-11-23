@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## V2-E HSODA-104 private one-shot entrypoint — source-only promotion approved 2026-11-23
+
+- User approved source-only promotion of the reviewed isolated `teddy_discovery_stage11_hsoda104_pilot.py` at Git blob `5fc3acc4c26c281736d67f0094198e8716612435` / SHA-256 `ef12da18cef07e4b60eb96979d24023b6a2fa08dfeaf4c64959ca990452fde74`, isolated commit `8ee9ed41242de225aace0468b50799e8c3f9283c` on `s11-v2e-hsoda104-pilot-candidate`; target canonical base was `14cb762bfa86618f2b9b1646867c1863483e8b0f`. Copy unchanged, do not merge diverged branch. Corresponding Stage11 ACTIVE_WORK milestone at top is authoritative for details.
+- The helper is **not an operator-ready CT108 CLI**, starts no model on import, and requires a future explicitly approved one-shot execution invocation. It binds source/title lock, validated ASR270/JA204/accepted alignment, expected 232 groups/6 batches, private output, existing bounded Native+targeted adapter to one V2-D call. The earlier fake-only regression is reported PASS, not independent host/quality proof.
+- **MODEL_EXECUTION=0, DEPLOYMENT=0, PRODUCTION_WRITES=0** for this promotion. Budget (9 actual Hermes calls, 36000s cooperative), real CT108/CT120/VM122 readiness, residual remote overrun risk and final source postcheck require distinct decision and approval. `REAL_TRIAL_READINESS=NO`, `PRODUCT_QUALITY=NOT_VERIFIED`; no Stage12/NAS/Jellyfin publication.
+
+
 ## V2-E guarded Native source-only promotion — approved 2026-11-23
 
 - User explicitly approved source promotion after bounded GitHub review of isolated `0d449eadde2f51ab80cb3d7759d715a8451c4540`. Promoted exactly 4 candidate blobs: `teddy_discovery_stage11_normal_mode.py` and `teddy_discovery_stage11_v2d.py` plus `teddy_discovery_stage11_v2d_remote_disconnect_smoke.py` and `teddy_discovery_stage11_v2d_remote_timeout_smoke.py`. Target: canonical `teddy-subtitle-stage11`, with existing unrelated code and history preserved.
