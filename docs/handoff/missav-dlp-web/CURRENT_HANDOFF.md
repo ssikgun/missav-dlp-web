@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## V2-E CT120 Hermes profile and timeout support PASS (2026-11-23)
+
+- Operator actual `teddy@hermes-lxc-slack` read-only log: hostname `hermes-lxc-slack`, PID1 `systemd`. Hermes launcher at `/home/teddy/.local/bin/hermes` is a Bash wrapper executing `/home/teddy/.hermes/hermes-agent/venv/bin/hermes`; `/home/teddy/.local/bin/python3.11` was not the Hermes runtime interpreter. In real Hermes venv with `HERMES_HOME=/home/teddy/.hermes/profiles/subtitle-translator`, `get_active_profile_name`/`read_user_config_raw` returned `PROFILE=subtitle-translator`, `PROVIDER=openai-codex`, `MODEL=gpt-6-luna`, `REASONING=xhigh`, config SHA-256 `d6a7bd408b5dccaf7d220535ee73b629007775d8978a01caf9a9d68ddf4b3fdf`, `PROFILE_READ=PASS`.
+- Installed Hermes code AST confirmed all four required timeout env names are supported: API stale, Codex TTFB, TTFB max, event stale. `TIMEOUT_SUPPORT=PASS`, `MODEL_EXECUTION_COUNT=0`, `WRITE_OPERATIONS=0`. This is static support and observed configuration, NOT actual live timeout enforcement or active-request idleness proof; no model inference, runtime config/service change, or production publication.
+- Next V2-E real-trial preparation: inspect actual Hermes request occupancy where available and live CT108/VM122 resource/lock conditions; verify external hard wall-time guard and separately approve one-shot no-resume/retry numeric attempt/time budget. `REAL_TRIAL_READINESS=NO`, `PRODUCT_QUALITY=NOT_VERIFIED`. Canonical Stage11 active-work record commit `e2f2b2f36676a6e52e88b4a57cf4d4d301c05935`.
+
+
 ## HSODA-104 270-ASR canonical reader PASS (2026-11-23)
 
 - Actual CT108 read-only check: both on-site Normal Mode and protected older Stage11 `teddy_discovery_asr.py` have identical SHA-256 `9f395ad04f64ce9bfe9b25a44733fb1b9549d1c9ac646587703aa63e4c51e610` and only 2 allowed ASR profiles; `large-v3/cuda/int8_float16` was not allowed there. The protected checkout `teddy-subtitle-stage11` HEAD `b1bc851fdcf95642fa2ed1cd9ae3a0bf2a8ee3bc` was not changed.
