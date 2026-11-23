@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## V2-E VM122 GPU and Whisper read-only snapshot (2026-11-23)
+
+- Actual `teddy@local-llm` VM122 operator snapshot (`hostname=local-llm`, PID1 systemd): `nvidia-smi` total 12288 MiB, used 7841 MiB, free 4071 MiB, instantaneous GPU utilization 0%; compute process PID 171430 `llama-server` used 7832 MiB. No 8091 TCP listener at inspection (`WHISPER_PORT=NOT_LISTENING`), not global ASR/Whisper idle proof. Host RAM total 19Gi, available 17Gi; swap 4.0Gi total and 30Mi used; root disk 145G total, 109G used, 30G available (79%). No model execution or write during inspection.
+- The remaining 4,071 MiB GPU memory is NOT proven enough for concurrent Whisper large-v3/cuda/int8_float16 with Qwen. Keep Qwen untouched; no Whisper restart or ASR regeneration. Retained 270-segment source-bound ASR already validated under exact current canonical (`RETAINED_270_ASR=PASS`), and actual CT120 Hermes `subtitle-translator` profile `openai-codex/gpt-6-luna/xhigh` plus all four timeout env source reads are PASS. These observations do not prove dynamic in-flight Hermes idleness, V2-D hard wall clock enforcement, or authorized real trial.
+- Next: prioritize read-only verification of an external hard-stop mechanism effective for one isolated V2-D invocation and its remote children, then revisit CT108/VM122 resource/locks/CT120 occupancy at attempt time and seek explicit numeric one-shot trial approval. `REAL_TRIAL_READINESS=NO`, `PRODUCT_QUALITY=NOT_VERIFIED`; Stage11 active record commit `74ad0d26bd9e8094a60685b2cf680d617ea3438d`.
+
+
 ## V2-E CT120 Hermes profile and timeout support PASS (2026-11-23)
 
 - Operator actual `teddy@hermes-lxc-slack` read-only log: hostname `hermes-lxc-slack`, PID1 `systemd`. Hermes launcher at `/home/teddy/.local/bin/hermes` is a Bash wrapper executing `/home/teddy/.hermes/hermes-agent/venv/bin/hermes`; `/home/teddy/.local/bin/python3.11` was not the Hermes runtime interpreter. In real Hermes venv with `HERMES_HOME=/home/teddy/.hermes/profiles/subtitle-translator`, `get_active_profile_name`/`read_user_config_raw` returned `PROFILE=subtitle-translator`, `PROVIDER=openai-codex`, `MODEL=gpt-6-luna`, `REASONING=xhigh`, config SHA-256 `d6a7bd408b5dccaf7d220535ee73b629007775d8978a01caf9a9d68ddf4b3fdf`, `PROFILE_READ=PASS`.
