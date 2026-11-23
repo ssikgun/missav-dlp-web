@@ -197,7 +197,9 @@ if v2d_guard:
         selector=selectors.DefaultSelector()
         for name,s in (('stdout',proc.stdout),('stderr',proc.stderr)):
             os.set_blocking(s.fileno(),False); selector.register(s,selectors.EVENT_READ,name)
-        while selector.get_map() or proc.poll() is None:
+        # Keep the leader unreaped so its PID cannot be reused before group cleanup.
+        while selector.get_map() or os.waitid(
+                os.P_PID,proc.pid,os.WEXITED|os.WNOHANG|os.WNOWAIT) is None:
             now=time.monotonic()
             if os.getppid()!=parent_pid:
                 reason='REMOTE_PARENT_LOST'; break
@@ -215,12 +217,12 @@ if v2d_guard:
         if reason:
             try: os.killpg(proc.pid,signal.SIGTERM)
             except ProcessLookupError: pass
-            try: proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                try: os.killpg(proc.pid,signal.SIGKILL)
-                except ProcessLookupError: pass
-                proc.wait(timeout=5)
+            # Give the whole group its grace period, even if the leader exits first.
+            time.sleep(5)
+            try: os.killpg(proc.pid,signal.SIGKILL)
+            except ProcessLookupError: pass
         rc=proc.wait(timeout=5)
+        proc=None
         for name,b in streams.items(): (task/(name+'.log')).write_bytes(b)
         assert hashlib.sha256((task/'prompt.txt').read_bytes()).hexdigest()==req['prompt_sha256']
         for p in (root,profile): assert not any((p/'skills').iterdir())

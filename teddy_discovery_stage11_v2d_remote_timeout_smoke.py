@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""No-model timeout check for V2-D-only REMOTE_NATIVE guard.
+"""No-model timeout check with a TERM-ignoring V2-D descendant.
 
 Shortens the guarded inactivity threshold IN MEMORY to one second. Does not
 modify repository source, run Hermes, open SSH, or touch production resources.
@@ -54,9 +54,12 @@ import json, os, pathlib, subprocess, sys, time
 if 'prompt-size' in sys.argv:
     print(json.dumps({'tools': {'count': 0}}))
 else:
-    descendant=subprocess.Popen([sys.executable, '-B', '-c', 'import time;time.sleep(120)'])
     root=pathlib.Path(os.environ['HERMES_HOME'])
-    (root/'fake-descendant-pid').write_text(str(descendant.pid))
+    subprocess.Popen([sys.executable, '-B', '-c',
+        "import os,pathlib,signal,time;"
+        "signal.signal(signal.SIGTERM,signal.SIG_IGN);"
+        "(pathlib.Path(os.environ['HERMES_HOME'])/'fake-descendant-pid').write_text(str(os.getpid()));"
+        "time.sleep(120)"])
     (root/'fake-child-pid').write_text(str(os.getpid()))
     time.sleep(120)
 """)
@@ -96,24 +99,26 @@ else:
             receipt = json.loads(out.decode("ascii"))
         except (ValueError, UnicodeError):
             raise RuntimeError("synthetic timeout receipt is invalid")
+        deadline = time.monotonic() + 1
+        while living(descendant) and time.monotonic() < deadline:
+            time.sleep(0.02)
         print("INACTIVITY_REASON=" + str(receipt.get("timeout_reason")), flush=True)
         print("CHILD_RETURN_CODE=" + str(receipt.get("returncode")), flush=True)
         print("CHILD_ALIVE=" + str(living(child)), flush=True)
         print("DESCENDANT_ALIVE=" + str(living(descendant)), flush=True)
         passed = (
             receipt.get("timeout_reason") == "INACTIVITY_TIMEOUT"
-            and type(receipt.get("returncode")) is int
-            and receipt.get("returncode") != 0
+            and receipt.get("returncode") == -signal.SIGTERM
             and receipt.get("tools_count") == 0
             and not living(child)
             and not living(descendant)
         )
-        print("SYNTHETIC_TIMEOUT_CLEANUP=" + ("PASS" if passed else "NOT_VERIFIED"), flush=True)
+        print("TERM_IGNORING_DESCENDANT_CLEANUP=" + ("PASS" if passed else "NOT_VERIFIED"), flush=True)
         print("REAL_MODEL_CALLS=0", flush=True)
         print("PRODUCTION_WRITES=0", flush=True)
         return 0 if passed else 1
     except Exception as error:
-        print("SYNTHETIC_TIMEOUT_CLEANUP=NOT_VERIFIED", flush=True)
+        print("TERM_IGNORING_DESCENDANT_CLEANUP=NOT_VERIFIED", flush=True)
         print("ERROR_TYPE=" + type(error).__name__, flush=True)
         return 1
     finally:
