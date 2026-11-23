@@ -1647,12 +1647,17 @@ def _budgeted_invoke(invoke: Callable, budget: _V2DRunBudget, owner):
                 budget.reserve_hermes(timeout)
                 return original(*args, **kwargs)
 
+            # The legacy Normal Mode path remains unchanged. Only the
+            # budgeted V2-D native call uses the parent-loss remote guard.
+            prior_guard = getattr(owner, "_v2d_remote_guard", False)
+            owner._v2d_remote_guard = True
             bridge._python = bounded_python
             try:
                 result = invoke(prompt, directory, label, validator,
                                 hermes_settings=hermes_settings, reuse_only=reuse_only)
             finally:
                 bridge._python = original
+                owner._v2d_remote_guard = prior_guard
         budget.require_time(reason="WALL_TIME_LIMIT_AFTER_STAGE")
         return result
 
