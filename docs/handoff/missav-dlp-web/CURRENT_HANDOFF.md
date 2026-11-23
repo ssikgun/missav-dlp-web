@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## V2-E guarded Native source-only promotion — approved 2026-11-23
+
+- User explicitly approved source promotion after bounded GitHub review of isolated `0d449eadde2f51ab80cb3d7759d715a8451c4540`. Promoted exactly 4 candidate blobs: `teddy_discovery_stage11_normal_mode.py` and `teddy_discovery_stage11_v2d.py` plus `teddy_discovery_stage11_v2d_remote_disconnect_smoke.py` and `teddy_discovery_stage11_v2d_remote_timeout_smoke.py`. Target: canonical `teddy-subtitle-stage11`, with existing unrelated code and history preserved.
+- Scoped evidence: CT108 model-free synthetic parent SIGKILL, inactivity timeout, and TERM-ignoring group-descendant cleanup reported PASS; code source review PASS_WITH_LIMITS. This does not prove live CT120 SSH-disconnect cancellation, descendants escaping the owned process group or full product subtitle quality. V2-D guard is opt-in and legacy Normal Mode unchanged.
+- Source-only change; no operational build/deployment, live Hermes or Whisper call, Stage12/NAS/Jellyfin/DB write or publication. `REAL_TRIAL_READINESS=NO`, `PRODUCT_QUALITY=NOT_VERIFIED`. One-shot model pilot still needs separate explicit approval and numeric call/wall budget with current runtime checks.
+
 ## V2-E guarded Native synthetic parent-loss and descendant cleanup PASS (2026-11-23)
 
 - Actual CT108 operator ran isolated GitHub commit `ce61f5eb99972c5ece905801d5a88ccd5822d725`, checkout `/tmp/s11-v2d-guard-check.UDueSZ/source`, expected HEAD PASS; three amended Python files and literal `REMOTE_NATIVE` compile PASS; `teddy_discovery_stage11_normal_mode.py` SHA-256 `7859353264dfafe1fa3e1cd723b14accd99035059de4cdbd151a350324ff1511`.
