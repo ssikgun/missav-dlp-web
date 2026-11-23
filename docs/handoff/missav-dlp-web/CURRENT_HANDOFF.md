@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## V2-E guarded Native synthetic parent-loss and descendant cleanup PASS (2026-11-23)
+
+- Actual CT108 operator ran isolated GitHub commit `ce61f5eb99972c5ece905801d5a88ccd5822d725`, checkout `/tmp/s11-v2d-guard-check.UDueSZ/source`, expected HEAD PASS; three amended Python files and literal `REMOTE_NATIVE` compile PASS; `teddy_discovery_stage11_normal_mode.py` SHA-256 `7859353264dfafe1fa3e1cd723b14accd99035059de4cdbd151a350324ff1511`.
+- Fake Hermes child and same-process-group descendant started. SIGKILL of synthetic Native forwarding parent resulted in `ORPHAN_CHILD_SURVIVED=NO`, `FAKE_DESCENDANT_SURVIVED=NO`, `REMOTE_DISCONNECT_HARD_STOP=PASS`, `SMOKE_EXIT_CODE=0`; no real model execution and no production source/data writes. This demonstrates only the synthetic parent-SIGKILL scenario with owned process-group child/grandchild. Actual CT120 SSH disconnection, true remote cgroup/supervisor cleanup, standalone group escape or transport failure remains NOT_VERIFIED. No promotion/deployment.
+- Original isolated branch `teddy-s11-v2e-hardstop-isolated-20261123` now has a separate no-model timeout smoke `teddy_discovery_stage11_v2d_remote_timeout_smoke.py` at commit `6b04a13d889dcabda378bfe41a5c803b8b6395e6`. This fixture only changes `REMOTE_NATIVE` V2-D guarded timeout values IN MEMORY to test short inactivity shutdown of fake descendants, not production constants. Its operator execution result is `NOT_RUN`. Parent-loss and guarded candidate implementation files are unchanged relative to `ce61f5e`.
+- Next checkpoint: run new exact isolated timeout fixture on actual CT108, check full cleanup and exit status, then review candidate before promotion; any actual V2-E model calls/pilot remain separately NOT_AUTHORIZED. Canonical Stage11 `ACTIVE_WORK` recording commit `6a3243b1d9ed6160b6965ac7957cfd2aa52380c1`. `REAL_TRIAL_READINESS=NO`, `PRODUCT_QUALITY=NOT_VERIFIED`.
+
+
 ## V2-E actual Native parent-loss witness and isolated guard candidate (2026-11-23)
 
 - Actual CT108 `root@downloader` ran synthetic no-model code from isolated branch SHA `71a9c76fab70d3282a47553f9fda31f57043e8c1` (root `/tmp/s11-v2d-hardstop.VHB8ik/source`) using actual canonical `REMOTE_NATIVE` script, fake Hermes and temporary auth/prompt: original Native forwarded parent was SIGKILLed, fake child survived (`ORPHAN_CHILD_SURVIVED=YES`, `REMOTE_DISCONNECT_HARD_STOP=NOT_VERIFIED`), cleanup of owned synthetic child PASS; model calls 0, writes 0, production unchanged. This proves only the model-free simulated failure mode, not real CT120 process leakage.
