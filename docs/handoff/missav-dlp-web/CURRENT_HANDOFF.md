@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 V2-D bounded source review and canonical promotion (2026-11-23)
+
+- Canonical `teddy-subtitle-stage11` parent `bc09b8e455683a803c0bfcf4b052205081231155`, common contract `1.0.1`, Stage11 contract `2.0.0`, and `S11-MVP001 / IN_PROGRESS` were verified in a clean isolated clone. The protected dirty checkout was not changed.
+- Promoted three reviewed files: `teddy_discovery_stage11_v2d.py` SHA-256 `90a204690aef76ce9a5eede1fc89c735746ab415ef538964e9edc579ccf9fee7`; `teddy_discovery_stage11_v2d_smoke.py` SHA-256 `8ca0ff095e154772beaa55a75c04e8b7996bd6b8edb50cd2030480d9c09e955b` (retained unchanged as the new smoke's synthetic fixture dependency); and `teddy_discovery_stage11_v2d_independent_recovery_smoke.py` SHA-256 `a9ca4eac00887527e3b20f3a1b7f492a87cdc58f96e053312da0d7eaf39fb8e3`. The extended module supersedes the earlier V2-D module; it is the sole runtime module, with `run_v2d_pipeline()` as its callable end-to-end entry point. It is not a CLI and does not connect Normal Mode/AUTO_INSERT.
+- The direct Stage11 dependency comparison found all 33 other candidate imports identical to canonical source. The new focused smoke passed on the canonical dependency set; prior V2-D smoke evidence was reused. It exercises baseline-linked and aligned external-JA-only recovery through the existing target window/runner/artifact checks, source-bound re-adjudication and private synthetic JA/KO output, plus safe HOLD for missing, empty, or mismatched evidence. Existing V2-B/C, Hermes translation/review, stage-local receipt/resume, and half-up SRT paths were reviewed and reused.
+- `INDEPENDENT_AUDIO_GAP_RECOVERY=DEFERRED_TO_V2-E_EVIDENCE`: both-source-missing speech still lacks a verified originating interval contract and is not inferred. No actual models, media access, Normal Mode, services, or production writes, deployment, or publication ran. `PRODUCT_QUALITY=NOT_VERIFIED`; protected dirty worktree unchanged.
+
+
 ## S11-MVP001 V2-C bounded source review and canonical promotion (2026-11-23)
 
 - Canonical `teddy-subtitle-stage11` parent was `46be2ae25e989f3cc653fdb82d255f94312b85d9`; common contract `1.0.1`, Stage11 contract `2.0.0`, and `S11-MVP001 / IN_PROGRESS` were confirmed. The isolated candidates matched their approved SHA-256 values and were promoted byte-for-byte: `teddy_discovery_stage11_utterance_groups.py` (`4a902f5a8fda8e63bd8580fd774e3cc33650e6644d3306708579f7155c0ab840`) and `teddy_discovery_stage11_utterance_groups_smoke.py` (`4c3b614576ed8c803d7d1c6c80f80e7ad14079bd9b640d6ff01c5acd67a3776d`). Relevant V2-B dependencies were unchanged from candidate base `e6d0b50cc8a3f4862ecb5aa1fd7f330d35632574` to the promotion parent.
