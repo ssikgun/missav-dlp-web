@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## HSODA-104 270-ASR canonical reader PASS (2026-11-23)
+
+- Actual CT108 read-only check: both on-site Normal Mode and protected older Stage11 `teddy_discovery_asr.py` have identical SHA-256 `9f395ad04f64ce9bfe9b25a44733fb1b9549d1c9ac646587703aa63e4c51e610` and only 2 allowed ASR profiles; `large-v3/cuda/int8_float16` was not allowed there. The protected checkout `teddy-subtitle-stage11` HEAD `b1bc851fdcf95642fa2ed1cd9ae3a0bf2a8ee3bc` was not changed.
+- GitHub canonical source at `670bbb8a61624a12464395924ac4f0be8ab755ae` already approves `REMOTE_GPU_LARGE_V3_INT8_FLOAT16` as a third runtime profile. Operator cloned exact canonical HEAD into `/tmp/hsoda104-asr-check.8GfH6y/source` without touching protected checkout. Using `/opt/stage11-stt-venv/bin/python -B`, existing seven identical preserved 270-segment HSODA-104 ASR artifacts had representative SHA-256 `c26efba4ddcb9fc0f062abb6e45825e85998280cb8578bdb6385e5ba35f3ac3e`. The representative original was read unchanged: `ARTIFACT_SHA256=PASS`, `ASR_PARSE=PASS`, `SOURCE_IDENTITY=PASS` against current verified NAS/Discovery size 1311074236 and mtime_ns 1788015836055049872, `SEGMENT_COUNT=270`, `RUNTIME_PROFILE=REMOTE_GPU_LARGE_V3_INT8_FLOAT16`, `CANONICAL_SERIALIZATION=PASS`, `RETAINED_270_ASR=PASS`. Model calls=0, production writes=0.
+- Cause of previous parser failure is stale on-site approved profile definitions, NOT demonstrated 270-ASR corruption. Do not modify preserved ASR or substitute separate 265-segment canary. The PASS establishes canonical structural and metadata-based source provenance, not audio/semantic accuracy or video content hash. Retained V2-E 232 groups/6 initial batch evidence remains prior preflight; no inference was run. Real trial requires separate approval and on-host resource/queue/CT120 effective Hermes/external supervisor and numeric budgets checks; `REAL_TRIAL_READINESS=NO`, `PRODUCT_QUALITY=NOT_VERIFIED`.
+- This is Stage11 S11-MVP001 documentation only; no model execution, source code promotion, operational deployment, service/DB/NAS/Jellyfin mutation, or publishing. Stage11 active-work record: `74b4a6c2e609751b2dceeab4283e4d1261be9a5a`.
+
+
 ## S11-MVP001 V2-E bounded candidate source review and promotion (2026-11-23)
 
 - Starting canonical `teddy-subtitle-stage11` HEAD `7b49bdc83d92f6745c74180a85f6f2bd27279a50` and approved contracts were verified in a clean isolated checkout. The protected 590-change checkout was untouched.
