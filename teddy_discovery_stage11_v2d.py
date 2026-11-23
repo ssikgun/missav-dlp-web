@@ -10,13 +10,17 @@ through the existing ``NativeNormalFirstPass.invoke``-compatible callback.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from fractions import Fraction
+import contextvars
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import stat
+import time
+from types import SimpleNamespace
 import uuid
 from contextlib import nullcontext
 from typing import Callable
@@ -159,6 +163,69 @@ class V2DError(ValueError):
 
 class V2DHold(V2DError):
     """The evidence is explicitly unresolved; no translated SRT may be made."""
+
+
+class V2DLimitStop(V2DError):
+    """A configured per-title attempt or wall-time budget was exhausted."""
+
+
+@dataclass(frozen=True)
+class V2DExecutionLimits:
+    """Explicit limits required for any Native-backed V2-D model execution."""
+
+    max_hermes_attempts: int
+    max_wall_seconds: int | float
+
+    def __post_init__(self):
+        if type(self.max_hermes_attempts) is not int or self.max_hermes_attempts < 1:
+            raise V2DError("max_hermes_attempts must be a positive integer")
+        if (type(self.max_wall_seconds) not in (int, float)
+                or not math.isfinite(float(self.max_wall_seconds))
+                or self.max_wall_seconds <= 0):
+            raise V2DError("max_wall_seconds must be a positive finite number")
+
+
+_ACTIVE_V2D_BUDGET = contextvars.ContextVar("stage11_v2d_budget", default=None)
+
+
+class _V2DRunBudget:
+    def __init__(self, limits: V2DExecutionLimits):
+        if type(limits) is not V2DExecutionLimits:
+            raise V2DError("explicit V2-D execution limits are required")
+        self.limits = limits
+        self.started = time.monotonic()
+        self.hermes_attempts = 0
+        self.targeted_asr_requests = 0
+
+    def elapsed(self) -> float:
+        return max(0.0, time.monotonic() - self.started)
+
+    def remaining(self) -> float:
+        return float(self.limits.max_wall_seconds) - self.elapsed()
+
+    def require_time(self, seconds: int | float = 0, *, reason="WALL_TIME_LIMIT"):
+        if (type(seconds) not in (int, float) or not math.isfinite(float(seconds))
+                or seconds < 0 or self.remaining() < float(seconds)):
+            raise V2DLimitStop(reason)
+
+    def reserve_hermes(self, timeout_seconds: int | float):
+        if self.hermes_attempts >= self.limits.max_hermes_attempts:
+            raise V2DLimitStop("HERMES_ATTEMPT_LIMIT")
+        self.require_time(timeout_seconds, reason="WALL_TIME_LIMIT_BEFORE_HERMES_ATTEMPT")
+        self.hermes_attempts += 1
+
+    def reserve_targeted_asr(self, timeout_seconds: int | float):
+        self.require_time(timeout_seconds, reason="WALL_TIME_LIMIT_BEFORE_TARGETED_ASR")
+        self.targeted_asr_requests += 1
+
+    def evidence(self) -> dict[str, object]:
+        return {
+            "max_hermes_attempts": self.limits.max_hermes_attempts,
+            "max_wall_seconds": self.limits.max_wall_seconds,
+            "hermes_attempts_started": self.hermes_attempts,
+            "targeted_asr_requests_started": self.targeted_asr_requests,
+            "elapsed_seconds": round(self.elapsed(), 6),
+        }
 
 
 def _sha(raw: bytes) -> str:
@@ -415,22 +482,50 @@ class GroupAdjudication:
     candidate_decisions: tuple[CandidateDecision, ...]
     source_decisions: tuple[SourceDecision, ...]
     outputs: tuple[MasterOutputProposal, ...]
+    audio_evidence_needed: bool = False
 
     def __post_init__(self):
         _safe_text(self.group_id, "group id", max_chars=128)
         if type(self.candidate_decisions) is not tuple or type(self.source_decisions) is not tuple or type(self.outputs) is not tuple:
             raise V2DError("adjudication collections must be immutable tuples")
+        if type(self.audio_evidence_needed) is not bool:
+            raise V2DError("audio evidence need flag must be boolean")
+
+
+@dataclass(frozen=True)
+class V2DBatchEvidence:
+    batch_id: str
+    source_fingerprint: str
+    group_ids: tuple[str, ...]
+    input_sha256: str
+    prompt_sha256: str
+    native_receipt_sha256: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        _digest(self.batch_id, "batch_id")
+        _digest(self.source_fingerprint, "batch source_fingerprint")
+        _digest(self.input_sha256, "batch input_sha256")
+        _digest(self.prompt_sha256, "batch prompt_sha256")
+        if type(self.group_ids) is not tuple or not self.group_ids or len(set(self.group_ids)) != len(self.group_ids):
+            raise V2DError("batch group coverage is invalid")
+        if type(self.native_receipt_sha256) is not tuple:
+            raise V2DError("batch receipt list is invalid")
+        for digest in self.native_receipt_sha256:
+            _digest(digest, "batch native receipt")
 
 
 @dataclass(frozen=True)
 class V2DAdjudication:
     source_fingerprint: str
     groups: tuple[GroupAdjudication, ...]
+    batch_evidence: tuple[V2DBatchEvidence, ...] = ()
 
     def __post_init__(self):
         _digest(self.source_fingerprint, "source_fingerprint")
         if type(self.groups) is not tuple or not self.groups:
             raise V2DError("adjudication groups are required")
+        if type(self.batch_evidence) is not tuple or any(type(item) is not V2DBatchEvidence for item in self.batch_evidence):
+            raise V2DError("adjudication batch evidence is invalid")
 
 
 @dataclass(frozen=True)
@@ -459,6 +554,7 @@ class V2DMaster:
 @dataclass(frozen=True)
 class _V2DTargetedRequest:
     plan: TargetedSecondEvidencePlan = field(repr=False)
+    asr_result: ASRResult = field(repr=False)
     cue_ids: tuple[str, ...]
     source_cue_links: tuple[tuple[str, int, tuple[str, ...], tuple[str, ...]], ...]
     baseline_asr_sha256: str
@@ -595,7 +691,7 @@ def _build_targeted_request(master: V2DMaster, translated: StatefulSubtitleResul
     }
     context_raw = _wire(context)
     return _V2DTargetedRequest(
-        plan=plan, cue_ids=requested,
+        plan=plan, asr_result=asr_result, cue_ids=requested,
         source_cue_links=tuple(source_cue_links),
         baseline_asr_sha256=baseline_sha,
         context_raw=context_raw,
@@ -710,6 +806,155 @@ def _build_targeted_requests(master: V2DMaster, translated: StatefulSubtitleResu
     return tuple(result)
 
 
+def _build_initial_targeted_requests(
+    plan: UtteranceReviewPlan, group_ids: tuple[str, ...],
+) -> tuple[_V2DTargetedRequest | _V2DExternalTargetedRequest, ...]:
+    """Plan early evidence from genuine source references, before master creation."""
+    plan = validate_utterance_review_plan(plan)
+    if (type(group_ids) is not tuple or not group_ids or len(set(group_ids)) != len(group_ids)):
+        raise V2DHold("INITIAL_TARGETED_GROUP_SELECTION_INVALID")
+    groups = {group.group_id: group for group in plan.groups}
+    if set(group_ids) - set(groups):
+        raise V2DHold("INITIAL_TARGETED_GROUP_UNBOUND")
+    review = plan.review_set
+    bundle = review._source_bundle
+    asr_result = bundle.asr_result
+    try:
+        asr_result.__post_init__()
+        asr_raw = serialize_asr_result(asr_result)
+    except Exception as error:
+        raise V2DHold("INITIAL_TARGETED_BASELINE_ASR_INVALID") from error
+    asr_sha = _sha(asr_raw)
+    if asr_sha != review.asr_sha256 or asr_result.source_snapshot != review.source_snapshot:
+        raise V2DHold("INITIAL_TARGETED_BASELINE_ASR_MISMATCH")
+
+    asr_links: dict[int, set[str]] = {}
+    external_links: dict[int, set[str]] = {}
+    for group_id in group_ids:
+        group = groups[group_id]
+        valid_interval_found = False
+        for member in group.members:
+            ref = member.source_reference
+            if ref.source == EVIDENCE_SOURCE_ASR_SEGMENT:
+                index = ref.source_index
+                if index >= len(asr_result.segments):
+                    raise V2DHold("INITIAL_TARGETED_ASR_SOURCE_INDEX_INVALID")
+                segment = asr_result.segments[index]
+                if (ref.source_id != stable_cue_id(EVIDENCE_SOURCE_ASR_SEGMENT, index)
+                        or ref.source_sha256 != asr_sha
+                        or ref.source_locator != review.source_snapshot.canonical_video_relative
+                        or ref.original_start_ms != segment.start_ms
+                        or ref.original_end_ms != segment.end_ms
+                        or ref.aligned_start_ms != Fraction(segment.start_ms)
+                        or ref.aligned_end_ms != Fraction(segment.end_ms)
+                        or member.text != segment.text):
+                    raise V2DHold("INITIAL_TARGETED_ASR_SOURCE_IDENTITY_MISMATCH")
+                asr_links.setdefault(index, set()).add(group_id)
+                valid_interval_found = True
+            elif ref.source == "external_ja":
+                # Unaligned external cues have no legitimate audio window.
+                # A timed ASR member in the same group may still supply one.
+                if (review.route != ROUTE_EXTERNAL_ALIGNMENT_ACCEPTED
+                        or review._source_alignment is None
+                        or bundle.external_ja_payload is None
+                        or bundle.external_ja_document is None):
+                    continue
+                payload = bundle.external_ja_payload
+                document = bundle.external_ja_document
+                index = ref.source_index
+                if index >= len(document.cues):
+                    raise V2DHold("INITIAL_TARGETED_EXTERNAL_SOURCE_INDEX_INVALID")
+                cue = document.cues[index]
+                if (ref.source_id != stable_cue_id("external_ja", index)
+                        or ref.source_sha256 != payload.sha256
+                        or ref.source_locator != payload.candidate.external_source_id
+                        or ref.original_start_ms != cue.start_ms
+                        or ref.original_end_ms != cue.end_ms
+                        or ref.aligned_start_ms is None or ref.aligned_end_ms is None
+                        or member.text != cue.text):
+                    continue
+                external_links.setdefault(index, set()).add(group_id)
+                valid_interval_found = True
+        if not valid_interval_found:
+            raise V2DHold("INITIAL_TARGETED_NO_VERIFIED_SOURCE_INTERVAL")
+
+    requests: list[_V2DTargetedRequest | _V2DExternalTargetedRequest] = []
+    if asr_links:
+        sources, intervals, links = [], [], []
+        for index, owners in sorted(asr_links.items()):
+            segment = asr_result.segments[index]
+            source_id = stable_cue_id(EVIDENCE_SOURCE_ASR_SEGMENT, index)
+            sources.append(TargetedSecondEvidenceSource(
+                source_index=index, cue_id=source_id, start_ms=segment.start_ms,
+                end_ms=segment.end_ms, source_text=segment.text,
+            ))
+            intervals.append(TargetedASRSourceInterval(
+                source_id=source_id, source_index=index,
+                start_ms=segment.start_ms, end_ms=segment.end_ms,
+            ))
+            links.append((source_id, index, (), tuple(sorted(owners))))
+        geometry = plan_targeted_asr_source_windows_with_policy(
+            tuple(intervals), policy=STAGE11_TARGETED_SECOND_EVIDENCE_WINDOW_POLICY_V1,
+        )
+        windows = tuple(TargetedSecondEvidenceWindow(
+            window_id="targeted-window-" + f"{index + 1:06d}",
+            start_ms=window.start_ms, end_ms=window.end_ms,
+            source_ids=window.source_ids, source_indices=window.source_indices,
+        ) for index, window in enumerate(geometry))
+        targeted_plan = _make_targeted_plan(review.source_snapshot, tuple(sources), windows)
+        context_raw = _wire({
+            "schema_version": 1,
+            "source_fingerprint": _source_fingerprint(plan),
+            "group_ids": list(group_ids),
+            "source_cue_links": [[source_id, index, list(cue_ids), list(owner_ids)]
+                                  for source_id, index, cue_ids, owner_ids in links],
+            "baseline_asr_sha256": asr_sha,
+            "plan_binding_sha256": targeted_plan.binding_sha256,
+        })
+        requests.append(_V2DTargetedRequest(
+            plan=targeted_plan, asr_result=asr_result, cue_ids=(),
+            source_cue_links=tuple(links), baseline_asr_sha256=asr_sha,
+            context_raw=context_raw, context_sha256=_sha(context_raw),
+        ))
+    if external_links:
+        review = plan.review_set
+        bundle = review._source_bundle
+        payload, document, alignment = (bundle.external_ja_payload,
+                                        bundle.external_ja_document,
+                                        review._source_alignment)
+        if (review.route != ROUTE_EXTERNAL_ALIGNMENT_ACCEPTED or payload is None
+                or document is None or alignment is None):
+            raise V2DHold("INITIAL_TARGETED_EXTERNAL_ALIGNMENT_UNAVAILABLE")
+        target_ids = tuple(stable_cue_id("external_ja", index)
+                           for index in sorted(external_links))
+        windows = plan_targeted_asr_windows_with_policy(
+            tuple(document.cues), alignment,
+            policy=STAGE11_TARGETED_SECOND_EVIDENCE_WINDOW_POLICY_V1,
+            target_cue_ids=target_ids,
+        )
+        links = tuple((stable_cue_id("external_ja", index), (),
+                       tuple(sorted(owners)))
+                      for index, owners in sorted(external_links.items()))
+        context_raw = _wire({
+            "schema_version": 1,
+            "source_fingerprint": _source_fingerprint(plan),
+            "group_ids": list(group_ids),
+            "external_ja_sha256": payload.sha256,
+            "source_cue_links": [[source_id, list(cue_ids), list(owner_ids)]
+                                  for source_id, cue_ids, owner_ids in links],
+            "windows": [[window.start_ms, window.end_ms, list(window.external_cue_ids)]
+                        for window in windows],
+        })
+        requests.append(_V2DExternalTargetedRequest(
+            source_snapshot=review.source_snapshot, windows=windows, cue_ids=(),
+            source_cue_links=links, context_raw=context_raw,
+            context_sha256=_sha(context_raw),
+        ))
+    if not requests:
+        raise V2DHold("INITIAL_TARGETED_NO_VERIFIED_SOURCE_INTERVAL")
+    return tuple(requests)
+
+
 def _execute_targeted_plan(plan: TargetedSecondEvidencePlan, *, asr_result: ASRResult,
                            targeted_transport, audio_window_provider) -> TargetedSecondEvidenceExecution:
     """Use the existing bounded window runner and binding contracts."""
@@ -753,7 +998,7 @@ def build_v2d_targeted_asr_adapter(*, holding_resolver, source_provider, targete
     if type(runtime_identity) is not ASRRuntimeIdentity or type(engine_version) is not str or not engine_version:
         raise V2DError("targeted ASR runtime identity is unavailable")
 
-    def execute_for_snapshot(source_snapshot, operation):
+    def execute_for_snapshot(source_snapshot, operation, *, window_count: int):
         from teddy_discovery_stage11_live_adapters import _snapshot
         try:
             video, current = _snapshot(holding_resolver(source_snapshot.dvd_id), source_snapshot.dvd_id)
@@ -761,23 +1006,56 @@ def build_v2d_targeted_asr_adapter(*, holding_resolver, source_provider, targete
             raise V2DHold("TARGETED_ASR_CURRENT_SOURCE_UNAVAILABLE") from error
         if current != source_snapshot:
             raise V2DHold("TARGETED_ASR_CURRENT_SOURCE_CHANGED")
+        budget = _ACTIVE_V2D_BUDGET.get()
+        request_timeout = getattr(targeted_transport, "request_timeout_seconds", None)
+        if (type(window_count) is not int or window_count < 1
+                or type(request_timeout) not in (int, float)
+                or not math.isfinite(float(request_timeout))
+                or request_timeout <= 0 or request_timeout > 900):
+            raise V2DHold("TARGETED_ASR_EXISTING_TIMEOUT_BOUND_UNAVAILABLE")
+        reserve = window_count * float(request_timeout)
+        copy_timeout = None
+        if budget is not None:
+            budget.require_time(reserve, reason="WALL_TIME_LIMIT_BEFORE_TARGETED_ASR")
+            copy_timeout = budget.remaining() - reserve
+            if copy_timeout <= 0:
+                raise V2DLimitStop("WALL_TIME_LIMIT_BEFORE_SOURCE_COPY")
         try:
-            with source_provider.copy_to_temp(video, max_media_bytes=current.source_size) as local_source:
+            with source_provider.copy_to_temp(
+                    video, max_media_bytes=current.source_size, timeout=copy_timeout) as local_source:
                 if not isinstance(local_source, ASRLocalMediaSource) or local_source.source_snapshot != current:
                     raise V2DHold("TARGETED_ASR_LOCAL_SOURCE_CHANGED")
+                if budget is not None:
+                    budget.require_time(reserve, reason="WALL_TIME_LIMIT_AFTER_SOURCE_COPY")
                 session_factory = getattr(targeted_transport, "session", None)
                 session = session_factory() if callable(session_factory) else nullcontext(targeted_transport)
                 with session as active_transport:
                     if (getattr(active_transport, "runtime_identity", None) != runtime_identity
                             or getattr(active_transport, "engine_version", None) != engine_version):
                         raise V2DHold("TARGETED_ASR_RUNTIME_CHANGED")
+                    if budget is not None:
+                        budget.require_time(reserve, reason="WALL_TIME_LIMIT_BEFORE_TARGETED_ASR")
+                        active_transport = _BudgetedTargetedTransport(active_transport, budget)
+                    active_audio_iterator = audio_chunk_iterator
+                    if budget is not None:
+                        def active_audio_iterator(*args, **kwargs):
+                            budget.require_time(request_timeout,
+                                                reason="WALL_TIME_LIMIT_BEFORE_TARGETED_AUDIO_DECODE")
+                            yield from audio_chunk_iterator(*args, **kwargs)
                     provider = build_targeted_audio_window_provider(
-                        local_source, audio_chunk_iterator=audio_chunk_iterator,
+                        local_source, audio_chunk_iterator=active_audio_iterator,
                     )
                     return operation(local_source, active_transport, provider)
-        except V2DHold:
+        except (V2DHold, V2DLimitStop):
             raise
         except Exception as error:
+            cause = error
+            while cause is not None:
+                if isinstance(cause, V2DLimitStop):
+                    raise cause
+                cause = cause.__cause__
+            if budget is not None and budget.remaining() <= 0:
+                raise V2DLimitStop("WALL_TIME_LIMIT_DURING_TARGETED_ASR") from error
             raise V2DHold("TARGETED_ASR_EXECUTION_OR_CLEANUP_FAILED") from error
 
     def targeted(asr_result: ASRResult, plan: TargetedSecondEvidencePlan):
@@ -789,6 +1067,7 @@ def build_v2d_targeted_asr_adapter(*, holding_resolver, source_provider, targete
                 plan, asr_result=asr_result, targeted_transport=active,
                 audio_window_provider=provider,
             ),
+            window_count=len(plan.windows),
         )
 
     def targeted_external_ja(request):
@@ -799,9 +1078,10 @@ def build_v2d_targeted_asr_adapter(*, holding_resolver, source_provider, targete
         def run(_source, active, _provider):
             return run_targeted_hybrid_windows(
                 request.windows, local_source=_source, targeted_transport=active,
-                audio_chunk_iterator=audio_chunk_iterator,
+                audio_chunk_iterator=active_audio_iterator,
             )
-        return execute_for_snapshot(request.source_snapshot, run)
+        return execute_for_snapshot(request.source_snapshot, run,
+                                    window_count=len(request.windows))
 
     targeted.runtime_identity = runtime_identity
     targeted.engine_version = engine_version
@@ -869,12 +1149,11 @@ def _validate_targeted_v2d_artifact(artifact: TargetedSecondEvidenceArtifact, *,
     return projection
 
 
-def _load_or_run_targeted_evidence(request: _V2DTargetedRequest, *, master: V2DMaster,
+def _load_or_run_targeted_evidence(request: _V2DTargetedRequest, *, master: V2DMaster | None = None,
                                    targeted_runner: Callable | None,
                                    staging_root: str | Path,
                                    reuse_only: bool) -> _V2DTargetedEvidence:
-    bundle = master.review_set._source_bundle
-    asr_result = bundle.asr_result
+    asr_result = request.asr_result
     try:
         root = _private_dir(staging_root)
     except V2DError as error:
@@ -945,6 +1224,8 @@ def _load_or_run_targeted_evidence(request: _V2DTargetedRequest, *, master: V2DM
             linkage_raw = _read_private_owned(linkage_path, max_bytes=V2D_MAX_JSON_BYTES)
             if linkage_raw != _targeted_linkage_raw(request, artifact_sha):
                 raise ValueError("targeted linkage readback differs")
+        except V2DLimitStop:
+            raise
         except V2DHold:
             raise
         except Exception as error:
@@ -961,7 +1242,7 @@ def _load_or_run_targeted_evidence(request: _V2DTargetedRequest, *, master: V2DM
     source_window_evidence = []
     for binding in artifact.bindings:
         cue_ids, group_ids = link_by_source.get(binding.source_id, ((), ()))
-        if not cue_ids or not group_ids:
+        if not group_ids:
             raise V2DHold("TARGETED_ASR_ARTIFACT_SOURCE_LINK_MISSING")
         result = result_by_window[binding.window.window_id]
         projection[binding.source_id].__post_init__()
@@ -1029,7 +1310,7 @@ def _validate_external_targeted_artifact(artifact: TargetedASRArtifact, *,
 
 
 def _load_or_run_external_targeted_evidence(
-    request: _V2DExternalTargetedRequest, *, master: V2DMaster,
+    request: _V2DExternalTargetedRequest, *, master: V2DMaster | None = None,
     targeted_runner: Callable | None, staging_root: str | Path,
     reuse_only: bool,
 ) -> _V2DTargetedEvidence:
@@ -1082,6 +1363,8 @@ def _load_or_run_external_targeted_evidence(
             linkage_raw = _read_private_owned(linkage_path, max_bytes=V2D_MAX_JSON_BYTES)
             if linkage_raw != _targeted_linkage_raw(request, artifact_sha):
                 raise ValueError("external targeted linkage readback differs")
+        except V2DLimitStop:
+            raise
         except V2DHold:
             raise
         except Exception as error:
@@ -1112,7 +1395,7 @@ def _load_or_run_external_targeted_evidence(
             })
         for source_id in result.external_cue_ids:
             cue_ids, group_ids = link_by_source.get(source_id, ((), ()))
-            if not cue_ids or not group_ids:
+            if not group_ids:
                 raise V2DHold("TARGETED_ASR_EXTERNAL_SOURCE_LINK_MISSING")
             source_window_evidence.append((source_id, window_id,
                                           tuple(segment.text for segment in result.segments)))
@@ -1179,7 +1462,8 @@ def _readjudicate_targeted_groups(plan: UtteranceReviewPlan,
                                   hermes_settings: HermesExecutionSettings,
                                   staging_root: str | Path,
                                   claim_token: int,
-                                  reuse_only: bool) -> V2DAdjudication:
+                                  reuse_only: bool,
+                                  batch_groups: bool | None = None) -> V2DAdjudication:
     """Revisit only affected groups; ASR output stays supporting evidence."""
     evidence_by_group = dict(evidence.group_payloads)
     original_by_group = {item.group_id: item for item in original.groups}
@@ -1196,36 +1480,60 @@ def _readjudicate_targeted_groups(plan: UtteranceReviewPlan,
         task = _private_child(root, "targeted-readjudication-" + context_sha, create=not reuse_only)
     except V2DError as error:
         raise V2DHold("TARGETED_ASR_READJUDICATION_RESUME_STAGE_MISSING") from error
-    resolved_groups = []
-    for group in plan.groups:
-        if group.group_id not in evidence_by_group:
-            resolved_groups.append(original_by_group[group.group_id])
-            continue
-        group_payload = _group_payload(plan, group)
-        group_payload["targeted_second_evidence"] = evidence_by_group[group.group_id]
-        prompt = (
-            SEMANTIC_ADJUDICATION_INSTRUCTION
-            + "\nSupplemental targeted ASR is source-bound corroboration only. "
-              "It may clarify existing source members; do not invent source IDs, indexes, times, or outputs without an existing source span."
-            + "\nSOURCE_BOUND_GROUP=" + _wire(group_payload).decode("utf-8")
-        ).encode("utf-8")
-        if len(prompt) > V2D_MAX_PROMPT_BYTES:
-            raise V2DHold("TARGETED_ASR_READJUDICATION_PROMPT_TOO_LARGE")
-        group_key = _sha(group.group_id.encode("utf-8"))[:24]
-        try:
-            group_dir = _private_child(task, "group-" + group_key, create=not reuse_only)
-        except V2DError as error:
-            raise V2DHold("TARGETED_ASR_READJUDICATION_STAGE_MISSING") from error
-        validator = lambda raw, group=group: _parse_group_response(raw, group)
-        adjudicated = invoke(
-            prompt, group_dir, "ja-master-targeted-readjudication", validator,
-            hermes_settings=hermes_settings, reuse_only=reuse_only,
+    if batch_groups is None:
+        batch_groups = getattr(invoke, "_v2d_native_owner", None) is not None
+    expected_groups = {group.group_id: group for group in plan.groups}
+    if batch_groups:
+        payloads = []
+        for group in plan.groups:
+            if group.group_id not in evidence_by_group:
+                continue
+            payload = _group_payload(plan, group)
+            payload["targeted_second_evidence"] = evidence_by_group[group.group_id]
+            payloads.append((group.group_id, payload))
+        revised, receipts = _adjudicate_group_batches(
+            tuple(payloads), expected_groups=expected_groups,
+            source_fingerprint=_source_fingerprint(plan), invoke=invoke,
+            hermes_settings=hermes_settings, task=task,
+            label="ja-master-targeted-readjudication-batch", reuse_only=reuse_only,
         )
-        if type(adjudicated) is not GroupAdjudication:
-            raise V2DHold("TARGETED_ASR_READJUDICATION_RESULT_INVALID")
-        resolved_groups.append(adjudicated)
+        revised_by_group = {item.group_id: item for item in revised}
+        resolved_groups = tuple(revised_by_group.get(group.group_id, original_by_group[group.group_id])
+                                for group in plan.groups)
+        batch_evidence = original.batch_evidence + receipts
+    else:
+        resolved = {}
+        for group in plan.groups:
+            if group.group_id not in evidence_by_group:
+                continue
+            group_payload = _group_payload(plan, group)
+            group_payload["targeted_second_evidence"] = evidence_by_group[group.group_id]
+            prompt = (
+                SEMANTIC_ADJUDICATION_INSTRUCTION
+                + "\nSupplemental targeted ASR is source-bound corroboration only. "
+                  "It may clarify existing source members; do not invent source IDs, indexes, times, or outputs without an existing source span."
+                + "\nSOURCE_BOUND_GROUP=" + _wire(group_payload).decode("utf-8")
+            ).encode("utf-8")
+            if len(prompt) > V2D_MAX_PROMPT_BYTES:
+                raise V2DHold("TARGETED_ASR_READJUDICATION_PROMPT_TOO_LARGE")
+            group_key = _sha(group.group_id.encode("utf-8"))[:24]
+            try:
+                group_dir = _private_child(task, "group-" + group_key, create=not reuse_only)
+            except V2DError as error:
+                raise V2DHold("TARGETED_ASR_READJUDICATION_STAGE_MISSING") from error
+            validator = lambda raw, group=group: _parse_group_response(raw, group)
+            adjudicated = invoke(
+                prompt, group_dir, "ja-master-targeted-readjudication", validator,
+                hermes_settings=hermes_settings, reuse_only=reuse_only,
+            )
+            if type(adjudicated) is not GroupAdjudication:
+                raise V2DHold("TARGETED_ASR_READJUDICATION_RESULT_INVALID")
+            resolved[group.group_id] = adjudicated
+        resolved_groups = tuple(resolved.get(group.group_id, original_by_group[group.group_id])
+                                for group in plan.groups)
+        batch_evidence = original.batch_evidence
     return validate_adjudication(
-        plan, V2DAdjudication(_source_fingerprint(plan), tuple(resolved_groups)),
+        plan, V2DAdjudication(_source_fingerprint(plan), resolved_groups, batch_evidence),
     )
 
 
@@ -1313,15 +1621,78 @@ def _stage_bound_native_invoke(invoke: Callable, current_settings: HermesExecuti
                 if item.get("label") == label:
                     item["hermes_execution_settings"] = selected_settings.evidence()
 
+    stage_invoke._v2d_native_owner = owner
     return stage_invoke, owner
 
 
-def _parse_group_response(raw: bytes, group) -> GroupAdjudication:
+def _budgeted_invoke(invoke: Callable, budget: _V2DRunBudget, owner):
+    """Gate each actual Native transport attempt; count fake offline calls too."""
+    def call(prompt, directory, label, validator, *, hermes_settings, reuse_only=False):
+        budget.require_time(reason="WALL_TIME_LIMIT_BEFORE_STAGE")
+        if owner is None:
+            if not reuse_only:
+                budget.reserve_hermes(0)
+            result = invoke(prompt, directory, label, validator,
+                            hermes_settings=hermes_settings, reuse_only=reuse_only)
+        else:
+            bridge = getattr(owner, "bridge", None)
+            original = getattr(bridge, "_python", None)
+            if not callable(original):
+                raise V2DHold("NATIVE_HERMES_TRANSPORT_BOUND_UNAVAILABLE")
+
+            def bounded_python(*args, **kwargs):
+                timeout = kwargs.get("timeout")
+                if type(timeout) not in (int, float) or not math.isfinite(float(timeout)) or timeout <= 0:
+                    raise V2DHold("NATIVE_HERMES_TIMEOUT_BOUND_UNAVAILABLE")
+                budget.reserve_hermes(timeout)
+                return original(*args, **kwargs)
+
+            bridge._python = bounded_python
+            try:
+                result = invoke(prompt, directory, label, validator,
+                                hermes_settings=hermes_settings, reuse_only=reuse_only)
+            finally:
+                bridge._python = original
+        budget.require_time(reason="WALL_TIME_LIMIT_AFTER_STAGE")
+        return result
+
+    call._v2d_native_owner = owner
+    return call
+
+
+class _BudgetedTargetedTransport:
+    def __init__(self, transport, budget: _V2DRunBudget):
+        self._transport = transport
+        self._budget = budget
+        self.runtime_identity = transport.runtime_identity
+        self.engine_version = transport.engine_version
+        self.request_timeout_seconds = transport.request_timeout_seconds
+
+    def transcribe_targeted_chunk(self, chunk):
+        self._budget.reserve_targeted_asr(self.request_timeout_seconds)
+        return self._transport.transcribe_targeted_chunk(chunk)
+
+    @property
+    def _budget(self):
+        return self.__dict__["__budget"]
+
+    @_budget.setter
+    def _budget(self, value):
+        self.__dict__["__budget"] = value
+
+
+def _parse_group_response(raw: bytes, group, *, require_audio_flag: bool = False) -> GroupAdjudication:
     data = _load_json(raw, "JA Master adjudication")
-    if type(data) is not dict or set(data) != {"group_id", "candidate_decisions", "source_decisions", "outputs"}:
+    base_fields = {"group_id", "candidate_decisions", "source_decisions", "outputs"}
+    if type(data) is not dict or set(data) not in (base_fields, base_fields | {"audio_evidence_needed"}):
         raise V2DError("JA Master response fields differ")
+    if require_audio_flag and "audio_evidence_needed" not in data:
+        raise V2DError("JA Master response lacks the explicit audio evidence disposition")
     if data["group_id"] != group.group_id:
         raise V2DError("JA Master response group differs")
+    audio_evidence_needed = data.get("audio_evidence_needed", False)
+    if type(audio_evidence_needed) is not bool:
+        raise V2DError("audio evidence disposition is invalid")
     if type(data["candidate_decisions"]) is not list or type(data["source_decisions"]) is not list or type(data["outputs"]) is not list:
         raise V2DError("JA Master response arrays are invalid")
     candidates = []
@@ -1344,7 +1715,15 @@ def _parse_group_response(raw: bytes, group) -> GroupAdjudication:
                 raise V2DError("JA Master source span fields differ")
             spans.append(SourceSpan(span["source_key"], span["word_start_index"], span["word_end_index"]))
         outputs.append(MasterOutputProposal(item["japanese_text"], tuple(spans), item["rationale"]))
-    return GroupAdjudication(group.group_id, tuple(candidates), tuple(sources), tuple(outputs))
+    result = GroupAdjudication(
+        group.group_id, tuple(candidates), tuple(sources), tuple(outputs),
+        audio_evidence_needed,
+    )
+    has_uncertain = any(item.status == DECISION_UNCERTAIN
+                        for item in (*result.candidate_decisions, *result.source_decisions))
+    if result.audio_evidence_needed and not has_uncertain:
+        raise V2DError("audio evidence was requested without an unresolved decision")
+    return result
 
 
 def validate_adjudication(plan: UtteranceReviewPlan, adjudication: V2DAdjudication) -> V2DAdjudication:
@@ -1360,10 +1739,126 @@ def validate_adjudication(plan: UtteranceReviewPlan, adjudication: V2DAdjudicati
             raise V2DError("candidate coverage/order differs")
         if tuple(item.source_key for item in resolved.source_decisions) != expected_sources:
             raise V2DError("source coverage/order differs")
+        if type(resolved.audio_evidence_needed) is not bool:
+            raise V2DError("audio evidence disposition is invalid")
     return adjudication
 
 
 SEMANTIC_ADJUDICATION_INSTRUCTION = """Interpret this one source-bound utterance group for a Japanese master. Return JSON only with exactly: group_id, candidate_decisions, source_decisions, outputs. Every candidate relation and every source must receive ACCEPTED, REJECTED, or UNCERTAIN plus a reason. A candidate relation is evidence, not proof of same utterance. Do not merge merely from overlap or identical text; preserve repeated spoken dialogue unless context supports a duplicate. Decide whether to merge or split semantic dialogue. Outputs contain Japanese text and source_spans only; each span has source_key and optional half-open word_start_index/word_end_index. Do not provide cue IDs, timestamps, speakers, ordering, or confidence. Source spans are claims the validator checks: only ASR word references may be split, with all words partitioned exactly once. Do not assign speakers; retain speaker evidence as supplied. If evidence is insufficient use UNCERTAIN. The caller owns IDs, time, ordering, source ownership, and files."""
+
+SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION = """Interpret each source-bound utterance group independently for a Japanese master. Return JSON only with exactly: batch_id, source_fingerprint, groups. Return one group object for every input group, in exactly the input order; each group object must have exactly group_id, audio_evidence_needed, candidate_decisions, source_decisions, outputs. For each group, every candidate relation and every source must receive ACCEPTED, REJECTED, or UNCERTAIN plus a reason. A candidate relation is evidence, not proof of same utterance. Do not merge merely from overlap or identical text; preserve repeated spoken dialogue unless context supports a duplicate. Decide whether to merge or split semantic dialogue. Outputs contain Japanese text and source_spans only; each span has source_key and optional half-open word_start_index/word_end_index. Do not provide cue IDs, timestamps, speakers, ordering, or confidence. Source spans are claims the validator checks: only ASR word references may be split, with all words partitioned exactly once. Do not assign speakers; retain speaker evidence as supplied. Set audio_evidence_needed true only when a materially uncertain candidate/source could be clarified by existing source-bound timed audio; otherwise false. This field does not decide acceptance. If evidence is insufficient use UNCERTAIN. The caller owns IDs, time, ordering, source ownership, and files."""
+
+
+def _make_batch_material(source_fingerprint: str, payloads: tuple[tuple[str, dict[str, object]], ...]):
+    input_raw = _wire({
+        "source_fingerprint": source_fingerprint,
+        "groups": [{"group_id": group_id, "payload": payload}
+                   for group_id, payload in payloads],
+    })
+    batch_id = _sha(input_raw)
+    envelope = {
+        "batch_id": batch_id,
+        "source_fingerprint": source_fingerprint,
+        "groups": [payload for _, payload in payloads],
+    }
+    prompt = (SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION
+              + "\nSOURCE_BOUND_BATCH=" + _wire(envelope).decode("utf-8")).encode("utf-8")
+    return batch_id, input_raw, prompt
+
+
+def _pack_group_batches(source_fingerprint: str, payloads: tuple[tuple[str, dict[str, object]], ...]):
+    if not payloads or len({group_id for group_id, _ in payloads}) != len(payloads):
+        raise V2DError("group batch input is empty or duplicated")
+    batches = []
+    pending = []
+    for item in payloads:
+        trial = tuple((*pending, item))
+        material = _make_batch_material(source_fingerprint, trial)
+        if len(material[2]) <= V2D_MAX_PROMPT_BYTES:
+            pending.append(item)
+            continue
+        if not pending:
+            raise V2DHold("ONE_UTTERANCE_GROUP_EXCEEDS_EXISTING_PROMPT_LIMIT")
+        batches.append(tuple(pending))
+        pending = [item]
+        if len(_make_batch_material(source_fingerprint, tuple(pending))[2]) > V2D_MAX_PROMPT_BYTES:
+            raise V2DHold("ONE_UTTERANCE_GROUP_EXCEEDS_EXISTING_PROMPT_LIMIT")
+    if pending:
+        batches.append(tuple(pending))
+    # Complete the packing and size validation before the first model call.
+    return tuple((batch, *_make_batch_material(source_fingerprint, batch)) for batch in batches)
+
+
+def _adjudicate_group_batches(
+    payloads: tuple[tuple[str, dict[str, object]], ...], *,
+    expected_groups: dict[str, object], source_fingerprint: str,
+    invoke: Callable, hermes_settings: HermesExecutionSettings,
+    task: Path, label: str, reuse_only: bool,
+) -> tuple[tuple[GroupAdjudication, ...], tuple[V2DBatchEvidence, ...]]:
+    batches = _pack_group_batches(source_fingerprint, payloads)
+    resolved_by_id = {}
+    receipts = []
+    owner = getattr(invoke, "_v2d_native_owner", getattr(invoke, "__self__", None))
+    for batch, batch_id, input_raw, prompt in batches:
+        expected_ids = tuple(group_id for group_id, _ in batch)
+        if set(expected_ids) - set(expected_groups):
+            raise V2DError("batch references an unknown source group")
+        try:
+            batch_dir = _private_child(task, "batch-" + batch_id, create=not reuse_only)
+        except V2DError as error:
+            if reuse_only:
+                raise V2DHold("GROUP_BATCH_RESUME_STAGE_MISSING") from error
+            raise
+
+        def validate_batch(raw, *, expected_ids=expected_ids, batch_id=batch_id):
+            data = _load_json(raw, "JA Master batch adjudication")
+            if (type(data) is not dict or set(data) != {"batch_id", "source_fingerprint", "groups"}
+                    or data["batch_id"] != batch_id
+                    or data["source_fingerprint"] != source_fingerprint
+                    or type(data["groups"]) is not list):
+                raise V2DError("JA Master batch envelope differs")
+            observed = tuple(item.get("group_id") if type(item) is dict else None
+                             for item in data["groups"])
+            if observed != expected_ids:
+                raise V2DError("JA Master batch group coverage/order differs")
+            group_results = []
+            for row, group_id in zip(data["groups"], expected_ids, strict=True):
+                parsed = _parse_group_response(
+                    _wire(row), SimpleNamespace(group_id=group_id), require_audio_flag=True,
+                )
+                group = expected_groups[group_id]
+                if (tuple(item.candidate_id for item in parsed.candidate_decisions)
+                        != tuple(group.candidate_ids)
+                        or tuple(item.source_key for item in parsed.source_decisions)
+                        != tuple(member.source_reference.key for member in group.members)):
+                    raise V2DError("JA Master batch candidate/source coverage differs")
+                group_results.append(parsed)
+            return tuple(group_results)
+
+        before = len(getattr(owner, "_verified_attempts", ()))
+        resolved = invoke(
+            prompt, batch_dir, label, validate_batch,
+            hermes_settings=hermes_settings, reuse_only=reuse_only,
+        )
+        if type(resolved) is not tuple or tuple(item.group_id for item in resolved) != expected_ids:
+            raise V2DError("group batch executor returned invalid coverage")
+        receipts_after = tuple(getattr(owner, "_verified_attempts", ()))
+        receipt_hashes = tuple(item["receipt_sha256"] for item in receipts_after[before:]
+                               if item.get("label") == label
+                               and type(item.get("receipt_sha256")) is str)
+        receipts.append(V2DBatchEvidence(
+            batch_id=batch_id, source_fingerprint=source_fingerprint,
+            group_ids=expected_ids, input_sha256=_sha(input_raw),
+            prompt_sha256=_sha(prompt), native_receipt_sha256=receipt_hashes,
+        ))
+        for item in resolved:
+            if item.group_id in resolved_by_id:
+                raise V2DError("group was adjudicated in more than one batch")
+            resolved_by_id[item.group_id] = item
+    expected_all = tuple(group_id for group_id, _ in payloads)
+    if tuple(group_id for group_id, _ in payloads if group_id in resolved_by_id) != expected_all:
+        raise V2DError("group batches omitted a source group")
+    return tuple(resolved_by_id[group_id] for group_id in expected_all), tuple(receipts)
 
 
 def adjudicate_ja_master(
@@ -1374,8 +1869,9 @@ def adjudicate_ja_master(
     staging_root: str | Path,
     claim_token: int,
     reuse_only: bool = False,
+    batch_groups: bool | None = None,
 ) -> V2DAdjudication:
-    """Run/replay one bounded semantic request per V2-C group via Native invoke."""
+    """Run source-bound adjudication, batching Native-backed title requests."""
     plan = validate_utterance_review_plan(plan)
     if type(hermes_settings) is not HermesExecutionSettings:
         raise V2DError("resolved Hermes profile settings are required")
@@ -1385,6 +1881,19 @@ def adjudicate_ja_master(
     fingerprint = _source_fingerprint(plan)
     session = str(uuid.uuid5(V2D_SESSION_NAMESPACE, fingerprint + ":" + str(claim_token)))
     task = _private_child(root, session, create=not reuse_only)
+    if batch_groups is None:
+        batch_groups = getattr(invoke, "_v2d_native_owner", None) is not None
+    if type(batch_groups) is not bool:
+        raise V2DError("batch_groups must be boolean when specified")
+    if batch_groups:
+        payloads = tuple((group.group_id, _group_payload(plan, group)) for group in plan.groups)
+        groups, evidence = _adjudicate_group_batches(
+            payloads, expected_groups={group.group_id: group for group in plan.groups},
+            source_fingerprint=fingerprint, invoke=invoke,
+            hermes_settings=hermes_settings, task=task,
+            label="ja-master-adjudication-batch", reuse_only=reuse_only,
+        )
+        return validate_adjudication(plan, V2DAdjudication(fingerprint, groups, evidence))
     results = []
     for group in plan.groups:
         payload = _wire(_group_payload(plan, group))
@@ -1965,6 +2474,9 @@ class V2DPipelineResult:
     translation: StatefulSubtitleResult | None = field(repr=False)
     review: V2DReviewOutcome | None = field(repr=False)
     output_hashes: tuple[tuple[str, str], ...] = ()
+    hermes_attempts_started: int = 0
+    targeted_asr_requests_started: int = 0
+    elapsed_seconds: float = 0.0
 
 
 def run_v2d_pipeline(
@@ -1978,31 +2490,106 @@ def run_v2d_pipeline(
     reuse_only: bool = False,
     semantic_policy=DEFAULT_STATEFUL_SEMANTIC_POLICY,
     targeted_runner: Callable | None = None,
+    execution_limits: V2DExecutionLimits | None = None,
 ) -> V2DPipelineResult:
     """Connected offline/live-injectable V2-D path; never bypasses validators."""
+    budget = None
+    budget_token = None
     try:
+        requested_batching = getattr(invoke, "_v2d_batch_groups", None)
         invoke, executor_owner = _stage_bound_native_invoke(invoke, hermes_settings)
+        if executor_owner is not None and execution_limits is None:
+            return V2DPipelineResult("LIMIT_STOP", "EXECUTION_LIMITS_REQUIRED",
+                                      None, None, None, None)
+        if execution_limits is not None:
+            budget = _V2DRunBudget(execution_limits)
+            budget_token = _ACTIVE_V2D_BUDGET.set(budget)
+            invoke = _budgeted_invoke(invoke, budget, executor_owner)
+            invoke._v2d_batch_groups = (executor_owner is not None or requested_batching is True)
         verified_before = len(getattr(executor_owner, "_verified_attempts", ()))
         plan = validate_utterance_review_plan(plan)
         output = _private_dir(output_directory)
         collisions = [name for name in V2D_OUTPUT_NAMES if (output / name).exists() or (output / name).is_symlink()]
         if collisions:
             raise V2DError("V2-D output collision")
+        batch_groups = executor_owner is not None or requested_batching is True
         adjudication = adjudicate_ja_master(
             plan, invoke=invoke, hermes_settings=hermes_settings,
             staging_root=staging_root, claim_token=claim_token, reuse_only=reuse_only,
+            batch_groups=batch_groups,
         )
-        master = materialize_ja_master(plan, adjudication)
+        targeted_evidence = None
+        initial_audio_groups = tuple(
+            group.group_id for group, resolved in zip(plan.groups, adjudication.groups, strict=True)
+            if resolved.audio_evidence_needed
+        )
+        if initial_audio_groups:
+            initial_requests = _build_initial_targeted_requests(plan, initial_audio_groups)
+            early_items = []
+            for request in initial_requests:
+                if budget is not None:
+                    budget.require_time(reason="WALL_TIME_LIMIT_BEFORE_INITIAL_TARGETED_ASR")
+                if type(request) is _V2DTargetedRequest:
+                    early_items.append(_load_or_run_targeted_evidence(
+                        request, targeted_runner=targeted_runner,
+                        staging_root=staging_root, reuse_only=reuse_only,
+                    ))
+                else:
+                    early_items.append(_load_or_run_external_targeted_evidence(
+                        request, targeted_runner=targeted_runner,
+                        staging_root=staging_root, reuse_only=reuse_only,
+                    ))
+            targeted_evidence = _combine_targeted_evidence(tuple(early_items))
+            adjudication = _readjudicate_targeted_groups(
+                plan, adjudication, targeted_evidence,
+                invoke=invoke, hermes_settings=hermes_settings,
+                staging_root=staging_root, claim_token=claim_token,
+                reuse_only=reuse_only, batch_groups=batch_groups,
+            )
+            if any(item.audio_evidence_needed for item in adjudication.groups):
+                raise V2DHold("INITIAL_TARGETED_ASR_UNCERTAINTY_REMAINS")
+        master = materialize_ja_master(
+            plan, adjudication,
+            targeted_evidence_sha256=(None if targeted_evidence is None
+                                      else targeted_evidence.linkage_sha256),
+        )
+        initial_translation_evidence = (None if targeted_evidence is None
+                                        else _targeted_translation_evidence(master, targeted_evidence))
         package, translated = translate_ja_master(
             master, invoke=invoke, hermes_settings=hermes_settings,
             staging_root=staging_root, claim_token=claim_token,
             semantic_policy=semantic_policy, reuse_only=reuse_only,
+            targeted_evidence_by_cue=initial_translation_evidence,
+            targeted_evidence_sha256=(targeted_evidence.linkage_sha256
+                                      if targeted_evidence is not None and initial_translation_evidence else None),
         )
-        targeted_evidence = None
         if any(isinstance(cue, StatefulCueOutput) and cue.needs_audio_evidence for cue in translated.cues):
-            targeted_requests = _build_targeted_requests(master, translated)
+            requested_translation = translated
+            if targeted_evidence is not None:
+                covered_sources = {source_id for source_id, _, _ in targeted_evidence.source_window_evidence}
+                master_by_id = {cue.cue_id: cue for cue in master.cues}
+                filtered_cues = []
+                for cue in translated.cues:
+                    if not (isinstance(cue, StatefulCueOutput) and cue.needs_audio_evidence):
+                        filtered_cues.append(cue)
+                        continue
+                    source_ids = {ref.source_id for ref in master_by_id[cue.cue_id].source_references}
+                    targetable = {source_id for source_id in source_ids
+                                  if source_id.startswith("asr_segment:")
+                                  or source_id.startswith("external_ja:")}
+                    if targetable and targetable.issubset(covered_sources):
+                        filtered_cues.append(replace(cue, needs_audio_evidence=False))
+                    else:
+                        filtered_cues.append(cue)
+                requested_translation = replace(translated, cues=tuple(filtered_cues))
+                if not any(isinstance(cue, StatefulCueOutput) and cue.needs_audio_evidence
+                           for cue in requested_translation.cues):
+                    raise V2DHold("TARGETED_ASR_STILL_REQUIRED_AFTER_EARLY_EVIDENCE")
+            targeted_requests = _build_targeted_requests(master, requested_translation)
             evidence_items = []
             for targeted_request in targeted_requests:
+                if budget is not None:
+                    budget.require_time(reason="WALL_TIME_LIMIT_BEFORE_TARGETED_ASR")
                 if type(targeted_request) is _V2DTargetedRequest:
                     evidence_items.append(_load_or_run_targeted_evidence(
                         targeted_request, master=master, targeted_runner=targeted_runner,
@@ -2015,12 +2602,14 @@ def run_v2d_pipeline(
                     ))
                 else:
                     raise V2DHold("TARGETED_ASR_REQUEST_TYPE_UNSUPPORTED")
-            targeted_evidence = _combine_targeted_evidence(tuple(evidence_items))
+            later_evidence = _combine_targeted_evidence(tuple(evidence_items))
+            targeted_evidence = (later_evidence if targeted_evidence is None else
+                                 _combine_targeted_evidence((targeted_evidence, later_evidence)))
             adjudication = _readjudicate_targeted_groups(
                 plan, adjudication, targeted_evidence,
                 invoke=invoke, hermes_settings=hermes_settings,
                 staging_root=staging_root, claim_token=claim_token,
-                reuse_only=reuse_only,
+                reuse_only=reuse_only, batch_groups=batch_groups,
             )
             master = materialize_ja_master(
                 plan, adjudication,
@@ -2053,6 +2642,8 @@ def run_v2d_pipeline(
         if parse_subtitle_bytes(ko_raw, "srt").cues != ko_cues:
             raise V2DError("Korean SRT failed round-trip validation")
         master_raw = _master_artifact_bytes(master)
+        if budget is not None:
+            budget.require_time(reason="WALL_TIME_LIMIT_BEFORE_FINAL_OUTPUT")
         settings_evidence = hermes_settings.evidence()
         native_attempts = getattr(executor_owner, "_verified_attempts", ())
         verified_attempts = []
@@ -2097,6 +2688,15 @@ def run_v2d_pipeline(
             "targeted_review_cue_count": len(review.targeted_cue_ids),
             "hermes_settings_resolved_for_unstarted_stages": settings_evidence,
             "verified_native_attempts": verified_attempts,
+            "semantic_batches": [{
+                "batch_id": item.batch_id,
+                "source_fingerprint": item.source_fingerprint,
+                "group_ids": list(item.group_ids),
+                "input_sha256": item.input_sha256,
+                "prompt_sha256": item.prompt_sha256,
+                "native_receipt_sha256": list(item.native_receipt_sha256),
+            } for item in adjudication.batch_evidence],
+            "execution_limits": None if budget is None else budget.evidence(),
             "outputs": {
                 V2D_OUTPUT_NAMES[0]: _sha(master_raw),
                 V2D_OUTPUT_NAMES[1]: _sha(ja_raw),
@@ -2110,15 +2710,36 @@ def run_v2d_pipeline(
         for name, raw in zip(V2D_OUTPUT_NAMES, payloads, strict=True):
             _write_exclusive(output / name, raw)
         hashes = tuple((name, _sha(raw)) for name, raw in zip(V2D_OUTPUT_NAMES, payloads, strict=True))
-        return V2DPipelineResult("CLEAN_SRT_READY", None, master, package, translated, review, hashes)
+        return V2DPipelineResult(
+            "CLEAN_SRT_READY", None, master, package, translated, review, hashes,
+            0 if budget is None else budget.hermes_attempts,
+            0 if budget is None else budget.targeted_asr_requests,
+            0.0 if budget is None else round(budget.elapsed(), 6),
+        )
+    except V2DLimitStop as stop:
+        return V2DPipelineResult(
+            "LIMIT_STOP", str(stop), None, None, None, None, (),
+            0 if budget is None else budget.hermes_attempts,
+            0 if budget is None else budget.targeted_asr_requests,
+            0.0 if budget is None else round(budget.elapsed(), 6),
+        )
     except V2DHold as hold:
-        return V2DPipelineResult("HOLD", str(hold), None, None, None, None)
+        return V2DPipelineResult(
+            "HOLD", str(hold), None, None, None, None, (),
+            0 if budget is None else budget.hermes_attempts,
+            0 if budget is None else budget.targeted_asr_requests,
+            0.0 if budget is None else round(budget.elapsed(), 6),
+        )
+    finally:
+        if budget_token is not None:
+            _ACTIVE_V2D_BUDGET.reset(budget_token)
 
 
 __all__ = [
     "CandidateDecision", "GroupAdjudication", "MasterOutputProposal", "SourceDecision",
-    "SourceSpan", "V2DAdjudication", "V2DError", "V2DHold", "V2DMaster",
-    "V2DPipelineResult", "adjudicate_ja_master", "build_v2d_review_request",
+    "SourceSpan", "V2DAdjudication", "V2DError", "V2DExecutionLimits", "V2DHold",
+    "V2DLimitStop", "V2DMaster", "V2DPipelineResult", "adjudicate_ja_master",
+    "build_v2d_review_request",
     "build_v2d_targeted_asr_adapter", "materialize_ja_master", "run_targeted_review", "run_v2d_pipeline",
     "translate_ja_master", "validate_adjudication",
 ]

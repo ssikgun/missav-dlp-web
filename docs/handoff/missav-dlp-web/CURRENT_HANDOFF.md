@@ -1,5 +1,15 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## S11-MVP001 V2-E bounded candidate source review and promotion (2026-11-23)
+
+- Starting canonical `teddy-subtitle-stage11` HEAD `7b49bdc83d92f6745c74180a85f6f2bd27279a50` and approved contracts were verified in a clean isolated checkout. The protected 590-change checkout was untouched.
+- Promoted the exact reviewed `teddy_discovery_stage11_v2d.py` candidate (SHA-256 `8a4a1d280c1c88e3c16164f641f507c2eb938981ea44d27e79429d6d0969bb88`) over the prior V2-D module and added `teddy_discovery_stage11_v2d_offline_trial_blocker_smoke.py` unchanged (SHA-256 `6fbc77d63a6e5a6e4b577beddfb3c397c4dff6c7e9738ccb4947d83ff11a62d8`). Existing V2-D smoke fixture and direct module dependencies matched the previous review baseline; the exact candidate smoke PASS was reused, not repeated.
+- Reviewed `run_v2d_pipeline()` as the only supported private one-shot route with directly bound `NativeNormalFirstPass.invoke`, mandatory explicit attempts/wall budget, and the bounded Targeted ASR adapter. HSODA-104's previously measured 232 groups / 6 batches / complete coverage was reused; nominal first-stage calls fall 232→6 (226 fewer, about 97.4%; not a cost, latency or quality measure). No Normal Mode/queue/deployment/AUTO_INSERT integration was added.
+- Explicit limits cover one process invocation only; a new invocation resets them, so the authorized trial must not resume/retry or start a second process. In-process deadlines do not prove hard interruption. The existing 24h Normal service timeout does not supervise V2-D. A hard-kill during sequential private output writes may leave partial files; they are not completed artifacts and collision protection remains in force.
+- Actual CT108 systemd/source/lock/output conditions remain `NOT_VERIFIED` from this Codex PID1 environment. CT120 profile-file values read as `openai-codex / gpt-6-luna / xhigh`; effective runtime timeout and idle status remain `NOT_VERIFIED` (three Hermes processes observed). These runtime gaps do not block source-only promotion, but live trial readiness remains `NO` pending separate authorization and genuine host/resource/supervisor checks. No model execution, deployment, service/timer/queue/database/NAS/Jellyfin change or publication; `PRODUCT_QUALITY=NOT_VERIFIED`.
+- Canonical source promotion and remote readback are recorded in the Git history; this record does not claim a live V2-E trial or production integration.
+
+
 ## S11-MVP001 V2-D bounded source review and canonical promotion (2026-11-23)
 
 - Canonical `teddy-subtitle-stage11` parent `bc09b8e455683a803c0bfcf4b052205081231155`; source promotion commit `44bea935e2920da7a1c87ae483603b37d2f05baa`; origin readback `PASS`. Common contract `1.0.1`, Stage11 contract `2.0.0`, and `S11-MVP001 / IN_PROGRESS` were verified in a clean isolated clone. The protected dirty checkout was not changed.
