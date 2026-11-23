@@ -154,88 +154,122 @@ assert model_env['HERMES_API_CALL_STALE_TIMEOUT']=='480'
 assert model_env['HERMES_CODEX_TTFB_TIMEOUT_SECONDS']=='300'
 assert model_env['HERMES_CODEX_TTFB_MAX_SECONDS']=='300'
 assert model_env['HERMES_CODEX_EVENT_STALE_TIMEOUT_SECONDS']=='300'
-# Remote owner survives loss of the CT108 SSH forwarding parent.
-parent_pid=os.getpid()
-read_fd,write_fd=os.pipe()
-supervisor_pid=os.fork()
-if supervisor_pid:
-    os.close(write_fd)
-    parts=[]; count=0
+v2d_guard=req.get('v2d_guard',False)
+if type(v2d_guard) is not bool:
+    raise ValueError('invalid V2-D native guard option')
+if v2d_guard:
+    # Remote owner survives loss of the CT108 SSH forwarding parent.
+    parent_pid=os.getpid()
+    read_fd,write_fd=os.pipe()
+    supervisor_pid=os.fork()
+    if supervisor_pid:
+        os.close(write_fd)
+        parts=[]; count=0
+        try:
+            while True:
+                piece=os.read(read_fd,65536)
+                if not piece: break
+                count+=len(piece)
+                if count>40*1024*1024:
+                    raise RuntimeError('supervisor response too large')
+                parts.append(piece)
+        finally:
+            os.close(read_fd)
+        _,status=os.waitpid(supervisor_pid,0)
+        if not os.WIFEXITED(status) or os.WEXITSTATUS(status)!=0 or not parts:
+            raise RuntimeError('native remote supervisor failed')
+        sys.stdout.buffer.write(b''.join(parts))
+        sys.stdout.buffer.flush()
+        raise SystemExit(0)
+    os.close(read_fd)
+    os.setsid()
+    null_fd=os.open(os.devnull,os.O_RDWR)
+    for fd in (0,1,2): os.dup2(null_fd,fd)
+    if null_fd>2: os.close(null_fd)
+    proc=None
     try:
-        while True:
-            piece=os.read(read_fd,65536)
-            if not piece: break
-            count+=len(piece)
-            if count>40*1024*1024:
-                raise RuntimeError('supervisor response too large')
-            parts.append(piece)
+        if os.getppid()!=parent_pid:
+            raise RuntimeError('forwarding parent already lost')
+        started=time.monotonic(); last=started; reason=None
+        proc=subprocess.Popen(command,cwd=task,env=model_env,
+            stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
+        streams={'stdout':bytearray(),'stderr':bytearray()}
+        selector=selectors.DefaultSelector()
+        for name,s in (('stdout',proc.stdout),('stderr',proc.stderr)):
+            os.set_blocking(s.fileno(),False); selector.register(s,selectors.EVENT_READ,name)
+        while selector.get_map() or proc.poll() is None:
+            now=time.monotonic()
+            if os.getppid()!=parent_pid:
+                reason='REMOTE_PARENT_LOST'; break
+            if now-started>=3600 or now-last>=600:
+                reason='ABSOLUTE_TIMEOUT' if now-started>=3600 else 'INACTIVITY_TIMEOUT'
+                break
+            for key,_ in selector.select(timeout=0.1):
+                chunk=os.read(key.fileobj.fileno(),65536)
+                if not chunk: selector.unregister(key.fileobj)
+                else:
+                    streams[key.data].extend(chunk); last=time.monotonic()
+                    if sum(map(len,streams.values()))>16*1024*1024:
+                        reason='OUTPUT_LIMIT'; break
+            if reason: break
+        if reason:
+            try: os.killpg(proc.pid,signal.SIGTERM)
+            except ProcessLookupError: pass
+            try: proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                try: os.killpg(proc.pid,signal.SIGKILL)
+                except ProcessLookupError: pass
+                proc.wait(timeout=5)
+        rc=proc.wait(timeout=5)
+        for name,b in streams.items(): (task/(name+'.log')).write_bytes(b)
+        assert hashlib.sha256((task/'prompt.txt').read_bytes()).hexdigest()==req['prompt_sha256']
+        for p in (root,profile): assert not any((p/'skills').iterdir())
+        response=json.dumps({'stdout':base64.b64encode(streams['stdout']).decode(),
+            'stderr':base64.b64encode(streams['stderr']).decode(),'returncode':rc,
+            'timeout_reason':reason,'tools_count':0,'elapsed_seconds':time.monotonic()-started,
+            'timeout_env':req['timeout_env'],'remote_root':str(root)}).encode('ascii')
+        while response:
+            response=response[os.write(write_fd,response):]
+    except BaseException:
+        if proc is not None:
+            try: os.killpg(proc.pid,signal.SIGKILL)
+            except ProcessLookupError: pass
+            try: proc.wait(timeout=5)
+            except (subprocess.TimeoutExpired,OSError): pass
+        os._exit(1)
     finally:
-        os.close(read_fd)
-    _,status=os.waitpid(supervisor_pid,0)
-    if not os.WIFEXITED(status) or os.WEXITSTATUS(status)!=0 or not parts:
-        raise RuntimeError('native remote supervisor failed')
-    sys.stdout.buffer.write(b''.join(parts))
-    sys.stdout.buffer.flush()
-    raise SystemExit(0)
-os.close(read_fd)
-os.setsid()
-null_fd=os.open(os.devnull,os.O_RDWR)
-for fd in (0,1,2): os.dup2(null_fd,fd)
-if null_fd>2: os.close(null_fd)
-proc=None
-try:
-    if os.getppid()!=parent_pid:
-        raise RuntimeError('forwarding parent already lost')
+        os.close(write_fd)
+    os._exit(0)
+else:
     started=time.monotonic(); last=started; reason=None
-    proc=subprocess.Popen(command,cwd=task,env=model_env,
-        stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
+    proc=subprocess.Popen(command,cwd=task,env=model_env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
     streams={'stdout':bytearray(),'stderr':bytearray()}
     selector=selectors.DefaultSelector()
     for name,s in (('stdout',proc.stdout),('stderr',proc.stderr)):
         os.set_blocking(s.fileno(),False); selector.register(s,selectors.EVENT_READ,name)
     while selector.get_map() or proc.poll() is None:
         now=time.monotonic()
-        if os.getppid()!=parent_pid:
-            reason='REMOTE_PARENT_LOST'; break
         if now-started>=3600 or now-last>=600:
-            reason='ABSOLUTE_TIMEOUT' if now-started>=3600 else 'INACTIVITY_TIMEOUT'
-            break
-        for key,_ in selector.select(timeout=0.1):
+            reason='ABSOLUTE_TIMEOUT' if now-started>=3600 else 'INACTIVITY_TIMEOUT'; break
+        for key,_ in selector.select(timeout=1):
             chunk=os.read(key.fileobj.fileno(),65536)
             if not chunk: selector.unregister(key.fileobj)
             else:
                 streams[key.data].extend(chunk); last=time.monotonic()
-                if sum(map(len,streams.values()))>16*1024*1024:
-                    reason='OUTPUT_LIMIT'; break
+                if sum(map(len,streams.values()))>16*1024*1024: reason='OUTPUT_LIMIT'; break
         if reason: break
     if reason:
-        try: os.killpg(proc.pid,signal.SIGTERM)
-        except ProcessLookupError: pass
+        os.killpg(proc.pid,signal.SIGTERM)
         try: proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            try: os.killpg(proc.pid,signal.SIGKILL)
-            except ProcessLookupError: pass
-            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired: os.killpg(proc.pid,signal.SIGKILL); proc.wait(timeout=5)
     rc=proc.wait(timeout=5)
     for name,b in streams.items(): (task/(name+'.log')).write_bytes(b)
     assert hashlib.sha256((task/'prompt.txt').read_bytes()).hexdigest()==req['prompt_sha256']
     for p in (root,profile): assert not any((p/'skills').iterdir())
-    response=json.dumps({'stdout':base64.b64encode(streams['stdout']).decode(),
+    print(json.dumps({'stdout':base64.b64encode(streams['stdout']).decode(),
         'stderr':base64.b64encode(streams['stderr']).decode(),'returncode':rc,
         'timeout_reason':reason,'tools_count':0,'elapsed_seconds':time.monotonic()-started,
-        'timeout_env':req['timeout_env'],'remote_root':str(root)}).encode('ascii')
-    while response:
-        response=response[os.write(write_fd,response):]
-except BaseException:
-    if proc is not None:
-        try: os.killpg(proc.pid,signal.SIGKILL)
-        except ProcessLookupError: pass
-        try: proc.wait(timeout=5)
-        except (subprocess.TimeoutExpired,OSError): pass
-    os._exit(1)
-finally:
-    os.close(write_fd)
-os._exit(0)
+        'timeout_env':req['timeout_env'],'remote_root':str(root)}))
 '''
 
 
@@ -349,7 +383,8 @@ class NativeNormalFirstPass:
                     'provider':hermes_settings.provider,
                     'model':hermes_settings.model,
                     'reasoning':hermes_settings.reasoning_effort,
-                    'timeout_env':dict(STAGE11_HERMES_TIMEOUT_ENV)}
+                    'timeout_env':dict(STAGE11_HERMES_TIMEOUT_ENV),
+                    'v2d_guard':bool(getattr(self,'_v2d_remote_guard',False))}
                 store(prompt_path,prompt)
                 raw = self.bridge._python(REMOTE_NATIVE,input_payload=wire(request),capture=True,timeout=NATIVE_ABSOLUTE_TIMEOUT+90)
                 receipt=json.loads(raw)
