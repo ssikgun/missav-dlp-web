@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## V2-E CT108 external timeout utilities presence (2026-11-23)
+
+- Operator actual `root@downloader` read-only check: hostname `downloader`, PID1 `systemd`. GNU timeout 9.7, systemd-run, systemctl (systemd 257.13), and setsid all present. `systemd-run --help` lists scope/property/wait/pipe/collect options. No model execution or production writes.
+- Tool availability is a limited PASS only: there has been no externally supervised V2-D invocation, no transient unit/cgroup property enforcement proof, and CT108-only timeout must not be presumed to terminate a detached or remote CT120 Hermes/Codex child. Canonical V2-D `run_v2d_pipeline` has explicit cooperative per-run attempt/wall budgets but the external hard wall-time constraint remains NOT_VERIFIED. No transient unit, kill, restart, ASR, GPU, or live model work is authorized by this observation.
+- Next gate: read-only cgroup/systemd capability and actual invocation-to-remote-child cleanup/ownership inspection, then propose a separately approved narrowly scoped synthetic no-model timeout smoke if warranted before one-shot real quality trial. Keep `REAL_TRIAL_READINESS=NO`, `PRODUCT_QUALITY=NOT_VERIFIED`. Stage11 ACTIVE_WORK commit `77e037a28eb8b72c0b9d817eb01640a9e1bdcef3`.
+
+
 ## V2-E VM122 GPU and Whisper read-only snapshot (2026-11-23)
 
 - Actual `teddy@local-llm` VM122 operator snapshot (`hostname=local-llm`, PID1 systemd): `nvidia-smi` total 12288 MiB, used 7841 MiB, free 4071 MiB, instantaneous GPU utilization 0%; compute process PID 171430 `llama-server` used 7832 MiB. No 8091 TCP listener at inspection (`WHISPER_PORT=NOT_LISTENING`), not global ASR/Whisper idle proof. Host RAM total 19Gi, available 17Gi; swap 4.0Gi total and 30Mi used; root disk 145G total, 109G used, 30G available (79%). No model execution or write during inspection.
