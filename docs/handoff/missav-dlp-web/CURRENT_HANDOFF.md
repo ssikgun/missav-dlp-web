@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## V2-E CT108 cgroup and remote child hard-stop gap (2026-11-23)
+
+- Actual CT108 `root@downloader` read-only evidence: host downloader, systemd PID1, cgroup2fs and v2 controllers cpuset/cpu/io/memory/hugetlb/pids/rdma/misc/dmem. `systemctl is-system-running=degraded`; no current failed-unit identity proved; earlier historical failed transient Stage11 service is documented separately. `teddy-subtitle-normal.service` currently loaded/inactive, `ControlGroup=` empty, `KillMode=control-group`, `TimeoutStopUSec=1min 30s`; those NORMAL unit settings do NOT bind a new V2-D execution. SSH available. Model calls=0, writes=0.
+- Current GitHub canonical source read-only inspection: `teddy_discovery_stage11_v2d.py` `run_v2d_pipeline()` budget is cooperative (`V2DExecutionLimits`). `teddy_discovery_stage11_normal_mode.py` `REMOTE_NATIVE` on CT120 starts native Hermes child with `start_new_session=True` and detects 3600-second absolute/600-second inactivity bounds, then `killpg(SIGTERM)` and possible `SIGKILL`; its parent CT108 SSH transport is `subprocess.run` via deployment bridge. A CT108-local external timeout/systemd cgroup does not itself verify that a remote Hermes child is cleaned up after SSH disconnect, crash or transport timeout. Deployment module has a separately implemented pidfd-checked detached remote quality-review supervisor, but there is no demonstrated wiring of that supervisor to V2-D *native first-pass*. Do not equate quality-review supervision with V2-D end-to-end cancellation.
+- No source/runtime/production mutation or model call. Next should be a tightly scoped isolated source-only review of existing remote supervision/termination semantics (with separate user approval before a no-model synthetic disconnect/timeout test or modifying source), and user-approved numerical one-shot pilot budget only after demonstrated hard-stop. `REAL_TRIAL_READINESS=NO`, `PRODUCT_QUALITY=NOT_VERIFIED`. Stage11 ACTIVE_WORK update commit `ab0db4952081a73f58603f43e33c40ab451efca2`.
+
+
 ## V2-E CT108 external timeout utilities presence (2026-11-23)
 
 - Operator actual `root@downloader` read-only check: hostname `downloader`, PID1 `systemd`. GNU timeout 9.7, systemd-run, systemctl (systemd 257.13), and setsid all present. `systemd-run --help` lists scope/property/wait/pipe/collect options. No model execution or production writes.
