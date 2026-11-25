@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-25 — V2-E HSODA-104 untimed external-JA analysis (Option B) COMPLETE / general solution proposed
+
+- Completed read-only Option B analysis against canonical HEAD `2eecebf618457d97871f071277af3f4c49979ce8`; prior semantic prompt candidate `bbf9b223fdca34bb2530dc19b58c88c6a3b57a17` (`s11-v2e-semantic-prompt-fix-candidate`) preserved untouched. `MODEL_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`.
+- **Evidence:** `VIDEO_DURATION=NOT_STORED_IN_LOCAL_METADATA` (verified ASR270 proves `>= 7,310,424 ms`). ASR270 covers `22,032..7,310,424 ms` (15 segments `>= 3,528,000 ms`); external JA204 covers orig `22,260..7,308,774 ms`. Accepted affine alignment (`62/62` inliers, `scale=1.0000093839`, `intercept_ms=-325.27`, median residual `122.43 ms`) has verified anchor span `22,260..3,528,168 ms` (`ja-000001..ja-000197`).
+- **Root cause of 7 untimed cues (`ja-000198..204`):** not an edition mismatch or out-of-video range. Five cues (`ja-000199`, `ja-000201..204`) are garbled external-JA STT fragments matching existing, more complete ASR segments (`asr-000261`, `asr-000269`, `asr-000270`) and retained legacy targeted ASR within ~1s, which failed lexical anchor matching (`< 0.80`), ending the verified anchor span at `ja-000197`. Two cues (`ja-000198`, `ja-000200`) have no baseline ASR within +/-30s and remain unresolved without audio evidence. No existing recovery path handles partial outside-span cues under `ACCEPT_HYBRID`.
+- **Recommended general solution (awaiting user approval):** under `ACCEPT_HYBRID`, scope aligned external-JA adjudication to cues inside the verified affine anchor span, use the approved ASR-first timeline for outside-span intervals, and preserve outside-span unaligned external-JA cues separately in provenance/proof as non-blocking `UNALIGNED_EXTERNAL_JA_OUTSIDE_AFFINE_SPAN` evidence (no forced `REJECTED`, no extrapolated timestamps, no whole-title `HOLD`; reduces HSODA-104 groups 232 -> 225, `<= 6` batches, 0 extra calls under the 9-call budget).
+
+
 ## 2026-11-25 — V2-E HSODA-104 second real trial VALIDATION_FAILED (Batch 2) / read-only audit complete
 
 - Operator ran the approved one-shot private trial from `/tmp/s11-hsoda104-retest.JSMJj6/source` at canonical HEAD `5d44e73a0606acfac1edcdfb9c2a2ff25dcd149f`, saving private staging/artifacts under `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-pilot-once-20261125-5d44e73a-corrected-schema`. **The one-shot live trial authorization is now CONSUMED**; no replay, resume, or further model execution is authorized.
