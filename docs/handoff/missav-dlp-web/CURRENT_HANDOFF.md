@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-25 — V2-E outside-span recovery candidate v2 (defect fixes) READY / PROMOTION_READY=YES
+
+- New isolated local candidate commit `af1764901c13c4262955cd2057d01de859fab9ad` on `s11-v2e-untimed-ja-recovery-v2-candidate` (parent `6a992b1fcef572d6a44cedc20c28e95b512d552e`, workdir `/tmp/s11-v2e-schema-fix.I1yXcEN3/source`); prior candidates `1bc1412f867b2f17b51df8eddb7935aa04c37fc4` and `bbf9b223fdca34bb2530dc19b58c88c6a3b57a17` preserved untouched. No product source promoted or pushed.
+- **Changed files (4):** `teddy_discovery_stage11_ja_master.py` (`c7654394...`), `teddy_discovery_stage11_v2d.py` (`7683193e...`), `teddy_discovery_stage11_hsoda104_pilot.py` (`6b0e2e93...`), `teddy_discovery_stage11_v2d_smoke.py` (`66c570b9...`).
+- **Fixes & recalculated HSODA-104 bounds:** propagated `exclude_group_ids`, `supplemental_groups`, effective `source_fingerprint`, and `outside_span_recovery_sha256` across early/late `_readjudicate_targeted_groups` and late `materialize_ja_master`; explicit `SUPPLEMENTAL_ASR_ADDITIONAL_AUDIO_UNSUPPORTED` HOLD on supplemental initial audio requests; removed 0.50 fuzzy skip gate without introducing any new numeric cutoff (exact normalized equality only; HSODA-104 merges all 7 outside-span cues into `4` windows, `48,625 ms <= 60,000 ms`, max `17,028 ms <= 30,000 ms`; active 225 groups still `6` batches `(31,43,45,38,38,30)` <= `128,000` bytes); added monotonic segment/window word-timing validation.
+- **Targeted regressions:** `S11_V2D_OFFLINE_SMOKE=PASS`, `EARLY_READJUDICATION=PASS`, `LATE_READJUDICATION=PASS`, `FALSE_DUPLICATE_PROTECTION=PASS`, `WORD_TIMING_VALIDATION=PASS`. `PROMOTION_READY=YES`, `HERMES_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`.
+
+
 ## 2026-11-25 — V2-E outside-affine-span ASR-first + bounded targeted ASR recovery ISOLATED CANDIDATE READY
 
 - Isolated local candidate commit `1bc1412f867b2f17b51df8eddb7935aa04c37fc4` on `s11-v2e-untimed-ja-recovery-candidate` (parent `db146eabce0133c6fbd30aed35560a0428f1d3e1`, workdir `/tmp/s11-v2e-schema-fix.I1yXcEN3/source`), reusing verified `SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION` from preserved candidate `bbf9b223fdca34bb2530dc19b58c88c6a3b57a17` (untouched). No product source promoted or pushed.
