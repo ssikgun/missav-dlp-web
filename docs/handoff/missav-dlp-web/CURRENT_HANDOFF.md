@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-25 — V2-E outside-affine-span ASR-first + bounded targeted ASR recovery ISOLATED CANDIDATE READY
+
+- Isolated local candidate commit `1bc1412f867b2f17b51df8eddb7935aa04c37fc4` on `s11-v2e-untimed-ja-recovery-candidate` (parent `db146eabce0133c6fbd30aed35560a0428f1d3e1`, workdir `/tmp/s11-v2e-schema-fix.I1yXcEN3/source`), reusing verified `SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION` from preserved candidate `bbf9b223fdca34bb2530dc19b58c88c6a3b57a17` (untouched). No product source promoted or pushed.
+- **Changed files (4):** `teddy_discovery_stage11_ja_master.py` (`c7654394...`), `teddy_discovery_stage11_v2d.py` (`67a987d1...`), `teddy_discovery_stage11_hsoda104_pilot.py` (`a6429a67...`), `teddy_discovery_stage11_v2d_smoke.py` (`66c570b9...`). Adds distinct `supplemental_asr` provenance (`sup-asr-<24hex>` with verified audio offsets), general outside-span lexical+interval baseline assessment, bounded hypothesis-only targeted ASR planning/execution (V1 +/-5s, 30s/window, 60s total), baseline deduplication, and fail-closed `HOLD` on unresolved/no-speech/budget-exceeded.
+- **HSODA-104 packing & offline validation:** 232 raw -> 225 active groups (`(31,43,45,38,38,30)`, max `127,771 <= 128,000`) + 7 outside-span (4 baseline-supported `ja-000201..204`, 3 requiring bounded targeted ASR `ja-000198..200`, `31,597 ms <= 60,000 ms`). Reusing validated `ja-000200` diagnostic (`34d095f9...`, read-only `diagnostic_only=True`): 227 groups (`(31,43,45,38,38,32)`, max `127,771 <= 128,000`, 6 batches unchanged). `JA_MASTER_SMOKE=PASS`, `UTTERANCE_GROUPS_SMOKE=PASS`, `S11_V2D_OFFLINE_SMOKE=PASS`, `ALL_OFFLINE_CHECKS=PASS`. `HERMES_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`.
+
+
 ## 2026-11-25 — V2-E HSODA-104 two-window untimed hypothesis targeted ASR EXECUTED (authorization CONSUMED)
 
 - Executed bounded diagnostic targeted ASR from clean isolated canonical checkout `1a59ce77990400ddc616750e54cba8c7727d1634` on CT108 (`downloader`) reusing `ASRMediaSourceReader`, `iter_audio_chunks`, and VM122 `BoundedTargetedASRTransport` (`faster-whisper / large-v3 / cuda / int8_float16`, `engine_version=1.2.1`). `ASR_EXECUTION_COUNT=2` (1 per window; **authorization CONSUMED**, no retry), `HERMES_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`.
