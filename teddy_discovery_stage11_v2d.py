@@ -1522,7 +1522,9 @@ def build_v2d_targeted_asr_adapter(*, holding_resolver, source_provider, targete
                         raise V2DHold("TARGETED_ASR_RUNTIME_CHANGED")
                     if budget is not None:
                         budget.require_time(reserve, reason="WALL_TIME_LIMIT_BEFORE_TARGETED_ASR")
-                        active_transport = _BudgetedTargetedTransport(active_transport, budget)
+                        active_transport = _BudgetedTargetedTransport(
+                            active_transport, budget, request_timeout_seconds=request_timeout,
+                        )
                     active_audio_iterator = audio_chunk_iterator
                     if budget is not None:
                         def active_audio_iterator(*args, **kwargs):
@@ -1532,7 +1534,7 @@ def build_v2d_targeted_asr_adapter(*, holding_resolver, source_provider, targete
                     provider = build_targeted_audio_window_provider(
                         local_source, audio_chunk_iterator=active_audio_iterator,
                     )
-                    return operation(local_source, active_transport, provider)
+                    return operation(local_source, active_transport, provider, active_audio_iterator)
         except (V2DHold, V2DLimitStop):
             raise
         except Exception as error:
@@ -1550,7 +1552,7 @@ def build_v2d_targeted_asr_adapter(*, holding_resolver, source_provider, targete
             raise V2DHold("TARGETED_ASR_BASELINE_IDENTITY_MISMATCH")
         return execute_for_snapshot(
             asr_result.source_snapshot,
-            lambda _source, active, provider: _execute_targeted_plan(
+            lambda _source, active, provider, _audio_iterator: _execute_targeted_plan(
                 plan, asr_result=asr_result, targeted_transport=active,
                 audio_window_provider=provider,
             ),
@@ -1562,7 +1564,7 @@ def build_v2d_targeted_asr_adapter(*, holding_resolver, source_provider, targete
             raise V2DHold("TARGETED_ASR_EXTERNAL_REQUEST_INVALID")
         if not request.windows or any(type(window) is not TargetedASRWindow for window in request.windows):
             raise V2DHold("TARGETED_ASR_EXTERNAL_WINDOWS_INVALID")
-        def run(_source, active, _provider):
+        def run(_source, active, _provider, active_audio_iterator):
             return run_targeted_hybrid_windows(
                 request.windows, local_source=_source, targeted_transport=active,
                 audio_chunk_iterator=active_audio_iterator,
@@ -1578,7 +1580,7 @@ def build_v2d_targeted_asr_adapter(*, holding_resolver, source_provider, targete
         if not recovery_plan.windows:
             raise V2DHold("OUTSIDE_SPAN_RECOVERY_WINDOWS_EMPTY")
 
-        def run(local_source, active, _provider):
+        def run(local_source, active, _provider, active_audio_iterator):
             import av
             with av.open(str(local_source.local_path)) as container:
                 dur_ms = int(round((float(container.duration) / float(av.time_base)) * 1000))
@@ -1589,7 +1591,7 @@ def build_v2d_targeted_asr_adapter(*, holding_resolver, source_provider, targete
                 if not (0 <= win.start_ms < win.end_ms <= dur_ms):
                     raise V2DHold("OUTSIDE_SPAN_WINDOW_OUTSIDE_VIDEO_DURATION")
                 dur_sec = (win.end_ms - win.start_ms) / 1000.0
-                chunks = tuple(iter_audio_chunks(
+                chunks = tuple(active_audio_iterator(
                     local_source,
                     chunk_seconds=dur_sec,
                     start_seconds=win.start_ms / 1000.0,
@@ -2241,12 +2243,22 @@ def _budgeted_invoke(invoke: Callable, budget: _V2DRunBudget, owner):
 
 
 class _BudgetedTargetedTransport:
-    def __init__(self, transport, budget: _V2DRunBudget):
+    def __init__(self, transport, budget: _V2DRunBudget,
+                 *, request_timeout_seconds: int | float | None = None):
         self._transport = transport
         self._budget = budget
         self.runtime_identity = transport.runtime_identity
         self.engine_version = transport.engine_version
-        self.request_timeout_seconds = transport.request_timeout_seconds
+        timeout = (
+            transport.request_timeout_seconds
+            if request_timeout_seconds is None
+            else request_timeout_seconds
+        )
+        if (type(timeout) not in (int, float)
+                or not math.isfinite(float(timeout))
+                or timeout <= 0 or timeout > 900):
+            raise V2DHold("TARGETED_ASR_EXISTING_TIMEOUT_BOUND_UNAVAILABLE")
+        self.request_timeout_seconds = float(timeout)
 
     def transcribe_targeted_chunk(self, chunk):
         self._budget.reserve_targeted_asr(self.request_timeout_seconds)
