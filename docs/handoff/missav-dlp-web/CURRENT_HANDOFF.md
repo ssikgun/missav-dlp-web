@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-25 — V2-E outside-span recovery candidate v2 canonical source promotion COMPLETE
+
+- `SOURCE_PROMOTION=PASS`. Promoted exact 4 files from local candidate `af1764901c13c4262955cd2057d01de859fab9ad` (parent `6a992b1fcef572d6a44cedc20c28e95b512d552e`) to canonical `teddy-subtitle-stage11` as source commit `03b30599b3fe63e7c071530261df66f47cb3189d` (parent `0b0c2d3873da1059af3193c52e3488e9e1cbc312`) via clean fast-forward push on `s11-v2e-outside-span-v2-promotion`.
+- `REMOTE_SHA256_MATCH=PASS` on all 4 fetched remote blobs: `teddy_discovery_stage11_ja_master.py` (`c76543944168e381104bedba883a54a732158b02ddb19f324adad5a7410ef57b`), `teddy_discovery_stage11_v2d.py` (`7683193e82e6abcd6282856ef0d10e00ad5e931e509b999b1668672218a9a3f2`), `teddy_discovery_stage11_hsoda104_pilot.py` (`6b0e2e93ae4df00efbf886d638073f493ef46df05590afb0578a004384ce9d1b`), `teddy_discovery_stage11_v2d_smoke.py` (`66c570b99a1ab18d590c31aee191413f6cf5114b017d316920319e29f5cc0f0b`).
+- Prior candidate branches (`af176490`, `1bc1412f`, `bbf9b223`) and retained private evidence preserved untouched. `HERMES_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`. Integrated live trial requires separate explicit approval.
+
+
 ## 2026-11-25 — V2-E outside-span recovery candidate v2 (defect fixes) READY / PROMOTION_READY=YES
 
 - New isolated local candidate commit `af1764901c13c4262955cd2057d01de859fab9ad` on `s11-v2e-untimed-ja-recovery-v2-candidate` (parent `6a992b1fcef572d6a44cedc20c28e95b512d552e`, workdir `/tmp/s11-v2e-schema-fix.I1yXcEN3/source`); prior candidates `1bc1412f867b2f17b51df8eddb7935aa04c37fc4` and `bbf9b223fdca34bb2530dc19b58c88c6a3b57a17` preserved untouched. No product source promoted or pushed.
