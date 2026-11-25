@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-25 — V2-E targeted ASR session/external-JA interface fix canonical source promotion COMPLETE
+
+- `SOURCE_PROMOTION=PASS`. Promoted exact 1 file (`teddy_discovery_stage11_v2d.py`, `+20/-8`) from local candidate `81fce4a68005e4f86bce6f821dac1d304a3f920e` (parent `db256a8a0a06df698612d68a45d79c06c08e374d`) to canonical `teddy-subtitle-stage11` as source commit `aba06332318a5c8e0e36b130b341cfa088cd935b` (parent `95401b63cb652a634a3b01d14564aa6b41a652ff`) via clean fast-forward push on `s11-v2e-asr-session-binding-promotion`.
+- `REMOTE_SHA256_MATCH=PASS`: fetched remote `teddy_discovery_stage11_v2d.py` SHA256 = `24e84ebd8c8a9e01130a029812bbbca7219e8f35a5850c5ca53b8627e204686e`; `OTHER_FILES_DIFF_COUNT=0` (all other product sources unchanged).
+- Prior candidate branches (`81fce4a6`, `af176490`, `1bc1412f`, `bbf9b223`) and all retained private trial/diagnostic evidence preserved untouched. `HERMES_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`. 4th live integrated trial requires separate explicit user approval.
+
+
 ## 2026-11-25 — V2-E targeted ASR session/external-JA interface fix ISOLATED CANDIDATE READY / PROMOTION_READY=YES
 
 - **Root cause reproduced offline** using actual `BoundedTargetedASRSession` + `_BudgetedTargetedTransport`: `AttributeError: 'BoundedTargetedASRSession' object has no attribute 'request_timeout_seconds'` at `teddy_discovery_stage11_v2d.py:2249` (wrapped as `V2DHold("TARGETED_ASR_EXECUTION_OR_CLEANUP_FAILED")` in `execute_for_snapshot`).
