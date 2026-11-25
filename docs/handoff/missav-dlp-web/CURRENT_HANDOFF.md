@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-25 — V2-E targeted ASR session/external-JA interface fix ISOLATED CANDIDATE READY / PROMOTION_READY=YES
+
+- **Root cause reproduced offline** using actual `BoundedTargetedASRSession` + `_BudgetedTargetedTransport`: `AttributeError: 'BoundedTargetedASRSession' object has no attribute 'request_timeout_seconds'` at `teddy_discovery_stage11_v2d.py:2249` (wrapped as `V2DHold("TARGETED_ASR_EXECUTION_OR_CLEANUP_FAILED")` in `execute_for_snapshot`).
+- **Isolated local candidate commit:** `81fce4a68005e4f86bce6f821dac1d304a3f920e` on `s11-v2e-asr-session-binding-fix-candidate` (parent `db256a8a0a06df698612d68a45d79c06c08e374d`, workdir `/tmp/s11-v2e-schema-fix.I1yXcEN3/source`). No product source promoted or pushed.
+- **Changed file (1):** `teddy_discovery_stage11_v2d.py` (SHA256 `24e84ebd8c8a9e01130a029812bbbca7219e8f35a5850c5ca53b8627e204686e`, `+20/-8`). Passes validated `request_timeout` explicitly to `_BudgetedTargetedTransport`; passes budget-guarded `active_audio_iterator` into `operation(...)` so `targeted_external_ja` resolves scope cleanly and `targeted_outside_span` reuses the same budget-guarded audio decode path. `teddy_discovery_asr_bounded_worker.py` and worker lifecycle/cleanup unchanged.
+- **Offline verification with actual `BoundedTargetedASRSession` + real PyAV `iter_audio_chunks` + inert I/O boundary:** `CASE1_OUTSIDE_SPAN=PASS`, `CASE2_EXTERNAL_JA=PASS`, `CASE3A_WALL_LIMIT_BEFORE_SESSION=PASS`, `CASE3B_WALL_LIMIT_IN_SESSION_CLEANUP=PASS`, `S11_V2D_OFFLINE_SMOKE=PASS`. `PROMOTION_READY=YES`, `HERMES_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`. Separate user approval required for source promotion and any 4th trial.
+
+
 ## 2026-11-25 — V2-E outside-span recovery candidate v2 canonical source promotion COMPLETE
 
 - `SOURCE_PROMOTION=PASS`. Promoted exact 4 files from local candidate `af1764901c13c4262955cd2057d01de859fab9ad` (parent `6a992b1fcef572d6a44cedc20c28e95b512d552e`) to canonical `teddy-subtitle-stage11` as source commit `03b30599b3fe63e7c071530261df66f47cb3189d` (parent `0b0c2d3873da1059af3193c52e3488e9e1cbc312`) via clean fast-forward push on `s11-v2e-outside-span-v2-promotion`.
