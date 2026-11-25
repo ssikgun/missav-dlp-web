@@ -1,5 +1,17 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E 4th trial retained evidence & continuation feasibility read-only analysis COMPLETE
+
+- **Read-only audit against canonical `e6fab608594b5bae95ca882bac6fc45da54ea055`** of `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-pilot-once-20261125-session-fix-v4` (`HERMES_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`).
+- **Retained evidence validated (`reuse_only=True`, `ForbidNetworkBridge` PASS):**
+  - Outside-span recovery (`8b95e095...`): 4/4 windows (`48,625 ms`) `SPEECH_CANDIDATE_FOUND` -> 9 supplemental groups -> **234 effective groups**, 6 initial batches `(31,43,45,38,38,39)` all `<= 128,000` bytes.
+  - Initial 6 batches (8 receipts): all 6 final attempts VALID. Exact retry errors: **Batch 2 attempt 1** `V2DError: JA Master batch candidate/source coverage differs` (`group-2c1ec243...`); **Batch 5 attempt 1** `V2DError: JA Master batch group coverage/order differs` (`len_obs=38, missing=1, extra=1`). 50 groups requested `audio_evidence_needed=True`.
+  - 43 targeted ASR requests validated: `4` outside-span + `19` ASR-based targeted second evidence + `20` External-JA targeted evidence = `43` (all 3 reuse validators PASS).
+  - Targeted re-adjudication (50 groups -> **3 batches**): **Batch 1** (`30d9f7caa232`, 18 groups) receipt structurally VALID (`reuse_only=True` PASS), **but 5 groups still have `audio_evidence_needed=True` & `UNCERTAIN`**; **Batch 2** (`8f5d77b4f433`, 20 groups) prompt-only (stopped before attempt #10 by `HERMES_ATTEMPT_LIMIT`); **Batch 3** (`2850a7af4a18`, 12 groups) unstarted.
+- **Reuse & critical continuation blocker:** Existing `NativeNormalFirstPass` receipt reuse (`HERMES_RESULT_REUSE=READY`) and all 3 ASR artifact loaders (`ASR_RESULT_REUSE=READY`) allow 0-cost reuse even with `reuse_only=False`, and `store()` handles Batch 2's prompt-only file via `_install_or_reuse`. However, (1) `run_hsoda104_pilot_once` enforces a fresh exclusive run root (requiring a separately approved continuation entrypoint copying validated `staging/` to a fresh root), and (2) **continuing under unchanged code + Batch 1 receipt will deterministically hit `V2DHold("INITIAL_TARGETED_ASR_UNCERTAINTY_REMAINS")` at `v2d.py:3331-3332` right after Batch 3** due to the 5 remaining `audio_evidence_needed=True` groups in Batch 1.
+- **Remaining work & recommendation:** Remaining re-adjudication = 2 batches (confirmed). If all 50 groups resolve cleanly: minimum **4–5 additional Hermes calls** (`2 readj + 1 translate + 1..2 review`), practical additional budget **10–12 calls** (accounting for fixed-64 translation fallback of ~248–267 cues + retries), **0** additional ASR calls. Recommend deciding targeted re-adjudication policy/prompt handling for post-ASR conflicts BEFORE approving any continuation run.
+
+
 ## 2026-11-25 — V2-E targeted ASR session/external-JA interface fix canonical source promotion COMPLETE
 
 - `SOURCE_PROMOTION=PASS`. Promoted exact 1 file (`teddy_discovery_stage11_v2d.py`, `+20/-8`) from local candidate `81fce4a68005e4f86bce6f821dac1d304a3f920e` (parent `db256a8a0a06df698612d68a45d79c06c08e374d`) to canonical `teddy-subtitle-stage11` as source commit `aba06332318a5c8e0e36b130b341cfa088cd935b` (parent `95401b63cb652a634a3b01d14564aa6b41a652ff`) via clean fast-forward push on `s11-v2e-asr-session-binding-promotion`.
