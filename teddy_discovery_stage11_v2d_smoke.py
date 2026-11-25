@@ -345,9 +345,33 @@ def main():
         staging = _private_subdir(base, "staging")
         output = _private_subdir(base, "output")
         invoke = OfflineInvoke(triage_repair=True)
+        def _smoke_outside_runner():
+            pass
+        def _smoke_outside_span(recovery_plan):
+            return {
+                "schema_version": 1,
+                "verified_container_duration_ms": 60_000,
+                "runtime_identity": {
+                    "engine": "faster-whisper", "model": "large-v3", "device": "cuda",
+                    "compute_type": "int8_float16", "cpu_threads": None, "num_workers": 1,
+                },
+                "engine_version": "1.2.1",
+                "windows": [{
+                    "window_id": w.window_id, "start_ms": w.start_ms, "end_ms": w.end_ms,
+                    "external_source_keys": list(w.external_source_keys),
+                    "outcome": "SPEECH_CANDIDATE_FOUND",
+                    "segments": [{
+                        "start_ms": w.start_ms + 100, "end_ms": w.start_ms + 900,
+                        "text": "補完音声テスト",
+                        "words": [{"start_ms": w.start_ms + 100, "end_ms": w.start_ms + 900, "text": "補完音声テスト"}],
+                    }],
+                } for w in recovery_plan.windows],
+            }
+        _smoke_outside_runner.targeted_outside_span = _smoke_outside_span
         result = run_v2d_pipeline(
             _plan(True), invoke=invoke, hermes_settings=settings,
             staging_root=staging, output_directory=output, claim_token=1,
+            targeted_runner=_smoke_outside_runner,
         )
         require(result.state == "CLEAN_SRT_READY", "CONNECTED_PIPELINE_READY")
         require(result.master is not None and len(result.master.cues) > 0, "JA_MASTER_MATERIALIZED")
@@ -553,6 +577,7 @@ def main():
         invoke = OfflineInvoke(needs_audio_evidence=True, reject_asr=True)
         output = _private_subdir(base, "output")
         runner = OfflineTargetedRunner(plan.review_set._source_bundle.asr_result.runtime_identity)
+        runner.targeted_outside_span = _smoke_outside_span
         result = run_v2d_pipeline(
             plan, invoke=invoke, hermes_settings=settings,
             staging_root=_private_subdir(base, "staging"), output_directory=output,

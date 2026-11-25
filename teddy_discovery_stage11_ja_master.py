@@ -38,6 +38,9 @@ from teddy_discovery_hybrid_evidence import (
 )
 
 
+EVIDENCE_SOURCE_SUPPLEMENTAL_ASR: Final = "supplemental_asr"
+_SUPPLEMENTAL_ASR_ID_RE: Final = re.compile(r"^sup-asr-[0-9a-f]{24}$")
+
 RELATION_MATCHED: Final = "MATCHED"
 RELATION_ASR_ONLY: Final = "ASR_ONLY"
 RELATION_EXTERNAL_ONLY: Final = "EXTERNAL_ONLY"
@@ -106,13 +109,21 @@ class JAMasterSourceReference:
     aligned_end_ms: Fraction | None
 
     def __post_init__(self):
-        if self.source not in {EVIDENCE_SOURCE_ASR_SEGMENT, EVIDENCE_SOURCE_EXTERNAL_JA}:
+        if self.source not in {
+            EVIDENCE_SOURCE_ASR_SEGMENT,
+            EVIDENCE_SOURCE_EXTERNAL_JA,
+            EVIDENCE_SOURCE_SUPPLEMENTAL_ASR,
+        }:
             raise JAMasterValidationError("source kind is unsupported")
         if type(self.source_index) is not int or self.source_index < 0:
             raise JAMasterValidationError("source index is invalid")
-        expected_id = stable_cue_id(self.source, self.source_index)
-        if self.source_id != expected_id:
-            raise JAMasterValidationError("source ID is detached from source index")
+        if self.source == EVIDENCE_SOURCE_SUPPLEMENTAL_ASR:
+            if type(self.source_id) is not str or _SUPPLEMENTAL_ASR_ID_RE.fullmatch(self.source_id) is None:
+                raise JAMasterValidationError("supplemental ASR source ID is invalid")
+        else:
+            expected_id = stable_cue_id(self.source, self.source_index)
+            if self.source_id != expected_id:
+                raise JAMasterValidationError("source ID is detached from source index")
         if (
             type(self.source_locator) is not str
             or not self.source_locator
@@ -136,6 +147,11 @@ class JAMasterSourceReference:
                 or self.aligned_end_ms <= self.aligned_start_ms
             ):
                 raise JAMasterValidationError("aligned interval is invalid")
+        if self.source == EVIDENCE_SOURCE_SUPPLEMENTAL_ASR and (
+            self.aligned_start_ms != Fraction(self.original_start_ms)
+            or self.aligned_end_ms != Fraction(self.original_end_ms)
+        ):
+            raise JAMasterValidationError("supplemental ASR reference must use exact verified audio offsets")
 
     @property
     def key(self) -> str:
@@ -841,6 +857,7 @@ __all__ = [
     "DECISION_ACCEPTED",
     "DECISION_REJECTED",
     "DECISION_UNCERTAIN",
+    "EVIDENCE_SOURCE_SUPPLEMENTAL_ASR",
     "JAMaster",
     "JAMasterCandidate",
     "JAMasterCue",

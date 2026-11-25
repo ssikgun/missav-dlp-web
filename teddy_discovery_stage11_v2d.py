@@ -11,6 +11,7 @@ through the existing ``NativeNormalFirstPass.invoke``-compatible callback.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from difflib import SequenceMatcher
 from fractions import Fraction
 import contextvars
 import hashlib
@@ -25,14 +26,21 @@ import uuid
 from contextlib import nullcontext
 from typing import Callable
 
+from teddy_discovery_alignment import normalize_japanese_for_matching
 from teddy_discovery_stage11_ja_master import (
     DECISION_ACCEPTED,
     DECISION_REJECTED,
     DECISION_UNCERTAIN,
+    EVIDENCE_SOURCE_SUPPLEMENTAL_ASR,
     JAMasterReviewSet,
     JAMasterSourceReference,
 )
 from teddy_discovery_stage11_utterance_groups import (
+    ASRWordReference,
+    SPEAKER_UNKNOWN,
+    UTTERANCE_UNRESOLVED,
+    UtteranceMember,
+    UtteranceReviewGroup,
     UtteranceReviewPlan,
     validate_utterance_review_plan,
 )
@@ -69,7 +77,7 @@ from teddy_discovery_stateful_parts import (
 from teddy_discovery_stage11_controller import Stage11ControllerError
 from teddy_discovery_stage11_hermes_profile import HermesExecutionSettings
 from teddy_discovery_stage11_ja_master import ROUTE_EXTERNAL_ALIGNMENT_ACCEPTED
-from teddy_discovery_asr import ASRResult, ASRRuntimeIdentity
+from teddy_discovery_asr import ASRResult, ASRRuntimeIdentity, ASRSegment, ASRWord
 from teddy_discovery_asr_artifact import serialize_asr_result
 from teddy_discovery_asr_audio import iter_audio_chunks
 from teddy_discovery_asr_source import ASRLocalMediaSource
@@ -306,10 +314,19 @@ def _private_child(parent: Path, name: str, *, create: bool) -> Path:
     return _private_dir(parent / name, create=create)
 
 
-def _source_fingerprint(plan: UtteranceReviewPlan) -> str:
+def _source_fingerprint(
+    plan: UtteranceReviewPlan,
+    *,
+    exclude_group_ids: tuple[str, ...] = (),
+    supplemental_groups: tuple[UtteranceReviewGroup, ...] = (),
+) -> str:
     review = plan.review_set
+    excluded = set(exclude_group_ids)
+    effective_groups = tuple(
+        g for g in plan.groups if g.group_id not in excluded
+    ) + tuple(supplemental_groups)
     groups = []
-    for group in plan.groups:
+    for group in effective_groups:
         members = []
         for member in group.members:
             ref = member.source_reference
@@ -356,15 +373,22 @@ def _source_fingerprint(plan: UtteranceReviewPlan) -> str:
         "route": review.route,
         "groups": groups,
     }
+    if exclude_group_ids:
+        identity["excluded_outside_span_group_ids"] = list(exclude_group_ids)
     return _sha(_wire(identity))
 
 
-def _group_payload(plan: UtteranceReviewPlan, group) -> dict[str, object]:
+def _group_payload(
+    plan: UtteranceReviewPlan,
+    group,
+    *,
+    source_fingerprint: str | None = None,
+) -> dict[str, object]:
     candidate_by_id = {item.candidate_id: item for item in plan.review_set.candidates}
     return {
         "schema_version": V2D_SCHEMA_VERSION,
         "dvd_id": plan.review_set.dvd_id,
-        "source_fingerprint": _source_fingerprint(plan),
+        "source_fingerprint": _source_fingerprint(plan) if source_fingerprint is None else source_fingerprint,
         "route": plan.review_set.route,
         "group": {
             "group_id": group.group_id,
@@ -549,6 +573,467 @@ class V2DMaster:
     source_fingerprint: str
     master_sha256: str
     targeted_evidence_sha256: str | None = None
+    outside_span_recovery_sha256: str | None = None
+    excluded_outside_span_group_ids: tuple[str, ...] = ()
+    supplemental_groups: tuple[UtteranceReviewGroup, ...] = field(default=(), repr=False)
+
+
+OUTSIDE_SPAN_CANDIDATE_RATIONALE = "EXTERNAL_CUE_OUTSIDE_AFFINE_EVIDENCE_SPAN"
+OUTSIDE_SPAN_DISPOSITION_BASELINE_SUPPORTED = "BASELINE_ASR_EXACT_MATCH_SUPPORTED"
+OUTSIDE_SPAN_DISPOSITION_NEEDS_TARGETED_ASR = "REQUIRES_BOUNDED_TARGETED_ASR"
+OUTSIDE_SPAN_OUTCOME_SPEECH_FOUND = "SPEECH_CANDIDATE_FOUND"
+OUTSIDE_SPAN_OUTCOME_NO_SPEECH = "NO_DETECTED_SPEECH"
+OUTSIDE_SPAN_OUTCOME_INCONCLUSIVE = "INCONCLUSIVE"
+
+
+@dataclass(frozen=True)
+class OutsideSpanRecoveryLimits:
+    """Explicit conservative bounds for outside-affine-span targeted ASR recovery."""
+
+    pre_padding_ms: int = STAGE11_TARGETED_SECOND_EVIDENCE_WINDOW_POLICY_V1.pre_padding_ms
+    post_padding_ms: int = STAGE11_TARGETED_SECOND_EVIDENCE_WINDOW_POLICY_V1.post_padding_ms
+    merge_gap_ms: int = STAGE11_TARGETED_SECOND_EVIDENCE_WINDOW_POLICY_V1.merge_gap_ms
+    max_window_ms: int = 30_000
+    max_total_audio_ms: int = 60_000
+
+    def __post_init__(self):
+        for name in ("pre_padding_ms", "post_padding_ms", "merge_gap_ms"):
+            val = getattr(self, name)
+            if type(val) is not int or val < 0:
+                raise V2DError(name + " must be a nonnegative integer")
+        if type(self.max_window_ms) is not int or self.max_window_ms <= 0:
+            raise V2DError("max_window_ms must be a positive integer")
+        if type(self.max_total_audio_ms) is not int or self.max_total_audio_ms < self.max_window_ms:
+            raise V2DError("max_total_audio_ms must be >= max_window_ms")
+
+
+@dataclass(frozen=True)
+class OutsideSpanExternalCueAssessment:
+    group_id: str
+    source_reference: JAMasterSourceReference = field(repr=False)
+    external_text: str = field(repr=False)
+    hypothesis_start_ms: Fraction
+    hypothesis_end_ms: Fraction
+    disposition: str
+    supporting_baseline_source_keys: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class OutsideSpanHypothesisWindow:
+    window_id: str
+    start_ms: int
+    end_ms: int
+    external_source_keys: tuple[str, ...]
+    hypothesis_intervals_ms: tuple[tuple[str, Fraction, Fraction], ...]
+
+
+@dataclass(frozen=True)
+class OutsideSpanRecoveryPlan:
+    source_snapshot: object = field(repr=False)
+    baseline_asr_sha256: str
+    external_ja_sha256: str
+    limits: OutsideSpanRecoveryLimits
+    excluded_group_ids: tuple[str, ...]
+    assessments: tuple[OutsideSpanExternalCueAssessment, ...]
+    windows: tuple[OutsideSpanHypothesisWindow, ...]
+    total_audio_ms: int
+    exceeds_budget: bool
+    budget_violation_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class RecoveredSupplementalASRSegment:
+    source_id: str
+    window_id: str
+    window_start_ms: int
+    window_end_ms: int
+    start_ms: int
+    end_ms: int
+    text: str = field(repr=False)
+    words: tuple[ASRWord, ...] = field(default=(), repr=False)
+    trigger_external_source_keys: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class OutsideSpanWindowOutcome:
+    window_id: str
+    start_ms: int
+    end_ms: int
+    external_source_keys: tuple[str, ...]
+    outcome: str
+    segments: tuple[RecoveredSupplementalASRSegment, ...] = ()
+
+
+@dataclass(frozen=True)
+class OutsideSpanRecoveryResult:
+    plan: OutsideSpanRecoveryPlan = field(repr=False)
+    runtime_identity: ASRRuntimeIdentity | None
+    engine_version: str | None
+    verified_container_duration_ms: int | None
+    artifact_sha256: str
+    window_outcomes: tuple[OutsideSpanWindowOutcome, ...]
+    diagnostic_only: bool = False
+
+
+def split_outside_span_groups(
+    plan: UtteranceReviewPlan,
+) -> tuple[tuple[UtteranceReviewGroup, ...], tuple[UtteranceReviewGroup, ...]]:
+    """Separate outside-affine-span untimed external-JA groups from active groups."""
+    plan = validate_utterance_review_plan(plan)
+    review = plan.review_set
+    if review.route != ROUTE_EXTERNAL_ALIGNMENT_ACCEPTED or review._source_alignment is None:
+        return plan.groups, ()
+    cand_by_id = {c.candidate_id: c for c in review.candidates}
+    active, outside = [], []
+    for group in plan.groups:
+        is_outside = (
+            group.source_cardinality == "EXTERNAL_JA_ONLY"
+            and bool(group.members)
+            and all(
+                m.source_reference.source == "external_ja"
+                and m.source_reference.aligned_start_ms is None
+                and m.source_reference.aligned_end_ms is None
+                for m in group.members
+            )
+            and bool(group.candidate_ids)
+            and all(
+                OUTSIDE_SPAN_CANDIDATE_RATIONALE in cand_by_id[cid].rationale_codes
+                for cid in group.candidate_ids
+            )
+        )
+        if is_outside:
+            outside.append(group)
+        else:
+            active.append(group)
+    return tuple(active), tuple(outside)
+
+
+def _find_baseline_comparison_candidates(
+    external_text: str,
+    hyp_start: Fraction,
+    hyp_end: Fraction,
+    tolerance_ms: Fraction,
+    baseline_asr: ASRResult,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Locate comparison candidates by interval/lexical overlap; skip recovery ONLY on exact normalized equality.
+
+    Lexical similarity is used strictly to identify comparison candidates, never as a
+    conclusive speech-coverage cutoff.  Any non-exact match remains eligible for
+    bounded targeted ASR recovery so short/partial utterances are not dropped.
+    """
+    ext_norm = normalize_japanese_for_matching(external_text)
+    exact_matches: list[str] = []
+    comparison_candidates: list[str] = []
+    for idx, seg in enumerate(baseline_asr.segments):
+        if Fraction(seg.end_ms) < hyp_start - tolerance_ms or Fraction(seg.start_ms) > hyp_end + tolerance_ms:
+            continue
+        key = EVIDENCE_SOURCE_ASR_SEGMENT + ":" + stable_cue_id(EVIDENCE_SOURCE_ASR_SEGMENT, idx)
+        asr_norm = normalize_japanese_for_matching(seg.text)
+        if ext_norm and asr_norm and ext_norm == asr_norm:
+            exact_matches.append(key)
+            comparison_candidates.append(key)
+        elif ext_norm and asr_norm and SequenceMatcher(None, ext_norm, asr_norm, autojunk=False).find_longest_match(
+            0, len(ext_norm), 0, len(asr_norm),
+        ).size > 0:
+            comparison_candidates.append(key)
+    return tuple(exact_matches), tuple(comparison_candidates)
+
+
+def _validate_recovered_word_timings(
+    words: tuple[ASRWord, ...],
+    *,
+    seg_start_ms: int,
+    seg_end_ms: int,
+    win_start_ms: int,
+    win_end_ms: int,
+    error_cls: type[Exception] = V2DHold,
+) -> None:
+    if not (win_start_ms <= seg_start_ms < seg_end_ms <= win_end_ms):
+        raise error_cls("OUTSIDE_SPAN_RECOVERY_SEGMENT_OUTSIDE_WINDOW")
+    prev_end = seg_start_ms
+    for word in words:
+        if (type(word.start_ms) is not int or type(word.end_ms) is not int
+                or not (win_start_ms <= seg_start_ms <= word.start_ms < word.end_ms <= seg_end_ms <= win_end_ms)
+                or word.start_ms < prev_end):
+            raise error_cls("OUTSIDE_SPAN_RECOVERY_WORD_TIMING_INVALID")
+        prev_end = word.end_ms
+
+
+def plan_outside_span_recovery(
+    plan: UtteranceReviewPlan,
+    *,
+    limits: OutsideSpanRecoveryLimits = OutsideSpanRecoveryLimits(),
+) -> OutsideSpanRecoveryPlan:
+    """Assess outside-affine-span untimed external JA cues and plan bounded hypothesis windows."""
+    if type(limits) is not OutsideSpanRecoveryLimits:
+        raise V2DError("OutsideSpanRecoveryLimits is required")
+    plan = validate_utterance_review_plan(plan)
+    review = plan.review_set
+    _, outside_groups = split_outside_span_groups(plan)
+    if not outside_groups:
+        return OutsideSpanRecoveryPlan(
+            source_snapshot=review.source_snapshot,
+            baseline_asr_sha256=review.asr_sha256,
+            external_ja_sha256=review.external_ja_sha256 or ("0" * 64),
+            limits=limits,
+            excluded_group_ids=(),
+            assessments=(),
+            windows=(),
+            total_audio_ms=0,
+            exceeds_budget=False,
+        )
+    alignment = review._source_alignment
+    if review.route != ROUTE_EXTERNAL_ALIGNMENT_ACCEPTED or alignment is None or review.external_ja_sha256 is None:
+        raise V2DHold("OUTSIDE_SPAN_ALIGNMENT_UNAVAILABLE")
+    scale = Fraction.from_float(alignment.scale)
+    intercept = Fraction.from_float(alignment.intercept_ms)
+    tolerance_ms = Fraction(int(alignment.residual_threshold_ms))
+    baseline_asr = review._source_bundle.asr_result
+
+    assessments: list[OutsideSpanExternalCueAssessment] = []
+    raw_windows: list[tuple[int, int, str, Fraction, Fraction]] = []
+    for group in outside_groups:
+        for member in group.members:
+            ref = member.source_reference
+            hyp_start = scale * ref.original_start_ms + intercept
+            hyp_end = scale * ref.original_end_ms + intercept
+            if hyp_end <= hyp_start:
+                raise V2DHold("OUTSIDE_SPAN_HYPOTHESIS_INTERVAL_INVALID")
+            exact_matches, comparison_candidates = _find_baseline_comparison_candidates(
+                member.text, hyp_start, hyp_end, tolerance_ms, baseline_asr,
+            )
+            if exact_matches:
+                assessments.append(OutsideSpanExternalCueAssessment(
+                    group_id=group.group_id,
+                    source_reference=ref,
+                    external_text=member.text,
+                    hypothesis_start_ms=hyp_start,
+                    hypothesis_end_ms=hyp_end,
+                    disposition=OUTSIDE_SPAN_DISPOSITION_BASELINE_SUPPORTED,
+                    supporting_baseline_source_keys=exact_matches,
+                ))
+            else:
+                assessments.append(OutsideSpanExternalCueAssessment(
+                    group_id=group.group_id,
+                    source_reference=ref,
+                    external_text=member.text,
+                    hypothesis_start_ms=hyp_start,
+                    hypothesis_end_ms=hyp_end,
+                    disposition=OUTSIDE_SPAN_DISPOSITION_NEEDS_TARGETED_ASR,
+                    supporting_baseline_source_keys=comparison_candidates,
+                ))
+                w_start = max(0, math.floor(hyp_start) - limits.pre_padding_ms)
+                w_end = math.ceil(hyp_end) + limits.post_padding_ms
+                raw_windows.append((w_start, w_end, ref.key, hyp_start, hyp_end))
+
+    raw_windows.sort(key=lambda item: (item[0], item[1], item[2]))
+    merged: list[OutsideSpanHypothesisWindow] = []
+    exceeds_budget = False
+    budget_reason = None
+    for w_start, w_end, key, hyp_start, hyp_end in raw_windows:
+        if w_end - w_start > limits.max_window_ms:
+            exceeds_budget = True
+            budget_reason = "SINGLE_WINDOW_EXCEEDS_MAX_WINDOW_MS"
+        if (merged
+                and w_start - merged[-1].end_ms <= limits.merge_gap_ms
+                and max(merged[-1].end_ms, w_end) - merged[-1].start_ms <= limits.max_window_ms):
+            prev = merged[-1]
+            merged[-1] = OutsideSpanHypothesisWindow(
+                window_id=prev.window_id,
+                start_ms=prev.start_ms,
+                end_ms=max(prev.end_ms, w_end),
+                external_source_keys=prev.external_source_keys + (key,),
+                hypothesis_intervals_ms=prev.hypothesis_intervals_ms + ((key, hyp_start, hyp_end),),
+            )
+        else:
+            merged.append(OutsideSpanHypothesisWindow(
+                window_id=f"outside-span-window-{len(merged) + 1:06d}",
+                start_ms=w_start,
+                end_ms=w_end,
+                external_source_keys=(key,),
+                hypothesis_intervals_ms=((key, hyp_start, hyp_end),),
+            ))
+    total_audio_ms = sum(w.end_ms - w.start_ms for w in merged)
+    if total_audio_ms > limits.max_total_audio_ms:
+        exceeds_budget = True
+        budget_reason = budget_reason or "TOTAL_AUDIO_EXCEEDS_MAX_TOTAL_AUDIO_MS"
+    return OutsideSpanRecoveryPlan(
+        source_snapshot=review.source_snapshot,
+        baseline_asr_sha256=review.asr_sha256,
+        external_ja_sha256=review.external_ja_sha256,
+        limits=limits,
+        excluded_group_ids=tuple(g.group_id for g in outside_groups),
+        assessments=tuple(assessments),
+        windows=tuple(merged),
+        total_audio_ms=total_audio_ms,
+        exceeds_budget=exceeds_budget,
+        budget_violation_reason=budget_reason,
+    )
+
+
+def build_supplemental_asr_groups(
+    plan: UtteranceReviewPlan,
+    recovery: OutsideSpanRecoveryResult,
+) -> tuple[UtteranceReviewGroup, ...]:
+    """Convert ASR-verified recovered speech into deduplicated supplemental groups."""
+    plan = validate_utterance_review_plan(plan)
+    baseline_asr = plan.review_set._source_bundle.asr_result
+    snapshot = plan.review_set.source_snapshot
+    groups: list[UtteranceReviewGroup] = []
+    seen_keys: set[str] = set()
+    sup_index = 0
+    for outcome in recovery.window_outcomes:
+        if outcome.outcome != OUTSIDE_SPAN_OUTCOME_SPEECH_FOUND:
+            continue
+        for seg in outcome.segments:
+            _validate_recovered_word_timings(
+                seg.words,
+                seg_start_ms=seg.start_ms,
+                seg_end_ms=seg.end_ms,
+                win_start_ms=outcome.start_ms,
+                win_end_ms=outcome.end_ms,
+                error_cls=V2DError,
+            )
+            seg_norm = normalize_japanese_for_matching(seg.text)
+            # Deduplicate against existing baseline ASR to prevent false duplicates
+            is_dup = False
+            for base_seg in baseline_asr.segments:
+                if base_seg.end_ms >= seg.start_ms and base_seg.start_ms <= seg.end_ms:
+                    base_norm = normalize_japanese_for_matching(base_seg.text)
+                    if seg_norm and base_norm and seg_norm == base_norm:
+                        is_dup = True
+                        break
+            if is_dup:
+                continue
+            ref = JAMasterSourceReference(
+                source=EVIDENCE_SOURCE_SUPPLEMENTAL_ASR,
+                source_id=seg.source_id,
+                source_locator=snapshot.canonical_video_relative,
+                source_index=sup_index,
+                source_sha256=recovery.artifact_sha256,
+                original_start_ms=seg.start_ms,
+                original_end_ms=seg.end_ms,
+                aligned_start_ms=Fraction(seg.start_ms),
+                aligned_end_ms=Fraction(seg.end_ms),
+            )
+            if ref.key in seen_keys:
+                continue
+            seen_keys.add(ref.key)
+            sup_index += 1
+            word_refs = tuple(
+                ASRWordReference(
+                    source_reference=ref,
+                    word_index=w_idx,
+                    text=w.text,
+                    start_ms=Fraction(w.start_ms),
+                    end_ms=Fraction(w.end_ms),
+                )
+                for w_idx, w in enumerate(seg.words)
+            )
+            member = UtteranceMember(
+                source_reference=ref,
+                text=seg.text,
+                word_references=word_refs,
+            )
+            group_id = "group-" + _sha(_wire([
+                "supplemental_asr", recovery.artifact_sha256, ref.key, seg.start_ms, seg.end_ms,
+            ]))
+            groups.append(UtteranceReviewGroup(
+                group_id=group_id,
+                source_cardinality="SUPPLEMENTAL_ASR_ONLY",
+                candidate_ids=(),
+                members=(member,),
+                relationships=(),
+                utterance_status=UTTERANCE_UNRESOLVED,
+                speaker_status=SPEAKER_UNKNOWN,
+            ))
+    return tuple(groups)
+
+
+def load_validated_outside_span_diagnostic_evidence(
+    path: str | Path,
+    *,
+    recovery_plan: OutsideSpanRecoveryPlan,
+    expected_sha256: str,
+    expected_runtime_identity: ASRRuntimeIdentity | None = None,
+) -> OutsideSpanRecoveryResult:
+    """Validate a saved private diagnostic JSON read-only for offline verification only."""
+    raw = Path(path).read_bytes()
+    actual_sha = _sha(raw)
+    if actual_sha != _digest(expected_sha256, "expected_sha256"):
+        raise V2DError("diagnostic artifact SHA-256 differs")
+    data = _load_json(raw, "outside-span diagnostic evidence")
+    if type(data) is not dict or data.get("diagnostic_kind") != "HYPOTHESIS_ONLY_UNTIMED_EXTERNAL_JA_TARGETED_ASR":
+        raise V2DError("diagnostic artifact kind is invalid")
+    snap = data.get("source_snapshot", {})
+    exp_snap = recovery_plan.source_snapshot
+    if (snap.get("canonical_video_relative") != exp_snap.canonical_video_relative
+            or snap.get("source_size") != exp_snap.source_size
+            or snap.get("source_mtime_ns") != exp_snap.source_mtime_ns):
+        raise V2DError("diagnostic artifact source snapshot differs")
+    dur_ms = snap.get("verified_container_duration_ms")
+    if type(dur_ms) is not int or dur_ms <= 0:
+        raise V2DError("diagnostic artifact container duration is invalid")
+    rt = data.get("runtime_identity", {})
+    runtime_id = ASRRuntimeIdentity(
+        engine=rt["engine"], model=rt["model"], device=rt["device"],
+        compute_type=rt["compute_type"], cpu_threads=rt.get("cpu_threads"),
+        num_workers=rt["num_workers"],
+    )
+    engine_ver = rt.get("engine_version")
+    if expected_runtime_identity is not None and runtime_id != expected_runtime_identity:
+        raise V2DError("diagnostic artifact runtime identity differs")
+    if type(engine_ver) is not str or not engine_ver:
+        raise V2DError("diagnostic artifact engine_version is invalid")
+    diag_by_cue = {w["cue_id"]: w for w in data.get("windows", []) if isinstance(w, dict) and "cue_id" in w}
+    outcomes: list[OutsideSpanWindowOutcome] = []
+    for win in recovery_plan.windows:
+        # Match diagnostic entry by external cue_id
+        matched_entries = [diag_by_cue[k.split(":", 1)[1]] for k in win.external_source_keys if k.split(":", 1)[1] in diag_by_cue]
+        if not matched_entries:
+            outcomes.append(OutsideSpanWindowOutcome(
+                window_id=win.window_id, start_ms=win.start_ms, end_ms=win.end_ms,
+                external_source_keys=win.external_source_keys, outcome=OUTSIDE_SPAN_OUTCOME_INCONCLUSIVE,
+            ))
+            continue
+        entry = matched_entries[0]
+        if entry.get("status") != "EXECUTED_ONCE":
+            outcomes.append(OutsideSpanWindowOutcome(
+                window_id=win.window_id, start_ms=win.start_ms, end_ms=win.end_ms,
+                external_source_keys=win.external_source_keys, outcome=OUTSIDE_SPAN_OUTCOME_INCONCLUSIVE,
+            ))
+            continue
+        w_s, w_e = entry["decoded_chunk_start_ms"], entry["decoded_chunk_end_ms"]
+        if not (0 <= w_s < w_e <= dur_ms) or w_s != win.start_ms or w_e != win.end_ms:
+            raise V2DError("diagnostic window bounds differ from recovery plan")
+        segs = []
+        for idx, s in enumerate(entry.get("segments", [])):
+            s_start, s_end, s_text = s["start_ms"], s["end_ms"], s["text"]
+            words = tuple(ASRWord(start_ms=wd["start_ms"], end_ms=wd["end_ms"], text=wd["text"]) for wd in s.get("words", ()))
+            _validate_recovered_word_timings(
+                words, seg_start_ms=s_start, seg_end_ms=s_end,
+                win_start_ms=w_s, win_end_ms=w_e, error_cls=V2DError,
+            )
+            sid = "sup-asr-" + _sha(_wire([actual_sha, win.window_id, idx, s_start, s_end, s_text]))[:24]
+            segs.append(RecoveredSupplementalASRSegment(
+                source_id=sid, window_id=win.window_id, window_start_ms=w_s, window_end_ms=w_e,
+                start_ms=s_start, end_ms=s_end, text=s_text, words=words,
+                trigger_external_source_keys=win.external_source_keys,
+            ))
+        outcome_kind = OUTSIDE_SPAN_OUTCOME_SPEECH_FOUND if segs else OUTSIDE_SPAN_OUTCOME_NO_SPEECH
+        outcomes.append(OutsideSpanWindowOutcome(
+            window_id=win.window_id, start_ms=w_s, end_ms=w_e,
+            external_source_keys=win.external_source_keys, outcome=outcome_kind, segments=tuple(segs),
+        ))
+    return OutsideSpanRecoveryResult(
+        plan=recovery_plan,
+        runtime_identity=runtime_id,
+        engine_version=engine_ver,
+        verified_container_duration_ms=dur_ms,
+        artifact_sha256=actual_sha,
+        window_outcomes=tuple(outcomes),
+        diagnostic_only=True,
+    )
 
 
 @dataclass(frozen=True)
@@ -796,6 +1281,8 @@ def _build_targeted_requests(master: V2DMaster, translated: StatefulSubtitleResu
             baseline_ids.append(cue_id)
         elif any(ref.source == "external_ja" for ref in refs):
             external_ids.append(cue_id)
+        elif any(ref.source == EVIDENCE_SOURCE_SUPPLEMENTAL_ASR for ref in refs):
+            raise V2DHold("TARGETED_ASR_NO_SOURCE_BOUND_BASELINE_SEGMENT")
         else:
             raise V2DHold("TARGETED_ASR_NO_SOURCE_BOUND_INTERVAL")
     result = []
@@ -1083,10 +1570,90 @@ def build_v2d_targeted_asr_adapter(*, holding_resolver, source_provider, targete
         return execute_for_snapshot(request.source_snapshot, run,
                                     window_count=len(request.windows))
 
+    def targeted_outside_span(recovery_plan: OutsideSpanRecoveryPlan):
+        if type(recovery_plan) is not OutsideSpanRecoveryPlan:
+            raise V2DHold("OUTSIDE_SPAN_RECOVERY_PLAN_INVALID")
+        if recovery_plan.exceeds_budget:
+            raise V2DHold("OUTSIDE_SPAN_TARGETED_ASR_BUDGET_EXCEEDED")
+        if not recovery_plan.windows:
+            raise V2DHold("OUTSIDE_SPAN_RECOVERY_WINDOWS_EMPTY")
+
+        def run(local_source, active, _provider):
+            import av
+            with av.open(str(local_source.local_path)) as container:
+                dur_ms = int(round((float(container.duration) / float(av.time_base)) * 1000))
+            if dur_ms <= 0:
+                raise V2DHold("OUTSIDE_SPAN_CONTAINER_DURATION_INVALID")
+            raw_windows = []
+            for win in recovery_plan.windows:
+                if not (0 <= win.start_ms < win.end_ms <= dur_ms):
+                    raise V2DHold("OUTSIDE_SPAN_WINDOW_OUTSIDE_VIDEO_DURATION")
+                dur_sec = (win.end_ms - win.start_ms) / 1000.0
+                chunks = tuple(iter_audio_chunks(
+                    local_source,
+                    chunk_seconds=dur_sec,
+                    start_seconds=win.start_ms / 1000.0,
+                    end_seconds=win.end_ms / 1000.0,
+                ))
+                if len(chunks) != 1:
+                    raise V2DHold("OUTSIDE_SPAN_AUDIO_DECODE_CHUNK_COUNT_INVALID")
+                chunk = chunks[0]
+                if chunk.start_ms != win.start_ms or chunk.end_ms != win.end_ms:
+                    raise V2DHold("OUTSIDE_SPAN_AUDIO_DECODE_BOUNDS_MISMATCH")
+                # Transcribe and immediately materialize raw segment data before optional metadata.
+                segs = active.transcribe_targeted_chunk(chunk)
+                seg_rows = []
+                for s in segs:
+                    if type(s) is not ASRSegment:
+                        raise V2DHold("OUTSIDE_SPAN_SEGMENT_TYPE_INVALID")
+                    words_tuple = tuple(s.words or ())
+                    _validate_recovered_word_timings(
+                        words_tuple, seg_start_ms=s.start_ms, seg_end_ms=s.end_ms,
+                        win_start_ms=win.start_ms, win_end_ms=win.end_ms, error_cls=V2DHold,
+                    )
+                    seg_rows.append({
+                        "start_ms": s.start_ms,
+                        "end_ms": s.end_ms,
+                        "text": s.text,
+                        "words": [
+                            {"start_ms": w.start_ms, "end_ms": w.end_ms, "text": w.text}
+                            for w in words_tuple
+                        ],
+                    })
+                raw_windows.append({
+                    "window_id": win.window_id,
+                    "start_ms": win.start_ms,
+                    "end_ms": win.end_ms,
+                    "external_source_keys": list(win.external_source_keys),
+                    "outcome": OUTSIDE_SPAN_OUTCOME_SPEECH_FOUND if seg_rows else OUTSIDE_SPAN_OUTCOME_NO_SPEECH,
+                    "segments": seg_rows,
+                    "decoded_sample_rate": chunk.sample_rate,
+                    "decoded_sample_count": int(len(chunk.samples)),
+                })
+            return {
+                "schema_version": V2D_SCHEMA_VERSION,
+                "verified_container_duration_ms": dur_ms,
+                "runtime_identity": {
+                    "engine": runtime_identity.engine,
+                    "model": runtime_identity.model,
+                    "device": runtime_identity.device,
+                    "compute_type": runtime_identity.compute_type,
+                    "cpu_threads": runtime_identity.cpu_threads,
+                    "num_workers": runtime_identity.num_workers,
+                },
+                "engine_version": engine_version,
+                "windows": raw_windows,
+            }
+
+        return execute_for_snapshot(
+            recovery_plan.source_snapshot, run, window_count=len(recovery_plan.windows),
+        )
+
     targeted.runtime_identity = runtime_identity
     targeted.engine_version = engine_version
     targeted.bounded_worker_lifecycle = getattr(targeted_transport, "bounded_worker_lifecycle", False) is True
     targeted.targeted_external_ja = targeted_external_ja
+    targeted.targeted_outside_span = targeted_outside_span
     return targeted
 
 
@@ -1463,15 +2030,22 @@ def _readjudicate_targeted_groups(plan: UtteranceReviewPlan,
                                   staging_root: str | Path,
                                   claim_token: int,
                                   reuse_only: bool,
-                                  batch_groups: bool | None = None) -> V2DAdjudication:
+                                  batch_groups: bool | None = None,
+                                  exclude_group_ids: tuple[str, ...] = (),
+                                  supplemental_groups: tuple[UtteranceReviewGroup, ...] = ()) -> V2DAdjudication:
     """Revisit only affected groups; ASR output stays supporting evidence."""
     evidence_by_group = dict(evidence.group_payloads)
     original_by_group = {item.group_id: item for item in original.groups}
     if not evidence_by_group or set(evidence_by_group) - set(original_by_group):
         raise V2DHold("TARGETED_ASR_GROUP_EVIDENCE_UNBOUND")
+    excluded = set(exclude_group_ids)
+    effective_groups = tuple(g for g in plan.groups if g.group_id not in excluded) + tuple(supplemental_groups)
+    effective_fp = _source_fingerprint(
+        plan, exclude_group_ids=exclude_group_ids, supplemental_groups=supplemental_groups,
+    )
     root = _private_dir(staging_root)
     context_sha = _sha(_wire({
-        "source_fingerprint": _source_fingerprint(plan),
+        "source_fingerprint": effective_fp,
         "artifact_sha256": evidence.artifact_sha256,
         "linkage_sha256": evidence.linkage_sha256,
         "claim_token": claim_token,
@@ -1482,31 +2056,31 @@ def _readjudicate_targeted_groups(plan: UtteranceReviewPlan,
         raise V2DHold("TARGETED_ASR_READJUDICATION_RESUME_STAGE_MISSING") from error
     if batch_groups is None:
         batch_groups = getattr(invoke, "_v2d_native_owner", None) is not None
-    expected_groups = {group.group_id: group for group in plan.groups}
+    expected_groups = {group.group_id: group for group in effective_groups}
     if batch_groups:
         payloads = []
-        for group in plan.groups:
+        for group in effective_groups:
             if group.group_id not in evidence_by_group:
                 continue
-            payload = _group_payload(plan, group)
+            payload = _group_payload(plan, group, source_fingerprint=effective_fp)
             payload["targeted_second_evidence"] = evidence_by_group[group.group_id]
             payloads.append((group.group_id, payload))
         revised, receipts = _adjudicate_group_batches(
             tuple(payloads), expected_groups=expected_groups,
-            source_fingerprint=_source_fingerprint(plan), invoke=invoke,
+            source_fingerprint=effective_fp, invoke=invoke,
             hermes_settings=hermes_settings, task=task,
             label="ja-master-targeted-readjudication-batch", reuse_only=reuse_only,
         )
         revised_by_group = {item.group_id: item for item in revised}
         resolved_groups = tuple(revised_by_group.get(group.group_id, original_by_group[group.group_id])
-                                for group in plan.groups)
+                                for group in effective_groups)
         batch_evidence = original.batch_evidence + receipts
     else:
         resolved = {}
-        for group in plan.groups:
+        for group in effective_groups:
             if group.group_id not in evidence_by_group:
                 continue
-            group_payload = _group_payload(plan, group)
+            group_payload = _group_payload(plan, group, source_fingerprint=effective_fp)
             group_payload["targeted_second_evidence"] = evidence_by_group[group.group_id]
             prompt = (
                 SEMANTIC_ADJUDICATION_INSTRUCTION
@@ -1530,10 +2104,11 @@ def _readjudicate_targeted_groups(plan: UtteranceReviewPlan,
                 raise V2DHold("TARGETED_ASR_READJUDICATION_RESULT_INVALID")
             resolved[group.group_id] = adjudicated
         resolved_groups = tuple(resolved.get(group.group_id, original_by_group[group.group_id])
-                                for group in plan.groups)
+                                for group in effective_groups)
         batch_evidence = original.batch_evidence
     return validate_adjudication(
-        plan, V2DAdjudication(_source_fingerprint(plan), resolved_groups, batch_evidence),
+        plan, V2DAdjudication(effective_fp, resolved_groups, batch_evidence),
+        exclude_group_ids=exclude_group_ids, supplemental_groups=supplemental_groups,
     )
 
 
@@ -1731,13 +2306,136 @@ def _parse_group_response(raw: bytes, group, *, require_audio_flag: bool = False
     return result
 
 
-def validate_adjudication(plan: UtteranceReviewPlan, adjudication: V2DAdjudication) -> V2DAdjudication:
+def _outside_span_result_from_payload(
+    recovery_plan: OutsideSpanRecoveryPlan,
+    payload: dict[str, object],
+    artifact_sha: str,
+) -> OutsideSpanRecoveryResult:
+    rt = payload.get("runtime_identity", {})
+    runtime_id = ASRRuntimeIdentity(
+        engine=rt["engine"], model=rt["model"], device=rt["device"],
+        compute_type=rt["compute_type"], cpu_threads=rt.get("cpu_threads"),
+        num_workers=rt["num_workers"],
+    )
+    engine_ver = payload.get("engine_version")
+    dur_ms = payload.get("verified_container_duration_ms")
+    if type(engine_ver) is not str or not engine_ver or type(dur_ms) is not int or dur_ms <= 0:
+        raise V2DHold("OUTSIDE_SPAN_RECOVERY_ARTIFACT_INVALID")
+    expected_by_id = {w.window_id: w for w in recovery_plan.windows}
+    outcomes: list[OutsideSpanWindowOutcome] = []
+    seen_ids: set[str] = set()
+    for row in payload.get("windows", []):
+        wid = row.get("window_id")
+        exp = expected_by_id.get(wid)
+        if exp is None or wid in seen_ids:
+            raise V2DHold("OUTSIDE_SPAN_RECOVERY_WINDOW_MISMATCH")
+        seen_ids.add(wid)
+        if row.get("start_ms") != exp.start_ms or row.get("end_ms") != exp.end_ms:
+            raise V2DHold("OUTSIDE_SPAN_RECOVERY_WINDOW_BOUNDS_MISMATCH")
+        segs = []
+        for idx, s in enumerate(row.get("segments", [])):
+            s_start, s_end, s_text = s["start_ms"], s["end_ms"], s["text"]
+            words = tuple(ASRWord(start_ms=wd["start_ms"], end_ms=wd["end_ms"], text=wd["text"]) for wd in s.get("words", ()))
+            _validate_recovered_word_timings(
+                words, seg_start_ms=s_start, seg_end_ms=s_end,
+                win_start_ms=exp.start_ms, win_end_ms=exp.end_ms, error_cls=V2DHold,
+            )
+            sid = "sup-asr-" + _sha(_wire([artifact_sha, wid, idx, s_start, s_end, s_text]))[:24]
+            segs.append(RecoveredSupplementalASRSegment(
+                source_id=sid, window_id=wid, window_start_ms=exp.start_ms, window_end_ms=exp.end_ms,
+                start_ms=s_start, end_ms=s_end, text=s_text, words=words,
+                trigger_external_source_keys=exp.external_source_keys,
+            ))
+        outcome_kind = row.get("outcome")
+        if outcome_kind not in {OUTSIDE_SPAN_OUTCOME_SPEECH_FOUND, OUTSIDE_SPAN_OUTCOME_NO_SPEECH, OUTSIDE_SPAN_OUTCOME_INCONCLUSIVE}:
+            raise V2DHold("OUTSIDE_SPAN_RECOVERY_OUTCOME_INVALID")
+        if outcome_kind == OUTSIDE_SPAN_OUTCOME_SPEECH_FOUND and not segs:
+            raise V2DHold("OUTSIDE_SPAN_RECOVERY_SPEECH_EMPTY")
+        outcomes.append(OutsideSpanWindowOutcome(
+            window_id=wid, start_ms=exp.start_ms, end_ms=exp.end_ms,
+            external_source_keys=exp.external_source_keys, outcome=outcome_kind, segments=tuple(segs),
+        ))
+    if seen_ids != set(expected_by_id):
+        raise V2DHold("OUTSIDE_SPAN_RECOVERY_WINDOW_COVERAGE_MISMATCH")
+    return OutsideSpanRecoveryResult(
+        plan=recovery_plan, runtime_identity=runtime_id, engine_version=engine_ver,
+        verified_container_duration_ms=dur_ms, artifact_sha256=artifact_sha,
+        window_outcomes=tuple(outcomes), diagnostic_only=False,
+    )
+
+
+def _load_or_run_outside_span_recovery(
+    recovery_plan: OutsideSpanRecoveryPlan,
+    *,
+    targeted_runner: Callable | None,
+    staging_root: str | Path,
+    reuse_only: bool,
+) -> OutsideSpanRecoveryResult:
+    if recovery_plan.exceeds_budget:
+        raise V2DHold("OUTSIDE_SPAN_TARGETED_ASR_BUDGET_EXCEEDED")
+    context_raw = _wire({
+        "schema_version": V2D_SCHEMA_VERSION,
+        "baseline_asr_sha256": recovery_plan.baseline_asr_sha256,
+        "external_ja_sha256": recovery_plan.external_ja_sha256,
+        "windows": [[w.window_id, w.start_ms, w.end_ms, list(w.external_source_keys)] for w in recovery_plan.windows],
+    })
+    context_sha = _sha(context_raw)
+    root = _private_dir(staging_root)
+    try:
+        top = _private_child(root, "outside-span-targeted-asr", create=not reuse_only)
+        stage = _private_child(top, context_sha, create=not reuse_only)
+    except V2DError as error:
+        if reuse_only:
+            raise V2DHold("OUTSIDE_SPAN_RECOVERY_RESUME_MISSING") from error
+        raise
+    artifact_path = stage / "outside-span-targeted-asr-v1.json"
+    if artifact_path.exists() or artifact_path.is_symlink():
+        raw = _read_private_owned(artifact_path, max_bytes=MAX_TARGETED_ASR_ARTIFACT_BYTES)
+        payload = _load_json(raw, "outside-span targeted ASR artifact")
+        if payload.get("context_sha256") != context_sha:
+            raise V2DHold("OUTSIDE_SPAN_RECOVERY_ARTIFACT_DETACHED")
+        return _outside_span_result_from_payload(recovery_plan, payload, _sha(raw))
+    if reuse_only:
+        raise V2DHold("OUTSIDE_SPAN_RECOVERY_RESUME_MISSING")
+    run_outside = getattr(targeted_runner, "targeted_outside_span", None)
+    if not callable(run_outside):
+        raise V2DHold("OUTSIDE_SPAN_TARGETED_ASR_ADAPTER_UNAVAILABLE")
+    try:
+        payload = run_outside(recovery_plan)
+        if type(payload) is not dict:
+            raise V2DHold("OUTSIDE_SPAN_RECOVERY_RESULT_INVALID")
+        payload = dict(payload, context_sha256=context_sha)
+        raw = _wire(payload)
+        # Persist raw ASR results immediately before optional diagnostics.
+        _write_exclusive(artifact_path, raw)
+        readback_raw = _read_private_owned(artifact_path, max_bytes=MAX_TARGETED_ASR_ARTIFACT_BYTES)
+        if readback_raw != raw:
+            raise V2DHold("OUTSIDE_SPAN_RECOVERY_READBACK_MISMATCH")
+        return _outside_span_result_from_payload(recovery_plan, payload, _sha(readback_raw))
+    except (V2DLimitStop, V2DHold):
+        raise
+    except Exception as error:
+        raise V2DHold("OUTSIDE_SPAN_TARGETED_ASR_EXECUTION_FAILED") from error
+
+
+def validate_adjudication(
+    plan: UtteranceReviewPlan,
+    adjudication: V2DAdjudication,
+    *,
+    exclude_group_ids: tuple[str, ...] = (),
+    supplemental_groups: tuple[UtteranceReviewGroup, ...] = (),
+) -> V2DAdjudication:
     plan = validate_utterance_review_plan(plan)
-    if type(adjudication) is not V2DAdjudication or adjudication.source_fingerprint != _source_fingerprint(plan):
+    excluded = set(exclude_group_ids)
+    effective_groups = tuple(g for g in plan.groups if g.group_id not in excluded) + tuple(supplemental_groups)
+    expected_fp = _source_fingerprint(
+        plan, exclude_group_ids=exclude_group_ids, supplemental_groups=supplemental_groups,
+    )
+    if type(adjudication) is not V2DAdjudication or adjudication.source_fingerprint != expected_fp:
         raise V2DError("adjudication is detached from source evidence")
-    if tuple(item.group_id for item in adjudication.groups) != tuple(group.group_id for group in plan.groups):
+    if tuple(item.group_id for item in adjudication.groups) != tuple(group.group_id for group in effective_groups):
         raise V2DError("adjudication group coverage/order differs")
-    for group, resolved in zip(plan.groups, adjudication.groups, strict=True):
+    for group, resolved in zip(effective_groups, adjudication.groups, strict=True):
         expected_candidates = tuple(group.candidate_ids)
         expected_sources = tuple(member.source_reference.key for member in group.members)
         if tuple(item.candidate_id for item in resolved.candidate_decisions) != expected_candidates:
@@ -1751,7 +2449,7 @@ def validate_adjudication(plan: UtteranceReviewPlan, adjudication: V2DAdjudicati
 
 SEMANTIC_ADJUDICATION_INSTRUCTION = """Interpret this one source-bound utterance group for a Japanese master. Return JSON only with exactly: group_id, candidate_decisions, source_decisions, outputs. Every candidate relation and every source must receive ACCEPTED, REJECTED, or UNCERTAIN plus a reason. A candidate relation is evidence, not proof of same utterance. Do not merge merely from overlap or identical text; preserve repeated spoken dialogue unless context supports a duplicate. Decide whether to merge or split semantic dialogue. Outputs contain Japanese text and source_spans only; each span has source_key and optional half-open word_start_index/word_end_index. Do not provide cue IDs, timestamps, speakers, ordering, or confidence. Source spans are claims the validator checks: only ASR word references may be split, with all words partitioned exactly once. Do not assign speakers; retain speaker evidence as supplied. If evidence is insufficient use UNCERTAIN. The caller owns IDs, time, ordering, source ownership, and files."""
 
-SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION = """Interpret each source-bound utterance group independently for a Japanese master. Return JSON only with exactly: batch_id, source_fingerprint, groups. Return one group object for every input group, in exactly the input order; each group object must have exactly group_id, audio_evidence_needed, candidate_decisions, source_decisions, outputs. For each group, return candidate_decisions in exact input candidate_relations order with exact keys candidate_id, status, rationale, and source_decisions in exact input members order with exact keys source_key, status, rationale; status must be ACCEPTED, REJECTED, or UNCERTAIN, and rationale must be a non-empty string. A candidate relation is evidence, not proof of same utterance. Do not merge merely from overlap or identical text; preserve repeated spoken dialogue unless context supports a duplicate. Decide whether to merge or split semantic dialogue. Each item in outputs must have exact keys japanese_text, source_spans, rationale (non-empty strings and non-empty source_spans). Each item in source_spans must have exact keys source_key, word_start_index, word_end_index; set both word_start_index and word_end_index to null for a whole source, or to half-open integer word indexes for a split ASR source. Do not omit or add keys. Do not provide cue IDs, timestamps, speakers, ordering, or confidence. Source spans are claims the validator checks: only ASR word references may be split, with all words partitioned exactly once. Do not assign speakers; retain speaker evidence as supplied. Set audio_evidence_needed true only when a materially uncertain candidate/source could be clarified by existing source-bound timed audio; otherwise false. This field does not decide acceptance. If evidence is insufficient use UNCERTAIN. The caller owns IDs, time, ordering, source ownership, and files."""
+SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION = """Interpret each source-bound utterance group independently for a Japanese master. Return JSON only with exactly: batch_id, source_fingerprint, groups. Return one group object for every input group, in exactly the input order; each group object must have exactly group_id, audio_evidence_needed, candidate_decisions, source_decisions, outputs. For each group, return candidate_decisions in exact input candidate_relations order with exact keys candidate_id, status, rationale, and source_decisions in exact input members order with exact keys source_key, status, rationale; status must be ACCEPTED, REJECTED, or UNCERTAIN, and rationale must be a non-empty string. A candidate relation is evidence, not proof of same utterance. Do not merge merely from overlap or identical text; preserve repeated spoken dialogue unless context supports a duplicate. Decide whether to merge or split semantic dialogue. Each item in outputs must have exact keys japanese_text, source_spans, rationale (non-empty strings and non-empty source_spans). Each item in source_spans must have exact keys source_key, word_start_index, word_end_index; set both word_start_index and word_end_index to null for a whole source, or to half-open integer word indexes for a split ASR source. Do not omit or add keys. Outputs must reference only sources with status ACCEPTED (never REJECTED or UNCERTAIN) and must cover every ACCEPTED source. Do not provide cue IDs, timestamps, speakers, ordering, or confidence. Source spans are claims the validator checks: only ASR word references may be split, with all words partitioned exactly once. Do not assign speakers; retain speaker evidence as supplied. Set audio_evidence_needed true only when all three hold: at least one candidate_decisions or source_decisions item in that group has status UNCERTAIN, at least one member in that group has non-null aligned_start_ms and aligned_end_ms (original times alone do not count), and checking that timed audio could materially resolve the uncertainty; otherwise false. This field does not decide acceptance; never change an honest status to satisfy it. Do not invent timing for untimed or uncertain sources, force ACCEPTED or REJECTED, or drop plausible dialogue just to pass validation; if evidence is insufficient, preserve UNCERTAIN. The caller owns IDs, time, ordering, source ownership, and files."""
 
 
 def _make_batch_material(source_fingerprint: str, payloads: tuple[tuple[str, dict[str, object]], ...]):
@@ -1875,6 +2573,8 @@ def adjudicate_ja_master(
     claim_token: int,
     reuse_only: bool = False,
     batch_groups: bool | None = None,
+    exclude_group_ids: tuple[str, ...] = (),
+    supplemental_groups: tuple[UtteranceReviewGroup, ...] = (),
 ) -> V2DAdjudication:
     """Run source-bound adjudication, batching Native-backed title requests."""
     plan = validate_utterance_review_plan(plan)
@@ -1883,7 +2583,11 @@ def adjudicate_ja_master(
     if type(claim_token) is not int or claim_token < 1:
         raise V2DError("claim token is invalid")
     root = _private_dir(staging_root)
-    fingerprint = _source_fingerprint(plan)
+    excluded = set(exclude_group_ids)
+    effective_groups = tuple(g for g in plan.groups if g.group_id not in excluded) + tuple(supplemental_groups)
+    fingerprint = _source_fingerprint(
+        plan, exclude_group_ids=exclude_group_ids, supplemental_groups=supplemental_groups,
+    )
     session = str(uuid.uuid5(V2D_SESSION_NAMESPACE, fingerprint + ":" + str(claim_token)))
     task = _private_child(root, session, create=not reuse_only)
     if batch_groups is None:
@@ -1891,17 +2595,23 @@ def adjudicate_ja_master(
     if type(batch_groups) is not bool:
         raise V2DError("batch_groups must be boolean when specified")
     if batch_groups:
-        payloads = tuple((group.group_id, _group_payload(plan, group)) for group in plan.groups)
+        payloads = tuple(
+            (group.group_id, _group_payload(plan, group, source_fingerprint=fingerprint))
+            for group in effective_groups
+        )
         groups, evidence = _adjudicate_group_batches(
-            payloads, expected_groups={group.group_id: group for group in plan.groups},
+            payloads, expected_groups={group.group_id: group for group in effective_groups},
             source_fingerprint=fingerprint, invoke=invoke,
             hermes_settings=hermes_settings, task=task,
             label="ja-master-adjudication-batch", reuse_only=reuse_only,
         )
-        return validate_adjudication(plan, V2DAdjudication(fingerprint, groups, evidence))
+        return validate_adjudication(
+            plan, V2DAdjudication(fingerprint, groups, evidence),
+            exclude_group_ids=exclude_group_ids, supplemental_groups=supplemental_groups,
+        )
     results = []
-    for group in plan.groups:
-        payload = _wire(_group_payload(plan, group))
+    for group in effective_groups:
+        payload = _wire(_group_payload(plan, group, source_fingerprint=fingerprint))
         prompt = (SEMANTIC_ADJUDICATION_INSTRUCTION + "\nSOURCE_BOUND_GROUP=" + payload.decode("utf-8")).encode("utf-8")
         if len(prompt) > V2D_MAX_PROMPT_BYTES:
             raise V2DError("one utterance group exceeds the existing native prompt bound")
@@ -1912,21 +2622,37 @@ def adjudicate_ja_master(
         if type(resolved) is not GroupAdjudication:
             raise V2DError("semantic executor did not return a validated group response")
         results.append(resolved)
-    return validate_adjudication(plan, V2DAdjudication(fingerprint, tuple(results)))
+    return validate_adjudication(
+        plan, V2DAdjudication(fingerprint, tuple(results)),
+        exclude_group_ids=exclude_group_ids, supplemental_groups=supplemental_groups,
+    )
 
 
-def materialize_ja_master(plan: UtteranceReviewPlan, adjudication: V2DAdjudication, *,
-                          targeted_evidence_sha256: str | None = None) -> V2DMaster:
+def materialize_ja_master(
+    plan: UtteranceReviewPlan,
+    adjudication: V2DAdjudication,
+    *,
+    targeted_evidence_sha256: str | None = None,
+    outside_span_recovery_sha256: str | None = None,
+    exclude_group_ids: tuple[str, ...] = (),
+    supplemental_groups: tuple[UtteranceReviewGroup, ...] = (),
+) -> V2DMaster:
     """Resolve source ownership and exact time from validated semantic spans."""
     plan = validate_utterance_review_plan(plan)
-    adjudication = validate_adjudication(plan, adjudication)
+    adjudication = validate_adjudication(
+        plan, adjudication, exclude_group_ids=exclude_group_ids, supplemental_groups=supplemental_groups,
+    )
     if targeted_evidence_sha256 is not None:
         _digest(targeted_evidence_sha256, "targeted_evidence_sha256")
+    if outside_span_recovery_sha256 is not None:
+        _digest(outside_span_recovery_sha256, "outside_span_recovery_sha256")
     if any(item.status == DECISION_UNCERTAIN for group in adjudication.groups
            for item in (*group.candidate_decisions, *group.source_decisions)):
         raise V2DHold("JA_MASTER_UNRESOLVED")
+    excluded = set(exclude_group_ids)
+    effective_groups = tuple(g for g in plan.groups if g.group_id not in excluded) + tuple(supplemental_groups)
     cues = []
-    for group, decisions in zip(plan.groups, adjudication.groups, strict=True):
+    for group, decisions in zip(effective_groups, adjudication.groups, strict=True):
         member_by_key = {item.source_reference.key: item for item in group.members}
         decision_by_key = {item.source_key: item for item in decisions.source_decisions}
         accepted = {key for key, item in decision_by_key.items() if item.status == DECISION_ACCEPTED}
@@ -1947,7 +2673,7 @@ def materialize_ja_master(plan: UtteranceReviewPlan, adjudication: V2DAdjudicati
                         raise V2DError("source appears in multiple outputs without a complete ASR word split")
                     start, end = ref.aligned_start_ms, ref.aligned_end_ms
                 else:
-                    if ref.source != "asr_segment" or not member.word_references:
+                    if ref.source not in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR} or not member.word_references:
                         raise V2DError("only timed ASR words can own a split")
                     if span.word_end_index > len(member.word_references):
                         raise V2DError("ASR split extends beyond source word references")
@@ -1994,7 +2720,9 @@ def materialize_ja_master(plan: UtteranceReviewPlan, adjudication: V2DAdjudicati
     cues.sort(key=lambda cue: (cue.start_ms, cue.end_ms, cue.cue_id))
     if len({cue.cue_id for cue in cues}) != len(cues):
         raise V2DError("duplicate deterministic JA Master cue identity")
-    fingerprint = _source_fingerprint(plan)
+    fingerprint = _source_fingerprint(
+        plan, exclude_group_ids=exclude_group_ids, supplemental_groups=supplemental_groups,
+    )
     identity = {
         "source_fingerprint": fingerprint,
         "route": plan.review_set.route,
@@ -2008,8 +2736,11 @@ def materialize_ja_master(plan: UtteranceReviewPlan, adjudication: V2DAdjudicati
                   _fraction(cue.start_ms), _fraction(cue.end_ms), cue.speaker_status,
                   list(cue.speaker_evidence_ids)] for cue in cues],
     }
-    return V2DMaster(plan.review_set, plan, adjudication, tuple(cues), fingerprint,
-                     _sha(_wire(identity)), targeted_evidence_sha256)
+    return V2DMaster(
+        plan.review_set, plan, adjudication, tuple(cues), fingerprint,
+        _sha(_wire(identity)), targeted_evidence_sha256,
+        outside_span_recovery_sha256, exclude_group_ids, supplemental_groups,
+    )
 
 
 def _validate_master(master: V2DMaster) -> V2DMaster:
@@ -2018,6 +2749,9 @@ def _validate_master(master: V2DMaster) -> V2DMaster:
     rebuilt = materialize_ja_master(
         master.utterance_plan, master.adjudication,
         targeted_evidence_sha256=master.targeted_evidence_sha256,
+        outside_span_recovery_sha256=master.outside_span_recovery_sha256,
+        exclude_group_ids=master.excluded_outside_span_group_ids,
+        supplemental_groups=master.supplemental_groups,
     )
     if rebuilt != master:
         raise V2DError("JA Master differs from its validated source decisions")
@@ -2041,10 +2775,12 @@ def _build_translation_package(master: V2DMaster, claim_token: int,
     elif targeted_evidence_sha256 is not None:
         raise V2DError("targeted evidence digest has no translation evidence")
     members = {member.source_reference.key: member
-               for group in master.utterance_plan.groups for member in group.members}
+               for group in (*master.utterance_plan.groups, *master.supplemental_groups)
+               for member in group.members}
     cues = []
     for index, cue in enumerate(master.cues):
-        asr_texts = [members[ref.key].text for ref in cue.source_references if ref.source == "asr_segment"]
+        asr_texts = [members[ref.key].text for ref in cue.source_references
+                     if ref.source in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR}]
         asr_texts.extend(targeted_evidence_by_cue.get(cue.cue_id, ()))
         primary = cue.text
         # The semantic master is the Japanese translation source regardless of
@@ -2213,23 +2949,24 @@ def build_v2d_review_request(master: V2DMaster, package: StatefulSubtitlePackage
     if tuple(cue.cue_id for cue in package.cues) != tuple(cue.cue_id for cue in master.cues):
         raise V2DError("translation cue identity/order differs from JA Master")
     member_by_key = {member.source_reference.key: member
-                     for group in master.utterance_plan.groups for member in group.members}
+                     for group in (*master.utterance_plan.groups, *master.supplemental_groups)
+                     for member in group.members}
     review_cues = []
     for index, (master_cue, output) in enumerate(zip(master.cues, validated.cues, strict=True)):
         asr_texts = [member_by_key[ref.key].text for ref in master_cue.source_references
-                     if ref.source == "asr_segment"]
+                     if ref.source in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR}]
         supporting = " / ".join(asr_texts) if asr_texts else None
         before = tuple(
             " / ".join(member_by_key[ref.key].text for ref in prior.source_references
-                       if ref.source == "asr_segment")
+                       if ref.source in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR})
             for prior in master.cues[max(0, index - 2):index]
-            if any(ref.source == "asr_segment" for ref in prior.source_references)
+            if any(ref.source in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR} for ref in prior.source_references)
         )
         after = tuple(
             " / ".join(member_by_key[ref.key].text for ref in following.source_references
-                       if ref.source == "asr_segment")
+                       if ref.source in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR})
             for following in master.cues[index + 1:index + 3]
-            if any(ref.source == "asr_segment" for ref in following.source_references)
+            if any(ref.source in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR} for ref in following.source_references)
         )
         raw_context = (before + after)[:4]
         first_ja = getattr(output, "repaired_ja", None)
@@ -2496,6 +3233,7 @@ def run_v2d_pipeline(
     semantic_policy=DEFAULT_STATEFUL_SEMANTIC_POLICY,
     targeted_runner: Callable | None = None,
     execution_limits: V2DExecutionLimits | None = None,
+    outside_span_limits: OutsideSpanRecoveryLimits = OutsideSpanRecoveryLimits(),
 ) -> V2DPipelineResult:
     """Connected offline/live-injectable V2-D path; never bypasses validators."""
     budget = None
@@ -2518,17 +3256,42 @@ def run_v2d_pipeline(
         if collisions:
             raise V2DError("V2-D output collision")
         batch_groups = executor_owner is not None or requested_batching is True
+        active_groups, outside_span_groups = split_outside_span_groups(plan)
+        excluded_outside_span_ids = tuple(g.group_id for g in outside_span_groups)
+        outside_span_plan: OutsideSpanRecoveryPlan | None = None
+        outside_span_recovery: OutsideSpanRecoveryResult | None = None
+        supplemental_groups: tuple[UtteranceReviewGroup, ...] = ()
+        if outside_span_groups:
+            outside_span_plan = plan_outside_span_recovery(plan, limits=outside_span_limits)
+            if outside_span_plan.exceeds_budget:
+                raise V2DHold("OUTSIDE_SPAN_TARGETED_ASR_BUDGET_EXCEEDED")
+            if outside_span_plan.windows:
+                if budget is not None:
+                    budget.require_time(reason="WALL_TIME_LIMIT_BEFORE_OUTSIDE_SPAN_TARGETED_ASR")
+                outside_span_recovery = _load_or_run_outside_span_recovery(
+                    outside_span_plan, targeted_runner=targeted_runner,
+                    staging_root=staging_root, reuse_only=reuse_only,
+                )
+                if any(o.outcome != OUTSIDE_SPAN_OUTCOME_SPEECH_FOUND for o in outside_span_recovery.window_outcomes):
+                    raise V2DHold("OUTSIDE_SPAN_SPEECH_UNRESOLVED")
+                supplemental_groups = build_supplemental_asr_groups(plan, outside_span_recovery)
+        effective_groups = active_groups + supplemental_groups
         adjudication = adjudicate_ja_master(
             plan, invoke=invoke, hermes_settings=hermes_settings,
             staging_root=staging_root, claim_token=claim_token, reuse_only=reuse_only,
             batch_groups=batch_groups,
+            exclude_group_ids=excluded_outside_span_ids,
+            supplemental_groups=supplemental_groups,
         )
         targeted_evidence = None
         initial_audio_groups = tuple(
-            group.group_id for group, resolved in zip(plan.groups, adjudication.groups, strict=True)
+            group.group_id for group, resolved in zip(effective_groups, adjudication.groups, strict=True)
             if resolved.audio_evidence_needed
         )
         if initial_audio_groups:
+            supplemental_ids = {g.group_id for g in supplemental_groups}
+            if any(gid in supplemental_ids for gid in initial_audio_groups):
+                raise V2DHold("SUPPLEMENTAL_ASR_ADDITIONAL_AUDIO_UNSUPPORTED")
             initial_requests = _build_initial_targeted_requests(plan, initial_audio_groups)
             early_items = []
             for request in initial_requests:
@@ -2550,6 +3313,8 @@ def run_v2d_pipeline(
                 invoke=invoke, hermes_settings=hermes_settings,
                 staging_root=staging_root, claim_token=claim_token,
                 reuse_only=reuse_only, batch_groups=batch_groups,
+                exclude_group_ids=excluded_outside_span_ids,
+                supplemental_groups=supplemental_groups,
             )
             if any(item.audio_evidence_needed for item in adjudication.groups):
                 raise V2DHold("INITIAL_TARGETED_ASR_UNCERTAINTY_REMAINS")
@@ -2557,6 +3322,10 @@ def run_v2d_pipeline(
             plan, adjudication,
             targeted_evidence_sha256=(None if targeted_evidence is None
                                       else targeted_evidence.linkage_sha256),
+            outside_span_recovery_sha256=(None if outside_span_recovery is None
+                                          else outside_span_recovery.artifact_sha256),
+            exclude_group_ids=excluded_outside_span_ids,
+            supplemental_groups=supplemental_groups,
         )
         initial_translation_evidence = (None if targeted_evidence is None
                                         else _targeted_translation_evidence(master, targeted_evidence))
@@ -2615,10 +3384,16 @@ def run_v2d_pipeline(
                 invoke=invoke, hermes_settings=hermes_settings,
                 staging_root=staging_root, claim_token=claim_token,
                 reuse_only=reuse_only, batch_groups=batch_groups,
+                exclude_group_ids=excluded_outside_span_ids,
+                supplemental_groups=supplemental_groups,
             )
             master = materialize_ja_master(
                 plan, adjudication,
                 targeted_evidence_sha256=targeted_evidence.linkage_sha256,
+                outside_span_recovery_sha256=(None if outside_span_recovery is None
+                                              else outside_span_recovery.artifact_sha256),
+                exclude_group_ids=excluded_outside_span_ids,
+                supplemental_groups=supplemental_groups,
             )
             translation_evidence = _targeted_translation_evidence(
                 master, targeted_evidence,
@@ -2681,6 +3456,18 @@ def run_v2d_pipeline(
                                               else targeted_evidence.linkage_sha256),
             "targeted_readjudicated_group_count": (0 if targeted_evidence is None
                                                    else len(targeted_evidence.group_payloads)),
+            "outside_span_recovery": (None if outside_span_plan is None else {
+                "excluded_outside_span_group_ids": list(excluded_outside_span_ids),
+                "assessments": [{
+                    "group_id": a.group_id,
+                    "source_key": a.source_reference.key,
+                    "disposition": a.disposition,
+                    "supporting_baseline_source_keys": list(a.supporting_baseline_source_keys),
+                } for a in outside_span_plan.assessments],
+                "recovery_artifact_sha256": (None if outside_span_recovery is None
+                                             else outside_span_recovery.artifact_sha256),
+                "supplemental_asr_group_ids": [g.group_id for g in supplemental_groups],
+            }),
             "asr_sha256": master.review_set.asr_sha256,
             "external_ja_sha256": master.review_set.external_ja_sha256,
             "translation_package_sha256": _sha(serialize_stateful_package(package)),
@@ -2741,10 +3528,15 @@ def run_v2d_pipeline(
 
 
 __all__ = [
-    "CandidateDecision", "GroupAdjudication", "MasterOutputProposal", "SourceDecision",
-    "SourceSpan", "V2DAdjudication", "V2DError", "V2DExecutionLimits", "V2DHold",
-    "V2DLimitStop", "V2DMaster", "V2DPipelineResult", "adjudicate_ja_master",
-    "build_v2d_review_request",
-    "build_v2d_targeted_asr_adapter", "materialize_ja_master", "run_targeted_review", "run_v2d_pipeline",
-    "translate_ja_master", "validate_adjudication",
+    "CandidateDecision", "GroupAdjudication", "MasterOutputProposal",
+    "OutsideSpanExternalCueAssessment", "OutsideSpanHypothesisWindow",
+    "OutsideSpanRecoveryLimits", "OutsideSpanRecoveryPlan", "OutsideSpanRecoveryResult",
+    "OutsideSpanWindowOutcome", "RecoveredSupplementalASRSegment",
+    "SourceDecision", "SourceSpan", "V2DAdjudication", "V2DError", "V2DExecutionLimits",
+    "V2DHold", "V2DLimitStop", "V2DMaster", "V2DPipelineResult",
+    "adjudicate_ja_master", "build_supplemental_asr_groups", "build_v2d_review_request",
+    "build_v2d_targeted_asr_adapter", "load_validated_outside_span_diagnostic_evidence",
+    "materialize_ja_master", "plan_outside_span_recovery", "run_targeted_review",
+    "run_v2d_pipeline", "split_outside_span_groups", "translate_ja_master",
+    "validate_adjudication",
 ]

@@ -38,8 +38,13 @@ VIDEO_RELATIVE = "HSODA/HSODA-104/HSODA-104.mp4"
 ASR_SHA256 = "c26efba4ddcb9fc0f062abb6e45825e85998280cb8578bdb6385e5ba35f3ac3e"
 JA_SHA256 = "1c73b000e363e87e715a95f4b846a93cfec035edcb81eb0b73a591b509c33965"
 SOURCE_RECORD_SHA256 = "75874bc61eb11f426fac895655e2ce310226226a063c8f769419fd2efa9392f7"
-EXPECTED_BATCH_GROUP_COUNTS = (32, 44, 46, 39, 40, 31)
-EXPECTED_PROMPT_BYTES = (126815, 124878, 127005, 123772, 127244, 103793)
+EXPECTED_RAW_GROUP_COUNT = 232
+EXPECTED_ACTIVE_GROUP_COUNT = 225
+EXPECTED_OUTSIDE_SPAN_GROUP_COUNT = 7
+EXPECTED_OUTSIDE_SPAN_RECOVERY_WINDOWS = 4
+EXPECTED_OUTSIDE_SPAN_RECOVERY_AUDIO_MS = 48625
+EXPECTED_BATCH_GROUP_COUNTS = (31, 43, 45, 38, 38, 30)
+EXPECTED_PROMPT_BYTES = (126258, 127771, 122995, 123221, 127232, 101621)
 
 
 def _retained_plan(retained_dir: Path, snapshot):
@@ -88,13 +93,25 @@ def _retained_plan(retained_dir: Path, snapshot):
     plan = build_utterance_review_plan(
         build_ja_master_review_set(bundle, alignment_application=application),
     )
-    payloads = tuple((group.group_id, v2d._group_payload(plan, group)) for group in plan.groups)
-    batches = v2d._pack_group_batches(v2d._source_fingerprint(plan), payloads)
-    if (len(plan.groups) != 232
+    active_groups, outside_groups = v2d.split_outside_span_groups(plan)
+    recovery_plan = v2d.plan_outside_span_recovery(plan)
+    excluded_ids = recovery_plan.excluded_group_ids
+    fingerprint = v2d._source_fingerprint(plan, exclude_group_ids=excluded_ids)
+    payloads = tuple(
+        (group.group_id, v2d._group_payload(plan, group, source_fingerprint=fingerprint))
+        for group in active_groups
+    )
+    batches = v2d._pack_group_batches(fingerprint, payloads)
+    if (len(plan.groups) != EXPECTED_RAW_GROUP_COUNT
+            or len(active_groups) != EXPECTED_ACTIVE_GROUP_COUNT
+            or len(outside_groups) != EXPECTED_OUTSIDE_SPAN_GROUP_COUNT
+            or len(recovery_plan.windows) != EXPECTED_OUTSIDE_SPAN_RECOVERY_WINDOWS
+            or recovery_plan.total_audio_ms != EXPECTED_OUTSIDE_SPAN_RECOVERY_AUDIO_MS
+            or recovery_plan.exceeds_budget
             or tuple(len(batch[0]) for batch in batches) != EXPECTED_BATCH_GROUP_COUNTS
             or tuple(len(batch[3]) for batch in batches) != EXPECTED_PROMPT_BYTES
             or tuple(row[0] for batch in batches for row in batch[0])
-            != tuple(group.group_id for group in plan.groups)):
+            != tuple(group.group_id for group in active_groups)):
         raise regeneration.RegenerationError("retained V2-D trial batch plan differs")
     return plan, source["claim_token"]
 
