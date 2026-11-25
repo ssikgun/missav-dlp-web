@@ -1,5 +1,15 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-25 — V2-E HSODA-104 two-window untimed hypothesis targeted ASR EXECUTED (authorization CONSUMED)
+
+- Executed bounded diagnostic targeted ASR from clean isolated canonical checkout `1a59ce77990400ddc616750e54cba8c7727d1634` on CT108 (`downloader`) reusing `ASRMediaSourceReader`, `iter_audio_chunks`, and VM122 `BoundedTargetedASRTransport` (`faster-whisper / large-v3 / cuda / int8_float16`, `engine_version=1.2.1`). `ASR_EXECUTION_COUNT=2` (1 per window; **authorization CONSUMED**, no retry), `HERMES_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`.
+- **Verified source & container duration:** `NAS_SOURCE_IDENTITY=PASS` before/after (`size=1311074236`, `mtime_ns=1788015836055049872`), PyAV verified duration = `7,319,957 ms` (`7319.957 s`), retained input SHA256 unchanged, temp media and VM122 worker cleanup PASS (`stage11_processes=0`).
+- **Results (saved privately at `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-untimed-hypothesis-asr-20261125/untimed-hypothesis-targeted-asr-v1.json`, SHA256 `34d095f95d76240f9acdcdc43fe66f3275983b836f465f0c70e1041d6e469f6c`):**
+  - `ja-000198` (`4,399,600..4,410,133 ms`, 10.533s): 1 ASR call executed, output unsaved due to diagnostic script `AttributeError: ASRAudioChunk.sample_count` after transcription returned; **NOT retried** (`INCONCLUSIVE`, requires fresh approval if re-check desired).
+  - `ja-000200` (`5,711,484..5,721,887 ms`, 10.403s): **REAL SPEECH CANDIDATES RECOVERED** where baseline ASR270 had 0 segments within +/-30s — `[5,714,464..5,716,064 ms]` `"もう駅まで行かなきゃね"` and `[5,716,504..5,717,004 ms]` `"遅れよ"` (matching affine hypothesis `5,716,484.4..5,716,886.4 ms` within ~20 ms; proves baseline ASR omitted real dialogue and external JA `'くるよ？'` was a truncated fragment of it).
+- **Updated recommendation:** Pure baseline ASR-first fallback without targeted audio for outside-span external JA cues risks dropping real dialogue. Recommend general bounded hypothesis-only targeted ASR recovery for outside-span external JA cues lacking overlapping baseline ASR, adopting ONLY ASR-verified timestamps/speech. Candidate `bbf9b223fdca34bb2530dc19b58c88c6a3b57a17` preserved untouched.
+
+
 ## 2026-11-25 — V2-E HSODA-104 untimed external-JA analysis (Option B) COMPLETE / general solution proposed
 
 - Completed read-only Option B analysis against canonical HEAD `2eecebf618457d97871f071277af3f4c49979ce8`; prior semantic prompt candidate `bbf9b223fdca34bb2530dc19b58c88c6a3b57a17` (`s11-v2e-semantic-prompt-fix-candidate`) preserved untouched. `MODEL_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`.
