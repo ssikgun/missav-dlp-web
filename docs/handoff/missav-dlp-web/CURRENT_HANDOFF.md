@@ -1,5 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E final targeted review & private provisional SRT completion USER_APPROVED
+
+- User approved minimal completion (`private_provisional_completion=True` records post-translation `needs_audio_evidence=True` cues in the private uncertainty report and proceeds to `run_targeted_review` without late ASR; verified reuse of all 4 ReAdj batches + all 5 KO translation parts / 266 cues from `s11-v2e-HSODA-104-short-id-once-20261126/staging`), minimal offline validation, canonical promotion, and 1 final private continuation (`max_hermes_attempts=4`, `ASR=0`) targeting `PRIVATE_PROVISIONAL_SRT_READY` atop `e3e88d797d495653158409ece6c1ca460dbb3f3c`. Production HOLD & Stage12 protections unchanged.
+
+
 ## 2026-11-26 — V2-E short-ID single private live continuation EXECUTED / HOLD_AFTER_KO_TRANSLATION (authorization CONSUMED)
 
 - **Execution:** Single approved HSODA-104 live continuation executed on CT108 (`downloader`) from promoted `88b70e318940267fb6dbdcd0f0eaec933044a48d` into `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-short-id-once-20261126` (`1279.3s`, exit `0`). Authorization **CONSUMED**.
