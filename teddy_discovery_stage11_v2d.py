@@ -2796,11 +2796,20 @@ def _adjudicate_group_batches(
         active_prompt = prompt
         active_input_raw = input_raw
         active_validator = validate_batch
-        if use_short_id_mapping_for_uncached and not has_existing_receipts and not reuse_only:
+        use_short_for_this_batch = False
+        short_mat = None
+        if use_short_id_mapping_for_uncached:
             short_mat = _build_short_id_batch_material(
                 batch, batch_id=batch_id, source_fingerprint=source_fingerprint,
                 instruction=instruction,
             )
+            if not has_existing_receipts and not reuse_only:
+                use_short_for_this_batch = True
+            elif has_existing_receipts:
+                first_prompt_path = batch_dir / f"{label}-attempt-1.prompt.txt"
+                if first_prompt_path.is_file() and first_prompt_path.read_bytes() == short_mat["prompt"]:
+                    use_short_for_this_batch = True
+        if use_short_for_this_batch and short_mat is not None:
             active_prompt = short_mat["prompt"]
             active_input_raw = short_mat["input_raw"]
 
@@ -3454,6 +3463,133 @@ class V2DReviewOutcome:
     targeted_cue_ids: tuple[str, ...]
 
 
+SHORT_REVIEW_ID_ADDENDUM = (
+    "\nUse the exact short cue_id identifiers provided in V2D_SOURCE_BOUND_INPUT "
+    "(such as Q001) verbatim in exact order without altering, omitting, or duplicating any cue_id. "
+    "Return ONLY the exact top-level fields schema_version (2), request_sha256 (\"REQ-SHORT\"), and cues. "
+    "Output pretty-printed JSON with standard indentation."
+)
+
+
+def _build_short_id_review_chunk_prompt(
+    request: QualityReviewRequest,
+    master: V2DMaster,
+    *,
+    cue_indices: tuple[int, ...],
+    target_indices: tuple[int, ...] | None,
+    real_to_short: dict[str, str],
+) -> bytes:
+    from teddy_discovery_stateful_quality_review_runner import QUALITY_REVIEW_QUERY
+    query = QUALITY_REVIEW_QUERY.replace(
+        "Review EVERY cue in source order, including source-quality KEEP.",
+        "Review every Japanese Master cue in this chunk in source order, including non-filtering KEEP hints.",
+    ).replace("external JA", "Japanese Master").replace("External JA", "Japanese Master")
+    target_short_ids = None
+    if target_indices is not None:
+        target_short_ids = [real_to_short[request.cues[i].cue_id] for i in target_indices]
+        query = query.replace(
+            "Review every Japanese Master cue in this chunk in source order, including non-filtering KEEP hints.",
+            "Read every cue in this chunk for context; adjudicate only the caller target cue IDs.",
+        ).replace(
+            "Return exactly the same cue IDs, count and order;",
+            "Return exactly the caller target cue IDs, count and order;",
+        )
+        query += "\nV2D_TARGET_ONLY: Preserve every non-target first-pass value. Targets in order: " + json.dumps(target_short_ids)
+    req_dict = json.loads(serialize_review_request(request))
+    chunk_cues = []
+    chunk_manifest = []
+    for i in cue_indices:
+        c = dict(req_dict["cues"][i])
+        mc = master.cues[i]
+        sid = real_to_short[mc.cue_id]
+        c["cue_id"] = sid
+        chunk_cues.append(c)
+        chunk_manifest.append({
+            "cue_id": sid,
+            "speaker_status": mc.speaker_status,
+            "source_keys": [ref.key for ref in mc.source_references],
+            "aligned_interval_ms": [_fraction(mc.start_ms), _fraction(mc.end_ms)],
+        })
+    payload = {
+        "schema_version": 2,
+        "request_sha256": "REQ-SHORT",
+        "cues": chunk_cues,
+        "ja_master_source_summary": chunk_manifest,
+        "target_cue_ids": target_short_ids,
+        "source_quality_field_note": "Legacy compatibility field only; KEEP/no_quality_objection is a neutral placeholder, not a classifier verdict.",
+    }
+    return (query + SHORT_REVIEW_ID_ADDENDUM + "\nV2D_SOURCE_BOUND_INPUT=" + _wire(payload).decode("utf-8")).encode("utf-8")
+
+
+def _restore_short_id_review_payload(
+    raw: bytes,
+    *,
+    request: QualityReviewRequest,
+    expected_short_ids: tuple[str, ...],
+    short_to_real: dict[str, str],
+    allow_limited_json_recovery: bool = False,
+) -> bytes:
+    if allow_limited_json_recovery:
+        data, _ = recover_limited_trailing_json(raw, "V2-D quality review")
+    else:
+        data = _load_json(raw, "V2-D quality review")
+    if type(data) is not dict or type(data.get("cues")) is not list:
+        raise V2DError("short-ID review response envelope is invalid")
+    seen: set[str] = set()
+    obs_short: list[str] = []
+    restored_cues = []
+    for row in data["cues"]:
+        if type(row) is not dict or type(row.get("cue_id")) is not str:
+            raise V2DError("short-ID review cue entry is invalid")
+        sid = row["cue_id"]
+        if sid not in short_to_real or sid in seen:
+            raise V2DError("short-ID review cue_id is unknown or duplicated")
+        seen.add(sid)
+        obs_short.append(sid)
+        restored_row = dict(row)
+        restored_row["cue_id"] = short_to_real[sid]
+        restored_cues.append(restored_row)
+    if tuple(obs_short) != expected_short_ids:
+        raise V2DError("short-ID review cue coverage/order differs")
+    restored = dict(data)
+    if restored.get("request_sha256") == "REQ-SHORT":
+        restored["request_sha256"] = review_request_sha256(request)
+    restored["cues"] = restored_cues
+    return _wire(restored)
+
+
+def _pack_short_id_review_chunks(
+    request: QualityReviewRequest,
+    master: V2DMaster,
+    real_to_short: dict[str, str],
+) -> tuple[tuple[tuple[int, ...], bytes], ...]:
+    chunks: list[tuple[tuple[int, ...], bytes]] = []
+    pending: list[int] = []
+    pending_prompt: bytes | None = None
+    for idx in range(len(request.cues)):
+        candidate = tuple(pending + [idx])
+        prompt = _build_short_id_review_chunk_prompt(
+            request, master, cue_indices=candidate, target_indices=None, real_to_short=real_to_short,
+        )
+        if len(prompt) <= V2D_MAX_PROMPT_BYTES:
+            pending.append(idx)
+            pending_prompt = prompt
+        else:
+            if not pending or pending_prompt is None:
+                raise V2DError("single review cue exceeds the existing native prompt bound")
+            chunks.append((tuple(pending), pending_prompt))
+            single_prompt = _build_short_id_review_chunk_prompt(
+                request, master, cue_indices=(idx,), target_indices=None, real_to_short=real_to_short,
+            )
+            if len(single_prompt) > V2D_MAX_PROMPT_BYTES:
+                raise V2DError("single review cue exceeds the existing native prompt bound")
+            pending = [idx]
+            pending_prompt = single_prompt
+    if pending and pending_prompt is not None:
+        chunks.append((tuple(pending), pending_prompt))
+    return tuple(chunks)
+
+
 def run_targeted_review(
     master: V2DMaster,
     package: StatefulSubtitlePackage,
@@ -3463,6 +3599,8 @@ def run_targeted_review(
     hermes_settings: HermesExecutionSettings,
     staging_root: str | Path,
     reuse_only: bool = False,
+    extra_target_cue_ids: tuple[str, ...] = (),
+    allow_limited_json_recovery: bool = False,
 ) -> V2DReviewOutcome:
     """Run existing full-title triage, then existing bounded suspect review."""
     if type(hermes_settings) is not HermesExecutionSettings:
@@ -3474,27 +3612,121 @@ def run_targeted_review(
     request_dir = _private_child(root, request_sha, create=not reuse_only)
     triage_dir = _private_child(request_dir, "triage", create=not reuse_only)
     triage_id = str(uuid.uuid5(V2D_SESSION_NAMESPACE, request_sha + ":triage"))
-    triage_prompt = _review_prompt(request, master, target_cue_ids=None)
-    triage = invoke(
-        triage_prompt, triage_dir, "v2d-triage",
-        lambda raw: parse_review_result(raw, request),
-        hermes_settings=hermes_settings, reuse_only=reuse_only,
+    use_chunked = False
+    try:
+        triage_prompt = _review_prompt(request, master, target_cue_ids=None)
+    except V2DError as error:
+        if "exceeds the existing native prompt bound" not in str(error):
+            raise
+        use_chunked = True
+        triage_prompt = b""
+
+    if not use_chunked:
+        triage = invoke(
+            triage_prompt, triage_dir, "v2d-triage",
+            lambda raw: parse_review_result(raw, request),
+            hermes_settings=hermes_settings, reuse_only=reuse_only,
+        )
+        if type(triage) is not QualityReviewResult:
+            raise V2DError("triage executor returned an invalid review result")
+        triage = bind_review_execution_provenance(triage, request, triage_id)
+        triage_raw = serialize_review_result(triage, request)
+        target_ids = select_suspect_cue_ids(request, triage)
+        if extra_target_cue_ids:
+            combined = set(target_ids) | set(extra_target_cue_ids)
+            target_ids = tuple(cue.cue_id for cue in request.cues if cue.cue_id in combined)
+        if not target_ids:
+            final = triage
+        else:
+            final_dir = _private_child(request_dir, "targeted-final", create=not reuse_only)
+            final_id = str(uuid.uuid5(V2D_SESSION_NAMESPACE, request_sha + ":targeted-final"))
+            final_prompt = _review_prompt(request, master, target_cue_ids=target_ids)
+            target_result = invoke(
+                final_prompt, final_dir, "v2d-targeted-final-review",
+                lambda raw: parse_review_result(raw, request, target_cue_ids=target_ids),
+                hermes_settings=hermes_settings, reuse_only=reuse_only,
+            )
+            if type(target_result) is not QualityReviewResult:
+                raise V2DError("targeted review executor returned an invalid result")
+            target_result = bind_review_execution_provenance(target_result, request, final_id)
+            final = merge_target_review_result(request, target_ids, target_result)
+            final = bind_review_execution_provenance(final, request, final_id)
+        final_raw = serialize_review_result(final, request)
+        return V2DReviewOutcome(request, triage, final, _sha(triage_raw), _sha(final_raw), target_ids)
+
+    # Chunked short-ID fallback when whole-title review prompt exceeds 128KB bound.
+    real_to_short = {cue.cue_id: f"Q{i + 1:03d}" for i, cue in enumerate(request.cues)}
+    short_to_real = {short: real for real, short in real_to_short.items()}
+    chunks = _pack_short_id_review_chunks(request, master, real_to_short)
+    merged_triage_cues = []
+    for part_idx, (cue_indices, chunk_prompt) in enumerate(chunks, 1):
+        chunk_dir = _private_child(triage_dir, f"chunk-{part_idx:02d}", create=not reuse_only)
+        chunk_real_ids = tuple(request.cues[i].cue_id for i in cue_indices)
+        chunk_short_ids = tuple(real_to_short[cid] for cid in chunk_real_ids)
+
+        def validate_chunk(raw, *, _sids=chunk_short_ids, _rids=chunk_real_ids):
+            restored = _restore_short_id_review_payload(
+                raw, request=request, expected_short_ids=_sids, short_to_real=short_to_real,
+                allow_limited_json_recovery=allow_limited_json_recovery,
+            )
+            return parse_review_result(restored, request, target_cue_ids=_rids)
+
+        part_res = invoke(
+            chunk_prompt, chunk_dir, f"v2d-triage-chunk-{part_idx:02d}",
+            validate_chunk, hermes_settings=hermes_settings, reuse_only=reuse_only,
+        )
+        if type(part_res) is not QualityReviewResult:
+            raise V2DError("chunked triage executor returned an invalid review result")
+        merged_triage_cues.extend(part_res.cues)
+    triage = QualityReviewResult(
+        schema_version=2,
+        request_sha256=request_sha,
+        cues=tuple(merged_triage_cues),
+        source_translation_session_id=None,
+        review_execution_session_id=None,
     )
-    if type(triage) is not QualityReviewResult:
-        raise V2DError("triage executor returned an invalid review result")
     triage = bind_review_execution_provenance(triage, request, triage_id)
     triage_raw = serialize_review_result(triage, request)
     target_ids = select_suspect_cue_ids(request, triage)
+    if extra_target_cue_ids:
+        combined = set(target_ids) | set(extra_target_cue_ids)
+        target_ids = tuple(cue.cue_id for cue in request.cues if cue.cue_id in combined)
     if not target_ids:
         final = triage
     else:
         final_dir = _private_child(request_dir, "targeted-final", create=not reuse_only)
         final_id = str(uuid.uuid5(V2D_SESSION_NAMESPACE, request_sha + ":targeted-final"))
-        final_prompt = _review_prompt(request, master, target_cue_ids=target_ids)
+        id_to_index = {cue.cue_id: i for i, cue in enumerate(request.cues)}
+        target_indices = tuple(id_to_index[cid] for cid in target_ids)
+        ctx_indices_set: set[int] = set()
+        for ti in target_indices:
+            for ci in range(max(0, ti - 2), min(len(request.cues), ti + 3)):
+                ctx_indices_set.add(ci)
+        ctx_indices = tuple(sorted(ctx_indices_set))
+        final_prompt = _build_short_id_review_chunk_prompt(
+            request, master, cue_indices=ctx_indices, target_indices=target_indices,
+            real_to_short=real_to_short,
+        )
+        if len(final_prompt) > V2D_MAX_PROMPT_BYTES:
+            # Drop surrounding context if many targets; keep exact targets within bound.
+            final_prompt = _build_short_id_review_chunk_prompt(
+                request, master, cue_indices=target_indices, target_indices=target_indices,
+                real_to_short=real_to_short,
+            )
+        if len(final_prompt) > V2D_MAX_PROMPT_BYTES:
+            raise V2DError("targeted final review prompt exceeds the existing native prompt bound")
+        target_short_ids = tuple(real_to_short[cid] for cid in target_ids)
+
+        def validate_final(raw, *, _sids=target_short_ids, _rids=target_ids):
+            restored = _restore_short_id_review_payload(
+                raw, request=request, expected_short_ids=_sids, short_to_real=short_to_real,
+                allow_limited_json_recovery=allow_limited_json_recovery,
+            )
+            return parse_review_result(restored, request, target_cue_ids=_rids)
+
         target_result = invoke(
             final_prompt, final_dir, "v2d-targeted-final-review",
-            lambda raw: parse_review_result(raw, request, target_cue_ids=target_ids),
-            hermes_settings=hermes_settings, reuse_only=reuse_only,
+            validate_final, hermes_settings=hermes_settings, reuse_only=reuse_only,
         )
         if type(target_result) is not QualityReviewResult:
             raise V2DError("targeted review executor returned an invalid result")
@@ -3635,12 +3867,14 @@ def run_v2d_pipeline(
     allow_limited_json_recovery: bool = False,
     private_provisional_completion: bool = False,
     use_short_id_mapping_for_uncached: bool = False,
+    reuse_verified_translation: bool = False,
 ) -> V2DPipelineResult:
     """Connected offline/live-injectable V2-D path; never bypasses validators."""
     budget = None
     budget_token = None
     json_recovery_log: list[dict[str, object]] = []
     preserved_uncertainty_report: tuple[dict[str, object], ...] = ()
+    preserved_translation_uncertainty_report: tuple[dict[str, object], ...] = ()
     try:
         requested_batching = getattr(invoke, "_v2d_batch_groups", None)
         invoke, executor_owner = _stage_bound_native_invoke(invoke, hermes_settings)
@@ -3744,12 +3978,32 @@ def run_v2d_pipeline(
         package, translated = translate_ja_master(
             master, invoke=invoke, hermes_settings=hermes_settings,
             staging_root=staging_root, claim_token=claim_token,
-            semantic_policy=semantic_policy, reuse_only=reuse_only,
+            semantic_policy=semantic_policy, reuse_only=(reuse_only or reuse_verified_translation),
             targeted_evidence_by_cue=initial_translation_evidence,
             targeted_evidence_sha256=(targeted_evidence.linkage_sha256
                                       if targeted_evidence is not None and initial_translation_evidence else None),
         )
-        if any(isinstance(cue, StatefulCueOutput) and cue.needs_audio_evidence for cue in translated.cues):
+        post_translation_audio_cues = tuple(
+            cue for cue in translated.cues
+            if isinstance(cue, StatefulCueOutput) and cue.needs_audio_evidence
+        )
+        extra_review_cue_ids: tuple[str, ...] = ()
+        if post_translation_audio_cues and private_provisional_completion:
+            master_by_id = {cue.cue_id: cue for cue in master.cues}
+            preserved_translation_uncertainty_report = tuple({
+                "cue_id": cue.cue_id,
+                "group_id": master_by_id[cue.cue_id].group_id,
+                "ja_text": master_by_id[cue.cue_id].text,
+                "first_pass_ko": getattr(cue, "ko", None),
+                "repaired_ja": getattr(cue, "repaired_ja", None),
+                "start_ms": _fraction(master_by_id[cue.cue_id].start_ms),
+                "end_ms": _fraction(master_by_id[cue.cue_id].end_ms),
+                "source_keys": [ref.key for ref in master_by_id[cue.cue_id].source_references],
+                "original_needs_audio_evidence": True,
+                "provisional_disposition": "PRESERVED_FOR_TARGETED_REVIEW_NO_LATE_ASR",
+            } for cue in post_translation_audio_cues)
+            extra_review_cue_ids = tuple(cue.cue_id for cue in post_translation_audio_cues)
+        elif post_translation_audio_cues:
             requested_translation = translated
             if targeted_evidence is not None:
                 covered_sources = {source_id for source_id, _, _ in targeted_evidence.source_window_evidence}
@@ -3825,6 +4079,8 @@ def run_v2d_pipeline(
             master, package, translated, invoke=invoke,
             hermes_settings=hermes_settings, staging_root=staging_root,
             reuse_only=reuse_only,
+            extra_target_cue_ids=extra_review_cue_ids,
+            allow_limited_json_recovery=allow_limited_json_recovery,
         )
         ja_cues, ko_cues = _materialized_cues(master, translated, review)
         ja_raw, ko_generated = _srt_bytes(ja_cues), generate_korean_srt(ko_cues)
@@ -3857,7 +4113,11 @@ def run_v2d_pipeline(
                 "hermes_execution_settings": item.get("hermes_execution_settings"),
             })
         is_private_provisional = bool(
-            private_provisional_completion and (preserved_uncertainty_report or json_recovery_log)
+            private_provisional_completion and (
+                preserved_uncertainty_report
+                or preserved_translation_uncertainty_report
+                or json_recovery_log
+            )
         ) or bool(json_recovery_log)
         result_state = "PRIVATE_PROVISIONAL_SRT_READY" if is_private_provisional else "CLEAN_SRT_READY"
         uncertainty_report_raw = None
@@ -3872,6 +4132,7 @@ def run_v2d_pipeline(
                 "master_sha256": master.master_sha256,
                 "limited_json_recoveries": list(json_recovery_log),
                 "preserved_unresolved_uncertainty": list(preserved_uncertainty_report),
+                "preserved_post_translation_audio_requests": list(preserved_translation_uncertainty_report),
             })
         proof_payload = {
             "schema_version": V2D_SCHEMA_VERSION,
@@ -3929,6 +4190,7 @@ def run_v2d_pipeline(
             proof_payload["provisional_trial_only"] = True
             proof_payload["limited_json_recoveries"] = list(json_recovery_log)
             proof_payload["preserved_unresolved_uncertainty_count"] = len(preserved_uncertainty_report)
+            proof_payload["preserved_post_translation_audio_request_count"] = len(preserved_translation_uncertainty_report)
             proof_payload["outputs"][V2D_PRIVATE_PROVISIONAL_UNCERTAINTY_FILENAME] = _sha(uncertainty_report_raw)
         proof_raw = _wire(proof_payload)
         output_names = (

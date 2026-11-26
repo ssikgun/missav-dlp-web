@@ -420,6 +420,9 @@ def prepare_verified_continuation_staging(
     approved_targeted_asr_scope: ApprovedTargetedASRScope | None = None,
     reuse_verified_targeted_readjudication: bool = False,
     allow_limited_json_recovery: bool = False,
+    use_short_id_mapping_for_uncached: bool = False,
+    reuse_verified_translation: bool = False,
+    private_provisional_completion: bool = False,
 ) -> dict[str, object]:
     """Validate and clone ONLY verified reusable artifacts into a fresh staging dir.
 
@@ -744,10 +747,41 @@ def prepare_verified_continuation_staging(
                 return tuple(results)
 
             # Validate on prior_staging (earliest eligible attempt in actual attempt order)
+            active_rprompt = rprompt
+            active_rval = _validate_readj_batch
+            if use_short_id_mapping_for_uncached:
+                short_mat = v2d._build_short_id_batch_material(
+                    rbatch, batch_id=rbid, source_fingerprint=effective_fp,
+                    instruction=v2d.SEMANTIC_TARGETED_READJUDICATION_BATCH_INSTRUCTION,
+                )
+                first_p = src_rbdir / "ja-master-targeted-readjudication-batch-attempt-1.prompt.txt"
+                if first_p.is_file() and first_p.read_bytes() == short_mat["prompt"]:
+                    active_rprompt = short_mat["prompt"]
+
+                    def _validate_short_readj(raw, *, _sm=short_mat, _rbid=rbid, _val=_validate_readj_batch):
+                        if allow_limited_json_recovery:
+                            data, _ = v2d.recover_limited_trailing_json(raw, "JA Master batch adjudication")
+                        else:
+                            data = v2d._load_json(raw, "JA Master batch adjudication")
+                        restored = v2d._restore_short_id_batch_response(
+                            data,
+                            short_batch_id=_sm["short_batch_id"],
+                            short_fp=_sm["short_fp"],
+                            real_batch_id=_rbid,
+                            real_fp=effective_fp,
+                            expected_short_gids=_sm["expected_short_gids"],
+                            short_to_real_gid=_sm["short_to_real_gid"],
+                            expected_short_cids_by_gid=_sm["expected_short_cids_by_gid"],
+                            short_to_real_cid_by_gid=_sm["short_to_real_cid_by_gid"],
+                        )
+                        return _val(v2d._wire(restored))
+
+                    active_rval = _validate_short_readj
+
             try:
                 forbid_invoke(
-                    rprompt, src_rbdir, "ja-master-targeted-readjudication-batch",
-                    _validate_readj_batch, hermes_settings=hermes_settings, reuse_only=True,
+                    active_rprompt, src_rbdir, "ja-master-targeted-readjudication-batch",
+                    active_rval, hermes_settings=hermes_settings, reuse_only=True,
                 )
             except Exception:
                 continue
@@ -761,18 +795,85 @@ def prepare_verified_continuation_staging(
                     _copy_private_file_exclusive(verr_path, dst_rbdir / (prefix + ".validation-error.json"))
             # Re-validate on cloned dst_rbdir
             verify_log: list[dict[str, object]] = []
-            forbid_invoke(
-                rprompt, dst_rbdir, "ja-master-targeted-readjudication-batch",
-                lambda raw, _e=expected_ids, _b=rbid, _l=verify_log: _validate_readj_batch(
-                    raw, _expected_ids=_e, _rbid=_b, _rec_log=_l,
-                ),
-                hermes_settings=hermes_settings, reuse_only=True,
-            )
+            if active_rprompt == rprompt:
+                forbid_invoke(
+                    rprompt, dst_rbdir, "ja-master-targeted-readjudication-batch",
+                    lambda raw, _e=expected_ids, _b=rbid, _l=verify_log: _validate_readj_batch(
+                        raw, _expected_ids=_e, _rbid=_b, _rec_log=_l,
+                    ),
+                    hermes_settings=hermes_settings, reuse_only=True,
+                )
+            else:
+                forbid_invoke(
+                    active_rprompt, dst_rbdir, "ja-master-targeted-readjudication-batch",
+                    active_rval, hermes_settings=hermes_settings, reuse_only=True,
+                )
             reused_readj_indices.append(rbi)
             if verify_log:
                 recovered_readj_indices.append(rbi)
                 readj_recovery_records.extend(verify_log)
+
+        reused_translation_parts = 0
+        if reuse_verified_translation:
+            if len(reused_readj_indices) != total_readj_batches:
+                raise regeneration.RegenerationError(
+                    "reuse_verified_translation requires all targeted readjudication batches reused"
+                )
+            final_adj = v2d._readjudicate_targeted_groups(
+                plan, init_adj, targeted_ev,
+                invoke=forbid_invoke, hermes_settings=hermes_settings,
+                staging_root=new_staging, claim_token=claim_token, reuse_only=True,
+                batch_groups=True, exclude_group_ids=excluded_ids,
+                supplemental_groups=supplemental_groups,
+                allow_limited_json_recovery=allow_limited_json_recovery,
+                use_short_id_mapping_for_uncached=use_short_id_mapping_for_uncached,
+            )
+            prov_master = v2d.materialize_ja_master(
+                plan, final_adj,
+                targeted_evidence_sha256=targeted_ev.linkage_sha256,
+                outside_span_recovery_sha256=os_res.artifact_sha256,
+                exclude_group_ids=excluded_ids,
+                supplemental_groups=supplemental_groups,
+                allow_private_provisional_unresolved=private_provisional_completion,
+            )
+            tr_ev = v2d._targeted_translation_evidence(prov_master, targeted_ev)
+            pkg = v2d._build_translation_package(
+                prov_master, claim_token,
+                targeted_evidence_by_cue=tr_ev,
+                targeted_evidence_sha256=(targeted_ev.linkage_sha256 if tr_ev else None),
+            )
+            tr_session_id = v2d.stateful_session_id_for_package(pkg)
+            src_tr_dir = prior_staging / tr_session_id
+            if not src_tr_dir.is_dir():
+                raise regeneration.RegenerationError("matching prior translation session directory is missing")
+            # Validate on prior_staging first (reuse_only=True, 0 Hermes calls)
+            v2d.translate_ja_master(
+                prov_master, invoke=forbid_invoke, hermes_settings=hermes_settings,
+                staging_root=prior_staging, claim_token=claim_token, reuse_only=True,
+                targeted_evidence_by_cue=tr_ev,
+                targeted_evidence_sha256=(targeted_ev.linkage_sha256 if tr_ev else None),
+            )
+            dst_tr_dir = _mkdir_private(new_staging / tr_session_id)
+            for jf in sorted(f for f in src_tr_dir.iterdir() if f.is_file() and f.suffix == ".json"):
+                _copy_private_file_exclusive(jf, dst_tr_dir / jf.name)
+            for pdir in sorted(p for p in src_tr_dir.glob("part-stage-*") if p.is_dir()):
+                dst_pdir = _mkdir_private(dst_tr_dir / pdir.name)
+                reused_translation_parts += 1
+                for subf in sorted(f for f in pdir.iterdir() if f.is_file()):
+                    _copy_private_file_exclusive(subf, dst_pdir / subf.name)
+            # Re-validate cloned translation session on new_staging (reuse_only=True, 0 Hermes calls)
+            v2d.translate_ja_master(
+                prov_master, invoke=forbid_invoke, hermes_settings=hermes_settings,
+                staging_root=new_staging, claim_token=claim_token, reuse_only=True,
+                targeted_evidence_by_cue=tr_ev,
+                targeted_evidence_sha256=(targeted_ev.linkage_sha256 if tr_ev else None),
+            )
     else:
+        reused_translation_parts = 0
+        if reuse_verified_translation:
+            raise regeneration.RegenerationError(
+                "reuse_verified_translation requires reuse_verified_targeted_readjudication=True"
+            )
         if list(new_staging.glob("targeted-readjudication-*")):
             raise regeneration.RegenerationError("prior targeted-readjudication artifacts must not be copied")
     if allow_new_targeted_asr and (
@@ -804,6 +905,7 @@ def prepare_verified_continuation_staging(
         "reused_readjudication_batch_indices": tuple(reused_readj_indices),
         "recovered_readjudication_batch_indices": tuple(recovered_readj_indices),
         "json_recovery_evidence": tuple(readj_recovery_records),
+        "reused_translation_parts": reused_translation_parts,
     }
 
 
@@ -824,6 +926,7 @@ def run_hsoda104_pilot_continue(
     allow_limited_json_recovery: bool = False,
     private_provisional_completion: bool = False,
     use_short_id_mapping_for_uncached: bool = False,
+    reuse_verified_translation: bool = False,
     continuation_approved: bool = False,
 ) -> HSODA104ContinuationResult:
     """Continue into a fresh exclusive run root reusing ONLY verified prior artifacts."""
@@ -875,6 +978,9 @@ def run_hsoda104_pilot_continue(
             approved_targeted_asr_scope=approved_targeted_asr_scope,
             reuse_verified_targeted_readjudication=reuse_verified_targeted_readjudication,
             allow_limited_json_recovery=allow_limited_json_recovery,
+            use_short_id_mapping_for_uncached=use_short_id_mapping_for_uncached,
+            reuse_verified_translation=reuse_verified_translation,
+            private_provisional_completion=private_provisional_completion,
         )
         if allow_new_targeted_asr:
             tracker = {"count": 0, "seen_windows": set(), "active_route": None}
@@ -909,6 +1015,7 @@ def run_hsoda104_pilot_continue(
             allow_limited_json_recovery=allow_limited_json_recovery,
             private_provisional_completion=private_provisional_completion,
             use_short_id_mapping_for_uncached=use_short_id_mapping_for_uncached,
+            reuse_verified_translation=reuse_verified_translation,
         )
         return HSODA104ContinuationResult(
             pipeline_result=pipeline_result,
