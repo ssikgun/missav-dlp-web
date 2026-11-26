@@ -1,5 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E short-ID mapping canonical source promotion COMPLETE (live continuation STARTING)
+
+- `SOURCE_PROMOTION=PASS`. Promoted exact 2 files (`+200/-4`) to canonical `teddy-subtitle-stage11` as `88b70e318940267fb6dbdcd0f0eaec933044a48d` (`REMOTE_SHA256_MATCH=PASS`: `v2d.py`=`369d9d4b...`, `hsoda104_pilot.py`=`232fbe4c...`). Offline verification PASS (`TEST1`–`TEST4` + `S11_V2D_OFFLINE_SMOKE=PASS`). Proceeding immediately to approved single private live continuation (`max_hermes_attempts=12`, `ASR=0`).
+
+
 ## 2026-11-26 — V2-E short-ID mapping, canonical promotion, and single private live continuation USER_APPROVED
 
 - User approved sequential implementation of deterministic short unique ID mapping for incomplete/uncached batches (preserving completed Batch 1/2 prompts/receipts/reuse unchanged; no guess-repair of failed Batch 3 outputs), minimal offline verification, canonical source promotion, and one private HSODA-104 live continuation (`max_hermes_attempts=12`, `ASR=0`, reusing 6 initial batches, 43 ASR windows, Batch 1 & Batch 2 Attempt 1, targeting `PRIVATE_PROVISIONAL_SRT_READY`) atop canonical `591a66ca0d9986980c24aaac673a9fdc46500e0e`. No deployment, publication, or auto-replay.
