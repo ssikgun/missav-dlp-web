@@ -38,6 +38,7 @@ from teddy_discovery_stateful_controller import build_stateful_whole_title_query
 from teddy_discovery_stateful_hybrid import prepare_stateful_hybrid
 from teddy_discovery_stateful_parts import build_stateful_part_plan, parse_stateful_part, assemble_stateful_result, serialize_stateful_part, _validated_output_cue
 from teddy_discovery_stateful_translator import (
+    StatefulSubtitleResult,
     serialize_stateful_package, serialize_stateful_model_input, serialize_stateful_result,
     parse_stateful_result, stateful_session_id_for_package,
     bind_stateful_model_input_generation_key,
@@ -50,6 +51,16 @@ from teddy_discovery_stage11_hermes_profile import (
     STAGE11_HERMES_TIMEOUT_ENV,
     legacy_receipt_matches,
     validate_settings_evidence,
+)
+from teddy_discovery_mozzi_backend import (
+    MOZZI_BACKEND_ID,
+    MOZZI_PROFILE_AUTHORITY,
+    MOZZI_PROFILE_NAME,
+    MOZZI_TARGET_HOST,
+    MOZZI_TARGET_SERVER,
+    MOZZI_TRANSPORT_PROTOCOL,
+    MozziSubtitleBackend,
+    MozziSubtitleBackendError,
 )
 from teddy_discovery_subtitle import SubtitleCandidate
 from teddy_discovery_subtitle_external import ExternalSubtitlePayload
@@ -71,6 +82,7 @@ MAX_VALIDATION_ATTEMPTS = 2  # Existing native semantic validation retry bound.
 NATIVE_ABSOLUTE_TIMEOUT = 3600
 NATIVE_INACTIVITY_TIMEOUT = 600
 NATIVE_SETTINGS_FILENAME = 'stage11-hermes-execution-settings-v1.json'
+MOZZI_BINDING_FILENAME = 'stage11-mozzi-execution-binding-v1.json'
 TIRITH_WARNING = ('  ⚠ tirith security scanner enabled but not available '
                   '— command scanning will use pattern matching only\r\n').encode()
 # Byte-identical to the previously verified canary277 tool-free profile. No auth.
@@ -280,6 +292,10 @@ def _bind_staging_hermes_settings(directory, settings):
     if type(settings) is not HermesExecutionSettings:
         raise controller.Stage11ControllerValidationError(
             'resolved Stage11 Hermes settings are required')
+    mozzi_path = directory / MOZZI_BINDING_FILENAME
+    if mozzi_path.exists() or mozzi_path.is_symlink():
+        raise controller.Stage11ControllerArtifactError(
+            'CT120 staging directory conflicts with CT121 Mozzi execution binding')
     path = directory / NATIVE_SETTINGS_FILENAME
     expected = wire(settings.evidence())
     exists = path.exists() or path.is_symlink()
@@ -343,13 +359,212 @@ def native_prompt(query, package, *, part_ids=None):
     return prompt
 
 
-class NativeNormalFirstPass:
-    def __init__(self, bridge):
-        self.bridge = bridge
-        self._verified_attempts = []
+def _validate_mozzi_receipt_provenance(receipt, *, expected_identity, expected_profile_evidence=None):
+    """Verify a CT121 Mozzi receipt and reject CT120 or inconsistent profile receipts."""
+    if type(receipt) is not dict:
+        raise controller.Stage11ControllerArtifactError('CT121 Mozzi receipt is invalid')
+    if 'hermes_execution_settings' in receipt:
+        raise controller.Stage11ControllerArtifactError(
+            'CT120 Hermes execution settings receipt cannot be reused by CT121 Mozzi')
+    for key in ('backend', 'target_server', 'target_host', 'transport', 'profile', 'profile_authority'):
+        if receipt.get(key) != expected_identity[key]:
+            raise controller.Stage11ControllerArtifactError(
+                f'CT121 Mozzi receipt {key} differs from bound backend')
+    if receipt.get('model_override_count') != 0:
+        raise controller.Stage11ControllerArtifactError(
+            'CT121 Mozzi receipt reports nonzero model overrides')
+    sid = receipt.get('runtime_session_id')
+    if type(sid) is not str or re.fullmatch(r'[A-Za-z0-9_-]{8,120}', sid) is None:
+        raise controller.Stage11ControllerArtifactError(
+            'CT121 Mozzi receipt runtime_session_id is invalid')
+    reported = receipt.get('server_reported_profile_evidence')
+    if reported is not None and type(reported) is not dict:
+        raise controller.Stage11ControllerArtifactError(
+            'CT121 Mozzi receipt server_reported_profile_evidence is invalid')
+    if expected_profile_evidence is not None and reported != expected_profile_evidence:
+        raise controller.Stage11ControllerArtifactError(
+            'CT121 Mozzi profile evidence changed mid-title; refusing to mix receipts')
+    return reported
 
-    def invoke(self, prompt, directory, label, validator, *, hermes_settings,
+
+def _bind_staging_mozzi_binding(directory, mozzi_backend):
+    """Bind a staging directory exclusively to CT121 Mozzi and isolate from CT120."""
+    ct120_path = directory / NATIVE_SETTINGS_FILENAME
+    if ct120_path.exists() or ct120_path.is_symlink():
+        raise controller.Stage11ControllerArtifactError(
+            'CT121 Mozzi cannot reuse a CT120 Hermes staging directory')
+    expected_identity = mozzi_backend.backend_identity()
+    path = directory / MOZZI_BINDING_FILENAME
+    exists = path.exists() or path.is_symlink()
+    if exists:
+        try:
+            persisted = json.loads(controller._read_private_file(path, max_bytes=65536))
+        except Exception as error:
+            raise controller.Stage11ControllerArtifactError(
+                'staged CT121 Mozzi binding is invalid') from error
+        if persisted != expected_identity:
+            raise controller.Stage11ControllerArtifactError(
+                'staged CT121 Mozzi binding differs from current backend identity')
+
+    receipt_paths = sorted(directory.glob('*-attempt-*.receipt.json'))
+    has_other_artifacts = any(
+        item.name != MOZZI_BINDING_FILENAME for item in directory.iterdir())
+    if not exists and has_other_artifacts:
+        raise controller.Stage11ControllerArtifactError(
+            'existing first-pass artifacts lack CT121 Mozzi backend binding')
+
+    observed_profile_evidence = None
+    has_observed_receipt = False
+    for receipt_path in receipt_paths:
+        try:
+            receipt = json.loads(controller._read_private_file(
+                receipt_path, max_bytes=1024 * 1024))
+        except Exception as error:
+            raise controller.Stage11ControllerArtifactError(
+                'staged CT121 Mozzi attempt receipt is invalid') from error
+        reported = _validate_mozzi_receipt_provenance(
+            receipt,
+            expected_identity=expected_identity,
+            expected_profile_evidence=(
+                observed_profile_evidence if has_observed_receipt else None
+            ),
+        )
+        if has_observed_receipt and reported != observed_profile_evidence:
+            raise controller.Stage11ControllerArtifactError(
+                'CT121 Mozzi profile evidence changed mid-title; refusing to mix receipts')
+        observed_profile_evidence = reported
+        has_observed_receipt = True
+
+    if not exists:
+        store(path, wire(expected_identity))
+    return expected_identity, (observed_profile_evidence if has_observed_receipt else None), has_observed_receipt
+
+
+class NativeNormalFirstPass:
+    def __init__(self, bridge=None, *, mozzi_backend=None):
+        if mozzi_backend is not None and bridge is not None:
+            raise controller.Stage11ControllerValidationError(
+                'NativeNormalFirstPass cannot mix CT120 bridge and CT121 Mozzi backend')
+        if mozzi_backend is not None and not isinstance(mozzi_backend, MozziSubtitleBackend):
+            raise controller.Stage11ControllerValidationError(
+                'mozzi_backend must be a MozziSubtitleBackend')
+        self.bridge = bridge
+        self.mozzi_backend = mozzi_backend
+        self.is_mozzi_backend = mozzi_backend is not None
+        self._verified_attempts = []
+        self._mozzi_profile_evidence = None
+        self._mozzi_has_observed_evidence = False
+
+    def _invoke_mozzi(self, prompt, directory, label, validator, *, hermes_settings=None,
+                      reuse_only=False):
+        if hermes_settings is not None:
+            raise controller.Stage11ControllerValidationError(
+                'CT121 Mozzi backend forbids caller-supplied model/profile overrides')
+        if type(reuse_only) is not bool:
+            raise controller.Stage11ControllerValidationError(
+                'first-pass reuse mode is invalid')
+        if len(prompt) > MAX_NATIVE_PROMPT_BYTES:
+            raise controller.Stage11ControllerValidationError('native prompt exceeds established byte bound')
+        expected_identity = self.mozzi_backend.backend_identity()
+        last_error = None
+        for attempt in range(1, MAX_VALIDATION_ATTEMPTS + 1):
+            prefix = directory / f'{label}-attempt-{attempt}'
+            receipt_path = prefix.with_suffix('.receipt.json')
+            prompt_path = prefix.with_suffix('.prompt.txt')
+            if receipt_path.exists():
+                receipt_raw = controller._read_private_file(receipt_path, max_bytes=1024 * 1024)
+                receipt = json.loads(receipt_raw)
+                stored_prompt = controller._read_private_file(
+                    prompt_path, max_bytes=MAX_NATIVE_PROMPT_BYTES)
+                if stored_prompt != prompt:
+                    raise controller.Stage11ControllerArtifactError(
+                        'CT121 Mozzi receipt is detached from its stored prompt')
+                stdout = controller._read_private_file(prefix.with_suffix('.stdout'), max_bytes=16 * 1024 * 1024)
+                stderr = controller._read_private_file(prefix.with_suffix('.stderr'), max_bytes=16 * 1024 * 1024)
+            else:
+                if reuse_only:
+                    raise controller.Stage11ControllerArtifactError(
+                        'completed first-pass output lacks a CT121 Mozzi execution receipt')
+                store(prompt_path, prompt)
+                try:
+                    stdout, stderr, receipt = self.mozzi_backend.run_native_candidate(prompt)
+                except MozziSubtitleBackendError as error:
+                    raise Stage11DeploymentTransportError(str(error)) from error
+                store(prefix.with_suffix('.stdout'), stdout)
+                if stderr != b'':
+                    raise controller.Stage11ControllerArtifactError(
+                        'CT121 Mozzi backend returned unexpected non-empty stderr')
+                stderr_persisted = b'\n'
+                store(prefix.with_suffix('.stderr'), stderr_persisted)
+                stderr = stderr_persisted
+                receipt = dict(receipt)
+                receipt['stderr_sha256'] = sha(stderr_persisted)
+                receipt['stderr_empty'] = True
+                receipt['attempt'] = attempt
+                receipt_raw = wire(receipt)
+                store(receipt_path, receipt_raw)
+            if receipt.get('prompt_sha256') != sha(prompt) or receipt.get('stdout_sha256') != sha(stdout):
+                raise controller.Stage11ControllerArtifactError('CT121 Mozzi receipt detached from prompt/output')
+            if (receipt.get('stderr_sha256') != sha(stderr)
+                    or stderr != b'\n'
+                    or receipt.get('stderr_empty') is not True):
+                raise controller.Stage11ControllerArtifactError('CT121 Mozzi receipt detached from stderr diagnostics')
+            if type(receipt.get('attempt')) is not int or receipt['attempt'] != attempt:
+                raise controller.Stage11ControllerArtifactError('CT121 Mozzi receipt attempt mismatch')
+            reported = _validate_mozzi_receipt_provenance(
+                receipt,
+                expected_identity=expected_identity,
+                expected_profile_evidence=(
+                    self._mozzi_profile_evidence if self._mozzi_has_observed_evidence else None
+                ),
+            )
+            if self._mozzi_has_observed_evidence and reported != self._mozzi_profile_evidence:
+                raise controller.Stage11ControllerArtifactError(
+                    'CT121 Mozzi profile evidence changed mid-title; refusing to mix receipts')
+            self._mozzi_profile_evidence = reported
+            self._mozzi_has_observed_evidence = True
+            self._verified_attempts.append({
+                'label': label,
+                'attempt': receipt.get('attempt'),
+                'receipt_sha256': sha(receipt_raw),
+                'prompt_sha256': receipt['prompt_sha256'],
+                'stdout_sha256': receipt['stdout_sha256'],
+                'stderr_sha256': receipt['stderr_sha256'],
+                'runtime_session_id_sha256': sha(receipt['runtime_session_id'].encode()),
+                'returncode': receipt.get('returncode'),
+                'timeout_reason': receipt.get('timeout_reason'),
+                'tools_count': receipt.get('tools_count'),
+                'backend': receipt['backend'],
+                'target_server': receipt['target_server'],
+                'transport': receipt['transport'],
+                'profile': receipt['profile'],
+                'profile_authority': receipt['profile_authority'],
+                'model_override_count': receipt['model_override_count'],
+                'server_reported_profile_evidence': reported,
+            })
+            if receipt.get('returncode') != 0 or receipt.get('timeout_reason') is not None:
+                raise controller.Stage11ControllerError(
+                    'CT121 Mozzi execution failed: ' + str(receipt.get('timeout_reason') or receipt.get('returncode')))
+            if receipt.get('tools_count') != 0:
+                raise controller.Stage11ControllerArtifactError('CT121 Mozzi tools_count must be zero')
+            clean = stdout[len(TIRITH_WARNING):] if stdout.startswith(TIRITH_WARNING) else stdout
+            try:
+                return validator(clean)
+            except ValueError as error:
+                last_error = error
+                if not reuse_only:
+                    store(prefix.with_suffix('.validation-error.json'), wire({'error_type': type(error).__name__,
+                        'reason': str(error), 'attempt': attempt, 'user_intervention': 0,
+                        'backend': MOZZI_BACKEND_ID}))
+        raise controller.Stage11ControllerValidationError('bounded native output validation retries exhausted') from last_error
+
+    def invoke(self, prompt, directory, label, validator, *, hermes_settings=None,
                reuse_only=False):
+        if self.is_mozzi_backend:
+            return self._invoke_mozzi(
+                prompt, directory, label, validator,
+                hermes_settings=hermes_settings, reuse_only=reuse_only,
+            )
         if type(hermes_settings) is not HermesExecutionSettings:
             raise controller.Stage11ControllerValidationError(
                 'resolved Stage11 Hermes settings are required')
@@ -458,9 +673,12 @@ class NativeNormalFirstPass:
 
     def __call__(self, package, *, route, staging_root, boundary_evidence,
                  hermes_settings=None, resume_only=False, **unused):
-        if type(hermes_settings) is not HermesExecutionSettings:
+        if not self.is_mozzi_backend and type(hermes_settings) is not HermesExecutionSettings:
             raise controller.Stage11ControllerValidationError(
                 'resolved Stage11 Hermes settings are required')
+        if self.is_mozzi_backend and hermes_settings is not None:
+            raise controller.Stage11ControllerValidationError(
+                'CT121 Mozzi backend forbids caller-supplied HermesExecutionSettings')
         if type(resume_only) is not bool:
             raise controller.Stage11ControllerValidationError(
                 'first-pass resume mode is invalid')
@@ -470,14 +688,22 @@ class NativeNormalFirstPass:
             raise controller.Stage11ControllerArtifactError(
                 'existing first-pass staging directory is unavailable')
         directory=controller._title_directory(stage_root,package.dvd_id)
-        bound_evidence = _bind_staging_hermes_settings(directory, hermes_settings)
-        bound_settings = _settings_object_from_evidence(bound_evidence)
+        if self.is_mozzi_backend:
+            _, obs_ev, has_obs = _bind_staging_mozzi_binding(directory, self.mozzi_backend)
+            self._mozzi_profile_evidence = obs_ev
+            self._mozzi_has_observed_evidence = has_obs
+            bound_evidence = None
+            bound_settings = None
+        else:
+            bound_evidence = _bind_staging_hermes_settings(directory, hermes_settings)
+            bound_settings = _settings_object_from_evidence(bound_evidence)
         result_path=directory/'stage11-semantic-result.json'
         cached_result = result_path.exists() or result_path.is_symlink()
         if resume_only and not cached_result:
             raise controller.Stage11ControllerArtifactError(
                 'resume requires a completed first-pass result')
-        if not cached_result and wire(bound_evidence) != wire(hermes_settings.evidence()):
+        if (not self.is_mozzi_backend and not cached_result
+                and wire(bound_evidence) != wire(hermes_settings.evidence())):
             raise controller.Stage11ControllerArtifactError(
                 'incomplete first-pass stage belongs to different profile settings')
         raw=serialize_stateful_package(package)
@@ -502,8 +728,10 @@ class NativeNormalFirstPass:
         result=None
         if len(prompt)<=MAX_NATIVE_PROMPT_BYTES:
             try:
-                invoke_options = {'hermes_settings':
-                                  (bound_settings if cached_result else hermes_settings)}
+                invoke_options = {'hermes_settings': (
+                    None if self.is_mozzi_backend
+                    else (bound_settings if cached_result else hermes_settings)
+                )}
                 if cached_result or resume_only:
                     invoke_options['reuse_only'] = True
                 result=self.invoke(prompt,directory,'whole-title',validator,
@@ -524,8 +752,10 @@ class NativeNormalFirstPass:
             for part in plan.parts:
                 query=build_stateful_part_query(package,model,part.part_index,boundary_evidence=boundary_evidence)
                 prompt=native_prompt(query,package,part_ids=part.cue_ids)
-                invoke_options = {'hermes_settings':
-                                  (bound_settings if cached_result else hermes_settings)}
+                invoke_options = {'hermes_settings': (
+                    None if self.is_mozzi_backend
+                    else (bound_settings if cached_result else hermes_settings)
+                )}
                 if cached_result or resume_only:
                     invoke_options['reuse_only'] = True
                 validated=self.invoke(prompt,directory,f'part-{part.part_index:04d}',
@@ -540,7 +770,17 @@ class NativeNormalFirstPass:
                 else:
                     store(part_path,part_raw)
                 parts.append(validated)
-            result=assemble_stateful_result(directory,package,plan)
+            if cached_result or resume_only:
+                result = StatefulSubtitleResult(
+                    schema_version=package.schema_version,
+                    dvd_id=package.dvd_id,
+                    generation_key=package.generation_key,
+                    claim_token=package.claim_token,
+                    session_id=stateful_session_id_for_package(package),
+                    cues=tuple(c for p in parts for c in p.cues),
+                )
+            else:
+                result=assemble_stateful_result(directory,package,plan)
         result_raw = serialize_stateful_result(result)
         result = validator(result_raw)
         if cached_result or resume_only:
@@ -1184,8 +1424,9 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
     directory=controller._title_directory(root,title)
     report_path=directory/controller.MECHANICAL_REPORT_FILENAME
     clean_path=directory/controller.CLEAN_SRT_FILENAME
+    using_mozzi = bool(getattr(first_pass_runner, 'is_mozzi_backend', False))
     try:
-        if hermes_settings is not None:
+        if hermes_settings is not None and not using_mozzi:
             _bind_staging_hermes_settings(
                 controller._title_directory(staging, title), hermes_settings)
         video,snapshot=controller._resolve_holding(title,holding_resolver)
@@ -1223,7 +1464,7 @@ def run_one_title_normal_mode(title, *, artifact_root, stateful_staging_root, cl
         first_pass_kwargs = {'route':'HYBRID','staging_root':staging,
                              'boundary_evidence':boundary,
                              'resume_only':resume_existing}
-        if hermes_settings is not None:
+        if hermes_settings is not None and not using_mozzi:
             first_pass_kwargs['hermes_settings'] = hermes_settings
         first=first_pass_runner(package,**first_pass_kwargs)
         first=validate_normal_translation(serialize_stateful_result(first),package,boundary)
@@ -1280,11 +1521,18 @@ def main():
     parser.add_argument('--run-root',type=Path,required=True)
     parser.add_argument('--external-ja',type=Path,action='append',help='Optional retained JA, in DVD-ID order; generic local acquisition only')
     parser.add_argument('--baseline-root',type=Path,help='Optional existing source-bound baseline cache')
+    parser.add_argument('--translation-backend',choices=('ct120','ct121-mozzi'),default='ct120',
+                        help='Opt-in translation backend selector (default stays ct120)')
     args=parser.parse_args()
     if args.external_ja and len(args.external_ja)!=len(args.dvd_id): parser.error('one JA input per title required')
     from teddy_discovery_stage12_bulk_runner import build_deployment_config, build_dependencies, acceptance_policy
     config=build_deployment_config(); dependencies=build_dependencies(config)
-    first_pass=NativeNormalFirstPass(dependencies.remote_bridge)
+    if args.translation_backend == 'ct121-mozzi':
+        mozzi = MozziSubtitleBackend()
+        mozzi.health()
+        first_pass = NativeNormalFirstPass(mozzi_backend=mozzi)
+    else:
+        first_pass=NativeNormalFirstPass(dependencies.remote_bridge)
     root=args.run_root.absolute(); root.mkdir(mode=0o700,parents=True,exist_ok=True)
     artifacts=root/'artifacts'; staging=root/'staging'
     for p in (artifacts,staging): p.mkdir(mode=0o700,exist_ok=True)

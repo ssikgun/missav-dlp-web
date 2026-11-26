@@ -2411,6 +2411,8 @@ class _HybridOriginalRegistry:
                 self._first_pass[session_id] = (package, result)
             return result
 
+        if getattr(callback, "is_mozzi_backend", False):
+            wrapped.is_mozzi_backend = True
         return wrapped
 
     def capture_targeted(self, callback: Callable) -> Callable:
