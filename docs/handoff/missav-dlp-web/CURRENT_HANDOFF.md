@@ -1,5 +1,17 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E quality improvement step 1 Path B1 live improved review EXECUTED / PRIVATE_PROVISIONAL_SRT_READY (authorization CONSUMED)
+
+- **Live execution:** Executed single approved Path B1 improved-review continuation on CT108 (`downloader`) from promoted `12df0859a753afd6a4dea600fa2e450cce5fc02f` into `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-b1-review-once-20261126` (`952.37s`, exit `0`). Authorization **CONSUMED**.
+- **Reuse & budget (`HERMES_EXECUTION_COUNT=3` / 4, 0 retries, `ASR=0`):** Reused 6 initial batches (8 receipts), 43 ASR windows, 4 ReAdj batches (55 groups), 266-cue JA Master, and 5 KO translation parts (266 cues).
+- **Before -> After (`s11-v2e-HSODA-104-final-review-once-20261126` -> `s11-v2e-HSODA-104-b1-review-once-20261126`):**
+  - Cue count & overlaps: `266 -> 264`, overlaps `14 -> 11`.
+  - Supplemental dedup: `#250` `'新しいの買える？'` & `#255` `'今までいいよ。'` -> **`OMIT/SOURCE_NOISE`**; distinct neighbors `#251`, `#256`, `#252`, `#254`, etc. preserved as `KEEP`.
+  - Hallucination & `Q064`: spurious `Q064` `REPAIR` eliminated (`REPAIR -> AMBIGUOUS`); `#62–67, #149, #152` shifted `KEEP -> AMBIGUOUS` (audit disposition recorded; retained in SRT under `AMBIGUOUS -> KEEP` pending real audio silence confirmation); `#143,#147,#151,#160,#260,#261,#262` stayed `KEEP/DIALOGUE`; `0` normal dialogue omitted.
+  - Legitimate repairs added: `#54`, `#222` (KO `'노자와 씨'`), `#233` (`'屋台ラーメン'`).
+- **Artifacts (`/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-b1-review-once-20261126/artifacts/`):** `ja-master-v1.json` (`421297cf...`), `clean-ja-v1.srt` (`e4dd1e03...`), `clean-ko-v1.srt` (`31a2f24c...`), `v2d-proof-v1.json` (`73913bf8...`), `v2d-private-provisional-uncertainty-v1.json` (`e4c5891b...`). `STAGE12_PUBLISH_ELIGIBLE=False`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`. Postcheck PASS across CT108/CT120/VM122/NAS/Stage12 (`5/25/165/10`).
+
+
 ## 2026-11-26 — V2-E quality improvement step 1 Path B1 canonical source promotion COMPLETE (private review STARTING)
 
 - `SOURCE_PROMOTION=PASS`. Promoted exact 2 files (`+358/-49`) to canonical `teddy-subtitle-stage11` as commit `12df0859a753afd6a4dea600fa2e450cce5fc02f` (`REMOTE_SHA256_MATCH=PASS`: `teddy_discovery_stage11_v2d.py`=`96bac642...`, `teddy_discovery_stage11_hsoda104_pilot.py`=`3de6618d...`).
