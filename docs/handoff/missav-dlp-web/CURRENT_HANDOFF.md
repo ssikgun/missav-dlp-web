@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E Option A bounded targeted ASR continuation ISOLATED CANDIDATE READY / PROMOTION_READY=YES
+
+- **Isolated local candidate commit:** `388fb3dde81013fd222598698462ccab92612417` on `s11-v2e-option-a-bounded-asr-continuation-candidate` (parent `aabd3f6db90956a438ddeb8e4feff370562d664a`, workdir `/tmp/s11-v2e-schema-fix.I1yXcEN3/source`). No product source promoted or pushed.
+- **Changed file (1, `+253/-41`):** `teddy_discovery_stage11_hsoda104_pilot.py` (SHA256 `5659e6c6ff9f8fb60551237fd0d7b6c5c69b62b1571e0f9c0068fcecbfe09204`).
+- **Implementation:** Added operator-supplied `ApprovedTargetedASRScope`, `_RequestCappedTargetedTransport`/`_CappedSessionProxy` (hard 39-request cap + per-window uniqueness), and `_BoundedApprovedTargetedASRAdapter` (exact context/window match, single execution per route, blocks outside-span re-run & late post-translation ASR). Updated `prepare_verified_continuation_staging(..., allow_new_targeted_asr=True)` to require all 6 initial batches valid (`allow_missing_initial_batch_indices=()`), clone 6 batches / 234 groups / 8 receipts + 4 outside-span windows, exclude stale ordinary ASR & empty dirs, and report `0` reused ordinary ASR windows. Exact recomputed requests (55 groups): ASR `3c91babafcc4f9d0f5e86f5066f92533b2695e246dcd3526144c76f90a00cbf9` (19w / `530,348 ms`) + External-JA `9a2c5f5186aa26bcaf5bb99ec02ddd01ad3ea01dc7c08239e2e35412ae5fc61a` (20w / `591,873 ms`) = **39w / `1,122,221 ms`**.
+- **Offline verification (`HERMES_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`):** `TEST1_STAGING_REUSE_AND_STALE_EXCLUSION=PASS`, `TEST2_SCOPE_MISMATCH_BLOCKED=PASS`, `TEST3_CAP_39_AND_DUPLICATE_BLOCK=PASS`, `TEST4_OPTION_A_SUCCESS_PATH=PASS` (`init_reused=6`, `asr_exec=39`, `JA_MASTER_MATERIALIZATION=PASS`, `TRANSLATION_ROUTE_REACHED=PASS` at `part-0001`), `TEST5_LATE_POST_TRANSLATION_ASR_BLOCKED=PASS`, `TEST6_RETAINED_ROOTS_UNTOUCHED=PASS`. `PROMOTION_READY=YES`, `PRODUCT_QUALITY=NOT_VERIFIED`. Separate approval required for canonical promotion and live Option A continuation.
+
+
 ## 2026-11-26 — V2-E post-continuation targeted ASR request delta read-only audit COMPLETE
 
 - **Read-only audit against canonical `f3b8ffd2bba88617cc8f40b1cbb7b94449ab6dce`** (`HERMES_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`).
