@@ -211,6 +211,136 @@ class _ReuseOnlyTargetedASRGuard:
         raise v2d.V2DHold("CONTINUATION_TARGETED_ASR_REQUEST_MISMATCH")
 
 
+@dataclass(frozen=True)
+class ApprovedTargetedASRScope:
+    """Explicit operator-approved bounds for fresh ordinary targeted ASR requests."""
+
+    asr_context_sha256: str
+    asr_window_count: int
+    asr_total_audio_ms: int
+    external_ja_context_sha256: str
+    external_ja_window_count: int
+    external_ja_total_audio_ms: int
+    max_total_requests: int
+    max_total_audio_ms: int
+
+    def __post_init__(self):
+        v2d._digest(self.asr_context_sha256, "asr_context_sha256")
+        v2d._digest(self.external_ja_context_sha256, "external_ja_context_sha256")
+        for name in (
+            "asr_window_count", "asr_total_audio_ms",
+            "external_ja_window_count", "external_ja_total_audio_ms",
+            "max_total_requests", "max_total_audio_ms",
+        ):
+            val = getattr(self, name)
+            if type(val) is not int or val <= 0:
+                raise regeneration.RegenerationError(f"ApprovedTargetedASRScope.{name} must be a positive int")
+        if self.asr_window_count + self.external_ja_window_count > self.max_total_requests:
+            raise regeneration.RegenerationError("approved window counts exceed max_total_requests")
+        if self.asr_total_audio_ms + self.external_ja_total_audio_ms > self.max_total_audio_ms:
+            raise regeneration.RegenerationError("approved audio duration exceeds max_total_audio_ms")
+
+
+class _CappedSessionProxy:
+    """Enforces hard total request cap and single execution per window on an active ASR session."""
+
+    def __init__(self, inner_session, *, tracker: dict[str, object], max_requests: int):
+        self._inner = inner_session
+        self._tracker = tracker
+        self._max_requests = max_requests
+        self.runtime_identity = inner_session.runtime_identity
+        self.engine_version = inner_session.engine_version
+
+    def transcribe_targeted_chunk(self, chunk):
+        key = (self._tracker["active_route"], chunk.start_ms, chunk.end_ms)
+        if key in self._tracker["seen_windows"]:
+            raise v2d.V2DHold("CONTINUATION_DUPLICATE_TARGETED_ASR_WINDOW")
+        if self._tracker["count"] >= self._max_requests:
+            raise v2d.V2DHold("CONTINUATION_TARGETED_ASR_REQUEST_LIMIT_EXCEEDED")
+        self._tracker["seen_windows"].add(key)
+        self._tracker["count"] += 1
+        return self._inner.transcribe_targeted_chunk(chunk)
+
+
+class _RequestCappedTargetedTransport:
+    """Wraps targeted_transport to enforce hard chunk cap and per-window uniqueness."""
+
+    def __init__(self, inner_transport, *, tracker: dict[str, object], max_requests: int):
+        self._inner = inner_transport
+        self._tracker = tracker
+        self._max_requests = max_requests
+        self.runtime_identity = inner_transport.runtime_identity
+        self.engine_version = inner_transport.engine_version
+        self.request_timeout_seconds = inner_transport.request_timeout_seconds
+
+    def session(self):
+        from contextlib import contextmanager
+
+        @contextmanager
+        def _ctx():
+            with self._inner.session() as active:
+                yield _CappedSessionProxy(active, tracker=self._tracker, max_requests=self._max_requests)
+
+        return _ctx()
+
+
+class _BoundedApprovedTargetedASRAdapter:
+    """Permits ONLY the two exact approved initial targeted ASR requests, once each."""
+
+    def __init__(
+        self,
+        base_adapter,
+        *,
+        scope: ApprovedTargetedASRScope,
+        expected_asr_windows: tuple[tuple[int, int], ...],
+        expected_ext_windows: tuple[tuple[int, int], ...],
+        tracker: dict[str, object],
+    ):
+        self._base = base_adapter
+        self._scope = scope
+        self._expected_asr_windows = expected_asr_windows
+        self._expected_ext_windows = expected_ext_windows
+        self._tracker = tracker
+        self.runtime_identity = base_adapter.runtime_identity
+        self.engine_version = base_adapter.engine_version
+        self._asr_executed = False
+        self._ext_executed = False
+
+    def __call__(self, asr_result, plan):
+        if self._asr_executed:
+            raise v2d.V2DHold("CONTINUATION_UNAUTHORIZED_OR_LATE_TARGETED_ASR")
+        actual_windows = tuple((w.start_ms, w.end_ms) for w in plan.windows)
+        actual_audio_ms = sum(e - s for s, e in actual_windows)
+        if (actual_windows != self._expected_asr_windows
+                or len(actual_windows) != self._scope.asr_window_count
+                or actual_audio_ms != self._scope.asr_total_audio_ms):
+            raise v2d.V2DHold("CONTINUATION_TARGETED_ASR_SCOPE_MISMATCH")
+        if self._tracker["count"] + len(actual_windows) > self._scope.max_total_requests:
+            raise v2d.V2DHold("CONTINUATION_TARGETED_ASR_REQUEST_LIMIT_EXCEEDED")
+        self._asr_executed = True
+        self._tracker["active_route"] = "asr"
+        return self._base(asr_result, plan)
+
+    def targeted_external_ja(self, request):
+        if self._ext_executed:
+            raise v2d.V2DHold("CONTINUATION_UNAUTHORIZED_OR_LATE_TARGETED_ASR")
+        actual_windows = tuple((w.start_ms, w.end_ms) for w in request.windows)
+        actual_audio_ms = sum(e - s for s, e in actual_windows)
+        if (request.context_sha256 != self._scope.external_ja_context_sha256
+                or actual_windows != self._expected_ext_windows
+                or len(actual_windows) != self._scope.external_ja_window_count
+                or actual_audio_ms != self._scope.external_ja_total_audio_ms):
+            raise v2d.V2DHold("CONTINUATION_TARGETED_ASR_SCOPE_MISMATCH")
+        if self._tracker["count"] + len(actual_windows) > self._scope.max_total_requests:
+            raise v2d.V2DHold("CONTINUATION_TARGETED_ASR_REQUEST_LIMIT_EXCEEDED")
+        self._ext_executed = True
+        self._tracker["active_route"] = "ext"
+        return self._base.targeted_external_ja(request)
+
+    def targeted_outside_span(self, *_args, **_kwargs):
+        raise v2d.V2DHold("CONTINUATION_OUTSIDE_SPAN_ASR_ALREADY_REUSED")
+
+
 def _copy_private_file_exclusive(src: Path, dst: Path) -> None:
     st = src.lstat()
     if not stat.S_ISREG(st.st_mode) or stat.S_IMODE(st.st_mode) != 0o600:
@@ -286,6 +416,8 @@ def prepare_verified_continuation_staging(
     prior_staging_root: Path,
     new_staging_root: Path,
     allow_missing_initial_batch_indices: tuple[int, ...] = (),
+    allow_new_targeted_asr: bool = False,
+    approved_targeted_asr_scope: ApprovedTargetedASRScope | None = None,
 ) -> dict[str, object]:
     """Validate and clone ONLY verified reusable artifacts into a fresh staging dir.
 
@@ -294,9 +426,14 @@ def prepare_verified_continuation_staging(
       shared _validate_group_source_spans structural checks; copies ONLY valid
       batches and fails closed if any batch outside
       allow_missing_initial_batch_indices fails validation or is missing.
-    - Validates and copies prior ordinary targeted ASR artifacts & linkages
-      strictly as exact-match cache candidates (never mutates linkage; mismatch
-      during continuation is blocked by _ReuseOnlyTargetedASRGuard).
+    - When allow_new_targeted_asr=False (default): validates and copies prior
+      ordinary targeted ASR artifacts & linkages strictly as exact-match cache
+      candidates.
+    - When allow_new_targeted_asr=True (Option A refresh): requires all 6
+      initial batches valid (allow_missing_initial_batch_indices=()) and an
+      explicit ApprovedTargetedASRScope matching the exact rebuilt initial
+      targeted requests; explicitly excludes stale ordinary ASR directories and
+      empty mismatch directories without modifying prior_staging_root.
     - Explicitly excludes any prior targeted-readjudication-* directory.
     """
     prior_staging = v2d._private_dir(prior_staging_root)
@@ -309,6 +446,15 @@ def prepare_verified_continuation_staging(
     allowed_missing = set(allow_missing_initial_batch_indices)
     if any(type(i) is not int or i < 1 for i in allowed_missing):
         raise regeneration.RegenerationError("allow_missing_initial_batch_indices must be positive integers")
+    if allow_new_targeted_asr:
+        if allowed_missing:
+            raise regeneration.RegenerationError(
+                "allow_new_targeted_asr requires all initial batches valid (allow_missing_initial_batch_indices=())"
+            )
+        if type(approved_targeted_asr_scope) is not ApprovedTargetedASRScope:
+            raise regeneration.RegenerationError(
+                "allow_new_targeted_asr requires an explicit ApprovedTargetedASRScope"
+            )
 
     active_groups, outside_span_groups = v2d.split_outside_span_groups(plan)
     excluded_ids = tuple(g.group_id for g in outside_span_groups)
@@ -398,43 +544,80 @@ def prepare_verified_continuation_staging(
             for suffix in (".prompt.txt", ".receipt.json", ".stdout", ".stderr"):
                 _copy_private_file_exclusive(src_bdir / (prefix + suffix), dst_bdir / (prefix + suffix))
 
-    # 5. Validate and copy prior ordinary targeted ASR artifacts (19 + 20 = 39w) as exact-match cache
+    # 5. Ordinary targeted ASR handling: exact-cache copy OR Option A stale exclusion + scope verification
     asr_targeted_windows = 0
     ext_ja_windows = 0
-    t2_root = prior_staging / "targeted-second-evidence"
-    ext_root = prior_staging / "targeted-external-ja-evidence"
-    t2_dirs = sorted(p for p in t2_root.iterdir() if p.is_dir()) if t2_root.is_dir() else []
-    ext_dirs = sorted(p for p in ext_root.iterdir() if p.is_dir()) if ext_root.is_dir() else []
-    if len(t2_dirs) != 1 or len(ext_dirs) != 1:
-        raise regeneration.RegenerationError("expected exactly one prior ASR-based and one external-JA targeted artifact")
+    rebuilt_asr_ctx = None
+    rebuilt_ext_ctx = None
+    rebuilt_asr_windows: tuple[tuple[int, int], ...] = ()
+    rebuilt_ext_windows: tuple[tuple[int, int], ...] = ()
+    rebuilt_targeted_groups = 0
 
-    t2_src = t2_dirs[0]
-    t2_art_raw = v2d._read_private_owned(t2_src / "targeted-second-evidence-v1.json", max_bytes=v2d.MAX_TARGETED_SECOND_EVIDENCE_ARTIFACT_BYTES)
-    t2_link_raw = v2d._read_private_owned(t2_src / "v2d-targeted-linkage-v1.json", max_bytes=v2d.V2D_MAX_JSON_BYTES)
-    t2_art = v2d.parse_targeted_second_evidence_artifact_bytes(t2_art_raw)
-    if v2d.serialize_targeted_second_evidence_artifact(t2_art) != t2_art_raw:
-        raise regeneration.RegenerationError("prior targeted-second-evidence artifact is noncanonical")
-    t2_link = v2d._load_json(t2_link_raw, "prior targeted-second-evidence linkage")
-    if t2_link.get("artifact_sha256") != v2d._sha(t2_art_raw) or t2_link.get("context_sha256") != t2_src.name:
-        raise regeneration.RegenerationError("prior targeted-second-evidence linkage mismatch")
-    asr_targeted_windows = len(t2_art.windows)
-    dst_t2_dir = _mkdir_private(_mkdir_private(new_staging / "targeted-second-evidence") / t2_src.name)
-    for fname in ("targeted-second-evidence-v1.json", "v2d-targeted-linkage-v1.json"):
-        _copy_private_file_exclusive(t2_src / fname, dst_t2_dir / fname)
+    if allow_new_targeted_asr:
+        # All 6 initial batches are validated; rebuild exact initial targeted requests and match scope.
+        audio_gids = tuple(
+            g.group_id for g in effective_groups
+            if resolved_by_gid[g.group_id].audio_evidence_needed
+        )
+        rebuilt_targeted_groups = len(audio_gids)
+        rebuilt_reqs = v2d._build_initial_targeted_requests(plan, audio_gids)
+        for req in rebuilt_reqs:
+            if type(req) is v2d._V2DTargetedRequest:
+                rebuilt_asr_ctx = req.context_sha256
+                rebuilt_asr_windows = tuple((w.start_ms, w.end_ms) for w in req.plan.windows)
+            elif type(req) is v2d._V2DExternalTargetedRequest:
+                rebuilt_ext_ctx = req.context_sha256
+                rebuilt_ext_windows = tuple((w.start_ms, w.end_ms) for w in req.windows)
+            else:
+                raise regeneration.RegenerationError("unsupported rebuilt targeted ASR request type")
+        asr_audio_ms = sum(e - s for s, e in rebuilt_asr_windows)
+        ext_audio_ms = sum(e - s for s, e in rebuilt_ext_windows)
+        scope = approved_targeted_asr_scope
+        if (rebuilt_asr_ctx != scope.asr_context_sha256
+                or len(rebuilt_asr_windows) != scope.asr_window_count
+                or asr_audio_ms != scope.asr_total_audio_ms
+                or rebuilt_ext_ctx != scope.external_ja_context_sha256
+                or len(rebuilt_ext_windows) != scope.external_ja_window_count
+                or ext_audio_ms != scope.external_ja_total_audio_ms
+                or (asr_audio_ms + ext_audio_ms) > scope.max_total_audio_ms):
+            raise regeneration.RegenerationError(
+                "rebuilt targeted ASR requests do not match ApprovedTargetedASRScope"
+            )
+    else:
+        t2_root = prior_staging / "targeted-second-evidence"
+        ext_root = prior_staging / "targeted-external-ja-evidence"
+        t2_dirs = sorted(p for p in t2_root.iterdir() if p.is_dir()) if t2_root.is_dir() else []
+        ext_dirs = sorted(p for p in ext_root.iterdir() if p.is_dir()) if ext_root.is_dir() else []
+        if len(t2_dirs) != 1 or len(ext_dirs) != 1:
+            raise regeneration.RegenerationError("expected exactly one prior ASR-based and one external-JA targeted artifact")
 
-    ext_src = ext_dirs[0]
-    ext_art_raw = v2d._read_private_owned(ext_src / "targeted-external-ja-asr-v1.json", max_bytes=v2d.MAX_TARGETED_ASR_ARTIFACT_BYTES)
-    ext_link_raw = v2d._read_private_owned(ext_src / "v2d-targeted-linkage-v1.json", max_bytes=v2d.V2D_MAX_JSON_BYTES)
-    ext_art = v2d.parse_targeted_asr_artifact_bytes(ext_art_raw)
-    if v2d.serialize_targeted_asr_artifact(ext_art) != ext_art_raw:
-        raise regeneration.RegenerationError("prior targeted-external-ja artifact is noncanonical")
-    ext_link = v2d._load_json(ext_link_raw, "prior targeted-external-ja linkage")
-    if ext_link.get("artifact_sha256") != v2d._sha(ext_art_raw) or ext_link.get("context_sha256") != ext_src.name:
-        raise regeneration.RegenerationError("prior targeted-external-ja linkage mismatch")
-    ext_ja_windows = len(ext_art.windows)
-    dst_ext_dir = _mkdir_private(_mkdir_private(new_staging / "targeted-external-ja-evidence") / ext_src.name)
-    for fname in ("targeted-external-ja-asr-v1.json", "v2d-targeted-linkage-v1.json"):
-        _copy_private_file_exclusive(ext_src / fname, dst_ext_dir / fname)
+        t2_src = t2_dirs[0]
+        t2_art_raw = v2d._read_private_owned(t2_src / "targeted-second-evidence-v1.json", max_bytes=v2d.MAX_TARGETED_SECOND_EVIDENCE_ARTIFACT_BYTES)
+        t2_link_raw = v2d._read_private_owned(t2_src / "v2d-targeted-linkage-v1.json", max_bytes=v2d.V2D_MAX_JSON_BYTES)
+        t2_art = v2d.parse_targeted_second_evidence_artifact_bytes(t2_art_raw)
+        if v2d.serialize_targeted_second_evidence_artifact(t2_art) != t2_art_raw:
+            raise regeneration.RegenerationError("prior targeted-second-evidence artifact is noncanonical")
+        t2_link = v2d._load_json(t2_link_raw, "prior targeted-second-evidence linkage")
+        if t2_link.get("artifact_sha256") != v2d._sha(t2_art_raw) or t2_link.get("context_sha256") != t2_src.name:
+            raise regeneration.RegenerationError("prior targeted-second-evidence linkage mismatch")
+        asr_targeted_windows = len(t2_art.windows)
+        dst_t2_dir = _mkdir_private(_mkdir_private(new_staging / "targeted-second-evidence") / t2_src.name)
+        for fname in ("targeted-second-evidence-v1.json", "v2d-targeted-linkage-v1.json"):
+            _copy_private_file_exclusive(t2_src / fname, dst_t2_dir / fname)
+
+        ext_src = ext_dirs[0]
+        ext_art_raw = v2d._read_private_owned(ext_src / "targeted-external-ja-asr-v1.json", max_bytes=v2d.MAX_TARGETED_ASR_ARTIFACT_BYTES)
+        ext_link_raw = v2d._read_private_owned(ext_src / "v2d-targeted-linkage-v1.json", max_bytes=v2d.V2D_MAX_JSON_BYTES)
+        ext_art = v2d.parse_targeted_asr_artifact_bytes(ext_art_raw)
+        if v2d.serialize_targeted_asr_artifact(ext_art) != ext_art_raw:
+            raise regeneration.RegenerationError("prior targeted-external-ja artifact is noncanonical")
+        ext_link = v2d._load_json(ext_link_raw, "prior targeted-external-ja linkage")
+        if ext_link.get("artifact_sha256") != v2d._sha(ext_art_raw) or ext_link.get("context_sha256") != ext_src.name:
+            raise regeneration.RegenerationError("prior targeted-external-ja linkage mismatch")
+        ext_ja_windows = len(ext_art.windows)
+        dst_ext_dir = _mkdir_private(_mkdir_private(new_staging / "targeted-external-ja-evidence") / ext_src.name)
+        for fname in ("targeted-external-ja-asr-v1.json", "v2d-targeted-linkage-v1.json"):
+            _copy_private_file_exclusive(ext_src / fname, dst_ext_dir / fname)
 
     # 6. Re-validate cloned outside-span recovery and all copied initial batches on new_staging
     v2d._load_or_run_outside_span_recovery(
@@ -455,6 +638,11 @@ def prepare_verified_continuation_staging(
 
     if list(new_staging.glob("targeted-readjudication-*")):
         raise regeneration.RegenerationError("prior targeted-readjudication artifacts must not be copied")
+    if allow_new_targeted_asr and (
+        (new_staging / "targeted-second-evidence").exists()
+        or (new_staging / "targeted-external-ja-evidence").exists()
+    ):
+        raise regeneration.RegenerationError("stale ordinary targeted ASR directories must not be copied")
 
     return {
         "reused_initial_batches": reused_batches,
@@ -468,6 +656,12 @@ def prepare_verified_continuation_staging(
         "reused_total_asr_windows": len(os_res.window_outcomes) + asr_targeted_windows + ext_ja_windows,
         "reused_effective_groups": len(effective_groups),
         "effective_source_fingerprint": effective_fp,
+        "stale_ordinary_asr_excluded": bool(allow_new_targeted_asr),
+        "rebuilt_targeted_groups": rebuilt_targeted_groups,
+        "rebuilt_asr_context_sha256": rebuilt_asr_ctx,
+        "rebuilt_asr_windows": rebuilt_asr_windows,
+        "rebuilt_external_ja_context_sha256": rebuilt_ext_ctx,
+        "rebuilt_external_ja_windows": rebuilt_ext_windows,
     }
 
 
@@ -483,6 +677,7 @@ def run_hsoda104_pilot_continue(
     prior_consumed_targeted_asr_requests: int = 43,
     allow_missing_initial_batch_indices: tuple[int, ...] = (1,),
     allow_new_targeted_asr: bool = False,
+    approved_targeted_asr_scope: ApprovedTargetedASRScope | None = None,
     continuation_approved: bool = False,
 ) -> HSODA104ContinuationResult:
     """Continue into a fresh exclusive run root reusing ONLY verified prior artifacts."""
@@ -493,6 +688,8 @@ def run_hsoda104_pilot_continue(
     if (type(prior_consumed_hermes_attempts) is not int or prior_consumed_hermes_attempts < 0
             or type(prior_consumed_targeted_asr_requests) is not int or prior_consumed_targeted_asr_requests < 0):
         raise regeneration.RegenerationError("prior consumed execution counts must be non-negative integers")
+    if allow_new_targeted_asr and type(approved_targeted_asr_scope) is not ApprovedTargetedASRScope:
+        raise regeneration.RegenerationError("allow_new_targeted_asr requires an explicit ApprovedTargetedASRScope")
 
     prior_root = Path(prior_run_root)
     new_root = Path(run_root)
@@ -528,17 +725,32 @@ def run_hsoda104_pilot_continue(
             prior_staging_root=prior_root / "staging",
             new_staging_root=staging,
             allow_missing_initial_batch_indices=allow_missing_initial_batch_indices,
+            allow_new_targeted_asr=allow_new_targeted_asr,
+            approved_targeted_asr_scope=approved_targeted_asr_scope,
         )
         if allow_new_targeted_asr:
+            tracker = {"count": 0, "seen_windows": set(), "active_route": None}
+            capped_transport = _RequestCappedTargetedTransport(
+                targeted_transport,
+                tracker=tracker,
+                max_requests=approved_targeted_asr_scope.max_total_requests,
+            )
             source_provider = ASRMediaSourceReader(
                 host=config.nas_host, user=config.nas_user, key=config.nas_key,
                 known_hosts=config.nas_known_hosts, library_root=config.nas_library_root,
                 temp_root=config.asr_media_temp_root, require_disk_backed=True,
                 reserve_bytes=config.asr_media_temp_reserve_bytes,
             )
-            targeted = v2d.build_v2d_targeted_asr_adapter(
+            base_targeted = v2d.build_v2d_targeted_asr_adapter(
                 holding_resolver=holding_resolver, source_provider=source_provider,
-                targeted_transport=targeted_transport,
+                targeted_transport=capped_transport,
+            )
+            targeted = _BoundedApprovedTargetedASRAdapter(
+                base_targeted,
+                scope=approved_targeted_asr_scope,
+                expected_asr_windows=summary["rebuilt_asr_windows"],
+                expected_ext_windows=summary["rebuilt_external_ja_windows"],
+                tracker=tracker,
             )
         else:
             targeted = _ReuseOnlyTargetedASRGuard(targeted_transport)
@@ -561,6 +773,6 @@ def run_hsoda104_pilot_continue(
             reused_asr_targeted_windows=int(summary["reused_asr_targeted_windows"]),
             reused_external_ja_windows=int(summary["reused_external_ja_windows"]),
             reused_effective_groups=int(summary["reused_effective_groups"]),
-            targeted_readjudication_groups=0,
+            targeted_readjudication_groups=int(summary["rebuilt_targeted_groups"]),
             targeted_readjudication_batches=0,
         )
