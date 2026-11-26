@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E early source-span validation & selective continuation ISOLATED CANDIDATE READY / PROMOTION_READY=YES
+
+- **Isolated local candidate commit:** `3d57f32925a0dd166444476318c0b329ad7b5d1f` on `s11-v2e-early-span-val-and-selective-cont-candidate` (parent `2d1de556e3eca98323eb4f090846bc3c9f1edb52`, workdir `/tmp/s11-v2e-schema-fix.I1yXcEN3/source`); prior candidate `5bf709625c32944b4bbd45d718244c61e4a59855` preserved untouched. No product source promoted or pushed.
+- **Changed files (3, `+498/-43` vs `2d1de556`):** `teddy_discovery_stage11_v2d.py` (`d33d0485a3122815e8fd90b9d6a4f83622f2cbe3dcb7de09624d80cec184be8d`), `teddy_discovery_stage11_hsoda104_pilot.py` (`44cc94574108107353fa40fae4d82681fa5533d8967608a263c2be23aacc3cb8`), `teddy_discovery_stage11_v2d_smoke.py` (`158651356a78707603d621775b0c31c4585267b4e5d07ffc7973be2b0ef784d8`).
+- **Fixes:** Extracted shared `_validate_group_source_spans` from `materialize_ja_master` and enforced it at initial/targeted batch and single-group validation boundaries (detects whole-source duplicates, missing ACCEPTED coverage, invalid ASR splits early while preserving honest `UNCERTAIN` and HOLD gates). Updated `prepare_verified_continuation_staging` to independently revalidate initial batches 1–6 (rejecting invalid Batch 1 `group-1e7ac640...`, reusing valid Batches 2–6 / 7 receipts + 4 outside-span windows + 39 ordinary targeted ASR cache candidates). Added `_ReuseOnlyTargetedASRGuard` so any rebuilt ASR request mismatch stops cleanly with `V2DHold("CONTINUATION_TARGETED_ASR_REQUEST_MISMATCH")` (0 unapproved ASR/readj calls).
+- **Offline verification (`HERMES_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`):** `TEST_VALID_ASR_WORD_SPLIT=PASS`, `TEST_EARLY_BATCH1_DETECTION=PASS`, `TEST_SELECTIVE_BATCH2_TO_6_REUSE=PASS`, `TEST_CONTINUATION_SUCCESS_PATH=PASS` (`JA_MASTER_MATERIALIZATION=PASS`, `TRANSLATION_ROUTE_REACHED=PASS` at `part-0001` `85,462B`), `TEST_ASR_MISMATCH_PROTECTION=PASS`, `TEST_HOLD_POLICY_UNCHANGED=PASS`, `TEST_PRIOR_ROOT_UNTOUCHED=PASS`, `S11_V2D_OFFLINE_SMOKE=PASS`. `PROMOTION_READY=YES`, `PRODUCT_QUALITY=NOT_VERIFIED`. Separate approval required for canonical promotion and live continuation.
+
+
 ## 2026-11-26 — V2-E dedicated re-adjudication prompt & verified continuation entrypoint ISOLATED CANDIDATE READY / PROMOTION_READY=YES
 
 - **Isolated local candidate commit:** `5bf709625c32944b4bbd45d718244c61e4a59855` on `s11-v2e-readj-prompt-and-continuation-candidate` (parent `30377b4385ea00673ae83cc38e2d5a8477300cad`, workdir `/tmp/s11-v2e-schema-fix.I1yXcEN3/source`). No product source promoted or pushed.
