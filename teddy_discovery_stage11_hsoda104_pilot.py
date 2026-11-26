@@ -190,6 +190,10 @@ class HSODA104ContinuationResult:
     vad_window_count: int = 0
     vad_total_audio_ms: int = 0
     vad_window_pass_evaluations: int = 0
+    reused_vad_evidence: bool = False
+    vad_reused_artifact_sha256: str | None = None
+    gpu_diagnostic_requests_started: int = 0
+    gpu_diagnostic_audio_ms: int = 0
 
 
 class _ForbidNetworkBridge:
@@ -430,6 +434,7 @@ def prepare_verified_continuation_staging(
     private_provisional_completion: bool = False,
     preserve_legacy_supplemental_grouping: bool = False,
     reuse_verified_review_baseline: bool = False,
+    reuse_verified_vad_evidence: bool = False,
 ) -> dict[str, object]:
     """Validate and clone ONLY verified reusable artifacts into a fresh staging dir.
 
@@ -475,6 +480,10 @@ def prepare_verified_continuation_staging(
     if reuse_verified_review_baseline and not reuse_verified_translation:
         raise regeneration.RegenerationError(
             "reuse_verified_review_baseline requires reuse_verified_translation=True"
+        )
+    if reuse_verified_vad_evidence and not reuse_verified_review_baseline:
+        raise regeneration.RegenerationError(
+            "reuse_verified_vad_evidence requires reuse_verified_review_baseline=True"
         )
 
     active_groups, outside_span_groups = v2d.split_outside_span_groups(plan)
@@ -831,6 +840,8 @@ def prepare_verified_continuation_staging(
         reused_translation_parts = 0
         reused_review_triage_chunks = 0
         reused_review_final_calls = 0
+        reused_vad_evidence = False
+        vad_reused_artifact_sha256 = None
         if reuse_verified_translation:
             if len(reused_readj_indices) != total_readj_batches:
                 raise regeneration.RegenerationError(
@@ -887,6 +898,8 @@ def prepare_verified_continuation_staging(
             )
             reused_review_triage_chunks = 0
             reused_review_final_calls = 0
+            reused_vad_evidence = False
+            vad_reused_artifact_sha256 = None
             if reuse_verified_review_baseline:
                 extra_rev_ids = tuple(
                     c.cue_id for c in cloned_tr.cues if getattr(c, "needs_audio_evidence", False)
@@ -927,10 +940,47 @@ def prepare_verified_continuation_staging(
                     extra_target_cue_ids=extra_rev_ids,
                     allow_limited_json_recovery=allow_limited_json_recovery,
                 )
+                if reuse_verified_vad_evidence:
+                    vad_plan = v2d.plan_targeted_vad_windows(
+                        prov_master, request=prior_rev.request, limits=v2d.TargetedVADLimits(),
+                    )
+                    _, _, vad_art_sha, _ = v2d._load_or_run_targeted_vad_evidence(
+                        prov_master, prior_rev.request, vad_plan,
+                        vad_evidence_runner=None, staging_root=prior_staging, reuse_only=True,
+                    )
+                    vad_ctx_sha = v2d._vad_context_sha256(
+                        prov_master.review_set._source_bundle.asr_result.source_snapshot,
+                        vad_plan,
+                    )
+                    src_vad_dir = prior_staging / "vad-evidence" / vad_ctx_sha
+                    dst_vad_root = _mkdir_private(new_staging / "vad-evidence")
+                    dst_vad_dir = _mkdir_private(dst_vad_root / vad_ctx_sha)
+                    for fname in (v2d.V2D_TARGETED_VAD_SIDECAR_FILENAME, "v2d-vad-linkage-v1.json"):
+                        _copy_private_file_exclusive(src_vad_dir / fname, dst_vad_dir / fname)
+                    vad_followup_name = "targeted-final-vad-" + vad_art_sha[:16]
+                    src_vad_followup = src_req_dir / vad_followup_name
+                    if src_vad_followup.is_dir():
+                        dst_vad_followup = _mkdir_private(dst_req_dir / vad_followup_name)
+                        for subf in sorted(f for f in src_vad_followup.iterdir() if f.is_file()):
+                            _copy_private_file_exclusive(subf, dst_vad_followup / subf.name)
+                    v2d.run_targeted_review(
+                        prov_master, pkg, cloned_tr,
+                        invoke=forbid_invoke, hermes_settings=hermes_settings,
+                        staging_root=new_staging, reuse_only=True,
+                        extra_target_cue_ids=extra_rev_ids,
+                        allow_limited_json_recovery=allow_limited_json_recovery,
+                        reuse_verified_review_baseline=True,
+                        targeted_vad_limits=v2d.TargetedVADLimits(),
+                        reuse_verified_vad_evidence=True,
+                    )
+                    reused_vad_evidence = True
+                    vad_reused_artifact_sha256 = vad_art_sha
     else:
         reused_translation_parts = 0
         reused_review_triage_chunks = 0
         reused_review_final_calls = 0
+        reused_vad_evidence = False
+        vad_reused_artifact_sha256 = None
         if reuse_verified_translation:
             raise regeneration.RegenerationError(
                 "reuse_verified_translation requires reuse_verified_targeted_readjudication=True"
@@ -969,6 +1019,8 @@ def prepare_verified_continuation_staging(
         "reused_translation_parts": reused_translation_parts,
         "reused_review_triage_chunks": reused_review_triage_chunks,
         "reused_review_final_calls": reused_review_final_calls,
+        "reused_vad_evidence": reused_vad_evidence,
+        "vad_reused_artifact_sha256": vad_reused_artifact_sha256,
     }
 
 
@@ -994,6 +1046,10 @@ def run_hsoda104_pilot_continue(
     reuse_verified_review_baseline: bool = False,
     enable_local_vad_evidence: bool = False,
     targeted_vad_limits: v2d.TargetedVADLimits | None = None,
+    reuse_verified_vad_evidence: bool = False,
+    enable_whisper_diagnostics: bool = False,
+    targeted_diagnostic_limits: v2d.TargetedDiagnosticLimits | None = None,
+    correct_review_source_labels: bool = True,
     continuation_approved: bool = False,
 ) -> HSODA104ContinuationResult:
     """Continue into a fresh exclusive run root reusing ONLY verified prior artifacts."""
@@ -1050,6 +1106,7 @@ def run_hsoda104_pilot_continue(
             private_provisional_completion=private_provisional_completion,
             preserve_legacy_supplemental_grouping=preserve_legacy_supplemental_grouping,
             reuse_verified_review_baseline=reuse_verified_review_baseline,
+            reuse_verified_vad_evidence=reuse_verified_vad_evidence,
         )
         if allow_new_targeted_asr:
             tracker = {"count": 0, "seen_windows": set(), "active_route": None}
@@ -1092,6 +1149,28 @@ def run_hsoda104_pilot_continue(
             active_vad_limits = (
                 v2d.TargetedVADLimits() if targeted_vad_limits is None else targeted_vad_limits
             )
+        elif reuse_verified_vad_evidence:
+            active_vad_limits = (
+                v2d.TargetedVADLimits() if targeted_vad_limits is None else targeted_vad_limits
+            )
+        diag_runner = None
+        active_diag_limits = None
+        if enable_whisper_diagnostics:
+            diag_source_provider = ASRMediaSourceReader(
+                host=config.nas_host, user=config.nas_user, key=config.nas_key,
+                known_hosts=config.nas_known_hosts, library_root=config.nas_library_root,
+                temp_root=config.asr_media_temp_root, require_disk_backed=True,
+                reserve_bytes=config.asr_media_temp_reserve_bytes,
+            )
+            diag_runner = v2d.build_v2d_targeted_diagnostic_runner(
+                holding_resolver=holding_resolver,
+                source_provider=diag_source_provider,
+                targeted_transport=targeted_transport,
+            )
+            active_diag_limits = (
+                v2d.TargetedDiagnosticLimits()
+                if targeted_diagnostic_limits is None else targeted_diagnostic_limits
+            )
         pipeline_result = v2d.run_v2d_pipeline(
             plan, invoke=NativeNormalFirstPass(bridge).invoke, hermes_settings=settings,
             staging_root=staging, output_directory=output, claim_token=claim_token,
@@ -1104,6 +1183,10 @@ def run_hsoda104_pilot_continue(
             reuse_verified_review_baseline=reuse_verified_review_baseline,
             vad_evidence_runner=vad_runner,
             targeted_vad_limits=active_vad_limits,
+            reuse_verified_vad_evidence=reuse_verified_vad_evidence,
+            whisper_diagnostic_runner=diag_runner,
+            targeted_diagnostic_limits=active_diag_limits,
+            correct_review_source_labels=correct_review_source_labels,
         )
         vad_summary = (
             pipeline_result.review.vad_evidence_summary
@@ -1130,4 +1213,8 @@ def run_hsoda104_pilot_continue(
             vad_window_count=int(vad_summary.get("window_count", 0)),
             vad_total_audio_ms=int(vad_summary.get("total_audio_ms", 0)),
             vad_window_pass_evaluations=int(vad_summary.get("vad_window_pass_evaluations", 0)),
+            reused_vad_evidence=bool(summary["reused_vad_evidence"]),
+            vad_reused_artifact_sha256=summary["vad_reused_artifact_sha256"],
+            gpu_diagnostic_requests_started=pipeline_result.gpu_diagnostic_requests_started,
+            gpu_diagnostic_audio_ms=pipeline_result.gpu_diagnostic_audio_ms,
         )

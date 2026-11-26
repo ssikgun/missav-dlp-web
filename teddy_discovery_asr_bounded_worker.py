@@ -497,6 +497,10 @@ class BoundedTargetedASRSession:
         """Submit one HYBRID targeted chunk through the owned worker."""
         return self._transcribe("transcribe_targeted_chunk", chunk)
 
+    def transcribe_targeted_chunk_diagnostics(self, chunk):
+        """Submit one bounded targeted chunk for numeric-only Whisper diagnostics."""
+        return self._transcribe("transcribe_targeted_chunk_diagnostics", chunk)
+
     def _cleanup(self) -> bool:
         if self._cleanup_attempted:
             return self._cleanup_ok is True
