@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E upstream Whisper hallucination suppression bounded comparison USER_APPROVED / NOT_RUN
+
+- User approved moving upstream after Option 2 removed only one of 15 suspect cues, with insufficient product quality. Stop repetitive post-hoc review. Authoritative exact scope is Stage11 S11-MVP001 ACTIVE_WORK at approval commit `8507529a81e7811904cbb7a05811726c25ab0994`. Existing large-v3, isolated paired baseline/candidate on same 11 suspect windows (84.08s) and up to 3 independently supported normal-dialogue control windows (<=30s); one candidate combination, total <=28 actual inference requests including retries / <=230s aggregate audio, reuse equivalent cached baseline, no full-title ASR, Hermes, new model/package, runtime service change, deployment/publication. Evaluate actual VAD padding and decoding options first, preserve weak dialogue and timing, report evidence and uncertainty; stop if comparison inconclusive. No product source promotion before review of results and confirmation of integration scope. Existing source label correction, prior private artifacts, Normal Mode, Stage12 protections and production HOLD remain. Local worktree and VM122 identity must be verified before trial. Implementation, model execution and trial NOT_RUN at approval.
+
 ## 2026-11-26 — V2-E review source label correction + Option 2 bounded Whisper diagnostics live trial EXECUTED / PRIVATE_PROVISIONAL_SRT_READY (HALLUCINATIONS_REMOVED=1, RETAINED=14; authorization CONSUMED)
 
 - **Live execution:** Executed single approved HSODA-104 Option 2 diagnostic + review trial on CT108 (`downloader`) from isolated canonical checkout `e4bf5904a80253afda4df9013cf3746f5c8dd340` into `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-option2-diag-once-20261126` (`263.88s`, exit `0`, authorization **CONSUMED**).
