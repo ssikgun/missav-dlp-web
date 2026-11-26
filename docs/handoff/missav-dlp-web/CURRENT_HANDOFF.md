@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E modified Option B single private live continuation EXECUTED / VALIDATION_ERROR_STOP (authorization CONSUMED)
+
+- **Execution:** Single approved HSODA-104 Modified Option B live continuation executed on CT108 (`downloader`) from isolated canonical checkout `8cdf4921442ae7cbcfca0a3a1bb3b29cdac3fa60` into exclusive private root `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-plan-b-once-20261126` (`14:35:55 -> 14:47:07 KST`, ~11m12s). Authorization **CONSUMED** (no automatic replay/resume).
+- **Reused (`0` ASR, `0` initial/B1/B2 Hermes):** `INITIAL_BATCH_REUSE_COUNT=6` (234 groups / 8 receipts), `ASR_REUSE_COUNT=43` (4 outside-span + 39 Option A), `READJUDICATION_REUSE_COUNT=2` (valid ReAdj Batch 1 `e80efb54...` + recovered ReAdj Batch 2 Attempt 1 `fe20633a...`, untouched originals preserved).
+- **Failure (`HERMES_EXECUTION_COUNT=2` / 12, `ASR_EXECUTION_COUNT=0`):** ReAdj Batch 3 (`batch-92e6c354...`, 12 groups) Attempt 1 (`284.2s`) and Attempt 2 (`362.0s`) returned valid JSON and matched 11/12 groups, but both failed `V2DError: JA Master batch candidate/source coverage differs` in `group-bff1b8e6ab` because Hermes spliced the 11-char prefix `6843f31ccdd` of expected `candidate_id` `6843f31ccdd0fb3c803cfc23f158b7837d3507d162fb408baceff222dfe9e2e2` with the 53-char suffix of earlier group `group-ba092d866c`'s `candidate_id` (`...7c82838bf51b30e54526453edf60ee712ccd99d682579789596dd`).
+- **Terminal state & postcheck:** `PILOT_RESULT_STATE=FAILED_VALIDATION_RETRY_EXHAUSTED`, `JA_MASTER_MATERIALIZATION=NOT_REACHED`, `KO_SUBTITLE_GENERATION=NOT_REACHED`, `FINAL_VALIDATION=NOT_REACHED`, `OUTPUT_PATHS=NONE`, `OUTPUT_SHA256=NONE`, `STAGE12_PUBLISH_ELIGIBLE=False`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`. Cumulative Trial4 + Cont1 + Option A + Plan B: `15` Hermes / `82` ASR. Postcheck PASS across CT108/CT120/VM122, retained inputs, NAS identity, prior roots (`44`/`39`/`53` files), and Stage12 queue (`5/25/165/10`).
+
+
 ## 2026-11-26 — V2-E modified Option B canonical source promotion COMPLETE (live continuation STARTING)
 
 - `SOURCE_PROMOTION=PASS`. Promoted exact 2 files (`+350/-16`) from local candidate `fd777ea3261dd688403634d8eeacf6eee1c481e2` to canonical `teddy-subtitle-stage11` as source commit `8cdf4921442ae7cbcfca0a3a1bb3b29cdac3fa60` (parent `42f561e7c748e363494b2bed73ae675b4c45ef54`, fast-forward push).
