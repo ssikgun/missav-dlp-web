@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E early source-span validation & selective continuation canonical source promotion COMPLETE
+
+- `SOURCE_PROMOTION=PASS`. Promoted exact 3 files (`+498/-43`) from local candidate `3d57f32925a0dd166444476318c0b329ad7b5d1f` (parent `2d1de556e3eca98323eb4f090846bc3c9f1edb52`) to canonical `teddy-subtitle-stage11` as source commit `01d80cf04e912d6bbe71692882f7029d7a60e1b2` (parent `f132dd5fe85d47b4cf6152846af619fd75b8cbfe`) via clean fast-forward push on `s11-v2e-early-span-selective-cont-promotion`.
+- `REMOTE_SHA256_MATCH=PASS`, `OTHER_FILES_DIFF_COUNT=0`: `teddy_discovery_stage11_v2d.py` (`d33d0485a3122815e8fd90b9d6a4f83622f2cbe3dcb7de09624d80cec184be8d`), `teddy_discovery_stage11_hsoda104_pilot.py` (`44cc94574108107353fa40fae4d82681fa5533d8967608a263c2be23aacc3cb8`), `teddy_discovery_stage11_v2d_smoke.py` (`158651356a78707603d621775b0c31c4585267b4e5d07ffc7973be2b0ef784d8`).
+- Prior candidate branches and all retained private trial/diagnostic evidence preserved untouched. `HERMES_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`. Live continuation requires separate explicit user approval.
+
+
 ## 2026-11-26 — V2-E early source-span validation & selective continuation ISOLATED CANDIDATE READY / PROMOTION_READY=YES
 
 - **Isolated local candidate commit:** `3d57f32925a0dd166444476318c0b329ad7b5d1f` on `s11-v2e-early-span-val-and-selective-cont-candidate` (parent `2d1de556e3eca98323eb4f090846bc3c9f1edb52`, workdir `/tmp/s11-v2e-schema-fix.I1yXcEN3/source`); prior candidate `5bf709625c32944b4bbd45d718244c61e4a59855` preserved untouched. No product source promoted or pushed.
