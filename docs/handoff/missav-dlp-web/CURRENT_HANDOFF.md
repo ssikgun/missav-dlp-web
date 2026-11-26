@@ -1,5 +1,16 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E post-continuation targeted ASR request delta read-only audit COMPLETE
+
+- **Read-only audit against canonical `f3b8ffd2bba88617cc8f40b1cbb7b94449ab6dce`** (`HERMES_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`).
+- **All 6 initial batches VALID & reusable (`INITIAL_BATCH_REUSE=READY`):** `adjudicate_ja_master(reuse_only=True)` PASS on `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-continuation-once-20261126/staging` (234 groups, 8 receipts: new Batch 1 `356.1s` + reused Batches 2–6 / 7 receipts); 4 outside-span ASR windows (`48,625 ms`) reusable.
+- **Targeted request delta (`OLD=50 -> NEW=55` groups; `48` kept, `7` added, `2` removed in Batch 1):**
+  - ASR-based (`21d95638... -> 3c91baba...`): 19w (`501.372s`) -> 19w (`530.348s`); `13` exact identical (`328.412s`), `6` shifted/overlapping (`201.936s`), `0` disjoint.
+  - External-JA (`0d4f4a71... -> 9a2c5f51...`): 20w (`546.301s`) -> 20w (`591.873s`); `13` exact identical (`360.653s`), `7` shifted/overlapping (`231.220s`), `0` disjoint.
+  - Combined NEW = **39 windows (`1,122.221 s`, ~4 min on VM122 GPU)**; exact identical = **26w (`689.065 s`)**; changed/shifted = **13w (`433.156 s`)**.
+- **Recommendation (`OPTION_A`, GOV-008):** Reuse existing whole-request ASR path (`allow_new_targeted_asr=True`, 39w in ~4 min) from the validated 6 initial batches + 4 outside-span windows rather than building complex per-window partial cache/linkage reuse (Option B saves only ~2.5 min GPU time). Note: `prepare_verified_continuation_staging` needs a tiny approved adjustment because `targeted-second-evidence/` in the continuation root has 2 subdirs (old + empty `3c91baba...`), so `allow_new_targeted_asr=True` should skip copying mismatched ordinary ASR cache dirs. Estimated additional Hermes calls = **8–11 minimum** (`3–4 readj + 4–5 fixed-64 translation + 1–2 review`), practical budget **12–15 calls** + **39 ASR windows**. Separate approval required.
+
+
 ## 2026-11-26 — V2-E early source-span validation & selective continuation canonical source promotion COMPLETE
 
 - `SOURCE_PROMOTION=PASS`. Promoted exact 3 files (`+498/-43`) from local candidate `3d57f32925a0dd166444476318c0b329ad7b5d1f` (parent `2d1de556e3eca98323eb4f090846bc3c9f1edb52`) to canonical `teddy-subtitle-stage11` as source commit `01d80cf04e912d6bbe71692882f7029d7a60e1b2` (parent `f132dd5fe85d47b4cf6152846af619fd75b8cbfe`) via clean fast-forward push on `s11-v2e-early-span-selective-cont-promotion`.
