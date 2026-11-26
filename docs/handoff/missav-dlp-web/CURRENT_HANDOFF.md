@@ -1,5 +1,19 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E final targeted review & private provisional SRT completion EXECUTED / PRIVATE_PROVISIONAL_SRT_READY (authorization CONSUMED)
+
+- **Source promotion:** `SOURCE_PROMOTION=PASS`. Promoted exact 2 files (`+392/-23`) to canonical `teddy-subtitle-stage11` as `0591b1b10992326c0c33322f2634c8debe54d3fc` (`REMOTE_SHA256_MATCH=PASS`: `teddy_discovery_stage11_v2d.py`=`a3065906...`, `teddy_discovery_stage11_hsoda104_pilot.py`=`a8d9e765...`). Offline validation PASS (`TEST1_REUSE`, `TEST2_PRIVATE_PROVISIONAL_END_TO_END`, `TEST3_PRODUCTION_HOLD_UNCHANGED`, `S11_V2D_OFFLINE_SMOKE=PASS`).
+- **Live execution:** Executed single approved HSODA-104 final review continuation on CT108 (`downloader`) from isolated canonical checkout `0591b1b10992326c0c33322f2634c8debe54d3fc` into `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-final-review-once-20261126` (`996.85s`, exit `0`). Authorization **CONSUMED**.
+- **Reuse & execution (`HERMES_EXECUTION_COUNT=4` / 4, `ASR_EXECUTION_COUNT=0`):** Reused 6 initial batches (8 receipts), 43 ASR windows, all 4 ReAdj batches (55 groups, 12 unresolved), JA Master (266 cues), and all 5 KO translation parts (266 cues, 5 `needs_audio_evidence=True`). Completed chunked short-ID targeted review (`triage/chunk-01` Att1 PASS `331.1s`, `triage/chunk-02` Att2 PASS, `targeted-final` Att1 PASS `205.7s`).
+- **Result & outputs:** `PILOT_RESULT_STATE=PRIVATE_PROVISIONAL_SRT_READY`, `PILOT_RESULT_REASON=None`, `TARGETED_REVIEW=PASS`, `FINAL_VALIDATION=PASS`, `JA_SRT_CUE_COUNT=266`, `KO_SRT_CUE_COUNT=266`, `UNRESOLVED_GROUP_COUNT=12`, `UNRESOLVED_TRANSLATION_CUE_COUNT=5`, `STAGE12_PUBLISH_ELIGIBLE=False`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`.
+  - `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-final-review-once-20261126/artifacts/ja-master-v1.json` (`421297cf7b1bd00afda55d18bf963bce0b8d0f42a3399f781291441d704f174b`)
+  - `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-final-review-once-20261126/artifacts/clean-ja-v1.srt` (`a177f33f0449baa10b032a070318fb60ceb0b4f02491fb93ad86b85bb3fd48b6`)
+  - `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-final-review-once-20261126/artifacts/clean-ko-v1.srt` (`29547f4ce489ef236f7187f766f2375634080625cbed86575e4a7982f17e0595`)
+  - `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-final-review-once-20261126/artifacts/v2d-proof-v1.json` (`4481dd919f4514d34ddc6b771522b20f54ff93423331b8be8b88669f0064213c`)
+  - `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-final-review-once-20261126/artifacts/v2d-private-provisional-uncertainty-v1.json` (`e50d155478f0dd76478edc29ba0a93bf0b941540800a0ee95366900fc91b4434`)
+- **Postcheck PASS:** CT108/CT120/VM122 clean (`competing=0`, `ASR_TEMP_RESIDUAL=0`, `SERVICE/TIMER=inactive`), all 5 prior private roots untouched (`44`/`39`/`53`/`63`/`88` files), retained inputs & NAS identity PASS, Stage12 queue unchanged (`5/25/165/10`).
+
+
 ## 2026-11-26 — V2-E final targeted review & private provisional SRT completion USER_APPROVED
 
 - User approved minimal completion (`private_provisional_completion=True` records post-translation `needs_audio_evidence=True` cues in the private uncertainty report and proceeds to `run_targeted_review` without late ASR; verified reuse of all 4 ReAdj batches + all 5 KO translation parts / 266 cues from `s11-v2e-HSODA-104-short-id-once-20261126/staging`), minimal offline validation, canonical promotion, and 1 final private continuation (`max_hermes_attempts=4`, `ASR=0`) targeting `PRIVATE_PROVISIONAL_SRT_READY` atop `e3e88d797d495653158409ece6c1ca460dbb3f3c`. Production HOLD & Stage12 protections unchanged.
