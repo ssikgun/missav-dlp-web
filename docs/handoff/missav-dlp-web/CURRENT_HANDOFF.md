@@ -1,5 +1,17 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E HSODA-104 generated subtitle read-only quality evaluation COMPLETE (`PROVISIONAL_USABLE_WITH_DEFECTS`)
+
+- **Read-only evaluation at canonical HEAD `862d3cf735187801bf1fe9519b512bfda5208fc9`** (`HERMES=0`, `ASR=0`, `PRODUCTION_WRITE_COUNT=0`).
+- **Positives:** Significant dialogue recovery over external JA (`204 -> 266` cues; `127` ASR-only + `9` supplemental ASR), natural Korean dialogue/narration across core scenes, `0` JA/KO timestamp mismatch, `0` JP/Hanja leaks in KO.
+- **Practical defects found:**
+  1. **Whisper boilerplate hallucinations (15 cues):** `'ご視聴ありがとうございました。'` (`'시청해 주셔서 감사합니다.'`) 9x (`#62–67`, `#149`, `#152`, `#261`; `Q064` erroneously repaired into it), plus 5x `'おやすみなさい。'` & 1x `02:00:00` `'お疲れ様でした。'` (audio verification needed).
+  2. **`supplemental_asr` duplicate echoes:** `#250/#251` (`'新しいの買える？'`/`'ね。'`), `#255/#256` (`'今までいいよ。'`/`'生でいいよ。'`).
+  3. **Timing:** `14` overlaps (`50–1,784ms`) and `17` short cues `<400ms` (min `80ms`).
+  4. **Localized translation/consistency issues:** `#188` (`言ってない` vs `行ってない`), `#222` (JA `'野沢'` vs KO `'노조미'`), `'유조'`/`'유우'` drift, and 5 `needs_audio_evidence` cues (`#49/#88/#157/#161/#259`, audio verification needed).
+- **Next decision:** Focused quality improvement (Whisper hallucination guard, `supplemental_asr` dedup + overlap clamping) is recommended before production use; separate approval required for any code or live changes.
+
+
 ## 2026-11-26 — V2-E final targeted review & private provisional SRT completion EXECUTED / PRIVATE_PROVISIONAL_SRT_READY (authorization CONSUMED)
 
 - **Source promotion:** `SOURCE_PROMOTION=PASS`. Promoted exact 2 files (`+392/-23`) to canonical `teddy-subtitle-stage11` as `0591b1b10992326c0c33322f2634c8debe54d3fc` (`REMOTE_SHA256_MATCH=PASS`: `teddy_discovery_stage11_v2d.py`=`a3065906...`, `teddy_discovery_stage11_hsoda104_pilot.py`=`a8d9e765...`). Offline validation PASS (`TEST1_REUSE`, `TEST2_PRIVATE_PROVISIONAL_END_TO_END`, `TEST3_PRODUCTION_HOLD_UNCHANGED`, `S11_V2D_OFFLINE_SMOKE=PASS`).
