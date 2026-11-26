@@ -131,7 +131,7 @@ class OfflineInvoke:
                     "status": "UNCERTAIN" if self.uncertain else status,
                     "rationale": "synthetic explicit source judgment",
                 })
-                if status == "ACCEPTED":
+                if not self.uncertain and status == "ACCEPTED":
                     accepted.append(member)
             if accepted:
                 if len(accepted) > 1:

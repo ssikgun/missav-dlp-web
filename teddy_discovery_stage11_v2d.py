@@ -2072,6 +2072,7 @@ def _readjudicate_targeted_groups(plan: UtteranceReviewPlan,
             source_fingerprint=effective_fp, invoke=invoke,
             hermes_settings=hermes_settings, task=task,
             label="ja-master-targeted-readjudication-batch", reuse_only=reuse_only,
+            instruction=SEMANTIC_TARGETED_READJUDICATION_BATCH_INSTRUCTION,
         )
         revised_by_group = {item.group_id: item for item in revised}
         resolved_groups = tuple(revised_by_group.get(group.group_id, original_by_group[group.group_id])
@@ -2097,7 +2098,10 @@ def _readjudicate_targeted_groups(plan: UtteranceReviewPlan,
                 group_dir = _private_child(task, "group-" + group_key, create=not reuse_only)
             except V2DError as error:
                 raise V2DHold("TARGETED_ASR_READJUDICATION_STAGE_MISSING") from error
-            validator = lambda raw, group=group: _parse_group_response(raw, group)
+            def validator(raw, group=group):
+                parsed = _parse_group_response(raw, group)
+                _validate_group_source_spans(group, parsed)
+                return parsed
             adjudicated = invoke(
                 prompt, group_dir, "ja-master-targeted-readjudication", validator,
                 hermes_settings=hermes_settings, reuse_only=reuse_only,
@@ -2463,8 +2467,22 @@ SEMANTIC_ADJUDICATION_INSTRUCTION = """Interpret this one source-bound utterance
 
 SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION = """Interpret each source-bound utterance group independently for a Japanese master. Return JSON only with exactly: batch_id, source_fingerprint, groups. Return one group object for every input group, in exactly the input order; each group object must have exactly group_id, audio_evidence_needed, candidate_decisions, source_decisions, outputs. For each group, return candidate_decisions in exact input candidate_relations order with exact keys candidate_id, status, rationale, and source_decisions in exact input members order with exact keys source_key, status, rationale; status must be ACCEPTED, REJECTED, or UNCERTAIN, and rationale must be a non-empty string. A candidate relation is evidence, not proof of same utterance. Do not merge merely from overlap or identical text; preserve repeated spoken dialogue unless context supports a duplicate. Decide whether to merge or split semantic dialogue. Each item in outputs must have exact keys japanese_text, source_spans, rationale (non-empty strings and non-empty source_spans). Each item in source_spans must have exact keys source_key, word_start_index, word_end_index; set both word_start_index and word_end_index to null for a whole source, or to half-open integer word indexes for a split ASR source. Do not omit or add keys. Outputs must reference only sources with status ACCEPTED (never REJECTED or UNCERTAIN) and must cover every ACCEPTED source. Do not provide cue IDs, timestamps, speakers, ordering, or confidence. Source spans are claims the validator checks: only ASR word references may be split, with all words partitioned exactly once. Do not assign speakers; retain speaker evidence as supplied. Set audio_evidence_needed true only when all three hold: at least one candidate_decisions or source_decisions item in that group has status UNCERTAIN, at least one member in that group has non-null aligned_start_ms and aligned_end_ms (original times alone do not count), and checking that timed audio could materially resolve the uncertainty; otherwise false. This field does not decide acceptance; never change an honest status to satisfy it. Do not invent timing for untimed or uncertain sources, force ACCEPTED or REJECTED, or drop plausible dialogue just to pass validation; if evidence is insufficient, preserve UNCERTAIN. The caller owns IDs, time, ordering, source ownership, and files."""
 
+SEMANTIC_TARGETED_READJUDICATION_BATCH_INSTRUCTION = (
+    SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION
+    + " This is a second-pass re-adjudication where targeted_second_evidence provides supporting time-bound ASR hypotheses already collected for this group; treat targeted_second_evidence as an ASR hypothesis, not absolute ground truth."
+    + " Actively consider targeted_second_evidence together with baseline ASR and external JA: preserve sufficiently supported dialogue and refine wording in outputs[].japanese_text on ACCEPTED time-bearing source spans when corroborated by evidence, without inventing speech, timing, or unsupported portions of another interval."
+    + " Judge source acceptance and candidate relations independently from evidence; do not automatically mark a candidate relation REJECTED merely because a source is REJECTED, as an inaccurate source can still refer to the same spoken utterance."
+    + " Do not drop existing dialogue merely because it was not detected in targeted_second_evidence, do not mechanically ACCEPT from agreement, and do not force resolution; when evidence still materially conflicts or is insufficient, honestly preserve UNCERTAIN."
+    + " Set audio_evidence_needed true only if a genuinely unresolved UNCERTAIN decision could still be materially helped by additional timed audio beyond the already-supplied windows; otherwise false, without suppressing honest UNCERTAIN."
+)
 
-def _make_batch_material(source_fingerprint: str, payloads: tuple[tuple[str, dict[str, object]], ...]):
+
+def _make_batch_material(
+    source_fingerprint: str,
+    payloads: tuple[tuple[str, dict[str, object]], ...],
+    *,
+    instruction: str = SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION,
+):
     input_raw = _wire({
         "source_fingerprint": source_fingerprint,
         "groups": [{"group_id": group_id, "payload": payload}
@@ -2476,19 +2494,24 @@ def _make_batch_material(source_fingerprint: str, payloads: tuple[tuple[str, dic
         "source_fingerprint": source_fingerprint,
         "groups": [payload for _, payload in payloads],
     }
-    prompt = (SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION
+    prompt = (instruction
               + "\nSOURCE_BOUND_BATCH=" + _wire(envelope).decode("utf-8")).encode("utf-8")
     return batch_id, input_raw, prompt
 
 
-def _pack_group_batches(source_fingerprint: str, payloads: tuple[tuple[str, dict[str, object]], ...]):
+def _pack_group_batches(
+    source_fingerprint: str,
+    payloads: tuple[tuple[str, dict[str, object]], ...],
+    *,
+    instruction: str = SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION,
+):
     if not payloads or len({group_id for group_id, _ in payloads}) != len(payloads):
         raise V2DError("group batch input is empty or duplicated")
     batches = []
     pending = []
     for item in payloads:
         trial = tuple((*pending, item))
-        material = _make_batch_material(source_fingerprint, trial)
+        material = _make_batch_material(source_fingerprint, trial, instruction=instruction)
         if len(material[2]) <= V2D_MAX_PROMPT_BYTES:
             pending.append(item)
             continue
@@ -2496,12 +2519,12 @@ def _pack_group_batches(source_fingerprint: str, payloads: tuple[tuple[str, dict
             raise V2DHold("ONE_UTTERANCE_GROUP_EXCEEDS_EXISTING_PROMPT_LIMIT")
         batches.append(tuple(pending))
         pending = [item]
-        if len(_make_batch_material(source_fingerprint, tuple(pending))[2]) > V2D_MAX_PROMPT_BYTES:
+        if len(_make_batch_material(source_fingerprint, tuple(pending), instruction=instruction)[2]) > V2D_MAX_PROMPT_BYTES:
             raise V2DHold("ONE_UTTERANCE_GROUP_EXCEEDS_EXISTING_PROMPT_LIMIT")
     if pending:
         batches.append(tuple(pending))
     # Complete the packing and size validation before the first model call.
-    return tuple((batch, *_make_batch_material(source_fingerprint, batch)) for batch in batches)
+    return tuple((batch, *_make_batch_material(source_fingerprint, batch, instruction=instruction)) for batch in batches)
 
 
 def _adjudicate_group_batches(
@@ -2509,8 +2532,9 @@ def _adjudicate_group_batches(
     expected_groups: dict[str, object], source_fingerprint: str,
     invoke: Callable, hermes_settings: HermesExecutionSettings,
     task: Path, label: str, reuse_only: bool,
+    instruction: str = SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION,
 ) -> tuple[tuple[GroupAdjudication, ...], tuple[V2DBatchEvidence, ...]]:
-    batches = _pack_group_batches(source_fingerprint, payloads)
+    batches = _pack_group_batches(source_fingerprint, payloads, instruction=instruction)
     resolved_by_id = {}
     receipts = []
     owner = getattr(invoke, "_v2d_native_owner", getattr(invoke, "__self__", None))
@@ -2547,6 +2571,7 @@ def _adjudicate_group_batches(
                         or tuple(item.source_key for item in parsed.source_decisions)
                         != tuple(member.source_reference.key for member in group.members)):
                     raise V2DError("JA Master batch candidate/source coverage differs")
+                _validate_group_source_spans(group, parsed)
                 group_results.append(parsed)
             return tuple(group_results)
 
@@ -2628,7 +2653,10 @@ def adjudicate_ja_master(
         if len(prompt) > V2D_MAX_PROMPT_BYTES:
             raise V2DError("one utterance group exceeds the existing native prompt bound")
         group_dir = _private_child(task, "group-" + group.group_id.removeprefix("group-")[:32], create=not reuse_only)
-        validator = lambda raw, group=group: _parse_group_response(raw, group)
+        def validator(raw, group=group):
+            parsed = _parse_group_response(raw, group)
+            _validate_group_source_spans(group, parsed)
+            return parsed
         resolved = invoke(prompt, group_dir, "ja-master-adjudication", validator,
                           hermes_settings=hermes_settings, reuse_only=reuse_only)
         if type(resolved) is not GroupAdjudication:
@@ -2638,6 +2666,62 @@ def adjudicate_ja_master(
         plan, V2DAdjudication(fingerprint, tuple(results)),
         exclude_group_ids=exclude_group_ids, supplemental_groups=supplemental_groups,
     )
+
+
+def _validate_group_source_spans(
+    group: UtteranceReviewGroup,
+    decisions: GroupAdjudication,
+) -> dict[str, list[tuple[int | None, int | None]]]:
+    """Validate deterministic per-group source-span ownership and ASR word partitions.
+
+    Reused at both the response-validation boundary (initial and targeted
+    adjudication) and materialize_ja_master. Honest UNCERTAIN decisions and
+    canonical-time HOLD checks remain enforced by materialize_ja_master.
+    """
+    member_by_key = {item.source_reference.key: item for item in group.members}
+    decision_by_key = {item.source_key: item for item in decisions.source_decisions}
+    if set(decision_by_key) != set(member_by_key):
+        raise V2DError("source decision coverage changed")
+    accepted = {key for key, item in decision_by_key.items() if item.status == DECISION_ACCEPTED}
+    used: dict[str, list[tuple[int | None, int | None]]] = {key: [] for key in accepted}
+    for proposal in decisions.outputs:
+        source_keys = tuple(span.source_key for span in proposal.source_spans)
+        if any(key not in accepted for key in source_keys):
+            raise V2DError("output uses a rejected or unknown source")
+        for span in proposal.source_spans:
+            member = member_by_key[span.source_key]
+            ref = member.source_reference
+            if span.word_start_index is None:
+                if used[span.source_key]:
+                    raise V2DError("source appears in multiple outputs without a complete ASR word split")
+            else:
+                if ref.source not in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR} or not member.word_references:
+                    raise V2DError("only timed ASR words can own a split")
+                if span.word_end_index > len(member.word_references):
+                    raise V2DError("ASR split extends beyond source word references")
+                selected_words = member.word_references[span.word_start_index:span.word_end_index]
+                if len(selected_words) != span.word_end_index - span.word_start_index:
+                    raise V2DError("ASR split word coverage is incomplete")
+            used[span.source_key].append((span.word_start_index, span.word_end_index))
+    for key in accepted:
+        spans = used[key]
+        member = member_by_key[key]
+        if not spans:
+            raise V2DError("accepted source is absent from JA Master outputs")
+        if len(spans) == 1 and spans[0] == (None, None):
+            continue
+        words = member.word_references
+        if not words or any(start is None or end is None for start, end in spans):
+            raise V2DError("source split lacks ASR word evidence")
+        ordered = sorted(spans)
+        cursor = 0
+        for start, end in ordered:
+            if start != cursor or end <= start:
+                raise V2DError("ASR split ranges overlap or leave a gap")
+            cursor = end
+        if cursor != len(words):
+            raise V2DError("ASR split does not cover all source words")
+    return used
 
 
 def materialize_ja_master(
@@ -2665,60 +2749,28 @@ def materialize_ja_master(
     effective_groups = tuple(g for g in plan.groups if g.group_id not in excluded) + tuple(supplemental_groups)
     cues = []
     for group, decisions in zip(effective_groups, adjudication.groups, strict=True):
+        _validate_group_source_spans(group, decisions)
         member_by_key = {item.source_reference.key: item for item in group.members}
         decision_by_key = {item.source_key: item for item in decisions.source_decisions}
         accepted = {key for key, item in decision_by_key.items() if item.status == DECISION_ACCEPTED}
-        used: dict[str, list[tuple[int | None, int | None]]] = {key: [] for key in accepted}
         pending = []
         for output_index, proposal in enumerate(decisions.outputs):
             starts, ends, refs, evidence_ids = [], [], [], []
-            source_keys = tuple(span.source_key for span in proposal.source_spans)
-            if any(key not in accepted for key in source_keys):
-                raise V2DError("output uses a rejected or unknown source")
             for span in proposal.source_spans:
                 member = member_by_key[span.source_key]
                 ref = member.source_reference
                 if ref.aligned_start_ms is None or ref.aligned_end_ms is None:
                     raise V2DHold("ACCEPTED_SOURCE_HAS_NO_CANONICAL_TIME")
                 if span.word_start_index is None:
-                    if used[span.source_key]:
-                        raise V2DError("source appears in multiple outputs without a complete ASR word split")
                     start, end = ref.aligned_start_ms, ref.aligned_end_ms
                 else:
-                    if ref.source not in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR} or not member.word_references:
-                        raise V2DError("only timed ASR words can own a split")
-                    if span.word_end_index > len(member.word_references):
-                        raise V2DError("ASR split extends beyond source word references")
                     selected_words = member.word_references[span.word_start_index:span.word_end_index]
-                    if len(selected_words) != span.word_end_index - span.word_start_index:
-                        raise V2DError("ASR split word coverage is incomplete")
                     start, end = selected_words[0].start_ms, selected_words[-1].end_ms
-                used[span.source_key].append((span.word_start_index, span.word_end_index))
                 starts.append(start); ends.append(end); refs.append(ref)
                 evidence_ids.extend(link.turn.turn_id for link in member.speaker_links)
                 for word in member.word_references:
                     evidence_ids.extend(link.turn.turn_id for link in word.speaker_links)
             pending.append((min(starts), max(ends), proposal, tuple(refs), tuple(sorted(set(evidence_ids))), output_index))
-        for key in accepted:
-            spans = used[key]
-            member = member_by_key[key]
-            if not spans:
-                raise V2DError("accepted source is absent from JA Master outputs")
-            if len(spans) == 1 and spans[0] == (None, None):
-                continue
-            words = member.word_references
-            if not words or any(start is None or end is None for start, end in spans):
-                raise V2DError("source split lacks ASR word evidence")
-            ordered = sorted(spans)
-            cursor = 0
-            for start, end in ordered:
-                if start != cursor or end <= start:
-                    raise V2DError("ASR split ranges overlap or leave a gap")
-                cursor = end
-            if cursor != len(words):
-                raise V2DError("ASR split does not cover all source words")
-        if set(decision_by_key) != set(member_by_key):
-            raise V2DError("source decision coverage changed")
         for start, end, proposal, refs, evidence_ids, output_index in sorted(
             pending, key=lambda item: (item[0], item[1], tuple(ref.key for ref in item[3]), item[5])
         ):
