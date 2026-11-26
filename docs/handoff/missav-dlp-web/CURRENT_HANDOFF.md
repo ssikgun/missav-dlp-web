@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E quality improvement step 1: Whisper hallucination & supplemental dedup design COMPLETE (read-only)
+
+- **Audit at canonical HEAD `691ebe6a4306fd975234dc1fc05b500092311560`** (`HERMES=0`, `ASR=0`, `PRODUCTION_WRITE_COUNT=0`).
+- **Hallucination cause:** `baseline-asr-v1.json` has no `no_speech_prob`/`avg_logprob`/`compression_ratio`, ONLY segment/word timings. `classify_asr_result_source_quality` ALREADY flagged `14/15` suspect cues (`consecutive_run=6`, `document_frequency=10/6`) in `features`, yet kept `action=KEEP` (`asr_source_quality_smoke.py` pins this), `v2d.py` passed `asr_source_quality=None`, fed neighboring JA Master cues as `raw_asr_context`, and `QUALITY_REVIEW_QUERY` forced closing remarks to `KEEP+DIALOGUE` (causing `Q064` `'ご視聴'` to be `REPAIR`ed into `'ご視聴ありがとうございました。'`).
+- **Duplicate cause:** `build_supplemental_asr_groups` (`v2d.py:954-964`) requires exact `seg_norm == base_norm`, missing `#250` `'新しいの買える?'` vs `#251` `'新しいの買えるね'` (`98%/95%` overlap) and `#255` `'今までいいよ'` vs `#256` `'生でいいよ'` (`98.5%` overlap, 14ms end delta), while preserving distinct turns (`#252`, `#254`).
+- **Minimal fix & reuse (`ASR=0`):** Extend `build_supplemental_asr_groups` overlap+similarity dedup AND wire deterministic recurrence (`freq>=3`/`run>=3`/`clean_len>=4`) + uncorroborated gap/skew + review `OMIT/SOURCE_NOISE` guidance in `teddy_discovery_stage11_v2d.py` (no hardcoded phrase bans). Expected Hermes calls on HSODA-104: `~18` under strict hash rerun (`effective_fp` changes in Batch 6), `9–10` if Batches 1–5 + ReAdj 1–4 are decoupled/reused, or **`3–4` (Max-Reuse Review-anchored Path B1, reusing 6 init + 43 ASR + 4 ReAdj + 5 KO parts)** while keeping `build_supplemental_asr_groups` improved for fresh runs. Separate user approval required before implementation or execution.
+
+
 ## 2026-11-26 — V2-E HSODA-104 generated subtitle read-only quality evaluation COMPLETE (`PROVISIONAL_USABLE_WITH_DEFECTS`)
 
 - **Read-only evaluation at canonical HEAD `862d3cf735187801bf1fe9519b512bfda5208fc9`** (`HERMES=0`, `ASR=0`, `PRODUCTION_WRITE_COUNT=0`).
