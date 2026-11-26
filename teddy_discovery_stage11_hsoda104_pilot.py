@@ -423,6 +423,7 @@ def prepare_verified_continuation_staging(
     use_short_id_mapping_for_uncached: bool = False,
     reuse_verified_translation: bool = False,
     private_provisional_completion: bool = False,
+    preserve_legacy_supplemental_grouping: bool = False,
 ) -> dict[str, object]:
     """Validate and clone ONLY verified reusable artifacts into a fresh staging dir.
 
@@ -478,7 +479,11 @@ def prepare_verified_continuation_staging(
     )
     if any(o.outcome != v2d.OUTSIDE_SPAN_OUTCOME_SPEECH_FOUND for o in os_res.window_outcomes):
         raise regeneration.RegenerationError("prior outside-span recovery has unresolved windows")
-    supplemental_groups = v2d.build_supplemental_asr_groups(plan, os_res)
+    supplemental_groups = v2d.build_supplemental_asr_groups(
+        plan,
+        os_res,
+        deduplicate_similar_overlaps=not preserve_legacy_supplemental_grouping,
+    )
     effective_groups = active_groups + supplemental_groups
     effective_fp = v2d._source_fingerprint(
         plan, exclude_group_ids=excluded_ids, supplemental_groups=supplemental_groups,
@@ -927,6 +932,7 @@ def run_hsoda104_pilot_continue(
     private_provisional_completion: bool = False,
     use_short_id_mapping_for_uncached: bool = False,
     reuse_verified_translation: bool = False,
+    preserve_legacy_supplemental_grouping: bool = False,
     continuation_approved: bool = False,
 ) -> HSODA104ContinuationResult:
     """Continue into a fresh exclusive run root reusing ONLY verified prior artifacts."""
@@ -981,6 +987,7 @@ def run_hsoda104_pilot_continue(
             use_short_id_mapping_for_uncached=use_short_id_mapping_for_uncached,
             reuse_verified_translation=reuse_verified_translation,
             private_provisional_completion=private_provisional_completion,
+            preserve_legacy_supplemental_grouping=preserve_legacy_supplemental_grouping,
         )
         if allow_new_targeted_asr:
             tracker = {"count": 0, "seen_windows": set(), "active_route": None}
@@ -1016,6 +1023,7 @@ def run_hsoda104_pilot_continue(
             private_provisional_completion=private_provisional_completion,
             use_short_id_mapping_for_uncached=use_short_id_mapping_for_uncached,
             reuse_verified_translation=reuse_verified_translation,
+            preserve_legacy_supplemental_grouping=preserve_legacy_supplemental_grouping,
         )
         return HSODA104ContinuationResult(
             pipeline_result=pipeline_result,

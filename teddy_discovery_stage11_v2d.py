@@ -27,6 +27,12 @@ from contextlib import nullcontext
 from typing import Callable
 
 from teddy_discovery_alignment import normalize_japanese_for_matching
+from teddy_discovery_asr_source_quality import (
+    ASR_SOURCE_REASON_CONSECUTIVE_RUN,
+    ASR_SOURCE_REASON_DOCUMENT_RECURRENCE,
+    ASRSourceQualityHint,
+    classify_asr_result_source_quality,
+)
 from teddy_discovery_stage11_ja_master import (
     DECISION_ACCEPTED,
     DECISION_REJECTED,
@@ -928,9 +934,82 @@ def plan_outside_span_recovery(
     )
 
 
+def _common_affix_length(left: str, right: str) -> int:
+    prefix = 0
+    limit = min(len(left), len(right))
+    while prefix < limit and left[prefix] == right[prefix]:
+        prefix += 1
+    suffix = 0
+    while suffix < limit and left[len(left) - 1 - suffix] == right[len(right) - 1 - suffix]:
+        suffix += 1
+    return max(prefix, suffix)
+
+
+def _match_supplemental_baseline_overlap(
+    seg_start_ms: int,
+    seg_end_ms: int,
+    seg_text: str,
+    baseline_segments: tuple[ASRSegment, ...],
+) -> dict[str, object] | None:
+    """Identify when a recovered segment matches a baseline ASR utterance on time and wording."""
+    seg_norm = normalize_japanese_for_matching(seg_text)
+    if not seg_norm or seg_end_ms <= seg_start_ms:
+        return None
+    seg_dur = seg_end_ms - seg_start_ms
+    best: dict[str, object] | None = None
+    best_score = -1.0
+    for base_index, base_seg in enumerate(baseline_segments):
+        if base_seg.end_ms < seg_start_ms or base_seg.start_ms > seg_end_ms:
+            continue
+        base_norm = normalize_japanese_for_matching(base_seg.text)
+        if not base_norm:
+            continue
+        ov_ms = max(0, min(seg_end_ms, base_seg.end_ms) - max(seg_start_ms, base_seg.start_ms))
+        base_dur = max(1, base_seg.end_ms - base_seg.start_ms)
+        containment = ov_ms / min(seg_dur, base_dur)
+        end_delta_ms = abs(seg_end_ms - base_seg.end_ms)
+        if seg_norm == base_norm:
+            return {
+                "match_kind": "EXACT_TEXT_MATCH",
+                "baseline_source_index": base_index,
+                "baseline_text": base_seg.text,
+                "overlap_ms": ov_ms,
+                "containment_ratio": round(containment, 4),
+                "text_similarity": 1.0,
+                "affix_ratio": 1.0,
+                "end_delta_ms": end_delta_ms,
+            }
+        if ov_ms <= 0:
+            continue
+        sim = SequenceMatcher(None, seg_norm, base_norm).ratio()
+        affix_ratio = _common_affix_length(seg_norm, base_norm) / min(len(seg_norm), len(base_norm))
+        match_kind = None
+        if containment >= 0.70 and sim >= 0.75:
+            match_kind = "HIGH_OVERLAP_SIMILAR_TEXT"
+        elif containment >= 0.90 and affix_ratio >= 0.50 and end_delta_ms <= 250:
+            match_kind = "CONTAINED_PHONETIC_NEAR_MATCH"
+        if match_kind is not None:
+            score = containment * (sim + affix_ratio)
+            if score > best_score:
+                best_score = score
+                best = {
+                    "match_kind": match_kind,
+                    "baseline_source_index": base_index,
+                    "baseline_text": base_seg.text,
+                    "overlap_ms": ov_ms,
+                    "containment_ratio": round(containment, 4),
+                    "text_similarity": round(sim, 4),
+                    "affix_ratio": round(affix_ratio, 4),
+                    "end_delta_ms": end_delta_ms,
+                }
+    return best
+
+
 def build_supplemental_asr_groups(
     plan: UtteranceReviewPlan,
     recovery: OutsideSpanRecoveryResult,
+    *,
+    deduplicate_similar_overlaps: bool = True,
 ) -> tuple[UtteranceReviewGroup, ...]:
     """Convert ASR-verified recovered speech into deduplicated supplemental groups."""
     plan = validate_utterance_review_plan(plan)
@@ -951,16 +1030,13 @@ def build_supplemental_asr_groups(
                 win_end_ms=outcome.end_ms,
                 error_cls=V2DError,
             )
-            seg_norm = normalize_japanese_for_matching(seg.text)
-            # Deduplicate against existing baseline ASR to prevent false duplicates
-            is_dup = False
-            for base_seg in baseline_asr.segments:
-                if base_seg.end_ms >= seg.start_ms and base_seg.start_ms <= seg.end_ms:
-                    base_norm = normalize_japanese_for_matching(base_seg.text)
-                    if seg_norm and base_norm and seg_norm == base_norm:
-                        is_dup = True
-                        break
-            if is_dup:
+            overlap_match = _match_supplemental_baseline_overlap(
+                seg.start_ms, seg.end_ms, seg.text, baseline_asr.segments,
+            )
+            if overlap_match is not None and (
+                overlap_match["match_kind"] == "EXACT_TEXT_MATCH"
+                or deduplicate_similar_overlaps
+            ):
                 continue
             ref = JAMasterSourceReference(
                 source=EVIDENCE_SOURCE_SUPPLEMENTAL_ASR,
@@ -3346,6 +3422,134 @@ def translate_ja_master(
     return package, final
 
 
+def _is_correlated_uncorroborated_repeat(
+    left_text: str,
+    right_text: str,
+    *,
+    left_has_ext: bool,
+    right_has_ext: bool,
+    right_doc_freq: int,
+    right_consec_run: int,
+) -> bool:
+    if left_has_ext or right_has_ext:
+        return False
+    left_norm = normalize_japanese_for_matching(left_text)
+    right_norm = normalize_japanese_for_matching(right_text)
+    if len(left_norm) < 3 or len(right_norm) < 4:
+        return False
+    if right_doc_freq < 3 and right_consec_run < 3:
+        return False
+    return (
+        left_norm == right_norm
+        or right_norm.startswith(left_norm)
+        or left_norm.startswith(right_norm)
+    )
+
+
+def _cue_asr_quality_context(
+    master: V2DMaster,
+) -> tuple[dict[str, dict[str, object]], dict[str, ASRSourceQualityHint]]:
+    """Compute source-bound recurrence, isolation, timing-skew, and dup signals."""
+    baseline_asr = master.review_set._source_bundle.asr_result
+    baseline_segs = baseline_asr.segments
+    decisions = classify_asr_result_source_quality(baseline_asr)
+    intervals = [(_round_ms(c.start_ms), _round_ms(c.end_ms)) for c in master.cues]
+    baseline_index_to_cue = {}
+    for idx, mc in enumerate(master.cues):
+        for ref in mc.source_references:
+            if ref.source == "asr_segment":
+                baseline_index_to_cue.setdefault(ref.source_index, (idx, mc))
+
+    signals_by_cue: dict[str, dict[str, object]] = {}
+    hints_by_cue: dict[str, ASRSourceQualityHint] = {}
+    for idx, mc in enumerate(master.cues):
+        has_ext_ja = any(ref.source == "external_ja" for ref in mc.source_references)
+        asr_refs = [ref for ref in mc.source_references if ref.source == "asr_segment"]
+        sup_refs = [ref for ref in mc.source_references if ref.source == EVIDENCE_SOURCE_SUPPLEMENTAL_ASR]
+        clean_len = len(normalize_japanese_for_matching(mc.text))
+
+        max_doc_freq = 0
+        max_consec_run = 0
+        feat_set: set[str] = set()
+        selected_hint: ASRSourceQualityHint | None = None
+        max_word_ms = 0
+        min_word_ms: int | None = None
+        word_count = 0
+        word_texts: list[str] = []
+        word_truncated = False
+
+        for ref in asr_refs:
+            d = decisions[ref.source_index]
+            seg = baseline_segs[ref.source_index]
+            max_doc_freq = max(max_doc_freq, d.evidence.document_frequency)
+            max_consec_run = max(max_consec_run, d.evidence.consecutive_run_length)
+            feat_set.update(d.features)
+            if selected_hint is None and (d.features or d.action != "KEEP"):
+                selected_hint = ASRSourceQualityHint.from_decision(d)
+            if seg.words:
+                w_joined = "".join(w.text for w in seg.words)
+                word_texts.append(w_joined)
+                seg_norm = normalize_japanese_for_matching(seg.text)
+                w_norm = normalize_japanese_for_matching(w_joined)
+                if seg_norm and w_norm and len(w_norm) + 3 <= len(seg_norm) and seg_norm.startswith(w_norm):
+                    word_truncated = True
+                for w in seg.words:
+                    dur = w.end_ms - w.start_ms
+                    word_count += 1
+                    max_word_ms = max(max_word_ms, dur)
+                    min_word_ms = dur if min_word_ms is None else min(min_word_ms, dur)
+
+        if selected_hint is not None:
+            hints_by_cue[mc.cue_id] = selected_hint
+
+        prev_gap_ms = None if idx == 0 else max(0, intervals[idx][0] - intervals[idx - 1][1])
+        next_gap_ms = None if idx + 1 >= len(intervals) else max(0, intervals[idx + 1][0] - intervals[idx][1])
+
+        has_recurrence = (max_consec_run >= 3) or (max_doc_freq >= 3 and clean_len >= 4)
+        is_isolated = (not has_ext_ja) and (
+            (prev_gap_ms is not None and prev_gap_ms >= 30_000)
+            or (next_gap_ms is not None and next_gap_ms >= 30_000)
+        )
+        has_word_skew = (not has_ext_ja) and bool(word_count) and (
+            word_truncated
+            or max_word_ms >= 1500
+            or (word_count >= 3 and min_word_ms is not None and min_word_ms <= 30 and max_word_ms >= 500)
+        )
+
+        sup_dup = None
+        if sup_refs:
+            ov = _match_supplemental_baseline_overlap(
+                intervals[idx][0], intervals[idx][1], mc.text, baseline_segs,
+            )
+            if ov is not None:
+                sup_dup = dict(ov)
+                counterpart = baseline_index_to_cue.get(ov["baseline_source_index"])
+                if counterpart is not None:
+                    sup_dup["counterpart_cue_id"] = counterpart[1].cue_id
+                    sup_dup["counterpart_text"] = counterpart[1].text
+
+        if has_recurrence or is_isolated or (has_word_skew and (has_recurrence or is_isolated)) or sup_dup is not None:
+            entry: dict[str, object] = {"ext_ja": has_ext_ja}
+            if has_recurrence or feat_set:
+                entry["asr_recurrence"] = {
+                    "doc_freq": max_doc_freq,
+                    "consec_run": max_consec_run,
+                    "features": sorted(feat_set),
+                }
+            if is_isolated or has_recurrence:
+                entry["isolation_gaps_ms"] = {"prev": prev_gap_ms, "next": next_gap_ms}
+            if has_word_skew:
+                entry["word_timing_anomaly"] = {
+                    "max_ms": max_word_ms,
+                    "min_ms": min_word_ms,
+                    "word_text": "".join(word_texts)[:64],
+                }
+            if sup_dup is not None:
+                entry["supplemental_duplicate_candidate"] = sup_dup
+            signals_by_cue[mc.cue_id] = entry
+    return signals_by_cue, hints_by_cue
+
+
 def build_v2d_review_request(master: V2DMaster, package: StatefulSubtitlePackage,
                              first_pass: StatefulSubtitleResult) -> QualityReviewRequest:
     """Bind review inputs to this JA Master, translation package and result."""
@@ -3358,22 +3562,45 @@ def build_v2d_review_request(master: V2DMaster, package: StatefulSubtitlePackage
     member_by_key = {member.source_reference.key: member
                      for group in (*master.utterance_plan.groups, *master.supplemental_groups)
                      for member in group.members}
+    baseline_decisions = classify_asr_result_source_quality(master.review_set._source_bundle.asr_result)
+    _, hints_by_cue = _cue_asr_quality_context(master)
+    cue_has_ext = [any(ref.source == "external_ja" for ref in c.source_references) for c in master.cues]
+    cue_doc_stats = []
+    for c in master.cues:
+        dfs = [baseline_decisions[r.source_index].evidence.document_frequency
+               for r in c.source_references if r.source == "asr_segment"]
+        runs = [baseline_decisions[r.source_index].evidence.consecutive_run_length
+                for r in c.source_references if r.source == "asr_segment"]
+        cue_doc_stats.append((max(dfs, default=0), max(runs, default=0)))
+
     review_cues = []
     for index, (master_cue, output) in enumerate(zip(master.cues, validated.cues, strict=True)):
         asr_texts = [member_by_key[ref.key].text for ref in master_cue.source_references
                      if ref.source in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR}]
         supporting = " / ".join(asr_texts) if asr_texts else None
         before = tuple(
-            " / ".join(member_by_key[ref.key].text for ref in prior.source_references
+            " / ".join(member_by_key[ref.key].text for ref in master.cues[ni].source_references
                        if ref.source in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR})
-            for prior in master.cues[max(0, index - 2):index]
-            if any(ref.source in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR} for ref in prior.source_references)
+            for ni in range(max(0, index - 2), index)
+            if (any(ref.source in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR}
+                    for ref in master.cues[ni].source_references)
+                and not _is_correlated_uncorroborated_repeat(
+                    master_cue.text, master.cues[ni].text,
+                    left_has_ext=cue_has_ext[index], right_has_ext=cue_has_ext[ni],
+                    right_doc_freq=cue_doc_stats[ni][0], right_consec_run=cue_doc_stats[ni][1],
+                ))
         )
         after = tuple(
-            " / ".join(member_by_key[ref.key].text for ref in following.source_references
+            " / ".join(member_by_key[ref.key].text for ref in master.cues[ni].source_references
                        if ref.source in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR})
-            for following in master.cues[index + 1:index + 3]
-            if any(ref.source in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR} for ref in following.source_references)
+            for ni in range(index + 1, min(len(master.cues), index + 3))
+            if (any(ref.source in {"asr_segment", EVIDENCE_SOURCE_SUPPLEMENTAL_ASR}
+                    for ref in master.cues[ni].source_references)
+                and not _is_correlated_uncorroborated_repeat(
+                    master_cue.text, master.cues[ni].text,
+                    left_has_ext=cue_has_ext[index], right_has_ext=cue_has_ext[ni],
+                    right_doc_freq=cue_doc_stats[ni][0], right_consec_run=cue_doc_stats[ni][1],
+                ))
         )
         raw_context = (before + after)[:4]
         first_ja = getattr(output, "repaired_ja", None)
@@ -3393,6 +3620,7 @@ def build_v2d_review_request(master: V2DMaster, package: StatefulSubtitlePackage
             source_quality_action="KEEP",
             source_quality_reason="no_quality_objection",
             raw_asr_context=raw_context,
+            asr_source_quality=hints_by_cue.get(master_cue.cue_id),
         ))
     request = QualityReviewRequest(
         schema_version=2,
@@ -3406,26 +3634,52 @@ def build_v2d_review_request(master: V2DMaster, package: StatefulSubtitlePackage
     return request
 
 
-def _review_source_manifest(master: V2DMaster) -> list[dict[str, object]]:
-    return [{
-        "cue_id": cue.cue_id,
-        "group_id": cue.group_id,
-        "speaker_status": cue.speaker_status,
-        "speaker_evidence_ids": list(cue.speaker_evidence_ids),
-        "source_references": [{
-            "source_key": ref.key,
-            "source_kind": ref.source,
-            "source_index": ref.source_index,
-            "sha256": ref.source_sha256,
-            "locator_sha256": _sha(ref.source_locator.encode("utf-8")),
-            "original_interval_ms": [ref.original_start_ms, ref.original_end_ms],
-            "aligned_interval_ms": [_fraction(ref.aligned_start_ms), _fraction(ref.aligned_end_ms)],
-        } for ref in cue.source_references],
-    } for cue in master.cues]
+V2D_REVIEW_HALLUCINATION_AND_DEDUP_ADDENDUM = (
+    "\nV2D_EVIDENCE_DISCIPLINE: Do NOT delete or repair cues based solely on a specific phrase, recurrence count, "
+    "or external_ja absence. However, note that raw_asr_context comes from adjacent cues in this same transcript, "
+    "NOT an independent audio pass: never treat adjacent identical uncorroborated ASR repeats as confirming speech "
+    "or use them to REPAIR a truncated fragment into boilerplate. When ja_master_source_summary provides "
+    "asr_signals (doc_freq/consec_run without external_ja, long isolation_gaps_ms, word_timing_anomaly), treat them "
+    "together conservatively: only classify uncorroborated non-speech-gap boilerplate as OMIT/SOURCE_NOISE when combined "
+    "evidence outweighs real-speech plausibility; otherwise preserve plausible greetings/farewells/short reactions via KEEP "
+    "or AMBIGUOUS (note audio verification unresolved in reason). If supplemental_duplicate_candidate (sup_dup) shows a "
+    "supplemental_asr cue matching a retained baseline counterpart cue on high time containment and wording as the same single "
+    "utterance, classify only the redundant supplemental duplicate as OMIT/SOURCE_NOISE while keeping its retained baseline "
+    "counterpart; preserve distinct speakers, short interjections, overlapping turns, and genuine repeated dialogue."
+)
+
+
+def _review_source_manifest(
+    master: V2DMaster,
+    *,
+    signals_by_cue: dict[str, dict[str, object]] | None = None,
+) -> list[dict[str, object]]:
+    rows = []
+    for cue in master.cues:
+        entry = {
+            "cue_id": cue.cue_id,
+            "group_id": cue.group_id,
+            "speaker_status": cue.speaker_status,
+            "speaker_evidence_ids": list(cue.speaker_evidence_ids),
+            "source_references": [{
+                "source_key": ref.key,
+                "source_kind": ref.source,
+                "source_index": ref.source_index,
+                "sha256": ref.source_sha256,
+                "locator_sha256": _sha(ref.source_locator.encode("utf-8")),
+                "original_interval_ms": [ref.original_start_ms, ref.original_end_ms],
+                "aligned_interval_ms": [_fraction(ref.aligned_start_ms), _fraction(ref.aligned_end_ms)],
+            } for ref in cue.source_references],
+        }
+        if signals_by_cue and cue.cue_id in signals_by_cue:
+            entry["asr_signals"] = signals_by_cue[cue.cue_id]
+        rows.append(entry)
+    return rows
 
 
 def _review_prompt(request: QualityReviewRequest, master: V2DMaster,
-                   *, target_cue_ids: tuple[str, ...] | None) -> bytes:
+                   *, target_cue_ids: tuple[str, ...] | None,
+                   signals_by_cue: dict[str, dict[str, object]] | None = None) -> bytes:
     from teddy_discovery_stateful_quality_review_runner import QUALITY_REVIEW_QUERY
     query = QUALITY_REVIEW_QUERY.replace(
         "Review EVERY cue in source order, including source-quality KEEP.",
@@ -3440,10 +3694,11 @@ def _review_prompt(request: QualityReviewRequest, master: V2DMaster,
             "Return exactly the caller target cue IDs, count and order;",
         )
         query += "\nV2D_TARGET_ONLY: Preserve every non-target first-pass value. Targets in order: " + json.dumps(target_cue_ids)
+    query += V2D_REVIEW_HALLUCINATION_AND_DEDUP_ADDENDUM
     payload = {
         "request": json.loads(serialize_review_request(request)),
         "request_sha256": review_request_sha256(request),
-        "ja_master_source_manifest": _review_source_manifest(master),
+        "ja_master_source_manifest": _review_source_manifest(master, signals_by_cue=signals_by_cue),
         "target_cue_ids": None if target_cue_ids is None else list(target_cue_ids),
         "source_quality_field_note": "Legacy compatibility field only; KEEP/no_quality_objection is a neutral placeholder, not a classifier verdict.",
     }
@@ -3478,6 +3733,7 @@ def _build_short_id_review_chunk_prompt(
     cue_indices: tuple[int, ...],
     target_indices: tuple[int, ...] | None,
     real_to_short: dict[str, str],
+    signals_by_cue: dict[str, dict[str, object]] | None = None,
 ) -> bytes:
     from teddy_discovery_stateful_quality_review_runner import QUALITY_REVIEW_QUERY
     query = QUALITY_REVIEW_QUERY.replace(
@@ -3495,6 +3751,7 @@ def _build_short_id_review_chunk_prompt(
             "Return exactly the caller target cue IDs, count and order;",
         )
         query += "\nV2D_TARGET_ONLY: Preserve every non-target first-pass value. Targets in order: " + json.dumps(target_short_ids)
+    query += V2D_REVIEW_HALLUCINATION_AND_DEDUP_ADDENDUM
     req_dict = json.loads(serialize_review_request(request))
     chunk_cues = []
     chunk_manifest = []
@@ -3504,12 +3761,19 @@ def _build_short_id_review_chunk_prompt(
         sid = real_to_short[mc.cue_id]
         c["cue_id"] = sid
         chunk_cues.append(c)
-        chunk_manifest.append({
+        manifest_row: dict[str, object] = {
             "cue_id": sid,
             "speaker_status": mc.speaker_status,
             "source_keys": [ref.key for ref in mc.source_references],
             "aligned_interval_ms": [_fraction(mc.start_ms), _fraction(mc.end_ms)],
-        })
+        }
+        if signals_by_cue and mc.cue_id in signals_by_cue:
+            sig = json.loads(json.dumps(signals_by_cue[mc.cue_id]))
+            dup = sig.get("supplemental_duplicate_candidate")
+            if isinstance(dup, dict) and dup.get("counterpart_cue_id") in real_to_short:
+                dup["counterpart_cue_id"] = real_to_short[dup["counterpart_cue_id"]]
+            manifest_row["asr_signals"] = sig
+        chunk_manifest.append(manifest_row)
     payload = {
         "schema_version": 2,
         "request_sha256": "REQ-SHORT",
@@ -3562,6 +3826,8 @@ def _pack_short_id_review_chunks(
     request: QualityReviewRequest,
     master: V2DMaster,
     real_to_short: dict[str, str],
+    *,
+    signals_by_cue: dict[str, dict[str, object]] | None = None,
 ) -> tuple[tuple[tuple[int, ...], bytes], ...]:
     chunks: list[tuple[tuple[int, ...], bytes]] = []
     pending: list[int] = []
@@ -3569,7 +3835,8 @@ def _pack_short_id_review_chunks(
     for idx in range(len(request.cues)):
         candidate = tuple(pending + [idx])
         prompt = _build_short_id_review_chunk_prompt(
-            request, master, cue_indices=candidate, target_indices=None, real_to_short=real_to_short,
+            request, master, cue_indices=candidate, target_indices=None,
+            real_to_short=real_to_short, signals_by_cue=signals_by_cue,
         )
         if len(prompt) <= V2D_MAX_PROMPT_BYTES:
             pending.append(idx)
@@ -3579,7 +3846,8 @@ def _pack_short_id_review_chunks(
                 raise V2DError("single review cue exceeds the existing native prompt bound")
             chunks.append((tuple(pending), pending_prompt))
             single_prompt = _build_short_id_review_chunk_prompt(
-                request, master, cue_indices=(idx,), target_indices=None, real_to_short=real_to_short,
+                request, master, cue_indices=(idx,), target_indices=None,
+                real_to_short=real_to_short, signals_by_cue=signals_by_cue,
             )
             if len(single_prompt) > V2D_MAX_PROMPT_BYTES:
                 raise V2DError("single review cue exceeds the existing native prompt bound")
@@ -3607,6 +3875,11 @@ def run_targeted_review(
         raise V2DError("resolved Hermes profile settings are required")
     master = _validate_master(master)
     request = build_v2d_review_request(master, package, first_pass)
+    signals_by_cue, _ = _cue_asr_quality_context(master)
+    signal_suspect_ids = {
+        cid for cid, sig in signals_by_cue.items()
+        if "asr_recurrence" in sig or "supplemental_duplicate_candidate" in sig
+    }
     root = _private_dir(staging_root)
     request_sha = review_request_sha256(request)
     request_dir = _private_child(root, request_sha, create=not reuse_only)
@@ -3614,7 +3887,9 @@ def run_targeted_review(
     triage_id = str(uuid.uuid5(V2D_SESSION_NAMESPACE, request_sha + ":triage"))
     use_chunked = False
     try:
-        triage_prompt = _review_prompt(request, master, target_cue_ids=None)
+        triage_prompt = _review_prompt(
+            request, master, target_cue_ids=None, signals_by_cue=signals_by_cue,
+        )
     except V2DError as error:
         if "exceeds the existing native prompt bound" not in str(error):
             raise
@@ -3632,15 +3907,17 @@ def run_targeted_review(
         triage = bind_review_execution_provenance(triage, request, triage_id)
         triage_raw = serialize_review_result(triage, request)
         target_ids = select_suspect_cue_ids(request, triage)
-        if extra_target_cue_ids:
-            combined = set(target_ids) | set(extra_target_cue_ids)
+        combined = set(target_ids) | set(extra_target_cue_ids) | signal_suspect_ids
+        if combined:
             target_ids = tuple(cue.cue_id for cue in request.cues if cue.cue_id in combined)
         if not target_ids:
             final = triage
         else:
             final_dir = _private_child(request_dir, "targeted-final", create=not reuse_only)
             final_id = str(uuid.uuid5(V2D_SESSION_NAMESPACE, request_sha + ":targeted-final"))
-            final_prompt = _review_prompt(request, master, target_cue_ids=target_ids)
+            final_prompt = _review_prompt(
+                request, master, target_cue_ids=target_ids, signals_by_cue=signals_by_cue,
+            )
             target_result = invoke(
                 final_prompt, final_dir, "v2d-targeted-final-review",
                 lambda raw: parse_review_result(raw, request, target_cue_ids=target_ids),
@@ -3657,7 +3934,9 @@ def run_targeted_review(
     # Chunked short-ID fallback when whole-title review prompt exceeds 128KB bound.
     real_to_short = {cue.cue_id: f"Q{i + 1:03d}" for i, cue in enumerate(request.cues)}
     short_to_real = {short: real for real, short in real_to_short.items()}
-    chunks = _pack_short_id_review_chunks(request, master, real_to_short)
+    chunks = _pack_short_id_review_chunks(
+        request, master, real_to_short, signals_by_cue=signals_by_cue,
+    )
     merged_triage_cues = []
     for part_idx, (cue_indices, chunk_prompt) in enumerate(chunks, 1):
         chunk_dir = _private_child(triage_dir, f"chunk-{part_idx:02d}", create=not reuse_only)
@@ -3688,8 +3967,8 @@ def run_targeted_review(
     triage = bind_review_execution_provenance(triage, request, triage_id)
     triage_raw = serialize_review_result(triage, request)
     target_ids = select_suspect_cue_ids(request, triage)
-    if extra_target_cue_ids:
-        combined = set(target_ids) | set(extra_target_cue_ids)
+    combined = set(target_ids) | set(extra_target_cue_ids) | signal_suspect_ids
+    if combined:
         target_ids = tuple(cue.cue_id for cue in request.cues if cue.cue_id in combined)
     if not target_ids:
         final = triage
@@ -3705,13 +3984,13 @@ def run_targeted_review(
         ctx_indices = tuple(sorted(ctx_indices_set))
         final_prompt = _build_short_id_review_chunk_prompt(
             request, master, cue_indices=ctx_indices, target_indices=target_indices,
-            real_to_short=real_to_short,
+            real_to_short=real_to_short, signals_by_cue=signals_by_cue,
         )
         if len(final_prompt) > V2D_MAX_PROMPT_BYTES:
             # Drop surrounding context if many targets; keep exact targets within bound.
             final_prompt = _build_short_id_review_chunk_prompt(
                 request, master, cue_indices=target_indices, target_indices=target_indices,
-                real_to_short=real_to_short,
+                real_to_short=real_to_short, signals_by_cue=signals_by_cue,
             )
         if len(final_prompt) > V2D_MAX_PROMPT_BYTES:
             raise V2DError("targeted final review prompt exceeds the existing native prompt bound")
@@ -3868,6 +4147,7 @@ def run_v2d_pipeline(
     private_provisional_completion: bool = False,
     use_short_id_mapping_for_uncached: bool = False,
     reuse_verified_translation: bool = False,
+    preserve_legacy_supplemental_grouping: bool = False,
 ) -> V2DPipelineResult:
     """Connected offline/live-injectable V2-D path; never bypasses validators."""
     budget = None
@@ -3911,7 +4191,11 @@ def run_v2d_pipeline(
                 )
                 if any(o.outcome != OUTSIDE_SPAN_OUTCOME_SPEECH_FOUND for o in outside_span_recovery.window_outcomes):
                     raise V2DHold("OUTSIDE_SPAN_SPEECH_UNRESOLVED")
-                supplemental_groups = build_supplemental_asr_groups(plan, outside_span_recovery)
+                supplemental_groups = build_supplemental_asr_groups(
+                    plan,
+                    outside_span_recovery,
+                    deduplicate_similar_overlaps=not preserve_legacy_supplemental_grouping,
+                )
         effective_groups = active_groups + supplemental_groups
         adjudication = adjudicate_ja_master(
             plan, invoke=invoke, hermes_settings=hermes_settings,
@@ -4120,6 +4404,22 @@ def run_v2d_pipeline(
             )
         ) or bool(json_recovery_log)
         result_state = "PRIVATE_PROVISIONAL_SRT_READY" if is_private_provisional else "CLEAN_SRT_READY"
+        review_signals_by_cue, _ = _cue_asr_quality_context(master)
+        review_dispositions = []
+        for mc, req_c, rev_c in zip(master.cues, review.request.cues, review.final.cues, strict=True):
+            eff_action = effective_review_action(req_c, rev_c)
+            sig = review_signals_by_cue.get(mc.cue_id)
+            if eff_action != KEEP or rev_c.action != KEEP or sig is not None:
+                review_dispositions.append({
+                    "cue_id": mc.cue_id,
+                    "ja_text": mc.text,
+                    "review_action": rev_c.action,
+                    "effective_action": eff_action,
+                    "category": rev_c.category,
+                    "reason": rev_c.reason,
+                    "has_asr_signals": sig is not None,
+                    "asr_signals": sig,
+                })
         uncertainty_report_raw = None
         if is_private_provisional:
             uncertainty_report_raw = _wire({
@@ -4133,6 +4433,7 @@ def run_v2d_pipeline(
                 "limited_json_recoveries": list(json_recovery_log),
                 "preserved_unresolved_uncertainty": list(preserved_uncertainty_report),
                 "preserved_post_translation_audio_requests": list(preserved_translation_uncertainty_report),
+                "review_dispositions": review_dispositions,
             })
         proof_payload = {
             "schema_version": V2D_SCHEMA_VERSION,
