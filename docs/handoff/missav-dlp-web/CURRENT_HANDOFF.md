@@ -1,5 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E short-ID mapping, canonical promotion, and single private live continuation USER_APPROVED
+
+- User approved sequential implementation of deterministic short unique ID mapping for incomplete/uncached batches (preserving completed Batch 1/2 prompts/receipts/reuse unchanged; no guess-repair of failed Batch 3 outputs), minimal offline verification, canonical source promotion, and one private HSODA-104 live continuation (`max_hermes_attempts=12`, `ASR=0`, reusing 6 initial batches, 43 ASR windows, Batch 1 & Batch 2 Attempt 1, targeting `PRIVATE_PROVISIONAL_SRT_READY`) atop canonical `591a66ca0d9986980c24aaac673a9fdc46500e0e`. No deployment, publication, or auto-replay.
+
+
 ## 2026-11-26 — V2-E modified Option B single private live continuation EXECUTED / VALIDATION_ERROR_STOP (authorization CONSUMED)
 
 - **Execution:** Single approved HSODA-104 Modified Option B live continuation executed on CT108 (`downloader`) from isolated canonical checkout `8cdf4921442ae7cbcfca0a3a1bb3b29cdac3fa60` into exclusive private root `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-plan-b-once-20261126` (`14:35:55 -> 14:47:07 KST`, ~11m12s). Authorization **CONSUMED** (no automatic replay/resume).
