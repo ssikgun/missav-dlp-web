@@ -1,5 +1,15 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E follow-up hallucination audio-evidence read-only investigation COMPLETE
+
+- **Audit at `edc455a40bfdf20575a195490041db43a697dee2`** (`HERMES=0`, `ASR=0`, `PRODUCTION_WRITE_COUNT=0`).
+- **Existing VAD & Whisper settings (`teddy_discovery_asr_gpu_worker.py`):** `faster-whisper 1.2.1` + Silero VAD ONNX (`faster_whisper.vad.get_speech_timestamps`) already run on CT108 & VM122. Full-title `transcribe_chunk` uses `GPU_ASR_VAD_THRESHOLD=0.54`, `GPU_ASR_SPEECH_PAD_MS=2500` (±2.5s padding = 5s envelope around brief sounds, causing `vad_filter=False` tail hallucinations). Existing artifact schema saves only `vad_region_count` and segment/word timings (no VAD intervals or `no_speech_prob`/`avg_logprob` persisted, though `/v1/asr/transcribe-targeted-diagnostic` already exists in `gpu_worker.py` & `asr_remote.py`). Future titles can store baseline VAD/numeric diagnostics in a sidecar at 0 extra model cost.
+- **Minimal-cost solution for HSODA-104's 15 suspect cues (`49.28s` -> `11` merged windows / `84.08s`):**
+  - **Option 1 (Recommended):** Decode ONLY the `11` windows (`84.08s`) locally on CT108 via existing `ASRMediaSourceReader` + `iter_audio_chunks` + bundled Silero VAD (`0.54` & high-recall `0.25–0.30`, `speech_pad_ms=0`) + RMS dBFS (**Whisper GPU `0` calls**, ~10s CPU), protecting quiet whispers via low-threshold VAD + noise-floor checks.
+  - **Option 2 (Optional):** Also wire `BoundedTargetedASRTransport` to `/v1/asr/transcribe-targeted-diagnostic` for the same 11 windows (`no_speech_prob`/`avg_logprob`).
+- **Maximum reuse:** Reuse 100% of Path B1 (`264`-cue SRT, 6 init batches, 43 ASR windows, 4 ReAdj batches, JA Master, 5 KO parts, Path B1 triage) and run **`1` Hermes call (`v2d-targeted-final-review`, or `3` if full review)** + **`0` GPU Whisper calls** under Option 1. Separate user approval required for implementation or execution.
+
+
 ## 2026-11-26 — V2-E quality improvement step 1 Path B1 live improved review EXECUTED / PRIVATE_PROVISIONAL_SRT_READY (authorization CONSUMED)
 
 - **Live execution:** Executed single approved Path B1 improved-review continuation on CT108 (`downloader`) from promoted `12df0859a753afd6a4dea600fa2e450cce5fc02f` into `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-b1-review-once-20261126` (`952.37s`, exit `0`). Authorization **CONSUMED**.
