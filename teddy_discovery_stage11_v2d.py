@@ -281,6 +281,62 @@ def _load_json(raw: bytes, label: str):
         raise V2DError(label + " is invalid JSON") from error
 
 
+LIMITED_JSON_TRAILING_SUFFIX = "]}"
+V2D_PRIVATE_PROVISIONAL_UNCERTAINTY_FILENAME = "v2d-private-provisional-uncertainty-v1.json"
+
+
+def recover_limited_trailing_json(
+    raw: bytes,
+    label: str,
+) -> tuple[object, dict[str, object] | None]:
+    """Strict JSON parse first; only recover exact literal trailing ']}' after one complete object.
+
+    Never edits any byte inside the JSON object body. Rejects truncation,
+    multiple objects, markdown fences, or any suffix other than literal ']}'
+    plus optional surrounding whitespace.
+    """
+    if type(raw) is not bytes or not 0 < len(raw) <= V2D_MAX_JSON_BYTES:
+        raise V2DError(label + " exceeds the bounded JSON contract")
+    try:
+        return _load_json(raw, label), None
+    except V2DError as strict_error:
+        cause = strict_error.__cause__
+        if not isinstance(cause, json.JSONDecodeError) or cause.msg != "Extra data":
+            raise
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise V2DError(label + " is invalid JSON") from error
+    stripped_lead = text.lstrip()
+    start_idx = len(text) - len(stripped_lead)
+    if not stripped_lead.startswith("{"):
+        raise V2DError(label + " is invalid JSON")
+    decoder = json.JSONDecoder(
+        object_pairs_hook=_reject_duplicate_json,
+        parse_constant=lambda value: (_ for _ in ()).throw(V2DError("nonfinite JSON number")),
+    )
+    try:
+        _obj, end_idx = decoder.raw_decode(text, start_idx)
+    except json.JSONDecodeError as error:
+        raise V2DError(label + " is invalid JSON") from error
+    remainder = text[end_idx:]
+    if remainder.strip() != LIMITED_JSON_TRAILING_SUFFIX:
+        raise V2DError(label + " is invalid JSON")
+    isolated_bytes = text[start_idx:end_idx].encode("utf-8")
+    # Re-parse isolated unchanged object bytes through the exact strict loader.
+    data = _load_json(isolated_bytes, label)
+    recovery_record = {
+        "recovery_mode": "LIMITED_TRAILING_DELIMITERS_STRIPPED",
+        "raw_sha256": _sha(raw),
+        "derived_sha256": _sha(isolated_bytes),
+        "removed_suffix": remainder,
+        "isolated_char_start": start_idx,
+        "isolated_char_end": end_idx,
+        "raw_char_len": len(text),
+    }
+    return data, recovery_record
+
+
 def _safe_text(value: object, label: str, *, max_chars: int = 16_000):
     if type(value) is not str or not value.strip() or len(value) > max_chars:
         raise V2DError(label + " is empty or exceeds its text bound")
@@ -576,6 +632,7 @@ class V2DMaster:
     outside_span_recovery_sha256: str | None = None
     excluded_outside_span_group_ids: tuple[str, ...] = ()
     supplemental_groups: tuple[UtteranceReviewGroup, ...] = field(default=(), repr=False)
+    provisional_unresolved_group_ids: tuple[str, ...] = ()
 
 
 OUTSIDE_SPAN_CANDIDATE_RATIONALE = "EXTERNAL_CUE_OUTSIDE_AFFINE_EVIDENCE_SPAN"
@@ -2034,7 +2091,9 @@ def _readjudicate_targeted_groups(plan: UtteranceReviewPlan,
                                   reuse_only: bool,
                                   batch_groups: bool | None = None,
                                   exclude_group_ids: tuple[str, ...] = (),
-                                  supplemental_groups: tuple[UtteranceReviewGroup, ...] = ()) -> V2DAdjudication:
+                                  supplemental_groups: tuple[UtteranceReviewGroup, ...] = (),
+                                  allow_limited_json_recovery: bool = False,
+                                  recovery_log: list[dict[str, object]] | None = None) -> V2DAdjudication:
     """Revisit only affected groups; ASR output stays supporting evidence."""
     evidence_by_group = dict(evidence.group_payloads)
     original_by_group = {item.group_id: item for item in original.groups}
@@ -2073,6 +2132,8 @@ def _readjudicate_targeted_groups(plan: UtteranceReviewPlan,
             hermes_settings=hermes_settings, task=task,
             label="ja-master-targeted-readjudication-batch", reuse_only=reuse_only,
             instruction=SEMANTIC_TARGETED_READJUDICATION_BATCH_INSTRUCTION,
+            allow_limited_json_recovery=allow_limited_json_recovery,
+            recovery_log=recovery_log,
         )
         revised_by_group = {item.group_id: item for item in revised}
         resolved_groups = tuple(revised_by_group.get(group.group_id, original_by_group[group.group_id])
@@ -2533,6 +2594,8 @@ def _adjudicate_group_batches(
     invoke: Callable, hermes_settings: HermesExecutionSettings,
     task: Path, label: str, reuse_only: bool,
     instruction: str = SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION,
+    allow_limited_json_recovery: bool = False,
+    recovery_log: list[dict[str, object]] | None = None,
 ) -> tuple[tuple[GroupAdjudication, ...], tuple[V2DBatchEvidence, ...]]:
     batches = _pack_group_batches(source_fingerprint, payloads, instruction=instruction)
     resolved_by_id = {}
@@ -2549,8 +2612,12 @@ def _adjudicate_group_batches(
                 raise V2DHold("GROUP_BATCH_RESUME_STAGE_MISSING") from error
             raise
 
-        def validate_batch(raw, *, expected_ids=expected_ids, batch_id=batch_id):
-            data = _load_json(raw, "JA Master batch adjudication")
+        def validate_batch(raw, *, expected_ids=expected_ids, batch_id=batch_id, label=label):
+            recovery_record = None
+            if allow_limited_json_recovery:
+                data, recovery_record = recover_limited_trailing_json(raw, "JA Master batch adjudication")
+            else:
+                data = _load_json(raw, "JA Master batch adjudication")
             if (type(data) is not dict or set(data) != {"batch_id", "source_fingerprint", "groups"}
                     or data["batch_id"] != batch_id
                     or data["source_fingerprint"] != source_fingerprint
@@ -2573,6 +2640,14 @@ def _adjudicate_group_batches(
                     raise V2DError("JA Master batch candidate/source coverage differs")
                 _validate_group_source_spans(group, parsed)
                 group_results.append(parsed)
+            if recovery_record is not None and recovery_log is not None:
+                recovery_log.append({
+                    **recovery_record,
+                    "batch_id": batch_id,
+                    "label": label,
+                    "source_fingerprint": source_fingerprint,
+                    "group_count": len(group_results),
+                })
             return tuple(group_results)
 
         before = len(getattr(owner, "_verified_attempts", ()))
@@ -2724,6 +2799,62 @@ def _validate_group_source_spans(
     return used
 
 
+def _build_private_provisional_uncertainty_report(
+    effective_groups: tuple[UtteranceReviewGroup, ...],
+    adjudication: V2DAdjudication,
+    targeted_evidence: _V2DTargetedEvidence | None = None,
+) -> tuple[dict[str, object], ...]:
+    """Build explicit audit records for groups with residual uncertainty after targeted ASR.
+
+    Preserves original source texts, canonical/hypothesis timings, original
+    audio_evidence_needed flag, source/candidate decisions, and rationales
+    without altering or forcing any adjudication field.
+    """
+    targeted_by_group = dict(targeted_evidence.group_payloads) if targeted_evidence is not None else {}
+    entries = []
+    for group, decisions in zip(effective_groups, adjudication.groups, strict=True):
+        has_uncertain_decision = any(
+            item.status == DECISION_UNCERTAIN
+            for item in (*decisions.candidate_decisions, *decisions.source_decisions)
+        )
+        if not decisions.audio_evidence_needed and not has_uncertain_decision:
+            continue
+        member_by_key = {m.source_reference.key: m for m in group.members}
+        sources_report = []
+        for sd in decisions.source_decisions:
+            member = member_by_key[sd.source_key]
+            ref = member.source_reference
+            sources_report.append({
+                "source_key": sd.source_key,
+                "source": ref.source,
+                "text": member.text,
+                "aligned_start_ms": None if ref.aligned_start_ms is None else _fraction(ref.aligned_start_ms),
+                "aligned_end_ms": None if ref.aligned_end_ms is None else _fraction(ref.aligned_end_ms),
+                "status": sd.status,
+                "rationale": sd.rationale,
+                "provisional_master_disposition": (
+                    "INCLUDED_SUPPORTED_ACCEPTED"
+                    if sd.status == DECISION_ACCEPTED
+                    else ("EXCLUDED_REJECTED" if sd.status == DECISION_REJECTED
+                          else "EXCLUDED_UNRESOLVED_PRESERVED")
+                ),
+            })
+        entries.append({
+            "group_id": group.group_id,
+            "original_audio_evidence_needed": decisions.audio_evidence_needed,
+            "has_uncertain_decision": has_uncertain_decision,
+            "retained_supported_output_count": len(decisions.outputs),
+            "sources": sources_report,
+            "candidate_decisions": [{
+                "candidate_id": cd.candidate_id,
+                "status": cd.status,
+                "rationale": cd.rationale,
+            } for cd in decisions.candidate_decisions],
+            "targeted_second_evidence_present": group.group_id in targeted_by_group,
+        })
+    return tuple(entries)
+
+
 def materialize_ja_master(
     plan: UtteranceReviewPlan,
     adjudication: V2DAdjudication,
@@ -2732,6 +2863,7 @@ def materialize_ja_master(
     outside_span_recovery_sha256: str | None = None,
     exclude_group_ids: tuple[str, ...] = (),
     supplemental_groups: tuple[UtteranceReviewGroup, ...] = (),
+    allow_private_provisional_unresolved: bool = False,
 ) -> V2DMaster:
     """Resolve source ownership and exact time from validated semantic spans."""
     plan = validate_utterance_review_plan(plan)
@@ -2742,9 +2874,16 @@ def materialize_ja_master(
         _digest(targeted_evidence_sha256, "targeted_evidence_sha256")
     if outside_span_recovery_sha256 is not None:
         _digest(outside_span_recovery_sha256, "outside_span_recovery_sha256")
+    unresolved_group_ids = tuple(
+        group.group_id for group in adjudication.groups
+        if (group.audio_evidence_needed
+            or any(item.status == DECISION_UNCERTAIN
+                   for item in (*group.candidate_decisions, *group.source_decisions)))
+    )
     if any(item.status == DECISION_UNCERTAIN for group in adjudication.groups
            for item in (*group.candidate_decisions, *group.source_decisions)):
-        raise V2DHold("JA_MASTER_UNRESOLVED")
+        if not allow_private_provisional_unresolved:
+            raise V2DHold("JA_MASTER_UNRESOLVED")
     excluded = set(exclude_group_ids)
     effective_groups = tuple(g for g in plan.groups if g.group_id not in excluded) + tuple(supplemental_groups)
     cues = []
@@ -2800,10 +2939,12 @@ def materialize_ja_master(
                   _fraction(cue.start_ms), _fraction(cue.end_ms), cue.speaker_status,
                   list(cue.speaker_evidence_ids)] for cue in cues],
     }
+    provisional_ids = unresolved_group_ids if allow_private_provisional_unresolved else ()
     return V2DMaster(
         plan.review_set, plan, adjudication, tuple(cues), fingerprint,
         _sha(_wire(identity)), targeted_evidence_sha256,
         outside_span_recovery_sha256, exclude_group_ids, supplemental_groups,
+        provisional_ids,
     )
 
 
@@ -2816,6 +2957,7 @@ def _validate_master(master: V2DMaster) -> V2DMaster:
         outside_span_recovery_sha256=master.outside_span_recovery_sha256,
         exclude_group_ids=master.excluded_outside_span_group_ids,
         supplemental_groups=master.supplemental_groups,
+        allow_private_provisional_unresolved=bool(master.provisional_unresolved_group_ids),
     )
     if rebuilt != master:
         raise V2DError("JA Master differs from its validated source decisions")
@@ -3298,10 +3440,14 @@ def run_v2d_pipeline(
     targeted_runner: Callable | None = None,
     execution_limits: V2DExecutionLimits | None = None,
     outside_span_limits: OutsideSpanRecoveryLimits = OutsideSpanRecoveryLimits(),
+    allow_limited_json_recovery: bool = False,
+    private_provisional_completion: bool = False,
 ) -> V2DPipelineResult:
     """Connected offline/live-injectable V2-D path; never bypasses validators."""
     budget = None
     budget_token = None
+    json_recovery_log: list[dict[str, object]] = []
+    preserved_uncertainty_report: tuple[dict[str, object], ...] = ()
     try:
         requested_batching = getattr(invoke, "_v2d_batch_groups", None)
         invoke, executor_owner = _stage_bound_native_invoke(invoke, hermes_settings)
@@ -3379,9 +3525,16 @@ def run_v2d_pipeline(
                 reuse_only=reuse_only, batch_groups=batch_groups,
                 exclude_group_ids=excluded_outside_span_ids,
                 supplemental_groups=supplemental_groups,
+                allow_limited_json_recovery=allow_limited_json_recovery,
+                recovery_log=json_recovery_log,
             )
             if any(item.audio_evidence_needed for item in adjudication.groups):
-                raise V2DHold("INITIAL_TARGETED_ASR_UNCERTAINTY_REMAINS")
+                if not private_provisional_completion:
+                    raise V2DHold("INITIAL_TARGETED_ASR_UNCERTAINTY_REMAINS")
+        if private_provisional_completion:
+            preserved_uncertainty_report = _build_private_provisional_uncertainty_report(
+                effective_groups, adjudication, targeted_evidence,
+            )
         master = materialize_ja_master(
             plan, adjudication,
             targeted_evidence_sha256=(None if targeted_evidence is None
@@ -3390,6 +3543,7 @@ def run_v2d_pipeline(
                                           else outside_span_recovery.artifact_sha256),
             exclude_group_ids=excluded_outside_span_ids,
             supplemental_groups=supplemental_groups,
+            allow_private_provisional_unresolved=private_provisional_completion,
         )
         initial_translation_evidence = (None if targeted_evidence is None
                                         else _targeted_translation_evidence(master, targeted_evidence))
@@ -3508,10 +3662,27 @@ def run_v2d_pipeline(
                 "tools_count": item.get("tools_count"),
                 "hermes_execution_settings": item.get("hermes_execution_settings"),
             })
-        proof_raw = _wire({
+        is_private_provisional = bool(
+            private_provisional_completion and (preserved_uncertainty_report or json_recovery_log)
+        ) or bool(json_recovery_log)
+        result_state = "PRIVATE_PROVISIONAL_SRT_READY" if is_private_provisional else "CLEAN_SRT_READY"
+        uncertainty_report_raw = None
+        if is_private_provisional:
+            uncertainty_report_raw = _wire({
+                "schema_version": V2D_SCHEMA_VERSION,
+                "dvd_id": master.review_set.dvd_id,
+                "state": result_state,
+                "stage12_publish_eligible": False,
+                "provisional_trial_only": True,
+                "source_fingerprint": master.source_fingerprint,
+                "master_sha256": master.master_sha256,
+                "limited_json_recoveries": list(json_recovery_log),
+                "preserved_unresolved_uncertainty": list(preserved_uncertainty_report),
+            })
+        proof_payload = {
             "schema_version": V2D_SCHEMA_VERSION,
             "dvd_id": master.review_set.dvd_id,
-            "state": "CLEAN_SRT_READY",
+            "state": result_state,
             "source_fingerprint": master.source_fingerprint,
             "master_sha256": master.master_sha256,
             "targeted_asr_artifact_sha256": (None if targeted_evidence is None
@@ -3558,16 +3729,30 @@ def run_v2d_pipeline(
                 V2D_OUTPUT_NAMES[1]: _sha(ja_raw),
                 V2D_OUTPUT_NAMES[2]: _sha(ko_raw),
             },
-        })
-        payloads = (master_raw, ja_raw, ko_raw, proof_raw)
+        }
+        if is_private_provisional:
+            proof_payload["stage12_publish_eligible"] = False
+            proof_payload["provisional_trial_only"] = True
+            proof_payload["limited_json_recoveries"] = list(json_recovery_log)
+            proof_payload["preserved_unresolved_uncertainty_count"] = len(preserved_uncertainty_report)
+            proof_payload["outputs"][V2D_PRIVATE_PROVISIONAL_UNCERTAINTY_FILENAME] = _sha(uncertainty_report_raw)
+        proof_raw = _wire(proof_payload)
+        output_names = (
+            V2D_OUTPUT_NAMES + (V2D_PRIVATE_PROVISIONAL_UNCERTAINTY_FILENAME,)
+            if is_private_provisional else V2D_OUTPUT_NAMES
+        )
+        payloads = (
+            (master_raw, ja_raw, ko_raw, proof_raw, uncertainty_report_raw)
+            if is_private_provisional else (master_raw, ja_raw, ko_raw, proof_raw)
+        )
         # Check all names again before the first exclusive write.
-        if any((output / name).exists() or (output / name).is_symlink() for name in V2D_OUTPUT_NAMES):
+        if any((output / name).exists() or (output / name).is_symlink() for name in output_names):
             raise V2DError("V2-D output collision")
-        for name, raw in zip(V2D_OUTPUT_NAMES, payloads, strict=True):
+        for name, raw in zip(output_names, payloads, strict=True):
             _write_exclusive(output / name, raw)
-        hashes = tuple((name, _sha(raw)) for name, raw in zip(V2D_OUTPUT_NAMES, payloads, strict=True))
+        hashes = tuple((name, _sha(raw)) for name, raw in zip(output_names, payloads, strict=True))
         return V2DPipelineResult(
-            "CLEAN_SRT_READY", None, master, package, translated, review, hashes,
+            result_state, None, master, package, translated, review, hashes,
             0 if budget is None else budget.hermes_attempts,
             0 if budget is None else budget.targeted_asr_requests,
             0.0 if budget is None else round(budget.elapsed(), 6),

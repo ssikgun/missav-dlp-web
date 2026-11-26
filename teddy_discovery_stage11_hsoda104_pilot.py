@@ -418,6 +418,8 @@ def prepare_verified_continuation_staging(
     allow_missing_initial_batch_indices: tuple[int, ...] = (),
     allow_new_targeted_asr: bool = False,
     approved_targeted_asr_scope: ApprovedTargetedASRScope | None = None,
+    reuse_verified_targeted_readjudication: bool = False,
+    allow_limited_json_recovery: bool = False,
 ) -> dict[str, object]:
     """Validate and clone ONLY verified reusable artifacts into a fresh staging dir.
 
@@ -454,6 +456,11 @@ def prepare_verified_continuation_staging(
         if type(approved_targeted_asr_scope) is not ApprovedTargetedASRScope:
             raise regeneration.RegenerationError(
                 "allow_new_targeted_asr requires an explicit ApprovedTargetedASRScope"
+            )
+    if reuse_verified_targeted_readjudication:
+        if allow_new_targeted_asr or allowed_missing:
+            raise regeneration.RegenerationError(
+                "reuse_verified_targeted_readjudication requires all initial batches valid and allow_new_targeted_asr=False"
             )
 
     active_groups, outside_span_groups = v2d.split_outside_span_groups(plan)
@@ -636,8 +643,138 @@ def prepare_verified_continuation_staging(
             hermes_settings=hermes_settings,
         )
 
-    if list(new_staging.glob("targeted-readjudication-*")):
-        raise regeneration.RegenerationError("prior targeted-readjudication artifacts must not be copied")
+    reused_readj_indices: list[int] = []
+    recovered_readj_indices: list[int] = []
+    readj_recovery_records: list[dict[str, object]] = []
+    total_readj_batches = 0
+
+    if reuse_verified_targeted_readjudication:
+        from types import SimpleNamespace
+        # Re-load all 6 validated initial batches and 39 targeted ASR windows on new_staging (0 network calls).
+        forbid_invoke = NativeNormalFirstPass(_ForbidNetworkBridge()).invoke
+        init_adj = v2d.adjudicate_ja_master(
+            plan, invoke=forbid_invoke, hermes_settings=hermes_settings,
+            staging_root=new_staging, claim_token=claim_token, reuse_only=True,
+            batch_groups=True, exclude_group_ids=excluded_ids,
+            supplemental_groups=supplemental_groups,
+        )
+        audio_gids = tuple(
+            g.group_id for g, r in zip(effective_groups, init_adj.groups, strict=True)
+            if r.audio_evidence_needed
+        )
+        rebuilt_targeted_groups = len(audio_gids)
+        rebuilt_reqs = v2d._build_initial_targeted_requests(plan, audio_gids)
+        guard_runner = _ReuseOnlyTargetedASRGuard(targeted_transport)
+        early_items = []
+        for req in rebuilt_reqs:
+            if type(req) is v2d._V2DTargetedRequest:
+                rebuilt_asr_ctx = req.context_sha256
+                rebuilt_asr_windows = tuple((w.start_ms, w.end_ms) for w in req.plan.windows)
+                early_items.append(v2d._load_or_run_targeted_evidence(
+                    req, targeted_runner=guard_runner, staging_root=new_staging, reuse_only=True,
+                ))
+            else:
+                rebuilt_ext_ctx = req.context_sha256
+                rebuilt_ext_windows = tuple((w.start_ms, w.end_ms) for w in req.windows)
+                early_items.append(v2d._load_or_run_external_targeted_evidence(
+                    req, targeted_runner=guard_runner, staging_root=new_staging, reuse_only=True,
+                ))
+        targeted_ev = v2d._combine_targeted_evidence(tuple(early_items))
+        readj_ctx_sha = v2d._sha(v2d._wire({
+            "source_fingerprint": effective_fp,
+            "artifact_sha256": targeted_ev.artifact_sha256,
+            "linkage_sha256": targeted_ev.linkage_sha256,
+            "claim_token": claim_token,
+        }))
+        src_readj_dir = prior_staging / ("targeted-readjudication-" + readj_ctx_sha)
+        if not src_readj_dir.is_dir():
+            raise regeneration.RegenerationError("matching prior targeted-readjudication directory is missing")
+        ev_by_gid = dict(targeted_ev.group_payloads)
+        readj_payloads = []
+        for g in effective_groups:
+            if g.group_id in ev_by_gid:
+                p = v2d._group_payload(plan, g, source_fingerprint=effective_fp)
+                p["targeted_second_evidence"] = ev_by_gid[g.group_id]
+                readj_payloads.append((g.group_id, p))
+        readj_batches = v2d._pack_group_batches(
+            effective_fp, tuple(readj_payloads),
+            instruction=v2d.SEMANTIC_TARGETED_READJUDICATION_BATCH_INSTRUCTION,
+        )
+        total_readj_batches = len(readj_batches)
+        dst_readj_dir = _mkdir_private(new_staging / ("targeted-readjudication-" + readj_ctx_sha))
+        for rbi, (rbatch, rbid, _rinp, rprompt) in enumerate(readj_batches, 1):
+            src_rbdir = src_readj_dir / ("batch-" + rbid)
+            if not src_rbdir.is_dir():
+                continue
+            r_receipts = sorted(src_rbdir.glob("ja-master-targeted-readjudication-batch-attempt-*.receipt.json"))
+            if not r_receipts:
+                continue
+            expected_ids = tuple(gid for gid, _ in rbatch)
+            batch_rec_log: list[dict[str, object]] = []
+
+            def _validate_readj_batch(raw, *, _expected_ids=expected_ids, _rbid=rbid, _rec_log=batch_rec_log):
+                rec = None
+                if allow_limited_json_recovery:
+                    data, rec = v2d.recover_limited_trailing_json(raw, "JA Master batch adjudication")
+                else:
+                    data = v2d._load_json(raw, "JA Master batch adjudication")
+                if (type(data) is not dict or set(data) != {"batch_id", "source_fingerprint", "groups"}
+                        or data["batch_id"] != _rbid
+                        or data["source_fingerprint"] != effective_fp
+                        or type(data["groups"]) is not list):
+                    raise v2d.V2DError("JA Master batch envelope differs")
+                observed = tuple(item.get("group_id") if type(item) is dict else None for item in data["groups"])
+                if observed != _expected_ids:
+                    raise v2d.V2DError("JA Master batch group coverage/order differs")
+                results = []
+                for row, gid in zip(data["groups"], _expected_ids, strict=True):
+                    parsed = v2d._parse_group_response(
+                        v2d._wire(row), SimpleNamespace(group_id=gid), require_audio_flag=True,
+                    )
+                    group = expected_by_gid[gid]
+                    if (tuple(item.candidate_id for item in parsed.candidate_decisions)
+                            != tuple(group.candidate_ids)
+                            or tuple(item.source_key for item in parsed.source_decisions)
+                            != tuple(member.source_reference.key for member in group.members)):
+                        raise v2d.V2DError("JA Master batch candidate/source coverage differs")
+                    v2d._validate_group_source_spans(group, parsed)
+                    results.append(parsed)
+                if rec is not None:
+                    _rec_log.append({**rec, "batch_id": _rbid, "batch_index": rbi})
+                return tuple(results)
+
+            # Validate on prior_staging (earliest eligible attempt in actual attempt order)
+            try:
+                forbid_invoke(
+                    rprompt, src_rbdir, "ja-master-targeted-readjudication-batch",
+                    _validate_readj_batch, hermes_settings=hermes_settings, reuse_only=True,
+                )
+            except Exception:
+                continue
+            dst_rbdir = _mkdir_private(dst_readj_dir / ("batch-" + rbid))
+            for rp in r_receipts:
+                prefix = rp.name[:-len(".receipt.json")]
+                for suffix in (".prompt.txt", ".receipt.json", ".stdout", ".stderr"):
+                    _copy_private_file_exclusive(src_rbdir / (prefix + suffix), dst_rbdir / (prefix + suffix))
+                verr_path = src_rbdir / (prefix + ".validation-error.json")
+                if verr_path.exists():
+                    _copy_private_file_exclusive(verr_path, dst_rbdir / (prefix + ".validation-error.json"))
+            # Re-validate on cloned dst_rbdir
+            verify_log: list[dict[str, object]] = []
+            forbid_invoke(
+                rprompt, dst_rbdir, "ja-master-targeted-readjudication-batch",
+                lambda raw, _e=expected_ids, _b=rbid, _l=verify_log: _validate_readj_batch(
+                    raw, _expected_ids=_e, _rbid=_b, _rec_log=_l,
+                ),
+                hermes_settings=hermes_settings, reuse_only=True,
+            )
+            reused_readj_indices.append(rbi)
+            if verify_log:
+                recovered_readj_indices.append(rbi)
+                readj_recovery_records.extend(verify_log)
+    else:
+        if list(new_staging.glob("targeted-readjudication-*")):
+            raise regeneration.RegenerationError("prior targeted-readjudication artifacts must not be copied")
     if allow_new_targeted_asr and (
         (new_staging / "targeted-second-evidence").exists()
         or (new_staging / "targeted-external-ja-evidence").exists()
@@ -662,6 +799,11 @@ def prepare_verified_continuation_staging(
         "rebuilt_asr_windows": rebuilt_asr_windows,
         "rebuilt_external_ja_context_sha256": rebuilt_ext_ctx,
         "rebuilt_external_ja_windows": rebuilt_ext_windows,
+        "total_readjudication_batches": total_readj_batches,
+        "reused_readjudication_batches": len(reused_readj_indices),
+        "reused_readjudication_batch_indices": tuple(reused_readj_indices),
+        "recovered_readjudication_batch_indices": tuple(recovered_readj_indices),
+        "json_recovery_evidence": tuple(readj_recovery_records),
     }
 
 
@@ -678,6 +820,9 @@ def run_hsoda104_pilot_continue(
     allow_missing_initial_batch_indices: tuple[int, ...] = (1,),
     allow_new_targeted_asr: bool = False,
     approved_targeted_asr_scope: ApprovedTargetedASRScope | None = None,
+    reuse_verified_targeted_readjudication: bool = False,
+    allow_limited_json_recovery: bool = False,
+    private_provisional_completion: bool = False,
     continuation_approved: bool = False,
 ) -> HSODA104ContinuationResult:
     """Continue into a fresh exclusive run root reusing ONLY verified prior artifacts."""
@@ -727,6 +872,8 @@ def run_hsoda104_pilot_continue(
             allow_missing_initial_batch_indices=allow_missing_initial_batch_indices,
             allow_new_targeted_asr=allow_new_targeted_asr,
             approved_targeted_asr_scope=approved_targeted_asr_scope,
+            reuse_verified_targeted_readjudication=reuse_verified_targeted_readjudication,
+            allow_limited_json_recovery=allow_limited_json_recovery,
         )
         if allow_new_targeted_asr:
             tracker = {"count": 0, "seen_windows": set(), "active_route": None}
@@ -758,6 +905,8 @@ def run_hsoda104_pilot_continue(
             plan, invoke=NativeNormalFirstPass(bridge).invoke, hermes_settings=settings,
             staging_root=staging, output_directory=output, claim_token=claim_token,
             reuse_only=False, targeted_runner=targeted, execution_limits=execution_limits,
+            allow_limited_json_recovery=allow_limited_json_recovery,
+            private_provisional_completion=private_provisional_completion,
         )
         return HSODA104ContinuationResult(
             pipeline_result=pipeline_result,
@@ -774,5 +923,5 @@ def run_hsoda104_pilot_continue(
             reused_external_ja_windows=int(summary["reused_external_ja_windows"]),
             reused_effective_groups=int(summary["reused_effective_groups"]),
             targeted_readjudication_groups=int(summary["rebuilt_targeted_groups"]),
-            targeted_readjudication_batches=0,
+            targeted_readjudication_batches=int(summary["reused_readjudication_batches"]),
         )
