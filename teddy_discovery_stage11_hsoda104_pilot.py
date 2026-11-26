@@ -823,6 +823,7 @@ def run_hsoda104_pilot_continue(
     reuse_verified_targeted_readjudication: bool = False,
     allow_limited_json_recovery: bool = False,
     private_provisional_completion: bool = False,
+    use_short_id_mapping_for_uncached: bool = False,
     continuation_approved: bool = False,
 ) -> HSODA104ContinuationResult:
     """Continue into a fresh exclusive run root reusing ONLY verified prior artifacts."""
@@ -907,6 +908,7 @@ def run_hsoda104_pilot_continue(
             reuse_only=False, targeted_runner=targeted, execution_limits=execution_limits,
             allow_limited_json_recovery=allow_limited_json_recovery,
             private_provisional_completion=private_provisional_completion,
+            use_short_id_mapping_for_uncached=use_short_id_mapping_for_uncached,
         )
         return HSODA104ContinuationResult(
             pipeline_result=pipeline_result,

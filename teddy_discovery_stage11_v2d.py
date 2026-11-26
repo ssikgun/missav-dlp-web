@@ -2093,7 +2093,8 @@ def _readjudicate_targeted_groups(plan: UtteranceReviewPlan,
                                   exclude_group_ids: tuple[str, ...] = (),
                                   supplemental_groups: tuple[UtteranceReviewGroup, ...] = (),
                                   allow_limited_json_recovery: bool = False,
-                                  recovery_log: list[dict[str, object]] | None = None) -> V2DAdjudication:
+                                  recovery_log: list[dict[str, object]] | None = None,
+                                  use_short_id_mapping_for_uncached: bool = False) -> V2DAdjudication:
     """Revisit only affected groups; ASR output stays supporting evidence."""
     evidence_by_group = dict(evidence.group_payloads)
     original_by_group = {item.group_id: item for item in original.groups}
@@ -2134,6 +2135,7 @@ def _readjudicate_targeted_groups(plan: UtteranceReviewPlan,
             instruction=SEMANTIC_TARGETED_READJUDICATION_BATCH_INSTRUCTION,
             allow_limited_json_recovery=allow_limited_json_recovery,
             recovery_log=recovery_log,
+            use_short_id_mapping_for_uncached=use_short_id_mapping_for_uncached,
         )
         revised_by_group = {item.group_id: item for item in revised}
         resolved_groups = tuple(revised_by_group.get(group.group_id, original_by_group[group.group_id])
@@ -2588,6 +2590,145 @@ def _pack_group_batches(
     return tuple((batch, *_make_batch_material(source_fingerprint, batch, instruction=instruction)) for batch in batches)
 
 
+SHORT_ID_INSTRUCTION_ADDENDUM = (
+    "\nUse the exact short identifiers provided in SOURCE_BOUND_GROUP_BATCH "
+    "(batch_id, source_fingerprint, group_id such as G01, and candidate_id such as C01) "
+    "verbatim without altering, omitting, or duplicating any identifier. "
+    "Output pretty-printed JSON with standard indentation."
+)
+
+
+def _build_short_id_batch_material(
+    batch: tuple[tuple[str, dict[str, object]], ...],
+    *,
+    batch_id: str,
+    source_fingerprint: str,
+    instruction: str,
+) -> dict[str, object]:
+    """Build deterministic short-ID batch prompt for uncached batches without mutating originals."""
+    short_batch_id = "B-" + batch_id[:8]
+    short_fp = "FP-SHORT"
+    short_to_real_gid: dict[str, str] = {}
+    expected_short_gids: list[str] = []
+    short_to_real_cid_by_gid: dict[str, dict[str, str]] = {}
+    expected_short_cids_by_gid: dict[str, tuple[str, ...]] = {}
+    short_groups: list[dict[str, object]] = []
+    cand_counter = 0
+
+    for g_idx, (real_gid, payload) in enumerate(batch, 1):
+        short_gid = f"G{g_idx:02d}"
+        short_to_real_gid[short_gid] = real_gid
+        expected_short_gids.append(short_gid)
+        copied = json.loads(json.dumps(payload))
+        copied["source_fingerprint"] = short_fp
+        grp = copied["group"]
+        grp["group_id"] = short_gid
+        c_map: dict[str, str] = {}
+        c_order: list[str] = []
+        for cr in grp.get("candidate_relations", ()):
+            cand_counter += 1
+            short_cid = f"C{cand_counter:02d}"
+            real_cid = cr["candidate_id"]
+            if short_cid in c_map:
+                raise V2DError("duplicate short candidate_id generated")
+            c_map[short_cid] = real_cid
+            c_order.append(short_cid)
+            cr["candidate_id"] = short_cid
+        short_to_real_cid_by_gid[real_gid] = c_map
+        expected_short_cids_by_gid[real_gid] = tuple(c_order)
+        short_groups.append(copied)
+
+    short_input_raw = _wire({
+        "batch_id": short_batch_id,
+        "source_fingerprint": short_fp,
+        "groups": short_groups,
+    })
+    short_prompt = (
+        instruction + SHORT_ID_INSTRUCTION_ADDENDUM
+        + "\nSOURCE_BOUND_GROUP_BATCH=" + short_input_raw.decode("utf-8")
+    ).encode("utf-8")
+    if len(short_prompt) > V2D_MAX_PROMPT_BYTES:
+        raise V2DError("short-ID batch prompt exceeds the existing native prompt bound")
+    return {
+        "short_batch_id": short_batch_id,
+        "short_fp": short_fp,
+        "expected_short_gids": tuple(expected_short_gids),
+        "short_to_real_gid": short_to_real_gid,
+        "expected_short_cids_by_gid": expected_short_cids_by_gid,
+        "short_to_real_cid_by_gid": short_to_real_cid_by_gid,
+        "input_raw": short_input_raw,
+        "prompt": short_prompt,
+    }
+
+
+def _restore_short_id_batch_response(
+    data: object,
+    *,
+    short_batch_id: str,
+    short_fp: str,
+    real_batch_id: str,
+    real_fp: str,
+    expected_short_gids: tuple[str, ...],
+    short_to_real_gid: dict[str, str],
+    expected_short_cids_by_gid: dict[str, tuple[str, ...]],
+    short_to_real_cid_by_gid: dict[str, dict[str, str]],
+) -> dict[str, object]:
+    """Deterministically restore short IDs to exact original SHA256 IDs; reject any mismatch."""
+    if (type(data) is not dict
+            or set(data) != {"batch_id", "source_fingerprint", "groups"}
+            or data["batch_id"] != short_batch_id
+            or data["source_fingerprint"] != short_fp
+            or type(data["groups"]) is not list):
+        raise V2DError("short-ID batch envelope differs")
+    seen_gids: set[str] = set()
+    obs_short_gids: list[str] = []
+    for row in data["groups"]:
+        if type(row) is not dict or type(row.get("group_id")) is not str:
+            raise V2DError("short-ID batch group entry invalid")
+        sgid = row["group_id"]
+        if sgid not in short_to_real_gid or sgid in seen_gids:
+            raise V2DError("short-ID batch group reference is unknown or duplicated")
+        seen_gids.add(sgid)
+        obs_short_gids.append(sgid)
+    if tuple(obs_short_gids) != expected_short_gids:
+        raise V2DError("short-ID batch group coverage/order differs")
+
+    restored_groups = []
+    for row in data["groups"]:
+        sgid = row["group_id"]
+        real_gid = short_to_real_gid[sgid]
+        c_decs = row.get("candidate_decisions")
+        if type(c_decs) is not list:
+            raise V2DError("short-ID batch candidate_decisions invalid")
+        c_map = short_to_real_cid_by_gid[real_gid]
+        seen_cids: set[str] = set()
+        obs_short_cids: list[str] = []
+        restored_c_decs = []
+        for cd in c_decs:
+            if type(cd) is not dict or type(cd.get("candidate_id")) is not str:
+                raise V2DError("short-ID batch candidate_decision entry invalid")
+            scid = cd["candidate_id"]
+            if scid not in c_map or scid in seen_cids:
+                raise V2DError("short-ID batch candidate reference is unknown, cross-group, or duplicated")
+            seen_cids.add(scid)
+            obs_short_cids.append(scid)
+            restored_cd = dict(cd)
+            restored_cd["candidate_id"] = c_map[scid]
+            restored_c_decs.append(restored_cd)
+        if tuple(obs_short_cids) != expected_short_cids_by_gid[real_gid]:
+            raise V2DError("short-ID batch candidate coverage/order differs")
+        restored_row = dict(row)
+        restored_row["group_id"] = real_gid
+        restored_row["candidate_decisions"] = restored_c_decs
+        restored_groups.append(restored_row)
+
+    return {
+        "batch_id": real_batch_id,
+        "source_fingerprint": real_fp,
+        "groups": restored_groups,
+    }
+
+
 def _adjudicate_group_batches(
     payloads: tuple[tuple[str, dict[str, object]], ...], *,
     expected_groups: dict[str, object], source_fingerprint: str,
@@ -2596,6 +2737,7 @@ def _adjudicate_group_batches(
     instruction: str = SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION,
     allow_limited_json_recovery: bool = False,
     recovery_log: list[dict[str, object]] | None = None,
+    use_short_id_mapping_for_uncached: bool = False,
 ) -> tuple[tuple[GroupAdjudication, ...], tuple[V2DBatchEvidence, ...]]:
     batches = _pack_group_batches(source_fingerprint, payloads, instruction=instruction)
     resolved_by_id = {}
@@ -2650,9 +2792,59 @@ def _adjudicate_group_batches(
                 })
             return tuple(group_results)
 
+        has_existing_receipts = any(batch_dir.glob(f"{label}-attempt-*.receipt.json"))
+        active_prompt = prompt
+        active_input_raw = input_raw
+        active_validator = validate_batch
+        if use_short_id_mapping_for_uncached and not has_existing_receipts and not reuse_only:
+            short_mat = _build_short_id_batch_material(
+                batch, batch_id=batch_id, source_fingerprint=source_fingerprint,
+                instruction=instruction,
+            )
+            active_prompt = short_mat["prompt"]
+            active_input_raw = short_mat["input_raw"]
+
+            def validate_short_batch(
+                raw,
+                *,
+                _short_mat=short_mat,
+                _batch_id=batch_id,
+                _validate_batch=validate_batch,
+                _label=label,
+            ):
+                recovery_record = None
+                if allow_limited_json_recovery:
+                    data, recovery_record = recover_limited_trailing_json(raw, "JA Master batch adjudication")
+                else:
+                    data = _load_json(raw, "JA Master batch adjudication")
+                restored = _restore_short_id_batch_response(
+                    data,
+                    short_batch_id=_short_mat["short_batch_id"],
+                    short_fp=_short_mat["short_fp"],
+                    real_batch_id=_batch_id,
+                    real_fp=source_fingerprint,
+                    expected_short_gids=_short_mat["expected_short_gids"],
+                    short_to_real_gid=_short_mat["short_to_real_gid"],
+                    expected_short_cids_by_gid=_short_mat["expected_short_cids_by_gid"],
+                    short_to_real_cid_by_gid=_short_mat["short_to_real_cid_by_gid"],
+                )
+                results = _validate_batch(_wire(restored))
+                if recovery_record is not None and recovery_log is not None:
+                    recovery_log.append({
+                        **recovery_record,
+                        "batch_id": _batch_id,
+                        "label": _label,
+                        "source_fingerprint": source_fingerprint,
+                        "group_count": len(results),
+                        "short_id_mapped": True,
+                    })
+                return results
+
+            active_validator = validate_short_batch
+
         before = len(getattr(owner, "_verified_attempts", ()))
         resolved = invoke(
-            prompt, batch_dir, label, validate_batch,
+            active_prompt, batch_dir, label, active_validator,
             hermes_settings=hermes_settings, reuse_only=reuse_only,
         )
         if type(resolved) is not tuple or tuple(item.group_id for item in resolved) != expected_ids:
@@ -2663,8 +2855,8 @@ def _adjudicate_group_batches(
                                and type(item.get("receipt_sha256")) is str)
         receipts.append(V2DBatchEvidence(
             batch_id=batch_id, source_fingerprint=source_fingerprint,
-            group_ids=expected_ids, input_sha256=_sha(input_raw),
-            prompt_sha256=_sha(prompt), native_receipt_sha256=receipt_hashes,
+            group_ids=expected_ids, input_sha256=_sha(active_input_raw),
+            prompt_sha256=_sha(active_prompt), native_receipt_sha256=receipt_hashes,
         ))
         for item in resolved:
             if item.group_id in resolved_by_id:
@@ -3442,6 +3634,7 @@ def run_v2d_pipeline(
     outside_span_limits: OutsideSpanRecoveryLimits = OutsideSpanRecoveryLimits(),
     allow_limited_json_recovery: bool = False,
     private_provisional_completion: bool = False,
+    use_short_id_mapping_for_uncached: bool = False,
 ) -> V2DPipelineResult:
     """Connected offline/live-injectable V2-D path; never bypasses validators."""
     budget = None
@@ -3527,6 +3720,7 @@ def run_v2d_pipeline(
                 supplemental_groups=supplemental_groups,
                 allow_limited_json_recovery=allow_limited_json_recovery,
                 recovery_log=json_recovery_log,
+                use_short_id_mapping_for_uncached=use_short_id_mapping_for_uncached,
             )
             if any(item.audio_evidence_needed for item in adjudication.groups):
                 if not private_provisional_completion:
