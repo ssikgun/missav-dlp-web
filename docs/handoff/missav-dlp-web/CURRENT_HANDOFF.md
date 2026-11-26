@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E dedicated re-adjudication prompt & verified continuation entrypoint ISOLATED CANDIDATE READY / PROMOTION_READY=YES
+
+- **Isolated local candidate commit:** `5bf709625c32944b4bbd45d718244c61e4a59855` on `s11-v2e-readj-prompt-and-continuation-candidate` (parent `30377b4385ea00673ae83cc38e2d5a8477300cad`, workdir `/tmp/s11-v2e-schema-fix.I1yXcEN3/source`). No product source promoted or pushed.
+- **Changed files (2, `+358/-7`):** `teddy_discovery_stage11_v2d.py` (SHA256 `6eeea043441c78e9e76990100e5fb865a5bb05d28747d533f6c84bd7ae4089f8`), `teddy_discovery_stage11_hsoda104_pilot.py` (SHA256 `65668b7d0e5c5033496bde309854ded0249e14a7035486681b84338b8a77d887`).
+- **Implementation:** Preserved initial `SEMANTIC_BATCH_ADJUDICATION_INSTRUCTION` byte-for-byte (`2,358B`). Added `SEMANTIC_TARGETED_READJUDICATION_BATCH_INSTRUCTION` (`3,637B`, `+1,279B`) treating `targeted_second_evidence` as supporting ASR hypotheses (not ground truth), judging source acceptance and candidate relations independently (no auto-REJECT of candidate relations), forbidding omission solely from non-detection, and preserving honest `UNCERTAIN` and both HOLD gates. Measured 50-group re-adjudication packing = **3 batches** `(18, 20, 12)` at `(126506, 125703, 110711)` bytes (`<= 128,000B`). Added separate `prepare_verified_continuation_staging` / `run_hsoda104_pilot_continue` / `HSODA104ContinuationResult` (keeping `run_hsoda104_pilot_once` untouched) that validates and clones ONLY verified initial 6 batches / 234 groups / 8 receipts + 43 ASR windows into a fresh exclusive root, excludes `targeted-readjudication-*`, fails closed on missing/invalid artifacts, and tracks prior vs. additional consumption separately.
+- **Offline verification on real 4th-trial artifacts (`HERMES_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`):** `TEST1_REUSE_AND_PACKING=PASS`, `TEST2_OLD_READJ_RECEIPT_REJECTED=PASS`, `TEST3_FAIL_CLOSED_ON_MISSING_ARTIFACT=PASS`, `TEST4_HOLD_audio_true=PASS`, `TEST4_HOLD_uncertain_false=PASS`, `TEST5_APPROVAL_GUARD=PASS`, `TEST6_PRIOR_ROOT_UNTOUCHED=PASS`. `PROMOTION_READY=YES`, `PRODUCT_QUALITY=NOT_VERIFIED`. Separate approval required for canonical source promotion and any live continuation run.
+
+
 ## 2026-11-26 — V2-E post-targeted-ASR UNCERTAIN root-cause audit & re-adjudication prompt proposal COMPLETE
 
 - **Read-only audit against canonical `20789b9abbbd128e6d3eecab8a3b8122cc990c58`** (`HERMES_EXECUTION_COUNT=0`, `ASR_EXECUTION_COUNT=0`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`).
