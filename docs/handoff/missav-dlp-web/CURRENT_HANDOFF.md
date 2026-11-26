@@ -1,5 +1,16 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-26 — V2-E short-ID single private live continuation EXECUTED / HOLD_AFTER_KO_TRANSLATION (authorization CONSUMED)
+
+- **Execution:** Single approved HSODA-104 live continuation executed on CT108 (`downloader`) from promoted `88b70e318940267fb6dbdcd0f0eaec933044a48d` into `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-short-id-once-20261126` (`1279.3s`, exit `0`). Authorization **CONSUMED**.
+- **Completed with ZERO retries (`HERMES_EXECUTION_COUNT=7` / 12, `ASR_EXECUTION_COUNT=0`):**
+  - Reused: 6 initial batches (8 receipts), 43 ASR windows, ReAdj Batch 1 + recovered Batch 2 Attempt 1.
+  - Short-ID ReAdj Batch 3 (`268.9s`, 3 unc) & Batch 4 (`221.3s`, 0 unc) **PASSED** -> `UNRESOLVED_GROUP_COUNT=12`.
+  - **JA Master (`JA_MASTER_MATERIALIZATION=PASS`, `266` cues)** & **ALL 5 KO translation parts (`9d6009f4-...`, `266` cues, `160.5s/189.0s/176.2s/182.3s/60.1s`) PASSED on Attempt 1!**
+- **Terminal HOLD right before `run_targeted_review`:** `PILOT_RESULT_STATE=HOLD`, `PILOT_RESULT_REASON=TARGETED_ASR_NO_SOURCE_BOUND_BASELINE_SEGMENT` (`5` translated cues set `needs_audio_evidence=True`, including `part-0005` `supplemental_asr` cue `v2d-2f934860...`, hitting the un-gated late-ASR block at `v2d.py:3404-3426`). `OUTPUT_PATHS=NONE`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`. Postcheck PASS across CT108/CT120/VM122, prior roots (`44`/`39`/`53`/`63`), and Stage12 queue (`5/25/165/10`).
+- **Remaining for `PRIVATE_PROVISIONAL_SRT_READY`:** ONLY `run_targeted_review` (`1–2` Hermes calls, `0` ASR) reusing all 4 completed ReAdj batches + all 5 completed KO translation parts (`266` cues), recording post-translation `needs_audio_evidence` cues in the private uncertainty report instead of requesting late ASR.
+
+
 ## 2026-11-26 — V2-E short-ID mapping canonical source promotion COMPLETE (live continuation STARTING)
 
 - `SOURCE_PROMOTION=PASS`. Promoted exact 2 files (`+200/-4`) to canonical `teddy-subtitle-stage11` as `88b70e318940267fb6dbdcd0f0eaec933044a48d` (`REMOTE_SHA256_MATCH=PASS`: `v2d.py`=`369d9d4b...`, `hsoda104_pilot.py`=`232fbe4c...`). Offline verification PASS (`TEST1`–`TEST4` + `S11_V2D_OFFLINE_SMOKE=PASS`). Proceeding immediately to approved single private live continuation (`max_hermes_attempts=12`, `ASR=0`).
