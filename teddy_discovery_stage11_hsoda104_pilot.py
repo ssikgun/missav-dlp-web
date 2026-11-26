@@ -185,6 +185,11 @@ class HSODA104ContinuationResult:
     reused_effective_groups: int
     targeted_readjudication_groups: int
     targeted_readjudication_batches: int
+    reused_review_triage_chunks: int = 0
+    reused_review_final_calls: int = 0
+    vad_window_count: int = 0
+    vad_total_audio_ms: int = 0
+    vad_window_pass_evaluations: int = 0
 
 
 class _ForbidNetworkBridge:
@@ -424,6 +429,7 @@ def prepare_verified_continuation_staging(
     reuse_verified_translation: bool = False,
     private_provisional_completion: bool = False,
     preserve_legacy_supplemental_grouping: bool = False,
+    reuse_verified_review_baseline: bool = False,
 ) -> dict[str, object]:
     """Validate and clone ONLY verified reusable artifacts into a fresh staging dir.
 
@@ -466,6 +472,10 @@ def prepare_verified_continuation_staging(
             raise regeneration.RegenerationError(
                 "reuse_verified_targeted_readjudication requires all initial batches valid and allow_new_targeted_asr=False"
             )
+    if reuse_verified_review_baseline and not reuse_verified_translation:
+        raise regeneration.RegenerationError(
+            "reuse_verified_review_baseline requires reuse_verified_translation=True"
+        )
 
     active_groups, outside_span_groups = v2d.split_outside_span_groups(plan)
     excluded_ids = tuple(g.group_id for g in outside_span_groups)
@@ -819,6 +829,8 @@ def prepare_verified_continuation_staging(
                 readj_recovery_records.extend(verify_log)
 
         reused_translation_parts = 0
+        reused_review_triage_chunks = 0
+        reused_review_final_calls = 0
         if reuse_verified_translation:
             if len(reused_readj_indices) != total_readj_batches:
                 raise regeneration.RegenerationError(
@@ -867,14 +879,58 @@ def prepare_verified_continuation_staging(
                 for subf in sorted(f for f in pdir.iterdir() if f.is_file()):
                     _copy_private_file_exclusive(subf, dst_pdir / subf.name)
             # Re-validate cloned translation session on new_staging (reuse_only=True, 0 Hermes calls)
-            v2d.translate_ja_master(
+            _, cloned_tr = v2d.translate_ja_master(
                 prov_master, invoke=forbid_invoke, hermes_settings=hermes_settings,
                 staging_root=new_staging, claim_token=claim_token, reuse_only=True,
                 targeted_evidence_by_cue=tr_ev,
                 targeted_evidence_sha256=(targeted_ev.linkage_sha256 if tr_ev else None),
             )
+            reused_review_triage_chunks = 0
+            reused_review_final_calls = 0
+            if reuse_verified_review_baseline:
+                extra_rev_ids = tuple(
+                    c.cue_id for c in cloned_tr.cues if getattr(c, "needs_audio_evidence", False)
+                )
+                prior_rev = v2d.run_targeted_review(
+                    prov_master, pkg, cloned_tr,
+                    invoke=forbid_invoke, hermes_settings=hermes_settings,
+                    staging_root=prior_staging, reuse_only=True,
+                    extra_target_cue_ids=extra_rev_ids,
+                    allow_limited_json_recovery=allow_limited_json_recovery,
+                )
+                req_sha = v2d.review_request_sha256(prior_rev.request)
+                src_req_dir = prior_staging / req_sha
+                dst_req_dir = _mkdir_private(new_staging / req_sha)
+                src_triage_dir = src_req_dir / "triage"
+                dst_triage_dir = _mkdir_private(dst_req_dir / "triage")
+                chunk_dirs = sorted(p for p in src_triage_dir.glob("chunk-*") if p.is_dir())
+                if chunk_dirs:
+                    for cdir in chunk_dirs:
+                        dst_cdir = _mkdir_private(dst_triage_dir / cdir.name)
+                        reused_review_triage_chunks += 1
+                        for subf in sorted(f for f in cdir.iterdir() if f.is_file()):
+                            _copy_private_file_exclusive(subf, dst_cdir / subf.name)
+                else:
+                    reused_review_triage_chunks = 1
+                    for subf in sorted(f for f in src_triage_dir.iterdir() if f.is_file()):
+                        _copy_private_file_exclusive(subf, dst_triage_dir / subf.name)
+                src_final_dir = src_req_dir / "targeted-final"
+                if src_final_dir.is_dir():
+                    dst_final_dir = _mkdir_private(dst_req_dir / "targeted-final")
+                    reused_review_final_calls = 1
+                    for subf in sorted(f for f in src_final_dir.iterdir() if f.is_file()):
+                        _copy_private_file_exclusive(subf, dst_final_dir / subf.name)
+                v2d.run_targeted_review(
+                    prov_master, pkg, cloned_tr,
+                    invoke=forbid_invoke, hermes_settings=hermes_settings,
+                    staging_root=new_staging, reuse_only=True,
+                    extra_target_cue_ids=extra_rev_ids,
+                    allow_limited_json_recovery=allow_limited_json_recovery,
+                )
     else:
         reused_translation_parts = 0
+        reused_review_triage_chunks = 0
+        reused_review_final_calls = 0
         if reuse_verified_translation:
             raise regeneration.RegenerationError(
                 "reuse_verified_translation requires reuse_verified_targeted_readjudication=True"
@@ -911,6 +967,8 @@ def prepare_verified_continuation_staging(
         "recovered_readjudication_batch_indices": tuple(recovered_readj_indices),
         "json_recovery_evidence": tuple(readj_recovery_records),
         "reused_translation_parts": reused_translation_parts,
+        "reused_review_triage_chunks": reused_review_triage_chunks,
+        "reused_review_final_calls": reused_review_final_calls,
     }
 
 
@@ -933,6 +991,9 @@ def run_hsoda104_pilot_continue(
     use_short_id_mapping_for_uncached: bool = False,
     reuse_verified_translation: bool = False,
     preserve_legacy_supplemental_grouping: bool = False,
+    reuse_verified_review_baseline: bool = False,
+    enable_local_vad_evidence: bool = False,
+    targeted_vad_limits: v2d.TargetedVADLimits | None = None,
     continuation_approved: bool = False,
 ) -> HSODA104ContinuationResult:
     """Continue into a fresh exclusive run root reusing ONLY verified prior artifacts."""
@@ -988,6 +1049,7 @@ def run_hsoda104_pilot_continue(
             reuse_verified_translation=reuse_verified_translation,
             private_provisional_completion=private_provisional_completion,
             preserve_legacy_supplemental_grouping=preserve_legacy_supplemental_grouping,
+            reuse_verified_review_baseline=reuse_verified_review_baseline,
         )
         if allow_new_targeted_asr:
             tracker = {"count": 0, "seen_windows": set(), "active_route": None}
@@ -1015,6 +1077,21 @@ def run_hsoda104_pilot_continue(
             )
         else:
             targeted = _ReuseOnlyTargetedASRGuard(targeted_transport)
+        vad_runner = None
+        active_vad_limits = None
+        if enable_local_vad_evidence:
+            vad_source_provider = ASRMediaSourceReader(
+                host=config.nas_host, user=config.nas_user, key=config.nas_key,
+                known_hosts=config.nas_known_hosts, library_root=config.nas_library_root,
+                temp_root=config.asr_media_temp_root, require_disk_backed=True,
+                reserve_bytes=config.asr_media_temp_reserve_bytes,
+            )
+            vad_runner = v2d.build_v2d_targeted_vad_runner(
+                holding_resolver=holding_resolver, source_provider=vad_source_provider,
+            )
+            active_vad_limits = (
+                v2d.TargetedVADLimits() if targeted_vad_limits is None else targeted_vad_limits
+            )
         pipeline_result = v2d.run_v2d_pipeline(
             plan, invoke=NativeNormalFirstPass(bridge).invoke, hermes_settings=settings,
             staging_root=staging, output_directory=output, claim_token=claim_token,
@@ -1024,7 +1101,14 @@ def run_hsoda104_pilot_continue(
             use_short_id_mapping_for_uncached=use_short_id_mapping_for_uncached,
             reuse_verified_translation=reuse_verified_translation,
             preserve_legacy_supplemental_grouping=preserve_legacy_supplemental_grouping,
+            reuse_verified_review_baseline=reuse_verified_review_baseline,
+            vad_evidence_runner=vad_runner,
+            targeted_vad_limits=active_vad_limits,
         )
+        vad_summary = (
+            pipeline_result.review.vad_evidence_summary
+            if pipeline_result.review is not None else None
+        ) or {}
         return HSODA104ContinuationResult(
             pipeline_result=pipeline_result,
             prior_run_root=str(prior_root),
@@ -1041,4 +1125,9 @@ def run_hsoda104_pilot_continue(
             reused_effective_groups=int(summary["reused_effective_groups"]),
             targeted_readjudication_groups=int(summary["rebuilt_targeted_groups"]),
             targeted_readjudication_batches=int(summary["reused_readjudication_batches"]),
+            reused_review_triage_chunks=int(summary["reused_review_triage_chunks"]),
+            reused_review_final_calls=int(summary["reused_review_final_calls"]),
+            vad_window_count=int(vad_summary.get("window_count", 0)),
+            vad_total_audio_ms=int(vad_summary.get("total_audio_ms", 0)),
+            vad_window_pass_evaluations=int(vad_summary.get("vad_window_pass_evaluations", 0)),
         )

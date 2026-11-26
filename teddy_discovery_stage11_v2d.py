@@ -143,6 +143,7 @@ from teddy_discovery_stateful_quality_review import (
     serialize_review_request,
     serialize_review_result,
     validate_review_result,
+    validate_review_target_ids,
     effective_review_action,
 )
 from teddy_discovery_hybrid_suspect_review import (
@@ -289,6 +290,15 @@ def _load_json(raw: bytes, label: str):
 
 LIMITED_JSON_TRAILING_SUFFIX = "]}"
 V2D_PRIVATE_PROVISIONAL_UNCERTAINTY_FILENAME = "v2d-private-provisional-uncertainty-v1.json"
+V2D_TARGETED_VAD_SIDECAR_FILENAME = "targeted-vad-evidence-v1.json"
+DEFAULT_VAD_TARGET_PAD_MS = 1_500
+DEFAULT_VAD_TARGET_MERGE_GAP_MS = 2_500
+DEFAULT_VAD_TARGET_MAX_WINDOWS = 11
+DEFAULT_VAD_TARGET_MAX_AUDIO_MS = 85_000
+DEFAULT_VAD_STANDARD_THRESHOLD = 0.54
+DEFAULT_VAD_HIGH_RECALL_THRESHOLD = 0.28
+DEFAULT_VAD_SPEECH_PAD_MS = 0
+MAX_TARGETED_VAD_ARTIFACT_BYTES = 4 * 1024 * 1024
 
 
 def recover_limited_trailing_json(
@@ -3695,6 +3705,8 @@ def _review_prompt(request: QualityReviewRequest, master: V2DMaster,
         )
         query += "\nV2D_TARGET_ONLY: Preserve every non-target first-pass value. Targets in order: " + json.dumps(target_cue_ids)
     query += V2D_REVIEW_HALLUCINATION_AND_DEDUP_ADDENDUM
+    if signals_by_cue and any("vad_audio_evidence" in sig for sig in signals_by_cue.values()):
+        query += V2D_REVIEW_VAD_EVIDENCE_ADDENDUM
     payload = {
         "request": json.loads(serialize_review_request(request)),
         "request_sha256": review_request_sha256(request),
@@ -3716,6 +3728,460 @@ class V2DReviewOutcome:
     triage_sha256: str
     final_sha256: str
     targeted_cue_ids: tuple[str, ...]
+    vad_evidence_artifact_sha256: str | None = None
+    vad_evidence_linkage_sha256: str | None = None
+    vad_evidence_summary: dict[str, object] | None = None
+    vad_evidence_raw: bytes | None = None
+    prior_final_sha256: str | None = None
+
+
+V2D_REVIEW_VAD_EVIDENCE_ADDENDUM = (
+    "\nV2D_TARGETED_AUDIO_EVIDENCE: When ja_master_source_summary provides vad_audio_evidence for a target cue "
+    "(measuring local CPU Silero VAD at threshold 0.54 [standard] and threshold 0.28 [high-recall], speech_pad_ms=0, "
+    "plus cue-span RMS dBFS / p90 frame energy relative to the window noise floor), combine audio evidence with "
+    "recurrence, isolation, and external_ja absence:\n"
+    "- ONLY classify as OMIT/SOURCE_NOISE when combined evidence strongly converges on non-speech Whisper hallucination "
+    "(specifically NO_VAD_LOW_ENERGY: vad_054_ms=0, vad_028_ms=0, low SNR above window noise floor, uncorroborated by "
+    "external_ja, and non-speech isolation or documented hallucination recurrence).\n"
+    "- PROTECT weak/whisper/short speech: NEVER OMIT if vad_028_ms>0 (LOW_THRESHOLD_VAD_ONLY), vad_054_ms>0 "
+    "(STANDARD_VAD_DETECTED), elevated RMS/p90 acoustic activity above noise floor (NO_VAD_ELEVATED_ENERGY), credible "
+    "aligned external_ja, or conflicting plausibility favors real speech; keep those as KEEP or AMBIGUOUS and cite "
+    "the measured VAD/RMS values in reason. Thresholds are diagnostic measurements only, never unconditional deletion rules."
+)
+
+
+@dataclass(frozen=True)
+class TargetedVADLimits:
+    pad_ms: int = DEFAULT_VAD_TARGET_PAD_MS
+    merge_gap_ms: int = DEFAULT_VAD_TARGET_MERGE_GAP_MS
+    max_windows: int = DEFAULT_VAD_TARGET_MAX_WINDOWS
+    max_total_audio_ms: int = DEFAULT_VAD_TARGET_MAX_AUDIO_MS
+    thresholds: tuple[float, ...] = (DEFAULT_VAD_STANDARD_THRESHOLD, DEFAULT_VAD_HIGH_RECALL_THRESHOLD)
+    speech_pad_ms: int = DEFAULT_VAD_SPEECH_PAD_MS
+
+    def __post_init__(self):
+        for name in ("pad_ms", "merge_gap_ms", "speech_pad_ms"):
+            if type(getattr(self, name)) is not int or getattr(self, name) < 0:
+                raise V2DError(name + " must be a nonnegative integer")
+        if type(self.max_windows) is not int or self.max_windows < 1:
+            raise V2DError("max_windows must be a positive integer")
+        if type(self.max_total_audio_ms) is not int or self.max_total_audio_ms < 1:
+            raise V2DError("max_total_audio_ms must be a positive integer")
+        if type(self.thresholds) is not tuple or not self.thresholds:
+            raise V2DError("thresholds must be a nonempty tuple")
+        for thr in self.thresholds:
+            if type(thr) not in (int, float) or not (0.0 < float(thr) < 1.0):
+                raise V2DError("VAD threshold must lie strictly in (0, 1)")
+
+
+@dataclass(frozen=True)
+class TargetedVADWindow:
+    window_index: int
+    start_ms: int
+    end_ms: int
+    cue_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class TargetedVADPlan:
+    source_fingerprint: str
+    master_sha256: str
+    review_request_sha256: str
+    target_cue_ids: tuple[str, ...]
+    windows: tuple[TargetedVADWindow, ...]
+    total_audio_ms: int
+    limits: TargetedVADLimits
+
+
+def _is_vad_hallucination_candidate(sig: dict[str, object] | None) -> bool:
+    if not sig or sig.get("ext_ja"):
+        return False
+    rec = sig.get("asr_recurrence")
+    if isinstance(rec, dict) and (int(rec.get("consec_run", 0)) >= 3 or int(rec.get("doc_freq", 0)) >= 3):
+        return True
+    gaps = sig.get("isolation_gaps_ms")
+    if isinstance(gaps, dict):
+        prev_g, next_g = gaps.get("prev"), gaps.get("next")
+        if prev_g is not None and next_g is not None and prev_g >= 30_000 and next_g >= 30_000:
+            return True
+    return False
+
+
+def plan_targeted_vad_windows(
+    master: V2DMaster,
+    *,
+    request: QualityReviewRequest,
+    limits: TargetedVADLimits = TargetedVADLimits(),
+) -> TargetedVADPlan:
+    """Plan bounded merged windows around structurally suspect uncorroborated cues."""
+    master = _validate_master(master)
+    if type(limits) is not TargetedVADLimits:
+        raise V2DError("explicit TargetedVADLimits is required")
+    signals_by_cue, _ = _cue_asr_quality_context(master)
+    raw_targets: list[tuple[int, int, str]] = []
+    target_cue_ids: list[str] = []
+    for mc in master.cues:
+        if _is_vad_hallucination_candidate(signals_by_cue.get(mc.cue_id)):
+            target_cue_ids.append(mc.cue_id)
+            s_ms = max(0, _round_ms(mc.start_ms) - limits.pad_ms)
+            e_ms = max(s_ms + 1, _round_ms(mc.end_ms) + limits.pad_ms)
+            raw_targets.append((s_ms, e_ms, mc.cue_id))
+    merged: list[list[object]] = []
+    for s_ms, e_ms, cid in sorted(raw_targets, key=lambda row: (row[0], row[1])):
+        if merged and s_ms <= int(merged[-1][1]) + limits.merge_gap_ms:
+            merged[-1][1] = max(int(merged[-1][1]), e_ms)
+            merged[-1][2].append(cid)
+        else:
+            merged.append([s_ms, e_ms, [cid]])
+    windows = tuple(
+        TargetedVADWindow(i, int(row[0]), int(row[1]), tuple(row[2]))
+        for i, row in enumerate(merged, 1)
+    )
+    total_audio_ms = sum(w.end_ms - w.start_ms for w in windows)
+    if len(windows) > limits.max_windows or total_audio_ms > limits.max_total_audio_ms:
+        raise V2DHold("TARGETED_VAD_BUDGET_EXCEEDED")
+    return TargetedVADPlan(
+        source_fingerprint=master.source_fingerprint,
+        master_sha256=master.master_sha256,
+        review_request_sha256=review_request_sha256(request),
+        target_cue_ids=tuple(target_cue_ids),
+        windows=windows,
+        total_audio_ms=total_audio_ms,
+        limits=limits,
+    )
+
+
+def _vad_context_sha256(snapshot: ASRSourceSnapshot, vad_plan: TargetedVADPlan) -> str:
+    return _sha(_wire({
+        "schema_version": V2D_SCHEMA_VERSION,
+        "dvd_id": snapshot.dvd_id,
+        "canonical_video_relative": snapshot.canonical_video_relative,
+        "source_size": snapshot.source_size,
+        "source_mtime_ns": snapshot.source_mtime_ns,
+        "source_fingerprint": vad_plan.source_fingerprint,
+        "master_sha256": vad_plan.master_sha256,
+        "review_request_sha256": vad_plan.review_request_sha256,
+        "thresholds": [float(t) for t in vad_plan.limits.thresholds],
+        "speech_pad_ms": vad_plan.limits.speech_pad_ms,
+        "target_cue_ids": list(vad_plan.target_cue_ids),
+        "windows": [[w.window_index, w.start_ms, w.end_ms, list(w.cue_ids)] for w in vad_plan.windows],
+    }))
+
+
+def _rms_dbfs_from_array(arr) -> float:
+    import numpy as np
+    if arr is None or int(arr.size) == 0:
+        return -120.0
+    val = float(np.sqrt(np.mean(np.square(arr.astype(np.float64)))))
+    if not math.isfinite(val) or val <= 1e-6:
+        return -120.0
+    return round(max(-120.0, min(0.0, 20.0 * math.log10(val))), 2)
+
+
+def _frame_rms_dbfs(arr, *, frame_samples: int = 320) -> list[float]:
+    import numpy as np
+    total = int(arr.size)
+    if total == 0:
+        return [-120.0]
+    vals = []
+    for offset in range(0, total, frame_samples):
+        vals.append(_rms_dbfs_from_array(arr[offset:offset + frame_samples]))
+    return vals
+
+
+def _interval_overlap_ms(a_s: int, a_e: int, spans: list[tuple[int, int]]) -> int:
+    total = 0
+    for b_s, b_e in spans:
+        lo = max(a_s, b_s)
+        hi = min(a_e, b_e)
+        if hi > lo:
+            total += hi - lo
+    return total
+
+
+def build_v2d_targeted_vad_runner(
+    *,
+    holding_resolver,
+    source_provider,
+    audio_chunk_iterator=iter_audio_chunks,
+    vad_timestamps_fn=None,
+):
+    """Build a bounded CT108 CPU Silero VAD + RMS energy collector reusing ASRMediaSourceReader."""
+    if not callable(holding_resolver) or source_provider is None:
+        raise V2DError("VAD runner requires holding_resolver and source_provider")
+
+    def run_vad(master: V2DMaster, request: QualityReviewRequest, vad_plan: TargetedVADPlan) -> dict[str, object]:
+        from teddy_discovery_asr_audio import _sample_index_to_ms
+        from teddy_discovery_stage11_live_adapters import _snapshot
+        import numpy as np
+
+        snapshot = master.review_set._source_bundle.asr_result.source_snapshot
+        try:
+            video, current = _snapshot(holding_resolver(snapshot.dvd_id), snapshot.dvd_id)
+        except Exception as error:
+            raise V2DHold("TARGETED_VAD_SOURCE_UNAVAILABLE") from error
+        if current != snapshot:
+            raise V2DHold("TARGETED_VAD_SOURCE_CHANGED")
+        if vad_timestamps_fn is None:
+            from faster_whisper.vad import VadOptions, get_speech_timestamps
+
+            def _detect_vad(samples, threshold: float, speech_pad_ms: int):
+                return get_speech_timestamps(
+                    samples,
+                    VadOptions(threshold=threshold, speech_pad_ms=speech_pad_ms),
+                    sampling_rate=16_000,
+                )
+        else:
+            _detect_vad = vad_timestamps_fn
+
+        budget = _ACTIVE_V2D_BUDGET.get()
+        copy_timeout = None if budget is None else max(1.0, budget.remaining() - 30.0)
+        cue_by_id = {mc.cue_id: (idx + 1, mc) for idx, mc in enumerate(master.cues)}
+        signals_by_cue, _ = _cue_asr_quality_context(master)
+        thr_keys = [f"{float(t):.2f}" for t in vad_plan.limits.thresholds]
+        evaluations = 0
+        window_records = []
+        cue_records = []
+
+        with source_provider.copy_to_temp(
+            video, max_media_bytes=current.source_size, timeout=copy_timeout,
+        ) as local_source:
+            if not isinstance(local_source, ASRLocalMediaSource) or local_source.source_snapshot != current:
+                raise V2DHold("TARGETED_VAD_LOCAL_SOURCE_CHANGED")
+            audio_provider = build_targeted_audio_window_provider(
+                local_source, audio_chunk_iterator=audio_chunk_iterator,
+            )
+            for w in vad_plan.windows:
+                if budget is not None:
+                    budget.require_time(5.0, reason="WALL_TIME_LIMIT_BEFORE_TARGETED_VAD")
+                chunk = audio_provider(TargetedASRWindow(
+                    start_ms=w.start_ms, end_ms=w.end_ms, external_cue_ids=w.cue_ids,
+                ))
+                samples = chunk.samples
+                win_frames = _frame_rms_dbfs(samples)
+                floor_dbfs = round(float(np.percentile(win_frames, 10)), 2)
+                median_dbfs = round(float(np.percentile(win_frames, 50)), 2)
+                max_frame_dbfs = round(float(max(win_frames)), 2)
+                win_rms_dbfs = _rms_dbfs_from_array(samples)
+
+                pass_spans: dict[str, list[tuple[int, int]]] = {}
+                for thr, tkey in zip(vad_plan.limits.thresholds, thr_keys, strict=True):
+                    evaluations += 1
+                    raw_segs = _detect_vad(samples, float(thr), vad_plan.limits.speech_pad_ms)
+                    spans: list[tuple[int, int]] = []
+                    for seg in raw_segs:
+                        s_abs = w.start_ms + _sample_index_to_ms(int(seg["start"]))
+                        e_abs = min(w.end_ms, w.start_ms + _sample_index_to_ms(int(seg["end"])))
+                        if e_abs > s_abs:
+                            spans.append((s_abs, e_abs))
+                    pass_spans[tkey] = spans
+
+                window_records.append({
+                    "window_index": w.window_index,
+                    "start_ms": w.start_ms,
+                    "end_ms": w.end_ms,
+                    "duration_ms": w.end_ms - w.start_ms,
+                    "cue_ids": list(w.cue_ids),
+                    "window_rms_dbfs": win_rms_dbfs,
+                    "window_noise_floor_p10_dbfs": floor_dbfs,
+                    "window_median_frame_dbfs": median_dbfs,
+                    "window_max_frame_dbfs": max_frame_dbfs,
+                    "vad_regions_ms_by_threshold": {
+                        k: [[s, e] for s, e in v] for k, v in pass_spans.items()
+                    },
+                    "vad_total_ms_by_threshold": {
+                        k: sum(e - s for s, e in v) for k, v in pass_spans.items()
+                    },
+                })
+
+                for cid in w.cue_ids:
+                    cue_num, mc = cue_by_id[cid]
+                    c_s = _round_ms(mc.start_ms)
+                    c_e = _round_ms(mc.end_ms)
+                    c_dur = max(1, c_e - c_s)
+                    i_s = max(0, min(int(samples.size), (c_s - w.start_ms) * 16))
+                    i_e = max(min(int(samples.size), i_s + 1), min(int(samples.size), (c_e - w.start_ms) * 16))
+                    c_slice = samples[i_s:i_e]
+                    c_frames = _frame_rms_dbfs(c_slice)
+                    c_rms = _rms_dbfs_from_array(c_slice)
+                    c_peak = round(
+                        max(-120.0, min(0.0, 20.0 * math.log10(max(1e-6, float(np.max(np.abs(c_slice))))))),
+                        2,
+                    ) if int(c_slice.size) > 0 else -120.0
+                    c_p90 = round(float(np.percentile(c_frames, 90)), 2)
+                    c_snr_rms = round(c_rms - floor_dbfs, 2)
+                    c_snr_p90 = round(c_p90 - floor_dbfs, 2)
+                    active_ratio = round(sum(1 for x in c_frames if x >= floor_dbfs + 6.0) / len(c_frames), 4)
+                    ov_by_thr = {k: _interval_overlap_ms(c_s, c_e, v) for k, v in pass_spans.items()}
+                    vad_std = ov_by_thr.get("0.54", 0)
+                    vad_low = ov_by_thr.get("0.28", 0)
+                    if vad_std > 0:
+                        tier = "STANDARD_VAD_DETECTED"
+                    elif vad_low > 0:
+                        tier = "LOW_THRESHOLD_VAD_ONLY"
+                    elif c_snr_p90 >= 6.0 or active_ratio >= 0.20:
+                        tier = "NO_VAD_ELEVATED_ENERGY"
+                    else:
+                        tier = "NO_VAD_LOW_ENERGY"
+                    cue_records.append({
+                        "cue_id": cid,
+                        "cue_number": cue_num,
+                        "window_index": w.window_index,
+                        "start_ms": c_s,
+                        "end_ms": c_e,
+                        "duration_ms": c_dur,
+                        "ja_text": mc.text,
+                        "cue_rms_dbfs": c_rms,
+                        "cue_peak_dbfs": c_peak,
+                        "cue_p90_frame_dbfs": c_p90,
+                        "window_noise_floor_p10_dbfs": floor_dbfs,
+                        "cue_snr_rms_above_floor_db": c_snr_rms,
+                        "cue_snr_p90_above_floor_db": c_snr_p90,
+                        "cue_active_frame_ratio_above_floor_6db": active_ratio,
+                        "cue_vad_overlap_ms_by_threshold": ov_by_thr,
+                        "cue_vad_coverage_ratio_by_threshold": {
+                            k: round(ms / c_dur, 4) for k, ms in ov_by_thr.items()
+                        },
+                        "audio_evidence_tier": tier,
+                        "structural_signals": signals_by_cue.get(cid),
+                    })
+
+        return {
+            "schema_version": V2D_SCHEMA_VERSION,
+            "dvd_id": current.dvd_id,
+            "canonical_video_relative": current.canonical_video_relative,
+            "source_size": current.source_size,
+            "source_mtime_ns": current.source_mtime_ns,
+            "source_fingerprint": vad_plan.source_fingerprint,
+            "master_sha256": vad_plan.master_sha256,
+            "review_request_sha256": vad_plan.review_request_sha256,
+            "vad_engine": "faster_whisper.vad.SileroVAD(local_cpu)",
+            "thresholds": [float(t) for t in vad_plan.limits.thresholds],
+            "speech_pad_ms": vad_plan.limits.speech_pad_ms,
+            "window_count": len(window_records),
+            "total_audio_ms": vad_plan.total_audio_ms,
+            "vad_window_pass_evaluations": evaluations,
+            "windows": window_records,
+            "cues": cue_records,
+        }
+
+    return run_vad
+
+
+def _validate_targeted_vad_payload(
+    payload: object,
+    *,
+    master: V2DMaster,
+    request: QualityReviewRequest,
+    vad_plan: TargetedVADPlan,
+) -> dict[str, object]:
+    if type(payload) is not dict:
+        raise V2DHold("TARGETED_VAD_ARTIFACT_INVALID")
+    snap = master.review_set._source_bundle.asr_result.source_snapshot
+    if (payload.get("schema_version") != V2D_SCHEMA_VERSION
+            or payload.get("dvd_id") != snap.dvd_id
+            or payload.get("canonical_video_relative") != snap.canonical_video_relative
+            or payload.get("source_size") != snap.source_size
+            or payload.get("source_mtime_ns") != snap.source_mtime_ns
+            or payload.get("source_fingerprint") != vad_plan.source_fingerprint
+            or payload.get("master_sha256") != vad_plan.master_sha256
+            or payload.get("review_request_sha256") != vad_plan.review_request_sha256):
+        raise V2DHold("TARGETED_VAD_SOURCE_IDENTITY_MISMATCH")
+    windows = payload.get("windows")
+    cues = payload.get("cues")
+    if type(windows) is not list or type(cues) is not list:
+        raise V2DHold("TARGETED_VAD_COVERAGE_INVALID")
+    expected_wins = [(w.window_index, w.start_ms, w.end_ms, list(w.cue_ids)) for w in vad_plan.windows]
+    actual_wins = [
+        (w.get("window_index"), w.get("start_ms"), w.get("end_ms"), w.get("cue_ids"))
+        for w in windows if isinstance(w, dict)
+    ]
+    if actual_wins != expected_wins or len(windows) > vad_plan.limits.max_windows:
+        raise V2DHold("TARGETED_VAD_WINDOW_COVERAGE_MISMATCH")
+    if payload.get("total_audio_ms") != vad_plan.total_audio_ms or vad_plan.total_audio_ms > vad_plan.limits.max_total_audio_ms:
+        raise V2DHold("TARGETED_VAD_DURATION_MISMATCH")
+    if tuple(c.get("cue_id") for c in cues if isinstance(c, dict)) != vad_plan.target_cue_ids:
+        raise V2DHold("TARGETED_VAD_CUE_COVERAGE_MISMATCH")
+    return payload
+
+
+def _load_or_run_targeted_vad_evidence(
+    master: V2DMaster,
+    request: QualityReviewRequest,
+    vad_plan: TargetedVADPlan,
+    *,
+    vad_evidence_runner: Callable | None,
+    staging_root: str | Path,
+    reuse_only: bool,
+) -> tuple[dict[str, object], bytes, str, str]:
+    try:
+        root = _private_dir(staging_root)
+        snap = master.review_set._source_bundle.asr_result.source_snapshot
+        ctx_sha = _vad_context_sha256(snap, vad_plan)
+        vad_root = _private_child(root, "vad-evidence", create=not reuse_only)
+        stage = _private_child(vad_root, ctx_sha, create=not reuse_only)
+    except V2DError as error:
+        if reuse_only:
+            raise V2DHold("TARGETED_VAD_RESUME_ARTIFACT_MISSING") from error
+        raise
+    art_path = stage / V2D_TARGETED_VAD_SIDECAR_FILENAME
+    link_path = stage / "v2d-vad-linkage-v1.json"
+    art_present = art_path.exists() or art_path.is_symlink()
+    link_present = link_path.exists() or link_path.is_symlink()
+    if art_present != link_present:
+        raise V2DHold("TARGETED_VAD_LINKAGE_INCOMPLETE")
+
+    if art_present:
+        art_raw = _read_private_owned(art_path, max_bytes=MAX_TARGETED_VAD_ARTIFACT_BYTES)
+        link_raw = _read_private_owned(link_path, max_bytes=V2D_MAX_JSON_BYTES)
+        payload = _validate_targeted_vad_payload(
+            _load_json(art_raw, "targeted VAD artifact"),
+            master=master, request=request, vad_plan=vad_plan,
+        )
+        if _wire(payload) != art_raw:
+            raise V2DHold("TARGETED_VAD_ARTIFACT_NONCANONICAL")
+        art_sha = _sha(art_raw)
+        expected_link = _wire({"context_sha256": ctx_sha, "artifact_sha256": art_sha})
+        if link_raw != expected_link:
+            raise V2DHold("TARGETED_VAD_LINKAGE_MISMATCH")
+        return payload, art_raw, art_sha, _sha(link_raw)
+
+    if reuse_only:
+        raise V2DHold("TARGETED_VAD_RESUME_ARTIFACT_MISSING")
+    if not callable(vad_evidence_runner):
+        raise V2DHold("TARGETED_VAD_RUNNER_UNAVAILABLE")
+    payload = _validate_targeted_vad_payload(
+        vad_evidence_runner(master, request, vad_plan),
+        master=master, request=request, vad_plan=vad_plan,
+    )
+    art_raw = _wire(payload)
+    _write_exclusive(art_path, art_raw)
+    art_raw = _read_private_owned(art_path, max_bytes=MAX_TARGETED_VAD_ARTIFACT_BYTES)
+    payload = _validate_targeted_vad_payload(
+        _load_json(art_raw, "targeted VAD artifact"),
+        master=master, request=request, vad_plan=vad_plan,
+    )
+    art_sha = _sha(art_raw)
+    link_raw = _wire({"context_sha256": ctx_sha, "artifact_sha256": art_sha})
+    _write_exclusive(link_path, link_raw)
+    link_raw = _read_private_owned(link_path, max_bytes=V2D_MAX_JSON_BYTES)
+    return payload, art_raw, art_sha, _sha(link_raw)
+
+
+def _overlay_target_review_result(
+    base_result: QualityReviewResult,
+    request: QualityReviewRequest,
+    target_cue_ids: tuple[str, ...],
+    target_result: QualityReviewResult,
+) -> QualityReviewResult:
+    """Apply validated partial target decisions cleanly onto a verified prior full review."""
+    validate_review_result(base_result, request)
+    validate_review_target_ids(request, target_cue_ids)
+    validate_review_result(target_result, request, target_cue_ids=target_cue_ids)
+    updates = {cue.cue_id: cue for cue in target_result.cues}
+    merged_cues = tuple(updates.get(cue.cue_id, cue) for cue in base_result.cues)
+    merged = replace(target_result, cues=merged_cues)
+    return validate_review_result(merged, request)
 
 
 SHORT_REVIEW_ID_ADDENDUM = (
@@ -3752,6 +4218,8 @@ def _build_short_id_review_chunk_prompt(
         )
         query += "\nV2D_TARGET_ONLY: Preserve every non-target first-pass value. Targets in order: " + json.dumps(target_short_ids)
     query += V2D_REVIEW_HALLUCINATION_AND_DEDUP_ADDENDUM
+    if signals_by_cue and any("vad_audio_evidence" in sig for sig in signals_by_cue.values()):
+        query += V2D_REVIEW_VAD_EVIDENCE_ADDENDUM
     req_dict = json.loads(serialize_review_request(request))
     chunk_cues = []
     chunk_manifest = []
@@ -3869,8 +4337,11 @@ def run_targeted_review(
     reuse_only: bool = False,
     extra_target_cue_ids: tuple[str, ...] = (),
     allow_limited_json_recovery: bool = False,
+    reuse_verified_review_baseline: bool = False,
+    vad_evidence_runner: Callable | None = None,
+    targeted_vad_limits: TargetedVADLimits | None = None,
 ) -> V2DReviewOutcome:
-    """Run existing full-title triage, then existing bounded suspect review."""
+    """Run/reuse full-title triage, bounded suspect review, and optional VAD follow-up review."""
     if type(hermes_settings) is not HermesExecutionSettings:
         raise V2DError("resolved Hermes profile settings are required")
     master = _validate_master(master)
@@ -3882,8 +4353,9 @@ def run_targeted_review(
     }
     root = _private_dir(staging_root)
     request_sha = review_request_sha256(request)
-    request_dir = _private_child(root, request_sha, create=not reuse_only)
-    triage_dir = _private_child(request_dir, "triage", create=not reuse_only)
+    triage_reuse = reuse_only or reuse_verified_review_baseline
+    request_dir = _private_child(root, request_sha, create=not triage_reuse)
+    triage_dir = _private_child(request_dir, "triage", create=not triage_reuse)
     triage_id = str(uuid.uuid5(V2D_SESSION_NAMESPACE, request_sha + ":triage"))
     use_chunked = False
     try:
@@ -3896,11 +4368,129 @@ def run_targeted_review(
         use_chunked = True
         triage_prompt = b""
 
+    vad_enabled = (targeted_vad_limits is not None or vad_evidence_runner is not None)
+    if vad_enabled:
+        vad_limits = TargetedVADLimits() if targeted_vad_limits is None else targeted_vad_limits
+        vad_plan = plan_targeted_vad_windows(master, request=request, limits=vad_limits)
+    else:
+        vad_plan = None
+
+    def _run_follow_up_vad_review(
+        *,
+        base_final: QualityReviewResult,
+        prior_final_sha: str | None,
+        prior_target_ids: tuple[str, ...],
+        use_short: bool,
+        real_to_short: dict[str, str] | None = None,
+        short_to_real: dict[str, str] | None = None,
+    ) -> V2DReviewOutcome:
+        vad_payload, vad_raw, vad_art_sha, vad_link_sha = _load_or_run_targeted_vad_evidence(
+            master, request, vad_plan,
+            vad_evidence_runner=vad_evidence_runner,
+            staging_root=staging_root, reuse_only=reuse_only,
+        )
+        vad_target_ids = vad_plan.target_cue_ids
+        if not vad_target_ids:
+            final_raw = serialize_review_result(base_final, request)
+            return V2DReviewOutcome(
+                request, triage, base_final, _sha(triage_raw), _sha(final_raw),
+                prior_target_ids, vad_art_sha, vad_link_sha, None, vad_raw, prior_final_sha,
+            )
+        vad_by_cid = {row["cue_id"]: row for row in vad_payload["cues"]}
+        enriched_signals = json.loads(json.dumps(signals_by_cue))
+        for cid, vrow in vad_by_cid.items():
+            entry = enriched_signals.setdefault(cid, {"ext_ja": False})
+            entry["vad_audio_evidence"] = {
+                "window_index": vrow["window_index"],
+                "cue_vad_054_ms": vrow["cue_vad_overlap_ms_by_threshold"].get("0.54", 0),
+                "cue_vad_028_ms": vrow["cue_vad_overlap_ms_by_threshold"].get("0.28", 0),
+                "cue_rms_dbfs": vrow["cue_rms_dbfs"],
+                "cue_p90_frame_dbfs": vrow["cue_p90_frame_dbfs"],
+                "window_noise_floor_p10_dbfs": vrow["window_noise_floor_p10_dbfs"],
+                "cue_snr_p90_above_floor_db": vrow["cue_snr_p90_above_floor_db"],
+                "cue_active_frame_ratio_above_floor_6db": vrow["cue_active_frame_ratio_above_floor_6db"],
+                "audio_evidence_tier": vrow["audio_evidence_tier"],
+            }
+        vad_dir = _private_child(
+            request_dir, "targeted-final-vad-" + vad_art_sha[:16], create=not reuse_only,
+        )
+        vad_id = str(uuid.uuid5(
+            V2D_SESSION_NAMESPACE, request_sha + ":targeted-final-vad:" + vad_art_sha,
+        ))
+        if not use_short:
+            vad_prompt = _review_prompt(
+                request, master, target_cue_ids=vad_target_ids, signals_by_cue=enriched_signals,
+            )
+            vad_target_result = invoke(
+                vad_prompt, vad_dir, "v2d-targeted-final-review",
+                lambda raw: parse_review_result(raw, request, target_cue_ids=vad_target_ids),
+                hermes_settings=hermes_settings, reuse_only=reuse_only,
+            )
+        else:
+            id_to_index = {cue.cue_id: i for i, cue in enumerate(request.cues)}
+            vad_indices = tuple(id_to_index[cid] for cid in vad_target_ids)
+            ctx_set: set[int] = set()
+            for ti in vad_indices:
+                for ci in range(max(0, ti - 2), min(len(request.cues), ti + 3)):
+                    ctx_set.add(ci)
+            ctx_indices = tuple(sorted(ctx_set))
+            vad_prompt = _build_short_id_review_chunk_prompt(
+                request, master, cue_indices=ctx_indices, target_indices=vad_indices,
+                real_to_short=real_to_short, signals_by_cue=enriched_signals,
+            )
+            if len(vad_prompt) > V2D_MAX_PROMPT_BYTES:
+                vad_prompt = _build_short_id_review_chunk_prompt(
+                    request, master, cue_indices=vad_indices, target_indices=vad_indices,
+                    real_to_short=real_to_short, signals_by_cue=enriched_signals,
+                )
+            if len(vad_prompt) > V2D_MAX_PROMPT_BYTES:
+                raise V2DError("VAD follow-up review prompt exceeds the existing native prompt bound")
+            vad_short_ids = tuple(real_to_short[cid] for cid in vad_target_ids)
+
+            def validate_vad(raw, *, _sids=vad_short_ids, _rids=vad_target_ids):
+                restored = _restore_short_id_review_payload(
+                    raw, request=request, expected_short_ids=_sids, short_to_real=short_to_real,
+                    allow_limited_json_recovery=allow_limited_json_recovery,
+                )
+                return parse_review_result(restored, request, target_cue_ids=_rids)
+
+            vad_target_result = invoke(
+                vad_prompt, vad_dir, "v2d-targeted-final-review",
+                validate_vad, hermes_settings=hermes_settings, reuse_only=reuse_only,
+            )
+        if type(vad_target_result) is not QualityReviewResult:
+            raise V2DError("VAD targeted review executor returned an invalid result")
+        vad_target_result = bind_review_execution_provenance(vad_target_result, request, vad_id)
+        merged_final = _overlay_target_review_result(base_final, request, vad_target_ids, vad_target_result)
+        merged_final = bind_review_execution_provenance(merged_final, request, vad_id)
+        final_raw = serialize_review_result(merged_final, request)
+        union_set = set(prior_target_ids) | set(vad_target_ids)
+        merged_targets = tuple(cue.cue_id for cue in request.cues if cue.cue_id in union_set)
+        vad_summary = {
+            "vad_engine": vad_payload["vad_engine"],
+            "thresholds": vad_payload["thresholds"],
+            "speech_pad_ms": vad_payload["speech_pad_ms"],
+            "window_count": vad_payload["window_count"],
+            "total_audio_ms": vad_payload["total_audio_ms"],
+            "vad_window_pass_evaluations": vad_payload["vad_window_pass_evaluations"],
+            "target_cue_count": len(vad_target_ids),
+            "target_cue_ids": list(vad_target_ids),
+            "vad_artifact_sha256": vad_art_sha,
+            "vad_linkage_sha256": vad_link_sha,
+            "prior_review_baseline_reused": reuse_verified_review_baseline,
+            "prior_final_review_result_sha256": prior_final_sha,
+            "followup_review_prompt_bytes": len(vad_prompt),
+        }
+        return V2DReviewOutcome(
+            request, triage, merged_final, _sha(triage_raw), _sha(final_raw),
+            merged_targets, vad_art_sha, vad_link_sha, vad_summary, vad_raw, prior_final_sha,
+        )
+
     if not use_chunked:
         triage = invoke(
             triage_prompt, triage_dir, "v2d-triage",
             lambda raw: parse_review_result(raw, request),
-            hermes_settings=hermes_settings, reuse_only=reuse_only,
+            hermes_settings=hermes_settings, reuse_only=triage_reuse,
         )
         if type(triage) is not QualityReviewResult:
             raise V2DError("triage executor returned an invalid review result")
@@ -3908,20 +4498,30 @@ def run_targeted_review(
         triage_raw = serialize_review_result(triage, request)
         target_ids = select_suspect_cue_ids(request, triage)
         combined = set(target_ids) | set(extra_target_cue_ids) | signal_suspect_ids
+        if vad_plan is not None and not reuse_verified_review_baseline:
+            combined |= set(vad_plan.target_cue_ids)
         if combined:
             target_ids = tuple(cue.cue_id for cue in request.cues if cue.cue_id in combined)
         if not target_ids:
             final = triage
         else:
-            final_dir = _private_child(request_dir, "targeted-final", create=not reuse_only)
+            final_reuse = reuse_only or reuse_verified_review_baseline
+            final_dir = _private_child(request_dir, "targeted-final", create=not final_reuse)
             final_id = str(uuid.uuid5(V2D_SESSION_NAMESPACE, request_sha + ":targeted-final"))
+            active_signals = signals_by_cue
+            if vad_plan is not None and not reuse_verified_review_baseline:
+                return _run_follow_up_vad_review(
+                    base_final=merge_target_review_result(request, ()),
+                    prior_final_sha=None, prior_target_ids=target_ids,
+                    use_short=False,
+                )
             final_prompt = _review_prompt(
-                request, master, target_cue_ids=target_ids, signals_by_cue=signals_by_cue,
+                request, master, target_cue_ids=target_ids, signals_by_cue=active_signals,
             )
             target_result = invoke(
                 final_prompt, final_dir, "v2d-targeted-final-review",
                 lambda raw: parse_review_result(raw, request, target_cue_ids=target_ids),
-                hermes_settings=hermes_settings, reuse_only=reuse_only,
+                hermes_settings=hermes_settings, reuse_only=final_reuse,
             )
             if type(target_result) is not QualityReviewResult:
                 raise V2DError("targeted review executor returned an invalid result")
@@ -3929,6 +4529,11 @@ def run_targeted_review(
             final = merge_target_review_result(request, target_ids, target_result)
             final = bind_review_execution_provenance(final, request, final_id)
         final_raw = serialize_review_result(final, request)
+        if vad_plan is not None and reuse_verified_review_baseline:
+            return _run_follow_up_vad_review(
+                base_final=final, prior_final_sha=_sha(final_raw),
+                prior_target_ids=target_ids, use_short=False,
+            )
         return V2DReviewOutcome(request, triage, final, _sha(triage_raw), _sha(final_raw), target_ids)
 
     # Chunked short-ID fallback when whole-title review prompt exceeds 128KB bound.
@@ -3939,7 +4544,7 @@ def run_targeted_review(
     )
     merged_triage_cues = []
     for part_idx, (cue_indices, chunk_prompt) in enumerate(chunks, 1):
-        chunk_dir = _private_child(triage_dir, f"chunk-{part_idx:02d}", create=not reuse_only)
+        chunk_dir = _private_child(triage_dir, f"chunk-{part_idx:02d}", create=not triage_reuse)
         chunk_real_ids = tuple(request.cues[i].cue_id for i in cue_indices)
         chunk_short_ids = tuple(real_to_short[cid] for cid in chunk_real_ids)
 
@@ -3952,7 +4557,7 @@ def run_targeted_review(
 
         part_res = invoke(
             chunk_prompt, chunk_dir, f"v2d-triage-chunk-{part_idx:02d}",
-            validate_chunk, hermes_settings=hermes_settings, reuse_only=reuse_only,
+            validate_chunk, hermes_settings=hermes_settings, reuse_only=triage_reuse,
         )
         if type(part_res) is not QualityReviewResult:
             raise V2DError("chunked triage executor returned an invalid review result")
@@ -3973,7 +4578,8 @@ def run_targeted_review(
     if not target_ids:
         final = triage
     else:
-        final_dir = _private_child(request_dir, "targeted-final", create=not reuse_only)
+        final_reuse = reuse_only or reuse_verified_review_baseline
+        final_dir = _private_child(request_dir, "targeted-final", create=not final_reuse)
         final_id = str(uuid.uuid5(V2D_SESSION_NAMESPACE, request_sha + ":targeted-final"))
         id_to_index = {cue.cue_id: i for i, cue in enumerate(request.cues)}
         target_indices = tuple(id_to_index[cid] for cid in target_ids)
@@ -4005,7 +4611,7 @@ def run_targeted_review(
 
         target_result = invoke(
             final_prompt, final_dir, "v2d-targeted-final-review",
-            validate_final, hermes_settings=hermes_settings, reuse_only=reuse_only,
+            validate_final, hermes_settings=hermes_settings, reuse_only=final_reuse,
         )
         if type(target_result) is not QualityReviewResult:
             raise V2DError("targeted review executor returned an invalid result")
@@ -4013,6 +4619,12 @@ def run_targeted_review(
         final = merge_target_review_result(request, target_ids, target_result)
         final = bind_review_execution_provenance(final, request, final_id)
     final_raw = serialize_review_result(final, request)
+    if vad_plan is not None:
+        return _run_follow_up_vad_review(
+            base_final=final, prior_final_sha=_sha(final_raw),
+            prior_target_ids=target_ids, use_short=True,
+            real_to_short=real_to_short, short_to_real=short_to_real,
+        )
     return V2DReviewOutcome(request, triage, final, _sha(triage_raw), _sha(final_raw), target_ids)
 
 
@@ -4148,6 +4760,9 @@ def run_v2d_pipeline(
     use_short_id_mapping_for_uncached: bool = False,
     reuse_verified_translation: bool = False,
     preserve_legacy_supplemental_grouping: bool = False,
+    reuse_verified_review_baseline: bool = False,
+    vad_evidence_runner: Callable | None = None,
+    targeted_vad_limits: TargetedVADLimits | None = None,
 ) -> V2DPipelineResult:
     """Connected offline/live-injectable V2-D path; never bypasses validators."""
     budget = None
@@ -4169,7 +4784,12 @@ def run_v2d_pipeline(
         verified_before = len(getattr(executor_owner, "_verified_attempts", ()))
         plan = validate_utterance_review_plan(plan)
         output = _private_dir(output_directory)
-        collisions = [name for name in V2D_OUTPUT_NAMES if (output / name).exists() or (output / name).is_symlink()]
+        check_names = list(V2D_OUTPUT_NAMES)
+        if private_provisional_completion:
+            check_names.append(V2D_PRIVATE_PROVISIONAL_UNCERTAINTY_FILENAME)
+        if targeted_vad_limits is not None or vad_evidence_runner is not None:
+            check_names.append(V2D_TARGETED_VAD_SIDECAR_FILENAME)
+        collisions = [name for name in check_names if (output / name).exists() or (output / name).is_symlink()]
         if collisions:
             raise V2DError("V2-D output collision")
         batch_groups = executor_owner is not None or requested_batching is True
@@ -4365,6 +4985,9 @@ def run_v2d_pipeline(
             reuse_only=reuse_only,
             extra_target_cue_ids=extra_review_cue_ids,
             allow_limited_json_recovery=allow_limited_json_recovery,
+            reuse_verified_review_baseline=reuse_verified_review_baseline,
+            vad_evidence_runner=vad_evidence_runner,
+            targeted_vad_limits=targeted_vad_limits,
         )
         ja_cues, ko_cues = _materialized_cues(master, translated, review)
         ja_raw, ko_generated = _srt_bytes(ja_cues), generate_korean_srt(ko_cues)
@@ -4401,8 +5024,9 @@ def run_v2d_pipeline(
                 preserved_uncertainty_report
                 or preserved_translation_uncertainty_report
                 or json_recovery_log
+                or review.vad_evidence_raw is not None
             )
-        ) or bool(json_recovery_log)
+        ) or bool(json_recovery_log) or bool(review.vad_evidence_raw)
         result_state = "PRIVATE_PROVISIONAL_SRT_READY" if is_private_provisional else "CLEAN_SRT_READY"
         review_signals_by_cue, _ = _cue_asr_quality_context(master)
         review_dispositions = []
@@ -4420,6 +5044,10 @@ def run_v2d_pipeline(
                     "has_asr_signals": sig is not None,
                     "asr_signals": sig,
                 })
+        vad_cues_report = []
+        if review.vad_evidence_raw is not None:
+            vad_decoded = json.loads(review.vad_evidence_raw)
+            vad_cues_report = list(vad_decoded.get("cues", ()))
         uncertainty_report_raw = None
         if is_private_provisional:
             uncertainty_report_raw = _wire({
@@ -4433,6 +5061,8 @@ def run_v2d_pipeline(
                 "limited_json_recoveries": list(json_recovery_log),
                 "preserved_unresolved_uncertainty": list(preserved_uncertainty_report),
                 "preserved_post_translation_audio_requests": list(preserved_translation_uncertainty_report),
+                "vad_audio_evidence_summary": review.vad_evidence_summary,
+                "vad_audio_evidence_cues": vad_cues_report,
                 "review_dispositions": review_dispositions,
             })
         proof_payload = {
@@ -4467,6 +5097,10 @@ def run_v2d_pipeline(
             "review_request_sha256": review_request_sha256(review.request),
             "triage_result_sha256": review.triage_sha256,
             "final_review_result_sha256": review.final_sha256,
+            "prior_final_review_result_sha256": review.prior_final_sha256,
+            "vad_audio_evidence_artifact_sha256": review.vad_evidence_artifact_sha256,
+            "vad_audio_evidence_linkage_sha256": review.vad_evidence_linkage_sha256,
+            "vad_audio_evidence_summary": review.vad_evidence_summary,
             "review_execution_session_id": review.final.review_execution_session_id,
             "targeted_review_cue_count": len(review.targeted_cue_ids),
             "hermes_settings_resolved_for_unstarted_stages": settings_evidence,
@@ -4493,15 +5127,19 @@ def run_v2d_pipeline(
             proof_payload["preserved_unresolved_uncertainty_count"] = len(preserved_uncertainty_report)
             proof_payload["preserved_post_translation_audio_request_count"] = len(preserved_translation_uncertainty_report)
             proof_payload["outputs"][V2D_PRIVATE_PROVISIONAL_UNCERTAINTY_FILENAME] = _sha(uncertainty_report_raw)
+        if review.vad_evidence_raw is not None:
+            proof_payload["outputs"][V2D_TARGETED_VAD_SIDECAR_FILENAME] = _sha(review.vad_evidence_raw)
         proof_raw = _wire(proof_payload)
-        output_names = (
-            V2D_OUTPUT_NAMES + (V2D_PRIVATE_PROVISIONAL_UNCERTAINTY_FILENAME,)
-            if is_private_provisional else V2D_OUTPUT_NAMES
-        )
-        payloads = (
-            (master_raw, ja_raw, ko_raw, proof_raw, uncertainty_report_raw)
-            if is_private_provisional else (master_raw, ja_raw, ko_raw, proof_raw)
-        )
+        output_names_list = list(V2D_OUTPUT_NAMES)
+        payloads_list = [master_raw, ja_raw, ko_raw, proof_raw]
+        if is_private_provisional:
+            output_names_list.append(V2D_PRIVATE_PROVISIONAL_UNCERTAINTY_FILENAME)
+            payloads_list.append(uncertainty_report_raw)
+        if review.vad_evidence_raw is not None:
+            output_names_list.append(V2D_TARGETED_VAD_SIDECAR_FILENAME)
+            payloads_list.append(review.vad_evidence_raw)
+        output_names = tuple(output_names_list)
+        payloads = tuple(payloads_list)
         # Check all names again before the first exclusive write.
         if any((output / name).exists() or (output / name).is_symlink() for name in output_names):
             raise V2DError("V2-D output collision")
@@ -4538,11 +5176,13 @@ __all__ = [
     "OutsideSpanExternalCueAssessment", "OutsideSpanHypothesisWindow",
     "OutsideSpanRecoveryLimits", "OutsideSpanRecoveryPlan", "OutsideSpanRecoveryResult",
     "OutsideSpanWindowOutcome", "RecoveredSupplementalASRSegment",
-    "SourceDecision", "SourceSpan", "V2DAdjudication", "V2DError", "V2DExecutionLimits",
+    "SourceDecision", "SourceSpan", "TargetedVADLimits", "TargetedVADPlan",
+    "TargetedVADWindow", "V2DAdjudication", "V2DError", "V2DExecutionLimits",
     "V2DHold", "V2DLimitStop", "V2DMaster", "V2DPipelineResult",
     "adjudicate_ja_master", "build_supplemental_asr_groups", "build_v2d_review_request",
-    "build_v2d_targeted_asr_adapter", "load_validated_outside_span_diagnostic_evidence",
-    "materialize_ja_master", "plan_outside_span_recovery", "run_targeted_review",
-    "run_v2d_pipeline", "split_outside_span_groups", "translate_ja_master",
-    "validate_adjudication",
+    "build_v2d_targeted_asr_adapter", "build_v2d_targeted_vad_runner",
+    "load_validated_outside_span_diagnostic_evidence",
+    "materialize_ja_master", "plan_outside_span_recovery", "plan_targeted_vad_windows",
+    "run_targeted_review", "run_v2d_pipeline", "split_outside_span_groups",
+    "translate_ja_master", "validate_adjudication",
 ]
