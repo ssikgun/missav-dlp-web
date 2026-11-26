@@ -1,6 +1,20 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
-## 2026-11-26 — V2-E follow-up hallucination audio-evidence Option 1 canonical source promotion COMPLETE (private trial NEXT)
+## 2026-11-26 — V2-E follow-up hallucination audio-evidence Option 1 live trial EXECUTED / PRIVATE_PROVISIONAL_SRT_READY (HALLUCINATION_REMOVED=0; authorization CONSUMED)
+
+- **Live execution:** Executed single approved HSODA-104 Option 1 trial on CT108 (`downloader`) from isolated canonical checkout `205e3032c0fcfb5f3702a85cd7e0c0a2bb40587a` into `/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-vad-review-once-20261126` (`220.58s`, exit `0`, authorization **CONSUMED**).
+- **Reused (`0` Whisper ASR calls, `0` initial/ReAdj/translation/triage/prior-final Hermes calls):** `6` initial batches (`8` receipts), `43` ASR windows (`4+19+20`), `4` ReAdj batches (`55` groups, `12` unresolved), `266`-cue JA Master, `5` KO translation parts, `2` B1 triage chunks, and `1` B1 `targeted-final`. B1 dedup (`#250/#255 OMIT`), B1 repairs (`#54/#76/#110/#222/#233`), and normal dialogue remained 100% intact.
+- **Measured local CPU Silero VAD + RMS energy (`11` windows / `84,080ms <= 85s`, `22` window-pass evaluations at `0.54` & `0.28`, `speech_pad_ms=0`):**
+  - `8` cues (`#143,#147,#149,#151,#152,#260,#261,#262`): `STANDARD_VAD_DETECTED` (`64–3,844ms` at `0.54`, SNR `+11.28..+21.17 dB` above floor).
+  - `2` cues (`#62, #160`): `LOW_THRESHOLD_VAD_ONLY` (`0ms` at `0.54`, `1,028ms / 36ms` at `0.28`, SNR `+9.03 / +14.54 dB`).
+  - `4` cues (`#63, #64, #65, #67`): `NO_VAD_ELEVATED_ENERGY` (`vad054=0ms, vad028=0ms`, SNR `+6.33..+11.0 dB`).
+  - `1` cue (`#66`): `NO_VAD_LOW_ENERGY` (`vad054=0ms, vad028=0ms`, `rms=-39.49`, `floor=-42.95`, `snr_p90=5.29 dB`, `act6=0.0469`).
+- **Follow-up review & before/after (`HERMES_EXECUTION_COUNT=1` / 2 budget, `46,710B` prompt):** `HALLUCINATION_REMOVED_COUNT=0`, `HALLUCINATION_RETAINED_COUNT=15` (`clean-ja-v1.srt` & `clean-ko-v1.srt` stay byte-identical to B1 at `264` cues; `#64` stays `AMBIGUOUS/KEEP`, remaining `14` `KEEP/KEEP`; `12` unresolved groups + `5` post-translation audio requests preserved).
+- **Verified root causes:** (1) On real audio, `10/15` hallucinated cues sit on non-verbal vocalizations/rustling (`+7..+21 dB` over floor) that trigger Silero VAD `0.28–0.54`, showing VAD alone cannot distinguish non-verbal JAV audio from dialogue without Whisper token confidence diagnostics (`no_speech_prob`/`avg_logprob`); (2) Even across `W02–W03` (`#63–67`, where `vad054=0ms, vad028=0ms`), legacy `QualityReviewInputCue`'s JSON key `"external_ja"` (actually holding `master.cues[i].text`) caused Hermes to cite `"External JA and accepted STT agree..."` while ignoring `asr_signals.ext_ja=false`.
+- **Artifacts (`/opt/missav-dlp-web/discovery/s11-v2e-HSODA-104-vad-review-once-20261126/artifacts/`):** `clean-ja-v1.srt` (`e4dd1e03...`), `clean-ko-v1.srt` (`31a2f24c...`), `v2d-proof-v1.json` (`614e30d0...`), `v2d-private-provisional-uncertainty-v1.json` (`6a6df271...`), `targeted-vad-evidence-v1.json` (`2b0e2440...`). Postcheck PASS across CT108/CT120/VM122/NAS/Stage12 (`5/25/165/10`), `ASR_TEMP_RESIDUAL=0`, `PRIOR_B1_ROOT_FILE_COUNT=105`, `STAGE12_PUBLISH_ELIGIBLE=False`, `PRODUCTION_WRITE_COUNT=0`, `PRODUCT_QUALITY=NOT_VERIFIED`.
+
+
+## 2026-11-26 — V2-E follow-up hallucination audio-evidence Option 1 canonical source promotion COMPLETE (private trial executed above)
 
 - `SOURCE_PROMOTION=PASS`. Promoted exact 2 tested files (`+756/-27`) to canonical `teddy-subtitle-stage11` as commit `205e3032c0fcfb5f3702a85cd7e0c0a2bb40587a` (parent `e89ae7985afb709035d41d8a0755f09dc9b1c0b5`, fast-forward push).
 - **Remote SHA256 readback PASS:** `teddy_discovery_stage11_v2d.py`=`ac2ea39e8d08068c02b1859ca0add49aae78926288296c0ba3f6a70135e6acc2`, `teddy_discovery_stage11_hsoda104_pilot.py`=`f29f1ad27e3be37204d4a3f3e7c1fe423b463e84bd2f27b416a22760a62bbb1f`.
