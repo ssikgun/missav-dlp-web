@@ -19317,3 +19317,11 @@ PY
 - Prior OS isolation was a temporary systemd DynamicUser service (30-second cap, PrivateNetwork=yes), not a retained login account. No matching dedicated account/service/private home was found in checked locations. The recorded script itself does not impose a timeout or network boundary; do not run it outside the externally verified restrictions.
 - Require an identified or separately approved non-admin trial environment, with private HOME/CODEX_HOME, denied paths, runtime cap, and verified narrowly scoped OpenAI connectivity before owner device authentication. No administrator credential copy. Account entitlement for requested gpt-6-luna / medium unverified.
 - CODEX_LOGIN=NOT_RUN; CODEX_EXEC_INVOCATION_COUNT=0; JSON/CUE/TRANSLATION/TIME/TOKENS=NOT_RUN. No product code, deployment, runtime, SIWC, CT120 or CT121 changes.
+
+## 2026-11-27 — CT108 isolated Codex CLI three-cue smoke: PASS
+
+- Actual CT108/systemd, Codex CLI 0.172.0. Dedicated non-admin trial identity, private home, owner-completed official device login. Existing file restrictions and private network namespace verified; only approved OpenAI hostnames allowed, unrelated host probe denied, inner Codex sandbox probe passed. 30-second cap and one-shot reservation enforced.
+- Exact canonical Verified user command SHA-256 matched. Authenticated catalog listed gpt-6-luna with medium. Requested those settings; effective model/effort and provider request count not exposed by this CLI evidence.
+- One codex exec invocation, exit 0, one completed turn, 10.248 seconds. No unexpected tool events. JSON, three ordered IDs [1,2,3], Korean text passed. Input 14,405; output 78; total 14,483; cached input, cache-write input and reasoning output all 0.
+- Synthetic output: (1) 어제 얘기, 아직 기억해? (2) 응, “비밀로 해 줘”라고 했던 거 말이지. (3) 맞아. 오늘은 그다음 이야기를 들려줘. Quoted imperative stayed dialogue. This smoke confirms feasibility only, not production readiness.
+- No administrator credential copy, SIWC activation, product code, deployment, CT120 or CT121 changes. No credentials or raw logs committed.
