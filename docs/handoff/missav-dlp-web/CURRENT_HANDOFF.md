@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC CT108 profile transfer PASS; live refresh pending
+
+- User terminal evidence: REMOTE_STORE=PASS, PROFILE_TRANSFER=PASS, 600:root:root. Selected profile transferred into isolated CT108 trial store; transfer command preserves existing host.json and does not overwrite an existing profile. ACTIVE_WORK result `32d2031f96ef4cbdc637a361ed906f7a7138f1aa`. No identifiers or credentials recorded. Next confirm local profile status and perform one previously approved live refresh on CT108 only, then verify available model catalog. User wishes to proceed with testing; no inference until prerequisite checks and bounded trial scope are recorded. No Windows refresh, paid fallback, integration or production deployment. CT120 unchanged, CT121 STOPPED, V2-E PAUSED. ChatGPT did not execute CT108 commands.
+
 ## 2026-11-27 — SIWC Windows live login PASS; CT108 connection pending
 
 - User's Windows interactive login completed with corrected `windows-acl-v2` candidate and isolated profile store. Redacted result: `SIWC_PROFILE client_id=[REDACTED] connected=true plan_usage_enabled=true`. ACTIVE_WORK record `e5fe3d0b7fb76add7d2f71a3ee8624b8182980ee`. Helper reports account connection and plan usage scope enabled; account tier, CT108 transfer/refresh, actual model catalog and inference not verified. Preserve CT108 host ID, use only officially supported secure profile transfer; do not transfer host.json, print secrets or refresh concurrently on Windows. No model inference or production integration authorized. CT120 unchanged, CT121 STOPPED, V2-E PAUSED.
