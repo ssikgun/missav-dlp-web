@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC live account connection and model catalog approved
+
+- User explicitly approved isolated independent public-client registration, user-interactive official ChatGPT login/consent, secure CT108 profile storage/official supported transfer if needed, live entitlement and bounded refresh checks, and model catalog retrieval. ACTIVE_WORK authorization `50a3b3f6ebba3f24e89ec3695640e300f84ab18e` under S11-MVP001. Reuse offline-verified `/tmp/s11-mvp001-siwc.pr7UsJ` and private venv; inspect REMOTE_LOGIN.md, actual CLI, intended host identity/store and current official guidance before execution. User handles official login privately; no credential values in chat/logs/Git or reuse of existing Codex/Hermes auth. Model inference, production integration, paid fallback and operational changes remain unauthorized. Live connection is NOT_RUN, CT120 unchanged, CT121 STOPPED, V2-E PAUSED; stop before inference. ChatGPT cannot execute directly on CT108.
+
 ## 2026-11-27 — SIWC offline authentication preparation PASS on CT108
 
 - User's actual CT108 terminal confirmed candidate `/tmp/s11-mvp001-siwc.pr7UsJ`, existing private venv, working package-index DNS, successful installation of pinned PyJWT 2.15.1 and crypto dependencies, pip check clean, and 4/4 offline tests OK (0 skipped, 0.022s), including the previously skipped synthetic JWT signature/claims/nonce/audience verification. ACTIVE_WORK result commit `31cae08c74d963df2529b8a70c025eaca6b41ea7`. Prior Codex DNS failure cause unverified. ChatGPT did not execute these commands. Offline preparation complete; live registration/login/consent, account eligibility, target identity/store/transfer, live refresh, model listing and inference remain unverified and subject to separate authorization. No product or operational changes reported; CT120 unchanged, CT121 STOPPED, V2-E PAUSED.
