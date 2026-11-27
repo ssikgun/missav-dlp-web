@@ -1,5 +1,18 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC response validation diagnostics candidate
+
+- Verified canonical SHA `213151452de597093f0cbc1d31cb888ccc6167ae`, common contract 1.0.1, Stage11 contract 2.1.0, router and S11-MVP001 IN_PROGRESS. The isolated candidate remains based on `af6d60a1ed4bac2e7ad3b98903ef4b79c640e433`. Prior compatibility candidate hashes matched before this change.
+- Fixed detail codes now identify each existing check: HTTP status, final URL, Content-Type, SSE JSON/event/line/size/UTF-8/completion, completed-event envelope, response status, returned model, output list/item/tool/message count/role/content/text and reasoning metadata/effort. Numeric HTTP status survives later SSE or response validation failures through the worker and Stage11 failure record.
+- HTTP error bodies are read up to 64 KiB and parsed in memory. Only exact allowlisted provider `type`, `code` and `param` values persist. Messages, request IDs, unknown fields, original exception text, headers, tokens and child stderr are excluded.
+- Focused fake-response tests passed for 24 diagnostic cases, including HTTP 200 preservation through the worker and Stage11 failure record, plus provider-field and secret-leak checks. The existing successful request shape and response acceptance checks passed. Python compilation and `git diff --check` passed. No full suite, live call, authentication refresh, production change, promotion or deployment. Response validation predicates, accepted request JSON, and receipt/resume policy remain unchanged. Previous live response-validation failure root cause remains UNKNOWN. Further live testing requires separate approval.
+
+| Changed candidate file | SHA256 |
+| --- | --- |
+| `teddy_discovery_siwc_backend.py` | `a32eb7d57ad23f8f84285a46a9134a72403346cba82a39d949b121317227bd24` |
+| `teddy_discovery_siwc_backend_smoke.py` | `86a75b3d1aa22476d81c23c81a90c01382828696a76385cb1dbb3674988705a5` |
+| `teddy_discovery_stage11_normal_mode_smoke.py` | `4a5c1a34014af0365440d22ab6a1af9fac8becbbdada53cfec7dd624dc0e9ccc` |
+
 ## 2026-11-27 — CT108 SIWC compatibility live trial failed response validation
 
 - Confirmed canonical approval `684d1ffeff94c3d3c283950eb29d7845dac6d28a`, contracts 1.0.1 and 2.1.0, router and S11-MVP001 IN_PROGRESS, CT108 downloader LXC and isolated candidate at base `af6d60a1ed4bac2e7ad3b98903ef4b79c640e433`. All eight source and requirements SHA256 values matched, including the two latest compatibility files and the existing auth module. Both prior failure reports remained intact.
