@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC Windows ACL immediate error identified
+
+- Non-elevated Windows synthetic test exception tracing revealed `_set_windows_private_acl` line 543 `AttributeError: module 'win32con' has no attribute 'FILE_ALL_ACCESS'`, wrapped at line 560. Correct constant namespace is ntsecuritycon; verify installed pywin32 312 before correction. ACTIVE_WORK record `d046a1a616af369b76a8328176387c9e4f3ed968`. Preserve existing candidates, test a narrow correction to all affected references, retain ACL protections and sanitized diagnostics; Windows compatibility remains unverified. No live authentication, tokens, inference or operational change; CT120 unchanged, CT121 STOPPED, V2-E PAUSED.
+
 ## 2026-11-27 — SIWC Windows ACL test failed in elevated and non-elevated sessions
 
 - User verified candidate hashes, pywin32 312 and dependency check. Elevated test 3/4 with owner mismatch; non-elevated (ADMINISTRATOR=False) test 3/4 with generic ACL setting error at line 560. Underlying exception hidden by `from None`, exact cause unknown. ACTIVE_WORK record `224b33d98d5a073ee1225597a3519aa5ae302214`. Next inspect ACL function and capture original exception in synthetic offline test only; no permission bypass or repeated blind retries. No live authentication, token issuance, inference or deployment. CT108 trial store preserved, CT120 unchanged, CT121 STOPPED, V2-E PAUSED.
