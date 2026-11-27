@@ -19371,3 +19371,48 @@ PY
 | 28 | ああ、構わないよ。急がなくていいから。 | 그래, 괜찮아. 서두르지 않아도 돼. |
 | 29 | ありがとうございます。 | 감사합니다. |
 | 30 | ふう、何とか首がつながったね。 | 휴, 어떻게든 목숨은 건졌네. |
+
+
+## 2026-11-27 — CT108 Codex CLI 30-cue unused-tools-off comparison
+
+- User approved one separate comparison; prior baseline `5b263850494a690d3bf0fa88a89d206e75d413d3`. One transient run with a new exclusive reservation; prior reservations preserved. Actual CT108 and stock official CLI 0.172.0; exact synthetic input, translation prompt, output schema, requested gpt-6-luna/medium, official ChatGPT auth, existing non-admin account, private network, filesystem denies, read-only Codex sandbox, and 30-second runtime unchanged. No retry or fallback.
+- Per-invocation settings only: `features.shell_tool=false`, `features.view_image=false`, `features.apps=false`, `web_search="disabled"`. Verified the three boolean feature settings with the versioned binary in a network-isolated no-auth check. Web-search disabling is defined by the [0.172.0 settings schema](https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/core/config.schema.json); no provider request-body capture. Base instructions not replaced.
+- Exit 0 and one completed turn, **13.190 s** instead of **14.914 s**, first observed model item 12.978 s (not network first-token latency), no timeout. Strict JSON, exact integer cue IDs and order **30/30 PASS**. No unexpected tool events or malformed events; zero residual trial-UID processes. CLI did not expose independent effective settings or provider-side request count.
+- **10,692 input / 559 output / 0 cached input / 0 cache-write / 0 reasoning / 11,251 total.** Input down 4,344 (-28.9%) compared with 15,036; total down 4,347 compared with 15,598. Single-run timing improvement of 1.724 s, not a latency guarantee or a subscription quota conversion.
+- All 30 Korean lines manually compared with source and prior output. No missing cue or invented plot event. Cue 14 still misreads the Japanese indebtedness idiom as shame. Cue 1 still adds “말씀드린”; cue 13 shifts “made it in time” toward “found it in time”; cue 27 loses “more”; cue 30 now renders relief more naturally. See exact output below. This comparison does not establish production quality.
+- No product files, deployment, SIWC activation, additional SIWC/Hermes calls, CT120/CT121 changes, or V2-E resumption. Candidate is suitable for further isolated quality validation, not promotion based on one run.
+
+### Unused-tools-off exact output, with prior CLI for comparison
+
+| Cue | Japanese | Prior CLI | Unused tools off |
+| ---: | --- | --- | --- |
+| 1 | 先輩、昨日の件なんですけど。 | 선배, 어제 말씀드린 건 말인데요. | 선배, 어제 말씀드린 건인데요. |
+| 2 | ああ、例の資料？ | 아, 그 자료 말이야? | 아, 그 자료 말이야? |
+| 3 | はい。部長にはもうお渡ししましたか？ | 네. 부장님께 벌써 드렸어요? | 네. 부장님께는 벌써 드렸어요? |
+| 4 | いや、まだ手をつけてない。 | 아니, 아직 손도 못 댔어. | 아니, 아직 손도 못 댔어. |
+| 5 | えっ、今日までですよね？ | 네? 오늘까지잖아요? | 네? 오늘까지잖아요? |
+| 6 | 分かってるって。今やろうと思ってたんだよ。 | 알고 있어. 지금 하려던 참이었어. | 알고 있어. 지금 하려던 참이었어. |
+| 7 | でしたら、私もお手伝いします。 | 그럼 저도 도와드릴게요. | 그럼 저도 도와드릴게요. |
+| 8 | 助かるよ。じゃあ、こっちをお願い。 | 도와주면 고맙지. 그럼 이쪽을 부탁해. | 큰 도움이 되겠네. 그럼 이쪽을 부탁해. |
+| 9 | この数字、ちょっとおかしくないですか？ | 이 숫자, 좀 이상하지 않아요? | 이 숫자, 좀 이상하지 않나요? |
+| 10 | どれ？ 見せて。 | 어디? 보여 줘. | 어디? 보여 줘. |
+| 11 | ほら、先月の分が入ってないみたいです。 | 여기요. 지난달분이 빠진 것 같아요. | 여기요. 지난달 수치가 빠진 것 같아요. |
+| 12 | 本当だ。危うく見落とすところだった。 | 정말이네. 하마터면 놓칠 뻔했어. | 정말이네. 하마터면 놓칠 뻔했어. |
+| 13 | 間に合ってよかったですね。 | 시간 맞춰서 다행이네요. | 제때 발견해서 다행이네요. |
+| 14 | まったく、君には頭が上がらないな。 | 정말, 자네한테는 고개를 못 들겠어. | 정말, 자네한테는 고개를 못 들겠어. |
+| 15 | そんな、大げさですよ。 | 아니에요, 과찬이세요. | 아니에요, 과찬이세요. |
+| 16 | そういえば、今日の飲み会、来る？ | 참, 오늘 회식 올 거야? | 그러고 보니 오늘 회식 올 거야? |
+| 17 | 今日はちょっと……。 | 오늘은 좀……. | 오늘은 좀……. |
+| 18 | 何か予定でもあるの？ | 무슨 약속이라도 있어? | 무슨 약속이라도 있어? |
+| 19 | 母が来ることになってまして。 | 어머니가 오시기로 해서요. | 어머니가 오시기로 해서요. |
+| 20 | そっか。それなら仕方ないね。 | 그렇구나. 그럼 어쩔 수 없지. | 그렇구나. 그럼 어쩔 수 없지. |
+| 21 | せっかく誘っていただいたのに、すみません。 | 모처럼 초대해 주셨는데 죄송해요. | 모처럼 초대해 주셨는데 죄송해요. |
+| 22 | いいって。気にしないで。 | 괜찮아. 신경 쓰지 마. | 괜찮아. 신경 쓰지 마. |
+| 23 | あ、部長が戻ってきました。 | 아, 부장님이 돌아오셨어요. | 아, 부장님이 돌아오셨어요. |
+| 24 | まずい。まだ確認が終わってない。 | 큰일이네. 아직 확인이 안 끝났어. | 큰일이네. 아직 확인이 안 끝났어. |
+| 25 | ここは私に任せてください。 | 여긴 저한테 맡겨 주세요. | 여기는 제가 맡을게요. |
+| 26 | お疲れ様です。資料の件ですが。 | 수고 많으십니다. 자료 건인데요. | 수고 많으십니다. 자료 건인데요. |
+| 27 | あと五分ほどお時間をいただけますか？ | 5분만 더 시간 내주실 수 있을까요? | 5분 정도 시간 내주실 수 있을까요? |
+| 28 | ああ、構わないよ。急がなくていいから。 | 그래, 괜찮아. 서두르지 않아도 돼. | 그래, 괜찮아. 서두르지 않아도 돼. |
+| 29 | ありがとうございます。 | 감사합니다. | 감사합니다. |
+| 30 | ふう、何とか首がつながったね。 | 휴, 어떻게든 목숨은 건졌네. | 휴, 어떻게든 한숨 돌렸네. |
