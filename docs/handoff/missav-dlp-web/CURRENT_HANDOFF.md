@@ -19416,3 +19416,9 @@ PY
 | 28 | ああ、構わないよ。急がなくていいから。 | 그래, 괜찮아. 서두르지 않아도 돼. | 그래, 괜찮아. 서두르지 않아도 돼. |
 | 29 | ありがとうございます。 | 감사합니다. | 감사합니다. |
 | 30 | ふう、何とか首がつながったね。 | 휴, 어떻게든 목숨은 건졌네. | 휴, 어떻게든 한숨 돌렸네. |
+
+
+## 2026-11-27 — Shared Japanese-to-Korean instruction agreed; docs only
+
+- Canonical candidate: [JA_KO_TRANSLATION_PROMPT.md](JA_KO_TRANSLATION_PROMPT.md), version `ja-ko-v1`. Based on the existing Hermes first-pass translation principles. Adds general fidelity guidance without any fixture-specific examples, benchmark answers, or model settings.
+- Keep subtitle form, ASR/repair/review, and runtime controls outside the shared block. Existing Hermes and CT108 execution settings remain unchanged. No new model request, product code, deployment, SIWC activation, CT120/CT121 changes, or V2-E resumption.
