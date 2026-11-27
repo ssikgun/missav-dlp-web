@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC Windows ACL test failed in elevated and non-elevated sessions
+
+- User verified candidate hashes, pywin32 312 and dependency check. Elevated test 3/4 with owner mismatch; non-elevated (ADMINISTRATOR=False) test 3/4 with generic ACL setting error at line 560. Underlying exception hidden by `from None`, exact cause unknown. ACTIVE_WORK record `224b33d98d5a073ee1225597a3519aa5ae302214`. Next inspect ACL function and capture original exception in synthetic offline test only; no permission bypass or repeated blind retries. No live authentication, token issuance, inference or deployment. CT108 trial store preserved, CT120 unchanged, CT121 STOPPED, V2-E PAUSED.
+
 ## 2026-11-27 — Windows SIWC store fix candidate prepared; Windows check pending
 
 - The original candidate `/tmp/s11-mvp001-siwc.pr7UsJ` was preserved unchanged; its `siwc_auth.py` SHA256 remains `a7f438373e84bf88a65b20c709d414561c0563452f0068458ed749de769b806b`. New isolated candidate: `/tmp/s11-mvp001-siwc-windows-acl-0ac76d6`. Changes are limited to `ProfileStore` platform handling, storage assertions in the existing offline test, the Windows-only dependency marker, and operator notes. Windows uses pywin32 owner SID/protected owner-only DACL checks and application, rejects reparse points, and uses `msvcrt.locking`; POSIX checks/locks and OAuth/JWT/token logic remain unchanged.
