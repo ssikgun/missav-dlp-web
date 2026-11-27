@@ -19325,3 +19325,49 @@ PY
 - One codex exec invocation, exit 0, one completed turn, 10.248 seconds. No unexpected tool events. JSON, three ordered IDs [1,2,3], Korean text passed. Input 14,405; output 78; total 14,483; cached input, cache-write input and reasoning output all 0.
 - Synthetic output: (1) 어제 얘기, 아직 기억해? (2) 응, “비밀로 해 줘”라고 했던 거 말이지. (3) 맞아. 오늘은 그다음 이야기를 들려줘. Quoted imperative stayed dialogue. This smoke confirms feasibility only, not production readiness.
 - No administrator credential copy, SIWC activation, product code, deployment, CT120 or CT121 changes. No credentials or raw logs committed.
+
+
+## 2026-11-27 — CT108 official Codex CLI representative synthetic 30-cue trial
+
+- **EXECUTED / STRUCTURAL PASS / APPROVAL CONSUMED.** Latest scope at `80b8e1a766a6dea3a06184e552ab90eab3d20a5e`. Actual CT108 downloader/systemd/LXC. Codex CLI 0.172.0. Same non-admin account, private HOME/CODEX_HOME, admin/home/production/NAS/Docker access denies, private network namespace with exact OpenAI HTTPS allowlist and negative external probe, unchanged read-only Codex sandbox, existing official ChatGPT auth. Authenticated catalog confirmed requested gpt-6-luna / medium; the CLI did not independently expose effective model, effective effort, or internal provider request count.
+- **Exact input:** extracts 30 Japanese cues and original translation instructions as literals without running the SIWC archive. Archived code digest matched `7f8f2581665c73f323d76d7fce378641e74eecd17bcdc42e11f2536286baa909`; ordered synthetic cue JSON SHA256 `80daf5ba1aa498d588ab50f27c314cd21880cd1975e9b8daf55f2d2bdaa7829f`. Same prompt intent, no optimization. CLI request uses the preserved instructions with the cue JSON and strict output schema.
+- **Execution:** separate exclusive reservation, original three-cue reservation unchanged. One Codex CLI invocation, exit 0, one completed turn, elapsed **14.914 s** from invocation through exit; first observed model item **14.658 s**, not server first-token latency. Existing systemd 30-second runtime cap retained; no timeout, observed retry or fallback. No unexpected tool events, malformed events or residual trial-UID processes; MainPID 0 after exit.
+- **Tokens:** 15,036 input; 562 output; 0 cached input; 0 cache-write input; 0 reasoning output; 15,598 total (input plus output). Strict JSON with no duplicate keys, a single cues array, exact rows with integer IDs 1–30 in order and nonempty Korean strings **PASS 30/30**.
+- **Offline quality:** all 30 rows reviewed against Japanese. No missing rows or invented plot events; dialogue is readable and the junior/senior/manager speech levels are generally maintained. Cue 14 `頭が上がらない` is a debt/respect idiom in context; “고개를 못 들겠어” suggests shame. “자네한테 신세를 많이 지네” better fits here. Cue 1 adds “말씀드린” (the original only establishes “yesterday’s matter”); cue 6 softens the emphasis of `分かってるって`; cue 5 slightly strengthens surprise into a reminder/rebuke; cue 30 “목숨은 건졌네” works figuratively but “휴, 어떻게든 위기는 넘겼네” is clearer in an office setting. These are text-only observations, not a production-quality rating.
+- **Historical comparisons only:** the previously recorded standalone SIWC run used the same archived Japanese cue list and reported 12.04 s, 732 input, 554 output, 0 cached, 0 reasoning, 1,286 total, 30/30 structural PASS. This CLI run took 2.874 s longer and reported 14,304 more input tokens (~20.5× input), with only eight more output tokens. Codex CLI and SIWC have different system context/runtime and token accounting; this is not controlled equivalence, baseline quality ranking, or a subscription quota conversion. A separate Stage11 SIWC integration run used a different synthetic 30-cue set (fixture comparison), with 23.344 s total, input 2,469 / output 1,181 / 0 reasoning / 3,650 total, cache not separately recorded in the retained report; not a same-input baseline. No same-input comparable Hermes usage record was found in checked canonical and retained comparison evidence. No new Hermes or SIWC request.
+- No product files, runtime deployment, credentials, SIWC activation, CT120/121 or V2-E changes. Structural feasibility established; production readiness and sustained latency not established.
+
+### Exact observed synthetic JA → KO pairs
+
+| Cue | Japanese input | Codex CLI Korean output |
+| ---: | --- | --- |
+| 1 | 先輩、昨日の件なんですけど。 | 선배, 어제 말씀드린 건 말인데요. |
+| 2 | ああ、例の資料？ | 아, 그 자료 말이야? |
+| 3 | はい。部長にはもうお渡ししましたか？ | 네. 부장님께 벌써 드렸어요? |
+| 4 | いや、まだ手をつけてない。 | 아니, 아직 손도 못 댔어. |
+| 5 | えっ、今日までですよね？ | 네? 오늘까지잖아요? |
+| 6 | 分かってるって。今やろうと思ってたんだよ。 | 알고 있어. 지금 하려던 참이었어. |
+| 7 | でしたら、私もお手伝いします。 | 그럼 저도 도와드릴게요. |
+| 8 | 助かるよ。じゃあ、こっちをお願い。 | 도와주면 고맙지. 그럼 이쪽을 부탁해. |
+| 9 | この数字、ちょっとおかしくないですか？ | 이 숫자, 좀 이상하지 않아요? |
+| 10 | どれ？ 見せて。 | 어디? 보여 줘. |
+| 11 | ほら、先月の分が入ってないみたいです。 | 여기요. 지난달분이 빠진 것 같아요. |
+| 12 | 本当だ。危うく見落とすところだった。 | 정말이네. 하마터면 놓칠 뻔했어. |
+| 13 | 間に合ってよかったですね。 | 시간 맞춰서 다행이네요. |
+| 14 | まったく、君には頭が上がらないな。 | 정말, 자네한테는 고개를 못 들겠어. |
+| 15 | そんな、大げさですよ。 | 아니에요, 과찬이세요. |
+| 16 | そういえば、今日の飲み会、来る？ | 참, 오늘 회식 올 거야? |
+| 17 | 今日はちょっと……。 | 오늘은 좀……. |
+| 18 | 何か予定でもあるの？ | 무슨 약속이라도 있어? |
+| 19 | 母が来ることになってまして。 | 어머니가 오시기로 해서요. |
+| 20 | そっか。それなら仕方ないね。 | 그렇구나. 그럼 어쩔 수 없지. |
+| 21 | せっかく誘っていただいたのに、すみません。 | 모처럼 초대해 주셨는데 죄송해요. |
+| 22 | いいって。気にしないで。 | 괜찮아. 신경 쓰지 마. |
+| 23 | あ、部長が戻ってきました。 | 아, 부장님이 돌아오셨어요. |
+| 24 | まずい。まだ確認が終わってない。 | 큰일이네. 아직 확인이 안 끝났어. |
+| 25 | ここは私に任せてください。 | 여긴 저한테 맡겨 주세요. |
+| 26 | お疲れ様です。資料の件ですが。 | 수고 많으십니다. 자료 건인데요. |
+| 27 | あと五分ほどお時間をいただけますか？ | 5분만 더 시간 내주실 수 있을까요? |
+| 28 | ああ、構わないよ。急がなくていいから。 | 그래, 괜찮아. 서두르지 않아도 돼. |
+| 29 | ありがとうございます。 | 감사합니다. |
+| 30 | ふう、何とか首がつながったね。 | 휴, 어떻게든 목숨은 건졌네. |
