@@ -3,11 +3,13 @@
 WORKSTREAM: stage11
 TASK_ID: S11-MVP001
 STATUS: IN_PROGRESS
-CONTRACT_VERSION: 2.1.0
+CONTRACT_VERSION: 2.2.0
 REQUIRES_WORKSTREAMS: stage11
 
 
 ## CURRENT ROADMAP — ASR-FIRST HYBRID V2 / APPROVED 2026-11-22
+
+- **CT108 CODEX CLI PRIMARY-TRANSLATION CANDIDATE: OFFLINE PASS / ONE-SHOT LIVE FAIL CLOSED (2026-11-28 KST).** Teddy approved isolated translation-only connection plus one synthetic job. The explicit opt-in seam uses accepted Japanese inputs and the unchanged Normal Mode validator; disabled by default, never selected by the product. Seven offline checks and the same-identity preflight passed. One real official CLI 0.172.0 invocation on CT108, external GPT-6-Luna/medium, four original synthetic Japanese cues, 30 s OS cap. CLI exited 0 in 5.833 s and emitted a completed-turn usage record (10,358 input, 132 output; cached/cache-write/reasoning all 0), but the adapter rejected an unexpected item before existing Stage 11 validation. Exact item type unavailable from the original retained record. No accepted translation, quality verdict, receipt, retry, fallback, or remaining trial process. Authorization consumed. Candidate only: tested commit 243e57ab18bcf421ee1648fb54dec3c0884ac740; follow-up diagnostics commit bd6e6663322400071e47971588004b299d6b72f7 adds safe category counts without accepting any additional event, verified offline only. Next decision: no canary; inspect native event semantics and obtain a fresh authorization before any further inference. CT120 default, Hermes review/adjudication/repair, SIWC, CT121, V2-E, Stage12 and production unchanged.
 
 - **CT108 OFFICIAL CODEX CLI OFFLINE-ONLY CANDIDATE PREPARATION=MOCK PASS / PRODUCTION NOT WIRED (2026-11-28 KST).** User requested preparation only over the living-room PC and a morning report. Isolated local branch `stage11-codex-cli-offline-20261128`, commit `31795fe85c1bbe79840cba49fe2c25a596674504`, based on `58fa6b984df26f7f9d79856cfc39d7d977088518`; candidate is not merged or pushed. Six offline checks passed including unchanged Normal Mode validator on a synthetic package. CT120 default, Hermes review/repair, Stage12, CT121, SIWC and V2-E unchanged. A CLI-specific governance amendment and separate approval are still required before wiring any runnable or live backend. See CURRENT_HANDOFF for the boundary and rollback proposal. S11-MVP001 remains IN_PROGRESS.
 

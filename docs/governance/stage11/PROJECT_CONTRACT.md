@@ -1,6 +1,6 @@
 # Stage11 subtitle design contract
 
-CONTRACT_VERSION: 2.1.0
+CONTRACT_VERSION: 2.2.0
 PROJECT_CONTRACT_STATUS: APPROVED
 APPLIES_TO: Stage11 subtitle acquisition/generation and its Stage12 publication boundary only
 
@@ -61,6 +61,12 @@ User explicitly approved adding an independent CT108 Sign in with ChatGPT (SIWC)
 - Preserve existing CT120 default and configuration, CT121 opt-in implementation and stopped state, and V2-E execution hold. Direct adapter is explicitly selected, not an implicit replacement or failover. Support validated model and reasoning configuration, pinned and traceable per invocation/title with existing receipt/reuse policy preserved. GPT-6-Luna medium is a candidate for ordinary translation, not a production setting or a mandate to reduce review reasoning.
 - Reuse existing whole-title primary translation, context-preserving partition fallback, strict result validation and source/prompt/backend-bound receipt/resume mechanisms. Do not weaken checks or mix incompatible unfinished artifacts. Determine exact integration boundaries from source; if the existing interface cannot isolate primary translation from semantic/review requests, report the conflict rather than reroute those requests.
 - This amendment authorizes design only; the active task records the isolated implementation scope. No additional live model inference, real media/subtitle transmission, account/production/service/queue/DB/NAS/Jellyfin changes, deployment or publication without separate explicit approval.
+
+### Approved isolated CT108 Codex CLI primary-translation candidate (v2.2.0)
+
+Teddy authorized an isolated opt-in official Codex CLI candidate for Japanese-to-Korean primary translation only, followed by one bounded fresh synthetic proof. CT120 remains the running default; Hermes review, adjudication and Japanese/source repair are unchanged. No changes to SIWC, CT121, V2-E, production selectors, scheduling, queues, databases, NAS, Jellyfin, Stage12, publication or existing title artifacts.
+
+Select the backend explicitly, never on failure. Bind prompt, source, session and external model/effort to the private proof; use the unchanged Stage 11 translation validator, never claim a production receipt. Preserve existing timestamp and source ownership. Use the verified dedicated unprivileged CT108 CLI identity, private scratch, read-only tools-off CLI, restricted network and existing 30-second process deadline. One fresh synthetic invocation, no retry, fallback, resume, or further model call. Full-title partition/resume and any production canary remain separate gates.
 
 ### Change discipline
 
