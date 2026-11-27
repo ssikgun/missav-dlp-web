@@ -1,5 +1,18 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC restart binding and stream deadline fixes reported offline PASS
+
+- User-provided Codex report 16:19:26 KST: both defects fixed in isolated candidate `/tmp/stage11-codex-cli.HTGBdv/repo`, base af6d60a1ed4bac2e7ad3b98903ef4b79c640e433. Missing-receipt backend/effort mismatch HOLD / SIWC_PRIMARY_TRANSLATION_BINDING_MISMATCH with zero fake calls; matching receipt reused, Hermes reviews unchanged. Full local SIWC request deadline capped by V2-D remaining time, attempt budget consumed, synthetic continuous stream connection/process terminated, LIMIT_STOP / SIWC_REQUEST_TIMEOUT. OAuth elapsed time reduces HTTP budget; no request when exhausted. Remote inference termination unverified. SIWC 7/7, Normal Mode 32/32, V2-D offline PASS, deployment 54/54, compile/diff PASS reported. No live auth/inference, production changes, dependency install or code promotion. Candidate not independently inspected by ChatGPT. Remote HEAD was still 2892aba1bf5d27e192e8c21c3d0e0dd90edfd097 with old defect record; this update records the reported fix. Next: separately approved bounded synthetic live integration via actual candidate, not production. S11-MVP001 IN_PROGRESS; CT120 default, CT121 stopped and V2-E paused per prior record.
+
+| Changed candidate file | Reported SHA256 |
+| --- | --- |
+| teddy_discovery_siwc_backend.py | 14d6db208ab73c703862a2dddcde633b6d0f4e507769484f528c55ac8fb41d24 |
+| teddy_discovery_siwc_backend_smoke.py | aa74d338fbc86e502530da4998f209cbe1776d4027688da25d72baf8005bb8db |
+| teddy_discovery_stage11_normal_mode.py | f87f90147338429eff3d2ac75ef5e0c0ee5537817da0e33cebe26f6a124ca59a |
+| teddy_discovery_stage11_normal_mode_smoke.py | 1508af23d47d641fa7324473ab3b21106e0ac0b57ed338968ed010d6cc630c98 |
+| teddy_discovery_stage11_v2d.py | a1887ccb9e11500c77b6a9031bf62574c1033f265b17a1663b5c84f34cbee092 |
+
+
 ## 2026-11-27 — CT108 SIWC follow-up offline verification
 
 - **Candidate integrity:** `/tmp/stage11-codex-cli.HTGBdv/repo` remained at `af6d60a1ed4bac2e7ad3b98903ef4b79c640e433`. All eight source hashes matched the table below, and `git diff --check` passed. This review started from canonical `312d32cb50f0d9f681b88abe626bc6a0ed876983`.
