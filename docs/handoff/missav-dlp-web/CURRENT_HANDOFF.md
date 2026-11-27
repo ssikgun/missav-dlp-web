@@ -1,5 +1,26 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — CT108 SIWC isolated implementation and offline validation PASS
+
+- **Scope and isolation:** Implemented in `/tmp/stage11-codex-cli.HTGBdv/repo`, a clean isolated checkout at approved base `af6d60a1ed4bac2e7ad3b98903ef4b79c640e433` on `teddy-subtitle-stage11`. The protected dirty worktree was not touched. This is a source candidate only; no product code was committed or promoted. The documentation update to this handoff and Stage11 `ACTIVE_WORK.md` is documentation-only.
+- **Authentication reuse:** Copied the approved `/tmp/s11-mvp001-siwc.pr7UsJ/siwc_auth.py` byte-for-byte (SHA256 below). The adapter selects exactly one eligible local profile, gets its access token through `SiwcClient.access_token()` (retaining the existing safe store and refresh path), and does not emit/store the raw profile Client ID or token. Receipts bind only a profile identity digest. No profile was loaded and no auth/refresh request was made here.
+- **Direct backend and routing:** Added a fixed official Responses endpoint transport with `stream=true`, `store=false`, `tools=[]`, `tool_choice=none` and JSON text format. It requires a terminal `response.completed`, completed status, the selected returned model, one assistant text output, and no non-text/tool result. Any reported reasoning effort must match the requested value. It has no provider/model fallback. Existing NativeNormalFirstPass prompt, strict parser, whole-title and fixed-part fallback, result materialization and private staging reuse are retained. `--translation-backend ct108-siwc` is opt-in; model defaults to `gpt-6-luna`, reasoning effort to `medium`; CT120 remains default. Only `whole-title` and `part-NNNN` labels may use SIWC. V2-D JA Master adjudication, targeted review and final review keep the existing Hermes route. Receipts bind backend/model/effort/profile digest and prompt/output hashes; incompatible backend or settings resume fails closed before another request. V2-D tracks SIWC attempts separately and requires explicit `max_siwc_attempts` (default 0) under its execution-limit wrapper.
+- **Offline validation:** `py_compile` PASS for changed Python modules; `teddy_discovery_siwc_backend_smoke.py` 5/5 PASS; `teddy_discovery_stage11_normal_mode_smoke.py` 32/32 PASS, including clean-proof replay and effort-mismatch rejection without another request; `teddy_discovery_stage11_v2d_smoke.py` PASS (`S11_V2D_OFFLINE_SMOKE=PASS`). The deployment smoke was attempted but could not import because this environment lacks `numpy`; dependencies were not installed. The tests used synthetic profiles, response events and outputs only.
+- **Not retested / not established:** Per instruction, existing live login/profile transfer/refresh/catalog and actual model comparisons were not repeated. This candidate made no real network request; actual API compatibility, real credential refresh through this integration, full-title response size/quality and product quality remain unverified. Windows compatibility, deployment and operational behavior were not tested. No service, timer, queue, DB, NAS, Jellyfin, media or Stage12 state was touched. CT120 settings, CT121 behavior and V2-E state remain unchanged.
+
+| Candidate file | SHA256 |
+| --- | --- |
+| `requirements.txt` | `a988141e558d6f758b085cb87bd7c8f37afe9cff7be7259cd174864ab846d450` |
+| `siwc_auth.py` | `a7f438373e84bf88a65b20c709d414561c0563452f0068458ed749de769b806b` |
+| `teddy_discovery_siwc_backend.py` | `aec704c2dc3b6b12f75a54bf3f8816862f1b36d8a2b92ca6f51a371b3153ca7c` |
+| `teddy_discovery_stage11_deployment.py` | `eef7a443c9ea76c6eaa3d31207a18bd1df82793f7623561a3828ec0581cd9ba4` |
+| `teddy_discovery_stage11_normal_mode.py` | `b7ef9686e5689b35f186e24c8c45ca319db952fcba18eaa974311784b9f49876` |
+| `teddy_discovery_stage11_normal_mode_smoke.py` | `ecffb2ecf7b04fec11045d13b4408e202e17e2bf4acb79892ed7df5849a11b9e` |
+| `teddy_discovery_stage11_v2d.py` | `f3725207909ceede54a15fae33978068b8bfc5a19166361fdd3f4a6a2d701b6c` |
+| `teddy_discovery_siwc_backend_smoke.py` | `25c96f818d4dbe4042e80bf3830ae8738b7446957739308f49680ef79e19cdce` |
+
+`S11-MVP001` remains `IN_PROGRESS`; this offline candidate is not a product-quality pass or authorization to run, promote, deploy, or publish it.
+
 ## 2026-11-27 — SIWC opt-in primary translation design and isolated development approved
 
 - User approved Stage11 contract v2.1.0 narrow amendment: optional CT108 SIWC direct primary Japanese-to-Korean translation, preserve CT120 default and semantic/review paths, CT121 stopped, V2-E paused. S11-MVP001 IN_PROGRESS. Isolated source candidate and offline validation only; reuse verified authentication module, native translation/partition/receipt/resume and deterministic safeguards. Configurable model/effort, medium candidate only; no production profile change, automatic fallback, live calls, real media, deployment or publication. Actual CT108 directory and candidate must be verified by operator/Codex before coding. See current ACTIVE_WORK scope and contract. Implementation NOT_RUN; no product promotion authorized.
