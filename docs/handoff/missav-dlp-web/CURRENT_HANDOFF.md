@@ -1,5 +1,20 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC Content-Type response diagnostics candidate
+
+- **Source and scope.** Canonical `ssikgun/missav-dlp-web`, branch `teddy-subtitle-stage11`, verified at `6a0e88dcc65b7a8da6ffc4fb5dd3b4c5ea420d8c`; common contract 1.0.1, Stage11 contract 2.1.0, S11-MVP001 IN_PROGRESS. Existing candidate `/tmp/stage11-codex-cli.HTGBdv/repo` remains based at `af6d60a1ed4bac2e7ad3b98903ef4b79c640e433`. This change is isolated to candidate backend and its existing smoke test; no product source promotion.
+- **Historical evidence.** The earlier medium/xhigh comparison is recorded as user-terminal evidence, not a Codex-executed script. Session records and preserved temporary trials did not contain the original successful executable code or its Content-Type. The prior failed sanitized report retained only HTTP 200 / `CONTENT_TYPE_INVALID`; it did not store the raw or normalized Content-Type. Both the original and failed response Content-Type values remain unknown.
+- **CONTENT_TYPE_DIAGNOSTICS.** On the existing mismatch path, header values map to fixed labels `MISSING`, `EVENT_STREAM`, `APPLICATION_JSON`, `TEXT_HTML` or `OTHER`. The acceptance predicate itself is unchanged. The response body is read only on mismatch with `read(64 KiB + 1)` to detect truncation; classification uses no more than the first 64 KiB. JSON parsing is skipped for truncated content.
+- **RESPONSE_STRUCTURE_DIAGNOSTICS.** Bounded content maps to `JSON_RESPONSE` when the expected response fields have the right structural types, `JSON_ERROR` for a JSON error object, `SSE_DATA` for data lines, `HTML` for a recognized HTML prefix, `EMPTY` for an empty body, and `UNKNOWN` otherwise. For `JSON_ERROR`, only existing exact provider type/code/param allowlists are emitted. Original body, header, message, token/credential data, private fields and stderr are never returned or saved. New safe fields propagate through the child result and parent exception allowlists to the existing Stage11 summary.
+- **VALIDATION_POLICY_UNCHANGED / REQUEST_PAYLOAD_UNCHANGED.** The original `text/event-stream` acceptance comparison and all later SSE/response/cue validation conditions are unchanged. Existing successful-response test still confirms the exact request object and accepted normal response with `text/event-stream; charset=utf-8`.
+- **Verification.** Four focused offline tests passed: fixed classification and secret filtering; 64 KiB read cap and truncated-body handling; child-result allowlisting; existing exact request/normal response/receipt behavior. No full offline suite was rerun. `MODEL_CALL_COUNT=0`, authentication refresh 0, `PRODUCTION_CHANGED=NO`. No live retest, source promotion, operational change or deployment. Actual prior response type/root cause remain unresolved; a new live request requires separate authorization.
+
+| Changed candidate file | SHA256 |
+| --- | --- |
+| `teddy_discovery_siwc_backend.py` | `beffe41b81946ce1f65c0abbe3c67a2991d08c67b4ac81d5a8c4e524354d84f1` |
+| `teddy_discovery_siwc_backend_smoke.py` | `639d3d7f22e656e1d533962814129ed3752a3ebdcfe62a0eeae9d3e95adf9178` |
+
+
 ## 2026-11-27 — SIWC detailed-diagnostics live retest failed Content-Type validation
 
 - **CANONICAL_SOURCE / authorization.** Repository `ssikgun/missav-dlp-web`, branch `teddy-subtitle-stage11`; the latest pretrial remote SHA and user approval SHA were both `cb3530c2b27261a5273bf593fa8947afa2d7b17a`. Common contract 1.0.1, Stage11 contract 2.1.0, `S11-MVP001=IN_PROGRESS`. CT108 host identity was `downloader` (LXC). The authorization covered one actual Stage11 integration attempt; it is now consumed.
