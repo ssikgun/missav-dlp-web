@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC corrected Windows candidate offline verification PASS
+
+- User copied the corrected `siwc_auth.py` from `/tmp/s11-mvp001-siwc-windows-acl-ntsecuritycon-bafb9fdd` to separate Windows `windows-acl-v2` directory; SHA256 matched `47cc9843021e6f4bdf4403847b4678391f3b8e8b5361bdbc1b00716286193329`. Existing private venv and verified tests reused. Actual Windows offline suite 4/4 OK, 0 skipped, 0.115s, including private storage/host ID/rotation/local signout and synthetic JWT validation. Prior Linux regression remains 4/4 PASS. ACTIVE_WORK result `17714930dd93777d7f40ea812afc1af27fc775f8`. Proceed only within prior live account connection approval with corrected Windows candidate and fresh isolated store under ordinary user; actual browser login, entitlement, transfer, live refresh and catalog remain unverified. No model inference, deployment or production changes. CT120 unchanged, CT121 STOPPED, V2-E PAUSED.
+
 ## 2026-11-27 14:07:32 — SIWC Windows ACL constant correction prepared; Windows test pending
 
 - Preserved prior candidate `/tmp/s11-mvp001-siwc-windows-acl-0ac76d6` and created separate candidate `/tmp/s11-mvp001-siwc-windows-acl-ntsecuritycon-bafb9fdd`. Only `siwc_auth.py` differs; its new SHA256 is `47cc9843021e6f4bdf4403847b4678391f3b8e8b5361bdbc1b00716286193329`. Prior candidate source SHA256 remains `cb32e9426102cf46821897dd4a599ea20e7e7fc7bbcedd13883f98e7f0a542de`.
