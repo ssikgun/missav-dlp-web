@@ -19310,3 +19310,10 @@ print("CODEX_EXEC_RESULT=PASS")
 print(json.dumps(result, ensure_ascii=False))
 PY
 ~~~
+
+## 2026-11-27 — CT108 real-host Codex CLI preflight: BLOCKED / NOT_RUN
+
+- Verified the specified canonical branch and Verified user command. Actual CT108 via SSH: downloader, PID 1 systemd, LXC. Codex CLI 0.172.0; official device-auth option present.
+- Prior OS isolation was a temporary systemd DynamicUser service (30-second cap, PrivateNetwork=yes), not a retained login account. No matching dedicated account/service/private home was found in checked locations. The recorded script itself does not impose a timeout or network boundary; do not run it outside the externally verified restrictions.
+- Require an identified or separately approved non-admin trial environment, with private HOME/CODEX_HOME, denied paths, runtime cap, and verified narrowly scoped OpenAI connectivity before owner device authentication. No administrator credential copy. Account entitlement for requested gpt-6-luna / medium unverified.
+- CODEX_LOGIN=NOT_RUN; CODEX_EXEC_INVOCATION_COUNT=0; JSON/CUE/TRANSLATION/TIME/TOKENS=NOT_RUN. No product code, deployment, runtime, SIWC, CT120 or CT121 changes.
