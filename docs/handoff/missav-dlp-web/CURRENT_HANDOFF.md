@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — CT108 SIWC compatibility live trial failed response validation
+
+- Confirmed canonical approval `684d1ffeff94c3d3c283950eb29d7845dac6d28a`, contracts 1.0.1 and 2.1.0, router and S11-MVP001 IN_PROGRESS, CT108 downloader LXC and isolated candidate at base `af6d60a1ed4bac2e7ad3b98903ef4b79c640e433`. All eight source and requirements SHA256 values matched, including the two latest compatibility files and the existing auth module. Both prior failure reports remained intact.
+- Used fresh private state, exact prior 30 synthetic Japanese cues and prompt SHA256 `8e43787cc165435c0db94695dead82ada0bf9f87ae0ee9dd48e3813dc724fdf4`, with one attempt through NativeNormalFirstPass whole-title. Verified the outgoing payload at the transport boundary: gpt-6-luna / medium, a single user message containing the complete prompt, tools=[], stream=true and store=false. No instructions, tool_choice or text.format field. Profile passed the token freshness preflight.
+- The transport reported `RESPONSE_VALIDATION_FAILED` after 0.719 s. No numeric HTTP status was included. The backend code emits this class after passing its HTTP 200 check, but the saved result contains no independent status or individual validation check. The previous HTTP 400 was not reproduced. The exact cause of this failure and the previous failure remains UNKNOWN. No confirmed completion event, model, usage or Korean output. Cue validation, receipt persistence and replay did not run. Sanitized report SHA256 `9aea0dbd4172efd72715ee057bda3c127e3f46621b69b568e9f4511f129bff8d`.
+- Single attempt consumed the approval. No retry, fallback, Hermes/ASR calls, offline suite rerun, code edit, production change, promotion or deployment. CT120 default, CT121 stopped and V2-E paused per standing records. Product quality unverified.
+
 ## 2026-11-27 — SIWC request compatibility candidate
 
 - Verified canonical `e6b50aa322210032b79bfadaec5178bf5aa7cc10`, contracts 1.0.1 and 2.1.0, router and S11-MVP001 IN_PROGRESS. The isolated candidate at `/tmp/stage11-codex-cli.HTGBdv/repo` matched all eight prior hashes before editing.
