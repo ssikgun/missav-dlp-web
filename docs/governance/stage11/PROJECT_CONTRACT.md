@@ -1,6 +1,6 @@
 # Stage11 subtitle design contract
 
-CONTRACT_VERSION: 2.0.0
+CONTRACT_VERSION: 2.1.0
 PROJECT_CONTRACT_STATUS: APPROVED
 APPLIES_TO: Stage11 subtitle acquisition/generation and its Stage12 publication boundary only
 
@@ -52,6 +52,15 @@ User explicitly approved the design and reuse plan recorded in f40d39a680fbd8513
 6. Materialize source-bound JA master with explicit accepted, rejected and uncertain candidate decisions, stable cue/source identities and timestamps; retain original external JA and raw ASR separately. Preserve plausible dialogue conservatively, no promotion of unsupported synthetic speech. Material unresolved evidence must not silently be called quality PASS; approved bounded fallback or title-level hold, no mandatory manual per-title action. Policy/acceptance specifics need user decision; no flip of AUTO_INSERT alone.
 7. Reuse whole-title Hermes primary translation if feasible, existing context-preserving partition fallback, dynamic profile, native runner, stage-local receipt reuse. Input is JA master, not a new fixed-64 translation architecture. Reuse targeted review and CLEAN materializer with necessary schema/ownership adaptations. No blanket rewriting, forced casual speech, or LLM ownership of timestamps.
 8. Reuse existing Stage12 validator, no-overwrite publication, title isolation/locks, queue, timer, NAS/Jellyfin path. Keep original external JA, self-generated JA master and final KO distinct (local comparison and NAS original-sidecar requirement preserved, naming/location/lifecycle decision outstanding). Resolve current Git metadata issue before activation. Stage9 unaffected.
+
+### Approved opt-in CT108 SIWC primary-translation backend — 2026-11-27 (v2.1.0)
+
+User explicitly approved adding an independent CT108 Sign in with ChatGPT (SIWC) direct Responses API backend as an opt-in alternative for primary Japanese-to-Korean translation only, and isolated source development/offline validation. This narrow amendment qualifies the Hermes primary-translation references in the role table and topology item 7 above: the explicitly selected SIWC adapter may perform primary Korean translation under the same semantic-authority and deterministic validation boundaries. Hermes remains the existing/default execution route and retains semantic adjudication, source repair/recovery, targeted review and final review in this phase. No change to ASR-FIRST HYBRID V2 ordering, identity/timing authority, source evidence, uncertainty, provenance, partition/resume, quality or Stage12 publication policies.
+
+- Reuse the verified independent SIWC authentication module and official direct Responses route, with secure isolated profiles, automatic refresh capability, no Codex/Hermes token reuse, private endpoints, credential disclosure, paid API fallback or automatic backend switching.
+- Preserve existing CT120 default and configuration, CT121 opt-in implementation and stopped state, and V2-E execution hold. Direct adapter is explicitly selected, not an implicit replacement or failover. Support validated model and reasoning configuration, pinned and traceable per invocation/title with existing receipt/reuse policy preserved. GPT-6-Luna medium is a candidate for ordinary translation, not a production setting or a mandate to reduce review reasoning.
+- Reuse existing whole-title primary translation, context-preserving partition fallback, strict result validation and source/prompt/backend-bound receipt/resume mechanisms. Do not weaken checks or mix incompatible unfinished artifacts. Determine exact integration boundaries from source; if the existing interface cannot isolate primary translation from semantic/review requests, report the conflict rather than reroute those requests.
+- This amendment authorizes design only; the active task records the isolated implementation scope. No additional live model inference, real media/subtitle transmission, account/production/service/queue/DB/NAS/Jellyfin changes, deployment or publication without separate explicit approval.
 
 ### Change discipline
 
