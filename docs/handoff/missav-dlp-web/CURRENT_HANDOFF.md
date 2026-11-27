@@ -1,5 +1,17 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC failure diagnostics preserved in isolated candidate
+
+- Verified canonical SHA `bf142cc2a0da5f43d33de889d88c9f2385e44768`, Stage11 contract 2.1.0, S11-MVP001 IN_PROGRESS and the previous isolated candidate hashes. The worker returns an allowlisted failure code and numeric HTTP error status when available. Stage11 writes those values in the existing failure reason. Raw response content, exception messages, headers, tokens and child stderr are excluded.
+- Focused offline test passed both cases through worker serialization, parent decoding and the actual Normal Mode failure JSON. Fake HTTP 400 recorded `HTTP_ERROR http_status=400`. A stream without response.completed recorded `SSE_INCOMPLETE`. Fixture secrets were absent from the worker result and failure record.
+- Source checks found no change to endpoint, headers, payload, prompt or auth module. Model and refresh calls 0. No full suite, production changes, product promotion or deployment. The previous live failure remains `ROOT_CAUSE=UNKNOWN`. A live retest requires separate approval.
+
+| Candidate file changed in this fix | SHA256 |
+| --- | --- |
+| `teddy_discovery_siwc_backend.py` | `621364e5467e2803ae17ce33a9a6a619de2ab666b9026d9cfc751a71f625d03b` |
+| `teddy_discovery_stage11_normal_mode.py` | `8fafaed5698b98587ae40d64151fbf07dab8b3c245a4ee639181475773b79e0e` |
+| `teddy_discovery_stage11_normal_mode_smoke.py` | `85abdbf2571d032aec5318248178bbe2c4ffb16719421631186a3285db2a4b10` |
+
 ## 2026-11-27 — CT108 SIWC one-request live integration failed
 
 - **Preflight.** Confirmed CT108 host, GitHub authorization SHA `4741963746cdbfaa73be225bd773c48948ce8010`, common contract 1.0.1, Stage11 contract 2.1.0 and S11-MVP001 IN_PROGRESS. Candidate at `af6d60a1ed4bac2e7ad3b98903ef4b79c640e433` matched the corrected source SHA256 values below and the approved authentication module. No prior offline suite was rerun.
