@@ -1,5 +1,24 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC Content-Type diagnostics live attempt stopped before Responses request
+
+- **CANONICAL_SOURCE / authorization.** Repository `ssikgun/missav-dlp-web`, branch `teddy-subtitle-stage11`; pretrial remote and explicit approval SHA `7919f9f35d9922fb2fe1c421aa37e7e0f0192b76`. Common contract 1.0.1, Stage11 contract 2.1.0, `S11-MVP001=IN_PROGRESS`. The approved one-trial authorization is consumed at the Stage11 invocation boundary; do not make another attempt without new approval. CT120 default retained, CT121 stopped, V2-E paused.
+- **CANDIDATE_IDENTITY.** Candidate `/tmp/stage11-codex-cli.HTGBdv/repo`, base `af6d60a1ed4bac2e7ad3b98903ef4b79c640e433`, on CT108 `downloader` LXC. All eight implementation/requirements files matched the recorded candidate hashes. `siwc_auth.py` SHA256 `a7f438373e84bf88a65b20c709d414561c0563452f0068458ed749de769b806b` and was byte-identical to the existing auth module. Existing venv reused; no dependency installation.
+- **REQUEST / INPUT.** The actual Stage11 `NativeNormalFirstPass` whole-title path reached the existing SIWC backend with gpt-6-luna / medium. The prior 30 synthetic Japanese cues matched byte-for-byte (SHA256 `b2ac56782520e6111970ebffdc5c12a20d91f520d1992d8c5a0cf96a65c846f0`); the existing prompt assertion passed (SHA256 `8e43787cc165435c0db94695dead82ada0bf9f87ae0ee9dd48e3813dc724fdf4`). The unchanged role=user request payload assertion was active. No real media was used.
+- **LIVE_INTEGRATION_RESULT=FAIL / ERROR_CODE=AUTH_ERROR.** The Stage11 backend returned the safe auth error after 0.011 seconds, before the Responses request boundary. `MODEL_CALL_COUNT=0`. No HTTP response exists: `HTTP_STATUS=NOT_APPLICABLE`, `CONTENT_TYPE_CLASS=NOT_APPLICABLE`, `RESPONSE_STRUCTURE=NOT_APPLICABLE`, `RESPONSE_TRUNCATED=NOT_APPLICABLE`, provider type/code/param unavailable. The sanitized failure record does not preserve whether automatic auth refresh was attempted, so `AUTH_REFRESH_COUNT=UNKNOWN`; the underlying auth failure cause is also UNKNOWN. No further auth or model request was made.
+- **RESULT / EVIDENCE.** `RESPONSE_COMPLETED=UNVERIFIED`; returned model and token usage unavailable; cue validation, completed receipt persistence and completed-result reuse were not run. `HERMES_CALL_COUNT=0`, ASR calls 0, `PRODUCTION_CHANGED=NO`. Sanitized private report SHA256 `74e7e9d3662e0e0dea1d58889122a8acda212f207dc17be2c95c4d3be8c2b484` at `/tmp/s11-ct108-siwc-live.8iwdEa/report.json` (directory mode 0700, report mode 0600). The trial runner was copied unchanged from the prior approved runner (SHA256 `55cd9960eebc310b8cf7718dd3793e048065a8025d15fc8092f8625c9b2cffc8`). No response body, headers, credentials or tokens were exposed. Candidate source remained unchanged; no offline tests were repeated. Only this documentation update is being reflected to canonical GitHub; no source promotion or deployment.
+
+| Candidate file | SHA256 |
+| --- | --- |
+| `requirements.txt` | `a988141e558d6f758b085cb87bd7c8f37afe9cff7be7259cd174864ab846d450` |
+| `siwc_auth.py` | `a7f438373e84bf88a65b20c709d414561c0563452f0068458ed749de769b806b` |
+| `teddy_discovery_siwc_backend.py` | `beffe41b81946ce1f65c0abbe3c67a2991d08c67b4ac81d5a8c4e524354d84f1` |
+| `teddy_discovery_siwc_backend_smoke.py` | `639d3d7f22e656e1d533962814129ed3752a3ebdcfe62a0eeae9d3e95adf9178` |
+| `teddy_discovery_stage11_deployment.py` | `eef7a443c9ea76c6eaa3d31207a18bd1df82793f7623561a3828ec0581cd9ba4` |
+| `teddy_discovery_stage11_normal_mode.py` | `8fafaed5698b98587ae40d64151fbf07dab8b3c245a4ee639181475773b79e0e` |
+| `teddy_discovery_stage11_normal_mode_smoke.py` | `4a5c1a34014af0365440d22ab6a1af9fac8becbbdada53cfec7dd624dc0e9ccc` |
+| `teddy_discovery_stage11_v2d.py` | `a1887ccb9e11500c77b6a9031bf62574c1033f265b17a1663b5c84f34cbee092` |
+
 ## 2026-11-27 — SIWC Content-Type response diagnostics candidate
 
 - **Source and scope.** Canonical `ssikgun/missav-dlp-web`, branch `teddy-subtitle-stage11`, verified at `6a0e88dcc65b7a8da6ffc4fb5dd3b4c5ea420d8c`; common contract 1.0.1, Stage11 contract 2.1.0, S11-MVP001 IN_PROGRESS. Existing candidate `/tmp/stage11-codex-cli.HTGBdv/repo` remains based at `af6d60a1ed4bac2e7ad3b98903ef4b79c640e433`. This change is isolated to candidate backend and its existing smoke test; no product source promotion.
