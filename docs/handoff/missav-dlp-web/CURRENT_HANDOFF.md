@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC Windows live login PASS; CT108 connection pending
+
+- User's Windows interactive login completed with corrected `windows-acl-v2` candidate and isolated profile store. Redacted result: `SIWC_PROFILE client_id=[REDACTED] connected=true plan_usage_enabled=true`. ACTIVE_WORK record `e5fe3d0b7fb76add7d2f71a3ee8624b8182980ee`. Helper reports account connection and plan usage scope enabled; account tier, CT108 transfer/refresh, actual model catalog and inference not verified. Preserve CT108 host ID, use only officially supported secure profile transfer; do not transfer host.json, print secrets or refresh concurrently on Windows. No model inference or production integration authorized. CT120 unchanged, CT121 STOPPED, V2-E PAUSED.
+
 ## 2026-11-27 — SIWC corrected Windows candidate offline verification PASS
 
 - User copied the corrected `siwc_auth.py` from `/tmp/s11-mvp001-siwc-windows-acl-ntsecuritycon-bafb9fdd` to separate Windows `windows-acl-v2` directory; SHA256 matched `47cc9843021e6f4bdf4403847b4678391f3b8e8b5361bdbc1b00716286193329`. Existing private venv and verified tests reused. Actual Windows offline suite 4/4 OK, 0 skipped, 0.115s, including private storage/host ID/rotation/local signout and synthetic JWT validation. Prior Linux regression remains 4/4 PASS. ACTIVE_WORK result `17714930dd93777d7f40ea812afc1af27fc775f8`. Proceed only within prior live account connection approval with corrected Windows candidate and fresh isolated store under ordinary user; actual browser login, entitlement, transfer, live refresh and catalog remain unverified. No model inference, deployment or production changes. CT120 unchanged, CT121 STOPPED, V2-E PAUSED.
