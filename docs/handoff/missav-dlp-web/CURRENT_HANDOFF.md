@@ -1,5 +1,26 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC detailed-diagnostics live retest failed Content-Type validation
+
+- **CANONICAL_SOURCE / authorization.** Repository `ssikgun/missav-dlp-web`, branch `teddy-subtitle-stage11`; the latest pretrial remote SHA and user approval SHA were both `cb3530c2b27261a5273bf593fa8947afa2d7b17a`. Common contract 1.0.1, Stage11 contract 2.1.0, `S11-MVP001=IN_PROGRESS`. CT108 host identity was `downloader` (LXC). The authorization covered one actual Stage11 integration attempt; it is now consumed.
+- **CANDIDATE_IDENTITY.** Isolated candidate `/tmp/stage11-codex-cli.HTGBdv/repo`, base `af6d60a1ed4bac2e7ad3b98903ef4b79c640e433`. All eight implementation/requirements hashes below matched before the attempt. `siwc_auth.py` was byte-identical to the existing auth module at `/tmp/s11-mvp001-siwc.pr7UsJ/siwc_auth.py`. Reused the existing venv; no dependencies were installed. Existing auth preflight found one eligible profile and no refresh required; refresh count was 0.
+- **REQUEST / INPUT.** The existing `NativeNormalFirstPass` whole-title route ran with `ct108-siwc`, gpt-6-luna and requested reasoning `medium`. The prior 30 synthetic Japanese cues and prompt were byte-identical; prompt SHA256 `8e43787cc165435c0db94695dead82ada0bf9f87ae0ee9dd48e3813dc724fdf4`. The transport-boundary assertion confirmed the unchanged request: one `role=user` message containing the whole prompt, tools `[]`, `stream=true`, `store=false`, with no separate instructions, `tool_choice` or `text.format`.
+- **LIVE_INTEGRATION_RESULT=FAIL.** Exactly one Responses request attempt was made; no retry or fallback. The observed failure was `HTTP_STATUS=200`, `ERROR_CODE=RESPONSE_VALIDATION_FAILED`, `ERROR_DETAIL=CONTENT_TYPE_INVALID`. This identifies the failed local response check: the returned Content-Type did not satisfy the existing SSE requirement. `PROVIDER_ERROR_TYPE`, `PROVIDER_ERROR_CODE` and `PROVIDER_ERROR_PARAM` are unavailable; no structured provider error was parsed. The server-side reason for the returned Content-Type is not established, therefore `ROOT_CAUSE=UNKNOWN`.
+- **RESULT FIELDS.** `RESPONSE_COMPLETED=UNVERIFIED`; `RETURNED_MODEL=UNAVAILABLE`; `TOKEN_USAGE=UNAVAILABLE`; `CUE_VALIDATION=NOT_RUN`; `RECEIPT_PERSISTENCE=NO_COMPLETED_RECEIPT`; `COMPLETED_RESULT_REUSE=NOT_RUN`; `MODEL_CALL_COUNT=1 request attempt`; `ELAPSED_SECONDS=1.642`; `HERMES_CALL_COUNT=0`; ASR calls 0; `PRODUCTION_CHANGED=NO`. No Korean translations were produced. The failed Content-Type check occurred before SSE parsing, completion verification, result validation or completed-receipt creation. The outcome distinguishes this observed failed check from an unconfirmed root cause.
+- **EVIDENCE / SCOPE.** Sanitized report SHA256 `453f6b9a17e18b2d3a8284463fdeebb9b20ba9a01df021ba684767fa4200df2a` in fresh private trial state `/tmp/s11-siwc-detailed-live.niQ4Q1`. No raw response body, credentials, headers or token values were read into the report. Prior failure evidence was preserved. No source code changed, no offline suite repeated, no production state changed, and no promotion/deployment occurred. CT120 default retained, CT121 STOPPED, V2-E PAUSED. Stop after this single authorized attempt.
+
+| Candidate file | SHA256 |
+| --- | --- |
+| `requirements.txt` | `a988141e558d6f758b085cb87bd7c8f37afe9cff7be7259cd174864ab846d450` |
+| `siwc_auth.py` | `a7f438373e84bf88a65b20c709d414561c0563452f0068458ed749de769b806b` |
+| `teddy_discovery_siwc_backend.py` | `a32eb7d57ad23f8f84285a46a9134a72403346cba82a39d949b121317227bd24` |
+| `teddy_discovery_siwc_backend_smoke.py` | `86a75b3d1aa22476d81c23c81a90c01382828696a76385cb1dbb3674988705a5` |
+| `teddy_discovery_stage11_deployment.py` | `eef7a443c9ea76c6eaa3d31207a18bd1df82793f7623561a3828ec0581cd9ba4` |
+| `teddy_discovery_stage11_normal_mode.py` | `8fafaed5698b98587ae40d64151fbf07dab8b3c245a4ee639181475773b79e0e` |
+| `teddy_discovery_stage11_normal_mode_smoke.py` | `4a5c1a34014af0365440d22ab6a1af9fac8becbbdada53cfec7dd624dc0e9ccc` |
+| `teddy_discovery_stage11_v2d.py` | `a1887ccb9e11500c77b6a9031bf62574c1033f265b17a1663b5c84f34cbee092` |
+
+
 ## 2026-11-27 — SIWC response validation diagnostics candidate
 
 - Verified canonical SHA `213151452de597093f0cbc1d31cb888ccc6167ae`, common contract 1.0.1, Stage11 contract 2.1.0, router and S11-MVP001 IN_PROGRESS. The isolated candidate remains based on `af6d60a1ed4bac2e7ad3b98903ef4b79c640e433`. Prior compatibility candidate hashes matched before this change.
