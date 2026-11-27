@@ -1,5 +1,13 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — CT108 SIWC follow-up offline verification
+
+- **Candidate integrity:** `/tmp/stage11-codex-cli.HTGBdv/repo` remained at `af6d60a1ed4bac2e7ad3b98903ef4b79c640e433`. All eight source hashes matched the table below, and `git diff --check` passed. This review started from canonical `312d32cb50f0d9f681b88abe626bc6a0ed876983`.
+- **Deployment smoke PASS:** Existing `/opt/stage11-stt-venv/bin/python` ran the candidate's `teddy_discovery_stage11_deployment_smoke.py` via `runpy` with `-I -B`. Exit 0, `DEPLOYMENT_SMOKE_PASS_COUNT=54`, `DEPLOYMENT_SMOKE_FAIL_COUNT=0`, `STAGE11_DEPLOYMENT_SMOKE_PASS`. This clears the prior numpy blocker. No environment changes or dependency installation.
+- **Diff review:** Confirmed the default CT120 selector and unchanged CT121 connection. SIWC is restricted to whole-title and fixed-part primary translation. Review and JA Master correction continue through Hermes. The SIWC adapter requests a token through the existing client, which refreshes near expiry, and records the selected model and reasoning effort with response, prompt and output evidence. Normal Mode verifies stored inputs and receipts and reuses the established result validators. Earlier passing suites were not repeated.
+- **Reproduced V2-D defect:** An interrupted primary translation can leave an SIWC binding without a receipt. On a fresh V2-D invocation with CT120 selected, the stage wrapper checks existing receipts but does not check the SIWC binding. A synthetic `whole-title` stage containing only that binding reached the fake Hermes transport with socket creation blocked. Normal Mode has a separate title binding check. Final diff review remains FAIL pending a V2-D check that rejects this backend change before reaching transport.
+- **Remaining limits:** Deployment smoke uses fake integrations. The review did not exercise live authentication, refresh or models. The SIWC transport's socket timeout limits individual I/O waits, so the V2-D pre-call time reservation does not establish a hard deadline for the full streamed request. Candidate source remains unchanged and S11-MVP001 remains IN_PROGRESS.
+
 ## 2026-11-27 — CT108 SIWC isolated implementation and offline validation PASS
 
 - **Scope and isolation:** Implemented in `/tmp/stage11-codex-cli.HTGBdv/repo`, a clean isolated checkout at approved base `af6d60a1ed4bac2e7ad3b98903ef4b79c640e433` on `teddy-subtitle-stage11`. The protected dirty worktree was not touched. This is a source candidate only; no product code was committed or promoted. The documentation update to this handoff and Stage11 `ACTIVE_WORK.md` is documentation-only.
