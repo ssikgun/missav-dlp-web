@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC Windows login blocked before browser authentication
+
+- CT108 isolated trial store `/root/.config/missav-dlp-web-siwc-trial` and host.json prepared, permissions 0700/0600 root-owned, candidate hash verified. Windows candidate copies match hashes, separate Python 3.11.15 venv and dependencies ready; CLI help passes, but actual login fails before browser authentication at `os.geteuid()` in private directory validation. No token issued, no inference. Linux offline tests do not establish Windows compatibility. ACTIVE_WORK blocker commit `6f7c62fc8d6c64774866e86071b720cd32da5885`. Prefer existing browser-capable macOS POSIX environment rather than weakening credential protections; Windows ACL support only if needed. No host ID value or credentials in record. Existing trial store preserved, CT120 unchanged, CT121 STOPPED, V2-E PAUSED. Live entitlement/refresh/catalog unverified, production integration not approved.
+
 ## 2026-11-27 — SIWC live account connection and model catalog approved
 
 - User explicitly approved isolated independent public-client registration, user-interactive official ChatGPT login/consent, secure CT108 profile storage/official supported transfer if needed, live entitlement and bounded refresh checks, and model catalog retrieval. ACTIVE_WORK authorization `50a3b3f6ebba3f24e89ec3695640e300f84ab18e` under S11-MVP001. Reuse offline-verified `/tmp/s11-mvp001-siwc.pr7UsJ` and private venv; inspect REMOTE_LOGIN.md, actual CLI, intended host identity/store and current official guidance before execution. User handles official login privately; no credential values in chat/logs/Git or reuse of existing Codex/Hermes auth. Model inference, production integration, paid fallback and operational changes remain unauthorized. Live connection is NOT_RUN, CT120 unchanged, CT121 STOPPED, V2-E PAUSED; stop before inference. ChatGPT cannot execute directly on CT108.
