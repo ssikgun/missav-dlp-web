@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 14:07:32 — SIWC Windows ACL constant correction prepared; Windows test pending
+
+- Preserved prior candidate `/tmp/s11-mvp001-siwc-windows-acl-0ac76d6` and created separate candidate `/tmp/s11-mvp001-siwc-windows-acl-ntsecuritycon-bafb9fdd`. Only `siwc_auth.py` differs; its new SHA256 is `47cc9843021e6f4bdf4403847b4678391f3b8e8b5361bdbc1b00716286193329`. Prior candidate source SHA256 remains `cb32e9426102cf46821897dd4a599ea20e7e7fc7bbcedd13883f98e7f0a542de`.
+- Both `FILE_ALL_ACCESS` uses now reference `ntsecuritycon.FILE_ALL_ACCESS`. Static inspection of upstream pywin32 `b312` sources found this symbol and every other candidate Windows API constant in the referenced `win32con` or `win32security` module. Existing ACL checks and OAuth/JWT code remain. ACL exception wrappers report only exception module/type and an available numeric Windows/POSIX error code or first numeric argument; no exception messages, paths or secrets are included. No dependency change.
+- The existing Linux offline suite passed 4/4 from the preserved private venv. Windows execution was not performed; compatibility remains UNVERIFIED for the user’s Windows test. No live login, token issuance, model call, operational/production change, candidate promotion or deployment. CT120 unchanged, CT121 STOPPED, V2-E PAUSED.
+
 ## 2026-11-27 — SIWC Windows ACL immediate error identified
 
 - Non-elevated Windows synthetic test exception tracing revealed `_set_windows_private_acl` line 543 `AttributeError: module 'win32con' has no attribute 'FILE_ALL_ACCESS'`, wrapped at line 560. Correct constant namespace is ntsecuritycon; verify installed pywin32 312 before correction. ACTIVE_WORK record `d046a1a616af369b76a8328176387c9e4f3ed968`. Preserve existing candidates, test a narrow correction to all affected references, retain ACL protections and sanitized diagnostics; Windows compatibility remains unverified. No live authentication, tokens, inference or operational change; CT120 unchanged, CT121 STOPPED, V2-E PAUSED.
