@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — CT108 SIWC live retest returned HTTP 400
+
+- Verified the CT108 downloader LXC and canonical approval `9740aaf5c2c774126be63fbc94c14f76cc1777e7`. Confirmed common contract 1.0.1, Stage11 contract 2.1.0 and S11-MVP001 IN_PROGRESS. The three diagnostics fix hashes and remaining candidate hashes matched the canonical records below, including the original authentication module.
+- Used fresh private trial state and the existing NativeNormalFirstPass whole-title path, ct108-siwc, gpt-6-luna and medium. Exact prior 30-cue input and 9,141-byte prompt matched. Prompt SHA256 `8e43787cc165435c0db94695dead82ada0bf9f87ae0ee9dd48e3813dc724fdf4`. Original failure evidence was preserved. The profile passed the existing token freshness preflight and the trial used the existing authentication path.
+- One Responses transport attempt returned `HTTP_ERROR` with numeric HTTP status `400` after 1.431 seconds end to end. The server rejected the request. The specific cause is `UNKNOWN`. The prior failure remains unknown. Raw response and authentication data were excluded. No completion event, returned model, usage, cue validation, completed receipt, replay or Korean result were available. Sanitized report SHA256 `e468bcbef17093528324c3037198bd12df7eaf51fbb3ffc7659cf27ff02b10a3`.
+- Authorization consumed. No retry, partition fallback, Hermes/ASR calls, offline suite rerun, product source edit/promotion, deployment or production change. CT120 default, CT121 stopped and V2-E paused per existing records. Product subtitle quality remains unverified.
+
 ## 2026-11-27 — SIWC failure diagnostics preserved in isolated candidate
 
 - Verified canonical SHA `bf142cc2a0da5f43d33de889d88c9f2385e44768`, Stage11 contract 2.1.0, S11-MVP001 IN_PROGRESS and the previous isolated candidate hashes. The worker returns an allowlisted failure code and numeric HTTP error status when available. Stage11 writes those values in the existing failure reason. Raw response content, exception messages, headers, tokens and child stderr are excluded.
