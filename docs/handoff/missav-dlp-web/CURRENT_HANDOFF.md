@@ -19422,3 +19422,82 @@ PY
 
 - Canonical candidate: [JA_KO_TRANSLATION_PROMPT.md](JA_KO_TRANSLATION_PROMPT.md), version `ja-ko-v1`. Based on the existing Hermes first-pass translation principles. Adds general fidelity guidance without any fixture-specific examples, benchmark answers, or model settings.
 - Keep subtitle form, ASR/repair/review, and runtime controls outside the shared block. Existing Hermes and CT108 execution settings remain unchanged. No new model request, product code, deployment, SIWC activation, CT120/CT121 changes, or V2-E resumption.
+
+
+## 2026-11-27 — ja-ko-v1 retained and previously unseen synthetic quality check
+
+- User approved a two-fixture check (one Codex exec each). Parent wording in `2e4c39ba08341e2369e61c98519eed8a29207ddd`; measured tools-off baseline in `d0f71a9ad23d9b45cd9c95e6823da04b24e57508`. Actual CT108, official CLI 0.172.0, requested gpt-6-luna/medium, existing auth and account, unchanged restrictive filesystem/network setup, read-only sandbox, 30-second cap per run. Separate one-shot reservations, no retry/fallback. Effective model/effort/provider request count not independently exposed; no new Hermes/SIWC inference.
+- Used the exact `ja-ko-v1` block, original JSON instruction and schema, tools-off settings and identical retained Japanese input. Unseen test uses a newly authored museum conversation with no references in the model input. The unseen run has no measured old-prompt baseline and is a coverage check, not a causal comparison.
+- Retained: exit 0, one completed turn, **18.398 s**, first observed model item 18.129 s, **10,817 input / 556 output / 11,373 sum**. Versus measured tools-off baseline: +125 input tokens and +5.208 s in this one sample; not evidence of a stable slowdown. Recovered cue 27's “more,” cue 13's timing intent, and cue 6's emphasis. Cue 14's debt/respect idiom still reads like shame; cue 15's “과장이세요” is awkward and ambiguous; cue 1 still adds a speech event not stated in the original.
+- Unseen: exit 0, one completed turn, **21.060 s**, first observed model item 20.804 s, **10,923 input / 689 output / 11,612 sum**. Conditions, amounts, negation and uncertainty generally preserved (e.g., 5–9, 13–15 and 19–20). Cue 25 `猫の手も借りたい` is rendered literally instead of “오늘은 손이 모자라서 누구라도 도와주면 좋을 정도야”; cue 16 overstates a mild apology and cue 21 narrows “getting ahead of oneself” to notifying early, plausible in context.
+- Both: 30/30 ordered integer IDs and strict JSON, zero cached input/cache writes/reasoning output, no timeout, malformed events, unexpected tools or residual isolated-UID processes. No missing cues; local meaning drift remains. Treat as mixed quality, not an overall win or production approval. No product code or runtime config changes, no deployment, no SIWC activation or CT120/121/V2-E changes.
+
+### Retained fixture
+
+| Cue | Japanese | Prior tools-off Korean | v1 Korean |
+| ---: | --- | --- | --- |
+| 1 | 先輩、昨日の件なんですけど。 | 선배, 어제 말씀드린 건인데요. | 선배, 어제 말씀드린 건 말인데요. |
+| 2 | ああ、例の資料？ | 아, 그 자료 말이야? | 아, 그 자료 말이야? |
+| 3 | はい。部長にはもうお渡ししましたか？ | 네. 부장님께는 벌써 드렸어요? | 네. 부장님께는 벌써 전달하셨어요? |
+| 4 | いや、まだ手をつけてない。 | 아니, 아직 손도 못 댔어. | 아니, 아직 손도 못 댔어. |
+| 5 | えっ、今日までですよね？ | 네? 오늘까지잖아요? | 네? 오늘까지잖아요? |
+| 6 | 分かってるって。今やろうと思ってたんだよ。 | 알고 있어. 지금 하려던 참이었어. | 알고 있다니까. 지금 하려고 했어. |
+| 7 | でしたら、私もお手伝いします。 | 그럼 저도 도와드릴게요. | 그러면 저도 도와드릴게요. |
+| 8 | 助かるよ。じゃあ、こっちをお願い。 | 큰 도움이 되겠네. 그럼 이쪽을 부탁해. | 도움 되겠다. 그럼 이쪽 부탁해. |
+| 9 | この数字、ちょっとおかしくないですか？ | 이 숫자, 좀 이상하지 않나요? | 이 숫자, 좀 이상하지 않아요? |
+| 10 | どれ？ 見せて。 | 어디? 보여 줘. | 어느 거? 보여 줘. |
+| 11 | ほら、先月の分が入ってないみたいです。 | 여기요. 지난달 수치가 빠진 것 같아요. | 여기요, 지난달 분이 안 들어간 것 같아요. |
+| 12 | 本当だ。危うく見落とすところだった。 | 정말이네. 하마터면 놓칠 뻔했어. | 그러네. 하마터면 놓칠 뻔했어. |
+| 13 | 間に合ってよかったですね。 | 제때 발견해서 다행이네요. | 시간에 맞춰서 다행이네요. |
+| 14 | まったく、君には頭が上がらないな。 | 정말, 자네한테는 고개를 못 들겠어. | 정말, 자네한테는 고개를 못 들겠네. |
+| 15 | そんな、大げさですよ。 | 아니에요, 과찬이세요. | 아유, 과장이세요. |
+| 16 | そういえば、今日の飲み会、来る？ | 그러고 보니 오늘 회식 올 거야? | 그러고 보니 오늘 회식 올 거야? |
+| 17 | 今日はちょっと……。 | 오늘은 좀……. | 오늘은 좀……. |
+| 18 | 何か予定でもあるの？ | 무슨 약속이라도 있어? | 무슨 일정이라도 있어? |
+| 19 | 母が来ることになってまして。 | 어머니가 오시기로 해서요. | 어머니가 오시기로 해서요. |
+| 20 | そっか。それなら仕方ないね。 | 그렇구나. 그럼 어쩔 수 없지. | 그렇구나. 그럼 어쩔 수 없지. |
+| 21 | せっかく誘っていただいたのに、すみません。 | 모처럼 초대해 주셨는데 죄송해요. | 모처럼 초대해 주셨는데 죄송해요. |
+| 22 | いいって。気にしないで。 | 괜찮아. 신경 쓰지 마. | 괜찮아. 신경 쓰지 마. |
+| 23 | あ、部長が戻ってきました。 | 아, 부장님이 돌아오셨어요. | 아, 부장님이 돌아오셨어요. |
+| 24 | まずい。まだ確認が終わってない。 | 큰일이네. 아직 확인이 안 끝났어. | 큰일이네. 아직 확인이 안 끝났어. |
+| 25 | ここは私に任せてください。 | 여기는 제가 맡을게요. | 여긴 제게 맡겨 주세요. |
+| 26 | お疲れ様です。資料の件ですが。 | 수고 많으십니다. 자료 건인데요. | 수고 많으십니다. 자료 건인데요. |
+| 27 | あと五分ほどお時間をいただけますか？ | 5분 정도 시간 내주실 수 있을까요? | 5분 정도만 더 시간 내주실 수 있을까요? |
+| 28 | ああ、構わないよ。急がなくていいから。 | 그래, 괜찮아. 서두르지 않아도 돼. | 그래, 괜찮아. 서두르지 않아도 돼. |
+| 29 | ありがとうございます。 | 감사합니다. | 감사합니다. |
+| 30 | ふう、何とか首がつながったね。 | 휴, 어떻게든 한숨 돌렸네. | 휴, 어떻게든 한숨 돌렸네. |
+
+### Previously unseen fixture
+
+| Cue | Japanese | v1 Korean |
+| ---: | --- | --- |
+| 1 | 館長、明日の展示のことで少しよろしいでしょうか。 | 관장님, 내일 전시 건으로 잠깐 괜찮으실까요? |
+| 2 | うん、開館時間のこと？ | 응, 개관 시간 말이야? |
+| 3 | いえ、受付の案内板です。 | 아뇨, 안내 데스크 안내판이요. |
+| 4 | もう印刷したんじゃなかった？ | 벌써 인쇄한 거 아니었어? |
+| 5 | 原稿はできていますが、印刷はまだです。 | 원고는 다 됐지만, 인쇄는 아직이에요. |
+| 6 | それなら、今日のうちにもう一枚だけ頼める？ | 그럼 오늘 안으로 한 장만 더 부탁해도 될까? |
+| 7 | 用紙が届けば、四時までには間に合うと思います。 | 종이가 도착하면 네 시까지는 맞출 수 있을 것 같아요. |
+| 8 | 届かなかったら、無理に作らなくていいよ。 | 도착하지 않으면 무리해서 만들지 않아도 돼. |
+| 9 | 承知しました。予備は二枚残しておきます。 | 알겠습니다. 예비분은 두 장 남겨 두겠습니다. |
+| 10 | あ、橋本さんにはもう連絡しましたか？ | 아, 하시모토 씨한테는 벌써 연락했어요? |
+| 11 | まだ。先に配送の人に聞いてみる。 | 아직. 먼저 배송 기사님께 물어볼게. |
+| 12 | あの……入口の鍵、見ませんでしたか。 | 저기…… 입구 열쇠 못 보셨어요? |
+| 13 | 鍵なら、さっき棚の上に置いたと思うけど。 | 열쇠라면 아까 선반 위에 둔 것 같은데. |
+| 14 | 棚のほうは、もう見たんです。 | 선반 쪽은 이미 봤어요. |
+| 15 | じゃあ、受付の引き出しかもしれない。 | 그럼 안내 데스크 서랍일지도 모르겠네. |
+| 16 | あ、ありました。お騒がせしました。 | 아, 찾았어요. 소란 피워서 죄송해요. |
+| 17 | いいよ。でも次からは私にも一声かけてね。 | 괜찮아. 그래도 다음부터는 나한테도 한마디 해 줘. |
+| 18 | はい。ところで、雨でも中庭は使いますか。 | 네. 그런데 비가 와도 안뜰을 사용하나요? |
+| 19 | 小雨なら使うけど、風が強ければ中止だね。 | 가랑비면 쓰지만, 바람이 강하면 취소야. |
+| 20 | 中止が決まるまでは、知らせないほうがいいですか。 | 취소가 결정될 때까지는 알리지 않는 편이 좋을까요? |
+| 21 | 決まってからでいい。先走ると話がややこしくなる。 | 결정된 다음에 해도 돼. 앞서 알리면 일이 복잡해져. |
+| 22 | 来場者には『ここでお待ちください』と伝えます。 | 방문객들에게 ‘여기서 기다려 주세요’라고 전하겠습니다. |
+| 23 | うん、でも通路はふさがないでね。 | 응, 그래도 통로는 막지 말아 줘. |
+| 24 | そういえば、森さんが手を貸してくれるそうです。 | 그러고 보니 모리 씨가 도와주신다고 해요. |
+| 25 | それはありがたい。今日は猫の手も借りたいくらいだ。 | 고맙지. 오늘은 고양이 손이라도 빌리고 싶을 정도야. |
+| 26 | じゃあ、案内の確認だけお願いしてみます。 | 그럼 안내 내용을 확인해 달라고 부탁해 볼게요. |
+| 27 | あっ、それは私が……いえ、あとで話すね。 | 아, 그건 내가…… 아니, 나중에 얘기할게. |
+| 28 | 分かりました。では、先に机を戻しておきます。 | 알겠습니다. 그럼 먼저 책상을 원래대로 돌려놓을게요. |
+| 29 | 助かるよ。終わったら、そのまま帰っていいから。 | 고마워. 끝나면 그대로 퇴근해도 돼. |
+| 30 | ありがとうございます。それでは失礼します。 | 감사합니다. 그럼 먼저 실례하겠습니다. |
