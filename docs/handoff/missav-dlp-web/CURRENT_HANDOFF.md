@@ -1,5 +1,17 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC request compatibility candidate
+
+- Verified canonical `e6b50aa322210032b79bfadaec5178bf5aa7cc10`, contracts 1.0.1 and 2.1.0, router and S11-MVP001 IN_PROGRESS. The isolated candidate at `/tmp/stage11-codex-cli.HTGBdv/repo` matched all eight prior hashes before editing.
+- The Responses request now sends `input=[{"role":"user","content":<unchanged prompt>}]` and omits `tool_choice` and `text.format`. Model, reasoning, `tools=[]`, `stream=true` and `store=false` remain as before. The intact prompt keeps its cross-references, inline source data and JSON-only instruction together in order. No separate instructions field is sent. The existing tool-free identity marker remains in receipts and bindings for reuse. Authentication, deadlines, Stage11 validators and V2-D policy are unchanged.
+- Three targeted offline tests passed. They checked the exact outgoing object and prompt, rejected incomplete/tool/wrong-model responses and exercised the existing Stage11 primary validation and completed-result reuse. The full suite was not rerun.
+- Provider error-code and field capture would require bounded parsing of the error body and exact allowlists for verified values. The present handler closes the body and records the safe local code and numeric HTTP status. No provider fields were added because the prior failure retained no structured provider evidence. The restored request configuration is based on conversation evidence, and the successful source is unavailable. HTTP 400 root cause remains UNKNOWN. No model calls, auth refreshes, production changes, promotions or deployment. Live retest requires separate approval.
+
+| Changed candidate file | SHA256 |
+| --- | --- |
+| `teddy_discovery_siwc_backend.py` | `87d6ed860010e0d520e052167be0544dfc0de25c42ebeb1a39f05c6af025b343` |
+| `teddy_discovery_siwc_backend_smoke.py` | `df6670dcdaf657f6d3905b7cfc2d580cd8b71456e215c9e482f0da69d259a931` |
+
 ## 2026-11-27 — CT108 SIWC live retest returned HTTP 400
 
 - Verified the CT108 downloader LXC and canonical approval `9740aaf5c2c774126be63fbc94c14f76cc1777e7`. Confirmed common contract 1.0.1, Stage11 contract 2.1.0 and S11-MVP001 IN_PROGRESS. The three diagnostics fix hashes and remaining candidate hashes matched the canonical records below, including the original authentication module.
