@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC CT108 live refresh and model/reasoning catalog PASS
+
+- User terminal evidence: plan_usage_enabled=true, LIVE_REFRESH=PASS; original Linux helper SHA256 verified. GET /v1/models HTTP 200, MODEL_COUNT=10, MODEL_CATALOG=PASS. User selects gpt-6-luna. Follow-up catalog HTTP 200, REASONING_CATALOG=PASS: low, medium, high, xhigh, max; default medium. Effort none not listed; default reasoning summary none is separate. See ACTIVE_WORK commit 047efa039ffad42845110ff93566247249ea36f7 for all ten model slugs and scope. No actual inference, credential identifiers, paid fallback, integration or production changes. Account tier and sustained automatic refresh not independently established. Next: user selects effort and separately approves one synthetic three-cue trial. CT120 unchanged, CT121 STOPPED, V2-E PAUSED (prior recorded state, not freshly rechecked). ChatGPT did not execute CT108 commands.
+
 ## 2026-11-27 — SIWC CT108 profile transfer PASS; live refresh pending
 
 - User terminal evidence: REMOTE_STORE=PASS, PROFILE_TRANSFER=PASS, 600:root:root. Selected profile transferred into isolated CT108 trial store; transfer command preserves existing host.json and does not overwrite an existing profile. ACTIVE_WORK result `32d2031f96ef4cbdc637a361ed906f7a7138f1aa`. No identifiers or credentials recorded. Next confirm local profile status and perform one previously approved live refresh on CT108 only, then verify available model catalog. User wishes to proceed with testing; no inference until prerequisite checks and bounded trial scope are recorded. No Windows refresh, paid fallback, integration or production deployment. CT120 unchanged, CT121 STOPPED, V2-E PAUSED. ChatGPT did not execute CT108 commands.
