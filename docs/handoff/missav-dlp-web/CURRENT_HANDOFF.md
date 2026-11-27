@@ -1,5 +1,9 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-27 — SIWC offline authentication preparation PASS on CT108
+
+- User's actual CT108 terminal confirmed candidate `/tmp/s11-mvp001-siwc.pr7UsJ`, existing private venv, working package-index DNS, successful installation of pinned PyJWT 2.15.1 and crypto dependencies, pip check clean, and 4/4 offline tests OK (0 skipped, 0.022s), including the previously skipped synthetic JWT signature/claims/nonce/audience verification. ACTIVE_WORK result commit `31cae08c74d963df2529b8a70c025eaca6b41ea7`. Prior Codex DNS failure cause unverified. ChatGPT did not execute these commands. Offline preparation complete; live registration/login/consent, account eligibility, target identity/store/transfer, live refresh, model listing and inference remain unverified and subject to separate authorization. No product or operational changes reported; CT120 unchanged, CT121 STOPPED, V2-E PAUSED.
+
 ## 2026-11-27 — SIWC independent authentication preparation approved
 
 - User approved independent Python authentication preparation and offline tests only, under S11-MVP001. ACTIVE_WORK authorization commit `b3c59ba5c3e4cbbd40f9cddeb5f00be1248f0a25`. CT108 user terminal evidence confirms downloader/systemd, Python 3.13.5, node/npm not found in PATH; protected local Stage11 worktree HEAD `b1bc851fdcf95642fa2ed1cd9ae3a0bf2a8ee3bc` has 10 modified and 4 untracked files, remote then `020fe495dbdf8dba9087181df24f387af6027230`. Preserve worktree; isolated directory/environment only. Prepare official public-client OAuth registration, secure validation/storage/renewal/sign-out, documented self-hosted login procedure and bounded offline checks. No live login, credentials, model inference, product integration, deployment or operational writes approved in this step. CT120 unchanged, CT121 STOPPED, V2-E PAUSED. ChatGPT did not execute CT108 commands. Next: isolated candidate preparation, stop before live authentication.
