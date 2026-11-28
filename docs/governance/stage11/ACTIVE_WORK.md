@@ -1,5 +1,11 @@
 # Stage11 subtitle workstream — active work
 
+## 2026-11-28 KST | S11-MVP001: source replay completed, targeted audio evidence gate held
+
+- Authorized private continuation reused 20 validated source receipts and completed all 30 remaining source requests, including the previously timed-out request. Offline verified replay validates all 50 receipts and all 246 source groups. Continuation elapsed 379.26 s; cumulative active run time 845.01 s; 51 total live Codex calls across both attempts.
+- Terminal HOLD: TARGETED_ASR_ADAPTER_UNAVAILABLE. Five adjudicated groups require targeted audio evidence, consolidated into one planned targeted request. This private run did not authorize or configure a targeted audio worker, and correctly stopped at the gate instead of guessing or translating uncertain source. No new Whisper, pyannote, Hermes, translation, coherence or repair calls; no private final artifacts or production changes.
+- Source replay/coverage PASS; unattended completion of this run FAIL; final speaker attribution, line quality, translation, final timing, full duration, and deployment readiness INCOMPLETE. Preserve the 50 receipts; no whole-title source rerun. Review retained evidence against the exact five groups first. Any new targeted inference or added data transfer remains separately gated.
+
 ## 2026-11-28 KST | S11-MVP001: deadline confirmed, interrupted source replay fix validated offline
 
 - The systemd journal independently confirms the 21st worker exceeded RuntimeMaxSec and exited with service result timeout. The 180-second wall limit is a worker safety deadline, not a token cap; why the provider did not finish is unknown. The failed prompt size was close to the median and no quota/context-limit evidence was retained.
