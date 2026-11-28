@@ -1,5 +1,20 @@
 # Stage11 subtitle workstream — active work
 
+## 2026-11-28 — Stage11 serial GPU whole speech candidate
+
+Candidate 5ded32a73b43ee04e4c3feb8530a91ed0c095aef wires the default-off whole-speech provider. It
+uses a private disk-checked spool, serial verified window transfers, a
+20-minute overall deadline and up to 118 seconds per call. A worker error
+or missing/invalid receipt stops the run; temporary PCM is cleaned and
+partial evidence does not advance. Window-qualified tags are not global
+speaker IDs, and ambiguous boundary-spanning hints are withheld from
+translation and coherence review. Actual SNOS-377 Whisper timings with
+synthetic PCM and mocked receipts exercised all 51 scheduled windows in
+order; stop/cleanup, invalid PCM and deadline tests passed. 96 tests and
+V2-D offline smoke PASS. No actual audio, GPU/Whisper/Codex execution,
+deployment or publish. A live whole-speech GPU-only validation needs
+explicit scope approval before starting; actual JA/KO quality is unverified.
+
 ## 2026-11-28 — Stage11 full speech-timeline coverage plan (offline only)
 
 Isolated candidate 448c771feeb49602495497594d16024feaddc06f adds a bounded coverage planner and receipt

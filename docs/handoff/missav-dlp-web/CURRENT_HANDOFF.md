@@ -19801,3 +19801,18 @@ bounded execution using the already verified GPU path, and explicit
 cross-window uncertainty before an authorized whole-title live test.
 
 Offline follow-up: candidate 1586206c1d6a474aa0a933857b94ab5f17999380 spools exact, hashed window PCM from one continuous source-bound decoder pass into private files. Tests verify byte-exact overlapping spans, truncation and continuity rejection, and mode 0600. 93 candidate tests passed. This is not yet wired to multi-window GPU execution; no actual media, model or production actions.
+
+## 2026-11-28 — Stage11 serial GPU whole speech candidate
+
+Candidate 5ded32a73b43ee04e4c3feb8530a91ed0c095aef wires the default-off whole-speech provider. It
+uses a private disk-checked spool, serial verified window transfers, a
+20-minute overall deadline and up to 118 seconds per call. A worker error
+or missing/invalid receipt stops the run; temporary PCM is cleaned and
+partial evidence does not advance. Window-qualified tags are not global
+speaker IDs, and ambiguous boundary-spanning hints are withheld from
+translation and coherence review. Actual SNOS-377 Whisper timings with
+synthetic PCM and mocked receipts exercised all 51 scheduled windows in
+order; stop/cleanup, invalid PCM and deadline tests passed. 96 tests and
+V2-D offline smoke PASS. No actual audio, GPU/Whisper/Codex execution,
+deployment or publish. A live whole-speech GPU-only validation needs
+explicit scope approval before starting; actual JA/KO quality is unverified.
