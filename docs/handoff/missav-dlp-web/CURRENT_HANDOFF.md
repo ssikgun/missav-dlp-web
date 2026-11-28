@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-29 KST | S11-MVP001: targeted audio passed; semantic uncertainty remains
+
+- The last, distinct 4.50 s contained attempt recovered the remaining targeted window while preserving the other four and all 50 verified source receipts. The strict acoustic evidence gate passed and the authenticated internal targeted artifact/linkage were saved. The pipeline ran one genuine Codex targeted Japanese readjudication; two of five were accepted and three remained uncertain. No Korean translation call was made (the coarse status logger labels this call as translation).
+- Read-only exact replay validated all receipts and targeted artifacts without another invocation. Of 246 groups, 16 retain a semantic uncertainty flag and none of those 16 has supported output: three of them already have targeted evidence but remain uncertain, and 13 did not request targeted audio. Terminal HOLD STRICT_CODEX_UNRESOLVED_SOURCE at 119.97 s for this continuation; no final JA/KO SRT, master, proof, publication or deployment. No new audio expansion attempted.
+- Technical PASS: source reuse, scoped audio recovery and automatic handoff to readjudication. Unattended full-title completion FAIL. Final speaker attribution, sentence/linebreak quality, JA/KO translation, final sync, full duration and readiness INCOMPLETE. Preserve both completed inference phases. Do not retry an unchanged decision or use speculative dialogue. Continuing with a private draft of supported cues while explicitly excluding unresolved groups, or changing what is processed, is a separate policy decision rather than a technical PASS.
+
 ## 2026-11-29 KST | S11-MVP001: narrower targeted recovery salvaged one source
 
 - With all 50 Japanese source receipts and three usable audio-window results preserved, the isolated candidate retried only two contained subwindows (5.16 s total) using the same GPU Whisper route. The run took 122.28 s and retained separate child-window provenance. One formerly noisy window produced clean, overlapping timing evidence; the other 2.70 s subwindow returned zero segments. Four of five now have evidence eligible for readjudication; none is a semantic PASS by itself.
