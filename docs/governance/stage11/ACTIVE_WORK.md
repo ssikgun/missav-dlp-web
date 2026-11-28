@@ -1,5 +1,18 @@
 # Stage11 subtitle workstream — active work
 
+## 2026-11-28 — Stage11 opt-in GPU speaker provider
+
+Candidate 97adbde5ee69c8930827471382da42e3c876e16a wires the default-off bounded pyannote provider through
+the private title and queue entry points. One automatically selected window (up
+to 60 seconds) uses source-bound PCM on VM122 only; the GPU admission gate
+requires 4,096 MiB free, and fails without CPU fallback or service changes.
+Standard overlapping turns are preserved; exclusive turns are validated but
+never force attribution. The exact old SNOS-377 receipt replay passed (18
+speaker turns); the fixture queue invoked the provider once automatically and
+carried the anonymous hints into translation and review. 89 tests and V2-D
+smoke passed. No new inference or deploy; this is bounded coverage, not
+whole-title speaker coverage or a real subtitle quality PASS.
+
 ## 2026-11-28 — S11-MVP001 bounded pyannote GPU evidence (no deployment)
 
 - Approved isolated diagnostic: one 60-second SNOS-377 window auto-selected using existing Whisper timestamps. Source identity verified and exact PCM bound privately; standard and exclusive output durations projected once to the original timeline.
