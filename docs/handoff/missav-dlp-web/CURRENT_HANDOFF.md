@@ -19727,3 +19727,8 @@ contained overlap, ten had insufficient speaker evidence. The automated
 pipeline and final JA/KO SRT quality are not certified by this diagnostic.
 No new Codex, production changes or publication. Reuse bound evidence for
 offline V2-C/JA Master and line-break verification; do not rerun gratuitously.
+
+Offline receipt replay passed V2-C time linkage. Three weak false-confidence
+hints are now excluded from primary translation in local candidate 97ac4df;
+all 19 diagnostic projections match the receipt, with 10 UNKNOWN retained.
+83 candidate tests and V2-C/V2-D smoke passed. No new inference or rollout.
