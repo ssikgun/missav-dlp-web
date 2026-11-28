@@ -1,5 +1,21 @@
 # Stage11 subtitle workstream — active work
 
+## 2026-11-28 — Stage11 offline end-to-end budget and timeout recovery
+
+Using the exact 246 real Whisper cues and scoped GPU evidence on local
+candidate de99b8d, a strict isolated run with synthetic model replies
+produced both private SRTs. Observed 77 mock requests: 50 JA adjudication,
+8 primary translation, 1 joined scan, 1 repair, and 17 source reviews.
+This is observed fixture demand, not a worst-case or quality guarantee.
+
+A second offline path injected a timeout at source request 15. The validator
+reverified the first 14 complete receipts, split only the failed 7-or-fewer
+group batch, and called the mock only for the 37 remaining leaves. The
+result covered all 246 groups exactly through 51 accepted leaves. This
+proves explicit source continuation in isolation, not unattended operational
+retry or a guarantee that live calls stay under the wall limit. No model,
+external data transfer, live queue activity or deployment took place.
+
 ## 2026-11-28 — Stage11 real scoped-speaker JA prompt-size preflight
 
 No-model, no-media replay of the exact 246-cue baseline and private 888-turn
