@@ -1,5 +1,12 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-28 KST | S11-MVP001: deadline confirmed, interrupted source replay fix validated offline
+
+- The systemd journal independently confirms the 21st worker exceeded RuntimeMaxSec and exited with service result timeout. The 180-second wall limit is a worker safety deadline, not a token cap; why the provider did not finish is unknown. The failed prompt size was close to the median and no quota/context-limit evidence was retained.
+- Exact private replay validation accepted all 20 original completed receipts against the pinned source, anonymous speaker evidence, prompt, schema, runner, and output validation. The first uncompleted batch contains one indivisible source group; it is not split or relabeled. A bounded follow-up would retry that single batch unchanged once, then process the untouched 29 source batches. The 20 completed batches are not resubmitted.
+- The isolated candidate now admits only a verified contiguous interrupted keyed-source prefix in a fresh private stage; it rejects altered success receipts and a mismatched interrupted marker before invoking a worker. Strict semantic and publication guards remain unchanged. Verified on the actual retained receipts with an execution stub: the first newly scheduled request is exactly the interrupted one; original artifacts remain byte-identical. All 97 existing offline unit tests passed. No live requests were made during the fix or verification. Candidate code is isolated; this canonical update is documentation only.
+- Live resume and final JA/KO quality remain NOT_RUN. No new ASR, pyannote, external transfer, publishing, or production actions. A new live continuation requires separate authorization; the previous isolated run ended.
+
 ## 2026-11-28 KST | S11-MVP001: isolated whole-title Codex quality trial stopped before translation
 
 - The bounded Codex-only validation reused the complete retained baseline ASR and GPU speaker evidence. No new Whisper or pyannote calls, backend fallback, media transfer, production or publication action.
