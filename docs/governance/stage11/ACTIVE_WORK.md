@@ -1,5 +1,11 @@
 # Stage11 subtitle workstream — active work
 
+## 2026-11-28 KST | S11-MVP001: GPU execution returned; isolated provenance wrapper fixed offline
+
+- Corrected interpreter run automatically replayed all 50 source receipts and returned a typed targeted GPU execution for the exact five windows in scope. Terminal HOLD at 187.93 s (TARGETED_ASR_ADAPTER_VALIDATION_OR_PERSISTENCE_FAILED); neither source-bound targeted artifact nor linkage was saved. No subsequent Codex adjudication, translation, review, output, pyannote, or deploy.
+- Reproduced exact failure offline: the isolated request-boundary wrapper failed to preserve runtime_identity and engine_version from the adapter, so proof persistence rejected the result. Correction copies only the two required provenance attributes, not unapproved audio routes. Using the exact five-window geometry and synthetic responses, the unmodified persistence layer accepted both artifacts and validated identical readback. No real results were substituted and no new inference ran during this correction.
+- Automatic targeting and GPU response PASS; real targeted evidence persistence and full unattended completion FAIL on this run. Actual speaker, subtitle lines, JA/KO quality, sync, full duration and deployment readiness INCOMPLETE. Preserve the 50 source receipts; targeted result cannot be reused because it was not committed. Any new live attempt remains scoped and separately authorized.
+
 ## 2026-11-28 KST | S11-MVP001: targeted decoder startup blocker reproduced locally
 
 - The isolated trial launcher used system Python, which lacks both NumPy and PyAV. The exact decoder imports deterministically fail in that interpreter before its first targeted GPU request. This explains the observed terminal stop after temporary protected source copy; no GPU restart or package install is required for this fix. The originally exposed generic error alone could not distinguish this.
