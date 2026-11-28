@@ -1,5 +1,10 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-29 KST | S11-MVP001: narrower targeted recovery salvaged one source
+
+- With all 50 Japanese source receipts and three usable audio-window results preserved, the isolated candidate retried only two contained subwindows (5.16 s total) using the same GPU Whisper route. The run took 122.28 s and retained separate child-window provenance. One formerly noisy window produced clean, overlapping timing evidence; the other 2.70 s subwindow returned zero segments. Four of five now have evidence eligible for readjudication; none is a semantic PASS by itself.
+- The existing strict evidence gate remains HOLD for the last unresolved interval. No new Codex call, final JA/KO artifact, publication, deployment or policy change. Do not repeat completed windows or synthesize a missing utterance. Full automation and final artifact validation remain incomplete; this overnight attempt did not complete.
+
 ## 2026-11-29 KST | S11-MVP001: per-window quality diagnosis confirmed
 
 - The instrumented private retry finished the five identical targeted GPU windows in 188.01 s. Hash-bound quarantined evidence and content-free diagnostics were retained; no accepted targeted artifact was written. Three windows contained non-repetitive evidence eligible for later adjudication; two produced runaway repetition and no clean timed segment overlapping the target interval. None was empty. Simply dropping repeated segments does not recover either source.
