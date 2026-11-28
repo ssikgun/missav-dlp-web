@@ -19714,3 +19714,16 @@ Codex prompt, not actual diarization execution or final SRT quality proof.
 No new Whisper, pyannote or Codex calls, publication, or production changes
 were performed as part of this follow-up. Do not upgrade quality status or
 reuse old receipts with changed speaker inputs.
+
+
+## 2026-11-28 — S11-MVP001 GPU speaker diagnostic (no deployment)
+
+The subsequent approved 60-second isolated SNOS-377 test ran local pyannote
+on VM122 GPU and matched detection intervals to the existing Whisper timeline.
+GPU execution PASS: 2.89 s model load plus inference, 2,008 MiB peak
+PyTorch reservation, 4,875 MiB free before/after with existing GPU jobs
+unchanged. Two anonymous speakers detected; one of 19 baseline cues
+contained overlap, ten had insufficient speaker evidence. The automated
+pipeline and final JA/KO SRT quality are not certified by this diagnostic.
+No new Codex, production changes or publication. Reuse bound evidence for
+offline V2-C/JA Master and line-break verification; do not rerun gratuitously.

@@ -1,5 +1,13 @@
 # Stage11 subtitle workstream — active work
 
+## 2026-11-28 — S11-MVP001 bounded pyannote GPU evidence (no deployment)
+
+- Approved isolated diagnostic: one 60-second SNOS-377 window auto-selected using existing Whisper timestamps. Source identity verified and exact PCM bound privately; standard and exclusive output durations projected once to the original timeline.
+- VM122 RTX 3060: GPU execution **PASS**; 4,875 MiB free before and after, 2,008 MiB peak reserved by PyTorch, existing GPU process IDs unchanged. Model load plus inference 2.89 s (does not include NAS staging, decoding or transfer). 4,096 MiB is an admission reserve for speech work, not unused headroom required during inference.
+- 2 detected anonymous speakers, 18 standard intervals and 15 exclusive intervals. One of 19 Whisper cues contains overlapping speaker evidence; ten cues have no qualifying evidence under the diagnostic's threshold and remain UNKNOWN. Speaker attribution quality, same-speaker continuity, full integration and final line breaks remain **INCOMPLETE**. Do not turn an overlap into a single exclusive label by default.
+- No new Whisper or Codex inference, no outside audio transfer, no production or queue changes, no publication. Temporary source cleaned. No full-title time extrapolation. Next: exercise the existing V2-C and JA Master binding against this receipt, then verify speaker/line-break preservation before any deployment approval.
+
+
 WORKSTREAM: stage11
 TASK_ID: S11-MVP001
 STATUS: IN_PROGRESS
