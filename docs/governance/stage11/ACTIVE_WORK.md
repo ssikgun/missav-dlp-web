@@ -16,6 +16,8 @@ CONTRACT_VERSION: 2.3.0
 REQUIRES_WORKSTREAMS: stage11
 
 
+- Offline JA Master and coherence pass: using existing bound timing evidence and structural JA adjudication fixtures, all 246 JA cues materialized, including the exact 19 diagnostic cues (10 UNKNOWN, one with multiple supported hints). With synthetic Korean text and deterministic test responses, sixteen overlapping review windows and one targeted repair retained the same speaker hints; UNKNOWN stayed empty. Candidate 92e64c59e3a6df0070dfe63ce40a8541404d7d15 admits a single safe Korean line break in Codex primary and coherence repair, proves it survives SRT output, and rejects blank lines/control bytes. 85 tests and V2-D offline smoke passed. No new model/network dialogue or live changes. Real JA/KO text quality and automatic production speaker acquisition remain unverified; the bounded manual diagnostic is not a production provider.
+
 ## CURRENT ROADMAP — ASR-FIRST HYBRID V2 / APPROVED 2026-11-22; CODEX-ONLY TARGET APPROVED 2026-11-28
 
 ### 2026-11-28 KST — S11-MVP001 real-title timeout and speaker audit (candidate only)
