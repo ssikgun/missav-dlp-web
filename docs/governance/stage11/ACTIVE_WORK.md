@@ -1,5 +1,11 @@
 # Stage11 subtitle workstream — active work
 
+## 2026-11-29 KST | S11-MVP001: per-window quality diagnosis confirmed
+
+- The instrumented private retry finished the five identical targeted GPU windows in 188.01 s. Hash-bound quarantined evidence and content-free diagnostics were retained; no accepted targeted artifact was written. Three windows contained non-repetitive evidence eligible for later adjudication; two produced runaway repetition and no clean timed segment overlapping the target interval. None was empty. Simply dropping repeated segments does not recover either source.
+- Automatic targeting, source receipt replay, GPU response and diagnostic preservation PASS. Strict audio gate and unattended completion FAIL. Final speaker attribution, sentence/line quality, JA/KO translation, sync, full duration and deployment readiness INCOMPLETE. No Codex readjudication/translation, publication or deployment.
+- Do not repeat the same five windows unchanged. Preserve the three evidence-bearing and two diagnostic-only results without declaring any of them accepted. Further work should first evaluate bounded recovery on only the two failed windows or a formally approved alternative operating policy; no guessed dialogue or fabricated timing.
+
 ## 2026-11-28 KST | S11-MVP001: corrected targeted GPU flow reached evidence quality gate
 
 - The private run reused all 50 source receipts and returned from five automatically selected GPU Whisper windows (59.36 s). Terminal HOLD TARGETED_ASR_EVIDENCE_EMPTY_OR_NOISY at 187.94 s, not the earlier interpreter or provenance error. At least one source projection did not satisfy the usable-evidence condition. Rejected window results are not persisted, so exact counts and acoustic causes cannot be asserted.
