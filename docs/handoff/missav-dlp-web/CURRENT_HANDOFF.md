@@ -19699,3 +19699,18 @@ PY
 ## 2026-11-28 — Stage 11 Codex-only actual-title private queue rehearsal
 
 - **CODEX-ONLY ACTUAL-TITLE PRIVATE QUEUE REHEARSAL: PASS AFTER BOUNDED REVIEW CONTINUATION / NO DEPLOYMENT (2026-11-28 KST).** Teddy approved one actual-title rehearsal before rollout. FC2-PPV-4973050 had a unique current Discovery holding and existing published KO; retained source-bound ASR text 11 cues, no NAS/audio reread, external JA fetch, publication or production writes. Private clone of the queue contracts only, isolated SQLite and title locks, PENDING/RUNNING/UNRESOLVED. Duplicate lock was blocked and lock released; publisher never constructed, direct PUBLISHED transition rejected, original production row and old KO hashes unchanged. Initial ffee336a22ede2b0e6c7c504374d8152161b05e5: original ASR-based source adjudication 4, primary translation 1 and assembled title coherence 1 passed; long evidence/source triage hit the verified systemd 30 s deadline; no output was published. Follow-up b09e9e10ef553fadc7c16e8b72c6fcc4ea1b36a5 revalidated/reused all six passed calls from a copy and used only the remaining three planned calls for short-ID source review (6+5 cues, final 4 reviewed targets; max 16.907 s). 10 total attempts, 9 successful, 1 timeout, no Hermes, no residual processes, 11/11 output with paired JA/KO timings and exact timings vs prior published SRT on this title. Assembled coherence edited zero lines for this title; previously verified seeded test is the positive boundary correction proof. Stage12 explicitly ineligible; private output SHA e07c97515440ce79b630d9df4d09a4ada8c6cd5327f8c3cca4667285e40f3c55. Existing rollback script behavior rehearsed via isolated paths and a stub systemctl: active job blocked, original release pointer/config/units restored, disabled/inactive timer preserved, real installed files unchanged. This is not actual deployment or a production rollback. No real HYBRID/ASR-recovery full-title proof, publish-path change or live service activation. Next prepare separate release/rollback plan and explicit deployment approval; test a representative larger HYBRID with actual source adapters before claiming full rollout readiness.
+
+
+## 2026-11-28 — S11-MVP001 Codex-only real-title timeout and speaker checkpoint
+
+Canonical design: Stage11 v2.3.0, 4bef3cb. See the Stage11 ACTIVE_WORK
+checkpoint for the complete status breakdown. SNOS-377 Whisper 246 groups;
+14 canonical source receipts retained, call 15 timed out at 180 seconds.
+A no-model continuation check validated those receipts and split the failed
+request; no continuation executed. No pyannote transmitted evidence in the
+tested path; all 246 groups UNKNOWN. Local candidate 237cf8323e30056bff3f05d95a56f0f1068cd917
+adds source-bound optional anonymous hints through JA Master to the primary
+Codex prompt, not actual diarization execution or final SRT quality proof.
+No new Whisper, pyannote or Codex calls, publication, or production changes
+were performed as part of this follow-up. Do not upgrade quality status or
+reuse old receipts with changed speaker inputs.
