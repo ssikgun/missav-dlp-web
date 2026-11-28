@@ -1,5 +1,13 @@
 # Stage11 subtitle workstream — active work
 
+## 2026-11-28 KST | S11-MVP001: isolated whole-title Codex quality trial stopped before translation
+
+- The bounded Codex-only validation reused the complete retained baseline ASR and GPU speaker evidence. No new Whisper or pyannote calls, backend fallback, media transfer, production or publication action.
+- Actual terminal state: HOLD at Japanese source adjudication. Of 50 planned source batches, 21 were started, 20 have retained paired result/receipt files, and the 21st has only a start marker. The last attempt ended at approximately 180.1 seconds (the configured worker deadline). The exposed host error is a generic CandidateError; the upstream reason for the slow/noncompleted response is unknown. Total elapsed was 465.75 s; neither the 96-call nor the two-hour limit was reached.
+- No translation, whole-title review or repair calls ran. The private output directory was empty: no JA/KO SRT, JA Master or final proof. This is not the known completion-reporter filename issue. Preserve the baseline, acoustic evidence and all receipts; no full restart.
+- Outcome: speaker extraction/attachment previously verified technically, final speaker quality INCOMPLETE; lines/sentences INCOMPLETE; JA/KO quality INCOMPLETE; final timing INCOMPLETE; this trial's unattended completion FAIL; time to HOLD measured, full processing duration INCOMPLETE; deployment readiness INCOMPLETE. No production deployment.
+- Next candidate gate (offline): revalidate the 20 receipt bindings against the exact source plan, verify and rehearse split/resume only at the failed batch, and expose a sanitized timeout class without logging dialogue. No live resubmission under the completed attempt's approval.
+
 ## 2026-11-28 — Stage11 offline end-to-end budget and timeout recovery
 
 Using the exact 246 real Whisper cues and scoped GPU evidence on local
