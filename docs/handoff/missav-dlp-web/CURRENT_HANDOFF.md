@@ -19816,3 +19816,18 @@ order; stop/cleanup, invalid PCM and deadline tests passed. 96 tests and
 V2-D offline smoke PASS. No actual audio, GPU/Whisper/Codex execution,
 deployment or publish. A live whole-speech GPU-only validation needs
 explicit scope approval before starting; actual JA/KO quality is unverified.
+
+## 2026-11-28 — Stage11 isolated actual whole known-speech GPU PASS
+
+The single approved SNOS-377 run on candidate 5ded32a ran 51/51 planned
+known-speech windows, reusing 246 existing Whisper cues. Source staging
+55.23 s, PCM 44.82 s, serial GPU worker phase 309.01 s, total 409.38 s;
+temporary media and PCM cleanup passed. 888 acoustic intervals were
+observed across the 51 analysis windows, not 888 speakers; identities
+remain window-local. Acoustic overlap evidence by cue: 180 single-tag,
+12 multiple-tag, 51 no qualifying tag, 3 ambiguous across boundaries.
+These are projection counts, not attribution accuracy. No new Whisper,
+Codex, external data transfer, release, or production changes. Actual
+Japanese/Korean subtitle quality and deployment readiness are not
+verified by this GPU result. Reuse the private, bound speaker evidence
+for subsequent candidate checks; do not rerun unnecessarily.
