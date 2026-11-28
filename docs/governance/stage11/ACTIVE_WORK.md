@@ -1,5 +1,21 @@
 # Stage11 subtitle workstream — active work
 
+## 2026-11-28 — Stage11 full speech-timeline coverage plan (offline only)
+
+Isolated candidate 448c771feeb49602495497594d16024feaddc06f adds a bounded coverage planner and receipt
+assembler without enabling any new inference. Verified all 246 existing
+SNOS-377 Whisper cue intervals have exact, non-duplicated core coverage
+across 51 windows; three cues straddle cores. Each model input is at most
+60 seconds including context, total input 3,006 seconds. This covers known
+Whisper speech intervals, not proof of untranscribed speech coverage.
+Overlapping analysis context is not double-counted. Missing, extra,
+misbound or malformed receipts fail closed; anonymous labels are local
+to each window and must not be interpreted as speaker changes across
+windows. 92 candidate tests passed; no audio read, new model call,
+production edit or publication. Next: implement a one-pass source spool,
+bounded execution using the already verified GPU path, and explicit
+cross-window uncertainty before an authorized whole-title live test.
+
 ## 2026-11-28 — Stage11 reuse of the staged Whisper source
 
 Isolated candidate 399f58289a15a4372b157d2f3962dc5721c45490 extracts the bounded speaker PCM from the
