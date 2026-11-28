@@ -1,5 +1,10 @@
 # Stage11 subtitle workstream — active work
 
+## 2026-11-28 KST | S11-MVP001: targeted decoder startup blocker reproduced locally
+
+- The isolated trial launcher used system Python, which lacks both NumPy and PyAV. The exact decoder imports deterministically fail in that interpreter before its first targeted GPU request. This explains the observed terminal stop after temporary protected source copy; no GPU restart or package install is required for this fix. The originally exposed generic error alone could not distinguish this.
+- Prepared private launcher correction: require the existing Stage11 audio environment and check decoder dependencies before any source copy. Both exact imports and the existing Stage11 audio smoke pass there. A separate targeted runner smoke requires an unrelated missing historical fixture, so that smoke was not completed. The failed run and all 50 source receipts remain unchanged. No additional actual media or inference run and no operational change.
+
 ## 2026-11-28 KST | S11-MVP001: automatic targeted path invoked; execution proof missing
 
 - Private continuation passed pinned internal GPU Whisper readiness, revalidated/reused all 50 Japanese adjudication receipts, and automatically entered the targeted adapter once for exactly 5 windows (59.36 s). The temporary protected source copy succeeded and cleanup reported PASS. The adapter did not return results or persist a linked targeted evidence artifact.
