@@ -19770,3 +19770,16 @@ Codex call, no production-queue write or deployment. This PASS is for the
 bounded automatic provider path only; full-title coverage and real end-to-end
 subtitle quality remain INCOMPLETE. Avoid restaging full media solely for
 speaker evidence in the production design.
+
+## 2026-11-28 — Stage11 reuse of the staged Whisper source
+
+Isolated candidate 399f58289a15a4372b157d2f3962dc5721c45490 extracts the bounded speaker PCM from the
+same already-staged media before Whisper cleanup. The normal candidate path
+starts GPU diarization only after the bounded Whisper session has ended and
+the media copy has been cleaned, using exact baseline-bound in-memory PCM.
+The separate copy remains only for a diagnostic using a precomputed Whisper
+baseline without staged media. Offline source-entry test verified one source
+copy, one capture, cleanup before GPU and exact ASR identity; 90 candidate
+tests and full-title-ASR smoke passed. No real model or operating changes in
+this step; speedup is not a new real measurement. Full-title diarization and
+real JA/KO end-to-end quality remain unverified.
