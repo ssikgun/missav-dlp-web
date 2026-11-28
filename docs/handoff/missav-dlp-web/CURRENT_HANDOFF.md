@@ -1,5 +1,11 @@
 # Teddy Downloader / missav-dlp-web — CURRENT HANDOFF
 
+## 2026-11-28 KST | S11-MVP001: corrected targeted GPU flow reached evidence quality gate
+
+- The private run reused all 50 source receipts and returned from five automatically selected GPU Whisper windows (59.36 s). Terminal HOLD TARGETED_ASR_EVIDENCE_EMPTY_OR_NOISY at 187.94 s, not the earlier interpreter or provenance error. At least one source projection did not satisfy the usable-evidence condition. Rejected window results are not persisted, so exact counts and acoustic causes cannot be asserted.
+- Automatic targeting/GPU response and source reuse PASS; evidence gate and unattended completion FAIL. Final speaker attribution, lines, translation, sync, full duration, and deployment readiness INCOMPLETE. No Codex readjudication, translation, final artifacts, publication, deployment or broader transfer.
+- Preserve the 50 source receipts. Do not repeat inference unchanged or remove the uncertainty gate. Investigate per-window non-content verdicts and private preservation of rejected evidence. Publishing with unresolved cues would be a separate operational decision, not authorized by bounded repair and retest.
+
 ## 2026-11-28 KST | S11-MVP001: GPU execution returned; isolated provenance wrapper fixed offline
 
 - Corrected interpreter run automatically replayed all 50 source receipts and returned a typed targeted GPU execution for the exact five windows in scope. Terminal HOLD at 187.93 s (TARGETED_ASR_ADAPTER_VALIDATION_OR_PERSISTENCE_FAILED); neither source-bound targeted artifact nor linkage was saved. No subsequent Codex adjudication, translation, review, output, pyannote, or deploy.
