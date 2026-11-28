@@ -19799,3 +19799,5 @@ windows. 92 candidate tests passed; no audio read, new model call,
 production edit or publication. Next: implement a one-pass source spool,
 bounded execution using the already verified GPU path, and explicit
 cross-window uncertainty before an authorized whole-title live test.
+
+Offline follow-up: candidate 1586206c1d6a474aa0a933857b94ab5f17999380 spools exact, hashed window PCM from one continuous source-bound decoder pass into private files. Tests verify byte-exact overlapping spans, truncation and continuity rejection, and mode 0600. 93 candidate tests passed. This is not yet wired to multi-window GPU execution; no actual media, model or production actions.
