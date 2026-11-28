@@ -1,5 +1,19 @@
 # Stage11 subtitle workstream — active work
 
+## 2026-11-28 — Stage11 live bounded speaker provider validation
+
+The approved private source path used actual SNOS-377 media, automatically
+invoked the opt-in VM122 GPU provider once, and reused the exact prior Whisper
+baseline. It reproduced the same PCM hash and 18 standard diarization intervals
+from two anonymous speakers. The result bound into the 246-group V2-C plan.
+Provider wall time was 88.57 seconds including NAS staging, decode, internal
+transfer, model launch and cleanup; the earlier 2.89 seconds measured model
+loading/inference only. Temporary media cleanup passed. No new Whisper or
+Codex call, no production-queue write or deployment. This PASS is for the
+bounded automatic provider path only; full-title coverage and real end-to-end
+subtitle quality remain INCOMPLETE. Avoid restaging full media solely for
+speaker evidence in the production design.
+
 ## 2026-11-28 — Stage11 opt-in GPU speaker provider
 
 Candidate 97adbde5ee69c8930827471382da42e3c876e16a wires the default-off bounded pyannote provider through
