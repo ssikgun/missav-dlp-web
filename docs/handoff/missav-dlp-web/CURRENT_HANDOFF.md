@@ -19831,3 +19831,19 @@ Codex, external data transfer, release, or production changes. Actual
 Japanese/Korean subtitle quality and deployment readiness are not
 verified by this GPU result. Reuse the private, bound speaker evidence
 for subsequent candidate checks; do not rerun unnecessarily.
+
+## 2026-11-28 — Stage11 real scoped-speaker JA prompt-size preflight
+
+No-model, no-media replay of the exact 246-cue baseline and private 888-turn
+GPU evidence first exposed three source groups oversized even on their own
+(max 7,422 bytes, hard bound 6,200; planning stopped). Isolated candidate
+de99b8d00b8ac991d7da44bfa6d2278deca88cca interns repeated speaker turn references in the keyed Codex
+request, retains acoustic labels/temporal overlaps, and still binds the
+full original evidence in the batch fingerprint. No-scoped-speaker request
+bytes and historical receipt path are unchanged. Scoped packing now uses
+a 5,400-byte planning ceiling and produced 50 requests for all 246 groups
+in order (max 5,383 bytes; max single group 5,172). This is a byte budget
+check, not a live timeout guarantee. 97 candidate tests and V2-D smoke
+passed; no new GPU/Whisper/Codex, external transfer or deployment.
+Next: validate source continuation and downstream total call headroom
+before an approved live Codex-only quality trial.
