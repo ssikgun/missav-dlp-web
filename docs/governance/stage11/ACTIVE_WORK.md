@@ -1,5 +1,11 @@
 # Stage11 subtitle workstream — active work
 
+## 2026-11-28 KST | S11-MVP001: automatic targeted path invoked; execution proof missing
+
+- Private continuation passed pinned internal GPU Whisper readiness, revalidated/reused all 50 Japanese adjudication receipts, and automatically entered the targeted adapter once for exactly 5 windows (59.36 s). The temporary protected source copy succeeded and cleanup reported PASS. The adapter did not return results or persist a linked targeted evidence artifact.
+- Terminal HOLD at 68.56 s: TARGETED_ASR_EXECUTION_OR_CLEANUP_FAILED. This generic code does not distinguish worker startup, audio processing, inference or worker-session cleanup. The worker and local tunnel ports were closed at postcheck; later GPU free memory is not proof of runtime conditions. No permanent change, new Codex call, pyannote run, final artifact or deployment.
+- Automatic invocation and prior-source reuse PASS; targeted evidence production and unattended completion FAIL for this run. Final speaker quality, subtitle lines, JA/KO quality, time accuracy, full duration and deployment readiness INCOMPLETE. Preserve successful source receipts and investigate safe worker error classifications and cleanup before considering any further live attempt.
+
 ## 2026-11-28 KST | S11-MVP001: source replay completed, targeted audio evidence gate held
 
 - Authorized private continuation reused 20 validated source receipts and completed all 30 remaining source requests, including the previously timed-out request. Offline verified replay validates all 50 receipts and all 246 source groups. Continuation elapsed 379.26 s; cumulative active run time 845.01 s; 51 total live Codex calls across both attempts.
